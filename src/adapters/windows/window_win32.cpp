@@ -7,6 +7,14 @@
 
 #include <new>
 
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+
+#ifndef DWMWCP_ROUND
+#define DWMWCP_ROUND 2
+#endif
+
 struct reach_platform_window {
     HWND hwnd;
     reach_surface_role role;
@@ -98,7 +106,12 @@ static reach_result reach_register_platform_class()
 
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
-    DWORD style = WS_EX_TOOLWINDOW | WS_EX_LAYERED;
+    DWORD style = WS_EX_TOOLWINDOW;
+    if (role == REACH_SURFACE_DOCK) {
+        style |= WS_EX_NOREDIRECTIONBITMAP;
+    } else {
+        style |= WS_EX_LAYERED;
+    }
     if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU) {
         style |= WS_EX_TOPMOST;
     }
@@ -154,7 +167,7 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
         width,
         height,
         SWP_NOACTIVATE);
-    if (ok && (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TRAY_MENU) && (window->width != width || window->height != height)) {
+    if (ok && window->role == REACH_SURFACE_TRAY_MENU && (window->width != width || window->height != height)) {
         int radius = window->corner_radius > 0.0f ? (int)(window->corner_radius * 2.0f) : (height > 0 ? (int)((float)height * 0.42f) : 24);
         if (radius < 18) {
             radius = 18;
@@ -176,6 +189,16 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     }
 
     window->corner_radius = radius;
+
+    /*
+        The dock uses DirectComposition + premultiplied alpha.
+        Do not apply DWM/native rounded corners here, or it creates a second
+        rounded shape around the D2D-rendered dock body.
+    */
+    if (window->role == REACH_SURFACE_DOCK) {
+        return REACH_OK;
+    }
+
     if (window->width <= 0 || window->height <= 0) {
         return REACH_OK;
     }
@@ -184,17 +207,31 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     if (diameter < 18) {
         diameter = 18;
     }
-    HRGN region = CreateRoundRectRgn(0, 0, window->width + 1, window->height + 1, diameter, diameter);
+
+    HRGN region = CreateRoundRectRgn(
+        0,
+        0,
+        window->width + 1,
+        window->height + 1,
+        diameter,
+        diameter
+    );
+
     if (region == nullptr) {
         return REACH_ERROR;
     }
-    return SetWindowRgn(window->hwnd, region, TRUE) ? REACH_OK : REACH_ERROR;
-}
 
+    return SetWindowRgn(window->hwnd, region, TRUE)
+        ? REACH_OK
+        : REACH_ERROR;
+}
 static reach_result reach_platform_window_set_opacity(reach_platform_window *window, float opacity)
 {
     if (window == nullptr || window->hwnd == nullptr) {
         return REACH_INVALID_ARGUMENT;
+    }
+    if (window->role == REACH_SURFACE_DOCK) {
+        return REACH_OK;
     }
 
     if (opacity < 0.0f) {

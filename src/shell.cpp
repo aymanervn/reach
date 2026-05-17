@@ -395,11 +395,29 @@ static int32_t reach_shell_any_window_maximized(reach_shell *shell)
     return 0;
 }
 
+static int32_t reach_shell_cursor_at_monitor_bottom(reach_rect_f32 monitor_bounds)
+{
+    POINT cursor = {};
+    if (!GetCursorPos(&cursor)) {
+        return 0;
+    }
+
+    float edge_top = monitor_bounds.y + monitor_bounds.height - 2.0f;
+    return (float)cursor.x >= monitor_bounds.x &&
+        (float)cursor.x < monitor_bounds.x + monitor_bounds.width &&
+        (float)cursor.y >= edge_top &&
+        (float)cursor.y < monitor_bounds.y + monitor_bounds.height + 1.0f;
+}
+
 static reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds, double delta_seconds)
 {
     REACH_ASSERT(shell != nullptr);
     float hidden_y = monitor_bounds.y + monitor_bounds.height + 4.0f;
-    int32_t target_hidden = shell != nullptr && shell->ui.dock.auto_hide && reach_shell_any_window_maximized(shell);
+    int32_t reveal_requested = reach_shell_cursor_at_monitor_bottom(monitor_bounds);
+    int32_t target_hidden = shell != nullptr &&
+        shell->ui.dock.auto_hide &&
+        reach_shell_any_window_maximized(shell) &&
+        !reveal_requested;
     float target_y = target_hidden ? hidden_y : shown_bounds.y;
 
     if (!shell->dock_animation_initialized) {
@@ -554,24 +572,23 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
     reach_render_command_buffer commands = {};
     reach_render_command command = {};
+
     float dock_radius = reach_theme_dock_corner_radius(theme, layout->bounds.height);
     float icon_box_size = reach_theme_icon_box_size(theme, layout->bounds.height);
     float icon_size = reach_theme_icon_size(theme, icon_box_size);
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
-    for (int shadow_index = 0; shadow_index < 3; ++shadow_index) {
-        float inset = (float)(shadow_index * 2);
-        command = {};
-        command.type = REACH_RENDER_COMMAND_RECT;
-        command.rect.x = 2.0f + inset;
-        command.rect.y = 5.0f + inset;
-        command.rect.width = layout->bounds.width - inset * 2.0f;
-        command.rect.height = layout->bounds.height - inset * 2.0f;
-        command.color = theme->dock_shadow;
-        command.color.a = theme->dock_shadow_alpha - (float)shadow_index * 0.035f;
-        command.radius = dock_radius;
-        reach_render_command_buffer_push(&commands, &command);
-    }
 
+    uintptr_t focused_window = shell->window_manager.ops.foreground != nullptr
+        ? shell->window_manager.ops.foreground(shell->window_manager.manager)
+        : 0;
+
+    /*
+        Dock body.
+
+        Do not draw fake internal shadow rectangles here. They create the visible
+        "extra border" effect. A proper outside shadow should be handled by the
+        DComp visual or by rendering into a larger transparent surface.
+    */
     command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect.x = 0.0f;
@@ -586,33 +603,33 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
         int32_t pinned_item = index < shell->dock_item_count ? shell->dock_item_pinned[index] : 1;
         reach_icon_handle icon = {};
         uint16_t fallback_initial = '?';
+
         if (pinned_item) {
             if (index < shell->pinned_icon_count) {
                 icon = shell->pinned_icons[index];
             }
             fallback_initial = index < REACH_MAX_PINNED_APPS ? shell->pinned_icon_initials[index] : '?';
         } else {
-            size_t open_index = index < shell->dock_item_count ? shell->dock_item_open_indices[index] : REACH_MAX_PINNED_APPS;
+            size_t open_index = index < shell->dock_item_count
+                ? shell->dock_item_open_indices[index]
+                : REACH_MAX_PINNED_APPS;
+
             if (open_index < shell->open_window_count) {
                 icon = shell->open_window_icons[open_index];
                 fallback_initial = shell->open_window_initials[open_index];
             }
         }
-        float box_x = layout->app_slots[index].x - layout->bounds.x + (layout->app_slots[index].width - icon_box_size) * 0.5f;
-        float box_y = layout->app_slots[index].y - layout->bounds.y + (layout->app_slots[index].height - icon_box_size) * 0.5f;
-        command = {};
-        command.type = REACH_RENDER_COMMAND_RECT;
-        command.rect.x = box_x;
-        command.rect.y = box_y;
-        command.rect.width = icon_box_size;
-        command.rect.height = icon_box_size;
-        command.color = theme->icon_box_background;
-        command.radius = icon_box_radius;
-        reach_render_command_buffer_push(&commands, &command);
+
+        float box_x = layout->app_slots[index].x - layout->bounds.x
+            + (layout->app_slots[index].width - icon_box_size) * 0.5f;
+
+        float box_y = layout->app_slots[index].y - layout->bounds.y
+            + (layout->app_slots[index].height - icon_box_size) * 0.5f;
 
         if (icon.id != 0) {
             float icon_x = box_x + (icon_box_size - icon_size) * 0.5f;
             float icon_y = box_y + (icon_box_size - icon_size) * 0.5f;
+
             command = {};
             command.type = REACH_RENDER_COMMAND_ICON;
             command.rect.x = icon_x;
@@ -623,6 +640,21 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
             command.color.a = 1.0f;
             reach_render_command_buffer_push(&commands, &command);
         } else {
+            /*
+                Keep a subtle fallback tile only when no real icon exists.
+                Real app icons should sit directly on the dock material.
+            */
+            command = {};
+            command.type = REACH_RENDER_COMMAND_RECT;
+            command.rect.x = box_x;
+            command.rect.y = box_y;
+            command.rect.width = icon_box_size;
+            command.rect.height = icon_box_size;
+            command.color = theme->icon_box_background;
+            command.color.a *= 0.35f;
+            command.radius = icon_box_radius;
+            reach_render_command_buffer_push(&commands, &command);
+
             command = {};
             command.type = REACH_RENDER_COMMAND_TEXT;
             command.rect.x = box_x;
@@ -634,24 +666,35 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
             command.text[1] = 0;
             reach_render_command_buffer_push(&commands, &command);
         }
+
         if (index < shell->dock_item_count && shell->dock_item_windows[index] != 0) {
+            int32_t focused = shell->dock_item_windows[index] == focused_window;
+
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect.x = box_x + (icon_box_size - 5.0f) * 0.5f;
-            command.rect.y = layout->bounds.height - 8.0f;
-            command.rect.width = 5.0f;
-            command.rect.height = 5.0f;
+            command.rect.x = box_x + (icon_box_size - 4.0f) * 0.5f;
+            command.rect.y = layout->bounds.height - 7.0f;
+            command.rect.width = 4.0f;
+            command.rect.height = 4.0f;
             command.color.r = 1.0f;
             command.color.g = 1.0f;
             command.color.b = 1.0f;
-            command.color.a = 1.0f;
-            command.radius = 2.5f;
+            command.color.a = focused ? 1.0f : 0.5f;
+            command.radius = 2.0f;
             reach_render_command_buffer_push(&commands, &command);
         }
     }
 
-    float tray_box_x = layout->tray_button.x - layout->bounds.x + (layout->tray_button.width - icon_box_size) * 0.5f;
-    float tray_box_y = layout->tray_button.y - layout->bounds.y + (layout->tray_button.height - icon_box_size) * 0.5f;
+    float tray_box_x = layout->tray_button.x - layout->bounds.x
+        + (layout->tray_button.width - icon_box_size) * 0.5f;
+
+    float tray_box_y = layout->tray_button.y - layout->bounds.y
+        + (layout->tray_button.height - icon_box_size) * 0.5f;
+
+    /*
+        Keep the tray button background subtle. macOS uses a separator area,
+        not a strong individual rounded tile.
+    */
     command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect.x = tray_box_x;
@@ -659,6 +702,7 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     command.rect.width = icon_box_size;
     command.rect.height = icon_box_size;
     command.color = theme->icon_box_background;
+    command.color.a *= 0.25f;
     command.radius = icon_box_radius;
     reach_render_command_buffer_push(&commands, &command);
 
@@ -677,7 +721,11 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
         return REACH_ERROR;
     }
 
-    (void)shell->dock_renderer.ops.execute(shell->dock_renderer.backend, &commands);
+    reach_result result = shell->dock_renderer.ops.execute(shell->dock_renderer.backend, &commands);
+    if (result != REACH_OK) {
+        return result;
+    }
+
     return shell->dock_renderer.ops.end_frame(shell->dock_renderer.backend);
 }
 
@@ -1002,7 +1050,7 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
     }
     if (result == REACH_OK) {
         void *native_window = dependencies.dock_window.ops.native_handle(dependencies.dock_window.window);
-        result = reach_windows_create_d2d_render_backend(native_window, &dependencies.dock_renderer);
+        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.dock_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_TRAY_MENU, &dependencies.tray_window);

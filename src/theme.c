@@ -8,7 +8,8 @@ static float reach_theme_min(float a, float b)
 const reach_theme *reach_theme_default(void)
 {
     static const reach_theme theme = {
-        { 1.0f, 1.0f, 1.0f, 1.0f },
+        { 1.0f, 1.0f, 1.0f, 0.50f },
+        { 1.0f, 1.0f, 1.0f, 0.70f },
         { 0.55f, 0.57f, 0.60f, 0.16f },
         { 1.0f, 1.0f, 1.0f, 1.0f },
         { 0.18f, 0.20f, 0.24f, 1.0f },
@@ -17,6 +18,7 @@ const reach_theme *reach_theme_default(void)
         { 0.12f, 0.14f, 0.17f, 0.90f },
         0.32f,
         22.0f,
+        1.0f,
         0.16f,
         0.60f,
         0.85f,

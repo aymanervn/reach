@@ -57,6 +57,7 @@ target_link_libraries(reach PRIVATE
     d2d1
     dwrite
     dcomp
+    d3d11
     dxgi
     user32
     shell32

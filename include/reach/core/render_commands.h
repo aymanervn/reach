@@ -14,7 +14,8 @@ typedef enum reach_render_command_type {
     REACH_RENDER_COMMAND_RECT = 1,
     REACH_RENDER_COMMAND_TEXT = 2,
     REACH_RENDER_COMMAND_ICON = 3,
-    REACH_RENDER_COMMAND_BLUR_BACKGROUND = 4
+    REACH_RENDER_COMMAND_BLUR_BACKGROUND = 4,
+    REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE = 5
 } reach_render_command_type;
 
 typedef struct reach_render_command {
@@ -22,6 +23,7 @@ typedef struct reach_render_command {
     reach_rect_f32 rect;
     reach_color color;
     float radius;
+    float stroke_width;
     uint64_t icon_id;
     uint16_t text[260];
 } reach_render_command;

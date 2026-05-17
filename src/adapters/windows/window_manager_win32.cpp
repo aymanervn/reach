@@ -13,7 +13,8 @@ struct reach_window_manager {
     HWND foreground;
     std::vector<HWND> maximized_windows;
     std::vector<reach_window_snapshot> windows;
-    std::vector<HWND> managed_minimized;
+    std::vector<HWND> window_order;
+    std::vector<reach_window_snapshot> pending_windows;
 };
 
 static reach_window_manager *g_window_manager;
@@ -109,7 +110,9 @@ static int32_t reach_window_manager_is_reach_window(HWND hwnd)
 {
     wchar_t class_name[64] = {};
     GetClassNameW(hwnd, class_name, 64);
-    return lstrcmpiW(class_name, L"ReachPlatformWindow") == 0 || lstrcmpiW(class_name, L"ReachInputMessageWindow") == 0;
+    return lstrcmpiW(class_name, L"ReachPlatformWindow") == 0 ||
+        lstrcmpiW(class_name, L"ReachInputMessageWindow") == 0 ||
+        lstrcmpiW(class_name, L"ReachWallpaperWindow") == 0;
 }
 
 static int32_t reach_window_manager_contains(const std::vector<HWND> &windows, HWND hwnd)
@@ -152,8 +155,7 @@ static int32_t reach_window_manager_is_app_window(HWND hwnd)
     if (hwnd == nullptr || !IsWindow(hwnd) || reach_window_manager_is_reach_window(hwnd)) {
         return 0;
     }
-    int32_t managed_minimized = g_window_manager != nullptr && reach_window_manager_contains(g_window_manager->managed_minimized, hwnd);
-    if (!IsWindowVisible(hwnd) && !IsIconic(hwnd) && !managed_minimized) {
+    if (!IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
         return 0;
     }
     if (GetWindow(hwnd, GW_OWNER) != nullptr) {
@@ -177,7 +179,7 @@ static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM pa
     snapshot.id = reinterpret_cast<uintptr_t>(hwnd);
     snapshot.visible = IsWindowVisible(hwnd) ? 1 : 0;
     snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
-    snapshot.minimized = IsIconic(hwnd) || reach_window_manager_contains(manager->managed_minimized, hwnd) ? 1 : 0;
+    snapshot.minimized = IsIconic(hwnd) ? 1 : 0;
     RECT rect = {};
     if (GetWindowRect(hwnd, &rect)) {
         snapshot.bounds = { rect.left, rect.top, rect.right, rect.bottom };
@@ -189,16 +191,21 @@ static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM pa
         return TRUE;
     }
 
-    if (snapshot.minimized) {
-        ShowWindow(hwnd, SW_HIDE);
-        snapshot.visible = 0;
-        if (!reach_window_manager_contains(manager->managed_minimized, hwnd)) {
-            manager->managed_minimized.push_back(hwnd);
+    manager->pending_windows.push_back(snapshot);
+    return TRUE;
+}
+
+static const reach_window_snapshot *reach_window_manager_find_pending(
+    const std::vector<reach_window_snapshot> &windows,
+    HWND hwnd)
+{
+    uintptr_t id = reinterpret_cast<uintptr_t>(hwnd);
+    for (const reach_window_snapshot &snapshot : windows) {
+        if (snapshot.id == id) {
+            return &snapshot;
         }
     }
-
-    manager->windows.push_back(snapshot);
-    return TRUE;
+    return nullptr;
 }
 
 static void reach_window_manager_refresh_maximized(reach_window_manager *manager)
@@ -217,30 +224,32 @@ static void reach_window_manager_refresh_windows(reach_window_manager *manager)
     if (manager == nullptr) {
         return;
     }
-    manager->windows.clear();
-    for (size_t index = 0; index < manager->managed_minimized.size();) {
-        if (!IsWindow(manager->managed_minimized[index])) {
-            manager->managed_minimized.erase(manager->managed_minimized.begin() + index);
+    manager->pending_windows.clear();
+    EnumWindows(reach_window_manager_enum_windows_proc, reinterpret_cast<LPARAM>(manager));
+
+    for (size_t index = 0; index < manager->window_order.size();) {
+        if (reach_window_manager_find_pending(manager->pending_windows, manager->window_order[index]) == nullptr) {
+            manager->window_order.erase(manager->window_order.begin() + index);
         } else {
             ++index;
         }
     }
-    EnumWindows(reach_window_manager_enum_windows_proc, reinterpret_cast<LPARAM>(manager));
-    for (HWND hwnd : manager->managed_minimized) {
-        if (!IsWindow(hwnd)) {
-            continue;
-        }
-        int32_t already_present = 0;
-        for (const reach_window_snapshot &snapshot : manager->windows) {
-            if (snapshot.id == reinterpret_cast<uintptr_t>(hwnd)) {
-                already_present = 1;
-                break;
-            }
-        }
-        if (!already_present) {
-            reach_window_manager_enum_windows_proc(hwnd, reinterpret_cast<LPARAM>(manager));
+
+    for (const reach_window_snapshot &snapshot : manager->pending_windows) {
+        HWND hwnd = reinterpret_cast<HWND>(snapshot.id);
+        if (!reach_window_manager_contains(manager->window_order, hwnd)) {
+            manager->window_order.push_back(hwnd);
         }
     }
+
+    manager->windows.clear();
+    for (HWND hwnd : manager->window_order) {
+        const reach_window_snapshot *snapshot = reach_window_manager_find_pending(manager->pending_windows, hwnd);
+        if (snapshot != nullptr) {
+            manager->windows.push_back(*snapshot);
+        }
+    }
+    manager->pending_windows.clear();
 }
 
 static reach_result reach_window_manager_refresh(reach_window_manager *manager)
@@ -340,13 +349,6 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
         return REACH_INVALID_ARGUMENT;
     }
     ShowWindow(hwnd, SW_RESTORE);
-    for (size_t index = 0; index < manager->managed_minimized.size();) {
-        if (manager->managed_minimized[index] == hwnd || !IsWindow(manager->managed_minimized[index])) {
-            manager->managed_minimized.erase(manager->managed_minimized.begin() + index);
-        } else {
-            ++index;
-        }
-    }
     SetForegroundWindow(hwnd);
     manager->foreground = hwnd;
     return REACH_OK;

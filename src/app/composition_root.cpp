@@ -40,7 +40,7 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK) {
         void *native_window = dependencies.dock_window.ops.native_handle(dependencies.dock_window.window);
-        result = reach_windows_create_d2d_render_backend(native_window, &dependencies.dock_renderer);
+        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.dock_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_TRAY_MENU, &dependencies.tray_window);

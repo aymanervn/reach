@@ -15,8 +15,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     float dock_height = reach_scale(state->dock.height, scale);
     float dock_width = reach_scale(state->dock.width, scale);
     float dock_x = input->work_area.x + (input->work_area.width - dock_width) * 0.5f;
-    float dock_y = input->work_area.y + input->work_area.height - dock_height - reach_scale(12.0f, scale);
-
+    float dock_y = input->work_area.y + input->work_area.height - dock_height - reach_scale(18.0f, scale);
     out_layout->dock.bounds.x = dock_x;
     out_layout->dock.bounds.y = dock_y;
     out_layout->dock.bounds.width = dock_width;
