@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <shlwapi.h>
 
+#include <stdio.h>
 #include <new>
 
 struct reach_config_store {
@@ -15,20 +16,63 @@ static reach_result reach_config_store_load(reach_config_store *store, reach_con
 {
     REACH_ASSERT(store != nullptr);
     REACH_ASSERT(out_snapshot != nullptr);
-    // Read dock settings and up to REACH_MAX_PINNED_APPS app records from the INI file.
-    (void)store;
-    (void)out_snapshot;
-    return REACH_NOT_IMPLEMENTED;
+    if (store == nullptr || out_snapshot == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_snapshot = {};
+    const wchar_t *path = reinterpret_cast<const wchar_t *>(store->path);
+    out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
+    out_snapshot->dock_width = (float)GetPrivateProfileIntW(L"dock", L"width", 560, path);
+    out_snapshot->dock_icon_size = (float)GetPrivateProfileIntW(L"dock", L"icon_size", 40, path);
+
+    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
+        wchar_t section[32] = {};
+        swprintf_s(section, L"pinned.%u", (unsigned)index);
+        wchar_t title[128] = {};
+        GetPrivateProfileStringW(section, L"title", L"", title, 128, path);
+        if (title[0] == 0) {
+            continue;
+        }
+
+        reach_pinned_app_model *app = &out_snapshot->pinned_apps[out_snapshot->pinned_app_count];
+        app->id = (uint32_t)(out_snapshot->pinned_app_count + 1);
+        reach_copy_utf16(app->title, 128, reinterpret_cast<const uint16_t *>(title));
+        GetPrivateProfileStringW(section, L"path", L"", reinterpret_cast<wchar_t *>(app->path), 260, path);
+        GetPrivateProfileStringW(section, L"icon", L"", reinterpret_cast<wchar_t *>(app->icon_ref), 260, path);
+        out_snapshot->pinned_app_count += 1;
+    }
+
+    return REACH_OK;
 }
 
 static reach_result reach_config_store_save(reach_config_store *store, const reach_config_snapshot *snapshot)
 {
     REACH_ASSERT(store != nullptr);
     REACH_ASSERT(snapshot != nullptr);
-    // Persist the same snapshot shape used by load; do not write adapter-specific state.
-    (void)store;
-    (void)snapshot;
-    return REACH_NOT_IMPLEMENTED;
+    if (store == nullptr || snapshot == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const wchar_t *path = reinterpret_cast<const wchar_t *>(store->path);
+    wchar_t value[32] = {};
+    swprintf_s(value, L"%.0f", snapshot->dock_height);
+    WritePrivateProfileStringW(L"dock", L"height", value, path);
+    swprintf_s(value, L"%.0f", snapshot->dock_width);
+    WritePrivateProfileStringW(L"dock", L"width", value, path);
+    swprintf_s(value, L"%.0f", snapshot->dock_icon_size);
+    WritePrivateProfileStringW(L"dock", L"icon_size", value, path);
+
+    for (size_t index = 0; index < snapshot->pinned_app_count && index < REACH_MAX_PINNED_APPS; ++index) {
+        wchar_t section[32] = {};
+        swprintf_s(section, L"pinned.%u", (unsigned)index);
+        const reach_pinned_app_model *app = &snapshot->pinned_apps[index];
+        WritePrivateProfileStringW(section, L"title", reinterpret_cast<const wchar_t *>(app->title), path);
+        WritePrivateProfileStringW(section, L"path", reinterpret_cast<const wchar_t *>(app->path), path);
+        WritePrivateProfileStringW(section, L"icon", reinterpret_cast<const wchar_t *>(app->icon_ref), path);
+    }
+
+    return REACH_OK;
 }
 
 static void reach_config_store_destroy(reach_config_store *store)

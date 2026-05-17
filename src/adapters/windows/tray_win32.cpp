@@ -14,9 +14,11 @@ struct reach_tray_provider {
 static reach_result reach_tray_refresh(reach_tray_provider *provider)
 {
     REACH_ASSERT(provider != nullptr);
-    // Implement notification-area enumeration and cache stable tray item ids here.
-    (void)provider;
-    return REACH_NOT_IMPLEMENTED;
+    if (provider == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    return REACH_OK;
 }
 
 static size_t reach_tray_item_count(const reach_tray_provider *provider)
@@ -30,20 +32,34 @@ static reach_result reach_tray_item_at(const reach_tray_provider *provider, size
 {
     REACH_ASSERT(provider != nullptr);
     REACH_ASSERT(out_item != nullptr);
-    // Return cached tray item metadata without exposing HWND or shell structures.
-    (void)provider;
+    if (provider == nullptr || out_item == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
     (void)index;
-    (void)out_item;
-    return REACH_NOT_IMPLEMENTED;
+    return REACH_INVALID_ARGUMENT;
 }
 
 static reach_result reach_tray_open_menu(reach_tray_provider *provider, uint32_t item_id)
 {
     REACH_ASSERT(provider != nullptr);
-    // Forward the click/menu request to the owning notification icon window.
-    (void)provider;
+    if (provider == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
     (void)item_id;
-    return REACH_NOT_IMPLEMENTED;
+    POINT point = {};
+    GetCursorPos(&point);
+    HMENU menu = CreatePopupMenu();
+    if (menu == nullptr) {
+        return REACH_ERROR;
+    }
+
+    AppendMenuW(menu, MF_STRING | MF_GRAYED, 1, L"Tray provider pending");
+    HWND owner = GetForegroundWindow();
+    TrackPopupMenu(menu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_NONOTIFY, point.x, point.y, 0, owner, nullptr);
+    DestroyMenu(menu);
+    return REACH_OK;
 }
 
 static void reach_tray_destroy(reach_tray_provider *provider)

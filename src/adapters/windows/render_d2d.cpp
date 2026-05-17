@@ -84,7 +84,7 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
 
     for (size_t index = 0; index < commands->count; ++index) {
         const reach_render_command *command = &commands->commands[index];
-        if (command->type == REACH_RENDER_COMMAND_RECT) {
+        if (command->type == REACH_RENDER_COMMAND_RECT || command->type == REACH_RENDER_COMMAND_ICON) {
             ID2D1SolidColorBrush *brush = nullptr;
             HRESULT hr = backend->target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
             if (FAILED(hr)) {
@@ -98,9 +98,31 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
             backend->target->FillRoundedRectangle(rect, brush);
             brush->Release();
         } else if (command->type == REACH_RENDER_COMMAND_TEXT) {
-            // Implement DirectWrite text layouts after font/style policy is added to render commands.
-        } else if (command->type == REACH_RENDER_COMMAND_ICON) {
-            // Implement icon drawing after icon_provider returns renderer-consumable bitmap handles.
+            IDWriteTextFormat *format = nullptr;
+            ID2D1SolidColorBrush *brush = nullptr;
+            HRESULT hr = backend->text_factory->CreateTextFormat(
+                L"Segoe UI",
+                nullptr,
+                DWRITE_FONT_WEIGHT_NORMAL,
+                DWRITE_FONT_STYLE_NORMAL,
+                DWRITE_FONT_STRETCH_NORMAL,
+                16.0f,
+                L"",
+                &format);
+            if (SUCCEEDED(hr)) {
+                hr = backend->target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+            }
+            if (FAILED(hr)) {
+                if (format != nullptr) {
+                    format->Release();
+                }
+                return REACH_ERROR;
+            }
+
+            D2D1_RECT_F rect = D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width, command->rect.y + command->rect.height);
+            backend->target->DrawTextW(reinterpret_cast<const wchar_t *>(command->text), static_cast<UINT32>(wcslen(reinterpret_cast<const wchar_t *>(command->text))), format, rect, brush);
+            brush->Release();
+            format->Release();
         } else if (command->type == REACH_RENDER_COMMAND_BLUR_BACKGROUND) {
             // Implement blur through the platform surface/composition path, not core rendering logic.
         }

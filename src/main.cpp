@@ -23,9 +23,21 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     }
 
     MSG message = {};
-    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
-        TranslateMessage(&message);
-        DispatchMessageW(&message);
+    int running = 1;
+    while (running) {
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+            if (message.message == WM_QUIT) {
+                running = 0;
+                break;
+            }
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+
+        if (app != nullptr) {
+            (void)reach_app_update(app, 1.0 / 60.0);
+        }
+        Sleep(16);
     }
 
     if (app != nullptr) {

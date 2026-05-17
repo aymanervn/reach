@@ -26,7 +26,19 @@ reach_result reach_ui_handle_event(reach_ui_state *state, const reach_ui_event *
         if (out_intent != 0) {
             out_intent->type = REACH_UI_INTENT_RUN_SEARCH;
         }
-        return reach_ui_state_set_query(state, event->text);
+        {
+            uint16_t merged[REACH_MAX_SEARCH_CHARS + 1];
+            size_t index = 0;
+            while (index < state->launcher.query_length && index < REACH_MAX_SEARCH_CHARS) {
+                merged[index] = state->launcher.query[index];
+                ++index;
+            }
+            for (size_t text_index = 0; event->text[text_index] != 0 && index < REACH_MAX_SEARCH_CHARS; ++text_index) {
+                merged[index++] = event->text[text_index];
+            }
+            merged[index] = 0;
+            return reach_ui_state_set_query(state, merged);
+        }
     case REACH_UI_EVENT_BACKSPACE:
         if (state->launcher.query_length > 0) {
             state->launcher.query_length -= 1;

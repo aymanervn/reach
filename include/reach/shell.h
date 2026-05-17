@@ -5,10 +5,12 @@
 
 #include "reach/ports/app_launcher.h"
 #include "reach/core/ui_events.h"
+#include "reach/ports/config_store.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/platform_window.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
+#include "reach/ports/tray_provider.h"
 #include "reach/ports/window_manager.h"
 #include "reach/util.h"
 
@@ -29,6 +31,8 @@ typedef struct reach_shell_dependencies {
     reach_render_backend_port dock_renderer;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
+    reach_config_store_port config_store;
+    reach_tray_provider_port tray_provider;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
 } reach_shell_dependencies;

@@ -51,6 +51,13 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_window_manager(&dependencies.window_manager);
     }
     if (result == REACH_OK) {
+        const uint16_t default_path[] = { 'r','e','a','c','h','.','i','n','i',0 };
+        result = reach_windows_create_config_store(desc != nullptr && desc->config_path != nullptr ? desc->config_path : default_path, &dependencies.config_store);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_tray_provider(&dependencies.tray_provider);
+    }
+    if (result == REACH_OK) {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
     }
     if (result != REACH_OK) {
@@ -71,6 +78,12 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.window_manager.ops.destroy != nullptr) {
             dependencies.window_manager.ops.destroy(dependencies.window_manager.manager);
+        }
+        if (dependencies.config_store.ops.destroy != nullptr) {
+            dependencies.config_store.ops.destroy(dependencies.config_store.store);
+        }
+        if (dependencies.tray_provider.ops.destroy != nullptr) {
+            dependencies.tray_provider.ops.destroy(dependencies.tray_provider.provider);
         }
         if (dependencies.search_provider.ops.destroy != nullptr) {
             dependencies.search_provider.ops.destroy(dependencies.search_provider.provider);
@@ -112,6 +125,16 @@ reach_result reach_app_stop(reach_app *app)
         (void)app->input_source.ops.stop(app->input_source.source);
     }
     return reach_shell_stop(app->shell);
+}
+
+reach_result reach_app_update(reach_app *app, double delta_seconds)
+{
+    REACH_ASSERT(app != nullptr);
+    if (app == nullptr || app->shell == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    return reach_shell_update(app->shell, delta_seconds);
 }
 
 void reach_app_destroy(reach_app *app)

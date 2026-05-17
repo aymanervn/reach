@@ -20,16 +20,13 @@ add_executable(reach WIN32
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/window_manager_win32.cpp
-    src/renderer.cpp
+    resources/reach.rc
     src/animation.cpp
     src/dock.cpp
-    src/applist.cpp
     src/wm.cpp
     src/layout.cpp
     src/monitor.cpp
     src/hotkeys.cpp
-    src/search.cpp
-    src/config.cpp
     src/util.cpp
 )
 

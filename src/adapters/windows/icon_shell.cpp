@@ -16,18 +16,30 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
     REACH_ASSERT(provider != nullptr);
     REACH_ASSERT(request != nullptr);
     REACH_ASSERT(out_icon != nullptr);
-    // Implement via SHGetFileInfo/IShellItemImageFactory and return renderer-consumable icon handles.
-    (void)provider;
-    (void)request;
-    (void)out_icon;
-    return REACH_NOT_IMPLEMENTED;
+    if (provider == nullptr || request == nullptr || out_icon == nullptr || request->path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    SHFILEINFOW info = {};
+    UINT flags = SHGFI_ICON | (request->size_px > 32 ? SHGFI_LARGEICON : SHGFI_SMALLICON);
+    DWORD_PTR result = SHGetFileInfoW(reinterpret_cast<const wchar_t *>(request->path), 0, &info, sizeof(info), flags);
+    if (result == 0 || info.hIcon == nullptr) {
+        return REACH_ERROR;
+    }
+
+    *out_icon = {};
+    out_icon->id = reinterpret_cast<uint64_t>(info.hIcon);
+    reach_copy_utf16(out_icon->debug_name, 260, request->path);
+    provider->next_id += 1;
+    return REACH_OK;
 }
 
 static reach_result reach_icon_release(reach_icon_provider *provider, reach_icon_handle icon)
 {
     REACH_ASSERT(provider != nullptr);
-    (void)provider;
-    (void)icon;
+    if (icon.id != 0) {
+        DestroyIcon(reinterpret_cast<HICON>(icon.id));
+    }
     return REACH_OK;
 }
 
