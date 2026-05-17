@@ -90,10 +90,10 @@ static reach_result reach_register_platform_class()
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = WS_EX_TOOLWINDOW | WS_EX_LAYERED;
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER) {
+    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU) {
         style |= WS_EX_TOPMOST;
     }
-    if (role == REACH_SURFACE_DOCK) {
+    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU) {
         style |= WS_EX_NOACTIVATE;
     }
     return style;
@@ -105,8 +105,8 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
-    ShowWindow(window->hwnd, window->role == REACH_SURFACE_DOCK ? SW_SHOWNOACTIVATE : SW_SHOW);
-    if (window->role != REACH_SURFACE_DOCK) {
+    ShowWindow(window->hwnd, window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TRAY_MENU ? SW_SHOWNOACTIVATE : SW_SHOW);
+    if (window->role != REACH_SURFACE_DOCK && window->role != REACH_SURFACE_TRAY_MENU) {
         SetForegroundWindow(window->hwnd);
         SetFocus(window->hwnd);
     }
@@ -139,7 +139,7 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
         width,
         height,
         SWP_NOACTIVATE);
-    if (ok && window->role == REACH_SURFACE_DOCK && (window->width != width || window->height != height)) {
+    if (ok && (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TRAY_MENU) && (window->width != width || window->height != height)) {
         int radius = height > 0 ? (int)((float)height * 0.42f) : 24;
         if (radius < 18) {
             radius = 18;

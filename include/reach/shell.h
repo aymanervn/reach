@@ -31,6 +31,8 @@ typedef struct reach_shell_dependencies {
     reach_render_backend_port launcher_renderer;
     reach_platform_window_port dock_window;
     reach_render_backend_port dock_renderer;
+    reach_platform_window_port tray_window;
+    reach_render_backend_port tray_renderer;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;

@@ -26,6 +26,8 @@ struct reach_shell {
     reach_render_backend_port launcher_renderer;
     reach_platform_window_port dock_window;
     reach_render_backend_port dock_renderer;
+    reach_platform_window_port tray_window;
+    reach_render_backend_port tray_renderer;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
@@ -43,21 +45,25 @@ struct reach_shell {
     int32_t render_dirty;
     int32_t dock_render_dirty;
     int32_t launcher_render_dirty;
+    int32_t tray_render_dirty;
     int32_t dock_bounds_valid;
     int32_t launcher_bounds_valid;
+    int32_t tray_bounds_valid;
     int32_t dock_opacity_valid;
     int32_t launcher_opacity_valid;
+    int32_t tray_opacity_valid;
     int32_t dock_animation_initialized;
     int32_t dock_animating;
     int32_t dock_target_hidden;
     reach_rect_f32 last_dock_bounds;
     reach_rect_f32 last_launcher_bounds;
+    reach_rect_f32 last_tray_bounds;
     float last_dock_opacity;
     float last_launcher_opacity;
+    float last_tray_opacity;
     reach_float_animation dock_y_animation;
     double window_manager_refresh_elapsed;
-    reach_float_animation tray_flat_animation;
-    int32_t tray_animating;
+    int32_t tray_popup_open;
     int32_t running;
 };
 
@@ -230,12 +236,6 @@ static reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach
         shell->dock_animating = reach_shell_float_animation_active(&shell->dock_y_animation);
         shell->dock_render_dirty = 1;
     }
-    if (shell->tray_animating) {
-        reach_float_animation_update(&shell->tray_flat_animation, delta_seconds);
-        shell->tray_animating = reach_shell_float_animation_active(&shell->tray_flat_animation);
-        shell->dock_render_dirty = 1;
-    }
-
     reach_rect_f32 animated = shown_bounds;
     animated.y = shell->dock_y_animation.value;
     return animated;
@@ -289,6 +289,12 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->dock_renderer.ops.destroy != nullptr) {
         shell->dock_renderer.ops.destroy(shell->dock_renderer.backend);
     }
+    if (shell->tray_window.ops.destroy != nullptr) {
+        shell->tray_window.ops.destroy(shell->tray_window.window);
+    }
+    if (shell->tray_renderer.ops.destroy != nullptr) {
+        shell->tray_renderer.ops.destroy(shell->tray_renderer.backend);
+    }
     if (shell->input_source.ops.destroy != nullptr) {
         shell->input_source.ops.destroy(shell->input_source.source);
     }
@@ -326,6 +332,8 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->launcher_renderer = {};
     shell->dock_window = {};
     shell->dock_renderer = {};
+    shell->tray_window = {};
+    shell->tray_renderer = {};
     shell->input_source = {};
     shell->window_manager = {};
     shell->config_store = {};
@@ -436,7 +444,7 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     command.color.g = 1.0f;
     command.color.b = 1.0f;
     command.color.a = 0.90f;
-    command.text[0] = shell->tray_flat_animation.value > 0.5f ? '-' : '^';
+    command.text[0] = '^';
     command.text[1] = 0;
     reach_render_command_buffer_push(&commands, &command);
 
@@ -445,6 +453,46 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     }
     (void)shell->dock_renderer.ops.execute(shell->dock_renderer.backend, &commands);
     return shell->dock_renderer.ops.end_frame(shell->dock_renderer.backend);
+}
+
+static reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 bounds)
+{
+    if (shell == nullptr || shell->tray_renderer.ops.begin_frame == nullptr) {
+        return REACH_OK;
+    }
+
+    reach_render_command_buffer commands = {};
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect.x = 5.0f;
+    command.rect.y = 8.0f;
+    command.rect.width = bounds.width - 10.0f;
+    command.rect.height = bounds.height - 10.0f;
+    command.color.r = 0.55f;
+    command.color.g = 0.57f;
+    command.color.b = 0.60f;
+    command.color.a = 0.16f;
+    command.radius = 16.0f;
+    reach_render_command_buffer_push(&commands, &command);
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect.x = 0.0f;
+    command.rect.y = 0.0f;
+    command.rect.width = bounds.width - 10.0f;
+    command.rect.height = bounds.height - 10.0f;
+    command.color.r = 1.0f;
+    command.color.g = 1.0f;
+    command.color.b = 1.0f;
+    command.color.a = 1.0f;
+    command.radius = 16.0f;
+    reach_render_command_buffer_push(&commands, &command);
+
+    if (shell->tray_renderer.ops.begin_frame(shell->tray_renderer.backend) != REACH_OK) {
+        return REACH_ERROR;
+    }
+    (void)shell->tray_renderer.ops.execute(shell->tray_renderer.backend, &commands);
+    return shell->tray_renderer.ops.end_frame(shell->tray_renderer.backend);
 }
 
 static reach_result reach_shell_render_launcher_surface(reach_shell *shell, const reach_launcher_layout *layout)
@@ -659,11 +707,13 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     }
 
     if (reach_rect_contains(shell->layout.dock.tray_button, event->x, event->y)) {
-        reach_float_animation_start(&shell->tray_flat_animation, 1.0f, 0.0f, 0.18);
-        shell->tray_animating = 1;
+        shell->tray_popup_open = !shell->tray_popup_open;
         shell->dock_render_dirty = 1;
-        routed.type = REACH_UI_EVENT_TRAY_BUTTON_CLICK;
-        return reach_shell_handle_event(shell, &routed);
+        shell->tray_render_dirty = 1;
+        if (!shell->tray_popup_open && shell->tray_window.ops.hide != nullptr) {
+            return shell->tray_window.ops.hide(shell->tray_window.window);
+        }
+        return REACH_OK;
     }
 
     for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
@@ -716,6 +766,13 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         result = reach_windows_create_d2d_render_backend(native_window, &dependencies.dock_renderer);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_platform_window(REACH_SURFACE_TRAY_MENU, &dependencies.tray_window);
+    }
+    if (result == REACH_OK) {
+        void *native_window = dependencies.tray_window.ops.native_handle(dependencies.tray_window.window);
+        result = reach_windows_create_d2d_render_backend(native_window, &dependencies.tray_renderer);
+    }
+    if (result == REACH_OK) {
         result = reach_windows_create_search_stub(&dependencies.search_provider);
     }
     if (result == REACH_OK) {
@@ -752,6 +809,12 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         }
         if (dependencies.dock_renderer.ops.destroy != nullptr) {
             dependencies.dock_renderer.ops.destroy(dependencies.dock_renderer.backend);
+        }
+        if (dependencies.tray_window.ops.destroy != nullptr) {
+            dependencies.tray_window.ops.destroy(dependencies.tray_window.window);
+        }
+        if (dependencies.tray_renderer.ops.destroy != nullptr) {
+            dependencies.tray_renderer.ops.destroy(dependencies.tray_renderer.backend);
         }
         if (dependencies.input_source.ops.destroy != nullptr) {
             dependencies.input_source.ops.destroy(dependencies.input_source.source);
@@ -793,6 +856,12 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         }
         if (dependencies.dock_renderer.ops.destroy != nullptr) {
             dependencies.dock_renderer.ops.destroy(dependencies.dock_renderer.backend);
+        }
+        if (dependencies.tray_window.ops.destroy != nullptr) {
+            dependencies.tray_window.ops.destroy(dependencies.tray_window.window);
+        }
+        if (dependencies.tray_renderer.ops.destroy != nullptr) {
+            dependencies.tray_renderer.ops.destroy(dependencies.tray_renderer.backend);
         }
         if (dependencies.input_source.ops.destroy != nullptr) {
             dependencies.input_source.ops.destroy(dependencies.input_source.source);
@@ -861,6 +930,8 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->launcher_renderer = dependencies->launcher_renderer;
     shell->dock_window = dependencies->dock_window;
     shell->dock_renderer = dependencies->dock_renderer;
+    shell->tray_window = dependencies->tray_window;
+    shell->tray_renderer = dependencies->tray_renderer;
     shell->input_source = dependencies->input_source;
     shell->window_manager = dependencies->window_manager;
     shell->config_store = dependencies->config_store;
@@ -937,6 +1008,12 @@ reach_result reach_shell_start(reach_shell *shell)
             return result;
         }
     }
+    if (shell->tray_window.ops.set_event_callback != nullptr) {
+        result = shell->tray_window.ops.set_event_callback(shell->tray_window.window, reach_shell_on_window_event, shell);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
     if (shell->launcher_window.ops.set_blur_enabled != nullptr) {
         result = shell->launcher_window.ops.set_blur_enabled(shell->launcher_window.window, 1);
         if (result != REACH_OK) {
@@ -961,6 +1038,7 @@ reach_result reach_shell_start(reach_shell *shell)
     shell->render_dirty = 1;
     shell->dock_render_dirty = 1;
     shell->launcher_render_dirty = 1;
+    shell->tray_render_dirty = 1;
     return REACH_OK;
 }
 
@@ -985,6 +1063,9 @@ reach_result reach_shell_stop(reach_shell *shell)
     }
     if (shell->launcher_window.ops.hide != nullptr) {
         (void)shell->launcher_window.ops.hide(shell->launcher_window.window);
+    }
+    if (shell->tray_window.ops.hide != nullptr) {
+        (void)shell->tray_window.ops.hide(shell->tray_window.window);
     }
     return REACH_OK;
 }
@@ -1119,6 +1200,36 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)reach_shell_render_dock_surface(shell, &layout.dock);
                     }
                 }
+                if (shell->tray_window.ops.set_bounds != nullptr) {
+                    reach_rect_f32 tray_bounds = {};
+                    tray_bounds.width = 220.0f;
+                    tray_bounds.height = 120.0f;
+                    tray_bounds.x = layout.dock.tray_button.x + layout.dock.tray_button.width - tray_bounds.width;
+                    tray_bounds.y = layout.dock.bounds.y - tray_bounds.height - 8.0f;
+                    int32_t tray_window_changed = 0;
+                    result = reach_shell_apply_window_state(
+                        &shell->tray_window,
+                        tray_bounds,
+                        shell->tray_popup_open ? 1.0f : 0.0f,
+                        &shell->last_tray_bounds,
+                        &shell->last_tray_opacity,
+                        &shell->tray_bounds_valid,
+                        &shell->tray_opacity_valid,
+                        &tray_window_changed);
+                    if (result != REACH_OK) {
+                        return result;
+                    }
+                    if (shell->tray_popup_open) {
+                        if (shell->tray_window.ops.show != nullptr) {
+                            (void)shell->tray_window.ops.show(shell->tray_window.window);
+                        }
+                        if (shell->render_dirty || shell->tray_render_dirty || tray_window_changed) {
+                            (void)reach_shell_render_tray_surface(shell, tray_bounds);
+                        }
+                    } else if (shell->tray_window.ops.hide != nullptr) {
+                        (void)shell->tray_window.ops.hide(shell->tray_window.window);
+                    }
+                }
             }
         }
     }
@@ -1126,6 +1237,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     shell->render_dirty = 0;
     shell->dock_render_dirty = 0;
     shell->launcher_render_dirty = 0;
+    shell->tray_render_dirty = 0;
 
     if (shell->dock != nullptr) {
         return reach_dock_update(shell->dock, delta_seconds);
@@ -1140,6 +1252,6 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
         (shell->render_dirty ||
          shell->dock_render_dirty ||
          shell->launcher_render_dirty ||
-         shell->dock_animating ||
-         shell->tray_animating);
+         shell->tray_render_dirty ||
+         shell->dock_animating);
 }
