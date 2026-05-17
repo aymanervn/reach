@@ -137,9 +137,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     }
 
     MSG message = {};
+    LARGE_INTEGER frequency = {};
+    LARGE_INTEGER previous_counter = {};
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&previous_counter);
     int running = 1;
     while (running) {
-        DWORD wait_result = MsgWaitForMultipleObjectsEx(0, nullptr, 100, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        DWORD wait_result = MsgWaitForMultipleObjectsEx(0, nullptr, 16, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         (void)wait_result;
 
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -152,7 +156,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         }
 
         if (app != nullptr) {
-            (void)reach_app_update(app, 0.1);
+            LARGE_INTEGER current_counter = {};
+            QueryPerformanceCounter(&current_counter);
+            double delta_seconds = frequency.QuadPart > 0
+                ? (double)(current_counter.QuadPart - previous_counter.QuadPart) / (double)frequency.QuadPart
+                : 0.016;
+            previous_counter = current_counter;
+            if (delta_seconds > 0.1) {
+                delta_seconds = 0.1;
+            }
+            (void)reach_app_update(app, delta_seconds);
         }
     }
 

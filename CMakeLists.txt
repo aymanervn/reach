@@ -20,6 +20,8 @@ add_executable(reach WIN32
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/window_manager_win32.cpp
+    src/adapters/windows/shell_registration_win32.cpp
+    src/adapters/windows/explorer_service_win32.cpp
     resources/reach.rc
     src/animation.cpp
     src/dock.cpp
@@ -57,6 +59,35 @@ target_link_libraries(reach PRIVATE
     shcore
     advapi32
     ole32
+    windowscodecs
+    dwmapi
+)
+
+add_executable(reachctl
+    src/tools/reachctl.cpp
+    src/adapters/windows/shell_registration_win32.cpp
+    src/util.cpp
+)
+
+target_include_directories(reachctl PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_compile_features(reachctl PRIVATE
+    cxx_std_17
+)
+
+target_compile_definitions(reachctl PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+
+target_link_libraries(reachctl PRIVATE
+    shell32
+    shlwapi
+    advapi32
 )
 
 add_executable(reach_core_tests

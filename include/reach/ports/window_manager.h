@@ -27,6 +27,8 @@ typedef struct reach_window_manager_ops {
     reach_result (*snap)(reach_window_manager *manager, uintptr_t window_id, reach_split_mode mode);
     uintptr_t (*foreground)(const reach_window_manager *manager);
     int32_t (*foreground_is_maximized)(const reach_window_manager *manager);
+    int32_t (*any_window_is_maximized)(const reach_window_manager *manager);
+    size_t (*maximized_window_count)(const reach_window_manager *manager);
     void (*destroy)(reach_window_manager *manager);
 } reach_window_manager_ops;
 

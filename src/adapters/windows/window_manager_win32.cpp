@@ -3,12 +3,14 @@
 #include <windows.h>
 
 #include <new>
+#include <vector>
 
 struct reach_window_manager {
     HWINEVENTHOOK create_hook;
     HWINEVENTHOOK destroy_hook;
     HWINEVENTHOOK foreground_hook;
     HWND foreground;
+    std::vector<HWND> maximized_windows;
 };
 
 static reach_window_manager *g_window_manager;
@@ -76,6 +78,41 @@ static reach_result reach_window_manager_stop(reach_window_manager *manager)
     return REACH_OK;
 }
 
+static BOOL CALLBACK reach_window_manager_enum_proc(HWND hwnd, LPARAM param)
+{
+    reach_window_manager *manager = reinterpret_cast<reach_window_manager *>(param);
+    if (manager == nullptr || hwnd == nullptr || !IsWindowVisible(hwnd) || !IsZoomed(hwnd)) {
+        return TRUE;
+    }
+    if (GetWindow(hwnd, GW_OWNER) != nullptr) {
+        return TRUE;
+    }
+
+    LONG_PTR ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    if ((ex_style & WS_EX_TOOLWINDOW) != 0) {
+        return TRUE;
+    }
+
+    RECT rect = {};
+    if (!GetWindowRect(hwnd, &rect) || rect.right <= rect.left || rect.bottom <= rect.top) {
+        return TRUE;
+    }
+
+    manager->maximized_windows.push_back(hwnd);
+    return TRUE;
+}
+
+static void reach_window_manager_refresh_maximized(reach_window_manager *manager)
+{
+    REACH_ASSERT(manager != nullptr);
+    if (manager == nullptr) {
+        return;
+    }
+
+    manager->maximized_windows.clear();
+    EnumWindows(reach_window_manager_enum_proc, reinterpret_cast<LPARAM>(manager));
+}
+
 static reach_result reach_window_manager_refresh(reach_window_manager *manager)
 {
     REACH_ASSERT(manager != nullptr);
@@ -84,6 +121,7 @@ static reach_result reach_window_manager_refresh(reach_window_manager *manager)
     }
 
     manager->foreground = GetForegroundWindow();
+    reach_window_manager_refresh_maximized(manager);
     return REACH_OK;
 }
 
@@ -135,6 +173,18 @@ static int32_t reach_window_manager_foreground_is_maximized(const reach_window_m
     return manager->foreground != nullptr && IsZoomed(manager->foreground);
 }
 
+static int32_t reach_window_manager_any_window_is_maximized(const reach_window_manager *manager)
+{
+    REACH_ASSERT(manager != nullptr);
+    return manager != nullptr && !manager->maximized_windows.empty();
+}
+
+static size_t reach_window_manager_maximized_window_count(const reach_window_manager *manager)
+{
+    REACH_ASSERT(manager != nullptr);
+    return manager == nullptr ? 0 : manager->maximized_windows.size();
+}
+
 static void reach_window_manager_destroy(reach_window_manager *manager)
 {
     if (manager != nullptr) {
@@ -157,6 +207,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     }
 
     manager->foreground = GetForegroundWindow();
+    reach_window_manager_refresh_maximized(manager);
     out_port->manager = manager;
     out_port->ops.start = reach_window_manager_start;
     out_port->ops.stop = reach_window_manager_stop;
@@ -164,6 +215,8 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.snap = reach_window_manager_snap;
     out_port->ops.foreground = reach_window_manager_foreground;
     out_port->ops.foreground_is_maximized = reach_window_manager_foreground_is_maximized;
+    out_port->ops.any_window_is_maximized = reach_window_manager_any_window_is_maximized;
+    out_port->ops.maximized_window_count = reach_window_manager_maximized_window_count;
     out_port->ops.destroy = reach_window_manager_destroy;
     return REACH_OK;
 }

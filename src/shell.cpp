@@ -3,6 +3,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
+#include "reach/animation.h"
 #include "reach/dock.h"
 #include "reach/hotkeys.h"
 #include "reach/monitor.h"
@@ -44,11 +45,14 @@ struct reach_shell {
     int32_t launcher_bounds_valid;
     int32_t dock_opacity_valid;
     int32_t launcher_opacity_valid;
-    int32_t last_foreground_maximized;
+    int32_t dock_animation_initialized;
+    int32_t dock_animating;
+    int32_t dock_target_hidden;
     reach_rect_f32 last_dock_bounds;
     reach_rect_f32 last_launcher_bounds;
     float last_dock_opacity;
     float last_launcher_opacity;
+    reach_float_animation dock_y_animation;
     double window_manager_refresh_elapsed;
     int32_t running;
 };
@@ -64,6 +68,11 @@ static int32_t reach_shell_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 static int32_t reach_shell_opacity_equal(float a, float b)
 {
     return fabsf(a - b) < 0.001f;
+}
+
+static int32_t reach_shell_float_animation_active(const reach_float_animation *animation)
+{
+    return animation != nullptr && animation->elapsed_seconds < animation->duration_seconds;
 }
 
 static reach_result reach_shell_apply_window_state(
@@ -143,21 +152,55 @@ static reach_result reach_shell_load_pinned_icons(reach_shell *shell)
     return REACH_OK;
 }
 
-static void reach_shell_update_dock_auto_hide(reach_shell *shell)
+static int32_t reach_shell_any_window_maximized(reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
-    if (shell == nullptr || !shell->ui.dock.auto_hide || shell->window_manager.ops.foreground_is_maximized == nullptr) {
-        return;
+    if (shell == nullptr) {
+        return 0;
+    }
+    if (shell->window_manager.ops.any_window_is_maximized != nullptr) {
+        return shell->window_manager.ops.any_window_is_maximized(shell->window_manager.manager);
+    }
+    if (shell->window_manager.ops.foreground_is_maximized != nullptr) {
+        return shell->window_manager.ops.foreground_is_maximized(shell->window_manager.manager);
+    }
+    return 0;
+}
+
+static reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds, double delta_seconds)
+{
+    REACH_ASSERT(shell != nullptr);
+    float hidden_y = monitor_bounds.y + monitor_bounds.height + 4.0f;
+    int32_t target_hidden = shell != nullptr && shell->ui.dock.auto_hide && reach_shell_any_window_maximized(shell);
+    float target_y = target_hidden ? hidden_y : shown_bounds.y;
+
+    if (!shell->dock_animation_initialized) {
+        shell->dock_animation_initialized = 1;
+        shell->dock_target_hidden = target_hidden;
+        shell->dock_y_animation = {};
+        shell->dock_y_animation.from = target_y;
+        shell->dock_y_animation.to = target_y;
+        shell->dock_y_animation.value = target_y;
+        shell->ui.dock.visible = target_hidden ? 0 : 1;
     }
 
-    int32_t foreground_maximized = shell->window_manager.ops.foreground_is_maximized(shell->window_manager.manager);
-    int32_t visible = foreground_maximized ? 0 : 1;
-    if (shell->ui.dock.visible != visible || shell->last_foreground_maximized != foreground_maximized) {
-        shell->ui.dock.visible = visible;
-        shell->last_foreground_maximized = foreground_maximized;
-        shell->layout_dirty = 1;
+    if (shell->dock_target_hidden != target_hidden) {
+        shell->dock_target_hidden = target_hidden;
+        shell->ui.dock.visible = target_hidden ? 0 : 1;
+        reach_float_animation_start(&shell->dock_y_animation, shell->dock_y_animation.value, target_y, 0.18);
+        shell->dock_animating = 1;
         shell->dock_render_dirty = 1;
     }
+
+    if (shell->dock_animating) {
+        reach_float_animation_update(&shell->dock_y_animation, delta_seconds);
+        shell->dock_animating = reach_shell_float_animation_active(&shell->dock_y_animation);
+        shell->dock_render_dirty = 1;
+    }
+
+    reach_rect_f32 animated = shown_bounds;
+    animated.y = shell->dock_y_animation.value;
+    return animated;
 }
 
 static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_event *event)
@@ -271,10 +314,10 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     command.rect.y = 0.0f;
     command.rect.width = layout->bounds.width;
     command.rect.height = layout->bounds.height;
-    command.color.r = 0.08f;
-    command.color.g = 0.08f;
-    command.color.b = 0.09f;
-    command.color.a = 0.92f;
+    command.color.r = 1.0f;
+    command.color.g = 1.0f;
+    command.color.b = 1.0f;
+    command.color.a = 0.96f;
     command.radius = 14.0f;
     reach_render_command_buffer_push(&commands, &command);
 
@@ -785,8 +828,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     } else if (shell->window_manager.ops.refresh == nullptr) {
         (void)reach_wm_update_z_order(shell->wm);
     }
-    reach_shell_update_dock_auto_hide(shell);
-
     if (shell->launcher_window.ops.set_bounds != nullptr && shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0) {
         const reach_monitor_info *monitor = reach_monitor_primary(shell->monitors);
         REACH_ASSERT(monitor != nullptr);
@@ -823,6 +864,14 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             reach_render_command_buffer commands = {};
             if (reach_ui_layout_compute(&shell->ui, &input, &layout) == REACH_OK &&
                 reach_ui_build_render_commands(&shell->ui, &layout, &commands) == REACH_OK) {
+                reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
+                reach_rect_f32 animated_dock_bounds = reach_shell_apply_dock_animation(shell, shown_dock_bounds, bounds, delta_seconds);
+                float dock_y_offset = animated_dock_bounds.y - shown_dock_bounds.y;
+                layout.dock.bounds = animated_dock_bounds;
+                for (size_t index = 0; index < layout.dock.app_slot_count; ++index) {
+                    layout.dock.app_slots[index].y += dock_y_offset;
+                }
+                layout.dock.tray_button.y += dock_y_offset;
                 int32_t dock_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.dock.bounds, layout.dock.bounds);
                 int32_t launcher_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.launcher.bounds, layout.launcher.bounds);
                 shell->layout = layout;
@@ -835,7 +884,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     result = reach_shell_apply_window_state(
                         &shell->dock_window,
                         layout.dock.bounds,
-                        shell->ui.dock.visible ? 0.95f : 0.0f,
+                        0.95f,
                         &shell->last_dock_bounds,
                         &shell->last_dock_opacity,
                         &shell->dock_bounds_valid,
