@@ -76,10 +76,11 @@ int wmain(int argc, wchar_t **argv)
             wchar_t line[640] = {};
             swprintf_s(
                 line,
-                L"CurrentShell=%ls PreviousShell=%ls ReachIsShell=%d",
+                L"CurrentShell=%ls PreviousShell=%ls ReachIsShell=%d StartupAttemptCount=%u",
                 reinterpret_cast<const wchar_t *>(status.current_shell),
                 reinterpret_cast<const wchar_t *>(status.previous_shell),
-                status.reach_is_shell);
+                status.reach_is_shell,
+                status.startup_attempt_count);
             reachctl_print(line);
             return 0;
         }

@@ -73,10 +73,11 @@ static int reach_handle_shell_command_line(void)
                 wchar_t line[640] = {};
                 swprintf_s(
                     line,
-                    L"CurrentShell=%ls PreviousShell=%ls ReachIsShell=%d",
+                    L"CurrentShell=%ls PreviousShell=%ls ReachIsShell=%d StartupAttemptCount=%u",
                     reinterpret_cast<const wchar_t *>(status.current_shell),
                     reinterpret_cast<const wchar_t *>(status.previous_shell),
-                    status.reach_is_shell);
+                    status.reach_is_shell,
+                    status.startup_attempt_count);
                 reach_write_console_line(line);
             } else {
                 reach_write_console_line(L"Reach shell status query failed.");
@@ -101,6 +102,23 @@ static void reach_restore_explorer_if_current_shell(void)
     }
 }
 
+static int reach_guard_shell_startup(void)
+{
+    uint16_t exe_path[260] = {};
+    uint32_t attempts = 0;
+    int32_t restore_required = 0;
+    if (reach_get_current_exe(exe_path, 260) != REACH_OK ||
+        reach_windows_shell_mark_startup_attempt(exe_path, &attempts, &restore_required) != REACH_OK ||
+        !restore_required) {
+        return 0;
+    }
+
+    (void)attempts;
+    reach_restore_explorer_if_current_shell();
+    reach_write_console_line(L"Reach restored Explorer after repeated early startup failures.");
+    return 1;
+}
+
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR command_line, int show_command)
 {
     (void)instance;
@@ -111,6 +129,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     int shell_command_exit = reach_handle_shell_command_line();
     if (shell_command_exit >= 0) {
         return shell_command_exit;
+    }
+
+    if (reach_guard_shell_startup()) {
+        return 1;
     }
 
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -125,6 +147,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         result = reach_app_start(app);
         if (result == REACH_OK) {
             (void)reach_app_update(app, 0.0);
+            (void)reach_windows_shell_clear_startup_attempts();
         }
     }
     if (result != REACH_OK) {

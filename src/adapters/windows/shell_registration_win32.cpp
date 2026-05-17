@@ -9,7 +9,9 @@ static const wchar_t *REACH_WINLOGON_KEY = L"Software\\Microsoft\\Windows NT\\Cu
 static const wchar_t *REACH_RESTORE_KEY = L"Software\\Reach";
 static const wchar_t *REACH_SHELL_VALUE = L"Shell";
 static const wchar_t *REACH_PREVIOUS_SHELL_VALUE = L"PreviousShell";
+static const wchar_t *REACH_STARTUP_ATTEMPTS_VALUE = L"StartupAttemptCount";
 static const wchar_t *REACH_DEFAULT_SHELL = L"explorer.exe";
+static const DWORD REACH_STARTUP_ATTEMPT_LIMIT = 3;
 
 static reach_result reach_read_string_value(HKEY root, const wchar_t *key, const wchar_t *value, wchar_t *buffer, DWORD buffer_count)
 {
@@ -53,6 +55,40 @@ static reach_result reach_write_string_value(HKEY root, const wchar_t *key, cons
     return status == ERROR_SUCCESS ? REACH_OK : REACH_ERROR;
 }
 
+static reach_result reach_read_dword_value(HKEY root, const wchar_t *key, const wchar_t *value, DWORD *out_value)
+{
+    REACH_ASSERT(key != nullptr);
+    REACH_ASSERT(value != nullptr);
+    REACH_ASSERT(out_value != nullptr);
+    if (key == nullptr || value == nullptr || out_value == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    DWORD type = REG_DWORD;
+    DWORD bytes = sizeof(*out_value);
+    LONG status = RegGetValueW(root, key, value, RRF_RT_REG_DWORD, &type, out_value, &bytes);
+    return status == ERROR_SUCCESS ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_write_dword_value(HKEY root, const wchar_t *key, const wchar_t *value, DWORD number)
+{
+    REACH_ASSERT(key != nullptr);
+    REACH_ASSERT(value != nullptr);
+    if (key == nullptr || value == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HKEY handle = nullptr;
+    LONG status = RegCreateKeyExW(root, key, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &handle, nullptr);
+    if (status != ERROR_SUCCESS) {
+        return REACH_ERROR;
+    }
+
+    status = RegSetValueExW(handle, value, 0, REG_DWORD, reinterpret_cast<const BYTE *>(&number), sizeof(number));
+    RegCloseKey(handle);
+    return status == ERROR_SUCCESS ? REACH_OK : REACH_ERROR;
+}
+
 static int32_t reach_shell_equals(const wchar_t *a, const wchar_t *b)
 {
     return a != nullptr && b != nullptr && CompareStringOrdinal(a, -1, b, -1, TRUE) == CSTR_EQUAL;
@@ -78,7 +114,11 @@ reach_result reach_windows_shell_install_current_user(const uint16_t *exe_path)
         }
     }
 
-    return reach_write_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, path);
+    reach_result install_result = reach_write_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, path);
+    if (install_result == REACH_OK) {
+        (void)reach_windows_shell_clear_startup_attempts();
+    }
+    return install_result;
 }
 
 reach_result reach_windows_shell_restore_current_user(void)
@@ -89,7 +129,11 @@ reach_result reach_windows_shell_restore_current_user(void)
         wcscpy_s(previous, REACH_DEFAULT_SHELL);
     }
 
-    return reach_write_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, previous);
+    reach_result restore_result = reach_write_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, previous);
+    if (restore_result == REACH_OK) {
+        (void)reach_windows_shell_clear_startup_attempts();
+    }
+    return restore_result;
 }
 
 reach_result reach_windows_shell_query_current_user(const uint16_t *exe_path, reach_shell_registration_status *out_status)
@@ -110,6 +154,10 @@ reach_result reach_windows_shell_query_current_user(const uint16_t *exe_path, re
     (void)reach_copy_utf16(out_status->current_shell, 260, reinterpret_cast<const uint16_t *>(current));
     (void)reach_copy_utf16(out_status->previous_shell, 260, reinterpret_cast<const uint16_t *>(previous));
     out_status->reach_is_shell = exe_path != nullptr && reach_shell_equals(current, reinterpret_cast<const wchar_t *>(exe_path));
+    DWORD attempts = 0;
+    if (reach_read_dword_value(HKEY_CURRENT_USER, REACH_RESTORE_KEY, REACH_STARTUP_ATTEMPTS_VALUE, &attempts) == REACH_OK) {
+        out_status->startup_attempt_count = attempts;
+    }
     return REACH_OK;
 }
 
@@ -121,4 +169,48 @@ reach_result reach_windows_shell_launch_explorer(void)
     info.lpFile = REACH_DEFAULT_SHELL;
     info.nShow = SW_SHOWNORMAL;
     return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
+}
+
+reach_result reach_windows_shell_mark_startup_attempt(const uint16_t *exe_path, uint32_t *out_attempt_count, int32_t *out_restore_required)
+{
+    REACH_ASSERT(exe_path != nullptr);
+    if (exe_path == nullptr || exe_path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (out_attempt_count != nullptr) {
+        *out_attempt_count = 0;
+    }
+    if (out_restore_required != nullptr) {
+        *out_restore_required = 0;
+    }
+
+    reach_shell_registration_status status = {};
+    reach_result query_result = reach_windows_shell_query_current_user(exe_path, &status);
+    if (query_result != REACH_OK || !status.reach_is_shell) {
+        return query_result;
+    }
+
+    DWORD attempts = status.startup_attempt_count;
+    if (attempts < UINT32_MAX) {
+        ++attempts;
+    }
+
+    reach_result write_result = reach_write_dword_value(HKEY_CURRENT_USER, REACH_RESTORE_KEY, REACH_STARTUP_ATTEMPTS_VALUE, attempts);
+    if (write_result != REACH_OK) {
+        return write_result;
+    }
+
+    if (out_attempt_count != nullptr) {
+        *out_attempt_count = attempts;
+    }
+    if (out_restore_required != nullptr) {
+        *out_restore_required = attempts >= REACH_STARTUP_ATTEMPT_LIMIT;
+    }
+    return REACH_OK;
+}
+
+reach_result reach_windows_shell_clear_startup_attempts(void)
+{
+    return reach_write_dword_value(HKEY_CURRENT_USER, REACH_RESTORE_KEY, REACH_STARTUP_ATTEMPTS_VALUE, 0);
 }
