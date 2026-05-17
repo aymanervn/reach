@@ -11,6 +11,7 @@
 #include "reach/ports/search_provider.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
+#include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
 
 #ifdef __cplusplus
@@ -28,6 +29,7 @@ reach_result reach_windows_create_config_store(const uint16_t *path, reach_confi
 reach_result reach_windows_create_window_manager(reach_window_manager_port *out_port);
 reach_result reach_windows_create_explorer_service(reach_explorer_service_port *out_port);
 reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port *out_port);
+reach_result reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port *out_port);
 
 #ifdef __cplusplus
 }

@@ -12,6 +12,28 @@ struct reach_config_store {
     uint16_t path[260];
 };
 
+static void reach_config_resolve_wallpaper_path(reach_config_store *store, reach_config_snapshot *snapshot)
+{
+    if (store == nullptr || snapshot == nullptr || snapshot->wallpaper_path[0] == 0) {
+        return;
+    }
+
+    wchar_t *wallpaper_path = reinterpret_cast<wchar_t *>(snapshot->wallpaper_path);
+    if (!PathIsRelativeW(wallpaper_path)) {
+        return;
+    }
+
+    wchar_t base[260] = {};
+    reach_copy_utf16(reinterpret_cast<uint16_t *>(base), 260, store->path);
+    if (!PathRemoveFileSpecW(base)) {
+        return;
+    }
+    if (!PathAppendW(base, wallpaper_path)) {
+        return;
+    }
+    reach_copy_utf16(snapshot->wallpaper_path, 260, reinterpret_cast<const uint16_t *>(base));
+}
+
 static reach_result reach_config_store_load(reach_config_store *store, reach_config_snapshot *out_snapshot)
 {
     REACH_ASSERT(store != nullptr);
@@ -26,6 +48,7 @@ static reach_result reach_config_store_load(reach_config_store *store, reach_con
     out_snapshot->dock_width = (float)GetPrivateProfileIntW(L"dock", L"width", 560, path);
     out_snapshot->dock_icon_size = (float)GetPrivateProfileIntW(L"dock", L"icon_size", 40, path);
     GetPrivateProfileStringW(L"wallpaper", L"path", L"", reinterpret_cast<wchar_t *>(out_snapshot->wallpaper_path), 260, path);
+    reach_config_resolve_wallpaper_path(store, out_snapshot);
 
     for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
         wchar_t section[32] = {};

@@ -6,6 +6,7 @@
 #include "reach/config_path.h"
 #include "reach/pin_config.h"
 #include "reach/platform/windows_adapters.h"
+#include "reach/platform/windows_messages.h"
 #include "reach/platform/shell_registration.h"
 
 static void reachctl_print(const wchar_t *message)
@@ -135,24 +136,52 @@ static reach_result reachctl_remove_context_menu(void)
     return result;
 }
 
+static reach_result reachctl_absolute_path(const uint16_t *path, uint16_t *out_path, DWORD out_path_count)
+{
+    if (path == nullptr || path[0] == 0 || out_path == nullptr || out_path_count == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    wchar_t full_path[260] = {};
+    DWORD length = GetFullPathNameW(reinterpret_cast<const wchar_t *>(path), 260, full_path, nullptr);
+    if (length == 0 || length >= out_path_count) {
+        return REACH_ERROR;
+    }
+    return reach_copy_utf16(out_path, out_path_count, reinterpret_cast<const uint16_t *>(full_path));
+}
+
+static void reachctl_notify_wallpaper_changed(void)
+{
+    HWND hwnd = nullptr;
+    while ((hwnd = FindWindowExW(nullptr, hwnd, L"ReachPlatformWindow", nullptr)) != nullptr) {
+        PostMessageW(hwnd, REACH_WM_WALLPAPER_CHANGED, 0, 0);
+    }
+}
+
 static reach_result reachctl_set_wallpaper(const uint16_t *path)
 {
     if (path == nullptr || path[0] == 0) {
         return REACH_INVALID_ARGUMENT;
     }
-    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(path));
+    uint16_t full_path[260] = {};
+    reach_result result = reachctl_absolute_path(path, full_path, 260);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(full_path));
     if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
         return REACH_INVALID_ARGUMENT;
     }
 
     reach_config_store_port store = {};
-    reach_result result = reachctl_open_config_store(&store);
+    result = reachctl_open_config_store(&store);
     reach_config_snapshot snapshot = {};
     if (result == REACH_OK) {
         result = store.ops.load(store.store, &snapshot);
     }
     if (result == REACH_OK) {
-        result = reach_copy_utf16(snapshot.wallpaper_path, 260, path);
+        result = reach_copy_utf16(snapshot.wallpaper_path, 260, full_path);
     }
     if (result == REACH_OK) {
         result = store.ops.save(store.store, &snapshot);
@@ -162,13 +191,16 @@ static reach_result reachctl_set_wallpaper(const uint16_t *path)
         result = reach_windows_create_wallpaper_service(&wallpaper);
     }
     if (result == REACH_OK) {
-        result = wallpaper.ops.set_wallpaper(wallpaper.service, path);
+        result = wallpaper.ops.set_wallpaper(wallpaper.service, full_path);
     }
     if (wallpaper.ops.destroy != nullptr) {
         wallpaper.ops.destroy(wallpaper.service);
     }
     if (store.ops.destroy != nullptr) {
         store.ops.destroy(store.store);
+    }
+    if (result == REACH_OK) {
+        reachctl_notify_wallpaper_changed();
     }
     return result;
 }
@@ -197,6 +229,9 @@ static reach_result reachctl_clear_wallpaper(void)
     }
     if (store.ops.destroy != nullptr) {
         store.ops.destroy(store.store);
+    }
+    if (result == REACH_OK) {
+        reachctl_notify_wallpaper_changed();
     }
     return result;
 }

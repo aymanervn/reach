@@ -1,4 +1,5 @@
 #include "reach/platform/windows_adapters.h"
+#include "reach/platform/windows_messages.h"
 
 #include <windows.h>
 #include <windowsx.h>
@@ -26,6 +27,13 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     reach_platform_window *window = reinterpret_cast<reach_platform_window *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
 
     switch (message) {
+    case REACH_WM_WALLPAPER_CHANGED:
+        if (window != nullptr && window->callback != nullptr) {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_WALLPAPER_CHANGED;
+            window->callback(window->callback_user, &event);
+        }
+        return 0;
     case WM_KEYDOWN:
         if (window != nullptr && window->callback != nullptr) {
             reach_ui_event event = {};
@@ -106,8 +114,13 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
-    ShowWindow(window->hwnd, window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TRAY_MENU ? SW_SHOWNOACTIVATE : SW_SHOW);
-    if (window->role != REACH_SURFACE_DOCK && window->role != REACH_SURFACE_TRAY_MENU) {
+    int show_command = window->role == REACH_SURFACE_DOCK ||
+        window->role == REACH_SURFACE_TRAY_MENU
+        ? SW_SHOWNOACTIVATE
+        : SW_SHOW;
+    ShowWindow(window->hwnd, show_command);
+    if (window->role != REACH_SURFACE_DOCK &&
+        window->role != REACH_SURFACE_TRAY_MENU) {
         SetForegroundWindow(window->hwnd);
         SetFocus(window->hwnd);
     }
@@ -132,6 +145,7 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
 
     int width = (int)bounds.width;
     int height = (int)bounds.height;
+
     BOOL ok = SetWindowPos(
         window->hwnd,
         HWND_TOPMOST,

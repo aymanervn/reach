@@ -27,7 +27,10 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
 
     reach_shell_dependencies dependencies = {};
-    reach_result result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER, &dependencies.launcher_window);
+    reach_result result = reach_windows_create_wallpaper_surface(&dependencies.wallpaper_surface);
+    if (result == REACH_OK) {
+        result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER, &dependencies.launcher_window);
+    }
     if (result == REACH_OK) {
         void *native_window = dependencies.launcher_window.ops.native_handle(dependencies.launcher_window.window);
         result = reach_windows_create_d2d_render_backend(native_window, &dependencies.launcher_renderer);
@@ -128,6 +131,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.wallpaper_service.ops.destroy != nullptr) {
             dependencies.wallpaper_service.ops.destroy(dependencies.wallpaper_service.service);
+        }
+        if (dependencies.wallpaper_surface.ops.destroy != nullptr) {
+            dependencies.wallpaper_surface.ops.destroy(dependencies.wallpaper_surface.surface);
         }
         delete app;
         return result;

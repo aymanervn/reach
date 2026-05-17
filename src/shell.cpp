@@ -39,6 +39,7 @@ struct reach_shell {
     reach_icon_provider_port icon_provider;
     reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
+    reach_wallpaper_surface_port wallpaper_surface;
     const reach_theme *theme;
     reach_icon_handle pinned_icons[REACH_MAX_PINNED_APPS];
     size_t pinned_icon_count;
@@ -77,6 +78,7 @@ struct reach_shell {
     double window_manager_refresh_elapsed;
     int32_t tray_popup_open;
     int32_t running;
+    uint16_t wallpaper_path[260];
 };
 
 static int32_t reach_shell_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
@@ -324,9 +326,14 @@ static void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config
     if (shell == nullptr || snapshot == nullptr || shell->wallpaper_service.service == nullptr) {
         return;
     }
+    shell->wallpaper_path[0] = 0;
     if (snapshot->wallpaper_path[0] != 0) {
+        reach_copy_utf16(shell->wallpaper_path, 260, snapshot->wallpaper_path);
         if (shell->wallpaper_service.ops.set_wallpaper != nullptr) {
             (void)shell->wallpaper_service.ops.set_wallpaper(shell->wallpaper_service.service, snapshot->wallpaper_path);
+        }
+        if (shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
+            (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, snapshot->wallpaper_path);
         }
         return;
     }
@@ -336,8 +343,40 @@ static void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config
     uint16_t current[260] = {};
     if (shell->wallpaper_service.ops.current_wallpaper(shell->wallpaper_service.service, current, 260) == REACH_OK &&
         current[0] != 0) {
+        reach_copy_utf16(shell->wallpaper_path, 260, current);
         (void)reach_copy_utf16(snapshot->wallpaper_path, 260, current);
         (void)shell->config_store.ops.save(shell->config_store.store, snapshot);
+        if (shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
+            (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, current);
+        }
+    }
+}
+
+static void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)
+{
+    if (shell == nullptr || shell->config_store.ops.load == nullptr) {
+        return;
+    }
+
+    reach_config_snapshot snapshot = {};
+    if (shell->config_store.ops.load(shell->config_store.store, &snapshot) != REACH_OK) {
+        return;
+    }
+
+    uint16_t new_path[260] = {};
+    if (snapshot.wallpaper_path[0] != 0) {
+        reach_copy_utf16(new_path, 260, snapshot.wallpaper_path);
+    }
+
+    if (!force && reach_shell_path_equals(shell->wallpaper_path, new_path)) {
+        return;
+    }
+
+    reach_copy_utf16(shell->wallpaper_path, 260, new_path);
+    if (new_path[0] != 0 && shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
+        (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, new_path);
+    } else if (new_path[0] == 0 && shell->wallpaper_surface.ops.clear != nullptr) {
+        (void)shell->wallpaper_surface.ops.clear(shell->wallpaper_surface.surface);
     }
 }
 
@@ -478,6 +517,9 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->wallpaper_service.ops.destroy != nullptr) {
         shell->wallpaper_service.ops.destroy(shell->wallpaper_service.service);
     }
+    if (shell->wallpaper_surface.ops.destroy != nullptr) {
+        shell->wallpaper_surface.ops.destroy(shell->wallpaper_surface.surface);
+    }
     shell->dock = nullptr;
     shell->wm = nullptr;
     shell->hotkeys = nullptr;
@@ -497,6 +539,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->icon_provider = {};
     shell->explorer_service = {};
     shell->wallpaper_service = {};
+    shell->wallpaper_surface = {};
     shell->pinned_icon_count = 0;
 }
 
@@ -633,6 +676,7 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     if (shell->dock_renderer.ops.begin_frame(shell->dock_renderer.backend) != REACH_OK) {
         return REACH_ERROR;
     }
+
     (void)shell->dock_renderer.ops.execute(shell->dock_renderer.backend, &commands);
     return shell->dock_renderer.ops.end_frame(shell->dock_renderer.backend);
 }
@@ -945,7 +989,10 @@ static void reach_shell_on_window_event(void *user, const reach_ui_event *event)
 reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_shell)
 {
     reach_shell_dependencies dependencies = {};
-    reach_result result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER, &dependencies.launcher_window);
+    reach_result result = reach_windows_create_wallpaper_surface(&dependencies.wallpaper_surface);
+    if (result == REACH_OK) {
+        result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER, &dependencies.launcher_window);
+    }
     if (result == REACH_OK) {
         void *native_window = dependencies.launcher_window.ops.native_handle(dependencies.launcher_window.window);
         result = reach_windows_create_d2d_render_backend(native_window, &dependencies.launcher_renderer);
@@ -1038,6 +1085,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         if (dependencies.wallpaper_service.ops.destroy != nullptr) {
             dependencies.wallpaper_service.ops.destroy(dependencies.wallpaper_service.service);
         }
+        if (dependencies.wallpaper_surface.ops.destroy != nullptr) {
+            dependencies.wallpaper_surface.ops.destroy(dependencies.wallpaper_surface.surface);
+        }
         return result;
     }
 
@@ -1087,6 +1137,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         }
         if (dependencies.wallpaper_service.ops.destroy != nullptr) {
             dependencies.wallpaper_service.ops.destroy(dependencies.wallpaper_service.service);
+        }
+        if (dependencies.wallpaper_surface.ops.destroy != nullptr) {
+            dependencies.wallpaper_surface.ops.destroy(dependencies.wallpaper_surface.surface);
         }
     }
     return result;
@@ -1142,6 +1195,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->icon_provider = dependencies->icon_provider;
     shell->explorer_service = dependencies->explorer_service;
     shell->wallpaper_service = dependencies->wallpaper_service;
+    shell->wallpaper_surface = dependencies->wallpaper_surface;
     shell->theme = reach_theme_default();
 
     if (result == REACH_OK && shell->config_store.ops.load != nullptr) {
@@ -1226,6 +1280,12 @@ reach_result reach_shell_start(reach_shell *shell)
     }
 
     if (shell->dock_window.ops.show != nullptr) {
+        if (shell->wallpaper_surface.ops.show != nullptr) {
+            result = shell->wallpaper_surface.ops.show(shell->wallpaper_surface.surface);
+            if (result != REACH_OK) {
+                return result;
+            }
+        }
         result = shell->dock_window.ops.show(shell->dock_window.window);
         if (result != REACH_OK) {
             return result;
@@ -1271,6 +1331,9 @@ reach_result reach_shell_stop(reach_shell *shell)
     if (shell->tray_window.ops.hide != nullptr) {
         (void)shell->tray_window.ops.hide(shell->tray_window.window);
     }
+    if (shell->wallpaper_surface.ops.hide != nullptr) {
+        (void)shell->wallpaper_surface.ops.hide(shell->wallpaper_surface.surface);
+    }
     return REACH_OK;
 }
 
@@ -1288,6 +1351,10 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
     if (event->type == REACH_UI_EVENT_POINTER_CONTEXT) {
         return reach_shell_handle_pointer_context(shell, event);
+    }
+    if (event->type == REACH_UI_EVENT_WALLPAPER_CHANGED) {
+        reach_shell_reload_wallpaper(shell, 1);
+        return REACH_OK;
     }
 
     reach_result result = reach_ui_handle_event(&shell->ui, event, &intent);
@@ -1314,9 +1381,18 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
 
     if (shell->launcher_window.ops.show != nullptr && shell->launcher_window.ops.hide != nullptr) {
-        return shell->ui.launcher.open
-            ? shell->launcher_window.ops.show(shell->launcher_window.window)
-            : shell->launcher_window.ops.hide(shell->launcher_window.window);
+        if (shell->ui.launcher.open) {
+            if (shell->launcher_window.ops.native_handle != nullptr &&
+                shell->dock_window.ops.native_handle != nullptr) {
+                HWND launcher_hwnd = (HWND)shell->launcher_window.ops.native_handle(shell->launcher_window.window);
+                HWND dock_hwnd = (HWND)shell->dock_window.ops.native_handle(shell->dock_window.window);
+                if (launcher_hwnd != nullptr && dock_hwnd != nullptr) {
+                    SetWindowPos(launcher_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+                }
+            }
+            return shell->launcher_window.ops.show(shell->launcher_window.window);
+        }
+        return shell->launcher_window.ops.hide(shell->launcher_window.window);
     }
 
     return REACH_OK;
@@ -1336,6 +1412,19 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         shell->window_manager_refresh_elapsed = 0.0;
     } else if (shell->window_manager.ops.refresh == nullptr) {
         (void)reach_wm_update_z_order(shell->wm);
+    }
+    if (shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0 && shell->wallpaper_surface.ops.set_bounds != nullptr) {
+        const reach_monitor_info *monitor = reach_monitor_primary(shell->monitors);
+        REACH_ASSERT(monitor != nullptr);
+        REACH_ASSERT(monitor->primary || reach_monitor_count(shell->monitors) == 1);
+        if (monitor != nullptr) {
+            reach_rect_f32 wallpaper_bounds = {};
+            wallpaper_bounds.x = (float)monitor->bounds.left;
+            wallpaper_bounds.y = (float)monitor->bounds.top;
+            wallpaper_bounds.width = (float)(monitor->bounds.right - monitor->bounds.left);
+            wallpaper_bounds.height = (float)(monitor->bounds.bottom - monitor->bounds.top);
+            (void)shell->wallpaper_surface.ops.set_bounds(shell->wallpaper_surface.surface, wallpaper_bounds);
+        }
     }
     if (shell->launcher_window.ops.set_bounds != nullptr && shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0) {
         const reach_monitor_info *monitor = reach_monitor_primary(shell->monitors);

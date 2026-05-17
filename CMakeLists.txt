@@ -23,6 +23,7 @@ add_executable(reach WIN32
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp
     src/adapters/windows/wallpaper_win32.cpp
+    src/adapters/windows/wallpaper_surface_win32.cpp
     src/config_path.cpp
     src/pin_config.cpp
     src/theme.c
@@ -63,6 +64,7 @@ target_link_libraries(reach PRIVATE
     shcore
     advapi32
     ole32
+    uuid
     windowscodecs
     dwmapi
 )
@@ -97,6 +99,8 @@ target_link_libraries(reachctl PRIVATE
     shlwapi
     user32
     advapi32
+    ole32
+    uuid
 )
 
 add_executable(reach_core_tests

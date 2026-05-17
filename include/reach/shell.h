@@ -14,6 +14,7 @@
 #include "reach/ports/search_provider.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
+#include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
 #include "reach/util.h"
 
@@ -43,6 +44,7 @@ typedef struct reach_shell_dependencies {
     reach_icon_provider_port icon_provider;
     reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
+    reach_wallpaper_surface_port wallpaper_surface;
 } reach_shell_dependencies;
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, const reach_shell_dependencies *dependencies, reach_shell **out_shell);
