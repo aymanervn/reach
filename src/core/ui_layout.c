@@ -1,0 +1,66 @@
+#include "reach/core/ui_layout.h"
+
+static float reach_scale(float value, float dpi_scale)
+{
+    return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+}
+
+reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui_layout_input *input, reach_ui_layout *out_layout)
+{
+    if (state == 0 || input == 0 || out_layout == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
+    float dock_height = reach_scale(state->dock.height, scale);
+    float dock_width = reach_scale(state->dock.width, scale);
+    float dock_x = input->work_area.x + (input->work_area.width - dock_width) * 0.5f;
+    float dock_y = input->work_area.y + input->work_area.height - dock_height - reach_scale(12.0f, scale);
+
+    out_layout->dock.bounds.x = dock_x;
+    out_layout->dock.bounds.y = dock_y;
+    out_layout->dock.bounds.width = dock_width;
+    out_layout->dock.bounds.height = dock_height;
+    out_layout->dock.app_slot_count = state->pinned_app_count;
+
+    float icon_size = reach_scale(state->dock.icon_size, scale);
+    float gap = reach_scale(state->dock.gap, scale);
+    float left = dock_x + gap;
+    float top = dock_y + (dock_height - icon_size) * 0.5f;
+    for (size_t index = 0; index < state->pinned_app_count; ++index) {
+        out_layout->dock.app_slots[index].x = left + (icon_size + gap) * (float)index;
+        out_layout->dock.app_slots[index].y = top;
+        out_layout->dock.app_slots[index].width = icon_size;
+        out_layout->dock.app_slots[index].height = icon_size;
+    }
+
+    out_layout->dock.tray_button.width = icon_size;
+    out_layout->dock.tray_button.height = icon_size;
+    out_layout->dock.tray_button.x = dock_x + dock_width - icon_size - gap;
+    out_layout->dock.tray_button.y = top;
+
+    out_layout->launcher.bounds = input->monitor_bounds;
+    out_layout->launcher.search_box.width = reach_scale(640.0f, scale);
+    out_layout->launcher.search_box.height = reach_scale(52.0f, scale);
+    out_layout->launcher.search_box.x = input->monitor_bounds.x + (input->monitor_bounds.width - out_layout->launcher.search_box.width) * 0.5f;
+    out_layout->launcher.search_box.y = input->monitor_bounds.y + input->monitor_bounds.height * 0.30f;
+    out_layout->launcher.pinned_app_slot_count = state->pinned_app_count;
+
+    float launcher_icon = reach_scale(56.0f, scale);
+    float launcher_gap = reach_scale(16.0f, scale);
+    float total_width = (launcher_icon * (float)state->pinned_app_count) + (launcher_gap * (float)(state->pinned_app_count > 0 ? state->pinned_app_count - 1 : 0));
+    float apps_x = input->monitor_bounds.x + (input->monitor_bounds.width - total_width) * 0.5f;
+    float apps_y = out_layout->launcher.search_box.y + out_layout->launcher.search_box.height + reach_scale(24.0f, scale);
+    for (size_t index = 0; index < state->pinned_app_count; ++index) {
+        out_layout->launcher.pinned_app_slots[index].x = apps_x + (launcher_icon + launcher_gap) * (float)index;
+        out_layout->launcher.pinned_app_slots[index].y = apps_y;
+        out_layout->launcher.pinned_app_slots[index].width = launcher_icon;
+        out_layout->launcher.pinned_app_slots[index].height = launcher_icon;
+    }
+
+    out_layout->launcher.search_results.x = out_layout->launcher.search_box.x;
+    out_layout->launcher.search_results.y = out_layout->launcher.search_box.y + out_layout->launcher.search_box.height + reach_scale(8.0f, scale);
+    out_layout->launcher.search_results.width = out_layout->launcher.search_box.width;
+    out_layout->launcher.search_results.height = reach_scale(120.0f, scale);
+    return REACH_OK;
+}

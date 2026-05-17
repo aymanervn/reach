@@ -1,0 +1,41 @@
+#ifndef REACH_CORE_RENDER_COMMANDS_H
+#define REACH_CORE_RENDER_COMMANDS_H
+
+#include "reach/core/ui_layout.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define REACH_MAX_RENDER_COMMANDS 256
+
+typedef enum reach_render_command_type {
+    REACH_RENDER_COMMAND_NONE = 0,
+    REACH_RENDER_COMMAND_RECT = 1,
+    REACH_RENDER_COMMAND_TEXT = 2,
+    REACH_RENDER_COMMAND_ICON = 3,
+    REACH_RENDER_COMMAND_BLUR_BACKGROUND = 4
+} reach_render_command_type;
+
+typedef struct reach_render_command {
+    reach_render_command_type type;
+    reach_rect_f32 rect;
+    reach_color color;
+    float radius;
+    uint16_t text[260];
+} reach_render_command;
+
+typedef struct reach_render_command_buffer {
+    reach_render_command commands[REACH_MAX_RENDER_COMMANDS];
+    size_t count;
+} reach_render_command_buffer;
+
+void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
+reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer, const reach_render_command *command);
+reach_result reach_ui_build_render_commands(const reach_ui_state *state, const reach_ui_layout *layout, reach_render_command_buffer *buffer);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
