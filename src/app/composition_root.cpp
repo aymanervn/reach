@@ -1,5 +1,6 @@
 #include "reach/app/composition_root.h"
 
+#include "reach/config_path.h"
 #include "reach/platform/windows_adapters.h"
 
 #include <new>
@@ -51,8 +52,14 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_window_manager(&dependencies.window_manager);
     }
     if (result == REACH_OK) {
-        const uint16_t default_path[] = { 'r','e','a','c','h','.','i','n','i',0 };
-        result = reach_windows_create_config_store(desc != nullptr && desc->config_path != nullptr ? desc->config_path : default_path, &dependencies.config_store);
+        uint16_t default_path[260] = {};
+        const uint16_t *config_path = desc != nullptr && desc->config_path != nullptr ? desc->config_path : default_path;
+        if (desc == nullptr || desc->config_path == nullptr) {
+            result = reach_default_config_path(default_path, 260);
+        }
+        if (result == REACH_OK) {
+            result = reach_windows_create_config_store(config_path, &dependencies.config_store);
+        }
     }
     if (result == REACH_OK) {
         result = reach_windows_create_tray_provider(&dependencies.tray_provider);
@@ -147,6 +154,11 @@ reach_result reach_app_update(reach_app *app, double delta_seconds)
     }
 
     return reach_shell_update(app->shell, delta_seconds);
+}
+
+int32_t reach_app_needs_frame(const reach_app *app)
+{
+    return app != nullptr && app->shell != nullptr && reach_shell_needs_frame(app->shell);
 }
 
 void reach_app_destroy(reach_app *app)

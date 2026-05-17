@@ -71,6 +71,11 @@ static reach_result reach_config_store_save(reach_config_store *store, const rea
         WritePrivateProfileStringW(section, L"path", reinterpret_cast<const wchar_t *>(app->path), path);
         WritePrivateProfileStringW(section, L"icon", reinterpret_cast<const wchar_t *>(app->icon_ref), path);
     }
+    for (size_t index = snapshot->pinned_app_count; index < REACH_MAX_PINNED_APPS; ++index) {
+        wchar_t section[32] = {};
+        swprintf_s(section, L"pinned.%u", (unsigned)index);
+        WritePrivateProfileStringW(section, nullptr, nullptr, path);
+    }
 
     return REACH_OK;
 }

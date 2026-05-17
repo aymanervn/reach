@@ -11,6 +11,8 @@ struct reach_platform_window {
     reach_surface_role role;
     reach_platform_window_event_callback callback;
     void *callback_user;
+    int width;
+    int height;
 };
 
 static const wchar_t *reach_window_class_name()
@@ -48,13 +50,14 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONUP:
+    case WM_RBUTTONUP:
         if (window != nullptr && window->callback != nullptr) {
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
             point.y = GET_Y_LPARAM(lparam);
             ClientToScreen(hwnd, &point);
             reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_POINTER_UP;
+            event.type = message == WM_RBUTTONUP ? REACH_UI_EVENT_POINTER_CONTEXT : REACH_UI_EVENT_POINTER_UP;
             event.x = point.x;
             event.y = point.y;
             window->callback(window->callback_user, &event);
@@ -126,14 +129,28 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
         return REACH_INVALID_ARGUMENT;
     }
 
+    int width = (int)bounds.width;
+    int height = (int)bounds.height;
     BOOL ok = SetWindowPos(
         window->hwnd,
         HWND_TOPMOST,
         (int)bounds.x,
         (int)bounds.y,
-        (int)bounds.width,
-        (int)bounds.height,
+        width,
+        height,
         SWP_NOACTIVATE);
+    if (ok && window->role == REACH_SURFACE_DOCK && (window->width != width || window->height != height)) {
+        int radius = height > 0 ? (int)((float)height * 0.42f) : 24;
+        if (radius < 18) {
+            radius = 18;
+        }
+        HRGN region = CreateRoundRectRgn(0, 0, width + 1, height + 1, radius, radius);
+        if (region != nullptr) {
+            SetWindowRgn(window->hwnd, region, TRUE);
+        }
+        window->width = width;
+        window->height = height;
+    }
     return ok ? REACH_OK : REACH_ERROR;
 }
 

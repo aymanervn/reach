@@ -8,6 +8,7 @@
 #include "reach/hotkeys.h"
 #include "reach/monitor.h"
 #include "reach/platform/windows_adapters.h"
+#include "reach/pin_config.h"
 #include "reach/wm.h"
 
 #include <windows.h>
@@ -35,6 +36,7 @@ struct reach_shell {
     reach_explorer_service_port explorer_service;
     reach_icon_handle pinned_icons[REACH_MAX_PINNED_APPS];
     size_t pinned_icon_count;
+    uint16_t pinned_icon_initials[REACH_MAX_PINNED_APPS];
     reach_ui_layout layout;
     int32_t has_layout;
     int32_t layout_dirty;
@@ -54,6 +56,8 @@ struct reach_shell {
     float last_launcher_opacity;
     reach_float_animation dock_y_animation;
     double window_manager_refresh_elapsed;
+    reach_float_animation tray_flat_animation;
+    int32_t tray_animating;
     int32_t running;
 };
 
@@ -73,6 +77,11 @@ static int32_t reach_shell_opacity_equal(float a, float b)
 static int32_t reach_shell_float_animation_active(const reach_float_animation *animation)
 {
     return animation != nullptr && animation->elapsed_seconds < animation->duration_seconds;
+}
+
+static float reach_min_float(float a, float b)
+{
+    return a < b ? a : b;
 }
 
 static reach_result reach_shell_apply_window_state(
@@ -136,6 +145,7 @@ static reach_result reach_shell_load_pinned_icons(reach_shell *shell)
 
     shell->pinned_icon_count = shell->ui.pinned_app_count;
     for (size_t index = 0; index < shell->ui.pinned_app_count; ++index) {
+        shell->pinned_icon_initials[index] = shell->ui.pinned_apps[index].title[0] != 0 ? shell->ui.pinned_apps[index].title[0] : '?';
         const uint16_t *icon_path = shell->ui.pinned_apps[index].icon_ref[0] != 0
             ? shell->ui.pinned_apps[index].icon_ref
             : shell->ui.pinned_apps[index].path;
@@ -150,6 +160,29 @@ static reach_result reach_shell_load_pinned_icons(reach_shell *shell)
     }
 
     return REACH_OK;
+}
+
+static reach_result reach_shell_reload_pins(reach_shell *shell)
+{
+    if (shell == nullptr || shell->config_store.ops.load == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_config_snapshot snapshot = {};
+    reach_result result = shell->config_store.ops.load(shell->config_store.store, &snapshot);
+    if (result != REACH_OK) {
+        return result;
+    }
+    result = reach_ui_state_set_pinned_apps(&shell->ui, snapshot.pinned_apps, snapshot.pinned_app_count);
+    if (result != REACH_OK) {
+        return result;
+    }
+    result = reach_shell_load_pinned_icons(shell);
+    shell->layout_dirty = 1;
+    shell->render_dirty = 1;
+    shell->dock_render_dirty = 1;
+    shell->launcher_render_dirty = 1;
+    return result;
 }
 
 static int32_t reach_shell_any_window_maximized(reach_shell *shell)
@@ -195,6 +228,11 @@ static reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach
     if (shell->dock_animating) {
         reach_float_animation_update(&shell->dock_y_animation, delta_seconds);
         shell->dock_animating = reach_shell_float_animation_active(&shell->dock_y_animation);
+        shell->dock_render_dirty = 1;
+    }
+    if (shell->tray_animating) {
+        reach_float_animation_update(&shell->tray_flat_animation, delta_seconds);
+        shell->tray_animating = reach_shell_float_animation_active(&shell->tray_flat_animation);
         shell->dock_render_dirty = 1;
     }
 
@@ -309,6 +347,24 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
 
     reach_render_command_buffer commands = {};
     reach_render_command command = {};
+    float dock_radius = reach_min_float(layout->bounds.height * 0.32f, 22.0f);
+    for (int shadow_index = 0; shadow_index < 3; ++shadow_index) {
+        float inset = (float)(shadow_index * 2);
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect.x = 2.0f + inset;
+        command.rect.y = 5.0f + inset;
+        command.rect.width = layout->bounds.width - inset * 2.0f;
+        command.rect.height = layout->bounds.height - inset * 2.0f;
+        command.color.r = 0.55f;
+        command.color.g = 0.57f;
+        command.color.b = 0.60f;
+        command.color.a = 0.16f - (float)shadow_index * 0.035f;
+        command.radius = dock_radius;
+        reach_render_command_buffer_push(&commands, &command);
+    }
+
+    command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect.x = 0.0f;
     command.rect.y = 0.0f;
@@ -317,26 +373,44 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     command.color.r = 1.0f;
     command.color.g = 1.0f;
     command.color.b = 1.0f;
-    command.color.a = 0.96f;
-    command.radius = 14.0f;
+    command.color.a = 1.0f;
+    command.radius = dock_radius;
     reach_render_command_buffer_push(&commands, &command);
 
     for (size_t index = 0; index < layout->app_slot_count; ++index) {
         command = {};
-        command.type = REACH_RENDER_COMMAND_ICON;
         command.rect.x = layout->app_slots[index].x - layout->bounds.x;
         command.rect.y = layout->app_slots[index].y - layout->bounds.y;
         command.rect.width = layout->app_slots[index].width;
         command.rect.height = layout->app_slots[index].height;
-        command.color.r = 0.18f;
-        command.color.g = 0.20f;
-        command.color.b = 0.24f;
-        command.color.a = 1.0f;
-        command.radius = 10.0f;
-        if (index < shell->pinned_icon_count) {
+        if (index < shell->pinned_icon_count && shell->pinned_icons[index].id != 0) {
+            command.type = REACH_RENDER_COMMAND_ICON;
             command.icon_id = shell->pinned_icons[index].id;
+            command.color.a = 1.0f;
+            reach_render_command_buffer_push(&commands, &command);
+        } else {
+            command.type = REACH_RENDER_COMMAND_RECT;
+            command.color.r = 0.18f;
+            command.color.g = 0.20f;
+            command.color.b = 0.24f;
+            command.color.a = 1.0f;
+            command.radius = 10.0f;
+            reach_render_command_buffer_push(&commands, &command);
+
+            command = {};
+            command.type = REACH_RENDER_COMMAND_TEXT;
+            command.rect.x = layout->app_slots[index].x - layout->bounds.x;
+            command.rect.y = layout->app_slots[index].y - layout->bounds.y + 8.0f;
+            command.rect.width = layout->app_slots[index].width;
+            command.rect.height = layout->app_slots[index].height;
+            command.color.r = 1.0f;
+            command.color.g = 1.0f;
+            command.color.b = 1.0f;
+            command.color.a = 0.92f;
+            command.text[0] = index < REACH_MAX_PINNED_APPS ? shell->pinned_icon_initials[index] : '?';
+            command.text[1] = 0;
+            reach_render_command_buffer_push(&commands, &command);
         }
-        reach_render_command_buffer_push(&commands, &command);
     }
 
     command = {};
@@ -350,6 +424,20 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     command.color.b = 0.28f;
     command.color.a = 1.0f;
     command.radius = 10.0f;
+    reach_render_command_buffer_push(&commands, &command);
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_TEXT;
+    command.rect.x = layout->tray_button.x - layout->bounds.x;
+    command.rect.y = layout->tray_button.y - layout->bounds.y + 7.0f;
+    command.rect.width = layout->tray_button.width;
+    command.rect.height = layout->tray_button.height;
+    command.color.r = 1.0f;
+    command.color.g = 1.0f;
+    command.color.b = 1.0f;
+    command.color.a = 0.90f;
+    command.text[0] = shell->tray_flat_animation.value > 0.5f ? '-' : '^';
+    command.text[1] = 0;
     reach_render_command_buffer_push(&commands, &command);
 
     if (shell->dock_renderer.ops.begin_frame(shell->dock_renderer.backend) != REACH_OK) {
@@ -435,7 +523,7 @@ static reach_result reach_shell_render_launcher_surface(reach_shell *shell, cons
         command.color.g = 1.0f;
         command.color.b = 1.0f;
         command.color.a = 0.72f;
-        reach_copy_utf16(command.text, 260, (const uint16_t *)L"waiting for api implementation");
+        reach_copy_utf16(command.text, 260, (const uint16_t *)L"Open Explorer");
         reach_render_command_buffer_push(&commands, &command);
     }
 
@@ -451,6 +539,98 @@ static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
     return (float)x >= rect.x && (float)x <= rect.x + rect.width && (float)y >= rect.y && (float)y <= rect.y + rect.height;
 }
 
+static int32_t reach_utf16_starts_with_ascii_case_insensitive(const uint16_t *text, const char *prefix)
+{
+    if (text == nullptr || prefix == nullptr) {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (prefix[index] != 0) {
+        uint16_t current = text[index];
+        char expected = prefix[index];
+        if (current >= 'A' && current <= 'Z') {
+            current = (uint16_t)(current - 'A' + 'a');
+        }
+        if (expected >= 'A' && expected <= 'Z') {
+            expected = (char)(expected - 'A' + 'a');
+        }
+        if (current != (uint16_t)expected) {
+            return 0;
+        }
+        ++index;
+    }
+    return 1;
+}
+
+static reach_result reach_shell_open_launcher_result(reach_shell *shell)
+{
+    REACH_ASSERT(shell != nullptr);
+    if (shell == nullptr || shell->explorer_service.service == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const uint16_t *query = shell->ui.launcher.query;
+    if (query[0] == 0) {
+        if (shell->explorer_service.ops.open_default != nullptr) {
+            return shell->explorer_service.ops.open_default(shell->explorer_service.service);
+        }
+        return REACH_OK;
+    }
+
+    if (reach_utf16_starts_with_ascii_case_insensitive(query, "shell:") &&
+        shell->explorer_service.ops.open_shell_location != nullptr) {
+        return shell->explorer_service.ops.open_shell_location(shell->explorer_service.service, query);
+    }
+
+    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(query));
+    if (attributes != INVALID_FILE_ATTRIBUTES && shell->explorer_service.ops.open_path != nullptr) {
+        return shell->explorer_service.ops.open_path(shell->explorer_service.service, query);
+    }
+
+    if (shell->explorer_service.ops.open_default != nullptr) {
+        return shell->explorer_service.ops.open_default(shell->explorer_service.service);
+    }
+    return REACH_OK;
+}
+
+enum reach_shell_context_command {
+    REACH_SHELL_CONTEXT_UNPIN = 100
+};
+
+static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t app_index, int32_t x, int32_t y)
+{
+    if (shell == nullptr || app_index >= shell->ui.pinned_app_count) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HMENU menu = CreatePopupMenu();
+    if (menu == nullptr) {
+        return REACH_ERROR;
+    }
+
+    AppendMenuW(menu, MF_STRING, REACH_SHELL_CONTEXT_UNPIN, L"Unpin app from dock");
+    HWND owner = shell->dock_window.ops.native_handle != nullptr
+        ? static_cast<HWND>(shell->dock_window.ops.native_handle(shell->dock_window.window))
+        : GetForegroundWindow();
+    if (owner == nullptr) {
+        owner = GetDesktopWindow();
+    }
+    SetForegroundWindow(owner);
+    int command = TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD, x, y, 0, owner, nullptr);
+    DestroyMenu(menu);
+
+    if (command == REACH_SHELL_CONTEXT_UNPIN) {
+        uint32_t id = shell->ui.pinned_apps[app_index].id;
+        if (reach_pin_config_unpin_id(&shell->config_store, id) == REACH_OK) {
+            return reach_shell_reload_pins(shell);
+        }
+        return REACH_ERROR;
+    }
+
+    return REACH_OK;
+}
+
 static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reach_ui_event *event)
 {
     if (!shell->has_layout) {
@@ -458,7 +638,30 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     }
 
     reach_ui_event routed = {};
+    if (shell->ui.launcher.open) {
+        for (size_t index = 0; index < shell->layout.launcher.pinned_app_slot_count; ++index) {
+            if (reach_rect_contains(shell->layout.launcher.pinned_app_slots[index], event->x, event->y)) {
+                routed.type = REACH_UI_EVENT_DOCK_APP_CLICK;
+                routed.id = shell->ui.pinned_apps[index].id;
+                return reach_shell_handle_event(shell, &routed);
+            }
+        }
+
+        if (reach_rect_contains(shell->layout.launcher.search_results, event->x, event->y)) {
+            (void)reach_shell_open_launcher_result(shell);
+            (void)reach_ui_state_close_launcher(&shell->ui);
+            shell->layout_dirty = 1;
+            shell->launcher_render_dirty = 1;
+            return shell->launcher_window.ops.hide != nullptr
+                ? shell->launcher_window.ops.hide(shell->launcher_window.window)
+                : REACH_OK;
+        }
+    }
+
     if (reach_rect_contains(shell->layout.dock.tray_button, event->x, event->y)) {
+        reach_float_animation_start(&shell->tray_flat_animation, 1.0f, 0.0f, 0.18);
+        shell->tray_animating = 1;
+        shell->dock_render_dirty = 1;
         routed.type = REACH_UI_EVENT_TRAY_BUTTON_CLICK;
         return reach_shell_handle_event(shell, &routed);
     }
@@ -468,6 +671,21 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
             routed.type = REACH_UI_EVENT_DOCK_APP_CLICK;
             routed.id = shell->ui.pinned_apps[index].id;
             return reach_shell_handle_event(shell, &routed);
+        }
+    }
+
+    return REACH_OK;
+}
+
+static reach_result reach_shell_handle_pointer_context(reach_shell *shell, const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr || !shell->has_layout) {
+        return REACH_OK;
+    }
+
+    for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
+        if (reach_rect_contains(shell->layout.dock.app_slots[index], event->x, event->y)) {
+            return reach_shell_show_dock_app_context_menu(shell, index, event->x, event->y);
         }
     }
 
@@ -653,6 +871,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->explorer_service = dependencies->explorer_service;
 
     if (result == REACH_OK && shell->config_store.ops.load != nullptr) {
+        (void)reach_pin_config_ensure_defaults(&shell->config_store);
         reach_config_snapshot snapshot = {};
         if (shell->config_store.ops.load(shell->config_store.store, &snapshot) == REACH_OK) {
             if (snapshot.dock_height > 0.0f) shell->ui.dock.height = snapshot.dock_height;
@@ -782,6 +1001,9 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     if (event->type == REACH_UI_EVENT_POINTER_UP) {
         return reach_shell_handle_pointer_up(shell, event);
     }
+    if (event->type == REACH_UI_EVENT_POINTER_CONTEXT) {
+        return reach_shell_handle_pointer_context(shell, event);
+    }
 
     reach_result result = reach_ui_handle_event(&shell->ui, event, &intent);
     if (result != REACH_OK) {
@@ -884,7 +1106,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     result = reach_shell_apply_window_state(
                         &shell->dock_window,
                         layout.dock.bounds,
-                        0.95f,
+                        1.0f,
                         &shell->last_dock_bounds,
                         &shell->last_dock_opacity,
                         &shell->dock_bounds_valid,
@@ -910,4 +1132,14 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
 
     return REACH_OK;
+}
+
+int32_t reach_shell_needs_frame(const reach_shell *shell)
+{
+    return shell != nullptr &&
+        (shell->render_dirty ||
+         shell->dock_render_dirty ||
+         shell->launcher_render_dirty ||
+         shell->dock_animating ||
+         shell->tray_animating);
 }

@@ -8,7 +8,14 @@
 #include <dwrite.h>
 #include <wincodec.h>
 
+#include <stdint.h>
 #include <new>
+#include <vector>
+
+struct reach_d2d_icon_cache_entry {
+    uintptr_t icon_id;
+    ID2D1Bitmap *bitmap;
+};
 
 struct reach_render_backend {
     HWND hwnd;
@@ -16,6 +23,9 @@ struct reach_render_backend {
     ID2D1HwndRenderTarget *target;
     IDWriteFactory *text_factory;
     IWICImagingFactory *wic_factory;
+    std::vector<reach_d2d_icon_cache_entry> icon_cache;
+    UINT target_width;
+    UINT target_height;
 };
 
 static D2D1_COLOR_F reach_d2d_color(reach_color color)
@@ -45,7 +55,25 @@ static reach_result reach_d2d_create_target(reach_render_backend *backend)
         D2D1::RenderTargetProperties(),
         D2D1::HwndRenderTargetProperties(backend->hwnd, D2D1::SizeU(width, height)),
         &backend->target);
+    if (SUCCEEDED(hr)) {
+        backend->target_width = width;
+        backend->target_height = height;
+    }
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
+static void reach_d2d_clear_icon_cache(reach_render_backend *backend)
+{
+    if (backend == nullptr) {
+        return;
+    }
+
+    for (reach_d2d_icon_cache_entry &entry : backend->icon_cache) {
+        if (entry.bitmap != nullptr) {
+            entry.bitmap->Release();
+        }
+    }
+    backend->icon_cache.clear();
 }
 
 static reach_result reach_d2d_begin_frame(reach_render_backend *backend)
@@ -53,6 +81,26 @@ static reach_result reach_d2d_begin_frame(reach_render_backend *backend)
     REACH_ASSERT(backend != nullptr);
     if (backend == nullptr || backend->target == nullptr) {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    RECT client = {};
+    GetClientRect(backend->hwnd, &client);
+    UINT width = static_cast<UINT>(client.right - client.left);
+    UINT height = static_cast<UINT>(client.bottom - client.top);
+    if (width == 0) {
+        width = 1;
+    }
+    if (height == 0) {
+        height = 1;
+    }
+    if (width != backend->target_width || height != backend->target_height) {
+        reach_d2d_clear_icon_cache(backend);
+        HRESULT resize_hr = backend->target->Resize(D2D1::SizeU(width, height));
+        if (FAILED(resize_hr)) {
+            return REACH_ERROR;
+        }
+        backend->target_width = width;
+        backend->target_height = height;
     }
 
     backend->target->BeginDraw();
@@ -69,6 +117,7 @@ static reach_result reach_d2d_end_frame(reach_render_backend *backend)
 
     HRESULT hr = backend->target->EndDraw();
     if (hr == D2DERR_RECREATE_TARGET) {
+        reach_d2d_clear_icon_cache(backend);
         backend->target->Release();
         backend->target = nullptr;
         return reach_d2d_create_target(backend);
@@ -76,16 +125,17 @@ static reach_result reach_d2d_end_frame(reach_render_backend *backend)
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_render_command *command)
+static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, uintptr_t icon_id, ID2D1Bitmap **out_bitmap)
 {
     REACH_ASSERT(backend != nullptr);
-    REACH_ASSERT(command != nullptr);
-    if (backend == nullptr || command == nullptr || backend->wic_factory == nullptr || command->icon_id == 0) {
+    REACH_ASSERT(out_bitmap != nullptr);
+    if (backend == nullptr || backend->target == nullptr || backend->wic_factory == nullptr || icon_id == 0 || out_bitmap == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
 
+    *out_bitmap = nullptr;
     IWICBitmap *wic_bitmap = nullptr;
-    HRESULT hr = backend->wic_factory->CreateBitmapFromHICON(reinterpret_cast<HICON>(command->icon_id), &wic_bitmap);
+    HRESULT hr = backend->wic_factory->CreateBitmapFromHICON(reinterpret_cast<HICON>(icon_id), &wic_bitmap);
     if (FAILED(hr)) {
         return REACH_ERROR;
     }
@@ -106,19 +156,65 @@ static reach_result reach_d2d_draw_icon(reach_render_backend *backend, const rea
     if (SUCCEEDED(hr)) {
         hr = backend->target->CreateBitmapFromWicBitmap(converter, nullptr, &bitmap);
     }
-    if (SUCCEEDED(hr)) {
-        D2D1_RECT_F rect = D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width, command->rect.y + command->rect.height);
-        backend->target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-    }
-
-    if (bitmap != nullptr) {
-        bitmap->Release();
+    if (SUCCEEDED(hr) && bitmap != nullptr) {
+        *out_bitmap = bitmap;
     }
     if (converter != nullptr) {
         converter->Release();
     }
     wic_bitmap->Release();
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_d2d_get_icon_bitmap(reach_render_backend *backend, uintptr_t icon_id, ID2D1Bitmap **out_bitmap)
+{
+    REACH_ASSERT(backend != nullptr);
+    REACH_ASSERT(out_bitmap != nullptr);
+    if (backend == nullptr || out_bitmap == nullptr || icon_id == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    for (reach_d2d_icon_cache_entry &entry : backend->icon_cache) {
+        if (entry.icon_id == icon_id && entry.bitmap != nullptr) {
+            *out_bitmap = entry.bitmap;
+            return REACH_OK;
+        }
+    }
+
+    ID2D1Bitmap *bitmap = nullptr;
+    reach_result result = reach_d2d_create_icon_bitmap(backend, icon_id, &bitmap);
+    if (result != REACH_OK || bitmap == nullptr) {
+        return result == REACH_OK ? REACH_ERROR : result;
+    }
+
+    try {
+        backend->icon_cache.push_back({ icon_id, bitmap });
+    } catch (...) {
+        bitmap->Release();
+        return REACH_ERROR;
+    }
+
+    *out_bitmap = bitmap;
+    return REACH_OK;
+}
+
+static reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_render_command *command)
+{
+    REACH_ASSERT(backend != nullptr);
+    REACH_ASSERT(command != nullptr);
+    if (backend == nullptr || command == nullptr || command->icon_id == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    ID2D1Bitmap *bitmap = nullptr;
+    reach_result result = reach_d2d_get_icon_bitmap(backend, command->icon_id, &bitmap);
+    if (result != REACH_OK || bitmap == nullptr) {
+        return result == REACH_OK ? REACH_ERROR : result;
+    }
+
+    D2D1_RECT_F rect = D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width, command->rect.y + command->rect.height);
+    backend->target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    return REACH_OK;
 }
 
 static reach_result reach_d2d_execute(reach_render_backend *backend, const reach_render_command_buffer *commands)
@@ -164,6 +260,10 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
                 L"",
                 &format);
             if (SUCCEEDED(hr)) {
+                (void)format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            }
+            if (SUCCEEDED(hr)) {
                 hr = backend->target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
             }
             if (FAILED(hr)) {
@@ -191,6 +291,7 @@ static void reach_d2d_destroy(reach_render_backend *backend)
         return;
     }
 
+    reach_d2d_clear_icon_cache(backend);
     if (backend->target != nullptr) {
         backend->target->Release();
     }

@@ -29,7 +29,7 @@ static reach_result reach_explorer_open_default(reach_explorer_service *service)
         return REACH_INVALID_ARGUMENT;
     }
 
-    return reach_explorer_execute(nullptr);
+    return reach_explorer_execute(L"shell:MyComputerFolder");
 }
 
 static reach_result reach_explorer_open_path(reach_explorer_service *service, const uint16_t *path)

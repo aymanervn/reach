@@ -48,6 +48,7 @@ reach_result reach_shell_start(reach_shell *shell);
 reach_result reach_shell_stop(reach_shell *shell);
 reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *event);
 reach_result reach_shell_update(reach_shell *shell, double delta_seconds);
+int32_t reach_shell_needs_frame(const reach_shell *shell);
 
 #ifdef __cplusplus
 }

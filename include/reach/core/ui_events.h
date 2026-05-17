@@ -15,7 +15,8 @@ typedef enum reach_ui_event_type {
     REACH_UI_EVENT_BACKSPACE = 4,
     REACH_UI_EVENT_DOCK_APP_CLICK = 5,
     REACH_UI_EVENT_TRAY_BUTTON_CLICK = 6,
-    REACH_UI_EVENT_POINTER_UP = 7
+    REACH_UI_EVENT_POINTER_UP = 7,
+    REACH_UI_EVENT_POINTER_CONTEXT = 8
 } reach_ui_event_type;
 
 typedef struct reach_ui_event {

@@ -166,7 +166,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     QueryPerformanceCounter(&previous_counter);
     int running = 1;
     while (running) {
-        DWORD wait_result = MsgWaitForMultipleObjectsEx(0, nullptr, 16, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        DWORD wait_ms = app != nullptr && reach_app_needs_frame(app) ? 16 : 250;
+        DWORD wait_result = MsgWaitForMultipleObjectsEx(0, nullptr, wait_ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         (void)wait_result;
 
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
