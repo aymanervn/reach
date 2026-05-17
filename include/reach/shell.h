@@ -6,6 +6,8 @@
 #include "reach/ports/app_launcher.h"
 #include "reach/core/ui_events.h"
 #include "reach/ports/config_store.h"
+#include "reach/ports/explorer_service.h"
+#include "reach/ports/icon_provider.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/platform_window.h"
 #include "reach/ports/render_backend.h"
@@ -35,6 +37,8 @@ typedef struct reach_shell_dependencies {
     reach_tray_provider_port tray_provider;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
+    reach_icon_provider_port icon_provider;
+    reach_explorer_service_port explorer_service;
 } reach_shell_dependencies;
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, const reach_shell_dependencies *dependencies, reach_shell **out_shell);

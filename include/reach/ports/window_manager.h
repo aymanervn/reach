@@ -21,6 +21,8 @@ typedef struct reach_window_snapshot {
 } reach_window_snapshot;
 
 typedef struct reach_window_manager_ops {
+    reach_result (*start)(reach_window_manager *manager);
+    reach_result (*stop)(reach_window_manager *manager);
     reach_result (*refresh)(reach_window_manager *manager);
     reach_result (*snap)(reach_window_manager *manager, uintptr_t window_id, reach_split_mode mode);
     uintptr_t (*foreground)(const reach_window_manager *manager);

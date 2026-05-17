@@ -6,6 +6,7 @@
 #include <d2d1_1.h>
 #include <dcomp.h>
 #include <dwrite.h>
+#include <wincodec.h>
 
 #include <new>
 
@@ -14,6 +15,7 @@ struct reach_render_backend {
     ID2D1Factory1 *factory;
     ID2D1HwndRenderTarget *target;
     IDWriteFactory *text_factory;
+    IWICImagingFactory *wic_factory;
 };
 
 static D2D1_COLOR_F reach_d2d_color(reach_color color)
@@ -74,6 +76,51 @@ static reach_result reach_d2d_end_frame(reach_render_backend *backend)
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
+static reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_render_command *command)
+{
+    REACH_ASSERT(backend != nullptr);
+    REACH_ASSERT(command != nullptr);
+    if (backend == nullptr || command == nullptr || backend->wic_factory == nullptr || command->icon_id == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    IWICBitmap *wic_bitmap = nullptr;
+    HRESULT hr = backend->wic_factory->CreateBitmapFromHICON(reinterpret_cast<HICON>(command->icon_id), &wic_bitmap);
+    if (FAILED(hr)) {
+        return REACH_ERROR;
+    }
+
+    IWICFormatConverter *converter = nullptr;
+    hr = backend->wic_factory->CreateFormatConverter(&converter);
+    if (SUCCEEDED(hr)) {
+        hr = converter->Initialize(
+            wic_bitmap,
+            GUID_WICPixelFormat32bppPBGRA,
+            WICBitmapDitherTypeNone,
+            nullptr,
+            0.0,
+            WICBitmapPaletteTypeMedianCut);
+    }
+
+    ID2D1Bitmap *bitmap = nullptr;
+    if (SUCCEEDED(hr)) {
+        hr = backend->target->CreateBitmapFromWicBitmap(converter, nullptr, &bitmap);
+    }
+    if (SUCCEEDED(hr)) {
+        D2D1_RECT_F rect = D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width, command->rect.y + command->rect.height);
+        backend->target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    }
+
+    if (bitmap != nullptr) {
+        bitmap->Release();
+    }
+    if (converter != nullptr) {
+        converter->Release();
+    }
+    wic_bitmap->Release();
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_d2d_execute(reach_render_backend *backend, const reach_render_command_buffer *commands)
 {
     REACH_ASSERT(backend != nullptr);
@@ -84,6 +131,13 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
 
     for (size_t index = 0; index < commands->count; ++index) {
         const reach_render_command *command = &commands->commands[index];
+        if (command->type == REACH_RENDER_COMMAND_ICON && command->icon_id != 0) {
+            reach_result result = reach_d2d_draw_icon(backend, command);
+            if (result == REACH_OK) {
+                continue;
+            }
+        }
+
         if (command->type == REACH_RENDER_COMMAND_RECT || command->type == REACH_RENDER_COMMAND_ICON) {
             ID2D1SolidColorBrush *brush = nullptr;
             HRESULT hr = backend->target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
@@ -143,6 +197,9 @@ static void reach_d2d_destroy(reach_render_backend *backend)
     if (backend->text_factory != nullptr) {
         backend->text_factory->Release();
     }
+    if (backend->wic_factory != nullptr) {
+        backend->wic_factory->Release();
+    }
     if (backend->factory != nullptr) {
         backend->factory->Release();
     }
@@ -167,6 +224,13 @@ reach_result reach_windows_create_d2d_render_backend(void *native_window, reach_
     HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &backend->factory);
     if (SUCCEEDED(hr)) {
         hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown **>(&backend->text_factory));
+    }
+    if (SUCCEEDED(hr)) {
+        hr = CoCreateInstance(
+            CLSID_WICImagingFactory,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_PPV_ARGS(&backend->wic_factory));
     }
     if (SUCCEEDED(hr)) {
         hr = reach_d2d_create_target(backend) == REACH_OK ? S_OK : E_FAIL;

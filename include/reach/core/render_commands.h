@@ -22,6 +22,7 @@ typedef struct reach_render_command {
     reach_rect_f32 rect;
     reach_color color;
     float radius;
+    uint64_t icon_id;
     uint16_t text[260];
 } reach_render_command;
 

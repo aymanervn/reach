@@ -58,6 +58,12 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_tray_provider(&dependencies.tray_provider);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_icon_provider(&dependencies.icon_provider);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_explorer_service(&dependencies.explorer_service);
+    }
+    if (result == REACH_OK) {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
     }
     if (result != REACH_OK) {
@@ -90,6 +96,12 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.app_launcher.ops.destroy != nullptr) {
             dependencies.app_launcher.ops.destroy(dependencies.app_launcher.launcher);
+        }
+        if (dependencies.icon_provider.ops.destroy != nullptr) {
+            dependencies.icon_provider.ops.destroy(dependencies.icon_provider.provider);
+        }
+        if (dependencies.explorer_service.ops.destroy != nullptr) {
+            dependencies.explorer_service.ops.destroy(dependencies.explorer_service.service);
         }
         delete app;
         return result;

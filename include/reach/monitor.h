@@ -26,6 +26,7 @@ void reach_monitor_list_destroy(reach_monitor_list *list);
 reach_result reach_monitor_refresh(reach_monitor_list *list);
 size_t reach_monitor_count(const reach_monitor_list *list);
 const reach_monitor_info *reach_monitor_get(const reach_monitor_list *list, size_t index);
+const reach_monitor_info *reach_monitor_primary(const reach_monitor_list *list);
 
 #ifdef __cplusplus
 }

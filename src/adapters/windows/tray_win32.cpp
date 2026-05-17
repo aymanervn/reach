@@ -8,7 +8,12 @@
 #include <new>
 
 struct reach_tray_provider {
-    int unused;
+    int32_t native_tray_supported;
+};
+
+enum reach_tray_menu_command {
+    REACH_TRAY_MENU_OPEN_EXPLORER = 100,
+    REACH_TRAY_MENU_OPEN_TASK_MANAGER = 101
 };
 
 static reach_result reach_tray_refresh(reach_tray_provider *provider)
@@ -18,7 +23,8 @@ static reach_result reach_tray_refresh(reach_tray_provider *provider)
         return REACH_INVALID_ARGUMENT;
     }
 
-    return REACH_OK;
+    provider->native_tray_supported = 0;
+    return REACH_NOT_IMPLEMENTED;
 }
 
 static size_t reach_tray_item_count(const reach_tray_provider *provider)
@@ -37,7 +43,8 @@ static reach_result reach_tray_item_at(const reach_tray_provider *provider, size
     }
 
     (void)index;
-    return REACH_INVALID_ARGUMENT;
+    *out_item = {};
+    return REACH_NOT_IMPLEMENTED;
 }
 
 static reach_result reach_tray_open_menu(reach_tray_provider *provider, uint32_t item_id)
@@ -55,10 +62,34 @@ static reach_result reach_tray_open_menu(reach_tray_provider *provider, uint32_t
         return REACH_ERROR;
     }
 
-    AppendMenuW(menu, MF_STRING | MF_GRAYED, 1, L"Tray provider pending");
+    AppendMenuW(menu, MF_STRING | MF_GRAYED, 1, L"Native tray enumeration pending");
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING, REACH_TRAY_MENU_OPEN_EXPLORER, L"Open Explorer");
+    AppendMenuW(menu, MF_STRING, REACH_TRAY_MENU_OPEN_TASK_MANAGER, L"Open Task Manager");
+
     HWND owner = GetForegroundWindow();
-    TrackPopupMenu(menu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_NONOTIFY, point.x, point.y, 0, owner, nullptr);
+    if (owner == nullptr) {
+        owner = GetDesktopWindow();
+    }
+    SetForegroundWindow(owner);
+    int command = TrackPopupMenu(menu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_RETURNCMD, point.x, point.y, 0, owner, nullptr);
     DestroyMenu(menu);
+
+    if (command == REACH_TRAY_MENU_OPEN_EXPLORER) {
+        SHELLEXECUTEINFOW info = {};
+        info.cbSize = sizeof(info);
+        info.lpFile = L"explorer.exe";
+        info.nShow = SW_SHOWNORMAL;
+        return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
+    }
+    if (command == REACH_TRAY_MENU_OPEN_TASK_MANAGER) {
+        SHELLEXECUTEINFOW info = {};
+        info.cbSize = sizeof(info);
+        info.lpFile = L"taskmgr.exe";
+        info.nShow = SW_SHOWNORMAL;
+        return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
+    }
+
     return REACH_OK;
 }
 
@@ -79,6 +110,7 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
     if (provider == nullptr) {
         return REACH_ERROR;
     }
+    provider->native_tray_supported = 0;
 
     out_port->provider = provider;
     out_port->ops.refresh = reach_tray_refresh;

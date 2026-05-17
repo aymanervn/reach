@@ -1,12 +1,16 @@
 #include "reach/platform/windows_adapters.h"
 
 #include <windows.h>
+#include <windowsx.h>
+#include <dwmapi.h>
 
 #include <new>
 
 struct reach_platform_window {
     HWND hwnd;
     reach_surface_role role;
+    reach_platform_window_event_callback callback;
+    void *callback_user;
 };
 
 static const wchar_t *reach_window_class_name()
@@ -16,7 +20,46 @@ static const wchar_t *reach_window_class_name()
 
 static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
+    reach_platform_window *window = reinterpret_cast<reach_platform_window *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+
     switch (message) {
+    case WM_KEYDOWN:
+        if (window != nullptr && window->callback != nullptr) {
+            reach_ui_event event = {};
+            if (wparam == VK_ESCAPE) {
+                event.type = REACH_UI_EVENT_ESCAPE;
+            } else if (wparam == VK_BACK) {
+                event.type = REACH_UI_EVENT_BACKSPACE;
+            }
+            if (event.type != REACH_UI_EVENT_NONE) {
+                window->callback(window->callback_user, &event);
+                return 0;
+            }
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_CHAR:
+        if (window != nullptr && window->callback != nullptr && wparam >= 0x20) {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_TEXT;
+            event.text[0] = static_cast<uint16_t>(wparam);
+            event.text[1] = 0;
+            window->callback(window->callback_user, &event);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_LBUTTONUP:
+        if (window != nullptr && window->callback != nullptr) {
+            POINT point = {};
+            point.x = GET_X_LPARAM(lparam);
+            point.y = GET_Y_LPARAM(lparam);
+            ClientToScreen(hwnd, &point);
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_POINTER_UP;
+            event.x = point.x;
+            event.y = point.y;
+            window->callback(window->callback_user, &event);
+        }
+        return 0;
     case WM_ERASEBKGND:
         return 1;
     default:
@@ -59,7 +102,11 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
-    ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
+    ShowWindow(window->hwnd, window->role == REACH_SURFACE_DOCK ? SW_SHOWNOACTIVATE : SW_SHOW);
+    if (window->role != REACH_SURFACE_DOCK) {
+        SetForegroundWindow(window->hwnd);
+        SetFocus(window->hwnd);
+    }
     return REACH_OK;
 }
 
@@ -105,6 +152,33 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
 
     BYTE alpha = (BYTE)(opacity * 255.0f);
     return SetLayeredWindowAttributes(window->hwnd, 0, alpha, LWA_ALPHA) ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_platform_window_set_blur_enabled(reach_platform_window *window, int32_t enabled)
+{
+    if (window == nullptr || window->hwnd == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    DWM_BLURBEHIND blur = {};
+    blur.dwFlags = DWM_BB_ENABLE;
+    blur.fEnable = enabled ? TRUE : FALSE;
+    HRESULT hr = DwmEnableBlurBehindWindow(window->hwnd, &blur);
+    return SUCCEEDED(hr) || hr == DWM_E_COMPOSITIONDISABLED ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_platform_window_set_event_callback(
+    reach_platform_window *window,
+    reach_platform_window_event_callback callback,
+    void *user)
+{
+    if (window == nullptr || window->hwnd == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    window->callback = callback;
+    window->callback_user = user;
+    return REACH_OK;
 }
 
 static void *reach_platform_window_native_handle(reach_platform_window *window)
@@ -159,6 +233,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
         delete window;
         return REACH_ERROR;
     }
+    SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
 
     out_port->window = window;
     out_port->role = role;
@@ -166,6 +241,8 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
     out_port->ops.hide = reach_platform_window_hide;
     out_port->ops.set_bounds = reach_platform_window_set_bounds;
     out_port->ops.set_opacity = reach_platform_window_set_opacity;
+    out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
+    out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
     out_port->ops.native_handle = reach_platform_window_native_handle;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;

@@ -99,3 +99,18 @@ const reach_monitor_info *reach_monitor_get(const reach_monitor_list *list, size
 
     return &list->monitors[index];
 }
+
+const reach_monitor_info *reach_monitor_primary(const reach_monitor_list *list)
+{
+    if (list == nullptr || list->monitors.empty()) {
+        return nullptr;
+    }
+
+    for (const reach_monitor_info &monitor : list->monitors) {
+        if (monitor.primary) {
+            return &monitor;
+        }
+    }
+
+    return &list->monitors[0];
+}

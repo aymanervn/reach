@@ -5,8 +5,76 @@
 #include <new>
 
 struct reach_window_manager {
+    HWINEVENTHOOK create_hook;
+    HWINEVENTHOOK destroy_hook;
+    HWINEVENTHOOK foreground_hook;
     HWND foreground;
 };
+
+static reach_window_manager *g_window_manager;
+
+static void CALLBACK reach_window_manager_event_proc(
+    HWINEVENTHOOK hook,
+    DWORD event,
+    HWND window,
+    LONG object_id,
+    LONG child_id,
+    DWORD event_thread,
+    DWORD event_time)
+{
+    (void)hook;
+    (void)event;
+    (void)object_id;
+    (void)child_id;
+    (void)event_thread;
+    (void)event_time;
+
+    if (g_window_manager != nullptr && window != nullptr && IsWindow(window)) {
+        g_window_manager->foreground = GetForegroundWindow();
+    }
+}
+
+static reach_result reach_window_manager_stop(reach_window_manager *manager);
+
+static reach_result reach_window_manager_start(reach_window_manager *manager)
+{
+    REACH_ASSERT(manager != nullptr);
+    if (manager == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    (void)reach_window_manager_stop(manager);
+    g_window_manager = manager;
+    manager->create_hook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    manager->destroy_hook = SetWinEventHook(EVENT_OBJECT_DESTROY, EVENT_OBJECT_DESTROY, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    manager->foreground_hook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    return manager->create_hook != nullptr && manager->destroy_hook != nullptr && manager->foreground_hook != nullptr ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_window_manager_stop(reach_window_manager *manager)
+{
+    REACH_ASSERT(manager != nullptr);
+    if (manager == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (manager->create_hook != nullptr) {
+        UnhookWinEvent(manager->create_hook);
+        manager->create_hook = nullptr;
+    }
+    if (manager->destroy_hook != nullptr) {
+        UnhookWinEvent(manager->destroy_hook);
+        manager->destroy_hook = nullptr;
+    }
+    if (manager->foreground_hook != nullptr) {
+        UnhookWinEvent(manager->foreground_hook);
+        manager->foreground_hook = nullptr;
+    }
+    if (g_window_manager == manager) {
+        g_window_manager = nullptr;
+    }
+    return REACH_OK;
+}
 
 static reach_result reach_window_manager_refresh(reach_window_manager *manager)
 {
@@ -69,6 +137,9 @@ static int32_t reach_window_manager_foreground_is_maximized(const reach_window_m
 
 static void reach_window_manager_destroy(reach_window_manager *manager)
 {
+    if (manager != nullptr) {
+        (void)reach_window_manager_stop(manager);
+    }
     delete manager;
 }
 
@@ -87,6 +158,8 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
 
     manager->foreground = GetForegroundWindow();
     out_port->manager = manager;
+    out_port->ops.start = reach_window_manager_start;
+    out_port->ops.stop = reach_window_manager_stop;
     out_port->ops.refresh = reach_window_manager_refresh;
     out_port->ops.snap = reach_window_manager_snap;
     out_port->ops.foreground = reach_window_manager_foreground;
