@@ -135,6 +135,72 @@ static reach_result reachctl_remove_context_menu(void)
     return result;
 }
 
+static reach_result reachctl_set_wallpaper(const uint16_t *path)
+{
+    if (path == nullptr || path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(path));
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_config_store_port store = {};
+    reach_result result = reachctl_open_config_store(&store);
+    reach_config_snapshot snapshot = {};
+    if (result == REACH_OK) {
+        result = store.ops.load(store.store, &snapshot);
+    }
+    if (result == REACH_OK) {
+        result = reach_copy_utf16(snapshot.wallpaper_path, 260, path);
+    }
+    if (result == REACH_OK) {
+        result = store.ops.save(store.store, &snapshot);
+    }
+    reach_wallpaper_service_port wallpaper = {};
+    if (result == REACH_OK) {
+        result = reach_windows_create_wallpaper_service(&wallpaper);
+    }
+    if (result == REACH_OK) {
+        result = wallpaper.ops.set_wallpaper(wallpaper.service, path);
+    }
+    if (wallpaper.ops.destroy != nullptr) {
+        wallpaper.ops.destroy(wallpaper.service);
+    }
+    if (store.ops.destroy != nullptr) {
+        store.ops.destroy(store.store);
+    }
+    return result;
+}
+
+static reach_result reachctl_clear_wallpaper(void)
+{
+    reach_config_store_port store = {};
+    reach_result result = reachctl_open_config_store(&store);
+    reach_config_snapshot snapshot = {};
+    if (result == REACH_OK) {
+        result = store.ops.load(store.store, &snapshot);
+    }
+    if (result == REACH_OK) {
+        snapshot.wallpaper_path[0] = 0;
+        result = store.ops.save(store.store, &snapshot);
+    }
+    reach_wallpaper_service_port wallpaper = {};
+    if (result == REACH_OK) {
+        result = reach_windows_create_wallpaper_service(&wallpaper);
+    }
+    if (result == REACH_OK) {
+        result = wallpaper.ops.clear_wallpaper(wallpaper.service);
+    }
+    if (wallpaper.ops.destroy != nullptr) {
+        wallpaper.ops.destroy(wallpaper.service);
+    }
+    if (store.ops.destroy != nullptr) {
+        store.ops.destroy(store.store);
+    }
+    return result;
+}
+
 int wmain(int argc, wchar_t **argv)
 {
     uint16_t reach_exe[260] = {};
@@ -225,8 +291,22 @@ int wmain(int argc, wchar_t **argv)
             reachctl_print(ok ? L"Reach Explorer context menu removed." : L"Reach Explorer context menu removal failed.");
             return ok ? 0 : 1;
         }
+        if (lstrcmpiW(argv[index], L"--set-wallpaper") == 0) {
+            if (index + 1 >= argc) {
+                reachctl_print(L"--set-wallpaper requires a path.");
+                return 2;
+            }
+            int ok = reachctl_set_wallpaper(reinterpret_cast<const uint16_t *>(argv[index + 1])) == REACH_OK;
+            reachctl_print(ok ? L"Reach wallpaper set." : L"Reach wallpaper set failed.");
+            return ok ? 0 : 1;
+        }
+        if (lstrcmpiW(argv[index], L"--clear-wallpaper") == 0) {
+            int ok = reachctl_clear_wallpaper() == REACH_OK;
+            reachctl_print(ok ? L"Reach wallpaper cleared." : L"Reach wallpaper clear failed.");
+            return ok ? 0 : 1;
+        }
     }
 
-    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --pin-path <path> | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu");
+    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --pin-path <path> | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu | --set-wallpaper <path> | --clear-wallpaper");
     return 2;
 }

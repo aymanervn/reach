@@ -22,8 +22,10 @@ add_executable(reach WIN32
     src/adapters/windows/window_manager_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp
+    src/adapters/windows/wallpaper_win32.cpp
     src/config_path.cpp
     src/pin_config.cpp
+    src/theme.c
     resources/reach.rc
     src/animation.cpp
     src/dock.cpp
@@ -69,6 +71,7 @@ add_executable(reachctl
     src/tools/reachctl.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
+    src/adapters/windows/wallpaper_win32.cpp
     src/config_path.cpp
     src/pin_config.cpp
     src/util.cpp
@@ -92,6 +95,7 @@ target_compile_definitions(reachctl PRIVATE
 target_link_libraries(reachctl PRIVATE
     shell32
     shlwapi
+    user32
     advapi32
 )
 

@@ -25,6 +25,7 @@ static reach_result reach_config_store_load(reach_config_store *store, reach_con
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
     out_snapshot->dock_width = (float)GetPrivateProfileIntW(L"dock", L"width", 560, path);
     out_snapshot->dock_icon_size = (float)GetPrivateProfileIntW(L"dock", L"icon_size", 40, path);
+    GetPrivateProfileStringW(L"wallpaper", L"path", L"", reinterpret_cast<wchar_t *>(out_snapshot->wallpaper_path), 260, path);
 
     for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
         wchar_t section[32] = {};
@@ -62,6 +63,7 @@ static reach_result reach_config_store_save(reach_config_store *store, const rea
     WritePrivateProfileStringW(L"dock", L"width", value, path);
     swprintf_s(value, L"%.0f", snapshot->dock_icon_size);
     WritePrivateProfileStringW(L"dock", L"icon_size", value, path);
+    WritePrivateProfileStringW(L"wallpaper", L"path", reinterpret_cast<const wchar_t *>(snapshot->wallpaper_path), path);
 
     for (size_t index = 0; index < snapshot->pinned_app_count && index < REACH_MAX_PINNED_APPS; ++index) {
         wchar_t section[32] = {};

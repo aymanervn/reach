@@ -15,9 +15,11 @@ typedef struct reach_window_manager reach_window_manager;
 typedef struct reach_window_snapshot {
     uintptr_t id;
     uint16_t title[260];
+    uint16_t path[260];
     reach_rect_i32 bounds;
     int32_t visible;
     int32_t maximized;
+    int32_t minimized;
 } reach_window_snapshot;
 
 typedef struct reach_window_manager_ops {
@@ -29,6 +31,10 @@ typedef struct reach_window_manager_ops {
     int32_t (*foreground_is_maximized)(const reach_window_manager *manager);
     int32_t (*any_window_is_maximized)(const reach_window_manager *manager);
     size_t (*maximized_window_count)(const reach_window_manager *manager);
+    size_t (*window_count)(const reach_window_manager *manager);
+    reach_result (*window_at)(const reach_window_manager *manager, size_t index, reach_window_snapshot *out_window);
+    reach_result (*activate)(reach_window_manager *manager, uintptr_t window_id);
+    reach_result (*close)(reach_window_manager *manager, uintptr_t window_id);
     void (*destroy)(reach_window_manager *manager);
 } reach_window_manager_ops;
 

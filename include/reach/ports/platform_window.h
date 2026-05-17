@@ -24,6 +24,7 @@ typedef struct reach_platform_window_ops {
     reach_result (*set_bounds)(reach_platform_window *window, reach_rect_f32 bounds);
     reach_result (*set_opacity)(reach_platform_window *window, float opacity);
     reach_result (*set_blur_enabled)(reach_platform_window *window, int32_t enabled);
+    reach_result (*apply_rounded_corners)(reach_platform_window *window, float radius);
     reach_result (*set_event_callback)(reach_platform_window *window, reach_platform_window_event_callback callback, void *user);
     void *(*native_handle)(reach_platform_window *window);
     void (*destroy)(reach_platform_window *window);

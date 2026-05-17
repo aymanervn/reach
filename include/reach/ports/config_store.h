@@ -15,6 +15,7 @@ typedef struct reach_config_store reach_config_store;
 typedef struct reach_config_snapshot {
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
+    uint16_t wallpaper_path[260];
     float dock_height;
     float dock_width;
     float dock_icon_size;

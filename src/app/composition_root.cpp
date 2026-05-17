@@ -78,6 +78,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_explorer_service(&dependencies.explorer_service);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_wallpaper_service(&dependencies.wallpaper_service);
+    }
+    if (result == REACH_OK) {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
     }
     if (result != REACH_OK) {
@@ -122,6 +125,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.explorer_service.ops.destroy != nullptr) {
             dependencies.explorer_service.ops.destroy(dependencies.explorer_service.service);
+        }
+        if (dependencies.wallpaper_service.ops.destroy != nullptr) {
+            dependencies.wallpaper_service.ops.destroy(dependencies.wallpaper_service.service);
         }
         delete app;
         return result;

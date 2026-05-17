@@ -13,6 +13,7 @@ struct reach_platform_window {
     void *callback_user;
     int width;
     int height;
+    float corner_radius;
 };
 
 static const wchar_t *reach_window_class_name()
@@ -140,7 +141,7 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
         height,
         SWP_NOACTIVATE);
     if (ok && (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TRAY_MENU) && (window->width != width || window->height != height)) {
-        int radius = height > 0 ? (int)((float)height * 0.42f) : 24;
+        int radius = window->corner_radius > 0.0f ? (int)(window->corner_radius * 2.0f) : (height > 0 ? (int)((float)height * 0.42f) : 24);
         if (radius < 18) {
             radius = 18;
         }
@@ -152,6 +153,28 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
         window->height = height;
     }
     return ok ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_platform_window_apply_rounded_corners(reach_platform_window *window, float radius)
+{
+    if (window == nullptr || window->hwnd == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    window->corner_radius = radius;
+    if (window->width <= 0 || window->height <= 0) {
+        return REACH_OK;
+    }
+
+    int diameter = radius > 0.0f ? (int)(radius * 2.0f) : 18;
+    if (diameter < 18) {
+        diameter = 18;
+    }
+    HRGN region = CreateRoundRectRgn(0, 0, window->width + 1, window->height + 1, diameter, diameter);
+    if (region == nullptr) {
+        return REACH_ERROR;
+    }
+    return SetWindowRgn(window->hwnd, region, TRUE) ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reach_platform_window_set_opacity(reach_platform_window *window, float opacity)
@@ -259,6 +282,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
     out_port->ops.set_bounds = reach_platform_window_set_bounds;
     out_port->ops.set_opacity = reach_platform_window_set_opacity;
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
+    out_port->ops.apply_rounded_corners = reach_platform_window_apply_rounded_corners;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
     out_port->ops.native_handle = reach_platform_window_native_handle;
     out_port->ops.destroy = reach_platform_window_destroy;

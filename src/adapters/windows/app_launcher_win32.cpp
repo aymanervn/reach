@@ -24,8 +24,23 @@ static BOOL CALLBACK reach_find_explorer_window_proc(HWND hwnd, LPARAM param)
     wchar_t class_name[64] = {};
     GetClassNameW(hwnd, class_name, 64);
     if (lstrcmpiW(class_name, L"CabinetWClass") == 0 || lstrcmpiW(class_name, L"ExploreWClass") == 0) {
-        search->window = hwnd;
-        return FALSE;
+        DWORD process_id = 0;
+        GetWindowThreadProcessId(hwnd, &process_id);
+        HANDLE process = process_id != 0 ? OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id) : nullptr;
+        wchar_t image_path[260] = {};
+        DWORD image_path_count = 260;
+        BOOL is_explorer = FALSE;
+        if (process != nullptr) {
+            if (QueryFullProcessImageNameW(process, 0, image_path, &image_path_count)) {
+                const wchar_t *file_name = PathFindFileNameW(image_path);
+                is_explorer = file_name != nullptr && lstrcmpiW(file_name, L"explorer.exe") == 0;
+            }
+            CloseHandle(process);
+        }
+        if (is_explorer) {
+            search->window = hwnd;
+            return FALSE;
+        }
     }
 
     return TRUE;
