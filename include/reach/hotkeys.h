@@ -27,6 +27,7 @@ void reach_hotkeys_destroy(reach_hotkeys *hotkeys);
 reach_result reach_hotkeys_register(reach_hotkeys *hotkeys, const reach_hotkey_config *config, uint32_t count);
 reach_result reach_hotkeys_unregister_all(reach_hotkeys *hotkeys);
 reach_hotkey_command reach_hotkeys_translate(uint32_t id);
+reach_hotkey_command reach_hotkeys_translate_registered(const reach_hotkeys *hotkeys, uint32_t id);
 
 #ifdef __cplusplus
 }

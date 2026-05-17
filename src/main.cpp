@@ -1,7 +1,7 @@
 #include <windows.h>
 #include <objbase.h>
 
-#include "reach/shell.h"
+#include "reach/app/composition_root.h"
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR command_line, int show_command)
 {
@@ -15,11 +15,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         return 1;
     }
 
-    reach_shell *shell = nullptr;
+    reach_app *app = nullptr;
     reach_shell_desc desc = {};
-    reach_result result = reach_shell_create(&desc, &shell);
+    reach_result result = reach_app_create(&desc, &app);
     if (result == REACH_OK) {
-        (void)reach_shell_start(shell);
+        (void)reach_app_start(app);
     }
 
     MSG message = {};
@@ -28,9 +28,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         DispatchMessageW(&message);
     }
 
-    if (shell != nullptr) {
-        (void)reach_shell_stop(shell);
-        reach_shell_destroy(shell);
+    if (app != nullptr) {
+        (void)reach_app_stop(app);
+        reach_app_destroy(app);
     }
 
     CoUninitialize();

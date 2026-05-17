@@ -9,7 +9,32 @@
 struct reach_input_source {
     reach_input_event_callback callback;
     void *user;
+    HHOOK keyboard_hook;
 };
+
+static reach_input_source *g_keyboard_source;
+
+static LRESULT CALLBACK reach_keyboard_proc(int code, WPARAM wparam, LPARAM lparam)
+{
+    if (code == HC_ACTION && g_keyboard_source != nullptr && g_keyboard_source->callback != nullptr) {
+        const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
+        if (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) {
+            reach_ui_event event = {};
+            if (keyboard->vkCode == VK_LWIN || keyboard->vkCode == VK_RWIN) {
+                event.type = REACH_UI_EVENT_WINDOWS_KEY;
+                g_keyboard_source->callback(g_keyboard_source->user, &event);
+            } else if (keyboard->vkCode == VK_ESCAPE) {
+                event.type = REACH_UI_EVENT_ESCAPE;
+                g_keyboard_source->callback(g_keyboard_source->user, &event);
+            } else if (keyboard->vkCode == VK_BACK) {
+                event.type = REACH_UI_EVENT_BACKSPACE;
+                g_keyboard_source->callback(g_keyboard_source->user, &event);
+            }
+        }
+    }
+
+    return CallNextHookEx(nullptr, code, wparam, lparam);
+}
 
 static reach_result reach_input_start(reach_input_source *source, reach_input_event_callback callback, void *user)
 {
@@ -21,8 +46,9 @@ static reach_result reach_input_start(reach_input_source *source, reach_input_ev
 
     source->callback = callback;
     source->user = user;
-    // Hook WM_HOTKEY, WM_CHAR, mouse hit tests, and Windows-key handling into this source.
-    return REACH_OK;
+    g_keyboard_source = source;
+    source->keyboard_hook = SetWindowsHookExW(WH_KEYBOARD_LL, reach_keyboard_proc, GetModuleHandleW(nullptr), 0);
+    return source->keyboard_hook != nullptr ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reach_input_stop(reach_input_source *source)
@@ -32,6 +58,13 @@ static reach_result reach_input_stop(reach_input_source *source)
         return REACH_INVALID_ARGUMENT;
     }
 
+    if (source->keyboard_hook != nullptr) {
+        UnhookWindowsHookEx(source->keyboard_hook);
+        source->keyboard_hook = nullptr;
+    }
+    if (g_keyboard_source == source) {
+        g_keyboard_source = nullptr;
+    }
     source->callback = nullptr;
     source->user = nullptr;
     return REACH_OK;

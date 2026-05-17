@@ -4,6 +4,7 @@ project(reach LANGUAGES C CXX)
 
 add_executable(reach WIN32
     src/main.cpp
+    src/app/composition_root.cpp
     src/shell.cpp
     src/core/ui_state.c
     src/core/ui_layout.c

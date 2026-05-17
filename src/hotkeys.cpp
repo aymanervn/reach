@@ -41,6 +41,8 @@ reach_result reach_hotkeys_register(reach_hotkeys *hotkeys, const reach_hotkey_c
     }
 
     (void)reach_hotkeys_unregister_all(hotkeys);
+    hotkeys->ids.reserve(count);
+    hotkeys->commands.reserve(count);
 
     for (uint32_t index = 0; index < count; ++index) {
         int id = static_cast<int>(index + 1);
@@ -89,4 +91,19 @@ reach_hotkey_command reach_hotkeys_translate(uint32_t id)
     default:
         return REACH_HOTKEY_NONE;
     }
+}
+
+reach_hotkey_command reach_hotkeys_translate_registered(const reach_hotkeys *hotkeys, uint32_t id)
+{
+    if (hotkeys == nullptr) {
+        return REACH_HOTKEY_NONE;
+    }
+
+    for (size_t index = 0; index < hotkeys->ids.size(); ++index) {
+        if (hotkeys->ids[index] == static_cast<int>(id)) {
+            return hotkeys->commands[index];
+        }
+    }
+
+    return REACH_HOTKEY_NONE;
 }

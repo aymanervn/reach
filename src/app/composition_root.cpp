@@ -1,0 +1,125 @@
+#include "reach/app/composition_root.h"
+
+#include "reach/platform/windows_adapters.h"
+
+#include <new>
+
+static void reach_app_on_input(void *user, const reach_ui_event *event)
+{
+    reach_app *app = static_cast<reach_app *>(user);
+    if (app != nullptr && app->shell != nullptr) {
+        (void)reach_shell_handle_event(app->shell, event);
+    }
+}
+
+reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
+{
+    REACH_ASSERT(out_app != nullptr);
+    if (out_app == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_app = nullptr;
+    reach_app *app = new (std::nothrow) reach_app();
+    if (app == nullptr) {
+        return REACH_ERROR;
+    }
+
+    reach_shell_dependencies dependencies = {};
+    reach_result result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER, &dependencies.launcher_window);
+    if (result == REACH_OK) {
+        void *native_window = dependencies.launcher_window.ops.native_handle(dependencies.launcher_window.window);
+        result = reach_windows_create_d2d_render_backend(native_window, &dependencies.launcher_renderer);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_platform_window(REACH_SURFACE_DOCK, &dependencies.dock_window);
+    }
+    if (result == REACH_OK) {
+        void *native_window = dependencies.dock_window.ops.native_handle(dependencies.dock_window.window);
+        result = reach_windows_create_d2d_render_backend(native_window, &dependencies.dock_renderer);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_search_stub(&dependencies.search_provider);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_app_launcher(&dependencies.app_launcher);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_input_source(&dependencies.input_source);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_window_manager(&dependencies.window_manager);
+    }
+    if (result == REACH_OK) {
+        result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
+    }
+    if (result != REACH_OK) {
+        if (dependencies.launcher_window.ops.destroy != nullptr) {
+            dependencies.launcher_window.ops.destroy(dependencies.launcher_window.window);
+        }
+        if (dependencies.launcher_renderer.ops.destroy != nullptr) {
+            dependencies.launcher_renderer.ops.destroy(dependencies.launcher_renderer.backend);
+        }
+        if (dependencies.dock_window.ops.destroy != nullptr) {
+            dependencies.dock_window.ops.destroy(dependencies.dock_window.window);
+        }
+        if (dependencies.dock_renderer.ops.destroy != nullptr) {
+            dependencies.dock_renderer.ops.destroy(dependencies.dock_renderer.backend);
+        }
+        if (dependencies.input_source.ops.destroy != nullptr) {
+            dependencies.input_source.ops.destroy(dependencies.input_source.source);
+        }
+        if (dependencies.window_manager.ops.destroy != nullptr) {
+            dependencies.window_manager.ops.destroy(dependencies.window_manager.manager);
+        }
+        if (dependencies.search_provider.ops.destroy != nullptr) {
+            dependencies.search_provider.ops.destroy(dependencies.search_provider.provider);
+        }
+        if (dependencies.app_launcher.ops.destroy != nullptr) {
+            dependencies.app_launcher.ops.destroy(dependencies.app_launcher.launcher);
+        }
+        delete app;
+        return result;
+    }
+
+    app->input_source = dependencies.input_source;
+    *out_app = app;
+    return REACH_OK;
+}
+
+reach_result reach_app_start(reach_app *app)
+{
+    REACH_ASSERT(app != nullptr);
+    if (app == nullptr || app->shell == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_result result = reach_shell_start(app->shell);
+    if (result == REACH_OK && app->input_source.ops.start != nullptr) {
+        result = app->input_source.ops.start(app->input_source.source, reach_app_on_input, app);
+    }
+    return result;
+}
+
+reach_result reach_app_stop(reach_app *app)
+{
+    REACH_ASSERT(app != nullptr);
+    if (app == nullptr || app->shell == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (app->input_source.ops.stop != nullptr) {
+        (void)app->input_source.ops.stop(app->input_source.source);
+    }
+    return reach_shell_stop(app->shell);
+}
+
+void reach_app_destroy(reach_app *app)
+{
+    if (app == nullptr) {
+        return;
+    }
+
+    reach_shell_destroy(app->shell);
+    delete app;
+}

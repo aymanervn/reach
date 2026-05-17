@@ -23,11 +23,36 @@ static reach_result reach_window_manager_snap(reach_window_manager *manager, uin
 {
     REACH_ASSERT(manager != nullptr);
     REACH_ASSERT(window_id != 0);
-    // Implement using monitor work area and SetWindowPos; keep snap policy outside the core.
-    (void)manager;
-    (void)window_id;
-    (void)mode;
-    return REACH_NOT_IMPLEMENTED;
+    if (manager == nullptr || window_id == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    if (!IsWindow(hwnd)) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info = {};
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(monitor, &info)) {
+        return REACH_ERROR;
+    }
+
+    reach_rect_i32 work_area = { info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom };
+    reach_rect_i32 target = {};
+    reach_result result = reach_layout_compute_split(work_area, mode, &target);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    if (IsZoomed(hwnd)) {
+        ShowWindow(hwnd, SW_RESTORE);
+    }
+
+    BOOL ok = SetWindowPos(hwnd, nullptr, target.left, target.top, target.right - target.left, target.bottom - target.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    manager->foreground = GetForegroundWindow();
+    return ok ? REACH_OK : REACH_ERROR;
 }
 
 static uintptr_t reach_window_manager_foreground(const reach_window_manager *manager)
