@@ -103,6 +103,26 @@ target_link_libraries(reachctl PRIVATE
     uuid
 )
 
+add_executable(reach_tray_probe
+    src/tools/tray_probe.cpp
+)
+
+target_compile_features(reach_tray_probe PRIVATE
+    cxx_std_17
+)
+
+target_compile_definitions(reach_tray_probe PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+
+target_link_libraries(reach_tray_probe PRIVATE
+    shell32
+    user32
+)
+
 add_executable(reach_core_tests
     tests/core_ui_tests.c
     src/core/ui_state.c
