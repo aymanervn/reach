@@ -12,6 +12,8 @@ typedef struct reach_theme {
     reach_color dock_border;
     reach_color dock_shadow;
     reach_color icon_box_background;
+    reach_color icon_backplate_background;
+    reach_color icon_backplate_edge;
     reach_color fallback_icon_background;
     reach_color fallback_icon_text;
     reach_color tray_button_background;

@@ -8,6 +8,7 @@
 #include <shobjidl.h>
 
 #include <new>
+#include <vector>
 
 struct reach_icon_provider {
     uint64_t next_id;
@@ -95,6 +96,132 @@ static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px)
     return selected;
 }
 
+static int32_t reach_icon_corner_has_content(const std::vector<uint32_t> &pixels, int width, int height, int corner_x, int corner_y)
+{
+    int sample = width < height ? width / 6 : height / 6;
+    if (sample < 3) {
+        sample = 3;
+    }
+    int start_x = corner_x == 0 ? 0 : width - sample;
+    int start_y = corner_y == 0 ? 0 : height - sample;
+    for (int y = 0; y < sample; ++y) {
+        for (int x = 0; x < sample; ++x) {
+            uint8_t alpha = (uint8_t)(pixels[(start_y + y) * width + start_x + x] >> 24);
+            if (alpha > 32) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int32_t reach_icon_classify_backplate(HICON icon)
+{
+    if (icon == nullptr) {
+        return 0;
+    }
+
+    ICONINFO info = {};
+    if (!GetIconInfo(icon, &info) || info.hbmColor == nullptr) {
+        if (info.hbmColor != nullptr) {
+            DeleteObject(info.hbmColor);
+        }
+        if (info.hbmMask != nullptr) {
+            DeleteObject(info.hbmMask);
+        }
+        return 0;
+    }
+
+    BITMAP bitmap = {};
+    if (GetObjectW(info.hbmColor, sizeof(bitmap), &bitmap) == 0 || bitmap.bmWidth <= 0 || bitmap.bmHeight <= 0) {
+        DeleteObject(info.hbmColor);
+        if (info.hbmMask != nullptr) {
+            DeleteObject(info.hbmMask);
+        }
+        return 0;
+    }
+
+    int width = bitmap.bmWidth;
+    int height = bitmap.bmHeight;
+    std::vector<uint32_t> pixels((size_t)width * (size_t)height);
+
+    BITMAPINFO dib = {};
+    dib.bmiHeader.biSize = sizeof(dib.bmiHeader);
+    dib.bmiHeader.biWidth = width;
+    dib.bmiHeader.biHeight = -height;
+    dib.bmiHeader.biPlanes = 1;
+    dib.bmiHeader.biBitCount = 32;
+    dib.bmiHeader.biCompression = BI_RGB;
+
+    HDC dc = GetDC(nullptr);
+    int scanlines = dc != nullptr
+        ? GetDIBits(dc, info.hbmColor, 0, (UINT)height, pixels.data(), &dib, DIB_RGB_COLORS)
+        : 0;
+    if (dc != nullptr) {
+        ReleaseDC(nullptr, dc);
+    }
+    DeleteObject(info.hbmColor);
+    if (info.hbmMask != nullptr) {
+        DeleteObject(info.hbmMask);
+    }
+    if (scanlines == 0) {
+        return 0;
+    }
+
+    int min_x = width;
+    int min_y = height;
+    int max_x = -1;
+    int max_y = -1;
+    int content = 0;
+    int strong_alpha = 0;
+    int alpha_seen = 0;
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            uint8_t alpha = (uint8_t)(pixels[(size_t)y * (size_t)width + (size_t)x] >> 24);
+            if (alpha > 0) {
+                alpha_seen = 1;
+            }
+            if (alpha > 32) {
+                ++content;
+                if (alpha > 220) {
+                    ++strong_alpha;
+                }
+                if (x < min_x) min_x = x;
+                if (y < min_y) min_y = y;
+                if (x > max_x) max_x = x;
+                if (y > max_y) max_y = y;
+            }
+        }
+    }
+
+    if (!alpha_seen || content == 0) {
+        return 0;
+    }
+
+    float total = (float)(width * height);
+    float content_ratio = (float)content / total;
+    float bbox_width_ratio = (float)(max_x - min_x + 1) / (float)width;
+    float bbox_height_ratio = (float)(max_y - min_y + 1) / (float)height;
+    float bbox_aspect = bbox_height_ratio > 0.0f ? bbox_width_ratio / bbox_height_ratio : 1.0f;
+    int transparent_corners = 0;
+    transparent_corners += !reach_icon_corner_has_content(pixels, width, height, 0, 0);
+    transparent_corners += !reach_icon_corner_has_content(pixels, width, height, 1, 0);
+    transparent_corners += !reach_icon_corner_has_content(pixels, width, height, 0, 1);
+    transparent_corners += !reach_icon_corner_has_content(pixels, width, height, 1, 1);
+
+    int near_square_box = bbox_width_ratio >= 0.86f &&
+        bbox_height_ratio >= 0.86f &&
+        bbox_aspect >= 0.90f &&
+        bbox_aspect <= 1.10f;
+    if (near_square_box && transparent_corners <= 1 && content_ratio >= 0.72f) {
+        return 0;
+    }
+    if (near_square_box && transparent_corners >= 2 && content_ratio >= 0.80f) {
+        return 0;
+    }
+    return 1;
+}
+
 static reach_result reach_icon_load(reach_icon_provider *provider, const reach_icon_request *request, reach_icon_handle *out_icon)
 {
     REACH_ASSERT(provider != nullptr);
@@ -130,6 +257,7 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
 
     *out_icon = {};
     out_icon->id = reinterpret_cast<uint64_t>(icon);
+    out_icon->wants_backplate = reach_icon_classify_backplate(icon);
     reach_copy_utf16(out_icon->debug_name, 260, reinterpret_cast<const uint16_t *>(icon_path));
     provider->next_id += 1;
     return REACH_OK;

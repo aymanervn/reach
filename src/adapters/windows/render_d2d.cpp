@@ -6,13 +6,21 @@
 #include <d2d1_1.h>
 #include <dcomp.h>
 #include <d3d11.h>
+#include <dwmapi.h>
 #include <dwrite.h>
 #include <dxgi1_2.h>
+#include <roapi.h>
 #include <wincodec.h>
+#include <windows.ui.composition.h>
+#include <windows.ui.composition.desktop.h>
+#include <windows.ui.composition.interop.h>
+#include <wrl/client.h>
 
 #include <stdint.h>
 #include <new>
 #include <vector>
+
+using Microsoft::WRL::ComPtr;
 
 struct reach_d2d_icon_cache_entry {
     uintptr_t icon_id;
@@ -32,6 +40,13 @@ struct reach_render_backend {
     IDCompositionDevice *dcomp_device;
     IDCompositionTarget *dcomp_target;
     IDCompositionVisual *dcomp_visual;
+    int ro_initialized;
+    ComPtr<ABI::Windows::UI::Composition::ICompositor> compositor;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionTarget> composition_target;
+    ComPtr<ABI::Windows::UI::Composition::IContainerVisual> root_visual;
+    ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> backdrop_visual;
+    ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> swap_chain_visual;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> composition_surface;
     IDWriteFactory *text_factory;
     IWICImagingFactory *wic_factory;
     std::vector<reach_d2d_icon_cache_entry> icon_cache;
@@ -53,6 +68,98 @@ static ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend)
 static D2D1_COLOR_F reach_d2d_color(reach_color color)
 {
     return D2D1::ColorF(color.r, color.g, color.b, color.a);
+}
+
+static void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr)
+{
+    if (SUCCEEDED(hr)) {
+        return;
+    }
+    wchar_t message[256] = {};
+    wsprintfW(
+        message,
+        L"Reach: %s failed with HRESULT 0x%08lX\r\n",
+        context != nullptr ? context : L"renderer operation",
+        static_cast<unsigned long>(hr));
+    OutputDebugStringW(message);
+}
+
+static HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level)
+{
+    if (out_device == nullptr || out_level == nullptr) {
+        return E_INVALIDARG;
+    }
+    D3D_FEATURE_LEVEL levels[] = {
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0
+    };
+    HRESULT hr = D3D11CreateDevice(
+        nullptr,
+        D3D_DRIVER_TYPE_HARDWARE,
+        nullptr,
+        D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+        levels,
+        sizeof(levels) / sizeof(levels[0]),
+        D3D11_SDK_VERSION,
+        out_device,
+        out_level,
+        nullptr);
+    if (hr == E_INVALIDARG) {
+        hr = D3D11CreateDevice(
+            nullptr,
+            D3D_DRIVER_TYPE_HARDWARE,
+            nullptr,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+            levels + 1,
+            (sizeof(levels) / sizeof(levels[0])) - 1,
+            D3D11_SDK_VERSION,
+            out_device,
+            out_level,
+            nullptr);
+    }
+    return hr;
+}
+
+static HRESULT reach_winrt_activate_compositor(ABI::Windows::UI::Composition::ICompositor **out_compositor)
+{
+    if (out_compositor == nullptr) {
+        return E_INVALIDARG;
+    }
+    *out_compositor = nullptr;
+
+    HSTRING class_name = nullptr;
+    HRESULT hr = WindowsCreateString(
+        L"Windows.UI.Composition.Compositor",
+        static_cast<UINT32>(wcslen(L"Windows.UI.Composition.Compositor")),
+        &class_name);
+    if (SUCCEEDED(hr)) {
+        IInspectable *inspectable = nullptr;
+        hr = RoActivateInstance(class_name, &inspectable);
+        if (SUCCEEDED(hr) && inspectable != nullptr) {
+            hr = inspectable->QueryInterface(IID_PPV_ARGS(out_compositor));
+            inspectable->Release();
+        }
+        WindowsDeleteString(class_name);
+    }
+    return hr;
+}
+
+static HRESULT reach_visual_set_size(IInspectable *inspectable, float width, float height)
+{
+    if (inspectable == nullptr) {
+        return E_INVALIDARG;
+    }
+    ComPtr<ABI::Windows::UI::Composition::IVisual> visual;
+    HRESULT hr = inspectable->QueryInterface(IID_PPV_ARGS(&visual));
+    if (SUCCEEDED(hr)) {
+        ABI::Windows::Foundation::Numerics::Vector2 size = {};
+        size.X = width;
+        size.Y = height;
+        hr = visual->put_Size(size);
+    }
+    return hr;
 }
 
 static reach_result reach_d2d_create_target(reach_render_backend *backend)
@@ -156,24 +263,8 @@ static reach_result reach_dcomp_create_target(reach_render_backend *backend)
     if (width == 0) width = 1;
     if (height == 0) height = 1;
 
-    D3D_FEATURE_LEVEL levels[] = {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0
-    };
     D3D_FEATURE_LEVEL actual_level = D3D_FEATURE_LEVEL_11_0;
-    HRESULT hr = D3D11CreateDevice(
-        nullptr,
-        D3D_DRIVER_TYPE_HARDWARE,
-        nullptr,
-        D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-        levels,
-        sizeof(levels) / sizeof(levels[0]),
-        D3D11_SDK_VERSION,
-        &backend->d3d_device,
-        &actual_level,
-        nullptr);
+    HRESULT hr = reach_d3d11_create_device(&backend->d3d_device, &actual_level);
     if (SUCCEEDED(hr)) {
         hr = backend->d3d_device->QueryInterface(IID_PPV_ARGS(&backend->dxgi_device));
     }
@@ -257,6 +348,15 @@ static reach_result reach_d2d_begin_frame(reach_render_backend *backend)
             HRESULT resize_hr = backend->swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
             if (FAILED(resize_hr) || reach_dcomp_create_target_bitmap(backend) != REACH_OK) {
                 return REACH_ERROR;
+            }
+            if (backend->root_visual != nullptr) {
+                (void)reach_visual_set_size(backend->root_visual.Get(), (float)width, (float)height);
+            }
+            if (backend->backdrop_visual != nullptr) {
+                (void)reach_visual_set_size(backend->backdrop_visual.Get(), (float)width, (float)height);
+            }
+            if (backend->swap_chain_visual != nullptr) {
+                (void)reach_visual_set_size(backend->swap_chain_visual.Get(), (float)width, (float)height);
             }
         } else {
             HRESULT resize_hr = backend->target->Resize(D2D1::SizeU(width, height));
@@ -394,8 +494,393 @@ static reach_result reach_d2d_draw_icon(reach_render_backend *backend, const rea
     if (target == nullptr) {
         return REACH_ERROR;
     }
+
+    if (command->radius > 0.0f) {
+        ID2D1Factory *factory = nullptr;
+        ID2D1RoundedRectangleGeometry *clip_geometry = nullptr;
+        ID2D1Layer *clip_layer = nullptr;
+        target->GetFactory(&factory);
+        HRESULT hr = factory != nullptr
+            ? factory->CreateRoundedRectangleGeometry(
+                D2D1::RoundedRect(rect, command->radius, command->radius),
+                &clip_geometry)
+            : E_FAIL;
+        if (SUCCEEDED(hr)) {
+            hr = target->CreateLayer(nullptr, &clip_layer);
+        }
+        if (SUCCEEDED(hr)) {
+            D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
+                rect,
+                clip_geometry,
+                D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                D2D1::IdentityMatrix(),
+                1.0f,
+                nullptr,
+                D2D1_LAYER_OPTIONS_NONE);
+            target->PushLayer(layer, clip_layer);
+            target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+            target->PopLayer();
+        }
+        if (clip_layer != nullptr) {
+            clip_layer->Release();
+        }
+        if (clip_geometry != nullptr) {
+            clip_geometry->Release();
+        }
+        if (factory != nullptr) {
+            factory->Release();
+        }
+        return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    }
+
     target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
     return REACH_OK;
+}
+
+static HRESULT reach_d2d_draw_gradient_line(
+    ID2D1RenderTarget *target,
+    D2D1_POINT_2F start,
+    D2D1_POINT_2F end,
+    reach_color color,
+    float stroke_width,
+    float end_alpha = 0.0f)
+{
+    D2D1_GRADIENT_STOP stops[2] = {};
+    stops[0].position = 0.0f;
+    stops[0].color = D2D1::ColorF(color.r, color.g, color.b, color.a);
+    stops[1].position = 1.0f;
+    stops[1].color = D2D1::ColorF(color.r, color.g, color.b, end_alpha);
+
+    ID2D1GradientStopCollection *stop_collection = nullptr;
+    HRESULT hr = target->CreateGradientStopCollection(stops, 2, &stop_collection);
+    ID2D1LinearGradientBrush *brush = nullptr;
+    if (SUCCEEDED(hr)) {
+        hr = target->CreateLinearGradientBrush(
+            D2D1::LinearGradientBrushProperties(start, end),
+            stop_collection,
+            &brush);
+    }
+    if (SUCCEEDED(hr)) {
+        target->DrawLine(start, end, brush, stroke_width);
+    }
+    if (brush != nullptr) {
+        brush->Release();
+    }
+    if (stop_collection != nullptr) {
+        stop_collection->Release();
+    }
+    return hr;
+}
+
+static HRESULT reach_d2d_draw_gradient_arc(
+    ID2D1RenderTarget *target,
+    D2D1_POINT_2F start,
+    D2D1_POINT_2F end,
+    D2D1_SIZE_F radius,
+    D2D1_SWEEP_DIRECTION sweep,
+    reach_color color,
+    float stroke_width,
+    float end_alpha = 0.85f)
+{
+    ID2D1PathGeometry *geometry = nullptr;
+    ID2D1GeometrySink *sink = nullptr;
+    ID2D1Factory *factory = nullptr;
+    target->GetFactory(&factory);
+    HRESULT hr = factory != nullptr ? factory->CreatePathGeometry(&geometry) : E_FAIL;
+    if (SUCCEEDED(hr)) {
+        hr = geometry->Open(&sink);
+    }
+    if (SUCCEEDED(hr)) {
+        sink->BeginFigure(start, D2D1_FIGURE_BEGIN_HOLLOW);
+        D2D1_ARC_SEGMENT arc = {};
+        arc.point = end;
+        arc.size = radius;
+        arc.rotationAngle = 0.0f;
+        arc.sweepDirection = sweep;
+        arc.arcSize = D2D1_ARC_SIZE_SMALL;
+        sink->AddArc(arc);
+        sink->EndFigure(D2D1_FIGURE_END_OPEN);
+        hr = sink->Close();
+    }
+
+    D2D1_GRADIENT_STOP stops[2] = {};
+    stops[0].position = 0.0f;
+    stops[0].color = D2D1::ColorF(color.r, color.g, color.b, color.a);
+    stops[1].position = 1.0f;
+    stops[1].color = D2D1::ColorF(color.r, color.g, color.b, end_alpha);
+    ID2D1GradientStopCollection *stop_collection = nullptr;
+    ID2D1LinearGradientBrush *brush = nullptr;
+    if (SUCCEEDED(hr)) {
+        hr = target->CreateGradientStopCollection(stops, 2, &stop_collection);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = target->CreateLinearGradientBrush(
+            D2D1::LinearGradientBrushProperties(start, end),
+            stop_collection,
+            &brush);
+    }
+    if (SUCCEEDED(hr)) {
+        target->DrawGeometry(geometry, brush, stroke_width);
+    }
+    if (brush != nullptr) {
+        brush->Release();
+    }
+    if (stop_collection != nullptr) {
+        stop_collection->Release();
+    }
+    if (sink != nullptr) {
+        sink->Release();
+    }
+    if (geometry != nullptr) {
+        geometry->Release();
+    }
+    if (factory != nullptr) {
+        factory->Release();
+    }
+    return hr;
+}
+
+static reach_result reach_d2d_draw_backplate_edge(ID2D1RenderTarget *target, const reach_render_command *command)
+{
+    if (target == nullptr || command == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    float x = command->rect.x;
+    float y = command->rect.y;
+    float w = command->rect.width;
+    float h = command->rect.height;
+    float r = command->radius;
+    float stroke = command->stroke_width > 0.0f ? command->stroke_width : 0.45f;
+    float inset = 1.0f;
+    float arc = r * 0.76f;
+
+    HRESULT hr = reach_d2d_draw_gradient_arc(
+        target,
+        D2D1::Point2F(x + inset, y + arc),
+        D2D1::Point2F(x + arc, y + inset),
+        D2D1::SizeF(r - inset, r - inset),
+        D2D1_SWEEP_DIRECTION_CLOCKWISE,
+        command->color,
+        stroke,
+        0.0f);
+    if (SUCCEEDED(hr)) {
+        hr = reach_d2d_draw_gradient_line(
+            target,
+            D2D1::Point2F(x + r * 0.70f, y + inset),
+            D2D1::Point2F(x + w * 0.58f, y + inset),
+            command->color,
+            stroke,
+            0.0f);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_d2d_draw_gradient_line(
+            target,
+            D2D1::Point2F(x + inset, y + r * 0.70f),
+            D2D1::Point2F(x + inset, y + h * 0.58f),
+            command->color,
+            stroke,
+            0.0f);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_d2d_draw_gradient_arc(
+            target,
+            D2D1::Point2F(x + w - inset, y + h - arc),
+            D2D1::Point2F(x + w - arc, y + h - inset),
+            D2D1::SizeF(r - inset, r - inset),
+            D2D1_SWEEP_DIRECTION_CLOCKWISE,
+            command->color,
+            stroke,
+            0.0f);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_d2d_draw_gradient_line(
+            target,
+            D2D1::Point2F(x + w - r * 0.70f, y + h - inset),
+            D2D1::Point2F(x + w * 0.42f, y + h - inset),
+            command->color,
+            stroke,
+            0.0f);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_d2d_draw_gradient_line(
+            target,
+            D2D1::Point2F(x + w - inset, y + h - r * 0.70f),
+            D2D1::Point2F(x + w - inset, y + h * 0.42f),
+            command->color,
+            stroke,
+            0.0f);
+    }
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_wuc_create_target(reach_render_backend *backend)
+{
+    if (backend == nullptr || backend->hwnd == nullptr || backend->factory == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    BOOL use_host_backdrop = TRUE;
+    (void)DwmSetWindowAttribute(
+        backend->hwnd,
+        DWMWA_USE_HOSTBACKDROPBRUSH,
+        &use_host_backdrop,
+        sizeof(use_host_backdrop));
+
+    RECT client = {};
+    GetClientRect(backend->hwnd, &client);
+    UINT width = static_cast<UINT>(client.right - client.left);
+    UINT height = static_cast<UINT>(client.bottom - client.top);
+    if (width == 0) width = 1;
+    if (height == 0) height = 1;
+
+    HRESULT hr = RoInitialize(RO_INIT_SINGLETHREADED);
+    reach_d2d_log_hresult(L"RoInitialize", hr);
+    if (SUCCEEDED(hr)) {
+        backend->ro_initialized = 1;
+    } else if (hr == RPC_E_CHANGED_MODE) {
+        hr = S_OK;
+    }
+
+    D3D_FEATURE_LEVEL actual_level = D3D_FEATURE_LEVEL_11_0;
+    if (SUCCEEDED(hr)) {
+        hr = reach_d3d11_create_device(&backend->d3d_device, &actual_level);
+        reach_d2d_log_hresult(L"D3D11CreateDevice", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->d3d_device->QueryInterface(IID_PPV_ARGS(&backend->dxgi_device));
+        reach_d2d_log_hresult(L"ID3D11Device::QueryInterface IDXGIDevice", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->factory->CreateDevice(backend->dxgi_device, &backend->d2d_device);
+        reach_d2d_log_hresult(L"ID2D1Factory1::CreateDevice", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &backend->d2d_context);
+        reach_d2d_log_hresult(L"ID2D1Device::CreateDeviceContext", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_dcomp_create_swap_chain(backend, width, height) == REACH_OK ? S_OK : E_FAIL;
+        reach_d2d_log_hresult(L"CreateSwapChainForComposition", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_winrt_activate_compositor(&backend->compositor);
+        reach_d2d_log_hresult(L"RoActivateInstance(Compositor)", hr);
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::Desktop::ICompositorDesktopInterop> desktop_interop;
+    if (SUCCEEDED(hr)) {
+        hr = backend->compositor.As(&desktop_interop);
+        reach_d2d_log_hresult(L"ICompositorDesktopInterop", hr);
+    }
+    ComPtr<ABI::Windows::UI::Composition::Desktop::IDesktopWindowTarget> desktop_target;
+    if (SUCCEEDED(hr)) {
+        hr = desktop_interop->CreateDesktopWindowTarget(backend->hwnd, TRUE, &desktop_target);
+        reach_d2d_log_hresult(L"CreateDesktopWindowTarget", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = desktop_target.As(&backend->composition_target);
+        reach_d2d_log_hresult(L"ICompositionTarget", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->compositor->CreateContainerVisual(&backend->root_visual);
+        reach_d2d_log_hresult(L"CreateContainerVisual", hr);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->compositor->CreateSpriteVisual(&backend->backdrop_visual);
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::ICompositor3> compositor3;
+    if (SUCCEEDED(hr)) {
+        hr = backend->compositor.As(&compositor3);
+    }
+    ComPtr<ABI::Windows::UI::Composition::ICompositionBackdropBrush> backdrop_brush;
+    if (SUCCEEDED(hr)) {
+        hr = compositor3->CreateHostBackdropBrush(&backdrop_brush);
+        reach_d2d_log_hresult(L"CreateHostBackdropBrush", hr);
+    }
+    ComPtr<ABI::Windows::UI::Composition::ICompositionBrush> backdrop_base_brush;
+    if (SUCCEEDED(hr)) {
+        hr = backdrop_brush.As(&backdrop_base_brush);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->backdrop_visual->put_Brush(backdrop_base_brush.Get());
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::ICompositorInterop> compositor_interop;
+    if (SUCCEEDED(hr)) {
+        hr = backend->compositor.As(&compositor_interop);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = compositor_interop->CreateCompositionSurfaceForSwapChain(backend->swap_chain, &backend->composition_surface);
+        reach_d2d_log_hresult(L"CreateCompositionSurfaceForSwapChain", hr);
+    }
+    ComPtr<ABI::Windows::UI::Composition::ICompositionSurfaceBrush> surface_brush;
+    if (SUCCEEDED(hr)) {
+        hr = backend->compositor->CreateSurfaceBrushWithSurface(backend->composition_surface.Get(), &surface_brush);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->compositor->CreateSpriteVisual(&backend->swap_chain_visual);
+    }
+    ComPtr<ABI::Windows::UI::Composition::ICompositionBrush> surface_base_brush;
+    if (SUCCEEDED(hr)) {
+        hr = surface_brush.As(&surface_base_brush);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->swap_chain_visual->put_Brush(surface_base_brush.Get());
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::IVisualCollection> children;
+    if (SUCCEEDED(hr)) {
+        hr = backend->root_visual->get_Children(&children);
+    }
+    ComPtr<ABI::Windows::UI::Composition::IVisual> backdrop_base_visual;
+    if (SUCCEEDED(hr)) {
+        hr = backend->backdrop_visual.As(&backdrop_base_visual);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = children->InsertAtTop(backdrop_base_visual.Get());
+    }
+    ComPtr<ABI::Windows::UI::Composition::IVisual> swap_chain_base_visual;
+    if (SUCCEEDED(hr)) {
+        hr = backend->swap_chain_visual.As(&swap_chain_base_visual);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = children->InsertAtTop(swap_chain_base_visual.Get());
+    }
+    ComPtr<ABI::Windows::UI::Composition::IVisual> root_base_visual;
+    if (SUCCEEDED(hr)) {
+        hr = backend->root_visual.As(&root_base_visual);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = backend->composition_target->put_Root(root_base_visual.Get());
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_visual_set_size(root_base_visual.Get(), (float)width, (float)height);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_visual_set_size(backdrop_base_visual.Get(), (float)width, (float)height);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_visual_set_size(swap_chain_base_visual.Get(), (float)width, (float)height);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = reach_dcomp_create_target_bitmap(backend) == REACH_OK ? S_OK : E_FAIL;
+    }
+    if (SUCCEEDED(hr)) {
+        backend->target_width = width;
+        backend->target_height = height;
+    }
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_dcomp_create_blur_target(reach_render_backend *backend)
+{
+    if (backend == nullptr || backend->hwnd == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    return reach_dcomp_create_target(backend);
 }
 
 static reach_result reach_d2d_execute(reach_render_backend *backend, const reach_render_command_buffer *commands)
@@ -414,6 +899,13 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
             if (result == REACH_OK) {
                 continue;
             }
+        }
+        if (command->type == REACH_RENDER_COMMAND_BACKPLATE_EDGE) {
+            reach_result result = reach_d2d_draw_backplate_edge(target, command);
+            if (result != REACH_OK) {
+                return result;
+            }
+            continue;
         }
 
         if (command->type == REACH_RENDER_COMMAND_RECT ||
@@ -507,6 +999,19 @@ static void reach_d2d_destroy(reach_render_backend *backend)
     }
     if (backend->dcomp_device != nullptr) {
         backend->dcomp_device->Release();
+    }
+    if (backend->composition_target != nullptr) {
+        (void)backend->composition_target->put_Root(nullptr);
+    }
+    backend->composition_surface.Reset();
+    backend->swap_chain_visual.Reset();
+    backend->backdrop_visual.Reset();
+    backend->root_visual.Reset();
+    backend->composition_target.Reset();
+    backend->compositor.Reset();
+    if (backend->ro_initialized) {
+        RoUninitialize();
+        backend->ro_initialized = 0;
     }
     if (backend->swap_chain != nullptr) {
         backend->swap_chain->Release();
@@ -607,7 +1112,47 @@ reach_result reach_windows_create_dcomp_render_backend(void *native_window, reac
             IID_PPV_ARGS(&backend->wic_factory));
     }
     if (SUCCEEDED(hr)) {
-        hr = reach_dcomp_create_target(backend) == REACH_OK ? S_OK : E_FAIL;
+        hr = reach_wuc_create_target(backend) == REACH_OK ? S_OK : E_FAIL;
+        if (FAILED(hr)) {
+            backend->composition_surface.Reset();
+            backend->swap_chain_visual.Reset();
+            backend->backdrop_visual.Reset();
+            backend->root_visual.Reset();
+            if (backend->composition_target != nullptr) {
+                (void)backend->composition_target->put_Root(nullptr);
+            }
+            backend->composition_target.Reset();
+            backend->compositor.Reset();
+            if (backend->ro_initialized) {
+                RoUninitialize();
+                backend->ro_initialized = 0;
+            }
+            if (backend->swap_chain_bitmap != nullptr) {
+                backend->swap_chain_bitmap->Release();
+                backend->swap_chain_bitmap = nullptr;
+            }
+            if (backend->swap_chain != nullptr) {
+                backend->swap_chain->Release();
+                backend->swap_chain = nullptr;
+            }
+            if (backend->d2d_context != nullptr) {
+                backend->d2d_context->Release();
+                backend->d2d_context = nullptr;
+            }
+            if (backend->d2d_device != nullptr) {
+                backend->d2d_device->Release();
+                backend->d2d_device = nullptr;
+            }
+            if (backend->dxgi_device != nullptr) {
+                backend->dxgi_device->Release();
+                backend->dxgi_device = nullptr;
+            }
+            if (backend->d3d_device != nullptr) {
+                backend->d3d_device->Release();
+                backend->d3d_device = nullptr;
+            }
+            hr = reach_dcomp_create_blur_target(backend) == REACH_OK ? S_OK : E_FAIL;
+        }
     }
     if (FAILED(hr)) {
         reach_d2d_destroy(backend);

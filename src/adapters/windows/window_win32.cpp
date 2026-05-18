@@ -6,6 +6,7 @@
 #include <dwmapi.h>
 
 #include <new>
+#include <wchar.h>
 
 #ifndef DWMWA_WINDOW_CORNER_PREFERENCE
 #define DWMWA_WINDOW_CORNER_PREFERENCE 33
@@ -23,6 +24,7 @@ struct reach_platform_window {
     int width;
     int height;
     float corner_radius;
+    int tracking_mouse_leave;
 };
 
 static const wchar_t *reach_window_class_name()
@@ -67,6 +69,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONUP:
+    case WM_MBUTTONUP:
     case WM_RBUTTONUP:
         if (window != nullptr && window->callback != nullptr) {
             POINT point = {};
@@ -74,17 +77,95 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             point.y = GET_Y_LPARAM(lparam);
             ClientToScreen(hwnd, &point);
             reach_ui_event event = {};
-            event.type = message == WM_RBUTTONUP ? REACH_UI_EVENT_POINTER_CONTEXT : REACH_UI_EVENT_POINTER_UP;
+            event.type = message == WM_RBUTTONUP
+                ? REACH_UI_EVENT_POINTER_CONTEXT
+                : (message == WM_MBUTTONUP ? REACH_UI_EVENT_POINTER_MIDDLE : REACH_UI_EVENT_POINTER_UP);
             event.x = point.x;
             event.y = point.y;
             window->callback(window->callback_user, &event);
         }
         return 0;
+    case WM_MOUSEMOVE:
+        if (window != nullptr && window->callback != nullptr) {
+            if (!window->tracking_mouse_leave) {
+                TRACKMOUSEEVENT track = {};
+                track.cbSize = sizeof(track);
+                track.dwFlags = TME_LEAVE;
+                track.hwndTrack = hwnd;
+                window->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
+            }
+            POINT point = {};
+            point.x = GET_X_LPARAM(lparam);
+            point.y = GET_Y_LPARAM(lparam);
+            ClientToScreen(hwnd, &point);
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_POINTER_MOVE;
+            event.x = point.x;
+            event.y = point.y;
+            window->callback(window->callback_user, &event);
+        }
+        return 0;
+    case WM_MOUSELEAVE:
+        if (window != nullptr) {
+            window->tracking_mouse_leave = 0;
+            if (window->callback != nullptr) {
+                reach_ui_event event = {};
+                event.type = REACH_UI_EVENT_POINTER_LEAVE;
+                window->callback(window->callback_user, &event);
+            }
+        }
+        return 0;
+    case WM_SIZE:
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_MEASUREITEM: {
+        MEASUREITEMSTRUCT *measure = reinterpret_cast<MEASUREITEMSTRUCT *>(lparam);
+        if (measure != nullptr && measure->CtlType == ODT_MENU) {
+            const wchar_t *text = reinterpret_cast<const wchar_t *>(measure->itemData);
+            SIZE size = {};
+            HDC dc = GetDC(hwnd);
+            if (dc != nullptr && text != nullptr) {
+                HFONT font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+                HGDIOBJ old_font = SelectObject(dc, font);
+                GetTextExtentPoint32W(dc, text, (int)wcslen(text), &size);
+                SelectObject(dc, old_font);
+                ReleaseDC(hwnd, dc);
+            }
+            measure->itemWidth = (UINT)(size.cx + 32);
+            measure->itemHeight = 32;
+            return TRUE;
+        }
+        break;
+    }
+    case WM_DRAWITEM: {
+        DRAWITEMSTRUCT *draw = reinterpret_cast<DRAWITEMSTRUCT *>(lparam);
+        if (draw != nullptr && draw->CtlType == ODT_MENU) {
+            const wchar_t *text = reinterpret_cast<const wchar_t *>(draw->itemData);
+            COLORREF background = (draw->itemState & ODS_SELECTED) ? RGB(36, 36, 36) : RGB(0, 0, 0);
+            HBRUSH brush = CreateSolidBrush(background);
+            if (brush != nullptr) {
+                FillRect(draw->hDC, &draw->rcItem, brush);
+                DeleteObject(brush);
+            }
+            SetBkMode(draw->hDC, TRANSPARENT);
+            SetTextColor(draw->hDC, RGB(255, 255, 255));
+            HFONT font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+            HGDIOBJ old_font = SelectObject(draw->hDC, font);
+            RECT text_rect = draw->rcItem;
+            text_rect.left += 14;
+            text_rect.right -= 14;
+            DrawTextW(draw->hDC, text != nullptr ? text : L"", -1, &text_rect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+            SelectObject(draw->hDC, old_font);
+            return TRUE;
+        }
+        break;
+    }
     case WM_ERASEBKGND:
         return 1;
     default:
         return DefWindowProcW(hwnd, message, wparam, lparam);
     }
+
+    return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
 static reach_result reach_register_platform_class()
@@ -93,7 +174,7 @@ static reach_result reach_register_platform_class()
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = reach_window_proc;
     wc.hInstance = GetModuleHandleW(nullptr);
-    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.lpszClassName = reach_window_class_name();
 
     ATOM atom = RegisterClassExW(&wc);
@@ -191,9 +272,8 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     window->corner_radius = radius;
 
     /*
-        The dock uses DirectComposition + premultiplied alpha.
-        Do not apply DWM/native rounded corners here, or it creates a second
-        rounded shape around the D2D-rendered dock body.
+        The dock uses a DirectComposition premultiplied-alpha surface.
+        Applying a native window region clips that surface with aliased edges.
     */
     if (window->role == REACH_SURFACE_DOCK) {
         return REACH_OK;
@@ -285,6 +365,7 @@ static void reach_platform_window_destroy(reach_platform_window *window)
 
     if (window->hwnd != nullptr) {
         DestroyWindow(window->hwnd);
+        window->hwnd = nullptr;
     }
     delete window;
 }
@@ -325,7 +406,6 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
         return REACH_ERROR;
     }
     SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
-
     out_port->window = window;
     out_port->role = role;
     out_port->ops.show = reach_platform_window_show;

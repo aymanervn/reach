@@ -11,10 +11,10 @@ struct reach_window_manager {
     HWINEVENTHOOK destroy_hook;
     HWINEVENTHOOK foreground_hook;
     HWND foreground;
-    std::vector<HWND> maximized_windows;
     std::vector<reach_window_snapshot> windows;
     std::vector<HWND> window_order;
     std::vector<reach_window_snapshot> pending_windows;
+    int32_t dirty;
 };
 
 static reach_window_manager *g_window_manager;
@@ -37,6 +37,7 @@ static void CALLBACK reach_window_manager_event_proc(
 
     if (g_window_manager != nullptr && window != nullptr && IsWindow(window)) {
         g_window_manager->foreground = GetForegroundWindow();
+        g_window_manager->dirty = 1;
     }
 }
 
@@ -80,30 +81,6 @@ static reach_result reach_window_manager_stop(reach_window_manager *manager)
         g_window_manager = nullptr;
     }
     return REACH_OK;
-}
-
-static BOOL CALLBACK reach_window_manager_enum_proc(HWND hwnd, LPARAM param)
-{
-    reach_window_manager *manager = reinterpret_cast<reach_window_manager *>(param);
-    if (manager == nullptr || hwnd == nullptr || !IsWindowVisible(hwnd) || !IsZoomed(hwnd)) {
-        return TRUE;
-    }
-    if (GetWindow(hwnd, GW_OWNER) != nullptr) {
-        return TRUE;
-    }
-
-    LONG_PTR ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-    if ((ex_style & WS_EX_TOOLWINDOW) != 0) {
-        return TRUE;
-    }
-
-    RECT rect = {};
-    if (!GetWindowRect(hwnd, &rect) || rect.right <= rect.left || rect.bottom <= rect.top) {
-        return TRUE;
-    }
-
-    manager->maximized_windows.push_back(hwnd);
-    return TRUE;
 }
 
 static int32_t reach_window_manager_is_reach_window(HWND hwnd)
@@ -168,6 +145,68 @@ static int32_t reach_window_manager_is_app_window(HWND hwnd)
     return 1;
 }
 
+static int32_t reach_rects_intersect(const RECT *a, const RECT *b)
+{
+    if (a == nullptr || b == nullptr) {
+        return 0;
+    }
+    return a->left < b->right &&
+        a->right > b->left &&
+        a->top < b->bottom &&
+        a->bottom > b->top;
+}
+
+static BOOL CALLBACK reach_find_primary_monitor_proc(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param)
+{
+    (void)dc;
+    (void)rect;
+    MONITORINFO info = {};
+    info.cbSize = sizeof(info);
+    if (GetMonitorInfoW(monitor, &info) && (info.dwFlags & MONITORINFOF_PRIMARY) != 0) {
+        RECT *out_rect = reinterpret_cast<RECT *>(param);
+        if (out_rect != nullptr) {
+            *out_rect = info.rcMonitor;
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static RECT reach_window_manager_primary_monitor_rect(void)
+{
+    RECT rect = {};
+    EnumDisplayMonitors(nullptr, nullptr, reach_find_primary_monitor_proc, reinterpret_cast<LPARAM>(&rect));
+    if (rect.left == rect.right || rect.top == rect.bottom) {
+        POINT point = { 0, 0 };
+        HMONITOR monitor = MonitorFromPoint(point, MONITOR_DEFAULTTOPRIMARY);
+        MONITORINFO info = {};
+        info.cbSize = sizeof(info);
+        if (GetMonitorInfoW(monitor, &info)) {
+            rect = info.rcMonitor;
+        }
+    }
+    return rect;
+}
+
+static int32_t reach_window_manager_any_visible_maximized_on_primary(void)
+{
+    RECT primary = reach_window_manager_primary_monitor_rect();
+    if (primary.left == primary.right || primary.top == primary.bottom) {
+        return 0;
+    }
+
+    for (HWND hwnd = GetTopWindow(nullptr); hwnd != nullptr; hwnd = GetWindow(hwnd, GW_HWNDNEXT)) {
+        if (!reach_window_manager_is_app_window(hwnd) || IsIconic(hwnd) || !IsZoomed(hwnd)) {
+            continue;
+        }
+        RECT rect = {};
+        if (GetWindowRect(hwnd, &rect) && reach_rects_intersect(&rect, &primary)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM param)
 {
     reach_window_manager *manager = reinterpret_cast<reach_window_manager *>(param);
@@ -181,9 +220,15 @@ static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM pa
     snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
     snapshot.minimized = IsIconic(hwnd) ? 1 : 0;
     RECT rect = {};
-    if (GetWindowRect(hwnd, &rect)) {
-        snapshot.bounds = { rect.left, rect.top, rect.right, rect.bottom };
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+    /* Use normal placement for minimized windows to avoid icon-position jumps. */
+    if (snapshot.minimized && GetWindowPlacement(hwnd, &placement)) {
+        rect = placement.rcNormalPosition;
+    } else {
+        (void)GetWindowRect(hwnd, &rect);
     }
+    snapshot.bounds = { rect.left, rect.top, rect.right, rect.bottom };
     wchar_t title[260] = {};
     GetWindowTextW(hwnd, title, 260);
     (void)reach_copy_utf16(snapshot.title, 260, reinterpret_cast<const uint16_t *>(title));
@@ -206,17 +251,6 @@ static const reach_window_snapshot *reach_window_manager_find_pending(
         }
     }
     return nullptr;
-}
-
-static void reach_window_manager_refresh_maximized(reach_window_manager *manager)
-{
-    REACH_ASSERT(manager != nullptr);
-    if (manager == nullptr) {
-        return;
-    }
-
-    manager->maximized_windows.clear();
-    EnumWindows(reach_window_manager_enum_proc, reinterpret_cast<LPARAM>(manager));
 }
 
 static void reach_window_manager_refresh_windows(reach_window_manager *manager)
@@ -260,8 +294,8 @@ static reach_result reach_window_manager_refresh(reach_window_manager *manager)
     }
 
     manager->foreground = GetForegroundWindow();
-    reach_window_manager_refresh_maximized(manager);
     reach_window_manager_refresh_windows(manager);
+    manager->dirty = 0;
     return REACH_OK;
 }
 
@@ -310,19 +344,25 @@ static uintptr_t reach_window_manager_foreground(const reach_window_manager *man
 static int32_t reach_window_manager_foreground_is_maximized(const reach_window_manager *manager)
 {
     REACH_ASSERT(manager != nullptr);
-    return manager->foreground != nullptr && IsZoomed(manager->foreground);
+    return manager != nullptr &&
+        reach_window_manager_is_app_window(manager->foreground) &&
+        IsZoomed(manager->foreground);
 }
 
-static int32_t reach_window_manager_any_window_is_maximized(const reach_window_manager *manager)
+static int32_t reach_window_manager_dock_should_auto_hide(const reach_window_manager *manager)
 {
-    REACH_ASSERT(manager != nullptr);
-    return manager != nullptr && !manager->maximized_windows.empty();
+    if (manager == nullptr || !reach_window_manager_is_app_window(manager->foreground)) {
+        return 0;
+    }
+    if (IsZoomed(manager->foreground)) {
+        return 1;
+    }
+    return reach_window_manager_any_visible_maximized_on_primary();
 }
 
-static size_t reach_window_manager_maximized_window_count(const reach_window_manager *manager)
+static int32_t reach_window_manager_needs_refresh(const reach_window_manager *manager)
 {
-    REACH_ASSERT(manager != nullptr);
-    return manager == nullptr ? 0 : manager->maximized_windows.size();
+    return manager != nullptr && manager->dirty;
 }
 
 static size_t reach_window_manager_window_count(const reach_window_manager *manager)
@@ -348,10 +388,39 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     if (!IsWindow(hwnd)) {
         return REACH_INVALID_ARGUMENT;
     }
-    ShowWindow(hwnd, SW_RESTORE);
+    if (IsIconic(hwnd)) {
+        WINDOWPLACEMENT placement = {};
+        placement.length = sizeof(placement);
+        int32_t was_maximized = GetWindowPlacement(hwnd, &placement) &&
+            (placement.showCmd == SW_SHOWMAXIMIZED ||
+             (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
+        ShowWindow(hwnd, was_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
+    } else if (!IsWindowVisible(hwnd)) {
+        ShowWindow(hwnd, SW_SHOW);
+    }
     SetForegroundWindow(hwnd);
     manager->foreground = hwnd;
+    (void)reach_window_manager_refresh(manager);
     return REACH_OK;
+}
+
+static reach_result reach_window_manager_minimize(reach_window_manager *manager, uintptr_t window_id)
+{
+    if (manager == nullptr || window_id == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    if (!IsWindow(hwnd)) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND shell = GetShellWindow();
+    if (shell != nullptr) {
+        SetForegroundWindow(shell);
+    }
+    ShowWindow(hwnd, SW_MINIMIZE);
+    manager->foreground = GetForegroundWindow();
+    return reach_window_manager_refresh(manager);
 }
 
 static reach_result reach_window_manager_close(reach_window_manager *manager, uintptr_t window_id)
@@ -389,7 +458,6 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     }
 
     manager->foreground = GetForegroundWindow();
-    reach_window_manager_refresh_maximized(manager);
     reach_window_manager_refresh_windows(manager);
     out_port->manager = manager;
     out_port->ops.start = reach_window_manager_start;
@@ -398,11 +466,12 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.snap = reach_window_manager_snap;
     out_port->ops.foreground = reach_window_manager_foreground;
     out_port->ops.foreground_is_maximized = reach_window_manager_foreground_is_maximized;
-    out_port->ops.any_window_is_maximized = reach_window_manager_any_window_is_maximized;
-    out_port->ops.maximized_window_count = reach_window_manager_maximized_window_count;
+    out_port->ops.dock_should_auto_hide = reach_window_manager_dock_should_auto_hide;
+    out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;
     out_port->ops.activate = reach_window_manager_activate;
+    out_port->ops.minimize = reach_window_manager_minimize;
     out_port->ops.close = reach_window_manager_close;
     out_port->ops.destroy = reach_window_manager_destroy;
     return REACH_OK;

@@ -29,8 +29,6 @@ add_executable(reach WIN32
     src/theme.c
     resources/reach.rc
     src/animation.cpp
-    src/dock.cpp
-    src/wm.cpp
     src/layout.cpp
     src/monitor.cpp
     src/hotkeys.cpp
@@ -65,6 +63,7 @@ target_link_libraries(reach PRIVATE
     shcore
     advapi32
     ole32
+    runtimeobject
     uuid
     windowscodecs
     dwmapi

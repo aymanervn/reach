@@ -4,13 +4,11 @@
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
 #include "reach/animation.h"
-#include "reach/dock.h"
 #include "reach/hotkeys.h"
 #include "reach/monitor.h"
 #include "reach/platform/windows_adapters.h"
 #include "reach/pin_config.h"
 #include "reach/theme.h"
-#include "reach/wm.h"
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -19,10 +17,8 @@
 #include <new>
 
 struct reach_shell {
-    reach_dock *dock;
     reach_hotkeys *hotkeys;
     reach_monitor_list *monitors;
-    reach_wm *wm;
     reach_ui_state ui;
     reach_platform_window_port launcher_window;
     reach_render_backend_port launcher_renderer;
@@ -57,6 +53,7 @@ struct reach_shell {
     int32_t layout_dirty;
     int32_t render_dirty;
     int32_t dock_render_dirty;
+    size_t hovered_dock_index;
     int32_t launcher_render_dirty;
     int32_t tray_render_dirty;
     int32_t dock_bounds_valid;
@@ -380,14 +377,14 @@ static void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)
     }
 }
 
-static int32_t reach_shell_any_window_maximized(reach_shell *shell)
+static int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
     if (shell == nullptr) {
         return 0;
     }
-    if (shell->window_manager.ops.any_window_is_maximized != nullptr) {
-        return shell->window_manager.ops.any_window_is_maximized(shell->window_manager.manager);
+    if (shell->window_manager.ops.dock_should_auto_hide != nullptr) {
+        return shell->window_manager.ops.dock_should_auto_hide(shell->window_manager.manager);
     }
     if (shell->window_manager.ops.foreground_is_maximized != nullptr) {
         return shell->window_manager.ops.foreground_is_maximized(shell->window_manager.manager);
@@ -416,7 +413,7 @@ static reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach
     int32_t reveal_requested = reach_shell_cursor_at_monitor_bottom(monitor_bounds);
     int32_t target_hidden = shell != nullptr &&
         shell->ui.dock.auto_hide &&
-        reach_shell_any_window_maximized(shell) &&
+        reach_shell_should_auto_hide_dock(shell) &&
         !reveal_requested;
     float target_y = target_hidden ? hidden_y : shown_bounds.y;
 
@@ -467,6 +464,9 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
     case REACH_UI_EVENT_DOCK_APP_CLICK:
     case REACH_UI_EVENT_TRAY_BUTTON_CLICK:
     case REACH_UI_EVENT_POINTER_UP:
+    case REACH_UI_EVENT_POINTER_MOVE:
+    case REACH_UI_EVENT_POINTER_LEAVE:
+    case REACH_UI_EVENT_POINTER_MIDDLE:
         break;
     case REACH_UI_EVENT_NONE:
     default:
@@ -480,8 +480,6 @@ static void reach_shell_cleanup(reach_shell *shell)
         return;
     }
 
-    reach_dock_destroy(shell->dock);
-    reach_wm_destroy(shell->wm);
     reach_hotkeys_destroy(shell->hotkeys);
     reach_monitor_list_destroy(shell->monitors);
     if (shell->launcher_window.ops.destroy != nullptr) {
@@ -538,8 +536,6 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->wallpaper_surface.ops.destroy != nullptr) {
         shell->wallpaper_surface.ops.destroy(shell->wallpaper_surface.surface);
     }
-    shell->dock = nullptr;
-    shell->wm = nullptr;
     shell->hotkeys = nullptr;
     shell->monitors = nullptr;
     shell->launcher_window = {};
@@ -599,6 +595,20 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
     command.radius = dock_radius;
     reach_render_command_buffer_push(&commands, &command);
 
+    if (theme->dock_border_thickness > 0.0f && theme->dock_border.a > 0.0f) {
+        command = {};
+        command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
+        command.rect.x = theme->dock_border_thickness * 0.5f;
+        command.rect.y = theme->dock_border_thickness * 0.5f;
+        command.rect.width = layout->bounds.width - theme->dock_border_thickness;
+        command.rect.height = layout->bounds.height - theme->dock_border_thickness;
+        command.color = theme->dock_border;
+        command.radius = dock_radius;
+        command.stroke_width = theme->dock_border_thickness;
+        reach_render_command_buffer_push(&commands, &command);
+    }
+
+
     for (size_t index = 0; index < layout->app_slot_count; ++index) {
         int32_t pinned_item = index < shell->dock_item_count ? shell->dock_item_pinned[index] : 1;
         reach_icon_handle icon = {};
@@ -626,18 +636,59 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
         float box_y = layout->app_slots[index].y - layout->bounds.y
             + (layout->app_slots[index].height - icon_box_size) * 0.5f;
 
+        if (shell->hovered_dock_index == index) {
+            command = {};
+            command.type = REACH_RENDER_COMMAND_RECT;
+            command.rect.x = box_x;
+            command.rect.y = box_y;
+            command.rect.width = icon_box_size;
+            command.rect.height = icon_box_size;
+            command.color = theme->icon_box_background;
+            command.color.a *= 0.32f;
+            command.radius = icon_box_radius;
+            reach_render_command_buffer_push(&commands, &command);
+        }
+
         if (icon.id != 0) {
-            float icon_x = box_x + (icon_box_size - icon_size) * 0.5f;
-            float icon_y = box_y + (icon_box_size - icon_size) * 0.5f;
+            int32_t wants_backplate = icon.wants_backplate;
+            float actual_icon_size = wants_backplate ? icon_size : icon_box_size;
+
+            if (wants_backplate) {
+                command = {};
+                command.type = REACH_RENDER_COMMAND_RECT;
+                command.rect.x = box_x;
+                command.rect.y = box_y;
+                command.rect.width = icon_box_size;
+                command.rect.height = icon_box_size;
+                command.color = theme->icon_backplate_background;
+                command.radius = icon_box_radius;
+                reach_render_command_buffer_push(&commands, &command);
+
+            }
+
+            float icon_x = box_x + (icon_box_size - actual_icon_size) * 0.5f;
+            float icon_y = box_y + (icon_box_size - actual_icon_size) * 0.5f;
 
             command = {};
             command.type = REACH_RENDER_COMMAND_ICON;
             command.rect.x = icon_x;
             command.rect.y = icon_y;
-            command.rect.width = icon_size;
-            command.rect.height = icon_size;
+            command.rect.width = actual_icon_size;
+            command.rect.height = actual_icon_size;
             command.icon_id = icon.id;
             command.color.a = 1.0f;
+            command.radius = wants_backplate ? 0.0f : icon_box_radius;
+            reach_render_command_buffer_push(&commands, &command);
+
+            command = {};
+            command.type = REACH_RENDER_COMMAND_BACKPLATE_EDGE;
+            command.rect.x = box_x;
+            command.rect.y = box_y;
+            command.rect.width = icon_box_size;
+            command.rect.height = icon_box_size;
+            command.color = theme->icon_backplate_edge;
+            command.radius = icon_box_radius;
+            command.stroke_width = 0.55f;
             reach_render_command_buffer_push(&commands, &command);
         } else {
             /*
@@ -913,8 +964,61 @@ static reach_result reach_shell_open_launcher_result(reach_shell *shell)
 
 enum reach_shell_context_command {
     REACH_SHELL_CONTEXT_UNPIN = 100,
-    REACH_SHELL_CONTEXT_CLOSE = 101
+    REACH_SHELL_CONTEXT_CLOSE = 101,
+    REACH_SHELL_CONTEXT_OPEN_NEW = 102
 };
+
+static HHOOK g_reach_context_menu_hook;
+
+static LRESULT CALLBACK reach_shell_context_menu_hook_proc(int code, WPARAM wparam, LPARAM lparam)
+{
+    if (code == HCBT_ACTIVATE) {
+        HWND hwnd = reinterpret_cast<HWND>(wparam);
+        wchar_t class_name[32] = {};
+        if (hwnd != nullptr &&
+            GetClassNameW(hwnd, class_name, 32) != 0 &&
+            lstrcmpiW(class_name, L"#32768") == 0) {
+            RECT rect = {};
+            if (GetWindowRect(hwnd, &rect)) {
+                int width = rect.right - rect.left;
+                int height = rect.bottom - rect.top;
+                HRGN region = CreateRoundRectRgn(0, 0, width + 1, height + 1, 18, 18);
+                if (region != nullptr) {
+                    SetWindowRgn(hwnd, region, TRUE);
+                }
+            }
+        }
+    }
+    return CallNextHookEx(g_reach_context_menu_hook, code, wparam, lparam);
+}
+
+static void reach_shell_append_context_menu_item(HMENU menu, UINT id, const wchar_t *text)
+{
+    AppendMenuW(menu, MF_OWNERDRAW, id, reinterpret_cast<LPCWSTR>(text));
+}
+
+static reach_result reach_shell_launch_dock_item(reach_shell *shell, size_t item_index, int32_t force_new_instance)
+{
+    if (shell == nullptr || item_index >= shell->dock_item_count || shell->app_launcher.ops.launch == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const uint16_t *path = nullptr;
+    if (shell->dock_item_pinned[item_index]) {
+        path = item_index < shell->ui.pinned_app_count ? shell->ui.pinned_apps[item_index].path : nullptr;
+    } else {
+        size_t open_index = shell->dock_item_open_indices[item_index];
+        path = open_index < shell->open_window_count ? shell->open_windows[open_index].path : nullptr;
+    }
+    if (path == nullptr || path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_app_launch_request request = {};
+    reach_copy_utf16(request.path, 260, path);
+    request.force_new_instance = force_new_instance;
+    return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+}
 
 static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t item_index, int32_t x, int32_t y)
 {
@@ -927,11 +1031,24 @@ static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, s
         return REACH_ERROR;
     }
 
+    HBRUSH menu_brush = CreateSolidBrush(RGB(0, 0, 0));
+    if (menu_brush != nullptr) {
+        MENUINFO info = {};
+        info.cbSize = sizeof(info);
+        info.fMask = MIM_BACKGROUND;
+        info.hbrBack = menu_brush;
+        SetMenuInfo(menu, &info);
+    }
+
+    reach_shell_append_context_menu_item(menu, REACH_SHELL_CONTEXT_OPEN_NEW, L"Open Another Instance");
+    if (shell->dock_item_pinned[item_index] || shell->dock_item_windows[item_index] != 0) {
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    }
     if (shell->dock_item_pinned[item_index]) {
-        AppendMenuW(menu, MF_STRING, REACH_SHELL_CONTEXT_UNPIN, L"Unpin app from dock");
+        reach_shell_append_context_menu_item(menu, REACH_SHELL_CONTEXT_UNPIN, L"Unpin app from dock");
     }
     if (shell->dock_item_windows[item_index] != 0) {
-        AppendMenuW(menu, MF_STRING, REACH_SHELL_CONTEXT_CLOSE, L"Close app");
+        reach_shell_append_context_menu_item(menu, REACH_SHELL_CONTEXT_CLOSE, L"Close app");
     }
     HWND owner = shell->dock_window.ops.native_handle != nullptr
         ? static_cast<HWND>(shell->dock_window.ops.native_handle(shell->dock_window.window))
@@ -940,9 +1057,24 @@ static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, s
         owner = GetDesktopWindow();
     }
     SetForegroundWindow(owner);
+    g_reach_context_menu_hook = SetWindowsHookExW(
+        WH_CBT,
+        reach_shell_context_menu_hook_proc,
+        nullptr,
+        GetCurrentThreadId());
     int command = TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD, x, y, 0, owner, nullptr);
+    if (g_reach_context_menu_hook != nullptr) {
+        UnhookWindowsHookEx(g_reach_context_menu_hook);
+        g_reach_context_menu_hook = nullptr;
+    }
     DestroyMenu(menu);
+    if (menu_brush != nullptr) {
+        DeleteObject(menu_brush);
+    }
 
+    if (command == REACH_SHELL_CONTEXT_OPEN_NEW) {
+        return reach_shell_launch_dock_item(shell, item_index, 1);
+    }
     if (command == REACH_SHELL_CONTEXT_UNPIN) {
         uint32_t id = shell->ui.pinned_apps[item_index].id;
         if (reach_pin_config_unpin_id(&shell->config_store, id) == REACH_OK) {
@@ -996,8 +1128,23 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
     for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
         if (reach_rect_contains(shell->layout.dock.app_slots[index], event->x, event->y)) {
-            if (index < shell->dock_item_count && shell->dock_item_windows[index] != 0 && shell->window_manager.ops.activate != nullptr) {
-                return shell->window_manager.ops.activate(shell->window_manager.manager, shell->dock_item_windows[index]);
+            if (index < shell->dock_item_count && shell->dock_item_windows[index] != 0) {
+                uintptr_t window_id = shell->dock_item_windows[index];
+                uintptr_t foreground = shell->window_manager.ops.foreground != nullptr
+                    ? shell->window_manager.ops.foreground(shell->window_manager.manager)
+                    : 0;
+                reach_result result = REACH_OK;
+                if (foreground == window_id && shell->window_manager.ops.minimize != nullptr) {
+                    result = shell->window_manager.ops.minimize(shell->window_manager.manager, window_id);
+                } else if (shell->window_manager.ops.activate != nullptr) {
+                    result = shell->window_manager.ops.activate(shell->window_manager.manager, window_id);
+                }
+                if (shell->window_manager.ops.refresh != nullptr) {
+                    (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
+                    (void)reach_shell_refresh_open_windows(shell);
+                }
+                shell->dock_render_dirty = 1;
+                return result;
             }
             if (index < shell->ui.pinned_app_count) {
                 routed.type = REACH_UI_EVENT_DOCK_APP_CLICK;
@@ -1008,6 +1155,50 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         }
     }
 
+    return REACH_OK;
+}
+
+static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr || !shell->has_layout) {
+        return REACH_OK;
+    }
+
+    size_t hovered = REACH_MAX_PINNED_APPS;
+    for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
+        if (reach_rect_contains(shell->layout.dock.app_slots[index], event->x, event->y)) {
+            hovered = index;
+            break;
+        }
+    }
+
+    if (shell->hovered_dock_index != hovered) {
+        shell->hovered_dock_index = hovered;
+        shell->dock_render_dirty = 1;
+    }
+    return REACH_OK;
+}
+
+static reach_result reach_shell_handle_pointer_middle(reach_shell *shell, const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr || !shell->has_layout) {
+        return REACH_OK;
+    }
+
+    for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
+        if (reach_rect_contains(shell->layout.dock.app_slots[index], event->x, event->y)) {
+            return reach_shell_launch_dock_item(shell, index, 1);
+        }
+    }
+    return REACH_OK;
+}
+
+static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
+{
+    if (shell != nullptr && shell->hovered_dock_index != REACH_MAX_PINNED_APPS) {
+        shell->hovered_dock_index = REACH_MAX_PINNED_APPS;
+        shell->dock_render_dirty = 1;
+    }
     return REACH_OK;
 }
 
@@ -1211,23 +1402,9 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
 
     reach_result result = reach_monitor_list_create(&shell->monitors);
     if (result == REACH_OK) {
-        result = reach_wm_create(&shell->wm);
-    }
-    if (result == REACH_OK) {
         result = reach_hotkeys_create(&shell->hotkeys);
     }
 
-    if (result == REACH_OK && dependencies->dock_window.window == nullptr) {
-        reach_dock_config dock_config = {};
-        dock_config.height_px = 56;
-        dock_config.icon_size_px = 32;
-        dock_config.auto_hide = 1;
-        dock_config.animation_seconds = 0.16;
-
-        reach_dock_desc dock_desc = {};
-        dock_desc.config = &dock_config;
-        result = reach_dock_create(&dock_desc, &shell->dock);
-    }
     shell->launcher_window = dependencies->launcher_window;
     shell->launcher_renderer = dependencies->launcher_renderer;
     shell->dock_window = dependencies->dock_window;
@@ -1272,6 +1449,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->render_dirty = 1;
     shell->dock_render_dirty = 1;
     shell->launcher_render_dirty = 1;
+    shell->hovered_dock_index = REACH_MAX_PINNED_APPS;
     *out_shell = shell;
     return REACH_OK;
 }
@@ -1295,8 +1473,6 @@ reach_result reach_shell_start(reach_shell *shell)
     reach_result result = REACH_OK;
     if (shell->window_manager.ops.start != nullptr) {
         result = shell->window_manager.ops.start(shell->window_manager.manager);
-    } else {
-        result = reach_wm_install_hooks(shell->wm);
     }
     if (result != REACH_OK) {
         return result;
@@ -1338,11 +1514,6 @@ reach_result reach_shell_start(reach_shell *shell)
         if (result != REACH_OK) {
             return result;
         }
-    } else {
-        result = reach_dock_show(shell->dock);
-        if (result != REACH_OK) {
-            return result;
-        }
     }
 
     shell->running = 1;
@@ -1363,13 +1534,8 @@ reach_result reach_shell_stop(reach_shell *shell)
     shell->running = 0;
     if (shell->window_manager.ops.stop != nullptr) {
         (void)shell->window_manager.ops.stop(shell->window_manager.manager);
-    } else {
-        (void)reach_wm_uninstall_hooks(shell->wm);
     }
     (void)reach_hotkeys_unregister_all(shell->hotkeys);
-    if (shell->dock != nullptr) {
-        (void)reach_dock_hide(shell->dock);
-    }
     if (shell->dock_window.ops.hide != nullptr) {
         (void)shell->dock_window.ops.hide(shell->dock_window.window);
     }
@@ -1396,6 +1562,15 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     reach_ui_intent intent = {};
     if (event->type == REACH_UI_EVENT_POINTER_UP) {
         return reach_shell_handle_pointer_up(shell, event);
+    }
+    if (event->type == REACH_UI_EVENT_POINTER_MOVE) {
+        return reach_shell_handle_pointer_move(shell, event);
+    }
+    if (event->type == REACH_UI_EVENT_POINTER_MIDDLE) {
+        return reach_shell_handle_pointer_middle(shell, event);
+    }
+    if (event->type == REACH_UI_EVENT_POINTER_LEAVE) {
+        return reach_shell_handle_pointer_leave(shell);
     }
     if (event->type == REACH_UI_EVENT_POINTER_CONTEXT) {
         return reach_shell_handle_pointer_context(shell, event);
@@ -1453,13 +1628,13 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
 
     shell->window_manager_refresh_elapsed += delta_seconds;
-    if (shell->window_manager_refresh_elapsed >= 0.25 && shell->window_manager.ops.refresh != nullptr) {
+    int32_t window_manager_dirty = shell->window_manager.ops.needs_refresh != nullptr &&
+        shell->window_manager.ops.needs_refresh(shell->window_manager.manager);
+    if ((window_manager_dirty || shell->window_manager_refresh_elapsed >= 0.25) && shell->window_manager.ops.refresh != nullptr) {
         (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
         (void)reach_shell_refresh_open_windows(shell);
         shell->dock_render_dirty = 1;
         shell->window_manager_refresh_elapsed = 0.0;
-    } else if (shell->window_manager.ops.refresh == nullptr) {
-        (void)reach_wm_update_z_order(shell->wm);
     }
     if (shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0 && shell->wallpaper_surface.ops.set_bounds != nullptr) {
         const reach_monitor_info *monitor = reach_monitor_primary(shell->monitors);
@@ -1591,10 +1766,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     shell->launcher_render_dirty = 0;
     shell->tray_render_dirty = 0;
 
-    if (shell->dock != nullptr) {
-        return reach_dock_update(shell->dock, delta_seconds);
-    }
-
     return REACH_OK;
 }
 
@@ -1605,5 +1776,8 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
          shell->dock_render_dirty ||
          shell->launcher_render_dirty ||
          shell->tray_render_dirty ||
-         shell->dock_animating);
+         shell->dock_animating ||
+         (shell->ui.dock.auto_hide &&
+             (shell->dock_target_hidden ||
+              reach_shell_should_auto_hide_dock(shell))));
 }

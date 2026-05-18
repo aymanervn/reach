@@ -101,7 +101,7 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher, cons
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (reach_launch_request_is_default_explorer(request)) {
+    if (!request->force_new_instance && reach_launch_request_is_default_explorer(request)) {
         return reach_launch_default_explorer();
     }
 

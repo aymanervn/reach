@@ -14,6 +14,7 @@ typedef struct reach_app_launcher reach_app_launcher;
 typedef struct reach_app_launch_request {
     uint16_t path[260];
     uint16_t arguments[260];
+    int32_t force_new_instance;
 } reach_app_launch_request;
 
 typedef struct reach_app_launcher_ops {
