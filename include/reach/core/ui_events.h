@@ -20,7 +20,8 @@ typedef enum reach_ui_event_type {
     REACH_UI_EVENT_WALLPAPER_CHANGED = 9,
     REACH_UI_EVENT_POINTER_MOVE = 10,
     REACH_UI_EVENT_POINTER_LEAVE = 11,
-    REACH_UI_EVENT_POINTER_MIDDLE = 12
+    REACH_UI_EVENT_POINTER_MIDDLE = 12,
+    REACH_UI_EVENT_POINTER_DOWN = 13
 } reach_ui_event_type;
 
 typedef struct reach_ui_event {

@@ -10,11 +10,15 @@ struct reach_input_source {
     reach_input_event_callback callback;
     void *user;
     HWND window;
+    HHOOK keyboard_hook;
     ATOM window_class;
     int32_t registered_hotkey_count;
+    int32_t windows_key_down;
 };
 
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
+static const UINT REACH_INPUT_WM_WINDOWS_KEY = WM_APP + 20;
+static reach_input_source *g_reach_keyboard_source;
 
 enum reach_input_hotkey_id {
     REACH_HOTKEY_LEFT_WINDOWS = 1,
@@ -32,6 +36,13 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
     }
 
     reach_input_source *source = reinterpret_cast<reach_input_source *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (message == REACH_INPUT_WM_WINDOWS_KEY && source != nullptr && source->callback != nullptr) {
+        reach_ui_event event = {};
+        event.type = REACH_UI_EVENT_WINDOWS_KEY;
+        source->callback(source->user, &event);
+        return 0;
+    }
+
     if (message == WM_HOTKEY && source != nullptr && source->callback != nullptr) {
         switch ((int)wparam) {
         case REACH_HOTKEY_LEFT_WINDOWS:
@@ -49,6 +60,29 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
     }
 
     return DefWindowProcW(hwnd, message, wparam, lparam);
+}
+
+static LRESULT CALLBACK reach_input_keyboard_proc(int code, WPARAM wparam, LPARAM lparam)
+{
+    reach_input_source *source = g_reach_keyboard_source;
+    if (code == HC_ACTION && source != nullptr && source->window != nullptr) {
+        const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
+        if (keyboard != nullptr && (keyboard->vkCode == VK_LWIN || keyboard->vkCode == VK_RWIN)) {
+            if (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) {
+                if (!source->windows_key_down) {
+                    source->windows_key_down = 1;
+                    PostMessageW(source->window, REACH_INPUT_WM_WINDOWS_KEY, 0, 0);
+                }
+                return 1;
+            }
+            if (wparam == WM_KEYUP || wparam == WM_SYSKEYUP) {
+                source->windows_key_down = 0;
+                return 1;
+            }
+        }
+    }
+
+    return CallNextHookEx(source != nullptr ? source->keyboard_hook : nullptr, code, wparam, lparam);
 }
 
 static reach_result reach_input_create_window(reach_input_source *source)
@@ -113,12 +147,19 @@ static reach_result reach_input_start(reach_input_source *source, reach_input_ev
     }
 
     source->registered_hotkey_count = 0;
-    (void)reach_input_register_hotkey(source, REACH_HOTKEY_LEFT_WINDOWS, 0, VK_LWIN);
-    (void)reach_input_register_hotkey(source, REACH_HOTKEY_RIGHT_WINDOWS, 0, VK_RWIN);
-    if (source->registered_hotkey_count == 0) {
+    source->windows_key_down = 0;
+    if (source->keyboard_hook == nullptr) {
+        g_reach_keyboard_source = source;
+        source->keyboard_hook = SetWindowsHookExW(
+            WH_KEYBOARD_LL,
+            reach_input_keyboard_proc,
+            GetModuleHandleW(nullptr),
+            0);
+    }
+    if (source->keyboard_hook == nullptr) {
         (void)reach_input_register_hotkey(source, REACH_HOTKEY_WIN_SPACE, MOD_WIN, VK_SPACE);
     }
-    if (source->registered_hotkey_count == 0) {
+    if (source->keyboard_hook == nullptr && source->registered_hotkey_count == 0) {
         (void)reach_input_register_hotkey(source, REACH_HOTKEY_CTRL_SPACE, MOD_CONTROL, VK_SPACE);
     }
     return REACH_OK;
@@ -137,7 +178,15 @@ static reach_result reach_input_stop(reach_input_source *source)
         UnregisterHotKey(source->window, REACH_HOTKEY_WIN_SPACE);
         UnregisterHotKey(source->window, REACH_HOTKEY_CTRL_SPACE);
     }
+    if (source->keyboard_hook != nullptr) {
+        UnhookWindowsHookEx(source->keyboard_hook);
+        source->keyboard_hook = nullptr;
+    }
+    if (g_reach_keyboard_source == source) {
+        g_reach_keyboard_source = nullptr;
+    }
     source->registered_hotkey_count = 0;
+    source->windows_key_down = 0;
     source->callback = nullptr;
     source->user = nullptr;
     return REACH_OK;

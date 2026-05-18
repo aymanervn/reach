@@ -32,6 +32,28 @@ static const wchar_t *reach_window_class_name()
     return L"ReachPlatformWindow";
 }
 
+static HFONT reach_create_windows_menu_font()
+{
+    NONCLIENTMETRICSW metrics = {};
+    metrics.cbSize = sizeof(metrics);
+    if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0)) {
+        if (metrics.lfMenuFont.lfHeight < 0) {
+            metrics.lfMenuFont.lfHeight += 2;
+        } else if (metrics.lfMenuFont.lfHeight > 2) {
+            metrics.lfMenuFont.lfHeight -= 2;
+        }
+        return CreateFontIndirectW(&metrics.lfMenuFont);
+    }
+    return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+}
+
+static void reach_delete_menu_font(HFONT font)
+{
+    if (font != nullptr && font != GetStockObject(DEFAULT_GUI_FONT)) {
+        DeleteObject(font);
+    }
+}
+
 static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
     reach_platform_window *window = reinterpret_cast<reach_platform_window *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -68,10 +90,28 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             return 0;
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_LBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+        if (window != nullptr && window->callback != nullptr) {
+            SetCapture(hwnd);
+            POINT point = {};
+            point.x = GET_X_LPARAM(lparam);
+            point.y = GET_Y_LPARAM(lparam);
+            ClientToScreen(hwnd, &point);
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_POINTER_DOWN;
+            event.x = point.x;
+            event.y = point.y;
+            window->callback(window->callback_user, &event);
+        }
+        return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
         if (window != nullptr && window->callback != nullptr) {
+            if (GetCapture() == hwnd) {
+                ReleaseCapture();
+            }
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
             point.y = GET_Y_LPARAM(lparam);
@@ -124,14 +164,15 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             SIZE size = {};
             HDC dc = GetDC(hwnd);
             if (dc != nullptr && text != nullptr) {
-                HFONT font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+                HFONT font = reach_create_windows_menu_font();
                 HGDIOBJ old_font = SelectObject(dc, font);
                 GetTextExtentPoint32W(dc, text, (int)wcslen(text), &size);
                 SelectObject(dc, old_font);
+                reach_delete_menu_font(font);
                 ReleaseDC(hwnd, dc);
             }
-            measure->itemWidth = (UINT)(size.cx + 32);
-            measure->itemHeight = 32;
+            measure->itemWidth = (UINT)(size.cx + 28);
+            measure->itemHeight = 30;
             return TRUE;
         }
         break;
@@ -140,21 +181,22 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         DRAWITEMSTRUCT *draw = reinterpret_cast<DRAWITEMSTRUCT *>(lparam);
         if (draw != nullptr && draw->CtlType == ODT_MENU) {
             const wchar_t *text = reinterpret_cast<const wchar_t *>(draw->itemData);
-            COLORREF background = (draw->itemState & ODS_SELECTED) ? RGB(36, 36, 36) : RGB(0, 0, 0);
+            COLORREF background = (draw->itemState & ODS_SELECTED) ? RGB(48, 45, 42) : RGB(32, 30, 28);
             HBRUSH brush = CreateSolidBrush(background);
             if (brush != nullptr) {
                 FillRect(draw->hDC, &draw->rcItem, brush);
                 DeleteObject(brush);
             }
             SetBkMode(draw->hDC, TRANSPARENT);
-            SetTextColor(draw->hDC, RGB(255, 255, 255));
-            HFONT font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+            SetTextColor(draw->hDC, RGB(218, 216, 212));
+            HFONT font = reach_create_windows_menu_font();
             HGDIOBJ old_font = SelectObject(draw->hDC, font);
             RECT text_rect = draw->rcItem;
-            text_rect.left += 14;
-            text_rect.right -= 14;
+            text_rect.left += 13;
+            text_rect.right -= 13;
             DrawTextW(draw->hDC, text != nullptr ? text : L"", -1, &text_rect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
             SelectObject(draw->hDC, old_font);
+            reach_delete_menu_font(font);
             return TRUE;
         }
         break;

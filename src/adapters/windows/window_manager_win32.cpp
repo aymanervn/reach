@@ -1,6 +1,7 @@
 #include "reach/platform/windows_adapters.h"
 
 #include <windows.h>
+#include <dwmapi.h>
 #include <shlwapi.h>
 
 #include <new>
@@ -10,6 +11,11 @@ struct reach_window_manager {
     HWINEVENTHOOK create_hook;
     HWINEVENTHOOK destroy_hook;
     HWINEVENTHOOK foreground_hook;
+    HWINEVENTHOOK show_hook;
+    HWINEVENTHOOK hide_hook;
+    HWINEVENTHOOK minimize_start_hook;
+    HWINEVENTHOOK minimize_end_hook;
+    HWINEVENTHOOK location_hook;
     HWND foreground;
     std::vector<reach_window_snapshot> windows;
     std::vector<HWND> window_order;
@@ -35,9 +41,26 @@ static void CALLBACK reach_window_manager_event_proc(
     (void)event_thread;
     (void)event_time;
 
-    if (g_window_manager != nullptr && window != nullptr && IsWindow(window)) {
+    if (event != EVENT_SYSTEM_FOREGROUND && object_id != OBJID_WINDOW) {
+        return;
+    }
+    if (event != EVENT_SYSTEM_FOREGROUND && event != EVENT_OBJECT_DESTROY) {
+        if (window == nullptr || !IsWindow(window) || GetAncestor(window, GA_ROOT) != window) {
+            return;
+        }
+    }
+
+    if (g_window_manager != nullptr) {
         g_window_manager->foreground = GetForegroundWindow();
         g_window_manager->dirty = 1;
+    }
+}
+
+static void reach_window_manager_unhook(HWINEVENTHOOK *hook)
+{
+    if (hook != nullptr && *hook != nullptr) {
+        UnhookWinEvent(*hook);
+        *hook = nullptr;
     }
 }
 
@@ -55,7 +78,21 @@ static reach_result reach_window_manager_start(reach_window_manager *manager)
     manager->create_hook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
     manager->destroy_hook = SetWinEventHook(EVENT_OBJECT_DESTROY, EVENT_OBJECT_DESTROY, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
     manager->foreground_hook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
-    return manager->create_hook != nullptr && manager->destroy_hook != nullptr && manager->foreground_hook != nullptr ? REACH_OK : REACH_ERROR;
+    manager->show_hook = SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    manager->hide_hook = SetWinEventHook(EVENT_OBJECT_HIDE, EVENT_OBJECT_HIDE, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    manager->minimize_start_hook = SetWinEventHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZESTART, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    manager->minimize_end_hook = SetWinEventHook(EVENT_SYSTEM_MINIMIZEEND, EVENT_SYSTEM_MINIMIZEEND, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    manager->location_hook = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, nullptr, reach_window_manager_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    return manager->create_hook != nullptr &&
+        manager->destroy_hook != nullptr &&
+        manager->foreground_hook != nullptr &&
+        manager->show_hook != nullptr &&
+        manager->hide_hook != nullptr &&
+        manager->minimize_start_hook != nullptr &&
+        manager->minimize_end_hook != nullptr &&
+        manager->location_hook != nullptr
+        ? REACH_OK
+        : REACH_ERROR;
 }
 
 static reach_result reach_window_manager_stop(reach_window_manager *manager)
@@ -65,18 +102,14 @@ static reach_result reach_window_manager_stop(reach_window_manager *manager)
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (manager->create_hook != nullptr) {
-        UnhookWinEvent(manager->create_hook);
-        manager->create_hook = nullptr;
-    }
-    if (manager->destroy_hook != nullptr) {
-        UnhookWinEvent(manager->destroy_hook);
-        manager->destroy_hook = nullptr;
-    }
-    if (manager->foreground_hook != nullptr) {
-        UnhookWinEvent(manager->foreground_hook);
-        manager->foreground_hook = nullptr;
-    }
+    reach_window_manager_unhook(&manager->create_hook);
+    reach_window_manager_unhook(&manager->destroy_hook);
+    reach_window_manager_unhook(&manager->foreground_hook);
+    reach_window_manager_unhook(&manager->show_hook);
+    reach_window_manager_unhook(&manager->hide_hook);
+    reach_window_manager_unhook(&manager->minimize_start_hook);
+    reach_window_manager_unhook(&manager->minimize_end_hook);
+    reach_window_manager_unhook(&manager->location_hook);
     if (g_window_manager == manager) {
         g_window_manager = nullptr;
     }
@@ -89,6 +122,22 @@ static int32_t reach_window_manager_is_reach_window(HWND hwnd)
     GetClassNameW(hwnd, class_name, 64);
     return lstrcmpiW(class_name, L"ReachPlatformWindow") == 0 ||
         lstrcmpiW(class_name, L"ReachInputMessageWindow") == 0 ||
+        lstrcmpiW(class_name, L"ReachWallpaperWindow") == 0;
+}
+
+static int32_t reach_window_manager_is_desktop_surface_window(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return 0;
+    }
+    if (hwnd == GetShellWindow()) {
+        return 1;
+    }
+
+    wchar_t class_name[64] = {};
+    GetClassNameW(hwnd, class_name, 64);
+    return lstrcmpiW(class_name, L"Progman") == 0 ||
+        lstrcmpiW(class_name, L"WorkerW") == 0 ||
         lstrcmpiW(class_name, L"ReachWallpaperWindow") == 0;
 }
 
@@ -145,15 +194,24 @@ static int32_t reach_window_manager_is_app_window(HWND hwnd)
     return 1;
 }
 
-static int32_t reach_rects_intersect(const RECT *a, const RECT *b)
+static int32_t reach_window_manager_is_cloaked(HWND hwnd)
 {
-    if (a == nullptr || b == nullptr) {
+    DWORD cloaked = 0;
+    HRESULT hr = DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+    return SUCCEEDED(hr) && cloaked != 0;
+}
+
+static int32_t reach_window_manager_is_displayed_app_window(HWND hwnd)
+{
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+    if (GetWindowPlacement(hwnd, &placement) && placement.showCmd == SW_SHOWMINIMIZED) {
         return 0;
     }
-    return a->left < b->right &&
-        a->right > b->left &&
-        a->top < b->bottom &&
-        a->bottom > b->top;
+    return reach_window_manager_is_app_window(hwnd) &&
+        IsWindowVisible(hwnd) &&
+        !IsIconic(hwnd) &&
+        !reach_window_manager_is_cloaked(hwnd);
 }
 
 static BOOL CALLBACK reach_find_primary_monitor_proc(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param)
@@ -163,44 +221,46 @@ static BOOL CALLBACK reach_find_primary_monitor_proc(HMONITOR monitor, HDC dc, L
     MONITORINFO info = {};
     info.cbSize = sizeof(info);
     if (GetMonitorInfoW(monitor, &info) && (info.dwFlags & MONITORINFOF_PRIMARY) != 0) {
-        RECT *out_rect = reinterpret_cast<RECT *>(param);
-        if (out_rect != nullptr) {
-            *out_rect = info.rcMonitor;
+        HMONITOR *out_monitor = reinterpret_cast<HMONITOR *>(param);
+        if (out_monitor != nullptr) {
+            *out_monitor = monitor;
         }
         return FALSE;
     }
     return TRUE;
 }
 
-static RECT reach_window_manager_primary_monitor_rect(void)
+static HMONITOR reach_window_manager_primary_monitor(void)
 {
-    RECT rect = {};
-    EnumDisplayMonitors(nullptr, nullptr, reach_find_primary_monitor_proc, reinterpret_cast<LPARAM>(&rect));
-    if (rect.left == rect.right || rect.top == rect.bottom) {
+    HMONITOR primary = nullptr;
+    EnumDisplayMonitors(nullptr, nullptr, reach_find_primary_monitor_proc, reinterpret_cast<LPARAM>(&primary));
+    if (primary == nullptr) {
         POINT point = { 0, 0 };
-        HMONITOR monitor = MonitorFromPoint(point, MONITOR_DEFAULTTOPRIMARY);
-        MONITORINFO info = {};
-        info.cbSize = sizeof(info);
-        if (GetMonitorInfoW(monitor, &info)) {
-            rect = info.rcMonitor;
-        }
+        primary = MonitorFromPoint(point, MONITOR_DEFAULTTOPRIMARY);
     }
-    return rect;
+    return primary;
+}
+
+static int32_t reach_window_manager_is_on_primary_monitor(HWND hwnd)
+{
+    HMONITOR primary = reach_window_manager_primary_monitor();
+    if (primary == nullptr) {
+        return 0;
+    }
+    HMONITOR window_monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONULL);
+    return window_monitor == primary;
 }
 
 static int32_t reach_window_manager_any_visible_maximized_on_primary(void)
 {
-    RECT primary = reach_window_manager_primary_monitor_rect();
-    if (primary.left == primary.right || primary.top == primary.bottom) {
-        return 0;
-    }
-
     for (HWND hwnd = GetTopWindow(nullptr); hwnd != nullptr; hwnd = GetWindow(hwnd, GW_HWNDNEXT)) {
-        if (!reach_window_manager_is_app_window(hwnd) || IsIconic(hwnd) || !IsZoomed(hwnd)) {
+        if (reach_window_manager_is_desktop_surface_window(hwnd)) {
+            return 0;
+        }
+        if (!reach_window_manager_is_displayed_app_window(hwnd) || !IsZoomed(hwnd)) {
             continue;
         }
-        RECT rect = {};
-        if (GetWindowRect(hwnd, &rect) && reach_rects_intersect(&rect, &primary)) {
+        if (reach_window_manager_is_on_primary_monitor(hwnd)) {
             return 1;
         }
     }
@@ -351,11 +411,8 @@ static int32_t reach_window_manager_foreground_is_maximized(const reach_window_m
 
 static int32_t reach_window_manager_dock_should_auto_hide(const reach_window_manager *manager)
 {
-    if (manager == nullptr || !reach_window_manager_is_app_window(manager->foreground)) {
+    if (manager == nullptr) {
         return 0;
-    }
-    if (IsZoomed(manager->foreground)) {
-        return 1;
     }
     return reach_window_manager_any_visible_maximized_on_primary();
 }
@@ -394,9 +451,9 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
         int32_t was_maximized = GetWindowPlacement(hwnd, &placement) &&
             (placement.showCmd == SW_SHOWMAXIMIZED ||
              (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
-        ShowWindow(hwnd, was_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
+        ShowWindowAsync(hwnd, was_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
     } else if (!IsWindowVisible(hwnd)) {
-        ShowWindow(hwnd, SW_SHOW);
+        ShowWindowAsync(hwnd, SW_SHOW);
     }
     SetForegroundWindow(hwnd);
     manager->foreground = hwnd;
@@ -418,7 +475,7 @@ static reach_result reach_window_manager_minimize(reach_window_manager *manager,
     if (shell != nullptr) {
         SetForegroundWindow(shell);
     }
-    ShowWindow(hwnd, SW_MINIMIZE);
+    ShowWindowAsync(hwnd, SW_MINIMIZE);
     manager->foreground = GetForegroundWindow();
     return reach_window_manager_refresh(manager);
 }
