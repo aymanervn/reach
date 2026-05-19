@@ -1682,6 +1682,13 @@ static reach_result reach_shell_render_switcher_surface(reach_shell *shell, reac
             if (selected) {
                 const wchar_t *path = reinterpret_cast<const wchar_t *>(shell->open_windows[index].path);
                 const wchar_t *name = PathFindFileNameW(path != nullptr ? path : L"");
+                // Strip .exe extension
+                wchar_t name_buf[260];
+                wcsncpy_s(name_buf, name, _TRUNCATE);
+                wchar_t *dot = wcsrchr(name_buf, L'.');
+                if (dot != nullptr) {
+                    *dot = L'\0';
+                }
                 command = {};
                 command.type = REACH_RENDER_COMMAND_TEXT;
                 command.rect.x = item.x - gap * 0.5f;
@@ -1690,7 +1697,7 @@ static reach_result reach_shell_render_switcher_surface(reach_shell *shell, reac
                 command.rect.height = 22.0f;
                 command.color = reach_shell_rgb(242, 240, 236, 0.96f);
                 command.text_bold = 1;
-                reach_copy_utf16(command.text, 260, reinterpret_cast<const uint16_t *>(name != nullptr && name[0] != 0 ? name : L"App"));
+                reach_copy_utf16(command.text, 260, reinterpret_cast<const uint16_t *>(name_buf[0] != L'\0' ? name_buf : L"App"));
                 reach_render_command_buffer_push(&commands, &command);
             }
         }
