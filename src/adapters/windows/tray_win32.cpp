@@ -297,6 +297,15 @@ static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t 
             wparam = reach_tray_cursor_wparam();
             lparam = reach_tray_v4_lparam(mouse_message, item->owner_id);
         }
+        if (action == REACH_TRAY_ACTION_LEFT_CLICK) {
+            WPARAM down_wparam = item->version >= NOTIFYICON_VERSION_4 ? reach_tray_cursor_wparam() : item->owner_id;
+            LPARAM down_lparam = item->version >= NOTIFYICON_VERSION_4
+                ? reach_tray_v4_lparam(WM_LBUTTONDOWN, item->owner_id)
+                : WM_LBUTTONDOWN;
+            if (!PostMessageW(item->owner, item->callback_message, down_wparam, down_lparam)) {
+                return REACH_ERROR;
+            }
+        }
         return PostMessageW(item->owner, item->callback_message, wparam, lparam) ? REACH_OK : REACH_ERROR;
     }
 

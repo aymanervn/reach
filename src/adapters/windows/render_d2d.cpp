@@ -931,10 +931,11 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
         } else if (command->type == REACH_RENDER_COMMAND_TEXT) {
             IDWriteTextFormat *format = nullptr;
             ID2D1SolidColorBrush *brush = nullptr;
+            DWRITE_FONT_WEIGHT weight = command->text_bold ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL;
             HRESULT hr = backend->text_factory->CreateTextFormat(
                 L"Segoe UI",
                 nullptr,
-                DWRITE_FONT_WEIGHT_NORMAL,
+                weight,
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
                 16.0f,

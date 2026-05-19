@@ -12,7 +12,8 @@ extern "C" {
 typedef enum reach_surface_role {
     REACH_SURFACE_DOCK = 0,
     REACH_SURFACE_LAUNCHER = 1,
-    REACH_SURFACE_TRAY_MENU = 2
+    REACH_SURFACE_TRAY_MENU = 2,
+    REACH_SURFACE_SWITCHER = 3
 } reach_surface_role;
 
 typedef struct reach_platform_window reach_platform_window;

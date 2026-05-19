@@ -235,10 +235,11 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     } else {
         style |= WS_EX_LAYERED;
     }
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU) {
+    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
+        role == REACH_SURFACE_SWITCHER) {
         style |= WS_EX_TOPMOST;
     }
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU) {
+    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER) {
         style |= WS_EX_NOACTIVATE;
     }
     return style;
@@ -251,12 +252,14 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     }
 
     int show_command = window->role == REACH_SURFACE_DOCK ||
-        window->role == REACH_SURFACE_TRAY_MENU
+        window->role == REACH_SURFACE_TRAY_MENU ||
+        window->role == REACH_SURFACE_SWITCHER
         ? SW_SHOWNOACTIVATE
         : SW_SHOW;
     ShowWindow(window->hwnd, show_command);
     if (window->role != REACH_SURFACE_DOCK &&
-        window->role != REACH_SURFACE_TRAY_MENU) {
+        window->role != REACH_SURFACE_TRAY_MENU &&
+        window->role != REACH_SURFACE_SWITCHER) {
         SetForegroundWindow(window->hwnd);
         SetFocus(window->hwnd);
     }

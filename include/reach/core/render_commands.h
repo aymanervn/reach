@@ -26,6 +26,7 @@ typedef struct reach_render_command {
     float radius;
     float stroke_width;
     uint64_t icon_id;
+    int32_t text_bold;
     uint16_t text[260];
 } reach_render_command;
 

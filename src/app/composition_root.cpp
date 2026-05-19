@@ -50,6 +50,13 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_d2d_render_backend(native_window, &dependencies.tray_renderer);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_platform_window(REACH_SURFACE_SWITCHER, &dependencies.switcher_window);
+    }
+    if (result == REACH_OK) {
+        void *native_window = dependencies.switcher_window.ops.native_handle(dependencies.switcher_window.window);
+        result = reach_windows_create_d2d_render_backend(native_window, &dependencies.switcher_renderer);
+    }
+    if (result == REACH_OK) {
         result = reach_windows_create_search_stub(&dependencies.search_provider);
     }
     if (result == REACH_OK) {
@@ -104,6 +111,12 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.tray_renderer.ops.destroy != nullptr) {
             dependencies.tray_renderer.ops.destroy(dependencies.tray_renderer.backend);
+        }
+        if (dependencies.switcher_window.ops.destroy != nullptr) {
+            dependencies.switcher_window.ops.destroy(dependencies.switcher_window.window);
+        }
+        if (dependencies.switcher_renderer.ops.destroy != nullptr) {
+            dependencies.switcher_renderer.ops.destroy(dependencies.switcher_renderer.backend);
         }
         if (dependencies.input_source.ops.destroy != nullptr) {
             dependencies.input_source.ops.destroy(dependencies.input_source.source);

@@ -144,3 +144,28 @@ target_compile_definitions(reach_core_tests PRIVATE
     UNICODE
     _UNICODE
 )
+
+add_executable(reach_pin_config_tests
+    tests/pin_config_tests.cpp
+    src/pin_config.cpp
+    src/util.cpp
+)
+
+target_include_directories(reach_pin_config_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_compile_features(reach_pin_config_tests PRIVATE
+    cxx_std_17
+)
+
+target_compile_definitions(reach_pin_config_tests PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+
+target_link_libraries(reach_pin_config_tests PRIVATE
+    shlwapi
+)
