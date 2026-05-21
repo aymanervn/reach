@@ -251,10 +251,10 @@ static int32_t reach_icon_classify_backplate(HICON icon)
         bbox_height_ratio >= 0.86f &&
         bbox_aspect >= 0.90f &&
         bbox_aspect <= 1.10f;
-    if (near_square_box && transparent_corners <= 1 && content_ratio >= 0.72f) {
+    if (near_square_box && transparent_corners <= 1 && content_ratio >= 0.88f) {
         return 0;
     }
-    if (near_square_box && transparent_corners >= 2 && content_ratio >= 0.80f) {
+    if (near_square_box && transparent_corners >= 2 && content_ratio >= 0.92f) {
         return 0;
     }
     return 1;

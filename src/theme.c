@@ -31,7 +31,7 @@ const reach_theme *reach_theme_default(void)
         220.0f,
         120.0f,
         18.0f,
-        0.36f
+        0.3f
     };
     return &theme;
 }
