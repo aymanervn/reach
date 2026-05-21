@@ -77,7 +77,7 @@ static HICON reach_icon_from_shell_file_info(const wchar_t *path, int32_t size_p
     return result != 0 ? info.hIcon : nullptr;
 }
 
-static HICON reach_icon_from_system_image_list(const wchar_t *path, int32_t size_px)
+static HICON reach_icon_from_system_image_list_size(const wchar_t *path, int image_list_size)
 {
     if (path == nullptr || path[0] == 0) {
         return nullptr;
@@ -89,7 +89,6 @@ static HICON reach_icon_from_system_image_list(const wchar_t *path, int32_t size
         return nullptr;
     }
 
-    int image_list_size = size_px > 96 ? SHIL_JUMBO : SHIL_EXTRALARGE;
     IImageList *image_list = nullptr;
     HRESULT hr = SHGetImageList(image_list_size, IID_IImageList, reinterpret_cast<void **>(&image_list));
     if (FAILED(hr) || image_list == nullptr) {
@@ -100,6 +99,18 @@ static HICON reach_icon_from_system_image_list(const wchar_t *path, int32_t size
     hr = image_list->GetIcon(info.iIcon, ILD_TRANSPARENT, &icon);
     image_list->Release();
     return SUCCEEDED(hr) ? icon : nullptr;
+}
+
+static HICON reach_icon_from_system_image_list(const wchar_t *path, int32_t size_px)
+{
+    HICON icon = nullptr;
+    if (size_px > 96) {
+        icon = reach_icon_from_system_image_list_size(path, SHIL_JUMBO);
+        if (icon != nullptr) {
+            return icon;
+        }
+    }
+    return reach_icon_from_system_image_list_size(path, SHIL_EXTRALARGE);
 }
 
 static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px)

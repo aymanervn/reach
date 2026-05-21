@@ -530,7 +530,7 @@ static reach_result reach_shell_load_pinned_icons(reach_shell *shell)
         }
 
         reach_icon_request request = {};
-        request.size_px = (int32_t)(shell->ui.dock.icon_size * 2.0f);
+        request.size_px = (int32_t)(reach_theme_icon_box_size(shell->theme, shell->ui.dock.height) * 4.0f);
         reach_copy_utf16(request.path, 260, icon_path);
         (void)shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &shell->pinned_icons[index]);
     }
@@ -596,7 +596,7 @@ static reach_result reach_shell_refresh_open_windows(reach_shell *shell)
         shell->open_window_initials[out_index] = snapshot.title[0] != 0 ? snapshot.title[0] : '?';
         if (shell->icon_provider.ops.load != nullptr) {
             reach_icon_request request = {};
-            request.size_px = (int32_t)(shell->ui.dock.icon_size * 2.0f);
+            request.size_px = (int32_t)(reach_theme_icon_box_size(shell->theme, shell->ui.dock.height) * 4.0f);
             (void)reach_copy_utf16(request.path, 260, snapshot.path);
             (void)shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &shell->open_window_icons[out_index]);
         }
@@ -903,6 +903,16 @@ static void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config
         if (shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
             (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, snapshot->wallpaper_path);
         }
+        if (shell->wallpaper_surface.ops.set_monitor_wallpaper != nullptr) {
+            for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index) {
+                if (snapshot->monitor_wallpaper_paths[index][0] != 0) {
+                    (void)shell->wallpaper_surface.ops.set_monitor_wallpaper(
+                        shell->wallpaper_surface.surface,
+                        index,
+                        snapshot->monitor_wallpaper_paths[index]);
+                }
+            }
+        }
         return;
     }
     if (shell->wallpaper_service.ops.current_wallpaper == nullptr || shell->config_store.ops.save == nullptr) {
@@ -916,6 +926,16 @@ static void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config
         (void)shell->config_store.ops.save(shell->config_store.store, snapshot);
         if (shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
             (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, current);
+        }
+    }
+    if (shell->wallpaper_surface.ops.set_monitor_wallpaper != nullptr) {
+        for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index) {
+            if (snapshot->monitor_wallpaper_paths[index][0] != 0) {
+                (void)shell->wallpaper_surface.ops.set_monitor_wallpaper(
+                    shell->wallpaper_surface.surface,
+                    index,
+                    snapshot->monitor_wallpaper_paths[index]);
+            }
         }
     }
 }
@@ -945,6 +965,19 @@ static void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)
         (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, new_path);
     } else if (new_path[0] == 0 && shell->wallpaper_surface.ops.clear != nullptr) {
         (void)shell->wallpaper_surface.ops.clear(shell->wallpaper_surface.surface);
+    }
+    if (shell->wallpaper_surface.ops.set_monitor_wallpaper != nullptr &&
+        shell->wallpaper_surface.ops.clear_monitor_wallpaper != nullptr) {
+        for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index) {
+            if (snapshot.monitor_wallpaper_paths[index][0] != 0) {
+                (void)shell->wallpaper_surface.ops.set_monitor_wallpaper(
+                    shell->wallpaper_surface.surface,
+                    index,
+                    snapshot.monitor_wallpaper_paths[index]);
+            } else {
+                (void)shell->wallpaper_surface.ops.clear_monitor_wallpaper(shell->wallpaper_surface.surface, index);
+            }
+        }
     }
 }
 
@@ -1363,13 +1396,20 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
 
         if (index < shell->dock_item_count && shell->dock_item_windows[index] != 0) {
             int32_t focused = shell->dock_item_windows[index] == focused_window;
+            float indicator_size = 4.0f;
+            float indicator_gap = 2.0f;
+            float indicator_y = box_y + icon_box_size + indicator_gap;
+            float max_indicator_y = layout->bounds.height - indicator_size - 2.0f;
+            if (indicator_y > max_indicator_y) {
+                indicator_y = max_indicator_y;
+            }
 
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect.x = box_x + (icon_box_size - 4.0f) * 0.5f;
-            command.rect.y = layout->bounds.height - 7.0f;
-            command.rect.width = 4.0f;
-            command.rect.height = 4.0f;
+            command.rect.x = box_x + (icon_box_size - indicator_size) * 0.5f;
+            command.rect.y = indicator_y;
+            command.rect.width = indicator_size;
+            command.rect.height = indicator_size;
             command.color.r = 1.0f;
             command.color.g = 1.0f;
             command.color.b = 1.0f;
@@ -3418,17 +3458,34 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         shell->dock_render_dirty = 1;
         shell->window_manager_refresh_elapsed = 0.0;
     }
-    if (shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0 && shell->wallpaper_surface.ops.set_bounds != nullptr) {
-        const reach_monitor_info *monitor = reach_monitor_primary(shell->monitors);
-        REACH_ASSERT(monitor != nullptr);
-        REACH_ASSERT(monitor->primary || reach_monitor_count(shell->monitors) == 1);
-        if (monitor != nullptr) {
-            reach_rect_f32 wallpaper_bounds = {};
-            wallpaper_bounds.x = (float)monitor->bounds.left;
-            wallpaper_bounds.y = (float)monitor->bounds.top;
-            wallpaper_bounds.width = (float)(monitor->bounds.right - monitor->bounds.left);
-            wallpaper_bounds.height = (float)(monitor->bounds.bottom - monitor->bounds.top);
-            (void)shell->wallpaper_surface.ops.set_bounds(shell->wallpaper_surface.surface, wallpaper_bounds);
+    if (shell->monitors != nullptr && shell->wallpaper_surface.ops.set_bounds != nullptr) {
+        (void)reach_monitor_refresh(shell->monitors);
+        size_t monitor_count = reach_monitor_count(shell->monitors);
+        if (monitor_count > 0) {
+            const reach_monitor_info *monitor = reach_monitor_get(shell->monitors, 0);
+            if (monitor != nullptr) {
+                int32_t left = monitor->bounds.left;
+                int32_t top = monitor->bounds.top;
+                int32_t right = monitor->bounds.right;
+                int32_t bottom = monitor->bounds.bottom;
+                for (size_t index = 1; index < monitor_count; ++index) {
+                    monitor = reach_monitor_get(shell->monitors, index);
+                    if (monitor == nullptr) {
+                        continue;
+                    }
+                    if (monitor->bounds.left < left) left = monitor->bounds.left;
+                    if (monitor->bounds.top < top) top = monitor->bounds.top;
+                    if (monitor->bounds.right > right) right = monitor->bounds.right;
+                    if (monitor->bounds.bottom > bottom) bottom = monitor->bounds.bottom;
+                }
+
+                reach_rect_f32 wallpaper_bounds = {};
+                wallpaper_bounds.x = (float)left;
+                wallpaper_bounds.y = (float)top;
+                wallpaper_bounds.width = (float)(right - left);
+                wallpaper_bounds.height = (float)(bottom - top);
+                (void)shell->wallpaper_surface.ops.set_bounds(shell->wallpaper_surface.surface, wallpaper_bounds);
+            }
         }
     }
     if (shell->launcher_window.ops.set_bounds != nullptr && shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0) {

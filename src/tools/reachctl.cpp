@@ -158,6 +158,40 @@ static void reachctl_notify_wallpaper_changed(void)
     }
 }
 
+struct reachctl_monitor_list_state {
+    size_t index;
+};
+
+static BOOL CALLBACK reachctl_print_monitor_proc(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param)
+{
+    (void)monitor;
+    (void)dc;
+    reachctl_monitor_list_state *state = reinterpret_cast<reachctl_monitor_list_state *>(param);
+    if (state == nullptr || rect == nullptr) {
+        return TRUE;
+    }
+
+    wchar_t line[256] = {};
+    swprintf_s(
+        line,
+        L"%u: x=%ld y=%ld width=%ld height=%ld",
+        (unsigned)(state->index + 1),
+        rect->left,
+        rect->top,
+        rect->right - rect->left,
+        rect->bottom - rect->top);
+    reachctl_print(line);
+    state->index += 1;
+    return TRUE;
+}
+
+static reach_result reachctl_list_monitors(void)
+{
+    reachctl_monitor_list_state state = {};
+    BOOL ok = EnumDisplayMonitors(nullptr, nullptr, reachctl_print_monitor_proc, reinterpret_cast<LPARAM>(&state));
+    return ok && state.index > 0 ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reachctl_set_wallpaper(const uint16_t *path)
 {
     if (path == nullptr || path[0] == 0) {
@@ -205,6 +239,54 @@ static reach_result reachctl_set_wallpaper(const uint16_t *path)
     return result;
 }
 
+static reach_result reachctl_set_monitor_wallpaper(size_t monitor_index, const uint16_t *path)
+{
+    if (monitor_index == 0 || monitor_index > REACH_MAX_WALLPAPER_MONITORS || path == nullptr || path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    size_t zero_based_index = monitor_index - 1;
+    uint16_t full_path[260] = {};
+    reach_result result = reachctl_absolute_path(path, full_path, 260);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(full_path));
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_config_store_port store = {};
+    result = reachctl_open_config_store(&store);
+    reach_config_snapshot snapshot = {};
+    if (result == REACH_OK) {
+        result = store.ops.load(store.store, &snapshot);
+    }
+    if (result == REACH_OK) {
+        result = reach_copy_utf16(snapshot.monitor_wallpaper_paths[zero_based_index], 260, full_path);
+    }
+    if (result == REACH_OK) {
+        result = store.ops.save(store.store, &snapshot);
+    }
+    reach_wallpaper_service_port wallpaper = {};
+    if (result == REACH_OK) {
+        result = reach_windows_create_wallpaper_service(&wallpaper);
+    }
+    if (result == REACH_OK && wallpaper.ops.set_monitor_wallpaper != nullptr) {
+        (void)wallpaper.ops.set_monitor_wallpaper(wallpaper.service, zero_based_index, full_path);
+    }
+    if (wallpaper.ops.destroy != nullptr) {
+        wallpaper.ops.destroy(wallpaper.service);
+    }
+    if (store.ops.destroy != nullptr) {
+        store.ops.destroy(store.store);
+    }
+    if (result == REACH_OK) {
+        reachctl_notify_wallpaper_changed();
+    }
+    return result;
+}
+
 static reach_result reachctl_clear_wallpaper(void)
 {
     reach_config_store_port store = {};
@@ -226,6 +308,32 @@ static reach_result reachctl_clear_wallpaper(void)
     }
     if (wallpaper.ops.destroy != nullptr) {
         wallpaper.ops.destroy(wallpaper.service);
+    }
+    if (store.ops.destroy != nullptr) {
+        store.ops.destroy(store.store);
+    }
+    if (result == REACH_OK) {
+        reachctl_notify_wallpaper_changed();
+    }
+    return result;
+}
+
+static reach_result reachctl_clear_monitor_wallpaper(size_t monitor_index)
+{
+    if (monitor_index == 0 || monitor_index > REACH_MAX_WALLPAPER_MONITORS) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    size_t zero_based_index = monitor_index - 1;
+
+    reach_config_store_port store = {};
+    reach_result result = reachctl_open_config_store(&store);
+    reach_config_snapshot snapshot = {};
+    if (result == REACH_OK) {
+        result = store.ops.load(store.store, &snapshot);
+    }
+    if (result == REACH_OK) {
+        snapshot.monitor_wallpaper_paths[zero_based_index][0] = 0;
+        result = store.ops.save(store.store, &snapshot);
     }
     if (store.ops.destroy != nullptr) {
         store.ops.destroy(store.store);
@@ -272,6 +380,13 @@ int wmain(int argc, wchar_t **argv)
                 status.startup_attempt_count);
             reachctl_print(line);
             return 0;
+        }
+        if (lstrcmpiW(argv[index], L"--list-monitors") == 0) {
+            int ok = reachctl_list_monitors() == REACH_OK;
+            if (!ok) {
+                reachctl_print(L"Monitor query failed.");
+            }
+            return ok ? 0 : 1;
         }
         if (lstrcmpiW(argv[index], L"--pin-path") == 0) {
             if (index + 1 >= argc) {
@@ -335,13 +450,33 @@ int wmain(int argc, wchar_t **argv)
             reachctl_print(ok ? L"Reach wallpaper set." : L"Reach wallpaper set failed.");
             return ok ? 0 : 1;
         }
+        if (lstrcmpiW(argv[index], L"--set-wallpaper-monitor") == 0) {
+            if (index + 2 >= argc) {
+                reachctl_print(L"--set-wallpaper-monitor requires a 1-based monitor index and path.");
+                return 2;
+            }
+            size_t monitor_index = (size_t)wcstoul(argv[index + 1], nullptr, 10);
+            int ok = reachctl_set_monitor_wallpaper(monitor_index, reinterpret_cast<const uint16_t *>(argv[index + 2])) == REACH_OK;
+            reachctl_print(ok ? L"Reach monitor wallpaper set." : L"Reach monitor wallpaper set failed.");
+            return ok ? 0 : 1;
+        }
         if (lstrcmpiW(argv[index], L"--clear-wallpaper") == 0) {
             int ok = reachctl_clear_wallpaper() == REACH_OK;
             reachctl_print(ok ? L"Reach wallpaper cleared." : L"Reach wallpaper clear failed.");
             return ok ? 0 : 1;
         }
+        if (lstrcmpiW(argv[index], L"--clear-wallpaper-monitor") == 0) {
+            if (index + 1 >= argc) {
+                reachctl_print(L"--clear-wallpaper-monitor requires a 1-based monitor index.");
+                return 2;
+            }
+            size_t monitor_index = (size_t)wcstoul(argv[index + 1], nullptr, 10);
+            int ok = reachctl_clear_monitor_wallpaper(monitor_index) == REACH_OK;
+            reachctl_print(ok ? L"Reach monitor wallpaper cleared." : L"Reach monitor wallpaper clear failed.");
+            return ok ? 0 : 1;
+        }
     }
 
-    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --pin-path <path> | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu | --set-wallpaper <path> | --clear-wallpaper");
+    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --list-monitors | --pin-path <path> | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu | --set-wallpaper <path> | --set-wallpaper-monitor <index> <path> | --clear-wallpaper | --clear-wallpaper-monitor <index>");
     return 2;
 }

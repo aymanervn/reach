@@ -12,10 +12,13 @@ extern "C" {
 
 typedef struct reach_config_store reach_config_store;
 
+#define REACH_MAX_WALLPAPER_MONITORS 8
+
 typedef struct reach_config_snapshot {
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
     uint16_t wallpaper_path[260];
+    uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
     float dock_height;
     float dock_width;
     float dock_icon_size;
