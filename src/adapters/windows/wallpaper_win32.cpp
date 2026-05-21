@@ -35,6 +35,36 @@ static reach_result reach_wallpaper_set(reach_wallpaper_service *service, const 
     return ok ? REACH_OK : REACH_ERROR;
 }
 
+static reach_result reach_wallpaper_set_monitor(reach_wallpaper_service *service, size_t monitor_index, const uint16_t *path)
+{
+    if (service == nullptr || path == nullptr || path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(path));
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->desktop == nullptr || monitor_index > 0xFFFFFFFFu) {
+        return REACH_ERROR;
+    }
+
+    UINT count = 0;
+    HRESULT hr = service->desktop->GetMonitorDevicePathCount(&count);
+    if (FAILED(hr) || monitor_index >= count) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    LPWSTR monitor_id = nullptr;
+    hr = service->desktop->GetMonitorDevicePathAt((UINT)monitor_index, &monitor_id);
+    if (SUCCEEDED(hr) && monitor_id != nullptr) {
+        hr = service->desktop->SetWallpaper(monitor_id, reinterpret_cast<const wchar_t *>(path));
+    }
+    if (monitor_id != nullptr) {
+        CoTaskMemFree(monitor_id);
+    }
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_wallpaper_clear(reach_wallpaper_service *service)
 {
     if (service == nullptr) {
@@ -139,6 +169,7 @@ reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port
 
     out_port->service = service;
     out_port->ops.set_wallpaper = reach_wallpaper_set;
+    out_port->ops.set_monitor_wallpaper = reach_wallpaper_set_monitor;
     out_port->ops.clear_wallpaper = reach_wallpaper_clear;
     out_port->ops.current_wallpaper = reach_wallpaper_current;
     out_port->ops.destroy = reach_wallpaper_destroy;

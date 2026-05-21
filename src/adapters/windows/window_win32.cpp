@@ -230,15 +230,25 @@ static reach_result reach_register_platform_class()
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = WS_EX_TOOLWINDOW;
-    if (role == REACH_SURFACE_DOCK) {
+    if (role == REACH_SURFACE_DOCK ||
+        role == REACH_SURFACE_TRAY_MENU ||
+        role == REACH_SURFACE_SWITCHER ||
+        role == REACH_SURFACE_CONTEXT_MENU) {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     } else {
         style |= WS_EX_LAYERED;
     }
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU) {
+    if (role == REACH_SURFACE_DOCK ||
+        role == REACH_SURFACE_LAUNCHER ||
+        role == REACH_SURFACE_TRAY_MENU ||
+        role == REACH_SURFACE_SWITCHER ||
+        role == REACH_SURFACE_CONTEXT_MENU) {
         style |= WS_EX_TOPMOST;
     }
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU) {
+    if (role == REACH_SURFACE_DOCK ||
+        role == REACH_SURFACE_TRAY_MENU ||
+        role == REACH_SURFACE_SWITCHER ||
+        role == REACH_SURFACE_CONTEXT_MENU) {
         style |= WS_EX_NOACTIVATE;
     }
     return style;
@@ -251,12 +261,16 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     }
 
     int show_command = window->role == REACH_SURFACE_DOCK ||
-        window->role == REACH_SURFACE_TRAY_MENU
+        window->role == REACH_SURFACE_TRAY_MENU ||
+        window->role == REACH_SURFACE_SWITCHER ||
+        window->role == REACH_SURFACE_CONTEXT_MENU
         ? SW_SHOWNOACTIVATE
         : SW_SHOW;
     ShowWindow(window->hwnd, show_command);
     if (window->role != REACH_SURFACE_DOCK &&
-        window->role != REACH_SURFACE_TRAY_MENU) {
+        window->role != REACH_SURFACE_TRAY_MENU &&
+        window->role != REACH_SURFACE_SWITCHER &&
+        window->role != REACH_SURFACE_CONTEXT_MENU) {
         SetForegroundWindow(window->hwnd);
         SetFocus(window->hwnd);
     }
@@ -290,18 +304,8 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
         width,
         height,
         SWP_NOACTIVATE);
-    if (ok && window->role == REACH_SURFACE_TRAY_MENU && (window->width != width || window->height != height)) {
-        int radius = window->corner_radius > 0.0f ? (int)(window->corner_radius * 2.0f) : (height > 0 ? (int)((float)height * 0.42f) : 24);
-        if (radius < 18) {
-            radius = 18;
-        }
-        HRGN region = CreateRoundRectRgn(0, 0, width + 1, height + 1, radius, radius);
-        if (region != nullptr) {
-            SetWindowRgn(window->hwnd, region, TRUE);
-        }
-        window->width = width;
-        window->height = height;
-    }
+    window->width = width;
+    window->height = height;
     return ok ? REACH_OK : REACH_ERROR;
 }
 
@@ -314,12 +318,19 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     window->corner_radius = radius;
 
     /*
-        The dock uses a DirectComposition premultiplied-alpha surface.
-        Applying a native window region clips that surface with aliased edges.
+        Composition-backed surfaces draw their own rounded shape in Direct2D.
+        Native corners or Win32 regions add a second clipping path and can make
+        edges look different from the dock.
     */
-    if (window->role == REACH_SURFACE_DOCK) {
+    if (window->role == REACH_SURFACE_DOCK ||
+        window->role == REACH_SURFACE_TRAY_MENU ||
+        window->role == REACH_SURFACE_SWITCHER ||
+        window->role == REACH_SURFACE_CONTEXT_MENU) {
         return REACH_OK;
     }
+
+    int preference = DWMWCP_ROUND;
+    (void)DwmSetWindowAttribute(window->hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
 
     if (window->width <= 0 || window->height <= 0) {
         return REACH_OK;
@@ -352,7 +363,10 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
     if (window == nullptr || window->hwnd == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
-    if (window->role == REACH_SURFACE_DOCK) {
+    if (window->role == REACH_SURFACE_DOCK ||
+        window->role == REACH_SURFACE_TRAY_MENU ||
+        window->role == REACH_SURFACE_SWITCHER ||
+        window->role == REACH_SURFACE_CONTEXT_MENU) {
         return REACH_OK;
     }
 
@@ -461,3 +475,4 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
 }
+

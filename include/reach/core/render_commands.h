@@ -16,7 +16,10 @@ typedef enum reach_render_command_type {
     REACH_RENDER_COMMAND_ICON = 3,
     REACH_RENDER_COMMAND_BLUR_BACKGROUND = 4,
     REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE = 5,
-    REACH_RENDER_COMMAND_BACKPLATE_EDGE = 6
+    REACH_RENDER_COMMAND_BACKPLATE_EDGE = 6,
+    REACH_RENDER_COMMAND_TRIANGLE = 7,
+    REACH_RENDER_COMMAND_NOTCH_STROKE = 8,
+    REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT = 9
 } reach_render_command_type;
 
 typedef struct reach_render_command {
@@ -26,6 +29,13 @@ typedef struct reach_render_command {
     float radius;
     float stroke_width;
     uint64_t icon_id;
+    int32_t text_weight;
+    float text_size;
+    float notch_center_x;
+    float notch_width;
+    float notch_height;
+    int32_t text_alignment;
+    int32_t text_ellipsis;
     uint16_t text[260];
 } reach_render_command;
 

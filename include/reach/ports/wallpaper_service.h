@@ -13,6 +13,7 @@ typedef struct reach_wallpaper_service reach_wallpaper_service;
 
 typedef struct reach_wallpaper_service_ops {
     reach_result (*set_wallpaper)(reach_wallpaper_service *service, const uint16_t *path);
+    reach_result (*set_monitor_wallpaper)(reach_wallpaper_service *service, size_t monitor_index, const uint16_t *path);
     reach_result (*clear_wallpaper)(reach_wallpaper_service *service);
     reach_result (*current_wallpaper)(reach_wallpaper_service *service, uint16_t *out_path, size_t out_path_count);
     void (*destroy)(reach_wallpaper_service *service);

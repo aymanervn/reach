@@ -14,10 +14,14 @@ struct reach_input_source {
     ATOM window_class;
     int32_t registered_hotkey_count;
     int32_t windows_key_down;
+    int32_t alt_down;
+    int32_t shift_down;
+    int32_t alt_tab_active;
 };
 
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
 static const UINT REACH_INPUT_WM_WINDOWS_KEY = WM_APP + 20;
+static const UINT REACH_INPUT_WM_UI_EVENT = WM_APP + 21;
 static reach_input_source *g_reach_keyboard_source;
 
 enum reach_input_hotkey_id {
@@ -39,6 +43,12 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
     if (message == REACH_INPUT_WM_WINDOWS_KEY && source != nullptr && source->callback != nullptr) {
         reach_ui_event event = {};
         event.type = REACH_UI_EVENT_WINDOWS_KEY;
+        source->callback(source->user, &event);
+        return 0;
+    }
+    if (message == REACH_INPUT_WM_UI_EVENT && source != nullptr && source->callback != nullptr) {
+        reach_ui_event event = {};
+        event.type = static_cast<reach_ui_event_type>(wparam);
         source->callback(source->user, &event);
         return 0;
     }
@@ -67,6 +77,45 @@ static LRESULT CALLBACK reach_input_keyboard_proc(int code, WPARAM wparam, LPARA
     reach_input_source *source = g_reach_keyboard_source;
     if (code == HC_ACTION && source != nullptr && source->window != nullptr) {
         const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
+        if (keyboard != nullptr &&
+            (keyboard->vkCode == VK_SHIFT || keyboard->vkCode == VK_LSHIFT || keyboard->vkCode == VK_RSHIFT)) {
+            source->shift_down = (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) ? 1 : 0;
+        }
+        if (keyboard != nullptr &&
+            (keyboard->vkCode == VK_MENU || keyboard->vkCode == VK_LMENU || keyboard->vkCode == VK_RMENU)) {
+            if (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) {
+                source->alt_down = 1;
+            } else if (wparam == WM_KEYUP || wparam == WM_SYSKEYUP) {
+                source->alt_down = 0;
+                if (source->alt_tab_active) {
+                    source->alt_tab_active = 0;
+                    PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, REACH_UI_EVENT_ALT_TAB_COMMIT, 0);
+                }
+            }
+        }
+        if (keyboard != nullptr &&
+            keyboard->vkCode == VK_TAB &&
+            (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) &&
+            (source->alt_down || (keyboard->flags & LLKHF_ALTDOWN) != 0)) {
+            if (!source->alt_tab_active) {
+                source->alt_tab_active = 1;
+                PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, REACH_UI_EVENT_ALT_TAB_BEGIN, 0);
+            }
+            PostMessageW(
+                source->window,
+                REACH_INPUT_WM_UI_EVENT,
+                source->shift_down ? REACH_UI_EVENT_ALT_TAB_PREVIOUS : REACH_UI_EVENT_ALT_TAB_NEXT,
+                0);
+            return 1;
+        }
+        if (keyboard != nullptr &&
+            keyboard->vkCode == VK_ESCAPE &&
+            source->alt_tab_active &&
+            (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN)) {
+            source->alt_tab_active = 0;
+            PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, REACH_UI_EVENT_ALT_TAB_CANCEL, 0);
+            return 1;
+        }
         if (keyboard != nullptr && (keyboard->vkCode == VK_LWIN || keyboard->vkCode == VK_RWIN)) {
             if (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) {
                 if (!source->windows_key_down) {
@@ -148,6 +197,9 @@ static reach_result reach_input_start(reach_input_source *source, reach_input_ev
 
     source->registered_hotkey_count = 0;
     source->windows_key_down = 0;
+    source->alt_down = 0;
+    source->shift_down = 0;
+    source->alt_tab_active = 0;
     if (source->keyboard_hook == nullptr) {
         g_reach_keyboard_source = source;
         source->keyboard_hook = SetWindowsHookExW(
@@ -187,6 +239,9 @@ static reach_result reach_input_stop(reach_input_source *source)
     }
     source->registered_hotkey_count = 0;
     source->windows_key_down = 0;
+    source->alt_down = 0;
+    source->shift_down = 0;
+    source->alt_tab_active = 0;
     source->callback = nullptr;
     source->user = nullptr;
     return REACH_OK;

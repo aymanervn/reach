@@ -128,6 +128,45 @@ reach_result reach_pin_config_pin_path(reach_config_store_port *store, const uin
     return reach_pin_save(store, &snapshot);
 }
 
+reach_result reach_pin_config_move_id(reach_config_store_port *store, uint32_t id, size_t target_index)
+{
+    reach_config_snapshot snapshot = {};
+    reach_result result = reach_pin_load(store, &snapshot);
+    if (result != REACH_OK) {
+        return result;
+    }
+    if (snapshot.pinned_app_count == 0) {
+        return REACH_OK;
+    }
+    if (target_index >= snapshot.pinned_app_count) {
+        target_index = snapshot.pinned_app_count - 1;
+    }
+
+    size_t source_index = snapshot.pinned_app_count;
+    for (size_t index = 0; index < snapshot.pinned_app_count; ++index) {
+        if (snapshot.pinned_apps[index].id == id) {
+            source_index = index;
+            break;
+        }
+    }
+    if (source_index == snapshot.pinned_app_count || source_index == target_index) {
+        return REACH_OK;
+    }
+
+    reach_pinned_app_model moved = snapshot.pinned_apps[source_index];
+    if (source_index < target_index) {
+        for (size_t index = source_index; index < target_index; ++index) {
+            snapshot.pinned_apps[index] = snapshot.pinned_apps[index + 1];
+        }
+    } else {
+        for (size_t index = source_index; index > target_index; --index) {
+            snapshot.pinned_apps[index] = snapshot.pinned_apps[index - 1];
+        }
+    }
+    snapshot.pinned_apps[target_index] = moved;
+    return reach_pin_save(store, &snapshot);
+}
+
 reach_result reach_pin_config_unpin_id(reach_config_store_port *store, uint32_t id)
 {
     reach_config_snapshot snapshot = {};

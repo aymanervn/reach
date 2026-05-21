@@ -455,10 +455,56 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     } else if (!IsWindowVisible(hwnd)) {
         ShowWindowAsync(hwnd, SW_SHOW);
     }
+    SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     SetForegroundWindow(hwnd);
+    if (GetForegroundWindow() != hwnd) {
+        HWND foreground = GetForegroundWindow();
+        DWORD foreground_thread = foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
+        DWORD target_thread = GetWindowThreadProcessId(hwnd, nullptr);
+        DWORD current_thread = GetCurrentThreadId();
+        BOOL attached_foreground = foreground_thread != 0 && foreground_thread != current_thread
+            ? AttachThreadInput(current_thread, foreground_thread, TRUE)
+            : FALSE;
+        BOOL attached_target = target_thread != 0 && target_thread != current_thread
+            ? AttachThreadInput(current_thread, target_thread, TRUE)
+            : FALSE;
+        SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        SetForegroundWindow(hwnd);
+        if (attached_target) {
+            AttachThreadInput(current_thread, target_thread, FALSE);
+        }
+        if (attached_foreground) {
+            AttachThreadInput(current_thread, foreground_thread, FALSE);
+        }
+    }
     manager->foreground = hwnd;
     (void)reach_window_manager_refresh(manager);
     return REACH_OK;
+}
+
+static void reach_window_manager_preserve_restore_placement(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd) || IsIconic(hwnd)) {
+        return;
+    }
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+    if (!GetWindowPlacement(hwnd, &placement)) {
+        return;
+    }
+
+    if (!IsZoomed(hwnd)) {
+        RECT rect = {};
+        if (GetWindowRect(hwnd, &rect)) {
+            placement.rcNormalPosition = rect;
+        }
+        placement.showCmd = SW_SHOWNORMAL;
+    } else {
+        placement.showCmd = SW_SHOWMAXIMIZED;
+    }
+    placement.flags &= ~WPF_SETMINPOSITION;
+    (void)SetWindowPlacement(hwnd, &placement);
 }
 
 static reach_result reach_window_manager_minimize(reach_window_manager *manager, uintptr_t window_id)
@@ -471,10 +517,7 @@ static reach_result reach_window_manager_minimize(reach_window_manager *manager,
         return REACH_INVALID_ARGUMENT;
     }
 
-    HWND shell = GetShellWindow();
-    if (shell != nullptr) {
-        SetForegroundWindow(shell);
-    }
+    reach_window_manager_preserve_restore_placement(hwnd);
     ShowWindowAsync(hwnd, SW_MINIMIZE);
     manager->foreground = GetForegroundWindow();
     return reach_window_manager_refresh(manager);

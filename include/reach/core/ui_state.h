@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-#define REACH_MAX_PINNED_APPS 10
+#define REACH_MAX_PINNED_APPS 12
 #define REACH_MAX_SEARCH_CHARS 255
 
 typedef struct reach_color {

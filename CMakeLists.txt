@@ -59,6 +59,7 @@ target_link_libraries(reach PRIVATE
     dxgi
     user32
     shell32
+    comctl32
     shlwapi
     shcore
     advapi32
@@ -103,6 +104,26 @@ target_link_libraries(reachctl PRIVATE
     uuid
 )
 
+add_executable(reach_tray_probe
+    src/tools/tray_probe.cpp
+)
+
+target_compile_features(reach_tray_probe PRIVATE
+    cxx_std_17
+)
+
+target_compile_definitions(reach_tray_probe PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+
+target_link_libraries(reach_tray_probe PRIVATE
+    shell32
+    user32
+)
+
 add_executable(reach_core_tests
     tests/core_ui_tests.c
     src/core/ui_state.c
@@ -123,4 +144,29 @@ target_compile_features(reach_core_tests PRIVATE
 target_compile_definitions(reach_core_tests PRIVATE
     UNICODE
     _UNICODE
+)
+
+add_executable(reach_pin_config_tests
+    tests/pin_config_tests.cpp
+    src/pin_config.cpp
+    src/util.cpp
+)
+
+target_include_directories(reach_pin_config_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_compile_features(reach_pin_config_tests PRIVATE
+    cxx_std_17
+)
+
+target_compile_definitions(reach_pin_config_tests PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    NOMINMAX
+)
+
+target_link_libraries(reach_pin_config_tests PRIVATE
+    shlwapi
 )
