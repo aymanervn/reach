@@ -409,10 +409,109 @@ static int32_t reach_window_manager_foreground_is_maximized(const reach_window_m
         IsZoomed(manager->foreground);
 }
 
+static int32_t reach_window_manager_is_window_fullscreen_on_primary(HWND hwnd)
+{
+    if (!reach_window_manager_is_displayed_app_window(hwnd)) {
+        return 0;
+    }
+
+    RECT win_rect = {};
+    if (!GetWindowRect(hwnd, &win_rect)) {
+        return 0;
+    }
+
+    HMONITOR mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    if (mon == nullptr) {
+        return 0;
+    }
+
+    HMONITOR primary = reach_window_manager_primary_monitor();
+    if (primary == nullptr || mon != primary) {
+        return 0;
+    }
+
+    MONITORINFO mi = {};
+    mi.cbSize = sizeof(mi);
+    if (!GetMonitorInfoW(mon, &mi)) {
+        return 0;
+    }
+
+    return (win_rect.left <= mi.rcWork.left &&
+            win_rect.top <= mi.rcWork.top &&
+            win_rect.right >= mi.rcWork.right &&
+            win_rect.bottom >= mi.rcWork.bottom);
+}
+
+static int32_t reach_window_manager_any_visible_fullscreen_on_primary(void)
+{
+    for (HWND hwnd = GetTopWindow(nullptr); hwnd != nullptr; hwnd = GetWindow(hwnd, GW_HWNDNEXT)) {
+        if (reach_window_manager_is_desktop_surface_window(hwnd)) {
+            return 0;
+        }
+        if (reach_window_manager_is_window_fullscreen_on_primary(hwnd)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int32_t reach_window_manager_is_window_exclusive_fullscreen(HWND hwnd)
+{
+    if (!reach_window_manager_is_displayed_app_window(hwnd)) {
+        return 0;
+    }
+
+    BOOL excluded = FALSE;
+    if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXCLUDED_FROM_PEEK, &excluded, sizeof(excluded)))) {
+        if (excluded) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int32_t reach_window_manager_any_visible_exclusive_fullscreen_on_primary(void)
+{
+    for (HWND hwnd = GetTopWindow(nullptr); hwnd != nullptr; hwnd = GetWindow(hwnd, GW_HWNDNEXT)) {
+        if (reach_window_manager_is_desktop_surface_window(hwnd)) {
+            return 0;
+        }
+        if (reach_window_manager_is_window_exclusive_fullscreen(hwnd) &&
+            reach_window_manager_is_on_primary_monitor(hwnd)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int32_t reach_window_manager_foreground_is_fullscreen(const reach_window_manager *manager)
+{
+    REACH_ASSERT(manager != nullptr);
+    if (manager == nullptr) {
+        return 0;
+    }
+    return reach_window_manager_is_window_fullscreen_on_primary(manager->foreground);
+}
+
+static int32_t reach_window_manager_foreground_is_exclusive_fullscreen(const reach_window_manager *manager)
+{
+    REACH_ASSERT(manager != nullptr);
+    if (manager == nullptr) {
+        return 0;
+    }
+    return reach_window_manager_is_window_exclusive_fullscreen(manager->foreground);
+}
+
 static int32_t reach_window_manager_dock_should_auto_hide(const reach_window_manager *manager)
 {
     if (manager == nullptr) {
         return 0;
+    }
+    if (reach_window_manager_any_visible_exclusive_fullscreen_on_primary()) {
+        return 1;
+    }
+    if (reach_window_manager_any_visible_fullscreen_on_primary()) {
+        return 1;
     }
     return reach_window_manager_any_visible_maximized_on_primary();
 }
@@ -566,6 +665,8 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.snap = reach_window_manager_snap;
     out_port->ops.foreground = reach_window_manager_foreground;
     out_port->ops.foreground_is_maximized = reach_window_manager_foreground_is_maximized;
+    out_port->ops.foreground_is_fullscreen = reach_window_manager_foreground_is_fullscreen;
+    out_port->ops.foreground_is_exclusive_fullscreen = reach_window_manager_foreground_is_exclusive_fullscreen;
     out_port->ops.dock_should_auto_hide = reach_window_manager_dock_should_auto_hide;
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;
