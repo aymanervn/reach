@@ -714,6 +714,107 @@ static reach_result reach_d2d_draw_backplate_edge(ID2D1RenderTarget *target, con
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
+static reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target, const reach_render_command *command)
+{
+    if (target == nullptr || command == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    float x = command->rect.x;
+    float y = command->rect.y;
+    float w = command->rect.width;
+    float h = command->rect.height;
+    float r = command->radius;
+    float notch_width = command->notch_width;
+    float notch_height = command->notch_height;
+    float notch_center = command->notch_center_x;
+    float body_bottom = y + h - notch_height;
+    if (r < 0.0f) {
+        r = 0.0f;
+    }
+    if (r > w * 0.5f) {
+        r = w * 0.5f;
+    }
+    if (r > (h - notch_height) * 0.5f) {
+        r = (h - notch_height) * 0.5f;
+    }
+    if (notch_width < 0.0f) {
+        notch_width = 0.0f;
+    }
+    if (notch_height < 0.0f) {
+        notch_height = 0.0f;
+    }
+    float notch_left = notch_center - notch_width * 0.5f;
+    float notch_right = notch_center + notch_width * 0.5f;
+    if (notch_left < x + r) {
+        notch_left = x + r;
+    }
+    if (notch_right > x + w - r) {
+        notch_right = x + w - r;
+    }
+    notch_center = (notch_left + notch_right) * 0.5f;
+
+    ID2D1SolidColorBrush *brush = nullptr;
+    ID2D1Factory *factory = nullptr;
+    ID2D1PathGeometry *geometry = nullptr;
+    ID2D1GeometrySink *sink = nullptr;
+    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+    if (SUCCEEDED(hr)) {
+        target->GetFactory(&factory);
+        hr = factory != nullptr ? factory->CreatePathGeometry(&geometry) : E_FAIL;
+    }
+    if (SUCCEEDED(hr)) {
+        hr = geometry->Open(&sink);
+    }
+    if (SUCCEEDED(hr)) {
+        sink->BeginFigure(D2D1::Point2F(x + r, y), D2D1_FIGURE_BEGIN_FILLED);
+        sink->AddLine(D2D1::Point2F(x + w - r, y));
+
+        D2D1_ARC_SEGMENT arc = {};
+        arc.size = D2D1::SizeF(r, r);
+        arc.rotationAngle = 0.0f;
+        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+        arc.arcSize = D2D1_ARC_SIZE_SMALL;
+
+        arc.point = D2D1::Point2F(x + w, y + r);
+        sink->AddArc(arc);
+        sink->AddLine(D2D1::Point2F(x + w, body_bottom - r));
+        arc.point = D2D1::Point2F(x + w - r, body_bottom);
+        sink->AddArc(arc);
+        sink->AddLine(D2D1::Point2F(notch_right, body_bottom));
+        sink->AddLine(D2D1::Point2F(notch_center, body_bottom + notch_height));
+        sink->AddLine(D2D1::Point2F(notch_left, body_bottom));
+        sink->AddLine(D2D1::Point2F(x + r, body_bottom));
+        arc.point = D2D1::Point2F(x, body_bottom - r);
+        sink->AddArc(arc);
+        sink->AddLine(D2D1::Point2F(x, y + r));
+        arc.point = D2D1::Point2F(x + r, y);
+        sink->AddArc(arc);
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        hr = sink->Close();
+    }
+    if (SUCCEEDED(hr)) {
+        if (command->stroke_width > 0.0f) {
+            target->DrawGeometry(geometry, brush, command->stroke_width);
+        } else {
+            target->FillGeometry(geometry, brush);
+        }
+    }
+    if (sink != nullptr) {
+        sink->Release();
+    }
+    if (geometry != nullptr) {
+        geometry->Release();
+    }
+    if (factory != nullptr) {
+        factory->Release();
+    }
+    if (brush != nullptr) {
+        brush->Release();
+    }
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_wuc_create_target(reach_render_backend *backend)
 {
     if (backend == nullptr || backend->hwnd == nullptr || backend->factory == nullptr) {
@@ -907,6 +1008,76 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
             }
             continue;
         }
+        if (command->type == REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT) {
+            reach_result result = reach_d2d_draw_notched_rounded_rect(target, command);
+            if (result != REACH_OK) {
+                return result;
+            }
+            continue;
+        }
+        if (command->type == REACH_RENDER_COMMAND_TRIANGLE) {
+            ID2D1SolidColorBrush *brush = nullptr;
+            ID2D1Factory *factory = nullptr;
+            ID2D1PathGeometry *geometry = nullptr;
+            ID2D1GeometrySink *sink = nullptr;
+            HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+            if (SUCCEEDED(hr)) {
+                target->GetFactory(&factory);
+                hr = factory != nullptr ? factory->CreatePathGeometry(&geometry) : E_FAIL;
+            }
+            if (SUCCEEDED(hr)) {
+                hr = geometry->Open(&sink);
+            }
+            if (SUCCEEDED(hr)) {
+                float x = command->rect.x;
+                float y = command->rect.y;
+                float w = command->rect.width;
+                float h = command->rect.height;
+                sink->BeginFigure(D2D1::Point2F(x, y), D2D1_FIGURE_BEGIN_FILLED);
+                sink->AddLine(D2D1::Point2F(x + w, y));
+                sink->AddLine(D2D1::Point2F(x + w * 0.5f, y + h));
+                sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+                hr = sink->Close();
+            }
+            if (SUCCEEDED(hr)) {
+                target->FillGeometry(geometry, brush);
+            }
+            if (sink != nullptr) {
+                sink->Release();
+            }
+            if (geometry != nullptr) {
+                geometry->Release();
+            }
+            if (factory != nullptr) {
+                factory->Release();
+            }
+            if (brush != nullptr) {
+                brush->Release();
+            }
+            if (FAILED(hr)) {
+                return REACH_ERROR;
+            }
+            continue;
+        }
+        if (command->type == REACH_RENDER_COMMAND_NOTCH_STROKE) {
+            ID2D1SolidColorBrush *brush = nullptr;
+            HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+            if (FAILED(hr)) {
+                return REACH_ERROR;
+            }
+            float stroke_width = command->stroke_width > 0.0f ? command->stroke_width : 1.0f;
+            float x = command->rect.x;
+            float y = command->rect.y;
+            float w = command->rect.width;
+            float h = command->rect.height;
+            D2D1_POINT_2F left = D2D1::Point2F(x, y);
+            D2D1_POINT_2F tip = D2D1::Point2F(x + w * 0.5f, y + h);
+            D2D1_POINT_2F right = D2D1::Point2F(x + w, y);
+            target->DrawLine(left, tip, brush, stroke_width);
+            target->DrawLine(tip, right, brush, stroke_width);
+            brush->Release();
+            continue;
+        }
 
         if (command->type == REACH_RENDER_COMMAND_RECT ||
             command->type == REACH_RENDER_COMMAND_ICON ||
@@ -931,19 +1102,34 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
         } else if (command->type == REACH_RENDER_COMMAND_TEXT) {
             IDWriteTextFormat *format = nullptr;
             ID2D1SolidColorBrush *brush = nullptr;
-            DWRITE_FONT_WEIGHT weight = command->text_bold ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL;
+            DWRITE_FONT_WEIGHT weight = command->text_weight > 0 ? (DWRITE_FONT_WEIGHT)command->text_weight : DWRITE_FONT_WEIGHT_NORMAL;
+            float text_size = command->text_size > 0.0f ? command->text_size : 16.0f;
             HRESULT hr = backend->text_factory->CreateTextFormat(
                 L"Segoe UI",
                 nullptr,
                 weight,
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
-                16.0f,
+                text_size,
                 L"",
                 &format);
             if (SUCCEEDED(hr)) {
-                (void)format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                DWRITE_TEXT_ALIGNMENT alignment = command->text_alignment != 0
+                    ? (DWRITE_TEXT_ALIGNMENT)command->text_alignment
+                    : DWRITE_TEXT_ALIGNMENT_CENTER;
+                (void)format->SetTextAlignment(alignment);
                 (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                if (command->text_ellipsis) {
+                    (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+                    IDWriteInlineObject *ellipsis = nullptr;
+                    HRESULT trim_hr = backend->text_factory->CreateEllipsisTrimmingSign(format, &ellipsis);
+                    if (SUCCEEDED(trim_hr)) {
+                        DWRITE_TRIMMING trimming = {};
+                        trimming.granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER;
+                        (void)format->SetTrimming(&trimming, ellipsis);
+                        ellipsis->Release();
+                    }
+                }
             }
             if (SUCCEEDED(hr)) {
                 hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);

@@ -59,6 +59,7 @@ target_link_libraries(reach PRIVATE
     dxgi
     user32
     shell32
+    comctl32
     shlwapi
     shcore
     advapi32

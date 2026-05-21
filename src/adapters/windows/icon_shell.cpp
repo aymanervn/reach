@@ -3,6 +3,8 @@
 #include "reach/ports/icon_provider.h"
 
 #include <windows.h>
+#include <commctrl.h>
+#include <commoncontrols.h>
 #include <shellapi.h>
 #include <shlwapi.h>
 #include <shobjidl.h>
@@ -73,6 +75,31 @@ static HICON reach_icon_from_shell_file_info(const wchar_t *path, int32_t size_p
     UINT flags = SHGFI_ICON | (size_px > 32 ? SHGFI_LARGEICON : SHGFI_SMALLICON);
     DWORD_PTR result = SHGetFileInfoW(path, 0, &info, sizeof(info), flags);
     return result != 0 ? info.hIcon : nullptr;
+}
+
+static HICON reach_icon_from_system_image_list(const wchar_t *path, int32_t size_px)
+{
+    if (path == nullptr || path[0] == 0) {
+        return nullptr;
+    }
+
+    SHFILEINFOW info = {};
+    DWORD_PTR result = SHGetFileInfoW(path, 0, &info, sizeof(info), SHGFI_SYSICONINDEX);
+    if (result == 0 || info.iIcon < 0) {
+        return nullptr;
+    }
+
+    int image_list_size = size_px > 96 ? SHIL_JUMBO : SHIL_EXTRALARGE;
+    IImageList *image_list = nullptr;
+    HRESULT hr = SHGetImageList(image_list_size, IID_IImageList, reinterpret_cast<void **>(&image_list));
+    if (FAILED(hr) || image_list == nullptr) {
+        return nullptr;
+    }
+
+    HICON icon = nullptr;
+    hr = image_list->GetIcon(info.iIcon, ILD_TRANSPARENT, &icon);
+    image_list->Release();
+    return SUCCEEDED(hr) ? icon : nullptr;
 }
 
 static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px)
@@ -244,7 +271,10 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
         icon_path = resolved;
     }
 
-    HICON icon = reach_icon_from_shell_file_info(icon_path, request->size_px);
+    HICON icon = reach_icon_from_system_image_list(icon_path, request->size_px);
+    if (icon == nullptr) {
+        icon = reach_icon_from_shell_file_info(icon_path, request->size_px);
+    }
     if (icon == nullptr) {
         icon = reach_icon_from_extract_icon(icon_path, request->size_px);
     }

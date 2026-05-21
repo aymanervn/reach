@@ -455,7 +455,28 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     } else if (!IsWindowVisible(hwnd)) {
         ShowWindowAsync(hwnd, SW_SHOW);
     }
+    SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     SetForegroundWindow(hwnd);
+    if (GetForegroundWindow() != hwnd) {
+        HWND foreground = GetForegroundWindow();
+        DWORD foreground_thread = foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
+        DWORD target_thread = GetWindowThreadProcessId(hwnd, nullptr);
+        DWORD current_thread = GetCurrentThreadId();
+        BOOL attached_foreground = foreground_thread != 0 && foreground_thread != current_thread
+            ? AttachThreadInput(current_thread, foreground_thread, TRUE)
+            : FALSE;
+        BOOL attached_target = target_thread != 0 && target_thread != current_thread
+            ? AttachThreadInput(current_thread, target_thread, TRUE)
+            : FALSE;
+        SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        SetForegroundWindow(hwnd);
+        if (attached_target) {
+            AttachThreadInput(current_thread, target_thread, FALSE);
+        }
+        if (attached_foreground) {
+            AttachThreadInput(current_thread, foreground_thread, FALSE);
+        }
+    }
     manager->foreground = hwnd;
     (void)reach_window_manager_refresh(manager);
     return REACH_OK;

@@ -9,6 +9,7 @@ const reach_theme *reach_theme_default(void)
 {
     static const reach_theme theme = {
         { 1.0f, 1.0f, 1.0f, 0.50f },
+        { 0.13f, 0.12f, 0.11f, 0.85f },
         { 1.0f, 1.0f, 1.0f, 0.70f },
         { 0.55f, 0.57f, 0.60f, 0.16f },
         { 1.0f, 1.0f, 1.0f, 1.0f },
@@ -29,8 +30,8 @@ const reach_theme *reach_theme_default(void)
         14.0f,
         220.0f,
         120.0f,
-        16.0f,
-        0.30f
+        18.0f,
+        0.36f
     };
     return &theme;
 }

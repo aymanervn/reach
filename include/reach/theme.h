@@ -9,6 +9,7 @@ extern "C" {
 
 typedef struct reach_theme {
     reach_color dock_background;
+    reach_color switcher_background;
     reach_color dock_border;
     reach_color dock_shadow;
     reach_color icon_box_background;
