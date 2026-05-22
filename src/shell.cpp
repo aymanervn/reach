@@ -2119,6 +2119,10 @@ static float reach_shell_dock_item_current_x(const reach_shell *shell, const rea
     if (shell == nullptr || layout == nullptr || index >= shell->dock_item_count || index >= layout->app_slot_count) {
         return 0.0f;
     }
+    if ((shell->dock_drag_active || shell->dock_drag_snapping) &&
+        reach_shell_dock_item_matches_key(shell, index, shell->dock_drag_pinned, shell->dock_drag_pin_id, shell->dock_drag_window)) {
+        return shell->dock_drag_snapping ? shell->dock_drag_snap_animation.value : shell->dock_drag_x;
+    }
     if ((shell->dock_item_x_animating[index] || shell->dock_item_x_valid[index]) &&
         reach_shell_dock_key_equal(
             shell->dock_item_x_pinned[index],
@@ -3632,6 +3636,11 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             if (shell->dock_reload_pins_after_snap) {
                 shell->dock_reload_pins_after_snap = 0;
                 (void)reach_shell_reload_pins(shell);
+                shell->dock_item_count = 0;
+                for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
+                    shell->dock_item_x_valid[index] = 0;
+                    shell->dock_item_x_animating[index] = 0;
+                }
             }
         }
     }
