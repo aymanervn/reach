@@ -1114,7 +1114,7 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
                 L"",
                 &format);
             if (SUCCEEDED(hr)) {
-                DWRITE_TEXT_ALIGNMENT alignment = command->text_alignment != 0
+                DWRITE_TEXT_ALIGNMENT alignment = command->text_alignment >= 0
                     ? (DWRITE_TEXT_ALIGNMENT)command->text_alignment
                     : DWRITE_TEXT_ALIGNMENT_CENTER;
                 (void)format->SetTextAlignment(alignment);
