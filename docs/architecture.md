@@ -1,0 +1,84 @@
+# Reach Architecture
+
+Reach uses a modular ports-and-adapters architecture. The core application
+policy is kept away from platform APIs, while Windows-specific code stays at
+the edge behind ports and adapter factories.
+
+## Layers
+
+- `app`: the executable entry point and composition root.
+- `shell`: the thin orchestrator that coordinates core state, feature logic,
+  ports, and support code.
+- `features`: user-facing behavior modules built from core models and ports.
+- `core`: pure C application state, layout, events, and render command logic.
+- `ports`: platform-neutral interfaces consumed by shell and features.
+- `support`: shared non-platform helper code.
+- `adapters/windows`: Windows implementations of ports and adapter factories.
+
+## Allowed Dependencies
+
+- `app -> shell`
+- `app -> adapters/windows` only through adapter factories and composition root
+- `shell -> features`
+- `shell -> core`
+- `shell -> ports`
+- `shell -> support`
+- `features -> core`
+- `features -> ports`
+- `features -> support`
+- `adapters/windows -> ports`
+- `adapters/windows -> support`
+- `core -> support` only
+
+## Forbidden Dependencies
+
+- `core -> shell`
+- `core -> features`
+- `core -> adapters/windows`
+- `features -> shell`
+- `features -> adapters/windows`
+- `shell -> adapters/windows` internals
+- `ports -> adapters/windows`
+
+## Windows Boundary
+
+Only files under `src/adapters/windows` should directly use Win32 APIs or
+Win32 types. The app composition root may call adapter factory functions to wire
+ports together.
+
+Temporary transition exceptions:
+
+- `src/main.cpp`: executable entry point, command-line shell registration, COM,
+  and Windows message loop setup.
+- `src/shell.cpp`: current shell implementation still directly uses Win32 types
+  and Windows adapter factories.
+- `src/util.cpp`: logging currently uses `OutputDebugStringA`.
+- `src/config_path.cpp`: default config path lookup currently uses Win32 path
+  APIs.
+- `src/pin_config.cpp`: pin matching currently uses Win32 path helpers.
+- `src/monitor.cpp`: monitor enumeration currently uses Win32 display APIs.
+- `src/hotkeys.cpp`: global hotkey registration currently uses Win32 APIs.
+- `src/tools/*.cpp`: developer and support tools are Windows-specific today.
+
+These exceptions should shrink as behavior moves behind ports or into Windows
+adapters. New Win32 usage outside `src/adapters/windows` should not be added
+without updating this section.
+
+## Internal CMake Targets
+
+- `reach_core`: `src/core/*.c`; pure core logic; no linked support or platform
+  libraries.
+- `reach_support`: shared helper code used across layers.
+- `reach_windows_adapters`: `src/adapters/windows/*.cpp`; Windows port
+  implementations and adapter factories; links `reach_support`.
+- `reach_shell`: current shell implementation; links `reach_core` and
+  `reach_support`.
+- `reach`: executable and app composition root; links `reach_shell`,
+  `reach_core`, `reach_support`, and `reach_windows_adapters`.
+
+`reach_support` currently owns Windows-dependent support files such as
+`src/util.cpp` and `src/config_path.cpp`, so pure core code must not link it.
+
+The target graph is intended to converge on the allowed dependency graph above.
+Where source files still violate it, the transition exceptions list is the
+contract for follow-up refactors.
