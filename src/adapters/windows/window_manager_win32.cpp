@@ -382,6 +382,7 @@ static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM pa
         if (snapshot.minimized) {
             reach_window_manager_track_hidden_minimized(manager, hwnd);
             ShowWindowAsync(hwnd, SW_HIDE);
+            snapshot.visible = 0;
         }
         manager->pending_windows.push_back(snapshot);
     }

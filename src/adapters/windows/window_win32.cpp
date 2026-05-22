@@ -12,6 +12,8 @@
 #define DWMWA_WINDOW_CORNER_PREFERENCE 33
 #endif
 
+#define IDI_ICON1 101
+
 #ifndef DWMWCP_ROUND
 #define DWMWCP_ROUND 2
 #endif
@@ -220,6 +222,8 @@ static reach_result reach_register_platform_class()
     wc.lpfnWndProc = reach_window_proc;
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_ICON1));
+    wc.hIconSm = wc.hIcon;
     wc.lpszClassName = reach_window_class_name();
 
     ATOM atom = RegisterClassExW(&wc);
