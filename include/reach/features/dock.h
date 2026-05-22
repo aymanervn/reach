@@ -110,6 +110,37 @@ typedef struct reach_dock_render_input {
 
 reach_result reach_dock_build_render_commands(const reach_dock_render_input *input, reach_render_command_buffer *out_commands);
 
+typedef enum reach_dock_hit_type {
+    REACH_DOCK_HIT_NONE = 0,
+    REACH_DOCK_HIT_ITEM = 1,
+    REACH_DOCK_HIT_TRAY_BUTTON = 2
+} reach_dock_hit_type;
+
+typedef struct reach_dock_hit_result {
+    reach_dock_hit_type type;
+    size_t index;
+} reach_dock_hit_result;
+
+typedef enum reach_dock_item_action_type {
+    REACH_DOCK_ITEM_ACTION_NONE = 0,
+    REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED = 1,
+    REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW = 2
+} reach_dock_item_action_type;
+
+typedef struct reach_dock_item_action {
+    reach_dock_item_action_type type;
+    size_t item_index;
+    size_t pinned_index;
+    uint32_t pin_id;
+    uintptr_t window;
+} reach_dock_item_action;
+
+reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32_t x, int32_t y);
+reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature_model *model, size_t item_index);
+float reach_dock_slot_box_x(const reach_theme *theme, const reach_dock_layout *layout, size_t index);
+float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layout *layout, int32_t cursor_x, float grab_offset_x);
+size_t reach_dock_reorder_target(const reach_dock_feature_model *model, const reach_dock_layout *layout, int32_t x);
+
 #ifdef __cplusplus
 }
 #endif

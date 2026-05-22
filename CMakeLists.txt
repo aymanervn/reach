@@ -53,6 +53,7 @@ target_compile_features(reach_core PUBLIC
 add_library(reach_features STATIC
     src/features/dock/dock_feature.cpp
     src/features/dock/dock_icons.cpp
+    src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
     src/features/dock/dock_render.cpp
 )
