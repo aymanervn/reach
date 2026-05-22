@@ -50,8 +50,8 @@ Temporary transition exceptions:
 
 - `src/main.cpp`: executable entry point, command-line shell registration, COM,
   and Windows message loop setup.
-- `src/shell.cpp`: current shell implementation still directly uses Win32 types
-  and Windows adapter factories.
+- `src/shell/shell.cpp`: current shell implementation still directly uses Win32
+  types and Windows adapter factories.
 - `src/util.cpp`: logging currently uses `OutputDebugStringA`.
 - `src/config_path.cpp`: default config path lookup currently uses Win32 path
   APIs.

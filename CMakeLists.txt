@@ -94,7 +94,8 @@ target_link_libraries(reach_windows_adapters PRIVATE
 )
 
 add_library(reach_shell STATIC
-    src/shell.cpp
+    src/shell/shell.cpp
+    src/shell/surface_runtime.cpp
     src/pin_config.cpp
     src/theme.c
     src/animation.cpp
