@@ -68,11 +68,13 @@ without updating this section.
 
 - `reach_core`: `src/core/*.c`; pure core logic; no linked support or platform
   libraries.
+- `reach_features`: feature modules such as dock item identity and ordering;
+  links `reach_core`.
 - `reach_support`: shared helper code used across layers.
 - `reach_windows_adapters`: `src/adapters/windows/*.cpp`; Windows port
   implementations and adapter factories; links `reach_support`.
-- `reach_shell`: current shell implementation; links `reach_core` and
-  `reach_support`.
+- `reach_shell`: current shell implementation; links `reach_features`,
+  `reach_core`, and `reach_support`.
 - `reach`: executable and app composition root; links `reach_shell`,
   `reach_core`, `reach_support`, and `reach_windows_adapters`.
 

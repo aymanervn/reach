@@ -4,6 +4,7 @@
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
 #include "reach/animation.h"
+#include "reach/features/dock.h"
 #include "reach/hotkeys.h"
 #include "reach/monitor.h"
 #include "reach/platform/windows_adapters.h"
@@ -54,15 +55,7 @@ struct reach_shell {
     reach_icon_handle open_window_icons[REACH_MAX_PINNED_APPS];
     uint16_t open_window_initials[REACH_MAX_PINNED_APPS];
     size_t open_window_count;
-    uintptr_t dock_item_windows[REACH_MAX_PINNED_APPS];
-    int32_t dock_item_pinned[REACH_MAX_PINNED_APPS];
-    size_t dock_item_pinned_indices[REACH_MAX_PINNED_APPS];
-    size_t dock_item_open_indices[REACH_MAX_PINNED_APPS];
-    size_t dock_item_count;
-    int32_t dock_order_pinned[REACH_MAX_PINNED_APPS];
-    uint32_t dock_order_pin_ids[REACH_MAX_PINNED_APPS];
-    uintptr_t dock_order_windows[REACH_MAX_PINNED_APPS];
-    size_t dock_order_count;
+    reach_dock_feature_model dock_model;
     reach_float_animation dock_item_x_animations[REACH_MAX_PINNED_APPS];
     int32_t dock_item_x_animating[REACH_MAX_PINNED_APPS];
     int32_t dock_item_x_valid[REACH_MAX_PINNED_APPS];
@@ -202,17 +195,9 @@ static reach_color reach_shell_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
 
 static int32_t reach_shell_dock_key_equal(int32_t a_pinned, uint32_t a_pin_id, uintptr_t a_window, int32_t b_pinned, uint32_t b_pin_id, uintptr_t b_window)
 {
-    return a_pinned == b_pinned && (a_pinned ? a_pin_id == b_pin_id : a_window == b_window);
-}
-
-static void reach_shell_set_dock_order_key(reach_shell *shell, size_t index, int32_t pinned, uint32_t pin_id, uintptr_t window)
-{
-    if (shell == nullptr || index >= REACH_MAX_PINNED_APPS) {
-        return;
-    }
-    shell->dock_order_pinned[index] = pinned;
-    shell->dock_order_pin_ids[index] = pin_id;
-    shell->dock_order_windows[index] = window;
+    reach_dock_order_key a = { a_pinned, a_pin_id, a_window };
+    reach_dock_order_key b = { b_pinned, b_pin_id, b_window };
+    return reach_dock_key_equal(&a, &b);
 }
 
 static size_t reach_shell_find_dock_order_key(const reach_shell *shell, int32_t pinned, uint32_t pin_id, uintptr_t window)
@@ -220,66 +205,29 @@ static size_t reach_shell_find_dock_order_key(const reach_shell *shell, int32_t 
     if (shell == nullptr) {
         return REACH_MAX_PINNED_APPS;
     }
-    for (size_t index = 0; index < shell->dock_order_count; ++index) {
-        if (reach_shell_dock_key_equal(
-                shell->dock_order_pinned[index],
-                shell->dock_order_pin_ids[index],
-                shell->dock_order_windows[index],
-                pinned,
-                pin_id,
-                window)) {
-            return index;
-        }
-    }
-    return REACH_MAX_PINNED_APPS;
+    reach_dock_order_key key = { pinned, pin_id, window };
+    return reach_dock_feature_model_find_order_key(&shell->dock_model, key);
 }
 
 static void reach_shell_move_dock_order(reach_shell *shell, size_t source, size_t target)
 {
-    if (shell == nullptr || source >= shell->dock_order_count || target >= shell->dock_order_count || source == target) {
-        return;
+    if (shell != nullptr) {
+        reach_dock_feature_model_move_order(&shell->dock_model, source, target);
     }
-
-    int32_t pinned = shell->dock_order_pinned[source];
-    uint32_t pin_id = shell->dock_order_pin_ids[source];
-    uintptr_t window = shell->dock_order_windows[source];
-    if (source < target) {
-        for (size_t index = source; index < target; ++index) {
-            shell->dock_order_pinned[index] = shell->dock_order_pinned[index + 1];
-            shell->dock_order_pin_ids[index] = shell->dock_order_pin_ids[index + 1];
-            shell->dock_order_windows[index] = shell->dock_order_windows[index + 1];
-        }
-    } else {
-        for (size_t index = source; index > target; --index) {
-            shell->dock_order_pinned[index] = shell->dock_order_pinned[index - 1];
-            shell->dock_order_pin_ids[index] = shell->dock_order_pin_ids[index - 1];
-            shell->dock_order_windows[index] = shell->dock_order_windows[index - 1];
-        }
-    }
-    reach_shell_set_dock_order_key(shell, target, pinned, pin_id, window);
 }
 
 static uint32_t reach_shell_dock_item_pin_id(const reach_shell *shell, size_t index)
 {
-    if (shell == nullptr || index >= shell->dock_item_count || !shell->dock_item_pinned[index]) {
-        return 0;
-    }
-    size_t pinned_index = shell->dock_item_pinned_indices[index];
-    return pinned_index < shell->ui.pinned_app_count ? shell->ui.pinned_apps[pinned_index].id : 0;
+    return shell != nullptr ? reach_dock_feature_model_item_pin_id(&shell->dock_model, index) : 0;
 }
 
 static int32_t reach_shell_dock_item_matches_key(const reach_shell *shell, size_t index, int32_t pinned, uint32_t pin_id, uintptr_t window)
 {
-    if (shell == nullptr || index >= shell->dock_item_count) {
+    if (shell == nullptr) {
         return 0;
     }
-    return reach_shell_dock_key_equal(
-        shell->dock_item_pinned[index],
-        reach_shell_dock_item_pin_id(shell, index),
-        shell->dock_item_windows[index],
-        pinned,
-        pin_id,
-        window);
+    reach_dock_order_key key = { pinned, pin_id, window };
+    return reach_dock_feature_model_item_matches_key(&shell->dock_model, index, key);
 }
 
 static void reach_shell_raise_launcher(reach_shell *shell)
@@ -617,23 +565,19 @@ static int32_t reach_shell_path_equals(const uint16_t *a, const uint16_t *b)
         CompareStringOrdinal(reinterpret_cast<const wchar_t *>(a), -1, reinterpret_cast<const wchar_t *>(b), -1, TRUE) == CSTR_EQUAL;
 }
 
-static size_t reach_shell_find_pinned_for_path(reach_shell *shell, const uint16_t *path)
+static int32_t reach_shell_dock_path_matches_pinned(void *user, const reach_pinned_app_model *pinned_app, const uint16_t *path)
 {
-    if (shell == nullptr || path == nullptr || path[0] == 0) {
-        return REACH_MAX_PINNED_APPS;
+    (void)user;
+    if (pinned_app == nullptr || path == nullptr || path[0] == 0) {
+        return 0;
     }
-    for (size_t index = 0; index < shell->ui.pinned_app_count; ++index) {
-        if (reach_shell_path_equals(shell->ui.pinned_apps[index].path, path) ||
-            reach_shell_path_equals(shell->ui.pinned_apps[index].icon_ref, path)) {
-            return index;
-        }
-        const wchar_t *pinned_name = PathFindFileNameW(reinterpret_cast<const wchar_t *>(shell->ui.pinned_apps[index].path));
-        const wchar_t *window_name = PathFindFileNameW(reinterpret_cast<const wchar_t *>(path));
-        if (pinned_name != nullptr && window_name != nullptr && lstrcmpiW(pinned_name, window_name) == 0) {
-            return index;
-        }
+    if (reach_shell_path_equals(pinned_app->path, path) ||
+        reach_shell_path_equals(pinned_app->icon_ref, path)) {
+        return 1;
     }
-    return REACH_MAX_PINNED_APPS;
+    const wchar_t *pinned_name = PathFindFileNameW(reinterpret_cast<const wchar_t *>(pinned_app->path));
+    const wchar_t *window_name = PathFindFileNameW(reinterpret_cast<const wchar_t *>(path));
+    return pinned_name != nullptr && window_name != nullptr && lstrcmpiW(pinned_name, window_name) == 0;
 }
 
 static void reach_shell_release_open_window_icons(reach_shell *shell)
@@ -692,25 +636,6 @@ static reach_result reach_shell_refresh_open_windows(reach_shell *shell)
         }
     }
     return REACH_OK;
-}
-
-static int32_t reach_shell_pinned_running(reach_shell *shell, size_t pinned_index, uintptr_t *out_window)
-{
-    if (out_window != nullptr) {
-        *out_window = 0;
-    }
-    if (shell == nullptr || pinned_index >= shell->ui.pinned_app_count) {
-        return 0;
-    }
-    for (size_t index = 0; index < shell->open_window_count; ++index) {
-        if (reach_shell_find_pinned_for_path(shell, shell->open_windows[index].path) == pinned_index) {
-            if (out_window != nullptr) {
-                *out_window = shell->open_windows[index].id;
-            }
-            return 1;
-        }
-    }
-    return 0;
 }
 
 static int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id)
@@ -841,80 +766,19 @@ static void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *
         return;
     }
 
-    int32_t natural_pinned[REACH_MAX_PINNED_APPS] = {};
-    uint32_t natural_pin_ids[REACH_MAX_PINNED_APPS] = {};
-    uintptr_t natural_windows[REACH_MAX_PINNED_APPS] = {};
-    size_t natural_pinned_indices[REACH_MAX_PINNED_APPS] = {};
-    size_t natural_open_indices[REACH_MAX_PINNED_APPS] = {};
-    int32_t used[REACH_MAX_PINNED_APPS] = {};
-    size_t natural_count = 0;
+    reach_dock_feature_model_build_items(
+        &shell->dock_model,
+        shell->ui.pinned_apps,
+        shell->ui.pinned_app_count,
+        shell->open_windows,
+        shell->open_window_count,
+        reach_shell_dock_path_matches_pinned,
+        shell);
 
-    for (size_t index = 0; index < shell->ui.pinned_app_count && natural_count < REACH_MAX_PINNED_APPS; ++index) {
-        uintptr_t window_id = 0;
-        natural_pinned[natural_count] = 1;
-        natural_pin_ids[natural_count] = shell->ui.pinned_apps[index].id;
-        natural_windows[natural_count] = reach_shell_pinned_running(shell, index, &window_id) ? window_id : 0;
-        natural_pinned_indices[natural_count] = index;
-        natural_open_indices[natural_count] = REACH_MAX_PINNED_APPS;
-        ++natural_count;
-    }
-    for (size_t index = 0; index < shell->open_window_count && natural_count < REACH_MAX_PINNED_APPS; ++index) {
-        if (reach_shell_find_pinned_for_path(shell, shell->open_windows[index].path) != REACH_MAX_PINNED_APPS) {
-            continue;
-        }
-        natural_pinned[natural_count] = 0;
-        natural_pin_ids[natural_count] = 0;
-        natural_windows[natural_count] = shell->open_windows[index].id;
-        natural_pinned_indices[natural_count] = REACH_MAX_PINNED_APPS;
-        natural_open_indices[natural_count] = index;
-        ++natural_count;
-    }
-
-    shell->dock_item_count = 0;
-    for (size_t order_index = 0; order_index < shell->dock_order_count; ++order_index) {
-        for (size_t natural_index = 0; natural_index < natural_count; ++natural_index) {
-            if (!used[natural_index] &&
-                reach_shell_dock_key_equal(
-                    shell->dock_order_pinned[order_index],
-                    shell->dock_order_pin_ids[order_index],
-                    shell->dock_order_windows[order_index],
-                    natural_pinned[natural_index],
-                    natural_pin_ids[natural_index],
-                    natural_windows[natural_index])) {
-                size_t out = shell->dock_item_count++;
-                shell->dock_item_pinned[out] = natural_pinned[natural_index];
-                shell->dock_item_windows[out] = natural_windows[natural_index];
-                shell->dock_item_pinned_indices[out] = natural_pinned_indices[natural_index];
-                shell->dock_item_open_indices[out] = natural_open_indices[natural_index];
-                used[natural_index] = 1;
-                break;
-            }
-        }
-    }
-    for (size_t natural_index = 0; natural_index < natural_count && shell->dock_item_count < REACH_MAX_PINNED_APPS; ++natural_index) {
-        if (!used[natural_index]) {
-            size_t out = shell->dock_item_count++;
-            shell->dock_item_pinned[out] = natural_pinned[natural_index];
-            shell->dock_item_windows[out] = natural_windows[natural_index];
-            shell->dock_item_pinned_indices[out] = natural_pinned_indices[natural_index];
-            shell->dock_item_open_indices[out] = natural_open_indices[natural_index];
-        }
-    }
-
-    shell->dock_order_count = shell->dock_item_count;
-
-    for (size_t index = 0; index < shell->dock_item_count; ++index) {
-        uint32_t pin_id = 0;
-        if (shell->dock_item_pinned[index] && shell->dock_item_pinned_indices[index] < shell->ui.pinned_app_count) {
-            pin_id = shell->ui.pinned_apps[shell->dock_item_pinned_indices[index]].id;
-        }
-        reach_shell_set_dock_order_key(shell, index, shell->dock_item_pinned[index], pin_id, shell->dock_item_windows[index]);
-    }
-
-    layout->app_slot_count = shell->dock_item_count;
+    layout->app_slot_count = shell->dock_model.item_count;
     float icon_size = shell->ui.dock.icon_size;
     float gap = shell->ui.dock.gap;
-    size_t count = shell->dock_item_count;
+    size_t count = shell->dock_model.item_count;
     float dock_width = ceilf(icon_size * (float)(count + 1) + gap * (float)(count + 2));
     if (count == 0) {
         dock_width = ceilf(icon_size + gap * 2.0f);
@@ -948,11 +812,11 @@ static reach_result reach_shell_reload_pins(reach_shell *shell)
     uint32_t old_order_pin_ids[REACH_MAX_PINNED_APPS] = {};
     uintptr_t old_order_windows[REACH_MAX_PINNED_APPS] = {};
     uint16_t old_order_paths[REACH_MAX_PINNED_APPS][260] = {};
-    size_t old_order_count = shell->dock_order_count;
+    size_t old_order_count = shell->dock_model.order_count;
     for (size_t order_index = 0; order_index < old_order_count; ++order_index) {
-        old_order_pinned[order_index] = shell->dock_order_pinned[order_index];
-        old_order_pin_ids[order_index] = shell->dock_order_pin_ids[order_index];
-        old_order_windows[order_index] = shell->dock_order_windows[order_index];
+        old_order_pinned[order_index] = shell->dock_model.order[order_index].pinned;
+        old_order_pin_ids[order_index] = shell->dock_model.order[order_index].pin_id;
+        old_order_windows[order_index] = shell->dock_model.order[order_index].window;
         if (old_order_pinned[order_index]) {
             for (size_t pin_index = 0; pin_index < shell->ui.pinned_app_count; ++pin_index) {
                 if (shell->ui.pinned_apps[pin_index].id == old_order_pin_ids[order_index]) {
@@ -973,15 +837,15 @@ static reach_result reach_shell_reload_pins(reach_shell *shell)
         return result;
     }
     result = reach_shell_load_pinned_icons(shell);
-    shell->dock_order_count = old_order_count;
-    for (size_t order_index = 0; order_index < shell->dock_order_count; ++order_index) {
-        shell->dock_order_pinned[order_index] = old_order_pinned[order_index];
-        shell->dock_order_pin_ids[order_index] = old_order_pin_ids[order_index];
-        shell->dock_order_windows[order_index] = old_order_windows[order_index];
+    shell->dock_model.order_count = old_order_count;
+    for (size_t order_index = 0; order_index < shell->dock_model.order_count; ++order_index) {
+        shell->dock_model.order[order_index].pinned = old_order_pinned[order_index];
+        shell->dock_model.order[order_index].pin_id = old_order_pin_ids[order_index];
+        shell->dock_model.order[order_index].window = old_order_windows[order_index];
         if (old_order_pinned[order_index] && old_order_paths[order_index][0] != 0) {
             for (size_t pin_index = 0; pin_index < shell->ui.pinned_app_count; ++pin_index) {
                 if (reach_shell_path_equals(shell->ui.pinned_apps[pin_index].path, old_order_paths[order_index])) {
-                    shell->dock_order_pin_ids[order_index] = shell->ui.pinned_apps[pin_index].id;
+                    shell->dock_model.order[order_index].pin_id = shell->ui.pinned_apps[pin_index].id;
                     break;
                 }
             }
@@ -1449,19 +1313,19 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
         : REACH_MAX_PINNED_APPS;
 
     auto push_dock_item = [&](size_t index, float override_box_x, int32_t use_override) {
-        int32_t pinned_item = index < shell->dock_item_count ? shell->dock_item_pinned[index] : 1;
+        int32_t pinned_item = index < shell->dock_model.item_count ? shell->dock_model.items[index].pinned : 1;
         reach_icon_handle icon = {};
         uint16_t fallback_initial = '?';
 
         if (pinned_item) {
-            size_t pinned_index = index < shell->dock_item_count ? shell->dock_item_pinned_indices[index] : REACH_MAX_PINNED_APPS;
+            size_t pinned_index = index < shell->dock_model.item_count ? shell->dock_model.items[index].pinned_index : REACH_MAX_PINNED_APPS;
             if (pinned_index < shell->pinned_icon_count) {
                 icon = shell->pinned_icons[pinned_index];
             }
             fallback_initial = pinned_index < REACH_MAX_PINNED_APPS ? shell->pinned_icon_initials[pinned_index] : '?';
         } else {
-            size_t open_index = index < shell->dock_item_count
-                ? shell->dock_item_open_indices[index]
+            size_t open_index = index < shell->dock_model.item_count
+                ? shell->dock_model.items[index].open_index
                 : REACH_MAX_PINNED_APPS;
 
             if (open_index < shell->open_window_count) {
@@ -1551,8 +1415,8 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
             reach_render_command_buffer_push(&commands, &command);
         }
 
-        if (index < shell->dock_item_count && shell->dock_item_windows[index] != 0) {
-            int32_t focused = shell->dock_item_windows[index] == focused_window;
+        if (index < shell->dock_model.item_count && shell->dock_model.items[index].window != 0) {
+            int32_t focused = shell->dock_model.items[index].window == focused_window;
             float indicator_size = 4.0f;
             float indicator_gap = 4.0f;
             float indicator_y = box_y + icon_box_size + indicator_gap;
@@ -2039,7 +1903,7 @@ static size_t reach_shell_find_dock_item_key(const reach_shell *shell, int32_t p
     if (shell == nullptr) {
         return REACH_MAX_PINNED_APPS;
     }
-    for (size_t index = 0; index < shell->dock_item_count; ++index) {
+    for (size_t index = 0; index < shell->dock_model.item_count; ++index) {
         if (reach_shell_dock_item_matches_key(shell, index, pinned, pin_id, window)) {
             return index;
         }
@@ -2049,11 +1913,11 @@ static size_t reach_shell_find_dock_item_key(const reach_shell *shell, int32_t p
 
 static size_t reach_shell_dock_reorder_target(const reach_shell *shell, int32_t x)
 {
-    if (shell == nullptr || !shell->has_layout || shell->dock_item_count == 0) {
+    if (shell == nullptr || !shell->has_layout || shell->dock_model.item_count == 0) {
         return REACH_MAX_PINNED_APPS;
     }
-    size_t last = shell->dock_item_count - 1;
-    for (size_t index = 0; index < shell->dock_item_count; ++index) {
+    size_t last = shell->dock_model.item_count - 1;
+    for (size_t index = 0; index < shell->dock_model.item_count; ++index) {
         reach_rect_f32 slot = shell->layout.dock.app_slots[index];
         float midpoint = slot.x + slot.width * 0.5f;
         if ((float)x < midpoint) {
@@ -2065,24 +1929,12 @@ static size_t reach_shell_dock_reorder_target(const reach_shell *shell, int32_t 
 
 static size_t reach_shell_pinned_order_index(const reach_shell *shell, uint32_t pin_id)
 {
-    if (shell == nullptr || pin_id == 0) {
-        return REACH_MAX_PINNED_APPS;
-    }
-    size_t pinned_index = 0;
-    for (size_t index = 0; index < shell->dock_order_count; ++index) {
-        if (shell->dock_order_pinned[index]) {
-            if (shell->dock_order_pin_ids[index] == pin_id) {
-                return pinned_index;
-            }
-            ++pinned_index;
-        }
-    }
-    return REACH_MAX_PINNED_APPS;
+    return shell != nullptr ? reach_dock_feature_model_pinned_order_index(&shell->dock_model, pin_id) : REACH_MAX_PINNED_APPS;
 }
 
 static float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index)
 {
-    if (shell == nullptr || layout == nullptr || index >= shell->dock_item_count || index >= layout->app_slot_count) {
+    if (shell == nullptr || layout == nullptr || index >= shell->dock_model.item_count || index >= layout->app_slot_count) {
         return 0.0f;
     }
     if ((shell->dock_drag_active || shell->dock_drag_snapping) &&
@@ -2094,9 +1946,9 @@ static float reach_shell_dock_item_current_x(const reach_shell *shell, const rea
             shell->dock_item_x_pinned[index],
             shell->dock_item_x_pin_ids[index],
             shell->dock_item_x_windows[index],
-            shell->dock_item_pinned[index],
+            shell->dock_model.items[index].pinned,
             reach_shell_dock_item_pin_id(shell, index),
-            shell->dock_item_windows[index])) {
+            shell->dock_model.items[index].window)) {
         return shell->dock_item_x_animations[index].value;
     }
     return reach_shell_dock_slot_box_x(shell, layout, index);
@@ -2131,18 +1983,18 @@ static void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, r
     uint32_t old_pin_ids[REACH_MAX_PINNED_APPS] = {};
     uintptr_t old_windows[REACH_MAX_PINNED_APPS] = {};
     float old_x[REACH_MAX_PINNED_APPS] = {};
-    size_t old_count = shell->dock_item_count;
+    size_t old_count = shell->dock_model.item_count;
     const reach_dock_layout *old_layout = shell->has_layout ? &shell->layout.dock : layout;
     for (size_t index = 0; index < old_count; ++index) {
-        old_pinned[index] = shell->dock_item_pinned[index];
+        old_pinned[index] = shell->dock_model.items[index].pinned;
         old_pin_ids[index] = reach_shell_dock_item_pin_id(shell, index);
-        old_windows[index] = shell->dock_item_windows[index];
+        old_windows[index] = shell->dock_model.items[index].window;
         old_x[index] = reach_shell_dock_item_current_x(shell, old_layout, index);
     }
 
     reach_shell_build_dock_items(shell, layout);
 
-    for (size_t index = 0; index < shell->dock_item_count; ++index) {
+    for (size_t index = 0; index < shell->dock_model.item_count; ++index) {
         uint32_t pin_id = reach_shell_dock_item_pin_id(shell, index);
         float target_x = reach_shell_dock_slot_box_x(shell, layout, index);
         float from_x = target_x;
@@ -2151,16 +2003,16 @@ static void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, r
                     old_pinned[old_index],
                     old_pin_ids[old_index],
                     old_windows[old_index],
-                    shell->dock_item_pinned[index],
+                    shell->dock_model.items[index].pinned,
                     pin_id,
-                    shell->dock_item_windows[index])) {
+                    shell->dock_model.items[index].window)) {
                 from_x = old_x[old_index];
                 break;
             }
         }
-        shell->dock_item_x_pinned[index] = shell->dock_item_pinned[index];
+        shell->dock_item_x_pinned[index] = shell->dock_model.items[index].pinned;
         shell->dock_item_x_pin_ids[index] = pin_id;
-        shell->dock_item_x_windows[index] = shell->dock_item_windows[index];
+        shell->dock_item_x_windows[index] = shell->dock_model.items[index].window;
         if (reach_shell_dock_item_matches_key(shell, index, shell->dock_drag_pinned, shell->dock_drag_pin_id, shell->dock_drag_window) &&
             (shell->dock_drag_active || shell->dock_drag_snapping)) {
             reach_shell_start_dock_item_x_animation(shell, index, target_x, target_x);
@@ -2168,7 +2020,7 @@ static void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, r
             reach_shell_start_dock_item_x_animation(shell, index, from_x, target_x);
         }
     }
-    for (size_t index = shell->dock_item_count; index < REACH_MAX_PINNED_APPS; ++index) {
+    for (size_t index = shell->dock_model.item_count; index < REACH_MAX_PINNED_APPS; ++index) {
         shell->dock_item_x_valid[index] = 0;
         shell->dock_item_x_animating[index] = 0;
         shell->dock_item_x_pinned[index] = 0;
@@ -2310,15 +2162,15 @@ static void reach_shell_append_context_menu_item(HMENU menu, UINT id, const wcha
 
 static const uint16_t *reach_shell_dock_item_path(const reach_shell *shell, size_t item_index)
 {
-    if (shell == nullptr || item_index >= shell->dock_item_count) {
+    if (shell == nullptr || item_index >= shell->dock_model.item_count) {
         return nullptr;
     }
-    if (shell->dock_item_pinned[item_index]) {
-        size_t pinned_index = shell->dock_item_pinned_indices[item_index];
+    if (shell->dock_model.items[item_index].pinned) {
+        size_t pinned_index = shell->dock_model.items[item_index].pinned_index;
         return pinned_index < shell->ui.pinned_app_count ? shell->ui.pinned_apps[pinned_index].path : nullptr;
     }
 
-    size_t open_index = shell->dock_item_open_indices[item_index];
+    size_t open_index = shell->dock_model.items[item_index].open_index;
     return open_index < shell->open_window_count ? shell->open_windows[open_index].path : nullptr;
 }
 
@@ -2351,7 +2203,7 @@ static int32_t reach_shell_estimate_context_menu_width(const reach_shell *shell,
     if (candidate > width) {
         width = candidate;
     }
-    if (shell != nullptr && item_index < shell->dock_item_count && shell->dock_item_pinned[item_index]) {
+    if (shell != nullptr && item_index < shell->dock_model.item_count && shell->dock_model.items[item_index].pinned) {
         candidate = reach_shell_context_menu_item_width(dc, font, L"Unpin app from dock");
     } else {
         candidate = reach_shell_context_menu_item_width(dc, font, L"Pin app to dock");
@@ -2359,7 +2211,7 @@ static int32_t reach_shell_estimate_context_menu_width(const reach_shell *shell,
     if (candidate > width) {
         width = candidate;
     }
-    if (shell != nullptr && item_index < shell->dock_item_count && shell->dock_item_windows[item_index] != 0) {
+    if (shell != nullptr && item_index < shell->dock_model.item_count && shell->dock_model.items[item_index].window != 0) {
         candidate = reach_shell_context_menu_item_width(dc, font, L"Close app");
         if (candidate > width) {
             width = candidate;
@@ -2373,7 +2225,7 @@ static int32_t reach_shell_estimate_context_menu_width(const reach_shell *shell,
 
 static reach_result reach_shell_launch_dock_item(reach_shell *shell, size_t item_index, int32_t force_new_instance)
 {
-    if (shell == nullptr || item_index >= shell->dock_item_count || shell->app_launcher.ops.launch == nullptr) {
+    if (shell == nullptr || item_index >= shell->dock_model.item_count || shell->app_launcher.ops.launch == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
 
@@ -2424,7 +2276,7 @@ static void reach_shell_close_context_menu(reach_shell *shell)
 
 static reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t command)
 {
-    if (shell == nullptr || shell->context_menu_target_index >= shell->dock_item_count) {
+    if (shell == nullptr || shell->context_menu_target_index >= shell->dock_model.item_count) {
         return REACH_OK;
     }
     size_t item_index = shell->context_menu_target_index;
@@ -2433,9 +2285,9 @@ static reach_result reach_shell_execute_context_command(reach_shell *shell, uint
     if (path != nullptr) {
         (void)reach_copy_utf16(item_path, 260, path);
     }
-    size_t pinned_index = shell->dock_item_pinned_indices[item_index];
+    size_t pinned_index = shell->dock_model.items[item_index].pinned_index;
     uint32_t pin_id = pinned_index < shell->ui.pinned_app_count ? shell->ui.pinned_apps[pinned_index].id : 0;
-    uintptr_t window_id = shell->dock_item_windows[item_index];
+    uintptr_t window_id = shell->dock_model.items[item_index].window;
     reach_shell_close_context_menu(shell);
 
     if (command == REACH_SHELL_CONTEXT_OPEN_NEW) {
@@ -2563,18 +2415,18 @@ static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, s
 {
     (void)x;
     (void)y;
-    if (shell == nullptr || item_index >= shell->dock_item_count) {
+    if (shell == nullptr || item_index >= shell->dock_model.item_count) {
         return REACH_INVALID_ARGUMENT;
     }
 
     shell->context_menu_item_count = 0;
     shell->context_menu_item_commands[shell->context_menu_item_count++] = REACH_SHELL_CONTEXT_OPEN_NEW;
-    if (shell->dock_item_pinned[item_index]) {
+    if (shell->dock_model.items[item_index].pinned) {
         shell->context_menu_item_commands[shell->context_menu_item_count++] = REACH_SHELL_CONTEXT_UNPIN;
     } else if (reach_shell_dock_item_path(shell, item_index) != nullptr) {
         shell->context_menu_item_commands[shell->context_menu_item_count++] = REACH_SHELL_CONTEXT_PIN;
     }
-    if (shell->dock_item_windows[item_index] != 0) {
+    if (shell->dock_model.items[item_index].window != 0) {
         shell->context_menu_item_commands[shell->context_menu_item_count++] = REACH_SHELL_CONTEXT_CLOSE;
     }
 
@@ -2740,8 +2592,8 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
     for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
         if (reach_rect_contains(shell->layout.dock.app_slots[index], event->x, event->y)) {
-            if (index < shell->dock_item_count && shell->dock_item_windows[index] != 0) {
-                uintptr_t window_id = shell->dock_item_windows[index];
+            if (index < shell->dock_model.item_count && shell->dock_model.items[index].window != 0) {
+                uintptr_t window_id = shell->dock_model.items[index].window;
                 if (shell->window_manager.ops.refresh != nullptr) {
                     (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
                     (void)reach_shell_refresh_open_windows(shell);
@@ -2763,8 +2615,8 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
                 shell->dock.dirty_flags = 1;
                 return result;
             }
-            if (index < shell->dock_item_count && shell->dock_item_pinned[index]) {
-                size_t pinned_index = shell->dock_item_pinned_indices[index];
+            if (index < shell->dock_model.item_count && shell->dock_model.items[index].pinned) {
+                size_t pinned_index = shell->dock_model.items[index].pinned_index;
                 if (pinned_index >= shell->ui.pinned_app_count) {
                     return REACH_OK;
                 }
@@ -2817,17 +2669,17 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
         if (reach_rect_contains(shell->layout.dock.app_slots[index], event->x, event->y)) {
             reach_shell_press_dock_item(shell, index);
-            if (index < shell->dock_item_count) {
+            if (index < shell->dock_model.item_count) {
                 shell->dock_drag_active = 1;
                 shell->dock_drag_moved = 0;
                 shell->dock_drag_source_index = index;
                 shell->dock_drag_target_index = index;
-                shell->dock_drag_pinned = shell->dock_item_pinned[index];
+                shell->dock_drag_pinned = shell->dock_model.items[index].pinned;
                 shell->dock_drag_pin_id = 0;
-                if (shell->dock_item_pinned[index] && shell->dock_item_pinned_indices[index] < shell->ui.pinned_app_count) {
-                shell->dock_drag_pin_id = shell->ui.pinned_apps[shell->dock_item_pinned_indices[index]].id;
-            }
-                shell->dock_drag_window = shell->dock_item_windows[index];
+                if (shell->dock_model.items[index].pinned && shell->dock_model.items[index].pinned_index < shell->ui.pinned_app_count) {
+                    shell->dock_drag_pin_id = shell->ui.pinned_apps[shell->dock_model.items[index].pinned_index].id;
+                }
+                shell->dock_drag_window = shell->dock_model.items[index].window;
                 shell->dock_drag_start_x = event->x;
                 shell->dock_drag_start_y = event->y;
                 float box_x = reach_shell_dock_slot_box_x(shell, &shell->layout.dock, index);
@@ -3285,6 +3137,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     }
 
     reach_ui_state_init(&shell->ui);
+    reach_dock_feature_model_init(&shell->dock_model);
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
     reach_surface_runtime_init(&shell->tray);
@@ -3586,7 +3439,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         }
         shell->tray.dirty_flags = 1;
     }
-    for (size_t index = 0; index < shell->dock_item_count; ++index) {
+    for (size_t index = 0; index < shell->dock_model.item_count; ++index) {
         if (shell->dock_item_x_animating[index]) {
             reach_float_animation_update(&shell->dock_item_x_animations[index], delta_seconds);
             shell->dock_item_x_animating[index] = reach_shell_float_animation_active(&shell->dock_item_x_animations[index]);
@@ -3607,7 +3460,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             if (shell->dock_reload_pins_after_snap) {
                 shell->dock_reload_pins_after_snap = 0;
                 (void)reach_shell_reload_pins(shell);
-                shell->dock_item_count = 0;
+                shell->dock_model.item_count = 0;
                 for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
                     shell->dock_item_x_valid[index] = 0;
                     shell->dock_item_x_animating[index] = 0;
@@ -3863,7 +3716,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
 {
     int32_t dock_item_animating = 0;
     if (shell != nullptr) {
-        for (size_t index = 0; index < shell->dock_item_count; ++index) {
+        for (size_t index = 0; index < shell->dock_model.item_count; ++index) {
             if (shell->dock_item_x_animating[index]) {
                 dock_item_animating = 1;
                 break;

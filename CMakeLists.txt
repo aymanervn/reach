@@ -50,6 +50,19 @@ target_compile_features(reach_core PUBLIC
     c_std_11
 )
 
+add_library(reach_features STATIC
+    src/features/dock/dock_feature.cpp
+    src/features/dock/dock_model.cpp
+)
+
+reach_configure_common(reach_features)
+target_compile_features(reach_features PUBLIC
+    cxx_std_17
+)
+target_link_libraries(reach_features PUBLIC
+    reach_core
+)
+
 add_library(reach_windows_adapters STATIC
     src/adapters/windows/window_win32.cpp
     src/adapters/windows/render_d2d.cpp
@@ -112,6 +125,7 @@ target_compile_features(reach_shell PUBLIC
 )
 target_link_libraries(reach_shell PUBLIC
     reach_core
+    reach_features
     reach_support
 )
 target_link_libraries(reach_shell PRIVATE
@@ -137,6 +151,7 @@ target_compile_features(reach PRIVATE
 target_link_libraries(reach PRIVATE
     reach_shell
     reach_core
+    reach_features
     reach_support
     reach_windows_adapters
     d2d1
