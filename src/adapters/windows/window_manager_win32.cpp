@@ -326,7 +326,7 @@ static int32_t reach_window_manager_any_visible_maximized_on_primary(void)
 {
     for (HWND hwnd = GetTopWindow(nullptr); hwnd != nullptr; hwnd = GetWindow(hwnd, GW_HWNDNEXT)) {
         if (reach_window_manager_is_desktop_surface_window(hwnd)) {
-            return 0;
+            continue;
         }
         if (!reach_window_manager_is_displayed_app_window(hwnd) || !IsZoomed(hwnd)) {
             continue;
@@ -549,7 +549,7 @@ static int32_t reach_window_manager_any_visible_fullscreen_on_primary(void)
 {
     for (HWND hwnd = GetTopWindow(nullptr); hwnd != nullptr; hwnd = GetWindow(hwnd, GW_HWNDNEXT)) {
         if (reach_window_manager_is_desktop_surface_window(hwnd)) {
-            return 0;
+            continue;
         }
         if (reach_window_manager_is_window_fullscreen_on_primary(hwnd)) {
             return 1;
@@ -577,7 +577,7 @@ static int32_t reach_window_manager_any_visible_exclusive_fullscreen_on_primary(
 {
     for (HWND hwnd = GetTopWindow(nullptr); hwnd != nullptr; hwnd = GetWindow(hwnd, GW_HWNDNEXT)) {
         if (reach_window_manager_is_desktop_surface_window(hwnd)) {
-            return 0;
+            continue;
         }
         if (reach_window_manager_is_window_exclusive_fullscreen(hwnd) &&
             reach_window_manager_is_on_primary_monitor(hwnd)) {

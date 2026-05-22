@@ -11,38 +11,52 @@ struct reach_app_launcher {
 };
 
 struct reach_explorer_window_search {
-    HWND window;
+    HWND visible_window;
+    HWND hidden_window;
 };
 
-static BOOL CALLBACK reach_find_explorer_window_proc(HWND hwnd, LPARAM param)
+static int32_t reach_is_file_explorer_window(HWND hwnd)
 {
-    reach_explorer_window_search *search = reinterpret_cast<reach_explorer_window_search *>(param);
-    if (search == nullptr || hwnd == nullptr || !IsWindowVisible(hwnd)) {
-        return TRUE;
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return 0;
     }
 
     wchar_t class_name[64] = {};
     GetClassNameW(hwnd, class_name, 64);
-    if (lstrcmpiW(class_name, L"CabinetWClass") == 0 || lstrcmpiW(class_name, L"ExploreWClass") == 0) {
-        DWORD process_id = 0;
-        GetWindowThreadProcessId(hwnd, &process_id);
-        HANDLE process = process_id != 0 ? OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id) : nullptr;
-        wchar_t image_path[260] = {};
-        DWORD image_path_count = 260;
-        BOOL is_explorer = FALSE;
-        if (process != nullptr) {
-            if (QueryFullProcessImageNameW(process, 0, image_path, &image_path_count)) {
-                const wchar_t *file_name = PathFindFileNameW(image_path);
-                is_explorer = file_name != nullptr && lstrcmpiW(file_name, L"explorer.exe") == 0;
-            }
-            CloseHandle(process);
-        }
-        if (is_explorer) {
-            search->window = hwnd;
-            return FALSE;
-        }
+    if (lstrcmpiW(class_name, L"CabinetWClass") != 0 && lstrcmpiW(class_name, L"ExploreWClass") != 0) {
+        return 0;
     }
 
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(hwnd, &process_id);
+    HANDLE process = process_id != 0 ? OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id) : nullptr;
+    wchar_t image_path[260] = {};
+    DWORD image_path_count = 260;
+    BOOL is_explorer = FALSE;
+    if (process != nullptr) {
+        if (QueryFullProcessImageNameW(process, 0, image_path, &image_path_count)) {
+            const wchar_t *file_name = PathFindFileNameW(image_path);
+            is_explorer = file_name != nullptr && lstrcmpiW(file_name, L"explorer.exe") == 0;
+        }
+        CloseHandle(process);
+    }
+    return is_explorer ? 1 : 0;
+}
+
+static BOOL CALLBACK reach_find_explorer_window_proc(HWND hwnd, LPARAM param)
+{
+    reach_explorer_window_search *search = reinterpret_cast<reach_explorer_window_search *>(param);
+    if (search == nullptr || !reach_is_file_explorer_window(hwnd)) {
+        return TRUE;
+    }
+
+    if (IsWindowVisible(hwnd) || IsIconic(hwnd)) {
+        search->visible_window = hwnd;
+        return FALSE;
+    }
+    if (search->hidden_window == nullptr) {
+        search->hidden_window = hwnd;
+    }
     return TRUE;
 }
 
@@ -50,7 +64,7 @@ static HWND reach_find_explorer_window(void)
 {
     reach_explorer_window_search search = {};
     EnumWindows(reach_find_explorer_window_proc, reinterpret_cast<LPARAM>(&search));
-    return search.window;
+    return search.visible_window != nullptr ? search.visible_window : search.hidden_window;
 }
 
 static reach_result reach_activate_explorer_window(HWND window)
@@ -88,8 +102,7 @@ static reach_result reach_launch_default_explorer(void)
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
     execute.fMask = SEE_MASK_DEFAULT;
-    execute.lpFile = L"explorer.exe";
-    execute.lpParameters = L"shell:MyComputerFolder";
+    execute.lpFile = L"shell:MyComputerFolder";
     execute.nShow = SW_SHOWNORMAL;
     return ShellExecuteExW(&execute) ? REACH_OK : REACH_ERROR;
 }

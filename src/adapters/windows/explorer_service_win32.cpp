@@ -11,13 +11,16 @@ struct reach_explorer_service {
     int unused;
 };
 
-static reach_result reach_explorer_execute(const wchar_t *parameters)
+static reach_result reach_explorer_execute(const wchar_t *target)
 {
+    if (target == nullptr || target[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
     SHELLEXECUTEINFOW info = {};
     info.cbSize = sizeof(info);
     info.fMask = SEE_MASK_NOASYNC;
-    info.lpFile = L"explorer.exe";
-    info.lpParameters = parameters;
+    info.lpFile = target;
     info.nShow = SW_SHOWNORMAL;
     return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
 }
