@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/ui_state.h"
+#include "reach/ports/icon_provider.h"
 #include "reach/ports/window_manager.h"
 
 #ifdef __cplusplus
@@ -37,7 +38,16 @@ typedef struct reach_dock_feature_model {
     size_t order_count;
 } reach_dock_feature_model;
 
+typedef struct reach_dock_icon_cache {
+    reach_icon_handle pinned_icons[REACH_MAX_PINNED_APPS];
+    size_t pinned_icon_count;
+    uint16_t pinned_icon_initials[REACH_MAX_PINNED_APPS];
+    reach_icon_handle open_window_icons[REACH_MAX_PINNED_APPS];
+    uint16_t open_window_initials[REACH_MAX_PINNED_APPS];
+} reach_dock_icon_cache;
+
 void reach_dock_feature_model_init(reach_dock_feature_model *model);
+void reach_dock_icon_cache_init(reach_dock_icon_cache *cache);
 int32_t reach_dock_key_equal(const reach_dock_order_key *a, const reach_dock_order_key *b);
 uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *model, size_t index);
 int32_t reach_dock_feature_model_item_matches_key(const reach_dock_feature_model *model, size_t index, reach_dock_order_key key);
@@ -59,6 +69,26 @@ void reach_dock_feature_model_build_items(
     size_t open_window_count,
     reach_dock_path_matches_pinned_fn path_matches_pinned,
     void *path_match_user);
+reach_result reach_dock_load_pinned_icons(
+    reach_dock_icon_cache *cache,
+    reach_icon_provider_port *icon_provider,
+    const reach_pinned_app_model *pinned_apps,
+    size_t pinned_app_count,
+    int32_t size_px);
+void reach_dock_release_pinned_icons(reach_dock_icon_cache *cache, reach_icon_provider_port *icon_provider);
+reach_result reach_dock_load_open_window_icons(
+    reach_dock_icon_cache *cache,
+    reach_icon_provider_port *icon_provider,
+    const reach_window_snapshot *open_windows,
+    size_t open_window_count,
+    int32_t size_px);
+void reach_dock_release_open_window_icons(reach_dock_icon_cache *cache, reach_icon_provider_port *icon_provider, size_t open_window_count);
+void reach_dock_release_all_icons(reach_dock_icon_cache *cache, reach_icon_provider_port *icon_provider, size_t open_window_count);
+reach_icon_handle reach_dock_icon_for_item(
+    const reach_dock_icon_cache *cache,
+    const reach_dock_feature_model *model,
+    size_t item_index,
+    uint16_t *out_fallback_initial);
 
 #ifdef __cplusplus
 }

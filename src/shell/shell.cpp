@@ -48,14 +48,10 @@ struct reach_shell {
     reach_wallpaper_service_port wallpaper_service;
     reach_wallpaper_surface_port wallpaper_surface;
     const reach_theme *theme;
-    reach_icon_handle pinned_icons[REACH_MAX_PINNED_APPS];
-    size_t pinned_icon_count;
-    uint16_t pinned_icon_initials[REACH_MAX_PINNED_APPS];
     reach_window_snapshot open_windows[REACH_MAX_PINNED_APPS];
-    reach_icon_handle open_window_icons[REACH_MAX_PINNED_APPS];
-    uint16_t open_window_initials[REACH_MAX_PINNED_APPS];
     size_t open_window_count;
     reach_dock_feature_model dock_model;
+    reach_dock_icon_cache dock_icons;
     reach_float_animation dock_item_x_animations[REACH_MAX_PINNED_APPS];
     int32_t dock_item_x_animating[REACH_MAX_PINNED_APPS];
     int32_t dock_item_x_valid[REACH_MAX_PINNED_APPS];
@@ -526,37 +522,23 @@ static reach_result reach_shell_apply_window_state(
     return REACH_OK;
 }
 
+static int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
+{
+    const reach_theme *theme = shell != nullptr && shell->theme != nullptr ? shell->theme : reach_theme_default();
+    float dock_height = shell != nullptr ? shell->ui.dock.height : 48.0f;
+    return (int32_t)(reach_theme_icon_box_size(theme, dock_height) * 4.0f);
+}
+
 static reach_result reach_shell_load_pinned_icons(reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
-    if (shell == nullptr || shell->icon_provider.ops.load == nullptr) {
+    if (shell == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (shell->icon_provider.ops.load == nullptr) {
         return REACH_OK;
     }
-
-    for (size_t index = 0; index < shell->pinned_icon_count; ++index) {
-        if (shell->icon_provider.ops.release != nullptr && shell->pinned_icons[index].id != 0) {
-            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->pinned_icons[index]);
-        }
-        shell->pinned_icons[index] = {};
-    }
-
-    shell->pinned_icon_count = shell->ui.pinned_app_count;
-    for (size_t index = 0; index < shell->ui.pinned_app_count; ++index) {
-        shell->pinned_icon_initials[index] = shell->ui.pinned_apps[index].title[0] != 0 ? shell->ui.pinned_apps[index].title[0] : '?';
-        const uint16_t *icon_path = shell->ui.pinned_apps[index].icon_ref[0] != 0
-            ? shell->ui.pinned_apps[index].icon_ref
-            : shell->ui.pinned_apps[index].path;
-        if (icon_path[0] == 0) {
-            continue;
-        }
-
-        reach_icon_request request = {};
-        request.size_px = (int32_t)(reach_theme_icon_box_size(shell->theme, shell->ui.dock.height) * 4.0f);
-        reach_copy_utf16(request.path, 260, icon_path);
-        (void)shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &shell->pinned_icons[index]);
-    }
-
-    return REACH_OK;
+    return reach_dock_load_pinned_icons(&shell->dock_icons, &shell->icon_provider, shell->ui.pinned_apps, shell->ui.pinned_app_count, reach_shell_dock_icon_size_px(shell));
 }
 
 static int32_t reach_shell_path_equals(const uint16_t *a, const uint16_t *b)
@@ -580,19 +562,6 @@ static int32_t reach_shell_dock_path_matches_pinned(void *user, const reach_pinn
     return pinned_name != nullptr && window_name != nullptr && lstrcmpiW(pinned_name, window_name) == 0;
 }
 
-static void reach_shell_release_open_window_icons(reach_shell *shell)
-{
-    if (shell == nullptr) {
-        return;
-    }
-    for (size_t index = 0; index < shell->open_window_count; ++index) {
-        if (shell->icon_provider.ops.release != nullptr && shell->open_window_icons[index].id != 0) {
-            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->open_window_icons[index]);
-        }
-        shell->open_window_icons[index] = {};
-    }
-}
-
 static reach_result reach_shell_refresh_open_windows(reach_shell *shell)
 {
     if (shell == nullptr || shell->window_manager.ops.window_count == nullptr || shell->window_manager.ops.window_at == nullptr) {
@@ -605,7 +574,7 @@ static reach_result reach_shell_refresh_open_windows(reach_shell *shell)
         old_windows[index] = shell->open_windows[index].id;
     }
 
-    reach_shell_release_open_window_icons(shell);
+    reach_dock_release_open_window_icons(&shell->dock_icons, &shell->icon_provider, shell->open_window_count);
     shell->open_window_count = 0;
     size_t count = shell->window_manager.ops.window_count(shell->window_manager.manager);
     for (size_t index = 0; index < count && shell->open_window_count < REACH_MAX_PINNED_APPS; ++index) {
@@ -616,14 +585,8 @@ static reach_result reach_shell_refresh_open_windows(reach_shell *shell)
         }
         size_t out_index = shell->open_window_count++;
         shell->open_windows[out_index] = snapshot;
-        shell->open_window_initials[out_index] = snapshot.title[0] != 0 ? snapshot.title[0] : '?';
-        if (shell->icon_provider.ops.load != nullptr) {
-            reach_icon_request request = {};
-            request.size_px = (int32_t)(reach_theme_icon_box_size(shell->theme, shell->ui.dock.height) * 4.0f);
-            (void)reach_copy_utf16(request.path, 260, snapshot.path);
-            (void)shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &shell->open_window_icons[out_index]);
-        }
     }
+    (void)reach_dock_load_open_window_icons(&shell->dock_icons, &shell->icon_provider, shell->open_windows, shell->open_window_count, reach_shell_dock_icon_size_px(shell));
 
     if (old_count != shell->open_window_count) {
         shell->dock_items_changed = 1;
@@ -1212,12 +1175,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->search_provider.ops.destroy != nullptr) {
         shell->search_provider.ops.destroy(shell->search_provider.provider);
     }
-    for (size_t index = 0; index < shell->pinned_icon_count; ++index) {
-        if (shell->icon_provider.ops.release != nullptr && shell->pinned_icons[index].id != 0) {
-            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->pinned_icons[index]);
-        }
-    }
-    reach_shell_release_open_window_icons(shell);
+    reach_dock_release_all_icons(&shell->dock_icons, &shell->icon_provider, shell->open_window_count);
     if (shell->app_launcher.ops.destroy != nullptr) {
         shell->app_launcher.ops.destroy(shell->app_launcher.launcher);
     }
@@ -1250,7 +1208,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->explorer_service = {};
     shell->wallpaper_service = {};
     shell->wallpaper_surface = {};
-    shell->pinned_icon_count = 0;
+    reach_dock_icon_cache_init(&shell->dock_icons);
 }
 
 static float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index);
@@ -1313,26 +1271,8 @@ static reach_result reach_shell_render_dock_surface(reach_shell *shell, const re
         : REACH_MAX_PINNED_APPS;
 
     auto push_dock_item = [&](size_t index, float override_box_x, int32_t use_override) {
-        int32_t pinned_item = index < shell->dock_model.item_count ? shell->dock_model.items[index].pinned : 1;
-        reach_icon_handle icon = {};
         uint16_t fallback_initial = '?';
-
-        if (pinned_item) {
-            size_t pinned_index = index < shell->dock_model.item_count ? shell->dock_model.items[index].pinned_index : REACH_MAX_PINNED_APPS;
-            if (pinned_index < shell->pinned_icon_count) {
-                icon = shell->pinned_icons[pinned_index];
-            }
-            fallback_initial = pinned_index < REACH_MAX_PINNED_APPS ? shell->pinned_icon_initials[pinned_index] : '?';
-        } else {
-            size_t open_index = index < shell->dock_model.item_count
-                ? shell->dock_model.items[index].open_index
-                : REACH_MAX_PINNED_APPS;
-
-            if (open_index < shell->open_window_count) {
-                icon = shell->open_window_icons[open_index];
-                fallback_initial = shell->open_window_initials[open_index];
-            }
-        }
+        reach_icon_handle icon = reach_dock_icon_for_item(&shell->dock_icons, &shell->dock_model, index, &fallback_initial);
 
         float box_x = use_override ? override_box_x : reach_shell_dock_item_current_x(shell, layout, index);
 
@@ -1732,7 +1672,7 @@ static reach_result reach_shell_render_switcher_surface(reach_shell *shell, reac
             int32_t selected = index == shell->switcher_selected_index;
             float box_x = item.x + (item.width - icon_box_size) * 0.5f;
             float box_y = item.y + 4.0f;
-            reach_icon_handle icon = index < shell->open_window_count ? shell->open_window_icons[index] : reach_icon_handle {};
+            reach_icon_handle icon = index < shell->open_window_count ? shell->dock_icons.open_window_icons[index] : reach_icon_handle {};
 
             if (selected) {
                 command = {};
@@ -3138,6 +3078,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
 
     reach_ui_state_init(&shell->ui);
     reach_dock_feature_model_init(&shell->dock_model);
+    reach_dock_icon_cache_init(&shell->dock_icons);
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
     reach_surface_runtime_init(&shell->tray);
