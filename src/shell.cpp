@@ -812,6 +812,7 @@ static void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *
     }
 
     shell->dock_order_count = shell->dock_item_count;
+
     for (size_t index = 0; index < shell->dock_item_count; ++index) {
         uint32_t pin_id = 0;
         if (shell->dock_item_pinned[index] && shell->dock_item_pinned_indices[index] < shell->ui.pinned_app_count) {
@@ -823,6 +824,17 @@ static void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *
     layout->app_slot_count = shell->dock_item_count;
     float icon_size = shell->ui.dock.icon_size;
     float gap = shell->ui.dock.gap;
+    size_t count = shell->dock_item_count;
+    float dock_width = ceilf(icon_size * (float)(count + 1) + gap * (float)(count + 2));
+    if (count == 0) {
+        dock_width = ceilf(icon_size + gap * 2.0f);
+    }
+    float old_width = layout->bounds.width;
+    if (dock_width != old_width) {
+        layout->bounds.x += (old_width - dock_width) * 0.5f;
+        layout->bounds.width = dock_width;
+    }
+
     float left = layout->bounds.x + gap;
     float top = layout->bounds.y + (layout->bounds.height - icon_size) * 0.5f;
     for (size_t index = 0; index < layout->app_slot_count; ++index) {
@@ -831,6 +843,9 @@ static void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *
         layout->app_slots[index].width = icon_size;
         layout->app_slots[index].height = icon_size;
     }
+
+    layout->tray_button.x = layout->bounds.x + dock_width - icon_size - gap;
+    layout->tray_button.y = top;
 }
 
 static reach_result reach_shell_reload_pins(reach_shell *shell)
@@ -3528,6 +3543,21 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 }
                 layout.dock.tray_button.y += dock_y_offset;
                 reach_shell_build_dock_items(shell, &layout.dock);
+                float dock_left_offset = bounds.x - layout.dock.bounds.x;
+                float dock_right_offset = bounds.x + bounds.width - (layout.dock.bounds.x + layout.dock.bounds.width);
+                float dock_x_offset = 0.0f;
+                if (dock_left_offset > 0.0f) {
+                    dock_x_offset = dock_left_offset;
+                } else if (dock_right_offset < 0.0f) {
+                    dock_x_offset = dock_right_offset;
+                }
+                if (dock_x_offset != 0.0f) {
+                    layout.dock.bounds.x += dock_x_offset;
+                    for (size_t index = 0; index < layout.dock.app_slot_count; ++index) {
+                        layout.dock.app_slots[index].x += dock_x_offset;
+                    }
+                    layout.dock.tray_button.x += dock_x_offset;
+                }
                 int32_t dock_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.dock.bounds, layout.dock.bounds);
                 int32_t launcher_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.launcher.bounds, layout.launcher.bounds);
                 shell->layout = layout;
