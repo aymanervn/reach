@@ -5,6 +5,7 @@
 #include "reach/core/ui_layout.h"
 #include "reach/animation.h"
 #include "reach/features/dock.h"
+#include "reach/features/tray.h"
 #include "reach/hotkeys.h"
 #include "reach/monitor.h"
 #include "reach/platform/windows_adapters.h"
@@ -98,9 +99,7 @@ struct reach_shell {
     reach_float_animation dock_y_animation;
     double window_manager_refresh_elapsed;
     int32_t tray_popup_open;
-    reach_tray_item tray_items[REACH_MAX_TRAY_ITEMS];
-    reach_rect_f32 tray_item_slots[REACH_MAX_TRAY_ITEMS];
-    size_t tray_item_count;
+    reach_tray_model tray_model;
     int32_t switcher_open;
     size_t switcher_selected_index;
     size_t switcher_visible_start;
@@ -410,22 +409,7 @@ static void reach_shell_toggle_tray_popup(reach_shell *shell)
 
 static reach_result reach_shell_refresh_tray_items(reach_shell *shell)
 {
-    if (shell == nullptr || shell->tray_provider.ops.item_count == nullptr || shell->tray_provider.ops.item_at == nullptr) {
-        return REACH_OK;
-    }
-
-    if (shell->tray_provider.ops.refresh != nullptr) {
-        (void)shell->tray_provider.ops.refresh(shell->tray_provider.provider);
-    }
-
-    size_t count = shell->tray_provider.ops.item_count(shell->tray_provider.provider);
-    shell->tray_item_count = reach_shell_min_size(count, REACH_MAX_TRAY_ITEMS);
-    for (size_t index = 0; index < shell->tray_item_count; ++index) {
-        if (shell->tray_provider.ops.item_at(shell->tray_provider.provider, index, &shell->tray_items[index]) != REACH_OK) {
-            shell->tray_items[index] = {};
-        }
-    }
-    return REACH_OK;
+    return shell != nullptr ? reach_tray_model_refresh(&shell->tray_model, &shell->tray_provider) : REACH_OK;
 }
 
 static void reach_shell_compute_tray_popup_layout(
@@ -438,39 +422,9 @@ static void reach_shell_compute_tray_popup_layout(
         return;
     }
 
+    (void)out_slots;
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    float slot_size = reach_theme_tray_slot_size(theme, dock_layout->bounds.height);
-    float gap = slot_size * 0.22f;
-    float padding = slot_size * 0.58f;
-    size_t visual_count = shell->tray_item_count > 0 ? shell->tray_item_count : 1;
-    size_t columns = reach_shell_min_size(visual_count, 5);
-    size_t rows = (visual_count + 4) / 5;
-    float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
-    float content_height = padding * 2.0f + (float)rows * slot_size + (float)(rows - 1) * gap;
-
-    out_bounds->width = ceilf(content_width);
-    out_bounds->height = ceilf(content_height);
-    out_bounds->x = dock_layout->tray_button.x + dock_layout->tray_button.width * 0.5f - out_bounds->width * 0.5f;
-    out_bounds->y = dock_layout->bounds.y - out_bounds->height - 8.0f;
-
-    if (out_slots == nullptr) {
-        return;
-    }
-    float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
-    float grid_y = out_bounds->y + (out_bounds->height - grid_height) * 0.5f;
-    for (size_t index = 0; index < shell->tray_item_count; ++index) {
-        size_t row = index / 5;
-        size_t column = index % 5;
-        size_t row_start = row * 5;
-        size_t row_remaining = shell->tray_item_count - row_start;
-        size_t row_columns = reach_shell_min_size(row_remaining, 5);
-        float row_width = (float)row_columns * slot_size + (float)(row_columns - 1) * gap;
-        float row_x = out_bounds->x + (out_bounds->width - row_width) * 0.5f;
-        out_slots[index].x = row_x + (float)column * (slot_size + gap);
-        out_slots[index].y = grid_y + (float)row * (slot_size + gap);
-        out_slots[index].width = slot_size;
-        out_slots[index].height = slot_size;
-    }
+    reach_tray_compute_popup_layout(&shell->tray_model, theme, dock_layout, out_bounds);
 }
 
 static reach_result reach_shell_apply_window_state(
@@ -1205,6 +1159,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->wallpaper_service = {};
     shell->wallpaper_surface = {};
     reach_dock_icon_cache_init(&shell->dock_icons);
+    reach_tray_model_init(&shell->tray_model);
 }
 
 static float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index);
@@ -1270,78 +1225,18 @@ static reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_re
         return REACH_OK;
     }
 
-    const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    float icon_box_radius = reach_theme_icon_box_corner_radius(theme, reach_theme_tray_slot_size(theme, shell->layout.dock.bounds.height));
     reach_render_command_buffer commands = {};
-    reach_render_command command = {};
-    float popup_stroke = theme->dock_border_thickness > 0.0f ? theme->dock_border_thickness : 1.0f;
-    float popup_inset = popup_stroke * 0.5f;
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect.x = popup_inset;
-    command.rect.y = popup_inset;
-    command.rect.width = bounds.width - popup_stroke;
-    command.rect.height = bounds.height - popup_stroke;
-    command.color = reach_shell_rgb(32, 30, 28, 1.0f);
-    command.radius = theme->tray_popup_corner_radius;
-    reach_render_command_buffer_push(&commands, &command);
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect.x = popup_inset;
-    command.rect.y = popup_inset;
-    command.rect.width = bounds.width - popup_stroke;
-    command.rect.height = bounds.height - popup_stroke;
-    command.color = theme->dock_border;
-    command.radius = theme->tray_popup_corner_radius;
-    command.stroke_width = popup_stroke;
-    reach_render_command_buffer_push(&commands, &command);
-
-    for (size_t index = 0; index < shell->tray_item_count; ++index) {
-        reach_rect_f32 slot = shell->tray_item_slots[index];
-        slot.x -= bounds.x;
-        slot.y -= bounds.y;
-        float icon_size = floorf(slot.height * 0.86f);
-        if (icon_size < 16.0f && slot.height >= 16.0f) {
-            icon_size = 16.0f;
-        }
-        float icon_x = slot.x + (slot.width - icon_size) * 0.5f;
-        float icon_y = slot.y + (slot.height - icon_size) * 0.5f;
-
-        if (shell->tray_items[index].icon_id != 0) {
-            command = {};
-            command.type = REACH_RENDER_COMMAND_ICON;
-            command.rect.x = icon_x;
-            command.rect.y = icon_y;
-            command.rect.width = icon_size;
-            command.rect.height = icon_size;
-            command.icon_id = shell->tray_items[index].icon_id;
-            command.color.a = 1.0f;
-            command.radius = 0.0f;
-            reach_render_command_buffer_push(&commands, &command);
-        } else {
-            command = {};
-            command.type = REACH_RENDER_COMMAND_TEXT;
-            command.rect = slot;
-            command.color = theme->fallback_icon_text;
-            command.text_alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
-            command.text[0] = shell->tray_items[index].title[0] != 0 ? shell->tray_items[index].title[0] : '?';
-            command.text[1] = 0;
-            reach_render_command_buffer_push(&commands, &command);
-        }
-
-        if (shell->tray_click_feedback_index == index && shell->tray_click_feedback_opacity.value > 0.001f) {
-            command = {};
-            command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect = slot;
-            command.color.r = 0.0f;
-            command.color.g = 0.0f;
-            command.color.b = 0.0f;
-            command.color.a = shell->tray_click_feedback_opacity.value;
-            command.radius = icon_box_radius;
-            reach_render_command_buffer_push(&commands, &command);
-        }
+    reach_tray_render_input input = {};
+    input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
+    input.model = &shell->tray_model;
+    input.bounds = bounds;
+    input.dock_height = shell->layout.dock.bounds.height;
+    input.click_feedback_index = shell->tray_click_feedback_index;
+    input.click_feedback_opacity = shell->tray_click_feedback_opacity.value;
+    input.text_alignment_center = DWRITE_TEXT_ALIGNMENT_CENTER;
+    reach_result result = reach_tray_build_render_commands(&input, &commands);
+    if (result != REACH_OK) {
+        return result;
     }
 
     if (shell->tray.renderer.ops.begin_frame(shell->tray.renderer.backend) != REACH_OK) {
@@ -1350,7 +1245,6 @@ static reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_re
     (void)shell->tray.renderer.ops.execute(shell->tray.renderer.backend, &commands);
     return shell->tray.renderer.ops.end_frame(shell->tray.renderer.backend);
 }
-
 static reach_rect_f32 reach_shell_switcher_bounds(reach_rect_f32 monitor_bounds)
 {
     reach_rect_f32 bounds = {};
@@ -2321,11 +2215,11 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     }
 
     if (shell->tray_popup_open && shell->tray_provider.ops.activate != nullptr) {
-        for (size_t index = 0; index < shell->tray_item_count; ++index) {
-            if (reach_rect_contains(shell->tray_item_slots[index], event->x, event->y)) {
+        for (size_t index = 0; index < shell->tray_model.item_count; ++index) {
+            if (reach_rect_contains(shell->tray_model.item_slots[index], event->x, event->y)) {
                 reach_result result = shell->tray_provider.ops.activate(
                     shell->tray_provider.provider,
-                    shell->tray_items[index].id,
+                    shell->tray_model.items[index].id,
                     REACH_TRAY_ACTION_LEFT_CLICK);
                 reach_shell_release_tray_item(shell);
                 if (shell->tray_popup_open) {
@@ -2383,8 +2277,8 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     }
 
     if (shell->tray_popup_open) {
-        for (size_t index = 0; index < shell->tray_item_count; ++index) {
-            if (reach_rect_contains(shell->tray_item_slots[index], event->x, event->y)) {
+        for (size_t index = 0; index < shell->tray_model.item_count; ++index) {
+            if (reach_rect_contains(shell->tray_model.item_slots[index], event->x, event->y)) {
                 reach_shell_press_tray_item(shell, index);
                 return REACH_OK;
             }
@@ -2538,12 +2432,12 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell, const
     }
 
     if (shell->tray_popup_open && shell->tray_provider.ops.activate != nullptr) {
-        for (size_t index = 0; index < shell->tray_item_count; ++index) {
-            if (reach_rect_contains(shell->tray_item_slots[index], event->x, event->y)) {
+        for (size_t index = 0; index < shell->tray_model.item_count; ++index) {
+            if (reach_rect_contains(shell->tray_model.item_slots[index], event->x, event->y)) {
                 reach_shell_press_tray_item(shell, index);
                 reach_result result = shell->tray_provider.ops.activate(
                     shell->tray_provider.provider,
-                    shell->tray_items[index].id,
+                    shell->tray_model.items[index].id,
                     REACH_TRAY_ACTION_RIGHT_CLICK);
                 reach_shell_release_tray_item(shell);
                 if (shell->tray_popup_open) {
@@ -2866,6 +2760,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     reach_ui_state_init(&shell->ui);
     reach_dock_feature_model_init(&shell->dock_model);
     reach_dock_icon_cache_init(&shell->dock_icons);
+    reach_tray_model_init(&shell->tray_model);
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
     reach_surface_runtime_init(&shell->tray);
@@ -3338,7 +3233,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 if (shell->tray.window.ops.set_bounds != nullptr) {
                     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
                     reach_rect_f32 tray_bounds = {};
-                    reach_shell_compute_tray_popup_layout(shell, &layout.dock, &tray_bounds, shell->tray_item_slots);
+                    reach_shell_compute_tray_popup_layout(shell, &layout.dock, &tray_bounds, shell->tray_model.item_slots);
                     int32_t tray_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->tray.window,

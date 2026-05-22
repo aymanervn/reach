@@ -56,6 +56,9 @@ add_library(reach_features STATIC
     src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
     src/features/dock/dock_render.cpp
+    src/features/tray/tray_feature.cpp
+    src/features/tray/tray_model.cpp
+    src/features/tray/tray_render.cpp
 )
 
 reach_configure_common(reach_features)
