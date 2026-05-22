@@ -2138,6 +2138,26 @@ static reach_result reach_shell_execute_dock_item_action(reach_shell *shell, rea
     return REACH_OK;
 }
 
+static reach_result reach_shell_execute_tray_action(reach_shell *shell, reach_tray_feature_action action)
+{
+    if (shell == nullptr || action.type != REACH_TRAY_FEATURE_ACTION_ACTIVATE) {
+        return REACH_OK;
+    }
+    if (shell->tray_provider.ops.activate == nullptr) {
+        return REACH_OK;
+    }
+
+    reach_result result = shell->tray_provider.ops.activate(
+        shell->tray_provider.provider,
+        action.item_id,
+        action.provider_action);
+    reach_shell_release_tray_item(shell);
+    if (shell->tray_popup_open) {
+        reach_shell_capture_tray_input(shell);
+    }
+    return result;
+}
+
 static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reach_ui_event *event)
 {
     if (!shell->has_layout) {
@@ -2215,18 +2235,10 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     }
 
     if (shell->tray_popup_open && shell->tray_provider.ops.activate != nullptr) {
-        for (size_t index = 0; index < shell->tray_model.item_count; ++index) {
-            if (reach_rect_contains(shell->tray_model.item_slots[index], event->x, event->y)) {
-                reach_result result = shell->tray_provider.ops.activate(
-                    shell->tray_provider.provider,
-                    shell->tray_model.items[index].id,
-                    REACH_TRAY_ACTION_LEFT_CLICK);
-                reach_shell_release_tray_item(shell);
-                if (shell->tray_popup_open) {
-                    reach_shell_capture_tray_input(shell);
-                }
-                return result;
-            }
+        reach_tray_hit_result tray_hit = reach_tray_hit_test_popup(&shell->tray_model, shell->tray.last_bounds, event->x, event->y);
+        reach_tray_feature_action tray_action = reach_tray_action_for_hit(&shell->tray_model, tray_hit, REACH_TRAY_ACTION_LEFT_CLICK);
+        if (tray_action.type != REACH_TRAY_FEATURE_ACTION_NONE) {
+            return reach_shell_execute_tray_action(shell, tray_action);
         }
     }
 
@@ -2277,13 +2289,12 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     }
 
     if (shell->tray_popup_open) {
-        for (size_t index = 0; index < shell->tray_model.item_count; ++index) {
-            if (reach_rect_contains(shell->tray_model.item_slots[index], event->x, event->y)) {
-                reach_shell_press_tray_item(shell, index);
-                return REACH_OK;
-            }
+        reach_tray_hit_result tray_hit = reach_tray_hit_test_popup(&shell->tray_model, shell->tray.last_bounds, event->x, event->y);
+        if (tray_hit.type == REACH_TRAY_HIT_ITEM) {
+            reach_shell_press_tray_item(shell, tray_hit.index);
+            return REACH_OK;
         }
-        if (!reach_rect_contains(shell->tray.last_bounds, event->x, event->y)) {
+        if (tray_hit.type == REACH_TRAY_HIT_NONE) {
             reach_shell_capture_tray_input(shell);
             return REACH_OK;
         }
@@ -2432,19 +2443,11 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell, const
     }
 
     if (shell->tray_popup_open && shell->tray_provider.ops.activate != nullptr) {
-        for (size_t index = 0; index < shell->tray_model.item_count; ++index) {
-            if (reach_rect_contains(shell->tray_model.item_slots[index], event->x, event->y)) {
-                reach_shell_press_tray_item(shell, index);
-                reach_result result = shell->tray_provider.ops.activate(
-                    shell->tray_provider.provider,
-                    shell->tray_model.items[index].id,
-                    REACH_TRAY_ACTION_RIGHT_CLICK);
-                reach_shell_release_tray_item(shell);
-                if (shell->tray_popup_open) {
-                    reach_shell_capture_tray_input(shell);
-                }
-                return result;
-            }
+        reach_tray_hit_result tray_hit = reach_tray_hit_test_popup(&shell->tray_model, shell->tray.last_bounds, event->x, event->y);
+        reach_tray_feature_action tray_action = reach_tray_action_for_hit(&shell->tray_model, tray_hit, REACH_TRAY_ACTION_RIGHT_CLICK);
+        if (tray_action.type != REACH_TRAY_FEATURE_ACTION_NONE) {
+            reach_shell_press_tray_item(shell, tray_action.item_index);
+            return reach_shell_execute_tray_action(shell, tray_action);
         }
     }
 
