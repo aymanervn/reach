@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(reach LANGUAGES C CXX)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 set(REACH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 function(reach_configure_common target)
@@ -51,11 +53,17 @@ target_compile_features(reach_core PUBLIC
 )
 
 add_library(reach_features STATIC
+    src/features/context_menu/context_menu_feature.cpp
+    src/features/context_menu/context_menu_interaction.cpp
+    src/features/context_menu/context_menu_render.cpp
     src/features/dock/dock_feature.cpp
     src/features/dock/dock_icons.cpp
     src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
     src/features/dock/dock_render.cpp
+    src/features/launcher/launcher_feature.cpp
+    src/features/launcher/launcher_interaction.cpp
+    src/features/launcher/launcher_render.cpp
     src/features/tray/tray_feature.cpp
     src/features/tray/tray_interaction.cpp
     src/features/tray/tray_model.cpp
@@ -243,4 +251,10 @@ target_compile_features(reach_pin_config_tests PRIVATE
 target_link_libraries(reach_pin_config_tests PRIVATE
     shlwapi
     user32
+)
+
+add_custom_target(check_architecture
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Checking Reach architecture boundaries"
 )

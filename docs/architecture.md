@@ -84,3 +84,24 @@ without updating this section.
 The target graph is intended to converge on the allowed dependency graph above.
 Where source files still violate it, the transition exceptions list is the
 contract for follow-up refactors.
+
+## Architecture Checks
+
+The `check_architecture` CMake target runs `tools/check_architecture.py`.
+It flags forbidden includes across core, features, shell, and ports, and it
+flags direct Win32 API/type tokens outside the documented transition allowlist.
+The allowlist is intentionally temporary and should shrink with the transition
+exceptions above.
+
+## Remaining Transition Debt
+
+- `src/shell/shell.cpp` still contains popup/capture Win32 orchestration while
+  the shell is being thinned. The exact popup/capture APIs still present are
+  `SetCapture`, `ReleaseCapture`, `GetCapture`, `SetWindowsHookExW`,
+  `UnhookWindowsHookEx`, and `WindowFromPoint`.
+- `src/shell/shell.cpp` still contains native context-menu hook and window
+  styling helpers. These remain shell transition debt until popup capture and
+  native context-menu behavior move behind ports or Windows adapters.
+- `src/shell/shell.cpp` still contains switcher rendering/model helpers and
+  wallpaper orchestration. These were not moved in the current pass because the
+  launcher and context-menu extractions were the safer mechanical boundary.
