@@ -48,14 +48,6 @@ reach_result reach_ui_build_render_commands(const reach_ui_state *state, const r
 
     reach_render_command command = {0};
     if (state->launcher.open) {
-        command.type = REACH_RENDER_COMMAND_BLUR_BACKGROUND;
-        command.rect = layout->launcher.bounds;
-        command.color.r = 0.0f;
-        command.color.g = 0.0f;
-        command.color.b = 0.0f;
-        command.color.a = 0.55f;
-        reach_render_command_buffer_push(buffer, &command);
-
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = layout->launcher.search_box;
         command.color.r = 0.08f;
@@ -65,36 +57,14 @@ reach_result reach_ui_build_render_commands(const reach_ui_state *state, const r
         command.radius = 10.0f;
         reach_render_command_buffer_push(buffer, &command);
 
-        if (reach_ui_state_should_show_search_placeholder(state)) {
-            command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect = layout->launcher.search_results;
-            command.color.r = 0.10f;
-            command.color.g = 0.10f;
-            command.color.b = 0.11f;
-            command.color.a = 0.96f;
-            command.radius = 8.0f;
-            reach_render_command_buffer_push(buffer, &command);
-
-            command.type = REACH_RENDER_COMMAND_TEXT;
-            command.rect = layout->launcher.search_results;
-            command.color.r = 1.0f;
-            command.color.g = 1.0f;
-            command.color.b = 1.0f;
-            command.color.a = 0.72f;
-            reach_copy_text(command.text, 260, (const uint16_t *)L"waiting for api implementation");
-            reach_render_command_buffer_push(buffer, &command);
-        } else if (reach_ui_state_should_show_pinned_apps(state)) {
-            for (size_t index = 0; index < layout->launcher.pinned_app_slot_count; ++index) {
-                command.type = REACH_RENDER_COMMAND_ICON;
-                command.rect = layout->launcher.pinned_app_slots[index];
-                command.color.r = 1.0f;
-                command.color.g = 1.0f;
-                command.color.b = 1.0f;
-                command.color.a = 1.0f;
-                reach_copy_text(command.text, 260, state->pinned_apps[index].icon_ref);
-                reach_render_command_buffer_push(buffer, &command);
-            }
-        }
+        command.type = REACH_RENDER_COMMAND_TEXT;
+        command.rect = layout->launcher.search_box;
+        command.color.r = 1.0f;
+        command.color.g = 1.0f;
+        command.color.b = 1.0f;
+        command.color.a = state->launcher.query_length > 0 ? 0.95f : 0.60f;
+        reach_copy_text(command.text, 260, state->launcher.query_length > 0 ? state->launcher.query : (const uint16_t *)L"Search");
+        reach_render_command_buffer_push(buffer, &command);
     }
 
     if (state->dock.visible) {

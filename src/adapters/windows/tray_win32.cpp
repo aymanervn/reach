@@ -26,6 +26,7 @@ struct reach_tray_provider {
     UINT taskbar_created_message;
     reach_tray_native_item items[REACH_MAX_TRAY_ITEMS];
     size_t item_count;
+    int32_t dirty;
 };
 
 static uint32_t reach_tray_read_u32(const BYTE *bytes, size_t count, size_t offset)
@@ -138,6 +139,7 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
     if (message == NIM_DELETE) {
         if (index != REACH_MAX_TRAY_ITEMS) {
             reach_tray_remove_item_at(provider, index);
+            provider->dirty = 1;
         }
         return REACH_OK;
     }
@@ -164,6 +166,7 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
     }
 
     reach_tray_apply_payload(&provider->items[index], bytes, count, message);
+    provider->dirty = 1;
     return REACH_OK;
 }
 
@@ -244,7 +247,13 @@ static reach_result reach_tray_refresh(reach_tray_provider *provider)
             ++index;
         }
     }
+    provider->dirty = 0;
     return REACH_OK;
+}
+
+static int32_t reach_tray_needs_refresh(const reach_tray_provider *provider)
+{
+    return provider != nullptr && provider->dirty;
 }
 
 static size_t reach_tray_item_count(const reach_tray_provider *provider)
@@ -348,6 +357,7 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
 
     out_port->provider = provider;
     out_port->ops.refresh = reach_tray_refresh;
+    out_port->ops.needs_refresh = reach_tray_needs_refresh;
     out_port->ops.item_count = reach_tray_item_count;
     out_port->ops.item_at = reach_tray_item_at;
     out_port->ops.activate = reach_tray_activate;

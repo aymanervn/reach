@@ -38,12 +38,12 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     out_layout->dock.tray_button.x = dock_x + dock_width - icon_size - gap;
     out_layout->dock.tray_button.y = top;
 
-    out_layout->launcher.bounds = input->monitor_bounds;
     out_layout->launcher.search_box.width = reach_scale(640.0f, scale);
     out_layout->launcher.search_box.height = reach_scale(52.0f, scale);
     out_layout->launcher.search_box.x = input->monitor_bounds.x + (input->monitor_bounds.width - out_layout->launcher.search_box.width) * 0.5f;
-    out_layout->launcher.search_box.y = input->monitor_bounds.y + input->monitor_bounds.height * 0.30f;
-    out_layout->launcher.pinned_app_slot_count = state->pinned_app_count;
+    out_layout->launcher.search_box.y = input->monitor_bounds.y + (input->monitor_bounds.height - out_layout->launcher.search_box.height) * 0.5f;
+    out_layout->launcher.bounds = out_layout->launcher.search_box;
+    out_layout->launcher.pinned_app_slot_count = 0;
 
     float launcher_icon = reach_scale(56.0f, scale);
     float launcher_gap = reach_scale(16.0f, scale);

@@ -28,6 +28,7 @@ typedef struct reach_tray_item {
 
 typedef struct reach_tray_provider_ops {
     reach_result (*refresh)(reach_tray_provider *provider);
+    int32_t (*needs_refresh)(const reach_tray_provider *provider);
     size_t (*item_count)(const reach_tray_provider *provider);
     reach_result (*item_at)(const reach_tray_provider *provider, size_t index, reach_tray_item *out_item);
     reach_result (*activate)(reach_tray_provider *provider, uint32_t item_id, reach_tray_action action);

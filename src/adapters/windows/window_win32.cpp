@@ -59,6 +59,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     reach_platform_window *window = reinterpret_cast<reach_platform_window *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
 
     switch (message) {
+    case WM_SETCURSOR:
+        SetCursor(LoadCursor(nullptr, IDC_ARROW));
+        return TRUE;
     case REACH_WM_WALLPAPER_CHANGED:
         if (window != nullptr && window->callback != nullptr) {
             reach_ui_event event = {};

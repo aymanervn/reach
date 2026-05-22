@@ -20,10 +20,67 @@ struct reach_window_manager {
     std::vector<reach_window_snapshot> windows;
     std::vector<HWND> window_order;
     std::vector<reach_window_snapshot> pending_windows;
+    std::vector<HWND> hidden_minimized_windows;
     int32_t dirty;
 };
 
 static reach_window_manager *g_window_manager;
+
+static int32_t reach_window_manager_contains_hwnd(const std::vector<HWND> &windows, HWND hwnd)
+{
+    for (HWND existing : windows) {
+        if (existing == hwnd) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void reach_window_manager_remove_hwnd(std::vector<HWND> &windows, HWND hwnd)
+{
+    for (size_t index = 0; index < windows.size();) {
+        if (windows[index] == hwnd) {
+            windows.erase(windows.begin() + index);
+        } else {
+            ++index;
+        }
+    }
+}
+
+static void reach_window_manager_track_hidden_minimized(reach_window_manager *manager, HWND hwnd)
+{
+    if (manager == nullptr || hwnd == nullptr || !IsWindow(hwnd)) {
+        return;
+    }
+    if (!reach_window_manager_contains_hwnd(manager->hidden_minimized_windows, hwnd)) {
+        manager->hidden_minimized_windows.push_back(hwnd);
+    }
+}
+
+static void reach_window_manager_set_reach_minimize_position(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return;
+    }
+
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info = {};
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(monitor, &info)) {
+        return;
+    }
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+    if (!GetWindowPlacement(hwnd, &placement)) {
+        return;
+    }
+
+    placement.ptMinPosition.x = info.rcWork.left + (info.rcWork.right - info.rcWork.left) / 2;
+    placement.ptMinPosition.y = info.rcWork.bottom - 24;
+    placement.flags |= WPF_SETMINPOSITION;
+    (void)SetWindowPlacement(hwnd, &placement);
+}
 
 static void CALLBACK reach_window_manager_event_proc(
     HWINEVENTHOOK hook,
@@ -47,6 +104,17 @@ static void CALLBACK reach_window_manager_event_proc(
     if (event != EVENT_SYSTEM_FOREGROUND && event != EVENT_OBJECT_DESTROY) {
         if (window == nullptr || !IsWindow(window) || GetAncestor(window, GA_ROOT) != window) {
             return;
+        }
+    }
+    if (event == EVENT_SYSTEM_MINIMIZESTART) {
+        reach_window_manager_set_reach_minimize_position(window);
+        if (g_window_manager != nullptr) {
+            reach_window_manager_track_hidden_minimized(g_window_manager, window);
+        }
+        ShowWindowAsync(window, SW_HIDE);
+    } else if (event == EVENT_SYSTEM_MINIMIZEEND || event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_DESTROY) {
+        if (g_window_manager != nullptr) {
+            reach_window_manager_remove_hwnd(g_window_manager->hidden_minimized_windows, window);
         }
     }
 
@@ -143,12 +211,7 @@ static int32_t reach_window_manager_is_desktop_surface_window(HWND hwnd)
 
 static int32_t reach_window_manager_contains(const std::vector<HWND> &windows, HWND hwnd)
 {
-    for (HWND existing : windows) {
-        if (existing == hwnd) {
-            return 1;
-        }
-    }
-    return 0;
+    return reach_window_manager_contains_hwnd(windows, hwnd);
 }
 
 static int32_t reach_window_manager_query_process_path(HWND hwnd, uint16_t *out_path, size_t out_path_count)
@@ -176,12 +239,9 @@ static int32_t reach_window_manager_query_process_path(HWND hwnd, uint16_t *out_
     return reach_copy_utf16(out_path, out_path_count, reinterpret_cast<const uint16_t *>(path)) == REACH_OK;
 }
 
-static int32_t reach_window_manager_is_app_window(HWND hwnd)
+static int32_t reach_window_manager_is_app_candidate(HWND hwnd)
 {
     if (hwnd == nullptr || !IsWindow(hwnd) || reach_window_manager_is_reach_window(hwnd)) {
-        return 0;
-    }
-    if (!IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
         return 0;
     }
     if (GetWindow(hwnd, GW_OWNER) != nullptr) {
@@ -189,6 +249,17 @@ static int32_t reach_window_manager_is_app_window(HWND hwnd)
     }
     LONG_PTR ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
     if ((ex_style & WS_EX_TOOLWINDOW) != 0) {
+        return 0;
+    }
+    return 1;
+}
+
+static int32_t reach_window_manager_is_app_window(HWND hwnd)
+{
+    if (!reach_window_manager_is_app_candidate(hwnd)) {
+        return 0;
+    }
+    if (!IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
         return 0;
     }
     return 1;
@@ -267,18 +338,17 @@ static int32_t reach_window_manager_any_visible_maximized_on_primary(void)
     return 0;
 }
 
-static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM param)
+static int32_t reach_window_manager_build_snapshot(HWND hwnd, int32_t force_hidden_minimized, reach_window_snapshot *out_snapshot)
 {
-    reach_window_manager *manager = reinterpret_cast<reach_window_manager *>(param);
-    if (manager == nullptr || !reach_window_manager_is_app_window(hwnd)) {
-        return TRUE;
+    if (out_snapshot == nullptr || hwnd == nullptr || !IsWindow(hwnd)) {
+        return 0;
     }
 
     reach_window_snapshot snapshot = {};
     snapshot.id = reinterpret_cast<uintptr_t>(hwnd);
     snapshot.visible = IsWindowVisible(hwnd) ? 1 : 0;
     snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
-    snapshot.minimized = IsIconic(hwnd) ? 1 : 0;
+    snapshot.minimized = force_hidden_minimized ? 1 : (IsIconic(hwnd) ? 1 : 0);
     RECT rect = {};
     WINDOWPLACEMENT placement = {};
     placement.length = sizeof(placement);
@@ -293,10 +363,28 @@ static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM pa
     GetWindowTextW(hwnd, title, 260);
     (void)reach_copy_utf16(snapshot.title, 260, reinterpret_cast<const uint16_t *>(title));
     if (!reach_window_manager_query_process_path(hwnd, snapshot.path, 260)) {
+        return 0;
+    }
+
+    *out_snapshot = snapshot;
+    return 1;
+}
+
+static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd, LPARAM param)
+{
+    reach_window_manager *manager = reinterpret_cast<reach_window_manager *>(param);
+    if (manager == nullptr || !reach_window_manager_is_app_window(hwnd)) {
         return TRUE;
     }
 
-    manager->pending_windows.push_back(snapshot);
+    reach_window_snapshot snapshot = {};
+    if (reach_window_manager_build_snapshot(hwnd, 0, &snapshot)) {
+        if (snapshot.minimized) {
+            reach_window_manager_track_hidden_minimized(manager, hwnd);
+            ShowWindowAsync(hwnd, SW_HIDE);
+        }
+        manager->pending_windows.push_back(snapshot);
+    }
     return TRUE;
 }
 
@@ -320,6 +408,21 @@ static void reach_window_manager_refresh_windows(reach_window_manager *manager)
     }
     manager->pending_windows.clear();
     EnumWindows(reach_window_manager_enum_windows_proc, reinterpret_cast<LPARAM>(manager));
+
+    for (size_t index = 0; index < manager->hidden_minimized_windows.size();) {
+        HWND hwnd = manager->hidden_minimized_windows[index];
+        if (hwnd == nullptr || !IsWindow(hwnd) || !reach_window_manager_is_app_candidate(hwnd)) {
+            manager->hidden_minimized_windows.erase(manager->hidden_minimized_windows.begin() + index);
+            continue;
+        }
+        if (!reach_window_manager_find_pending(manager->pending_windows, hwnd)) {
+            reach_window_snapshot snapshot = {};
+            if (reach_window_manager_build_snapshot(hwnd, 1, &snapshot)) {
+                manager->pending_windows.push_back(snapshot);
+            }
+        }
+        ++index;
+    }
 
     for (size_t index = 0; index < manager->window_order.size();) {
         if (reach_window_manager_find_pending(manager->pending_windows, manager->window_order[index]) == nullptr) {
@@ -544,7 +647,12 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     if (!IsWindow(hwnd)) {
         return REACH_INVALID_ARGUMENT;
     }
-    if (IsIconic(hwnd)) {
+    int32_t hidden_minimized = reach_window_manager_contains_hwnd(manager->hidden_minimized_windows, hwnd);
+    if (hidden_minimized) {
+        reach_window_manager_remove_hwnd(manager->hidden_minimized_windows, hwnd);
+        ShowWindowAsync(hwnd, SW_SHOW);
+        ShowWindowAsync(hwnd, SW_RESTORE);
+    } else if (IsIconic(hwnd)) {
         WINDOWPLACEMENT placement = {};
         placement.length = sizeof(placement);
         int32_t was_maximized = GetWindowPlacement(hwnd, &placement) &&
@@ -602,7 +710,14 @@ static void reach_window_manager_preserve_restore_placement(HWND hwnd)
     } else {
         placement.showCmd = SW_SHOWMAXIMIZED;
     }
-    placement.flags &= ~WPF_SETMINPOSITION;
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info = {};
+    info.cbSize = sizeof(info);
+    if (GetMonitorInfoW(monitor, &info)) {
+        placement.ptMinPosition.x = info.rcWork.left + (info.rcWork.right - info.rcWork.left) / 2;
+        placement.ptMinPosition.y = info.rcWork.bottom - 24;
+        placement.flags |= WPF_SETMINPOSITION;
+    }
     (void)SetWindowPlacement(hwnd, &placement);
 }
 
@@ -618,6 +733,8 @@ static reach_result reach_window_manager_minimize(reach_window_manager *manager,
 
     reach_window_manager_preserve_restore_placement(hwnd);
     ShowWindowAsync(hwnd, SW_MINIMIZE);
+    reach_window_manager_track_hidden_minimized(manager, hwnd);
+    ShowWindowAsync(hwnd, SW_HIDE);
     manager->foreground = GetForegroundWindow();
     return reach_window_manager_refresh(manager);
 }

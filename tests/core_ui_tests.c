@@ -43,7 +43,10 @@ int main(void)
     reach_ui_layout layout = {0};
     failed += expect(reach_ui_layout_compute(&state, &input, &layout) == REACH_OK);
     failed += expect(layout.dock.bounds.y > 900.0f);
-    failed += expect(layout.launcher.search_box.y == 324.0f);
+    failed += expect(layout.launcher.search_box.y == 514.0f);
+    failed += expect(layout.launcher.bounds.width == layout.launcher.search_box.width);
+    failed += expect(layout.launcher.bounds.height == layout.launcher.search_box.height);
+    failed += expect(layout.launcher.pinned_app_slot_count == 0);
 
     reach_render_command_buffer buffer = {0};
     failed += expect(reach_ui_build_render_commands(&state, &layout, &buffer) == REACH_OK);
