@@ -5,8 +5,10 @@
 #include <stdint.h>
 
 #include "reach/core/ui_state.h"
+#include "reach/core/render_commands.h"
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/window_manager.h"
+#include "reach/theme.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,6 +91,24 @@ reach_icon_handle reach_dock_icon_for_item(
     const reach_dock_feature_model *model,
     size_t item_index,
     uint16_t *out_fallback_initial);
+
+typedef struct reach_dock_render_input {
+    const reach_theme *theme;
+    const reach_dock_layout *layout;
+    const reach_dock_feature_model *model;
+    const reach_dock_icon_cache *icons;
+    const float *item_box_x;
+    size_t item_box_x_count;
+    uintptr_t focused_window;
+    size_t dragged_render_index;
+    float dragged_box_x;
+    size_t click_feedback_index;
+    float click_feedback_opacity;
+    size_t tray_feedback_index;
+    int32_t text_alignment_center;
+} reach_dock_render_input;
+
+reach_result reach_dock_build_render_commands(const reach_dock_render_input *input, reach_render_command_buffer *out_commands);
 
 #ifdef __cplusplus
 }
