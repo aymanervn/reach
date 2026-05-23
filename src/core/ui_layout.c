@@ -57,8 +57,10 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     out_layout->launcher.search_box.height = reach_scale(52.0f, scale);
     out_layout->launcher.search_box.x = input->monitor_bounds.x + (input->monitor_bounds.width - out_layout->launcher.search_box.width) * 0.5f;
     out_layout->launcher.search_box.y = input->monitor_bounds.y + (input->monitor_bounds.height - out_layout->launcher.search_box.height) * 0.5f;
-    out_layout->launcher.bounds = out_layout->launcher.search_box;
-    out_layout->launcher.pinned_app_slot_count = 0;
+    out_layout->launcher.pinned_app_slot_count =
+        state->launcher.open && state->launcher.query_length == 0
+            ? state->pinned_app_count
+            : 0;
 
     float launcher_icon = reach_scale(56.0f, scale);
     float launcher_gap = reach_scale(16.0f, scale);
@@ -76,5 +78,19 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     out_layout->launcher.search_results.y = out_layout->launcher.search_box.y + out_layout->launcher.search_box.height + reach_scale(8.0f, scale);
     out_layout->launcher.search_results.width = out_layout->launcher.search_box.width;
     out_layout->launcher.search_results.height = reach_scale(120.0f, scale);
+    out_layout->launcher.bounds = out_layout->launcher.search_box;
+    if (out_layout->launcher.pinned_app_slot_count > 0) {
+        float launcher_left = apps_x < out_layout->launcher.search_box.x ? apps_x : out_layout->launcher.search_box.x;
+        float launcher_right = apps_x + total_width;
+        float search_right = out_layout->launcher.search_box.x + out_layout->launcher.search_box.width;
+        if (search_right > launcher_right) {
+            launcher_right = search_right;
+        }
+        float launcher_bottom = apps_y + launcher_icon;
+        out_layout->launcher.bounds.x = launcher_left;
+        out_layout->launcher.bounds.width = launcher_right - launcher_left;
+        out_layout->launcher.bounds.y = out_layout->launcher.search_box.y;
+        out_layout->launcher.bounds.height = launcher_bottom - out_layout->launcher.bounds.y;
+    }
     return REACH_OK;
 }

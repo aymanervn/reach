@@ -238,6 +238,7 @@ static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = WS_EX_TOOLWINDOW;
     if (role == REACH_SURFACE_DOCK ||
+        role == REACH_SURFACE_LAUNCHER ||
         role == REACH_SURFACE_TRAY_MENU ||
         role == REACH_SURFACE_SWITCHER ||
         role == REACH_SURFACE_CONTEXT_MENU) {
@@ -330,6 +331,7 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
         edges look different from the dock.
     */
     if (window->role == REACH_SURFACE_DOCK ||
+        window->role == REACH_SURFACE_LAUNCHER ||
         window->role == REACH_SURFACE_TRAY_MENU ||
         window->role == REACH_SURFACE_SWITCHER ||
         window->role == REACH_SURFACE_CONTEXT_MENU) {
@@ -371,6 +373,7 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
         return REACH_INVALID_ARGUMENT;
     }
     if (window->role == REACH_SURFACE_DOCK ||
+        window->role == REACH_SURFACE_LAUNCHER ||
         window->role == REACH_SURFACE_TRAY_MENU ||
         window->role == REACH_SURFACE_SWITCHER ||
         window->role == REACH_SURFACE_CONTEXT_MENU) {

@@ -7,6 +7,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/core/theme.h"
+#include "reach/features/popup.h"
 
 #ifdef __cplusplus
 extern "C" {

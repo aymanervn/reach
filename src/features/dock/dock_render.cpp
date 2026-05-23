@@ -299,7 +299,7 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
         command.color.g = 0.0f;
         command.color.b = 0.0f;
         command.color.a = input->click_feedback_opacity;
-        command.radius = icon_box_radius;
+        command.radius = 100.0f;
         reach_render_command_buffer_push(out_commands, &command);
     }
 

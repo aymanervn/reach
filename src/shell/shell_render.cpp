@@ -165,6 +165,7 @@ reach_result reach_shell_render_launcher_surface(reach_shell *shell, const reach
     }
 
     reach_launcher_render_input input = {};
+    input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
     input.state = &shell->ui;
     input.layout = layout;
     input.text_alignment_leading = DWRITE_TEXT_ALIGNMENT_LEADING;

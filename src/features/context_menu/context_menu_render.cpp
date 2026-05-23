@@ -19,59 +19,24 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     reach_render_command_buffer_clear(out_commands);
     reach_render_command command = {};
     float width = input->bounds.width;
-    float height = input->bounds.height;
-    float radius = 14.0f;
-    float notch_width = 18.0f;
-    float notch_height = 8.0f;
     float notch_center = width * 0.30f;
-    reach_color context_border = input->theme->dock_border;
-    context_border.a = 1.0f;
     if (input->use_anchor_x) {
         notch_center = input->anchor_x - input->bounds.x;
-        if (notch_center < radius + notch_width) {
-            notch_center = radius + notch_width;
-        }
-        if (notch_center > width - radius - notch_width) {
-            notch_center = width - radius - notch_width;
-        }
     } else if (input->has_layout &&
         input->dock_layout != nullptr &&
         input->target_index < input->dock_layout->app_slot_count) {
         reach_rect_f32 slot = input->dock_layout->app_slots[input->target_index];
         notch_center = slot.x + slot.width * 0.5f - input->bounds.x;
-        if (notch_center < radius + notch_width) {
-            notch_center = radius + notch_width;
-        }
-        if (notch_center > width - radius - notch_width) {
-            notch_center = width - radius - notch_width;
-        }
     }
 
-    command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
-    command.rect.x = 0.5f;
-    command.rect.y = 0.5f;
-    command.rect.width = width - 1.0f;
-    command.rect.height = height - 1.0f;
-    command.color = reach_context_menu_rgb(32, 30, 28, 0.96f);
-    command.radius = radius;
-    command.notch_center_x = notch_center;
-    command.notch_width = notch_width;
-    command.notch_height = notch_height;
-    reach_render_command_buffer_push(out_commands, &command);
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
-    command.rect.x = 0.5f;
-    command.rect.y = 0.5f;
-    command.rect.width = width - 1.0f;
-    command.rect.height = height - 1.0f;
-    command.color = context_border;
-    command.radius = radius;
-    command.stroke_width = 1.0f;
-    command.notch_center_x = notch_center;
-    command.notch_width = notch_width;
-    command.notch_height = notch_height;
-    reach_render_command_buffer_push(out_commands, &command);
+    reach_popup_background_input popup = {};
+    popup.theme = input->theme;
+    popup.bounds = input->bounds;
+    popup.notch_center_x = notch_center;
+    reach_result popup_result = reach_popup_push_background(&popup, out_commands);
+    if (popup_result != REACH_OK) {
+        return popup_result;
+    }
 
     for (size_t index = 0; index < input->item_count; ++index) {
         reach_rect_f32 item = input->item_slots[index];

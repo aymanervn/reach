@@ -45,6 +45,8 @@ void reach_shell_raise_launcher(reach_shell *shell)
     HWND launcher_hwnd = (HWND)shell->launcher.window.ops.native_handle(shell->launcher.window.window);
     if (launcher_hwnd != nullptr) {
         SetWindowPos(launcher_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        SetForegroundWindow(launcher_hwnd);
+        SetFocus(launcher_hwnd);
     }
 }
 
@@ -161,6 +163,11 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
         (float)point.x <= shell->context_menu_bounds.x + shell->context_menu_bounds.width &&
         (float)point.y >= shell->context_menu_bounds.y &&
         (float)point.y <= shell->context_menu_bounds.y + shell->context_menu_bounds.height;
+    int32_t on_launcher = shell->ui.launcher.open &&
+        (float)point.x >= shell->layout.launcher.bounds.x &&
+        (float)point.x <= shell->layout.launcher.bounds.x + shell->layout.launcher.bounds.width &&
+        (float)point.y >= shell->layout.launcher.bounds.y &&
+        (float)point.y <= shell->layout.launcher.bounds.y + shell->layout.launcher.bounds.height;
     reach_dock_hit_result dock_hit = shell->has_layout ? reach_dock_hit_test(&shell->layout.dock, point.x, point.y) : reach_dock_hit_result {};
     int32_t on_tray_button = shell->tray_popup_open && dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON;
     int32_t on_power_button = shell->context_menu_open && shell->context_menu_power_open && dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON;
@@ -172,6 +179,11 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
         reach_shell_close_context_menu(shell);
         reach_shell_clear_sticky_dock_feedback(shell);
     }
+    if (shell->ui.launcher.open && !on_launcher) {
+        (void)reach_ui_state_close_launcher(&shell->ui);
+        shell->layout_dirty = 1;
+        shell->launcher.dirty_flags = 1;
+    }
 }
 
 void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
@@ -180,7 +192,7 @@ void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
         return;
     }
 
-    int32_t should_hook = shell->tray_popup_open || shell->context_menu_open;
+    int32_t should_hook = shell->tray_popup_open || shell->context_menu_open || shell->ui.launcher.open;
     (void)shell->popup_capture.sync_mouse_hook(
         shell->popup_capture.userdata,
         should_hook,
@@ -314,6 +326,23 @@ static void reach_shell_press_tray_button(reach_shell *shell)
     shell->dock_click_feedback_pressed = 1;
     shell->dock_click_feedback_sticky = 0;
     reach_shell_start_dock_click_feedback(shell, REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON, 0.50f);
+}
+
+static void reach_shell_close_launcher(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->ui.launcher.open) {
+        return;
+    }
+
+    (void)reach_ui_state_close_launcher(&shell->ui);
+    shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
+    shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
+    shell->layout_dirty = 1;
+    shell->launcher.dirty_flags = 1;
+    reach_shell_sync_popup_mouse_hook(shell);
+    if (shell->launcher.window.ops.hide != nullptr) {
+        (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
+    }
 }
 
 static void reach_shell_press_power_button(reach_shell *shell)
@@ -710,7 +739,7 @@ static reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     float popup_width = 176.0f;
     float item_height = 34.0f;
     float padding = 8.0f;
-    float notch_height = 8.0f;
+    float notch_height = reach_popup_notch_height();
     float popup_body_height = padding * 2.0f + item_height * (float)shell->context_menu_item_count;
     float popup_height = popup_body_height + notch_height;
     float anchor_x = shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
@@ -778,7 +807,7 @@ static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, s
     float popup_width = 208.0f;
     float item_height = 34.0f;
     float padding = 8.0f;
-    float notch_height = 8.0f;
+    float notch_height = reach_popup_notch_height();
     float anchor_ratio = 0.30f;
     float popup_body_height = padding * 2.0f + item_height * (float)shell->context_menu_item_count;
     float popup_height = popup_body_height + notch_height;
@@ -919,10 +948,12 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         uint32_t pin_id = shell->dock_drag_pin_id;
         int32_t dragged_pinned = shell->dock_drag_pinned;
         int32_t moved = shell->dock_drag_moved;
+        size_t pressed_dock_index = shell->pressed_dock_index;
         size_t target_pinned_index = dragged_pinned ? reach_shell_pinned_order_index(shell, pin_id) : REACH_MAX_PINNED_APPS;
         size_t target_index = reach_shell_find_dock_item_key(shell, shell->dock_drag_pinned, shell->dock_drag_pin_id, shell->dock_drag_window);
         shell->dock_drag_active = 0;
         shell->dock_drag_moved = 0;
+        shell->pressed_dock_index = moved ? REACH_MAX_PINNED_APPS : pressed_dock_index;
         shell->dock.dirty_flags = 1;
         reach_shell_release_dock_item(shell);
         if (moved && target_index < shell->layout.dock.app_slot_count) {
@@ -957,20 +988,21 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     if (shell->ui.launcher.open) {
         reach_launcher_hit_result launcher_hit = reach_launcher_hit_test(&shell->ui, &shell->layout.launcher, event->x, event->y);
         reach_launcher_action launcher_action = reach_launcher_action_for_hit(&shell->ui, launcher_hit);
-        if (launcher_action.type == REACH_LAUNCHER_ACTION_LAUNCH_PINNED) {
+        int32_t launcher_pressed_match =
+            shell->pressed_launcher_hit_type == launcher_hit.type &&
+            shell->pressed_launcher_index == launcher_hit.index;
+        shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
+        shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
+        if (launcher_action.type == REACH_LAUNCHER_ACTION_LAUNCH_PINNED && launcher_pressed_match) {
             reach_ui_event routed = {};
             routed.type = REACH_UI_EVENT_DOCK_APP_CLICK;
             routed.id = launcher_action.pin_id;
             return reach_shell_handle_event(shell, &routed);
         }
-        if (launcher_action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT) {
+        if (launcher_action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT && launcher_pressed_match) {
             (void)reach_shell_open_launcher_result(shell);
-            (void)reach_ui_state_close_launcher(&shell->ui);
-            shell->layout_dirty = 1;
-            shell->launcher.dirty_flags = 1;
-            return shell->launcher.window.ops.hide != nullptr
-                ? shell->launcher.window.ops.hide(shell->launcher.window.window)
-                : REACH_OK;
+            reach_shell_close_launcher(shell);
+            return REACH_OK;
         }
     }
 
@@ -992,6 +1024,10 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     }
 
     if (dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON) {
+        if (shell->suppress_power_button_release) {
+            shell->suppress_power_button_release = 0;
+            return REACH_OK;
+        }
         if (shell->context_menu_open && shell->context_menu_power_open) {
             reach_shell_close_context_menu(shell);
             return REACH_OK;
@@ -1006,9 +1042,11 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         }
     }
 
-    if (dock_hit.type == REACH_DOCK_HIT_ITEM) {
+    if (dock_hit.type == REACH_DOCK_HIT_ITEM && shell->pressed_dock_index == dock_hit.index) {
+        shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
         return reach_shell_execute_dock_item_action(shell, reach_dock_item_action_for_index(&shell->dock_model, dock_hit.index));
     }
+    shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
 
     return REACH_OK;
 }
@@ -1022,6 +1060,13 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     reach_shell_clear_sticky_dock_feedback(shell);
 
     if (shell->context_menu_open) {
+        reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+        if (shell->context_menu_power_open && dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON) {
+            reach_shell_close_context_menu(shell);
+            reach_shell_clear_sticky_dock_feedback(shell);
+            shell->suppress_power_button_release = 1;
+            return REACH_OK;
+        }
         if (!reach_rect_contains(shell->context_menu_bounds, event->x, event->y)) {
             reach_shell_close_context_menu(shell);
         } else {
@@ -1030,7 +1075,22 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         return REACH_OK;
     }
 
+    if (shell->ui.launcher.open) {
+        reach_launcher_hit_result launcher_hit = reach_launcher_hit_test(&shell->ui, &shell->layout.launcher, event->x, event->y);
+        if (launcher_hit.type == REACH_LAUNCHER_HIT_NONE &&
+            !reach_rect_contains(shell->layout.launcher.bounds, event->x, event->y)) {
+            reach_shell_close_launcher(shell);
+            return REACH_OK;
+        }
+        shell->pressed_launcher_hit_type = launcher_hit.type;
+        shell->pressed_launcher_index = launcher_hit.index;
+        return REACH_OK;
+    }
+
     reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+    if (shell->suppress_power_button_release && dock_hit.type != REACH_DOCK_HIT_POWER_BUTTON) {
+        shell->suppress_power_button_release = 0;
+    }
     if (dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON) {
         reach_shell_press_tray_button(shell);
         return REACH_OK;
@@ -1055,6 +1115,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
 
     if (dock_hit.type == REACH_DOCK_HIT_ITEM) {
         size_t index = dock_hit.index;
+        shell->pressed_dock_index = index;
         reach_shell_press_dock_item(shell, index);
         if (index < shell->dock_model.item_count) {
             shell->dock_drag_active = 1;
@@ -1079,6 +1140,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     }
 
     reach_shell_release_tray_item(shell);
+    shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
     return REACH_OK;
 }
 
@@ -1143,18 +1205,6 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         }
     }
 
-    // size_t hovered = REACH_MAX_PINNED_APPS;
-    // for (size_t index = 0; index < shell->layout.dock.app_slot_count; ++index) {
-    //     if (reach_rect_contains(shell->layout.dock.app_slots[index], event->x, event->y)) {
-    //         hovered = index;
-    //         break;
-    //     }
-    // }
-
-    // if (shell->hovered_dock_index != hovered) {
-    //     shell->hovered_dock_index = hovered;
-    //     shell->dock.dirty_flags = 1;
-    // }
     return REACH_OK;
 }
 
@@ -1176,10 +1226,7 @@ static reach_result reach_shell_handle_pointer_middle(reach_shell *shell, const 
 
 static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
 {
-    // if (shell != nullptr && shell->hovered_dock_index != REACH_MAX_PINNED_APPS) {
-    //     shell->hovered_dock_index = REACH_MAX_PINNED_APPS;
-    //     shell->dock.dirty_flags = 1;
-    // }
+    (void)shell;
     return REACH_OK;
 }
 
@@ -1314,6 +1361,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         reach_shell_close_context_menu(shell);
         return REACH_OK;
     }
+    int32_t launcher_was_open = shell->ui.launcher.open;
     if (event->type == REACH_UI_EVENT_POINTER_UP) {
         return reach_shell_handle_pointer_up(shell, event);
     }
@@ -1350,6 +1398,9 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
 
     reach_shell_mark_dirty_for_event(shell, event);
+    if (launcher_was_open != shell->ui.launcher.open) {
+        reach_shell_sync_popup_mouse_hook(shell);
+    }
 
     if (intent.type == REACH_UI_INTENT_OPEN_TRAY_MENU) {
         reach_shell_toggle_tray_popup(shell);

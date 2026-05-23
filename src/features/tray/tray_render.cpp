@@ -22,29 +22,14 @@ reach_result reach_tray_build_render_commands(const reach_tray_render_input *inp
     const reach_theme *theme = input->theme;
     reach_render_command command = {};
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, reach_theme_tray_slot_size(theme, input->dock_height));
-    float popup_stroke = theme->dock_border_thickness > 0.0f ? theme->dock_border_thickness : 1.0f;
-    float popup_inset = popup_stroke * 0.5f;
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect.x = popup_inset;
-    command.rect.y = popup_inset;
-    command.rect.width = input->bounds.width - popup_stroke;
-    command.rect.height = input->bounds.height - popup_stroke;
-    command.color = theme->tray_popup_background;
-    command.radius = theme->tray_popup_corner_radius;
-    reach_render_command_buffer_push(out_commands, &command);
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect.x = popup_inset;
-    command.rect.y = popup_inset;
-    command.rect.width = input->bounds.width - popup_stroke;
-    command.rect.height = input->bounds.height - popup_stroke;
-    command.color = theme->dock_border;
-    command.radius = theme->tray_popup_corner_radius;
-    command.stroke_width = popup_stroke;
-    reach_render_command_buffer_push(out_commands, &command);
+    reach_popup_background_input popup = {};
+    popup.theme = theme;
+    popup.bounds = input->bounds;
+    popup.notch_center_x = input->bounds.width * 0.5f;
+    reach_result popup_result = reach_popup_push_background(&popup, out_commands);
+    if (popup_result != REACH_OK) {
+        return popup_result;
+    }
 
     for (size_t index = 0; index < input->model->item_count; ++index) {
         reach_rect_f32 slot = input->model->item_slots[index];

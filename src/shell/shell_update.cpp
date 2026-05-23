@@ -848,6 +848,13 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             reach_render_command_buffer commands = {};
             if (reach_ui_layout_compute(&shell->ui, &input, &layout) == REACH_OK &&
                 reach_ui_build_render_commands(&shell->ui, &layout, &commands) == REACH_OK) {
+                if (shell->dock_items_changed) {
+                    reach_shell_rebuild_dock_items_with_animations(shell, &layout.dock);
+                    shell->dock_items_changed = 0;
+                } else {
+                    reach_shell_build_dock_items(shell, &layout.dock);
+                }
+                reach_shell_apply_dock_width_animation(shell, &layout.dock, delta_seconds);
                 reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
                 reach_rect_f32 animated_dock_bounds = reach_shell_apply_dock_animation(shell, shown_dock_bounds, bounds, delta_seconds);
                 float dock_y_offset = animated_dock_bounds.y - shown_dock_bounds.y;
@@ -859,13 +866,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 layout.dock.system_separator.y += dock_y_offset;
                 layout.dock.clock.y += dock_y_offset;
                 layout.dock.power_button.y += dock_y_offset;
-                if (shell->dock_items_changed) {
-                    reach_shell_rebuild_dock_items_with_animations(shell, &layout.dock);
-                    shell->dock_items_changed = 0;
-                } else {
-                    reach_shell_build_dock_items(shell, &layout.dock);
-                }
-                reach_shell_apply_dock_width_animation(shell, &layout.dock, delta_seconds);
                 float dock_left_offset = bounds.x - layout.dock.bounds.x;
                 float dock_right_offset = bounds.x + bounds.width - (layout.dock.bounds.x + layout.dock.bounds.width);
                 float dock_x_offset = 0.0f;
@@ -926,7 +926,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     }
                 }
                 if (shell->tray.window.ops.set_bounds != nullptr) {
-                    const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
                     reach_rect_f32 tray_bounds = {};
                     reach_shell_compute_tray_popup_layout(shell, &layout.dock, &tray_bounds, shell->tray_model.item_slots);
                     int32_t tray_window_changed = 0;
@@ -943,7 +942,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         return result;
                     }
                     if (tray_window_changed && shell->tray.window.ops.apply_rounded_corners != nullptr) {
-                        (void)shell->tray.window.ops.apply_rounded_corners(shell->tray.window.window, theme->tray_popup_corner_radius);
+                        (void)shell->tray.window.ops.apply_rounded_corners(shell->tray.window.window, reach_popup_radius());
                     }
                     if (shell->tray_popup_open) {
                         if (shell->tray.window.ops.show != nullptr) {
@@ -1000,7 +999,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         return result;
                     }
                     if (context_window_changed && shell->context_menu.window.ops.apply_rounded_corners != nullptr) {
-                        (void)shell->context_menu.window.ops.apply_rounded_corners(shell->context_menu.window.window, 14.0f);
+                        (void)shell->context_menu.window.ops.apply_rounded_corners(shell->context_menu.window.window, reach_popup_radius());
                     }
                     if (shell->context_menu_open) {
                         if (shell->context_menu.window.ops.show != nullptr) {

@@ -11,7 +11,7 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
     }
     if (result == REACH_OK) {
         void *native_window = dependencies.launcher_window.ops.native_handle(dependencies.launcher_window.window);
-        result = reach_windows_create_d2d_render_backend(native_window, &dependencies.launcher_renderer);
+        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.launcher_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_DOCK, &dependencies.dock_window);
@@ -68,6 +68,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
     }
     if (result == REACH_OK) {
         result = reach_windows_create_wallpaper_service(&dependencies.wallpaper_service);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_popup_capture(&dependencies.popup_capture);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_power_session(&dependencies.power_session);
@@ -136,6 +139,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         if (dependencies.power_session.ops.destroy != nullptr) {
             dependencies.power_session.ops.destroy(dependencies.power_session.session);
         }
+        if (dependencies.popup_capture.destroy != nullptr) {
+            dependencies.popup_capture.destroy(dependencies.popup_capture.userdata);
+        }
         return result;
     }
 
@@ -203,6 +209,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         }
         if (dependencies.power_session.ops.destroy != nullptr) {
             dependencies.power_session.ops.destroy(dependencies.power_session.session);
+        }
+        if (dependencies.popup_capture.destroy != nullptr) {
+            dependencies.popup_capture.destroy(dependencies.popup_capture.userdata);
         }
     }
     return result;

@@ -34,9 +34,6 @@ typedef struct reach_theme {
     float icon_backplate_scale;
     float icon_box_corner_radius_ratio;
     float icon_box_corner_radius_max;
-    float tray_popup_width;
-    float tray_popup_height;
-    float tray_popup_corner_radius;
     float tray_slot_size_ratio;
     float dock_power_button_corner_radius;
     float dock_system_separator_width;

@@ -132,6 +132,9 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->tray_click_feedback_opacity = {};
     shell->dock_drag_source_index = REACH_MAX_PINNED_APPS;
     shell->dock_drag_target_index = REACH_MAX_PINNED_APPS;
+    shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
+    shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
+    shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_target_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_hovered_index = REACH_MAX_PINNED_APPS;
 
@@ -191,7 +194,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
-    shell->hovered_dock_index = REACH_MAX_PINNED_APPS;
     *out_shell = shell;
     return REACH_OK;
 }

@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 typedef struct reach_launcher_render_input {
+    const reach_theme *theme;
     const reach_ui_state *state;
     const reach_launcher_layout *layout;
     int32_t text_alignment_leading;

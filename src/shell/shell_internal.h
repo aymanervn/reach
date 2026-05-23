@@ -55,7 +55,6 @@ struct reach_shell {
     int32_t has_layout;
     int32_t layout_dirty;
     int32_t render_dirty;
-    size_t hovered_dock_index;
     int32_t dock_animation_initialized;
     int32_t dock_animating;
     int32_t dock_target_hidden;
@@ -86,6 +85,10 @@ struct reach_shell {
     float dock_drag_x;
     int32_t dock_drag_snapping;
     int32_t dock_reload_pins_after_snap;
+    size_t pressed_dock_index;
+    reach_launcher_hit_type pressed_launcher_hit_type;
+    size_t pressed_launcher_index;
+    int32_t suppress_power_button_release;
     reach_float_animation dock_drag_snap_animation;
     reach_float_animation dock_y_animation;
     double window_manager_refresh_elapsed;
