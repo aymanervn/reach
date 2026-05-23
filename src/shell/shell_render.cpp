@@ -3,21 +3,6 @@
 #include <dwrite.h>
 #include <shlwapi.h>
 
-static size_t reach_shell_min_size(size_t a, size_t b)
-{
-    return a < b ? a : b;
-}
-
-static reach_color reach_shell_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
-{
-    reach_color color = {};
-    color.r = (float)r / 255.0f;
-    color.g = (float)g / 255.0f;
-    color.b = (float)b / 255.0f;
-    color.a = a;
-    return color;
-}
-
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout)
 {
     REACH_ASSERT(shell != nullptr);
@@ -98,67 +83,25 @@ reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 
     (void)shell->tray.renderer.ops.execute(shell->tray.renderer.backend, &commands);
     return shell->tray.renderer.ops.end_frame(shell->tray.renderer.backend);
 }
-static reach_rect_f32 reach_shell_switcher_bounds(reach_rect_f32 monitor_bounds)
-{
-    reach_rect_f32 bounds = {};
-    bounds.width = monitor_bounds.width < 320.0f ? monitor_bounds.width : 320.0f;
-    bounds.height = 168.0f;
-    bounds.x = monitor_bounds.x + (monitor_bounds.width - bounds.width) * 0.5f;
-    bounds.y = monitor_bounds.y + monitor_bounds.height * 0.20f;
-    return bounds;
-}
-
 size_t reach_shell_switcher_visible_count(const reach_shell *shell)
 {
     if (shell == nullptr) {
         return 0;
     }
-    return reach_shell_min_size(shell->open_window_count, REACH_SHELL_SWITCHER_VISIBLE_MAX);
-}
-
-reach_rect_f32 reach_shell_switcher_bounds_for_count(reach_rect_f32 monitor_bounds, size_t visible_count)
-{
-    float padding = 24.0f;
-    float item_size = 112.0f;
-    float gap = 14.0f;
-    reach_rect_f32 bounds = {};
-    size_t count = visible_count > 0 ? visible_count : 1;
-    bounds.width = padding * 2.0f + (float)count * item_size + (float)(count - 1) * gap;
-    float max_width = monitor_bounds.width - 48.0f;
-    if (bounds.width > max_width) {
-        bounds.width = max_width;
-    }
-    if (bounds.width < 280.0f) {
-        bounds.width = monitor_bounds.width < 280.0f ? monitor_bounds.width : 280.0f;
-    }
-    bounds.height = 184.0f;
-    bounds.x = monitor_bounds.x + (monitor_bounds.width - bounds.width) * 0.5f;
-    bounds.y = monitor_bounds.y + (monitor_bounds.height - bounds.height) * 0.5f;
-    return bounds;
+    return reach_switcher_visible_count(shell->open_window_count);
 }
 
 void reach_shell_update_switcher_visible_start(reach_shell *shell)
 {
-    if (shell == nullptr || shell->open_window_count == 0) {
-        if (shell != nullptr) {
-            shell->switcher_visible_start = 0;
-        }
+    if (shell == nullptr) {
         return;
     }
-    size_t visible_count = reach_shell_switcher_visible_count(shell);
-    if (visible_count == 0 || visible_count >= shell->open_window_count) {
-        shell->switcher_visible_start = 0;
-        return;
-    }
-    if (shell->switcher_selected_index < shell->switcher_visible_start) {
-        shell->switcher_visible_start = shell->switcher_selected_index;
-    } else if (shell->switcher_selected_index >= shell->switcher_visible_start + visible_count) {
-        shell->switcher_visible_start = shell->switcher_selected_index - visible_count + 1;
-    }
-    size_t max_start = shell->open_window_count - visible_count;
-    if (shell->switcher_visible_start > max_start) {
-        shell->switcher_visible_start = max_start;
-    }
+    reach_switcher_model model = {};
+    model.window_count = shell->open_window_count;
+    model.selected_index = shell->switcher_selected_index;
+    model.visible_start = shell->switcher_visible_start;
+    reach_switcher_update_visible_start(&model);
+    shell->switcher_visible_start = model.visible_start;
 }
 
 reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds)
@@ -167,139 +110,40 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
         return REACH_OK;
     }
 
-    reach_render_command_buffer commands = {};
-    reach_render_command command = {};
-    float radius = 20.0f;
-    float padding = 24.0f;
-    float item_size = 112.0f;
-    float icon_box_size = 88.0f;
-    float gap = 14.0f;
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
-    size_t visible_count = reach_shell_switcher_visible_count(shell);
     reach_shell_update_switcher_visible_start(shell);
+    reach_switcher_model model = {};
+    model.window_count = shell->open_window_count;
+    model.selected_index = shell->switcher_selected_index;
+    model.visible_start = shell->switcher_visible_start;
 
-    command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect.x = 0.5f;
-    command.rect.y = 0.5f;
-    command.rect.width = bounds.width - 1.0f;
-    command.rect.height = bounds.height - 1.0f;
-    command.color = theme->switcher_background;
-    command.radius = radius;
-    reach_render_command_buffer_push(&commands, &command);
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect.x = 0.5f;
-    command.rect.y = 0.5f;
-    command.rect.width = bounds.width - 1.0f;
-    command.rect.height = bounds.height - 1.0f;
-    command.color = shell->theme != nullptr ? shell->theme->dock_border : reach_theme_default()->dock_border;
-    command.radius = radius;
-    command.stroke_width = 1.0f;
-    reach_render_command_buffer_push(&commands, &command);
-
-    if (visible_count > 0) {
-        float total_width = (float)visible_count * item_size + (float)(visible_count - 1) * gap;
-        float x = (bounds.width - total_width) * 0.5f;
-        if (x < padding) {
-            x = padding;
+    reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
+    for (size_t index = 0; index < shell->open_window_count && index < REACH_MAX_PINNED_APPS; ++index) {
+        items[index].icon = shell->dock_icons.open_window_icons[index];
+        const wchar_t *path = reinterpret_cast<const wchar_t *>(shell->open_windows[index].path);
+        const wchar_t *name = PathFindFileNameW(path != nullptr ? path : L"");
+        // Strip .exe extension
+        wchar_t name_buf[260];
+        wcsncpy_s(name_buf, name, _TRUNCATE);
+        wchar_t *dot = wcsrchr(name_buf, L'.');
+        if (dot != nullptr) {
+            *dot = L'\0';
         }
-        float y = (bounds.height - item_size) * 0.5f;
-        for (size_t visible_index = 0; visible_index < visible_count; ++visible_index) {
-            size_t index = shell->switcher_visible_start + visible_index;
-            if (index >= shell->open_window_count) {
-                break;
-            }
-            reach_rect_f32 item = { x + (float)visible_index * (item_size + gap), y, item_size, item_size };
-            int32_t selected = index == shell->switcher_selected_index;
-            float box_x = item.x + (item.width - icon_box_size) * 0.5f;
-            float box_y = item.y + 4.0f;
-            reach_icon_handle icon = index < shell->open_window_count ? shell->dock_icons.open_window_icons[index] : reach_icon_handle {};
+        reach_copy_utf16(items[index].label, 260, reinterpret_cast<const uint16_t *>(name_buf[0] != L'\0' ? name_buf : L"App"));
+    }
 
-            if (selected) {
-                command = {};
-                command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = box_x - 5.0f;
-                command.rect.y = box_y - 5.0f;
-                command.rect.width = icon_box_size + 10.0f;
-                command.rect.height = icon_box_size + 10.0f;
-                command.color = reach_shell_rgb(255, 255, 255, 0.34f);
-                command.radius = icon_box_radius + 5.0f;
-                reach_render_command_buffer_push(&commands, &command);
-            }
-
-            if (icon.id != 0 && icon.wants_backplate) {
-                command = {};
-                command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = box_x;
-                command.rect.y = box_y;
-                command.rect.width = icon_box_size;
-                command.rect.height = icon_box_size;
-                command.color = theme->icon_backplate_background;
-                command.radius = icon_box_radius;
-                reach_render_command_buffer_push(&commands, &command);
-            }
-
-            command = {};
-            command.type = REACH_RENDER_COMMAND_ICON;
-            if (icon.id != 0 && icon.wants_backplate) {
-                float actual_icon_size = icon_box_size * theme->icon_backplate_scale;
-                command.rect.x = box_x + (icon_box_size - actual_icon_size) * 0.5f;
-                command.rect.y = box_y + (icon_box_size - actual_icon_size) * 0.5f;
-                command.rect.width = actual_icon_size;
-                command.rect.height = actual_icon_size;
-                command.radius = 0.0f;
-            } else {
-                command.rect.x = box_x;
-                command.rect.y = box_y;
-                command.rect.width = icon_box_size;
-                command.rect.height = icon_box_size;
-                command.radius = icon_box_radius;
-            }
-            command.color.a = 1.0f;
-            command.icon_id = icon.id;
-            reach_render_command_buffer_push(&commands, &command);
-
-            if (icon.id != 0 && icon.wants_backplate) {
-                command = {};
-                command.type = REACH_RENDER_COMMAND_BACKPLATE_EDGE;
-                command.rect.x = box_x;
-                command.rect.y = box_y;
-                command.rect.width = icon_box_size;
-                command.rect.height = icon_box_size;
-                command.color = theme->icon_backplate_edge;
-                command.radius = icon_box_radius;
-                command.stroke_width = 0.55f;
-                reach_render_command_buffer_push(&commands, &command);
-            }
-
-            if (selected) {
-                const wchar_t *path = reinterpret_cast<const wchar_t *>(shell->open_windows[index].path);
-                const wchar_t *name = PathFindFileNameW(path != nullptr ? path : L"");
-                // Strip .exe extension
-                wchar_t name_buf[260];
-                wcsncpy_s(name_buf, name, _TRUNCATE);
-                wchar_t *dot = wcsrchr(name_buf, L'.');
-                if (dot != nullptr) {
-                    *dot = L'\0';
-                }
-                command = {};
-                command.type = REACH_RENDER_COMMAND_TEXT;
-                command.rect.x = item.x - gap * 0.5f;
-                command.rect.y = item.y + 104.0f;
-                command.rect.width = item.width + gap;
-                command.rect.height = 20.0f;
-                command.color = reach_shell_rgb(242, 240, 236, 0.96f);
-                command.text_weight = DWRITE_FONT_WEIGHT_DEMI_BOLD;
-                command.text_alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
-                command.text_size = 13.0f;
-                command.text_ellipsis = 1;
-                reach_copy_utf16(command.text, 260, reinterpret_cast<const uint16_t *>(name_buf[0] != L'\0' ? name_buf : L"App"));
-                reach_render_command_buffer_push(&commands, &command);
-            }
-        }
+    reach_render_command_buffer commands = {};
+    reach_switcher_render_input input = {};
+    input.theme = theme;
+    input.bounds = bounds;
+    input.model = &model;
+    input.items = items;
+    input.item_count = shell->open_window_count;
+    input.text_alignment_center = DWRITE_TEXT_ALIGNMENT_CENTER;
+    input.text_weight_demi_bold = DWRITE_FONT_WEIGHT_DEMI_BOLD;
+    reach_result build_result = reach_switcher_build_render_commands(&input, &commands);
+    if (build_result != REACH_OK) {
+        return build_result;
     }
 
     if (shell->switcher.renderer.ops.begin_frame(shell->switcher.renderer.backend) != REACH_OK) {

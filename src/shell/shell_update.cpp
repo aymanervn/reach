@@ -886,7 +886,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     }
                 }
                 if (shell->switcher.window.ops.set_bounds != nullptr) {
-                    reach_rect_f32 switcher_bounds = reach_shell_switcher_bounds_for_count(bounds, reach_shell_switcher_visible_count(shell));
+                    reach_rect_f32 switcher_bounds = reach_switcher_bounds_for_count(bounds, reach_shell_switcher_visible_count(shell));
                     int32_t switcher_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->switcher.window,

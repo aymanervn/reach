@@ -69,6 +69,8 @@ add_library(reach_features STATIC
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
+    src/features/switcher/switcher_feature.cpp
+    src/features/switcher/switcher_render.cpp
     src/features/tray/tray_feature.cpp
     src/features/tray/tray_interaction.cpp
     src/features/tray/tray_model.cpp

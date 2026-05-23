@@ -10,6 +10,7 @@
 #include "reach/features/context_menu.h"
 #include "reach/features/dock.h"
 #include "reach/features/launcher.h"
+#include "reach/features/switcher.h"
 #include "reach/features/tray.h"
 #include "reach/hotkeys.h"
 #include "reach/monitor.h"
@@ -156,7 +157,6 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
 
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout);
 reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 bounds);
-reach_rect_f32 reach_shell_switcher_bounds_for_count(reach_rect_f32 monitor_bounds, size_t visible_count);
 size_t reach_shell_switcher_visible_count(const reach_shell *shell);
 void reach_shell_update_switcher_visible_start(reach_shell *shell);
 reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds);
