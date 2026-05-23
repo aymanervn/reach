@@ -2,6 +2,7 @@
 #define REACH_PLATFORM_WINDOWS_ADAPTERS_H
 
 #include "reach/ports/app_launcher.h"
+#include "reach/ports/audio_volume.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
@@ -35,6 +36,7 @@ reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port
 reach_result reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port *out_port);
 reach_result reach_windows_create_popup_capture(reach_popup_capture_port *out_port);
 reach_result reach_windows_create_power_session(reach_power_session_port *out_port);
+reach_result reach_windows_create_audio_volume(reach_audio_volume_port *out_port);
 
 #ifdef __cplusplus
 }

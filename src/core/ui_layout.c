@@ -16,6 +16,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     float dock_width = reach_scale(state->dock.width, scale);
     float dock_x = input->work_area.x + (input->work_area.width - dock_width) * 0.5f;
     float dock_y = input->work_area.y + input->work_area.height - dock_height - reach_scale(18.0f, scale);
+
     out_layout->dock.bounds.x = dock_x;
     out_layout->dock.bounds.y = dock_y;
     out_layout->dock.bounds.width = dock_width;
@@ -29,6 +30,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     float separator_height = dock_height * 0.56f;
     float left = dock_x + gap;
     float top = dock_y + (dock_height - icon_size) * 0.5f;
+
     for (size_t index = 0; index < state->pinned_app_count; ++index) {
         out_layout->dock.app_slots[index].x = left + (icon_size + gap) * (float)index;
         out_layout->dock.app_slots[index].y = top;
@@ -38,19 +40,31 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
 
     out_layout->dock.tray_button.width = icon_size;
     out_layout->dock.tray_button.height = icon_size;
+
+    out_layout->dock.quick_settings_button.width = icon_size;
+    out_layout->dock.quick_settings_button.height = icon_size;
+
     out_layout->dock.power_button.width = icon_size;
     out_layout->dock.power_button.height = icon_size;
     out_layout->dock.power_button.x = dock_x + dock_width - icon_size - gap;
     out_layout->dock.power_button.y = top;
+
     out_layout->dock.clock.width = clock_width;
     out_layout->dock.clock.height = icon_size;
     out_layout->dock.clock.x = out_layout->dock.power_button.x - gap - clock_width;
     out_layout->dock.clock.y = top;
+
     out_layout->dock.system_separator.width = separator_width;
     out_layout->dock.system_separator.height = separator_height;
     out_layout->dock.system_separator.x = out_layout->dock.clock.x - gap - separator_width;
     out_layout->dock.system_separator.y = dock_y + (dock_height - separator_height) * 0.5f;
-    out_layout->dock.tray_button.x = out_layout->dock.system_separator.x - gap - icon_size;
+
+    out_layout->dock.quick_settings_button.x =
+        out_layout->dock.system_separator.x - gap - icon_size;
+    out_layout->dock.quick_settings_button.y = top;
+
+    out_layout->dock.tray_button.x =
+        out_layout->dock.quick_settings_button.x - gap - icon_size;
     out_layout->dock.tray_button.y = top;
 
     out_layout->launcher.search_box.width = reach_scale(640.0f, scale);
@@ -67,6 +81,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     float total_width = (launcher_icon * (float)state->pinned_app_count) + (launcher_gap * (float)(state->pinned_app_count > 0 ? state->pinned_app_count - 1 : 0));
     float apps_x = input->monitor_bounds.x + (input->monitor_bounds.width - total_width) * 0.5f;
     float apps_y = out_layout->launcher.search_box.y + out_layout->launcher.search_box.height + reach_scale(24.0f, scale);
+
     for (size_t index = 0; index < state->pinned_app_count; ++index) {
         out_layout->launcher.pinned_app_slots[index].x = apps_x + (launcher_icon + launcher_gap) * (float)index;
         out_layout->launcher.pinned_app_slots[index].y = apps_y;
@@ -79,6 +94,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     out_layout->launcher.search_results.width = out_layout->launcher.search_box.width;
     out_layout->launcher.search_results.height = reach_scale(120.0f, scale);
     out_layout->launcher.bounds = out_layout->launcher.search_box;
+
     if (out_layout->launcher.pinned_app_slot_count > 0) {
         float launcher_left = apps_x < out_layout->launcher.search_box.x ? apps_x : out_layout->launcher.search_box.x;
         float launcher_right = apps_x + total_width;
@@ -92,5 +108,6 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
         out_layout->launcher.bounds.y = out_layout->launcher.search_box.y;
         out_layout->launcher.bounds.height = launcher_bottom - out_layout->launcher.bounds.y;
     }
+
     return REACH_OK;
 }

@@ -105,6 +105,7 @@ typedef struct reach_dock_render_input {
     size_t click_feedback_index;
     float click_feedback_opacity;
     size_t tray_feedback_index;
+    size_t quick_settings_feedback_index;
     size_t power_feedback_index;
     const uint16_t *time_text;
     const uint16_t *date_text;
@@ -117,7 +118,8 @@ typedef enum reach_dock_hit_type {
     REACH_DOCK_HIT_NONE = 0,
     REACH_DOCK_HIT_ITEM = 1,
     REACH_DOCK_HIT_TRAY_BUTTON = 2,
-    REACH_DOCK_HIT_POWER_BUTTON = 3
+    REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON = 3,
+    REACH_DOCK_HIT_POWER_BUTTON = 4
 } reach_dock_hit_type;
 
 typedef struct reach_dock_hit_result {

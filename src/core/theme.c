@@ -25,6 +25,13 @@ const reach_theme *reach_theme_default(void)
         .dock_clock_date =                { 1.0f, 0.97f, 0.91f, 0.56f },
         .dock_power_button_background =   { 1.0f, 0.97f, 0.91f, 0.36f },
         .dock_power_glyph =               { 1.0f, 1.0f, 1.0f, 1.0f },
+
+        .quick_settings_slider_track_color =      { 1.0f, 0.97f, 0.91f, 0.24f },
+        .quick_settings_slider_fill_color =       { 1.0f, 0.97f, 0.91f, 0.92f },
+        .quick_settings_slider_muted_fill_color = { 1.0f, 0.97f, 0.91f, 0.38f },
+        .quick_settings_expand_button_color =     { 1.0f, 0.97f, 0.91f, 0.18f },
+        .quick_settings_expand_text_color =       { 1.0f, 0.97f, 0.91f, 0.88f },
+        .quick_settings_expand_icon_color =       { 1.0f, 0.97f, 0.91f, 0.62f },
         .dock_corner_radius_ratio =       0.32f,
         .dock_corner_radius_max =         22.0f,
         .dock_border_thickness =          1.0f,

@@ -225,6 +225,37 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
         reach_render_command_buffer_push(out_commands, &command);
     }
 
+    float quick_settings_box_x = layout->quick_settings_button.x - layout->bounds.x
+        + (layout->quick_settings_button.width - icon_box_size) * 0.5f;
+    float quick_settings_box_y = layout->quick_settings_button.y - layout->bounds.y
+        + (layout->quick_settings_button.height - icon_box_size) * 0.5f;
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect.x = quick_settings_box_x;
+    command.rect.y = quick_settings_box_y;
+    command.rect.width = icon_box_size;
+    command.rect.height = icon_box_size;
+    command.color = theme->tray_button_background;
+    command.radius = icon_box_radius;
+    reach_render_command_buffer_push(out_commands, &command);
+
+    if (input->click_feedback_index == input->quick_settings_feedback_index &&
+        input->click_feedback_opacity > 0.001f) {
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect.x = quick_settings_box_x;
+        command.rect.y = quick_settings_box_y;
+        command.rect.width = icon_box_size;
+        command.rect.height = icon_box_size;
+        command.color.r = 0.0f;
+        command.color.g = 0.0f;
+        command.color.b = 0.0f;
+        command.color.a = input->click_feedback_opacity;
+        command.radius = icon_box_radius;
+        reach_render_command_buffer_push(out_commands, &command);
+    }
+
     command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect.x = layout->system_separator.x - layout->bounds.x;

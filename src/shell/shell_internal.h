@@ -13,6 +13,8 @@
 #include "reach/features/switcher.h"
 #include "reach/features/tray.h"
 #include "reach/features/wallpaper.h"
+#include "reach/features/quick_settings.h"
+#include "reach/features/popup.h"
 #include "reach/platform/hotkeys.h"
 #include "reach/platform/monitor.h"
 #include "reach/app/pin_config.h"
@@ -28,6 +30,7 @@ struct reach_shell {
     reach_surface_runtime tray;
     reach_surface_runtime switcher;
     reach_surface_runtime context_menu;
+    reach_surface_runtime quick_settings;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
@@ -111,12 +114,22 @@ struct reach_shell {
     int32_t dock_clock_initialized;
     int32_t running;
     uint16_t wallpaper_path[260];
+    reach_audio_volume_port audio_volume;
+    int32_t quick_settings_open;
+    int32_t quick_settings_dragging_volume;
+    reach_audio_volume_state quick_settings_audio_state;
+    reach_quick_settings_model quick_settings_model;
+    reach_quick_settings_layout quick_settings_layout;
+    reach_rect_f32 quick_settings_bounds;
+    reach_rect_f32 quick_settings_content_bounds;
+    float quick_settings_notch_anchor_x;
     reach_popup_capture_port popup_capture;
 };
 
 static const size_t REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_PINNED_APPS;
-static const size_t REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON = REACH_MAX_PINNED_APPS + 1;
-static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 2;
+static const size_t REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON = REACH_MAX_PINNED_APPS + 1;
+static const size_t REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON = REACH_MAX_PINNED_APPS + 2;
+static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 3;
 
 int32_t reach_shell_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
 int32_t reach_shell_opacity_equal(float a, float b);
@@ -129,10 +142,23 @@ reach_result reach_shell_apply_window_state(
     int32_t *bounds_valid,
     int32_t *opacity_valid,
     int32_t *out_changed);
+reach_result reach_shell_render_popup_surface(
+    reach_shell *shell,
+    reach_surface_runtime *surface,
+    reach_rect_f32 bounds,
+    float notch_anchor_x,
+    const reach_render_command_buffer *content_commands);
 
 void reach_shell_raise_launcher(reach_shell *shell);
 void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open);
 void reach_shell_toggle_tray_popup(reach_shell *shell);
+void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open);
+void reach_shell_toggle_quick_settings(reach_shell *shell);
+void reach_shell_refresh_quick_settings_audio(reach_shell *shell);
+void reach_shell_refresh_quick_settings_layout(reach_shell *shell);
+void reach_shell_execute_quick_settings_action(
+    reach_shell *shell,
+    reach_quick_settings_action action);
 reach_result reach_shell_refresh_tray_items(reach_shell *shell);
 void reach_shell_compute_tray_popup_layout(
     reach_shell *shell,
@@ -167,12 +193,12 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
 
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout);
 reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 bounds);
+reach_result reach_shell_render_quick_settings_surface(reach_shell *shell);
 size_t reach_shell_switcher_visible_count(const reach_shell *shell);
 void reach_shell_update_switcher_visible_start(reach_shell *shell);
 reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds);
 reach_result reach_shell_render_launcher_surface(reach_shell *shell, const reach_launcher_layout *layout);
 reach_result reach_shell_render_context_menu_surface(reach_shell *shell);
-
 void reach_shell_on_window_event(void *user, const reach_ui_event *event);
 
 #endif

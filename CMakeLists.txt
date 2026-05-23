@@ -72,6 +72,9 @@ add_library(reach_features STATIC
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
     src/features/popup/popup_render.cpp
+    src/features/quick_settings/quick_settings_feature.cpp
+    src/features/quick_settings/quick_settings_interaction.cpp
+    src/features/quick_settings/quick_settings_render.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
     src/features/tray/tray_feature.cpp
@@ -114,6 +117,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/wallpaper_surface_win32.cpp
     src/adapters/windows/popup_capture_win32.cpp
     src/adapters/windows/power_session_win32.cpp
+    src/adapters/windows/audio_volume_win32.cpp
 )
 
 reach_configure_common(reach_windows_adapters)
@@ -148,6 +152,8 @@ add_library(reach_shell STATIC
     src/shell/shell.cpp
     src/shell/shell_input.cpp
     src/shell/shell_lifecycle.cpp
+    src/shell/shell_popup_surface.cpp
+    src/shell/shell_quick_settings.cpp
     src/shell/shell_render.cpp
     src/shell/shell_surfaces.cpp
     src/shell/shell_update.cpp
@@ -292,14 +298,28 @@ target_link_libraries(reach_pin_config_tests PRIVATE
     user32
 )
 
+add_executable(reach_quick_settings_feature_tests
+    tests/quick_settings_feature_tests.cpp
+)
+
+reach_configure_common(reach_quick_settings_feature_tests)
+target_compile_features(reach_quick_settings_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_quick_settings_feature_tests PRIVATE
+    reach_features
+)
+
 if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_core_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_core_tests.exe)
     add_test(NAME reach_dock_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_dock_feature_tests.exe)
     add_test(NAME reach_pin_config_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_pin_config_tests.exe)
+    add_test(NAME reach_quick_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_quick_settings_feature_tests.exe)
 else()
     add_test(NAME reach_core_tests COMMAND reach_core_tests)
     add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
+    add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
 endif()
 
 add_custom_target(check_architecture

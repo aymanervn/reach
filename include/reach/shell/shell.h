@@ -18,6 +18,7 @@
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
+#include "reach/ports/audio_volume.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -41,6 +42,8 @@ typedef struct reach_shell_dependencies {
     reach_render_backend_port switcher_renderer;
     reach_platform_window_port context_menu_window;
     reach_render_backend_port context_menu_renderer;
+    reach_platform_window_port quick_settings_window;
+    reach_render_backend_port quick_settings_renderer;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
@@ -53,6 +56,7 @@ typedef struct reach_shell_dependencies {
     reach_wallpaper_surface_port wallpaper_surface;
     reach_popup_capture_port popup_capture;
     reach_power_session_port power_session;
+    reach_audio_volume_port audio_volume;
 } reach_shell_dependencies;
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, const reach_shell_dependencies *dependencies, reach_shell **out_shell);

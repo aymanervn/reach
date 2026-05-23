@@ -25,6 +25,12 @@ typedef struct reach_theme {
     reach_color dock_clock_date;
     reach_color dock_power_button_background;
     reach_color dock_power_glyph;
+    reach_color quick_settings_slider_track_color;
+    reach_color quick_settings_slider_fill_color;
+    reach_color quick_settings_slider_muted_fill_color;
+    reach_color quick_settings_expand_button_color;
+    reach_color quick_settings_expand_text_color;
+    reach_color quick_settings_expand_icon_color;
     float dock_corner_radius_ratio;
     float dock_corner_radius_max;
     float dock_border_thickness;

@@ -64,6 +64,13 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.context_menu_renderer);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_platform_window(REACH_SURFACE_QUICK_SETTINGS, &dependencies.quick_settings_window);
+    }
+    if (result == REACH_OK) {
+        void *native_window = dependencies.quick_settings_window.ops.native_handle(dependencies.quick_settings_window.window);
+        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.quick_settings_renderer);
+    }
+    if (result == REACH_OK) {
         result = reach_windows_create_search_stub(&dependencies.search_provider);
     }
     if (result == REACH_OK) {
@@ -104,10 +111,16 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_power_session(&dependencies.power_session);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_audio_volume(&dependencies.audio_volume);
+    }
+    if (result == REACH_OK) {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
         if (result == REACH_OK) {
             dependencies.popup_capture = {};
             dependencies.power_session = {};
+            dependencies.audio_volume = {};
+            dependencies.quick_settings_window = {};
+            dependencies.quick_settings_renderer = {};
         }
     }
     if (result != REACH_OK) {
@@ -140,6 +153,12 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.context_menu_renderer.ops.destroy != nullptr) {
             dependencies.context_menu_renderer.ops.destroy(dependencies.context_menu_renderer.backend);
+        }
+        if (dependencies.quick_settings_window.ops.destroy != nullptr) {
+            dependencies.quick_settings_window.ops.destroy(dependencies.quick_settings_window.window);
+        }
+        if (dependencies.quick_settings_renderer.ops.destroy != nullptr) {
+            dependencies.quick_settings_renderer.ops.destroy(dependencies.quick_settings_renderer.backend);
         }
         if (dependencies.input_source.ops.destroy != nullptr) {
             dependencies.input_source.ops.destroy(dependencies.input_source.source);
@@ -176,6 +195,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.power_session.ops.destroy != nullptr) {
             dependencies.power_session.ops.destroy(dependencies.power_session.session);
+        }
+        if (dependencies.audio_volume.destroy != nullptr) {
+            dependencies.audio_volume.destroy(dependencies.audio_volume.userdata);
         }
         delete app;
         return result;

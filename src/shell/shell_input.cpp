@@ -163,6 +163,11 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
         (float)point.x <= shell->context_menu_bounds.x + shell->context_menu_bounds.width &&
         (float)point.y >= shell->context_menu_bounds.y &&
         (float)point.y <= shell->context_menu_bounds.y + shell->context_menu_bounds.height;
+    int32_t on_quick_settings = shell->quick_settings_open &&
+        (float)point.x >= shell->quick_settings_bounds.x &&
+        (float)point.x <= shell->quick_settings_bounds.x + shell->quick_settings_bounds.width &&
+        (float)point.y >= shell->quick_settings_bounds.y &&
+        (float)point.y <= shell->quick_settings_bounds.y + shell->quick_settings_bounds.height;
     int32_t on_launcher = shell->ui.launcher.open &&
         (float)point.x >= shell->layout.launcher.bounds.x &&
         (float)point.x <= shell->layout.launcher.bounds.x + shell->layout.launcher.bounds.width &&
@@ -170,6 +175,7 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
         (float)point.y <= shell->layout.launcher.bounds.y + shell->layout.launcher.bounds.height;
     reach_dock_hit_result dock_hit = shell->has_layout ? reach_dock_hit_test(&shell->layout.dock, point.x, point.y) : reach_dock_hit_result {};
     int32_t on_tray_button = shell->tray_popup_open && dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON;
+    int32_t on_quick_settings_button = shell->quick_settings_open && dock_hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON;
     int32_t on_power_button = shell->context_menu_open && shell->context_menu_power_open && dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON;
 
     if (shell->tray_popup_open && !on_tray && !on_tray_button) {
@@ -177,6 +183,10 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
     }
     if (shell->context_menu_open && !on_context && !on_power_button) {
         reach_shell_close_context_menu(shell);
+        reach_shell_clear_sticky_dock_feedback(shell);
+    }
+    if (shell->quick_settings_open && !on_quick_settings && !on_quick_settings_button) {
+        reach_shell_set_quick_settings_open(shell, 0);
         reach_shell_clear_sticky_dock_feedback(shell);
     }
     if (shell->ui.launcher.open && !on_launcher) {
@@ -192,7 +202,7 @@ void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
         return;
     }
 
-    int32_t should_hook = shell->tray_popup_open || shell->context_menu_open || shell->ui.launcher.open;
+    int32_t should_hook = shell->tray_popup_open || shell->context_menu_open || shell->quick_settings_open || shell->ui.launcher.open;
     (void)shell->popup_capture.sync_mouse_hook(
         shell->popup_capture.userdata,
         should_hook,
@@ -213,6 +223,8 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
 
     shell->tray_popup_open = next_open;
     if (shell->tray_popup_open) {
+        reach_shell_set_quick_settings_open(shell, 0);
+        reach_shell_close_context_menu(shell);
         (void)reach_shell_refresh_tray_items(shell);
         reach_shell_capture_tray_input(shell);
     } else {
@@ -326,6 +338,16 @@ static void reach_shell_press_tray_button(reach_shell *shell)
     shell->dock_click_feedback_pressed = 1;
     shell->dock_click_feedback_sticky = 0;
     reach_shell_start_dock_click_feedback(shell, REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON, 0.50f);
+}
+
+static void reach_shell_press_quick_settings_button(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return;
+    }
+    shell->dock_click_feedback_pressed = 1;
+    shell->dock_click_feedback_sticky = 0;
+    reach_shell_start_dock_click_feedback(shell, REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON, 0.50f);
 }
 
 static void reach_shell_close_launcher(reach_shell *shell)
@@ -730,6 +752,8 @@ static reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     if (shell == nullptr || !shell->has_layout) {
         return REACH_INVALID_ARGUMENT;
     }
+    reach_shell_set_quick_settings_open(shell, 0);
+    reach_shell_set_tray_popup_open(shell, 0);
 
     reach_context_menu_build_power_commands(
         shell->context_menu_item_commands,
@@ -793,6 +817,8 @@ static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, s
     if (shell == nullptr || item_index >= shell->dock_model.item_count) {
         return REACH_INVALID_ARGUMENT;
     }
+    reach_shell_set_quick_settings_open(shell, 0);
+    reach_shell_set_tray_popup_open(shell, 0);
 
     reach_context_menu_build_dock_item_commands(
         shell->dock_model.items[item_index].pinned,
@@ -985,6 +1011,11 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
     reach_shell_release_dock_item(shell);
 
+    if (shell->quick_settings_dragging_volume) {
+        shell->quick_settings_dragging_volume = 0;
+        return REACH_OK;
+    }
+
     if (shell->ui.launcher.open) {
         reach_launcher_hit_result launcher_hit = reach_launcher_hit_test(&shell->ui, &shell->layout.launcher, event->x, event->y);
         reach_launcher_action launcher_action = reach_launcher_action_for_hit(&shell->ui, launcher_hit);
@@ -1020,6 +1051,11 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         if (!shell->tray_popup_open && shell->tray.window.ops.hide != nullptr) {
             return shell->tray.window.ops.hide(shell->tray.window.window);
         }
+        return REACH_OK;
+    }
+
+    if (dock_hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON) {
+        reach_shell_toggle_quick_settings(shell);
         return REACH_OK;
     }
 
@@ -1059,6 +1095,31 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
 
     reach_shell_clear_sticky_dock_feedback(shell);
 
+    if (shell->quick_settings_open) {
+        reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+        if (dock_hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON) {
+            reach_shell_press_quick_settings_button(shell);
+            return REACH_OK;
+        }
+
+        if (reach_rect_contains(shell->quick_settings_bounds, event->x, event->y)) {
+            reach_quick_settings_hit_result hit = reach_quick_settings_hit_test(
+                &shell->quick_settings_layout,
+                (float)event->x - shell->quick_settings_bounds.x,
+                (float)event->y - shell->quick_settings_bounds.y);
+            reach_quick_settings_action action = reach_quick_settings_action_for_hit(hit);
+            if (action.type != REACH_QUICK_SETTINGS_ACTION_NONE) {
+                shell->quick_settings_dragging_volume =
+                    action.type == REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
+                reach_shell_execute_quick_settings_action(shell, action);
+            }
+            return REACH_OK;
+        }
+
+        reach_shell_set_quick_settings_open(shell, 0);
+        return REACH_OK;
+    }
+
     if (shell->context_menu_open) {
         reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
         if (shell->context_menu_power_open && dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON) {
@@ -1093,6 +1154,11 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     }
     if (dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON) {
         reach_shell_press_tray_button(shell);
+        return REACH_OK;
+    }
+
+    if (dock_hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON) {
+        reach_shell_press_quick_settings_button(shell);
         return REACH_OK;
     }
 
@@ -1160,6 +1226,18 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         if (shell->context_menu_hovered_index != hovered_context) {
             shell->context_menu_hovered_index = hovered_context;
             shell->context_menu.dirty_flags = 1;
+        }
+        return REACH_OK;
+    }
+
+    if (shell->quick_settings_dragging_volume) {
+        reach_rect_f32 track = shell->quick_settings_layout.main_slider_track;
+        if (track.width > 0.0f) {
+            float local_x = (float)event->x - shell->quick_settings_bounds.x;
+            reach_quick_settings_action action = {};
+            action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
+            action.volume_level = (local_x - track.x) / track.width;
+            reach_shell_execute_quick_settings_action(shell, action);
         }
         return REACH_OK;
     }
@@ -1239,6 +1317,9 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell, const
     reach_shell_clear_sticky_dock_feedback(shell);
     if (shell->context_menu_open) {
         reach_shell_close_context_menu(shell);
+    }
+    if (shell->quick_settings_open) {
+        reach_shell_set_quick_settings_open(shell, 0);
     }
 
     if (shell->tray_popup_open && shell->tray_provider.ops.activate != nullptr) {
@@ -1357,6 +1438,10 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
 
     reach_ui_intent intent = {};
+    if (event->type == REACH_UI_EVENT_ESCAPE && shell->quick_settings_open) {
+        reach_shell_set_quick_settings_open(shell, 0);
+        return REACH_OK;
+    }
     if (event->type == REACH_UI_EVENT_ESCAPE && shell->context_menu_open) {
         reach_shell_close_context_menu(shell);
         return REACH_OK;

@@ -181,9 +181,9 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     float clock_width = theme->dock_clock_width;
     float separator_width = theme->dock_system_separator_width;
     float separator_height = layout->bounds.height * theme->dock_system_separator_height_ratio;
-    float dock_width = ceilf(icon_size * (float)(count + 2) + clock_width + separator_width + gap * (float)(count + 5));
+    float dock_width = ceilf(icon_size * (float)(count + 3) + clock_width + separator_width + gap * (float)(count + 6));
     if (count == 0) {
-        dock_width = ceilf(icon_size * 2.0f + clock_width + separator_width + gap * 4.0f);
+        dock_width = ceilf(icon_size * 3.0f + clock_width + separator_width + gap * 5.0f);
     }
     float old_width = layout->bounds.width;
     if (dock_width != old_width) {
@@ -212,7 +212,13 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     layout->system_separator.height = separator_height;
     layout->system_separator.x = layout->clock.x - gap - separator_width;
     layout->system_separator.y = layout->bounds.y + (layout->bounds.height - separator_height) * 0.5f;
-    layout->tray_button.x = layout->system_separator.x - gap - icon_size;
+    layout->quick_settings_button.width = icon_size;
+    layout->quick_settings_button.height = icon_size;
+    layout->quick_settings_button.x = layout->system_separator.x - gap - icon_size;
+    layout->quick_settings_button.y = top;
+    layout->tray_button.width = icon_size;
+    layout->tray_button.height = icon_size;
+    layout->tray_button.x = layout->quick_settings_button.x - gap - icon_size;
     layout->tray_button.y = top;
 }
 
@@ -491,6 +497,9 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     if (target_hidden && shell->tray_popup_open) {
         reach_shell_set_tray_popup_open(shell, 0);
     }
+    if (target_hidden && shell->quick_settings_open) {
+        reach_shell_set_quick_settings_open(shell, 0);
+    }
     if (target_hidden && shell->context_menu_open) {
         reach_shell_close_context_menu(shell);
         reach_shell_clear_sticky_dock_feedback(shell);
@@ -583,7 +592,8 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
     layout->power_button.x = layout->bounds.x + layout->bounds.width - layout->power_button.width - gap;
     layout->clock.x = layout->power_button.x - gap - theme->dock_clock_width;
     layout->system_separator.x = layout->clock.x - gap - theme->dock_system_separator_width;
-    layout->tray_button.x = layout->system_separator.x - gap - layout->tray_button.width;
+    layout->quick_settings_button.x = layout->system_separator.x - gap - layout->quick_settings_button.width;
+    layout->tray_button.x = layout->quick_settings_button.x - gap - layout->tray_button.width;
 }
 
 float reach_shell_dock_slot_box_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index)
@@ -863,6 +873,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     layout.dock.app_slots[index].y += dock_y_offset;
                 }
                 layout.dock.tray_button.y += dock_y_offset;
+                layout.dock.quick_settings_button.y += dock_y_offset;
                 layout.dock.system_separator.y += dock_y_offset;
                 layout.dock.clock.y += dock_y_offset;
                 layout.dock.power_button.y += dock_y_offset;
@@ -880,6 +891,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         layout.dock.app_slots[index].x += dock_x_offset;
                     }
                     layout.dock.tray_button.x += dock_x_offset;
+                    layout.dock.quick_settings_button.x += dock_x_offset;
                     layout.dock.system_separator.x += dock_x_offset;
                     layout.dock.clock.x += dock_x_offset;
                     layout.dock.power_button.x += dock_x_offset;
@@ -955,6 +967,35 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)shell->tray.window.ops.hide(shell->tray.window.window);
                     }
                 }
+                if (shell->quick_settings.window.ops.set_bounds != nullptr) {
+                    int32_t quick_window_changed = 0;
+                    reach_shell_refresh_quick_settings_layout(shell);
+                    result = reach_shell_apply_window_state(
+                        &shell->quick_settings.window,
+                        shell->quick_settings_bounds,
+                        shell->quick_settings_open ? 1.0f : 0.0f,
+                        &shell->quick_settings.last_bounds,
+                        &shell->quick_settings.last_opacity,
+                        &shell->quick_settings.bounds_valid,
+                        &shell->quick_settings.opacity_valid,
+                        &quick_window_changed);
+                    if (result != REACH_OK) {
+                        return result;
+                    }
+                    if (quick_window_changed && shell->quick_settings.window.ops.apply_rounded_corners != nullptr) {
+                        (void)shell->quick_settings.window.ops.apply_rounded_corners(shell->quick_settings.window.window, reach_popup_radius());
+                    }
+                    if (shell->quick_settings_open) {
+                        if (shell->quick_settings.window.ops.show != nullptr) {
+                            (void)shell->quick_settings.window.ops.show(shell->quick_settings.window.window);
+                        }
+                        if (shell->render_dirty || shell->quick_settings.dirty_flags || quick_window_changed) {
+                            (void)reach_shell_render_quick_settings_surface(shell);
+                        }
+                    } else if (shell->quick_settings.window.ops.hide != nullptr) {
+                        (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
+                    }
+                }
                 if (shell->switcher.window.ops.set_bounds != nullptr) {
                     reach_rect_f32 switcher_bounds = reach_switcher_bounds_for_count(bounds, reach_shell_switcher_visible_count(shell));
                     int32_t switcher_window_changed = 0;
@@ -1025,6 +1066,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     shell->tray.dirty_flags = 0;
     shell->switcher.dirty_flags = 0;
     shell->context_menu.dirty_flags = 0;
+    shell->quick_settings.dirty_flags = 0;
 
     return REACH_OK;
 }
@@ -1047,8 +1089,10 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
          shell->tray.dirty_flags ||
          shell->switcher.dirty_flags ||
          shell->context_menu.dirty_flags ||
+         shell->quick_settings.dirty_flags ||
          shell->switcher_open ||
          shell->context_menu_open ||
+         shell->quick_settings_open ||
          shell->dock_animating ||
          shell->dock_width_animating ||
          shell->dock_drag_active ||

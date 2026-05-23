@@ -31,14 +31,17 @@ int main(void)
     failed += expect(reach_dock_reorder_target(&model, &layout, 3, 10.0f) == REACH_MAX_PINNED_APPS);
 
     layout.tray_button = { 166.0f, 0.0f, 40.0f, 40.0f };
-    layout.system_separator = { 218.0f, 8.0f, 1.0f, 24.0f };
-    layout.clock = { 231.0f, 0.0f, 92.0f, 40.0f };
-    layout.power_button = { 335.0f, 0.0f, 40.0f, 40.0f };
-    failed += expect(layout.tray_button.x + layout.tray_button.width < layout.system_separator.x);
+    layout.quick_settings_button = { 218.0f, 0.0f, 40.0f, 40.0f };
+    layout.system_separator = { 270.0f, 8.0f, 1.0f, 24.0f };
+    layout.clock = { 283.0f, 0.0f, 92.0f, 40.0f };
+    layout.power_button = { 387.0f, 0.0f, 40.0f, 40.0f };
+    failed += expect(layout.tray_button.x + layout.tray_button.width < layout.quick_settings_button.x);
+    failed += expect(layout.quick_settings_button.x + layout.quick_settings_button.width < layout.system_separator.x);
     failed += expect(layout.system_separator.x + layout.system_separator.width < layout.clock.x);
     failed += expect(layout.clock.x + layout.clock.width < layout.power_button.x);
     failed += expect(reach_dock_hit_test(&layout, 180, 20).type == REACH_DOCK_HIT_TRAY_BUTTON);
-    failed += expect(reach_dock_hit_test(&layout, 350, 20).type == REACH_DOCK_HIT_POWER_BUTTON);
+    failed += expect(reach_dock_hit_test(&layout, 230, 20).type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON);
+    failed += expect(reach_dock_hit_test(&layout, 400, 20).type == REACH_DOCK_HIT_POWER_BUTTON);
     failed += expect(reach_dock_hit_test(&layout, 30, 20).type == REACH_DOCK_HIT_ITEM);
 
     uint32_t commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
