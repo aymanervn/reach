@@ -280,6 +280,7 @@ target_compile_features(reach_dock_feature_tests PRIVATE
 )
 target_link_libraries(reach_dock_feature_tests PRIVATE
     reach_features
+    reach_support
 )
 
 add_executable(reach_pin_config_tests

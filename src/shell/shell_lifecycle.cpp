@@ -156,10 +156,16 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
 
     shell->quick_settings_open = 0;
     shell->quick_settings_dragging_volume = 0;
+    shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
+    shell->quick_settings_drag_session_index = 0;
+    shell->quick_settings_drag_session_instance_id[0] = 0;
     shell->quick_settings_audio_state.level = 0.0f;
     shell->quick_settings_audio_state.muted = 0;
+    shell->quick_settings_audio_sessions = {};
     shell->quick_settings_notch_anchor_x = 0.0f;
     shell->quick_settings_bounds = {};
+    shell->quick_settings_target_bounds = {};
+    shell->quick_settings_bounds_animation = {};
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
 
@@ -318,6 +324,7 @@ reach_result reach_shell_start(reach_shell *shell)
     shell->context_menu_open = 0;
     shell->quick_settings_open = 0;
     shell->quick_settings_dragging_volume = 0;
+    shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
     return REACH_OK;
 }
 

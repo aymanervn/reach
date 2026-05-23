@@ -20,7 +20,8 @@ typedef enum reach_render_command_type {
     REACH_RENDER_COMMAND_TRIANGLE = 7,
     REACH_RENDER_COMMAND_NOTCH_STROKE = 8,
     REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT = 9,
-    REACH_RENDER_COMMAND_VECTOR_ICON = 10
+    REACH_RENDER_COMMAND_VECTOR_ICON = 10,
+    REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11
 } reach_render_command_type;
 
 typedef enum reach_vector_icon_id {
@@ -31,7 +32,12 @@ typedef enum reach_vector_icon_id {
     REACH_VECTOR_ICON_RESTART = 4,
     REACH_VECTOR_ICON_SHUTDOWN = 5,
     REACH_VECTOR_ICON_SIGN_OUT = 6,
-    REACH_VECTOR_ICON_TRAY_ARROW = 7
+    REACH_VECTOR_ICON_ARROW_UP = 7,
+    REACH_VECTOR_ICON_SETTINGS = 8,
+    REACH_VECTOR_ICON_VOLUME_ZERO = 9,
+    REACH_VECTOR_ICON_VOLUME_LOW = 10,
+    REACH_VECTOR_ICON_VOLUME_HIGH = 11,
+    REACH_VECTOR_ICON_ARROW_DOWN = 12
 } reach_vector_icon_id;
 
 typedef enum reach_text_weight {
@@ -44,8 +50,10 @@ typedef enum reach_text_weight {
 typedef struct reach_render_command {
     reach_render_command_type type;
     reach_rect_f32 rect;
+    reach_rect_f32 clip_rect;
     reach_color color;
     float radius;
+    float clip_radius;
     float stroke_width;
     uint64_t icon_id;
     int32_t text_weight;

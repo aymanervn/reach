@@ -189,24 +189,56 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     float tray_box_y = layout->tray_button.y - layout->bounds.y
         + (layout->tray_button.height - icon_box_size) * 0.5f;
 
+    float quick_settings_box_x = layout->quick_settings_button.x - layout->bounds.x
+        + (layout->quick_settings_button.width - icon_box_size) * 0.5f;
+    float quick_settings_box_y = layout->quick_settings_button.y - layout->bounds.y
+        + (layout->quick_settings_button.height - icon_box_size) * 0.5f;
+
+    float tray_group_x = tray_box_x < quick_settings_box_x
+        ? tray_box_x
+        : quick_settings_box_x;
+    float tray_group_y = tray_box_y < quick_settings_box_y
+        ? tray_box_y
+        : quick_settings_box_y;
+    float tray_group_right = tray_box_x + icon_box_size;
+    float quick_settings_group_right = quick_settings_box_x + icon_box_size;
+    if (quick_settings_group_right > tray_group_right) {
+        tray_group_right = quick_settings_group_right;
+    }
+    float tray_group_bottom = tray_box_y + icon_box_size;
+    float quick_settings_group_bottom = quick_settings_box_y + icon_box_size;
+    if (quick_settings_group_bottom > tray_group_bottom) {
+        tray_group_bottom = quick_settings_group_bottom;
+    }
+
     command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect.x = tray_box_x;
-    command.rect.y = tray_box_y;
-    command.rect.width = icon_box_size;
-    command.rect.height = icon_box_size;
+    command.rect.x = tray_group_x;
+    command.rect.y = tray_group_y;
+    command.rect.width = tray_group_right - tray_group_x;
+    command.rect.height = tray_group_bottom - tray_group_y;
     command.color = theme->tray_button_background;
     command.radius = icon_box_radius;
     reach_render_command_buffer_push(out_commands, &command);
 
     command = {};
     command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-    command.rect.x = tray_box_x + icon_box_size * 0.28f;
-    command.rect.y = tray_box_y + icon_box_size * 0.30f;
-    command.rect.width = icon_box_size * 0.44f;
-    command.rect.height = icon_box_size * 0.44f;
-    command.color = theme->tray_glyph;
-    command.icon_id = REACH_VECTOR_ICON_TRAY_ARROW;
+    command.rect.x = tray_box_x + icon_box_size * 0.22f;
+    command.rect.y = tray_box_y + icon_box_size * 0.22f;
+    command.rect.width = icon_box_size * 0.56f;
+    command.rect.height = icon_box_size * 0.56f;
+    command.color = theme->icon_backplate_background;
+    command.icon_id = REACH_VECTOR_ICON_ARROW_UP;
+    reach_render_command_buffer_push(out_commands, &command);
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    command.rect.x = quick_settings_box_x + icon_box_size * 0.31f;
+    command.rect.y = quick_settings_box_y + icon_box_size * 0.31f;
+    command.rect.width = icon_box_size * 0.38f;
+    command.rect.height = icon_box_size * 0.38f;
+    command.color = theme->icon_backplate_background;
+    command.icon_id = REACH_VECTOR_ICON_SETTINGS;
     reach_render_command_buffer_push(out_commands, &command);
 
     if (input->click_feedback_index == input->tray_feedback_index &&
@@ -224,21 +256,6 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
         command.radius = icon_box_radius;
         reach_render_command_buffer_push(out_commands, &command);
     }
-
-    float quick_settings_box_x = layout->quick_settings_button.x - layout->bounds.x
-        + (layout->quick_settings_button.width - icon_box_size) * 0.5f;
-    float quick_settings_box_y = layout->quick_settings_button.y - layout->bounds.y
-        + (layout->quick_settings_button.height - icon_box_size) * 0.5f;
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect.x = quick_settings_box_x;
-    command.rect.y = quick_settings_box_y;
-    command.rect.width = icon_box_size;
-    command.rect.height = icon_box_size;
-    command.color = theme->tray_button_background;
-    command.radius = icon_box_radius;
-    reach_render_command_buffer_push(out_commands, &command);
 
     if (input->click_feedback_index == input->quick_settings_feedback_index &&
         input->click_feedback_opacity > 0.001f) {

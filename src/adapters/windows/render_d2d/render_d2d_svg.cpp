@@ -9,7 +9,12 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
     case REACH_VECTOR_ICON_POWER:
     case REACH_VECTOR_ICON_SHUTDOWN: return 204;
     case REACH_VECTOR_ICON_SIGN_OUT: return 205;
-    case REACH_VECTOR_ICON_TRAY_ARROW: return 206;
+    case REACH_VECTOR_ICON_ARROW_UP: return 206;
+    case REACH_VECTOR_ICON_SETTINGS: return 207;
+    case REACH_VECTOR_ICON_VOLUME_ZERO: return 208;
+    case REACH_VECTOR_ICON_VOLUME_LOW: return 209;
+    case REACH_VECTOR_ICON_VOLUME_HIGH: return 210;
+    case REACH_VECTOR_ICON_ARROW_DOWN: return 211;
     default: return 0;
     }
 }

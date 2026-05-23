@@ -44,6 +44,46 @@ int main(void)
     failed += expect(reach_dock_hit_test(&layout, 400, 20).type == REACH_DOCK_HIT_POWER_BUTTON);
     failed += expect(reach_dock_hit_test(&layout, 30, 20).type == REACH_DOCK_HIT_ITEM);
 
+    layout.bounds = { 0.0f, 0.0f, 440.0f, 56.0f };
+    reach_dock_icon_cache icon_cache = {};
+    reach_dock_render_input dock_render = {};
+    dock_render.theme = reach_theme_default();
+    dock_render.layout = &layout;
+    dock_render.model = &model;
+    dock_render.icons = &icon_cache;
+    dock_render.dragged_render_index = REACH_MAX_PINNED_APPS;
+    dock_render.tray_feedback_index = REACH_MAX_PINNED_APPS;
+    dock_render.quick_settings_feedback_index = REACH_MAX_PINNED_APPS + 1;
+    dock_render.power_feedback_index = REACH_MAX_PINNED_APPS + 2;
+
+    reach_render_command_buffer render_commands = {};
+    failed += expect(reach_dock_build_render_commands(&dock_render, &render_commands) == REACH_OK);
+    const reach_render_command *tray_arrow_icon = nullptr;
+    const reach_render_command *settings_icon = nullptr;
+    for (size_t index = 0; index < render_commands.count; ++index) {
+        if (render_commands.commands[index].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            render_commands.commands[index].icon_id == REACH_VECTOR_ICON_ARROW_UP) {
+            tray_arrow_icon = &render_commands.commands[index];
+        }
+        if (render_commands.commands[index].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            render_commands.commands[index].icon_id == REACH_VECTOR_ICON_SETTINGS) {
+            settings_icon = &render_commands.commands[index];
+        }
+    }
+    failed += expect(tray_arrow_icon != nullptr);
+    failed += expect(settings_icon != nullptr);
+    if (tray_arrow_icon != nullptr && settings_icon != nullptr) {
+        failed += expect(tray_arrow_icon->rect.width > settings_icon->rect.width);
+        failed += expect(settings_icon->color.r == dock_render.theme->icon_backplate_background.r);
+        failed += expect(settings_icon->color.g == dock_render.theme->icon_backplate_background.g);
+        failed += expect(settings_icon->color.b == dock_render.theme->icon_backplate_background.b);
+        failed += expect(settings_icon->color.a == dock_render.theme->icon_backplate_background.a);
+        failed += expect(tray_arrow_icon->color.r == dock_render.theme->icon_backplate_background.r);
+        failed += expect(tray_arrow_icon->color.g == dock_render.theme->icon_backplate_background.g);
+        failed += expect(tray_arrow_icon->color.b == dock_render.theme->icon_backplate_background.b);
+        failed += expect(tray_arrow_icon->color.a == dock_render.theme->icon_backplate_background.a);
+    }
+
     uint32_t commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     uint32_t icons[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     size_t count = 0;

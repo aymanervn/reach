@@ -36,6 +36,89 @@ static reach_rect_f32 reach_shell_quick_settings_content_bounds(
     return bounds;
 }
 
+static void reach_shell_quick_settings_target_size(
+    reach_shell *shell,
+    float *out_width,
+    float *out_height)
+{
+    const float surface_vertical_padding =
+        8.0f + 12.0f + reach_popup_notch_height();
+    float content_height =
+        reach_quick_settings_content_height_for_model(
+            shell != nullptr ? &shell->quick_settings_model : nullptr);
+
+    if (out_width != nullptr) {
+        *out_width = 280.0f;
+    }
+    if (out_height != nullptr) {
+        *out_height = content_height + surface_vertical_padding;
+    }
+}
+
+static reach_rect_f32 reach_shell_quick_settings_target_bounds(reach_shell *shell)
+{
+    reach_rect_f32 bounds = {};
+    if (shell == nullptr || !shell->has_layout) {
+        return bounds;
+    }
+
+    float width = 280.0f;
+    float height = 140.0f;
+    reach_shell_quick_settings_target_size(shell, &width, &height);
+
+    const float gap = 8.0f;
+    reach_rect_f32 button = shell->layout.dock.quick_settings_button;
+    float anchor_x = button.x + button.width * 0.5f;
+
+    bounds.width = width;
+    bounds.height = height;
+    bounds.x = anchor_x - width * 0.5f;
+    bounds.y = shell->layout.dock.bounds.y - height - gap;
+    return bounds;
+}
+
+static int32_t reach_shell_quick_settings_height_changed(
+    float a,
+    float b)
+{
+    float diff = a - b;
+    if (diff < 0.0f) {
+        diff = -diff;
+    }
+    return diff > 0.5f;
+}
+
+static void reach_shell_relayout_quick_settings(
+    reach_shell *shell,
+    int32_t animate_height)
+{
+    if (shell == nullptr || !shell->has_layout) {
+        return;
+    }
+
+    reach_rect_f32 old_target = shell->quick_settings_target_bounds;
+    reach_rect_f32 current_bounds = shell->quick_settings_bounds;
+    reach_rect_f32 new_target = reach_shell_quick_settings_target_bounds(shell);
+
+    shell->quick_settings_target_bounds = new_target;
+
+    if (animate_height &&
+        reach_shell_quick_settings_height_changed(old_target.height, new_target.height)) {
+        reach_shell_start_popup_bounds_animation(
+            &shell->quick_settings_bounds_animation,
+            current_bounds,
+            new_target,
+            0,
+            1,
+            0.16);
+    } else if (!reach_shell_popup_bounds_animation_active(
+        &shell->quick_settings_bounds_animation)) {
+        shell->quick_settings_bounds = new_target;
+    }
+
+    reach_shell_refresh_quick_settings_layout(shell);
+}
+
 static void reach_shell_capture_quick_settings_input(reach_shell *shell)
 {
     if (shell == nullptr ||
@@ -76,27 +159,27 @@ void reach_shell_refresh_quick_settings_layout(reach_shell *shell)
         return;
     }
 
-    const float popup_width = 280.0f;
-    const float popup_height = 112.0f;
-    const float gap = 8.0f;
     reach_rect_f32 button = shell->layout.dock.quick_settings_button;
     float anchor_x = button.x + button.width * 0.5f;
 
-    shell->quick_settings_bounds.width = popup_width;
-    shell->quick_settings_bounds.height = popup_height;
-    shell->quick_settings_bounds.x = anchor_x - popup_width * 0.5f;
-    shell->quick_settings_bounds.y = shell->layout.dock.bounds.y - popup_height - gap;
+    shell->quick_settings_target_bounds =
+        reach_shell_quick_settings_target_bounds(shell);
+    if (!reach_shell_popup_bounds_animation_active(
+        &shell->quick_settings_bounds_animation)) {
+        shell->quick_settings_bounds = shell->quick_settings_target_bounds;
+    }
     shell->quick_settings_notch_anchor_x = anchor_x;
 
     reach_rect_f32 surface_bounds = {};
-    surface_bounds.width = popup_width;
-    surface_bounds.height = popup_height;
+    surface_bounds.width = shell->quick_settings_bounds.width;
+    surface_bounds.height = shell->quick_settings_bounds.height;
     shell->quick_settings_content_bounds =
         reach_shell_quick_settings_content_bounds(surface_bounds);
     shell->quick_settings_layout =
         reach_quick_settings_layout_for_content_bounds(
             shell->quick_settings_content_bounds,
-            shell->theme);
+            shell->theme,
+            &shell->quick_settings_model);
 }
 
 void reach_shell_refresh_quick_settings_audio(
@@ -118,6 +201,49 @@ void reach_shell_refresh_quick_settings_audio(
             state.level,
             state.muted);
     }
+
+    reach_audio_volume_session_list sessions = {};
+    if (shell->audio_volume.list_sessions != nullptr &&
+        shell->audio_volume.list_sessions(
+            shell->audio_volume.userdata,
+            &sessions) == REACH_OK) {
+        shell->quick_settings_audio_sessions = sessions;
+        reach_quick_settings_model_set_sessions(
+            &shell->quick_settings_model,
+            &sessions);
+    } else {
+        shell->quick_settings_audio_sessions = {};
+        reach_quick_settings_model_set_sessions(
+            &shell->quick_settings_model,
+            nullptr);
+    }
+}
+
+void reach_shell_update_quick_settings_animation(
+    reach_shell *shell,
+    double delta_seconds)
+{
+    if (shell == nullptr || !shell->quick_settings_open || !shell->has_layout) {
+        return;
+    }
+
+    if (reach_shell_popup_bounds_animation_active(
+        &shell->quick_settings_bounds_animation)) {
+        const float gap = 8.0f;
+        float anchor_x = shell->layout.dock.quick_settings_button.x +
+            shell->layout.dock.quick_settings_button.width * 0.5f;
+        shell->quick_settings_bounds =
+            reach_shell_apply_popup_bounds_animation(
+                &shell->quick_settings_bounds_animation,
+                shell->quick_settings_target_bounds,
+                anchor_x,
+                shell->layout.dock.bounds.y,
+                gap,
+                delta_seconds);
+        reach_shell_refresh_quick_settings_layout(shell);
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+    }
 }
 
 void reach_shell_set_quick_settings_open(
@@ -136,12 +262,14 @@ void reach_shell_set_quick_settings_open(
 
     shell->quick_settings_open = next_open;
     shell->quick_settings_dragging_volume = 0;
+    shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
 
     if (next_open) {
         reach_shell_set_tray_popup_open(shell, 0);
         reach_shell_close_context_menu(shell);
         reach_shell_refresh_quick_settings_audio(shell);
-        reach_shell_refresh_quick_settings_layout(shell);
+        shell->quick_settings_bounds_animation = {};
+        reach_shell_relayout_quick_settings(shell, 0);
         reach_shell_capture_quick_settings_input(shell);
         if (shell->quick_settings.window.ops.show != nullptr) {
             (void)shell->quick_settings.window.ops.show(shell->quick_settings.window.window);
@@ -199,9 +327,50 @@ void reach_shell_execute_quick_settings_action(
         return;
     }
 
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME) {
+        float level = reach_shell_quick_settings_clamp01(action.volume_level);
+
+        if (action.session_index < shell->quick_settings_model.sessions.count) {
+            reach_audio_volume_session *session =
+                &shell->quick_settings_model.sessions.sessions[action.session_index];
+            session->level = level;
+            if (shell->audio_volume.set_session_level != nullptr) {
+                (void)shell->audio_volume.set_session_level(
+                    shell->audio_volume.userdata,
+                    session->session_instance_id,
+                    level);
+            }
+        } else if (shell->audio_volume.set_session_level != nullptr) {
+            (void)shell->audio_volume.set_session_level(
+                shell->audio_volume.userdata,
+                action.session_instance_id,
+                level);
+        }
+
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+        return;
+    }
+
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_MUTED) {
+        if (shell->audio_volume.set_session_muted != nullptr) {
+            (void)shell->audio_volume.set_session_muted(
+                shell->audio_volume.userdata,
+                action.session_instance_id,
+                action.muted);
+        }
+        reach_shell_refresh_quick_settings_audio(shell);
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+        return;
+    }
+
     if (action.type == REACH_QUICK_SETTINGS_ACTION_EXPAND) {
         shell->quick_settings_model.expanded =
             shell->quick_settings_model.expanded ? 0 : 1;
+
+        reach_shell_refresh_quick_settings_audio(shell);
+        reach_shell_relayout_quick_settings(shell, 1);
 
         shell->quick_settings.dirty_flags = 1;
         shell->render_dirty = 1;

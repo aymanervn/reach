@@ -970,6 +970,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 if (shell->quick_settings.window.ops.set_bounds != nullptr) {
                     int32_t quick_window_changed = 0;
                     reach_shell_refresh_quick_settings_layout(shell);
+                    reach_shell_update_quick_settings_animation(shell, delta_seconds);
                     result = reach_shell_apply_window_state(
                         &shell->quick_settings.window,
                         shell->quick_settings_bounds,
@@ -1093,6 +1094,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
          shell->switcher_open ||
          shell->context_menu_open ||
          shell->quick_settings_open ||
+         reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
          shell->dock_animating ||
          shell->dock_width_animating ||
          shell->dock_drag_active ||

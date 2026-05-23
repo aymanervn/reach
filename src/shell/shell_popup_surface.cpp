@@ -1,4 +1,122 @@
 #include "shell_internal.h"
+#include <math.h>
+
+static int32_t reach_shell_popup_float_animation_active(
+    const reach_float_animation *animation)
+{
+    return animation != nullptr &&
+        animation->elapsed_seconds < animation->duration_seconds;
+}
+
+static float reach_shell_round_f32(float value)
+{
+    return floorf(value + 0.5f);
+}
+
+static reach_rect_f32 reach_shell_snap_rect(reach_rect_f32 rect)
+{
+    rect.x = reach_shell_round_f32(rect.x);
+    rect.y = reach_shell_round_f32(rect.y);
+    rect.width = reach_shell_round_f32(rect.width);
+    rect.height = reach_shell_round_f32(rect.height);
+    return rect;
+}
+
+void reach_shell_start_popup_bounds_animation(
+    reach_shell_popup_bounds_animation *animation,
+    reach_rect_f32 current_bounds,
+    reach_rect_f32 target_bounds,
+    int32_t animate_width,
+    int32_t animate_height,
+    double duration_seconds)
+{
+    if (animation == nullptr) {
+        return;
+    }
+
+    animation->animate_width = animate_width ? 1 : 0;
+    animation->animate_height = animate_height ? 1 : 0;
+
+    if (animation->animate_width) {
+        reach_float_animation_start(
+            &animation->width,
+            current_bounds.width,
+            target_bounds.width,
+            duration_seconds);
+    } else {
+        reach_float_animation_start(
+            &animation->width,
+            target_bounds.width,
+            target_bounds.width,
+            0.0);
+    }
+
+    if (animation->animate_height) {
+        reach_float_animation_start(
+            &animation->height,
+            current_bounds.height,
+            target_bounds.height,
+            duration_seconds);
+    } else {
+        reach_float_animation_start(
+            &animation->height,
+            target_bounds.height,
+            target_bounds.height,
+            0.0);
+    }
+
+    animation->active =
+        animation->animate_width ||
+        animation->animate_height;
+}
+
+reach_rect_f32 reach_shell_apply_popup_bounds_animation(
+    reach_shell_popup_bounds_animation *animation,
+    reach_rect_f32 target_bounds,
+    float anchor_x,
+    float reference_y,
+    float gap,
+    double delta_seconds)
+{
+    reach_rect_f32 bounds = target_bounds;
+
+    if (animation != nullptr && animation->active) {
+        if (animation->animate_width) {
+            reach_float_animation_update(&animation->width, delta_seconds);
+            bounds.width = animation->width.value;
+        } else {
+            bounds.width = target_bounds.width;
+        }
+
+        if (animation->animate_height) {
+            reach_float_animation_update(&animation->height, delta_seconds);
+            bounds.height = animation->height.value;
+        } else {
+            bounds.height = target_bounds.height;
+        }
+
+        animation->active =
+            (animation->animate_width &&
+                reach_shell_popup_float_animation_active(&animation->width)) ||
+            (animation->animate_height &&
+                reach_shell_popup_float_animation_active(&animation->height));
+    }
+
+    if (animation != nullptr && animation->animate_width) {
+        bounds.x = anchor_x - bounds.width * 0.5f;
+    } else {
+        bounds.x = target_bounds.x;
+    }
+
+    bounds.y = reference_y - bounds.height - gap;
+    return reach_shell_snap_rect(bounds);
+}
+
+int32_t reach_shell_popup_bounds_animation_active(
+    const reach_shell_popup_bounds_animation *animation)
+{
+    return animation != nullptr && animation->active;
+}
 
 reach_result reach_shell_render_popup_surface(
     reach_shell *shell,

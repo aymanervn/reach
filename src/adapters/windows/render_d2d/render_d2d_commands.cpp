@@ -73,6 +73,14 @@ reach_result reach_d2d_execute(
             continue;
         }
 
+        if (command->type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT) {
+            reach_result result = reach_d2d_draw_clipped_rounded_rect(target, command);
+            if (result != REACH_OK) {
+                return result;
+            }
+            continue;
+        }
+
         if (command->type == REACH_RENDER_COMMAND_TEXT) {
             reach_result result = reach_d2d_draw_text(backend, command);
             if (result != REACH_OK) {

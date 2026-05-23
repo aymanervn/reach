@@ -21,6 +21,14 @@
 #include "reach/shell/surface_runtime.h"
 #include "reach/core/theme.h"
 
+typedef struct reach_shell_popup_bounds_animation {
+    reach_float_animation width;
+    reach_float_animation height;
+    int32_t animate_width;
+    int32_t animate_height;
+    int32_t active;
+} reach_shell_popup_bounds_animation;
+
 struct reach_shell {
     reach_hotkeys *hotkeys;
     reach_monitor_list *monitors;
@@ -117,12 +125,18 @@ struct reach_shell {
     reach_audio_volume_port audio_volume;
     int32_t quick_settings_open;
     int32_t quick_settings_dragging_volume;
+    reach_quick_settings_hit_type quick_settings_drag_type;
+    size_t quick_settings_drag_session_index;
+    uint16_t quick_settings_drag_session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
     reach_audio_volume_state quick_settings_audio_state;
+    reach_audio_volume_session_list quick_settings_audio_sessions;
     reach_quick_settings_model quick_settings_model;
     reach_quick_settings_layout quick_settings_layout;
     reach_rect_f32 quick_settings_bounds;
+    reach_rect_f32 quick_settings_target_bounds;
     reach_rect_f32 quick_settings_content_bounds;
     float quick_settings_notch_anchor_x;
+    reach_shell_popup_bounds_animation quick_settings_bounds_animation;
     reach_popup_capture_port popup_capture;
 };
 
@@ -148,6 +162,22 @@ reach_result reach_shell_render_popup_surface(
     reach_rect_f32 bounds,
     float notch_anchor_x,
     const reach_render_command_buffer *content_commands);
+void reach_shell_start_popup_bounds_animation(
+    reach_shell_popup_bounds_animation *animation,
+    reach_rect_f32 current_bounds,
+    reach_rect_f32 target_bounds,
+    int32_t animate_width,
+    int32_t animate_height,
+    double duration_seconds);
+reach_rect_f32 reach_shell_apply_popup_bounds_animation(
+    reach_shell_popup_bounds_animation *animation,
+    reach_rect_f32 target_bounds,
+    float anchor_x,
+    float reference_y,
+    float gap,
+    double delta_seconds);
+int32_t reach_shell_popup_bounds_animation_active(
+    const reach_shell_popup_bounds_animation *animation);
 
 void reach_shell_raise_launcher(reach_shell *shell);
 void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open);
@@ -156,6 +186,7 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open);
 void reach_shell_toggle_quick_settings(reach_shell *shell);
 void reach_shell_refresh_quick_settings_audio(reach_shell *shell);
 void reach_shell_refresh_quick_settings_layout(reach_shell *shell);
+void reach_shell_update_quick_settings_animation(reach_shell *shell, double delta_seconds);
 void reach_shell_execute_quick_settings_action(
     reach_shell *shell,
     reach_quick_settings_action action);

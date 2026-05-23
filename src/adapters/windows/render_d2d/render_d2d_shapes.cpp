@@ -465,3 +465,81 @@ reach_result reach_d2d_draw_rect_or_rounded_rect(
 
     return REACH_OK;
 }
+
+reach_result reach_d2d_draw_clipped_rounded_rect(
+    ID2D1RenderTarget *target,
+    const reach_render_command *command
+)
+{
+    if (target == nullptr || command == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    ID2D1SolidColorBrush *brush = nullptr;
+    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+    if (FAILED(hr) || brush == nullptr) {
+        return REACH_ERROR;
+    }
+
+    ID2D1Factory *factory = nullptr;
+    ID2D1RoundedRectangleGeometry *clip_geometry = nullptr;
+    ID2D1Layer *layer = nullptr;
+
+    target->GetFactory(&factory);
+    if (factory == nullptr) {
+        brush->Release();
+        return REACH_ERROR;
+    }
+
+    D2D1_ROUNDED_RECT clip_rect = D2D1::RoundedRect(
+        D2D1::RectF(
+            command->clip_rect.x,
+            command->clip_rect.y,
+            command->clip_rect.x + command->clip_rect.width,
+            command->clip_rect.y + command->clip_rect.height),
+        command->clip_radius,
+        command->clip_radius);
+
+    hr = factory->CreateRoundedRectangleGeometry(clip_rect, &clip_geometry);
+    if (SUCCEEDED(hr)) {
+        hr = target->CreateLayer(nullptr, &layer);
+    }
+
+    if (SUCCEEDED(hr)) {
+        D2D1_LAYER_PARAMETERS parameters = D2D1::LayerParameters(
+            D2D1::RectF(
+                command->clip_rect.x,
+                command->clip_rect.y,
+                command->clip_rect.x + command->clip_rect.width,
+                command->clip_rect.y + command->clip_rect.height),
+            clip_geometry);
+
+        target->PushLayer(parameters, layer);
+
+        D2D1_ROUNDED_RECT rect = D2D1::RoundedRect(
+            D2D1::RectF(
+                command->rect.x,
+                command->rect.y,
+                command->rect.x + command->rect.width,
+                command->rect.y + command->rect.height),
+            command->radius,
+            command->radius);
+        target->FillRoundedRectangle(rect, brush);
+        target->PopLayer();
+    }
+
+    if (layer != nullptr) {
+        layer->Release();
+    }
+    if (clip_geometry != nullptr) {
+        clip_geometry->Release();
+    }
+    if (factory != nullptr) {
+        factory->Release();
+    }
+    if (brush != nullptr) {
+        brush->Release();
+    }
+
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
