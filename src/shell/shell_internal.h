@@ -12,6 +12,7 @@
 #include "reach/features/launcher.h"
 #include "reach/features/switcher.h"
 #include "reach/features/tray.h"
+#include "reach/features/wallpaper.h"
 #include "reach/hotkeys.h"
 #include "reach/monitor.h"
 #include "reach/pin_config.h"

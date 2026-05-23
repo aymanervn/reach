@@ -257,53 +257,16 @@ reach_result reach_shell_reload_pins(reach_shell *shell)
 
 void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot)
 {
-    if (shell == nullptr || snapshot == nullptr || shell->wallpaper_service.service == nullptr) {
+    if (shell == nullptr) {
         return;
     }
-    shell->wallpaper_path[0] = 0;
-    if (snapshot->wallpaper_path[0] != 0) {
-        reach_copy_utf16(shell->wallpaper_path, 260, snapshot->wallpaper_path);
-        if (shell->wallpaper_service.ops.set_wallpaper != nullptr) {
-            (void)shell->wallpaper_service.ops.set_wallpaper(shell->wallpaper_service.service, snapshot->wallpaper_path);
-        }
-        if (shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
-            (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, snapshot->wallpaper_path);
-        }
-        if (shell->wallpaper_surface.ops.set_monitor_wallpaper != nullptr) {
-            for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index) {
-                if (snapshot->monitor_wallpaper_paths[index][0] != 0) {
-                    (void)shell->wallpaper_surface.ops.set_monitor_wallpaper(
-                        shell->wallpaper_surface.surface,
-                        index,
-                        snapshot->monitor_wallpaper_paths[index]);
-                }
-            }
-        }
-        return;
-    }
-    if (shell->wallpaper_service.ops.current_wallpaper == nullptr || shell->config_store.ops.save == nullptr) {
-        return;
-    }
-    uint16_t current[260] = {};
-    if (shell->wallpaper_service.ops.current_wallpaper(shell->wallpaper_service.service, current, 260) == REACH_OK &&
-        current[0] != 0) {
-        reach_copy_utf16(shell->wallpaper_path, 260, current);
-        (void)reach_copy_utf16(snapshot->wallpaper_path, 260, current);
-        (void)shell->config_store.ops.save(shell->config_store.store, snapshot);
-        if (shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
-            (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, current);
-        }
-    }
-    if (shell->wallpaper_surface.ops.set_monitor_wallpaper != nullptr) {
-        for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index) {
-            if (snapshot->monitor_wallpaper_paths[index][0] != 0) {
-                (void)shell->wallpaper_surface.ops.set_monitor_wallpaper(
-                    shell->wallpaper_surface.surface,
-                    index,
-                    snapshot->monitor_wallpaper_paths[index]);
-            }
-        }
-    }
+    reach_wallpaper_seed_or_apply(
+        &shell->config_store,
+        &shell->wallpaper_service,
+        &shell->wallpaper_surface,
+        snapshot,
+        shell->wallpaper_path,
+        260);
 }
 
 void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)

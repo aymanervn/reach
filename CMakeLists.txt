@@ -75,6 +75,7 @@ add_library(reach_features STATIC
     src/features/tray/tray_interaction.cpp
     src/features/tray/tray_model.cpp
     src/features/tray/tray_render.cpp
+    src/features/wallpaper/wallpaper_feature.cpp
 )
 
 reach_configure_common(reach_features)
