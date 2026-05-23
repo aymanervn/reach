@@ -50,14 +50,16 @@ Temporary transition exceptions:
 
 - `src/main.cpp`: executable entry point, command-line shell registration, COM,
   and Windows message loop setup.
-- `src/shell/shell.cpp`: shell composition glue still directly uses Windows
-  adapter factories.
+- `src/shell/shell.cpp`: public shell creation glue still directly uses Windows
+  adapter factories while the compatibility entry point remains in shell.
 - `src/shell/shell_input.cpp`: current shell input orchestration still uses
-  Win32 types for transitional popup/context-menu handling.
+  Win32 types for launcher activation and transitional popup/context-menu
+  handling.
 - `src/shell/shell_render.cpp`: current shell render orchestration still uses
-  DirectWrite constants while render text alignment remains shell-owned.
+  DirectWrite constants and Win32 path helpers while text alignment and
+  switcher label derivation remain shell-owned.
 - `src/shell/shell_update.cpp`: current shell update orchestration still uses
-  Win32 path and cursor helpers.
+  Win32 path comparison, cursor helpers, and wallpaper reload orchestration.
 - `src/util.cpp`: logging currently uses `OutputDebugStringA`.
 - `src/config_path.cpp`: default config path lookup currently uses Win32 path
   APIs.
@@ -101,9 +103,13 @@ exceptions above.
 
 ## Remaining Transition Debt
 
-- `src/shell/shell.cpp` still contains native context-menu hook and window
-  styling helpers. These remain shell transition debt until popup capture and
-  native context-menu behavior move behind ports or Windows adapters.
-- `src/shell/shell.cpp` still contains switcher rendering/model helpers and
-  wallpaper orchestration. These were not moved in the current pass because the
-  launcher and context-menu extractions were the safer mechanical boundary.
+- `src/shell/shell.cpp` still contains public shell creation glue that directly
+  calls Windows adapter factories. New composition should continue to prefer
+  `src/app/composition_root.cpp`.
+- `src/shell/shell_input.cpp` still contains native input and context-menu
+  transition code, including Win32 window handles and native menu hook helpers.
+- `src/shell/shell_render.cpp` still owns DirectWrite text constants and
+  Win32 path-label derivation before calling feature render builders.
+- `src/shell/shell_update.cpp` still owns Win32 path comparison, cursor helpers,
+  and wallpaper reload orchestration. Wallpaper seed/apply logic has moved to
+  the wallpaper feature.

@@ -28,7 +28,6 @@ WIN32_TOKENS = [
 # narrow so new Win32 usage outside adapters/windows is caught by default.
 WIN32_ALLOWLIST = {
     "src/main.cpp",
-    "src/shell/shell.cpp",
     "src/shell/shell_input.cpp",
     "src/shell/shell_render.cpp",
     "src/shell/shell_update.cpp",
@@ -37,8 +36,6 @@ WIN32_ALLOWLIST = {
     "src/pin_config.cpp",
     "src/monitor.cpp",
     "src/hotkeys.cpp",
-    "src/tools/reachctl.cpp",
-    "src/tools/tray_probe.cpp",
 }
 
 WIN32_ALLOWED_PREFIXES = (

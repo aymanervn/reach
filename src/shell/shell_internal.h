@@ -107,7 +107,6 @@ struct reach_shell {
 
 static const size_t REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_PINNED_APPS;
 static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 1;
-static const size_t REACH_SHELL_SWITCHER_VISIBLE_MAX = 12;
 
 int32_t reach_shell_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
 int32_t reach_shell_opacity_equal(float a, float b);
