@@ -83,18 +83,31 @@ float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layou
     return wanted_local_x;
 }
 
-size_t reach_dock_reorder_target(const reach_dock_feature_model *model, const reach_dock_layout *layout, int32_t x)
+size_t reach_dock_reorder_target(const reach_dock_feature_model *model, const reach_dock_layout *layout, size_t current_index, float dragged_box_x)
 {
-    if (model == nullptr || layout == nullptr || model->item_count == 0) {
+    if (model == nullptr || layout == nullptr || model->item_count == 0 || layout->app_slot_count == 0) {
         return REACH_MAX_PINNED_APPS;
     }
-    size_t last = model->item_count - 1;
-    for (size_t index = 0; index < model->item_count; ++index) {
-        reach_rect_f32 slot = layout->app_slots[index];
-        float midpoint = slot.x + slot.width * 0.5f;
-        if ((float)x < midpoint) {
-            return index;
-        }
+
+    size_t count = model->item_count < layout->app_slot_count ? model->item_count : layout->app_slot_count;
+    if (current_index >= count) {
+        return REACH_MAX_PINNED_APPS;
     }
-    return last;
+
+    size_t target = current_index;
+    while (target > 0) {
+        float threshold = layout->app_slots[target - 1].x + layout->app_slots[target - 1].width * 0.25f;
+        if (dragged_box_x > threshold) {
+            break;
+        }
+        --target;
+    }
+    while (target + 1 < count) {
+        float threshold = layout->app_slots[target + 1].x - layout->app_slots[target + 1].width * 0.25f;
+        if (dragged_box_x < threshold) {
+            break;
+        }
+        ++target;
+    }
+    return target;
 }

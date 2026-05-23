@@ -510,10 +510,10 @@ size_t reach_shell_find_dock_item_key(const reach_shell *shell, int32_t pinned, 
     return REACH_MAX_PINNED_APPS;
 }
 
-size_t reach_shell_dock_reorder_target(const reach_shell *shell, int32_t x)
+size_t reach_shell_dock_reorder_target(const reach_shell *shell, size_t current_index, float dragged_box_x)
 {
     return shell != nullptr && shell->has_layout
-        ? reach_dock_reorder_target(&shell->dock_model, &shell->layout.dock, x)
+        ? reach_dock_reorder_target(&shell->dock_model, &shell->layout.dock, current_index, dragged_box_x)
         : REACH_MAX_PINNED_APPS;
 }
 

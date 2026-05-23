@@ -251,6 +251,18 @@ target_link_libraries(reach_core_tests PRIVATE
     reach_core
 )
 
+add_executable(reach_dock_feature_tests
+    tests/dock_feature_tests.cpp
+)
+
+reach_configure_common(reach_dock_feature_tests)
+target_compile_features(reach_dock_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_dock_feature_tests PRIVATE
+    reach_features
+)
+
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
     src/app/pin_config.cpp
@@ -269,9 +281,11 @@ target_link_libraries(reach_pin_config_tests PRIVATE
 
 if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_core_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_core_tests.exe)
+    add_test(NAME reach_dock_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_dock_feature_tests.exe)
     add_test(NAME reach_pin_config_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_pin_config_tests.exe)
 else()
     add_test(NAME reach_core_tests COMMAND reach_core_tests)
+    add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
 endif()
 

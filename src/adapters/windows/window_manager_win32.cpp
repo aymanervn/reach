@@ -768,16 +768,17 @@ static reach_result reach_window_manager_activate(
     if (hidden != nullptr) {
         WINDOWPLACEMENT placement = hidden->placement;
 
-        reach_window_manager_remove_hidden_minimized(manager, hwnd);
-
-        ShowWindowAsync(hwnd, SW_SHOW);
-        SetWindowPlacement(hwnd, &placement);
-
         const bool restore_to_maximized =
             placement.showCmd == SW_SHOWMAXIMIZED ||
             (placement.flags & WPF_RESTORETOMAXIMIZED) != 0;
 
-        ShowWindowAsync(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
+        placement.showCmd = restore_to_maximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
+
+        reach_window_manager_remove_hidden_minimized(manager, hwnd);
+
+        ShowWindow(hwnd, SW_SHOW);
+        SetWindowPlacement(hwnd, &placement);
+        ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
     } else if (IsIconic(hwnd)) {
         WINDOWPLACEMENT placement = {};
         placement.length = sizeof(placement);
@@ -789,9 +790,9 @@ static reach_result reach_window_manager_activate(
                 (placement.flags & WPF_RESTORETOMAXIMIZED) != 0
             );
 
-        ShowWindowAsync(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
+        ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
     } else if (!IsWindowVisible(hwnd)) {
-        ShowWindowAsync(hwnd, SW_SHOW);
+        ShowWindow(hwnd, SW_SHOW);
     }
 
     HWND foreground = GetForegroundWindow();

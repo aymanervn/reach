@@ -986,16 +986,16 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
                 shell->dock_drag_x = next_drag_x;
                 shell->dock.dirty_flags = 1;
             }
-            float dragged_center_x = shell->layout.dock.bounds.x + shell->dock_drag_x + shell->ui.dock.icon_size * 0.5f;
-            size_t target = reach_shell_dock_reorder_target(shell, (int32_t)dragged_center_x);
+            float dragged_box_x = shell->layout.dock.bounds.x + shell->dock_drag_x;
+            size_t current = reach_shell_find_dock_order_key(
+                shell,
+                shell->dock_drag_pinned,
+                shell->dock_drag_pin_id,
+                shell->dock_drag_window);
+            size_t target = reach_shell_dock_reorder_target(shell, current, dragged_box_x);
             if (target != REACH_MAX_PINNED_APPS && target != shell->dock_drag_target_index) {
-                size_t source = reach_shell_find_dock_order_key(
-                    shell,
-                    shell->dock_drag_pinned,
-                    shell->dock_drag_pin_id,
-                    shell->dock_drag_window);
-                if (source != REACH_MAX_PINNED_APPS) {
-                    reach_shell_move_dock_order(shell, source, target);
+                if (current != REACH_MAX_PINNED_APPS) {
+                    reach_shell_move_dock_order(shell, current, target);
                     reach_shell_rebuild_dock_items_with_animations(shell, &shell->layout.dock);
                 }
                 shell->dock_drag_target_index = target;

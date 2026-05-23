@@ -142,7 +142,7 @@ int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t wind
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout);
 float reach_shell_dock_slot_box_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index);
 float reach_shell_dock_drag_clamped_x(const reach_shell *shell, const reach_dock_layout *layout, int32_t cursor_x);
-size_t reach_shell_dock_reorder_target(const reach_shell *shell, int32_t x);
+size_t reach_shell_dock_reorder_target(const reach_shell *shell, size_t current_index, float dragged_box_x);
 size_t reach_shell_find_dock_item_key(const reach_shell *shell, int32_t pinned, uint32_t pin_id, uintptr_t window);
 size_t reach_shell_find_dock_order_key(const reach_shell *shell, int32_t pinned, uint32_t pin_id, uintptr_t window);
 void reach_shell_move_dock_order(reach_shell *shell, size_t source, size_t target);

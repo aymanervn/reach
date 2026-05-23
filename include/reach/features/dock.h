@@ -139,7 +139,7 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
 reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature_model *model, size_t item_index);
 float reach_dock_slot_box_x(const reach_theme *theme, const reach_dock_layout *layout, size_t index);
 float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layout *layout, int32_t cursor_x, float grab_offset_x);
-size_t reach_dock_reorder_target(const reach_dock_feature_model *model, const reach_dock_layout *layout, int32_t x);
+size_t reach_dock_reorder_target(const reach_dock_feature_model *model, const reach_dock_layout *layout, size_t current_index, float dragged_box_x);
 
 #ifdef __cplusplus
 }
