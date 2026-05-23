@@ -10,6 +10,7 @@
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/platform_window.h"
+#include "reach/ports/popup_capture.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
 #include "reach/ports/tray_provider.h"
@@ -49,6 +50,7 @@ typedef struct reach_shell_dependencies {
     reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
     reach_wallpaper_surface_port wallpaper_surface;
+    reach_popup_capture_port popup_capture;
 } reach_shell_dependencies;
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, const reach_shell_dependencies *dependencies, reach_shell **out_shell);

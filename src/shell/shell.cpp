@@ -114,7 +114,7 @@ struct reach_shell {
     size_t context_menu_hovered_index;
     int32_t running;
     uint16_t wallpaper_path[260];
-    HHOOK popup_mouse_hook;
+    reach_popup_capture_port popup_capture;
 };
 
 static const size_t REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_PINNED_APPS;
@@ -155,29 +155,16 @@ static float reach_shell_clamp_float(float value, float min_value, float max_val
     return value;
 }
 
-static reach_shell *g_reach_popup_mouse_shell;
+static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point);
 
-static HWND reach_shell_native_window(const reach_platform_window_port *window)
+static void reach_shell_on_popup_mouse_down(void *user, int32_t x, int32_t y)
 {
-    if (window == nullptr || window->ops.native_handle == nullptr) {
-        return nullptr;
+    reach_shell *shell = static_cast<reach_shell *>(user);
+    if (shell == nullptr) {
+        return;
     }
-    return (HWND)window->ops.native_handle(window->window);
-}
-
-static int32_t reach_shell_point_on_window(HWND hwnd, POINT point)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd)) {
-        return 0;
-    }
-    HWND hit = WindowFromPoint(point);
-    while (hit != nullptr) {
-        if (hit == hwnd) {
-            return 1;
-        }
-        hit = GetAncestor(hit, GA_PARENT);
-    }
-    return 0;
+    POINT point = { x, y };
+    reach_shell_handle_global_mouse_down(shell, point);
 }
 
 static reach_color reach_shell_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
@@ -247,73 +234,97 @@ static void reach_shell_clear_sticky_dock_feedback(reach_shell *shell);
 
 static void reach_shell_capture_tray_input(reach_shell *shell)
 {
-    if (shell == nullptr || shell->tray.window.ops.native_handle == nullptr) {
+    if (shell == nullptr ||
+        shell->popup_capture.begin_capture == nullptr ||
+        shell->tray.window.ops.native_handle == nullptr) {
         return;
     }
 
-    HWND tray_hwnd = (HWND)shell->tray.window.ops.native_handle(shell->tray.window.window);
+    void *tray_hwnd = shell->tray.window.ops.native_handle(shell->tray.window.window);
     if (tray_hwnd != nullptr) {
-        SetCapture(tray_hwnd);
+        (void)shell->popup_capture.begin_capture(
+            shell->popup_capture.userdata,
+            tray_hwnd);
     }
 }
 
 static void reach_shell_release_tray_input(reach_shell *shell)
 {
-    if (shell == nullptr || shell->tray.window.ops.native_handle == nullptr) {
+    if (shell == nullptr ||
+        shell->popup_capture.end_capture == nullptr ||
+        shell->tray.window.ops.native_handle == nullptr) {
         return;
     }
 
-    HWND tray_hwnd = (HWND)shell->tray.window.ops.native_handle(shell->tray.window.window);
-    if (tray_hwnd != nullptr && GetCapture() == tray_hwnd) {
-        ReleaseCapture();
+    void *tray_hwnd = shell->tray.window.ops.native_handle(shell->tray.window.window);
+    if (tray_hwnd != nullptr) {
+        shell->popup_capture.end_capture(
+            shell->popup_capture.userdata,
+            tray_hwnd);
     }
 }
 
 static void reach_shell_capture_dock_input(reach_shell *shell)
 {
-    if (shell == nullptr || shell->dock.window.ops.native_handle == nullptr) {
+    if (shell == nullptr ||
+        shell->popup_capture.begin_capture == nullptr ||
+        shell->dock.window.ops.native_handle == nullptr) {
         return;
     }
 
-    HWND dock_hwnd = (HWND)shell->dock.window.ops.native_handle(shell->dock.window.window);
+    void *dock_hwnd = shell->dock.window.ops.native_handle(shell->dock.window.window);
     if (dock_hwnd != nullptr) {
-        SetCapture(dock_hwnd);
+        (void)shell->popup_capture.begin_capture(
+            shell->popup_capture.userdata,
+            dock_hwnd);
     }
 }
 
 static void reach_shell_release_dock_input(reach_shell *shell)
 {
-    if (shell == nullptr || shell->dock.window.ops.native_handle == nullptr) {
+    if (shell == nullptr ||
+        shell->popup_capture.end_capture == nullptr ||
+        shell->dock.window.ops.native_handle == nullptr) {
         return;
     }
 
-    HWND dock_hwnd = (HWND)shell->dock.window.ops.native_handle(shell->dock.window.window);
-    if (dock_hwnd != nullptr && GetCapture() == dock_hwnd) {
-        ReleaseCapture();
+    void *dock_hwnd = shell->dock.window.ops.native_handle(shell->dock.window.window);
+    if (dock_hwnd != nullptr) {
+        shell->popup_capture.end_capture(
+            shell->popup_capture.userdata,
+            dock_hwnd);
     }
 }
 
 static void reach_shell_capture_context_menu_input(reach_shell *shell)
 {
-    if (shell == nullptr || shell->context_menu.window.ops.native_handle == nullptr) {
+    if (shell == nullptr ||
+        shell->popup_capture.begin_capture == nullptr ||
+        shell->context_menu.window.ops.native_handle == nullptr) {
         return;
     }
 
-    HWND hwnd = (HWND)shell->context_menu.window.ops.native_handle(shell->context_menu.window.window);
+    void *hwnd = shell->context_menu.window.ops.native_handle(shell->context_menu.window.window);
     if (hwnd != nullptr) {
-        SetCapture(hwnd);
+        (void)shell->popup_capture.begin_capture(
+            shell->popup_capture.userdata,
+            hwnd);
     }
 }
 
 static void reach_shell_release_context_menu_input(reach_shell *shell)
 {
-    if (shell == nullptr || shell->context_menu.window.ops.native_handle == nullptr) {
+    if (shell == nullptr ||
+        shell->popup_capture.end_capture == nullptr ||
+        shell->context_menu.window.ops.native_handle == nullptr) {
         return;
     }
 
-    HWND hwnd = (HWND)shell->context_menu.window.ops.native_handle(shell->context_menu.window.window);
-    if (hwnd != nullptr && GetCapture() == hwnd) {
-        ReleaseCapture();
+    void *hwnd = shell->context_menu.window.ops.native_handle(shell->context_menu.window.window);
+    if (hwnd != nullptr) {
+        shell->popup_capture.end_capture(
+            shell->popup_capture.userdata,
+            hwnd);
     }
 }
 
@@ -345,38 +356,18 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
     }
 }
 
-static LRESULT CALLBACK reach_shell_popup_mouse_hook_proc(int code, WPARAM wparam, LPARAM lparam)
-{
-    if (code >= 0 &&
-        (wparam == WM_LBUTTONDOWN || wparam == WM_RBUTTONDOWN || wparam == WM_MBUTTONDOWN || wparam == WM_XBUTTONDOWN)) {
-        MSLLHOOKSTRUCT *mouse = reinterpret_cast<MSLLHOOKSTRUCT *>(lparam);
-        if (mouse != nullptr) {
-            reach_shell_handle_global_mouse_down(g_reach_popup_mouse_shell, mouse->pt);
-        }
-    }
-    HHOOK hook = g_reach_popup_mouse_shell != nullptr ? g_reach_popup_mouse_shell->popup_mouse_hook : nullptr;
-    return CallNextHookEx(hook, code, wparam, lparam);
-}
-
 static void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
 {
-    if (shell == nullptr) {
+    if (shell == nullptr || shell->popup_capture.sync_mouse_hook == nullptr) {
         return;
     }
 
     int32_t should_hook = shell->tray_popup_open || shell->context_menu_open;
-    if (should_hook && shell->popup_mouse_hook == nullptr) {
-        shell->popup_mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, reach_shell_popup_mouse_hook_proc, GetModuleHandleW(nullptr), 0);
-        if (shell->popup_mouse_hook != nullptr) {
-            g_reach_popup_mouse_shell = shell;
-        }
-    } else if (!should_hook && shell->popup_mouse_hook != nullptr) {
-        UnhookWindowsHookEx(shell->popup_mouse_hook);
-        shell->popup_mouse_hook = nullptr;
-        if (g_reach_popup_mouse_shell == shell) {
-            g_reach_popup_mouse_shell = nullptr;
-        }
-    }
+    (void)shell->popup_capture.sync_mouse_hook(
+        shell->popup_capture.userdata,
+        should_hook,
+        reach_shell_on_popup_mouse_down,
+        shell);
 }
 
 static void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
@@ -1143,8 +1134,12 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->wallpaper_surface.ops.destroy != nullptr) {
         shell->wallpaper_surface.ops.destroy(shell->wallpaper_surface.surface);
     }
+    if (shell->popup_capture.destroy != nullptr) {
+        shell->popup_capture.destroy(shell->popup_capture.userdata);
+    }
     shell->hotkeys = nullptr;
     shell->monitors = nullptr;
+    shell->popup_capture = {};
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
     reach_surface_runtime_init(&shell->tray);
@@ -2701,6 +2696,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->explorer_service = dependencies->explorer_service;
     shell->wallpaper_service = dependencies->wallpaper_service;
     shell->wallpaper_surface = dependencies->wallpaper_surface;
+    shell->popup_capture = dependencies->popup_capture;
     shell->theme = reach_theme_default();
 
     if (result == REACH_OK && shell->config_store.ops.load != nullptr) {

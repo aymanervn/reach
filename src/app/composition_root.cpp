@@ -98,7 +98,13 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_wallpaper_service(&dependencies.wallpaper_service);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_popup_capture(&dependencies.popup_capture);
+    }
+    if (result == REACH_OK) {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
+        if (result == REACH_OK) {
+            dependencies.popup_capture = {};
+        }
     }
     if (result != REACH_OK) {
         if (dependencies.launcher_window.ops.destroy != nullptr) {
@@ -160,6 +166,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.wallpaper_surface.ops.destroy != nullptr) {
             dependencies.wallpaper_surface.ops.destroy(dependencies.wallpaper_surface.surface);
+        }
+        if (dependencies.popup_capture.destroy != nullptr) {
+            dependencies.popup_capture.destroy(dependencies.popup_capture.userdata);
         }
         delete app;
         return result;

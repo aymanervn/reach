@@ -95,10 +95,6 @@ exceptions above.
 
 ## Remaining Transition Debt
 
-- `src/shell/shell.cpp` still contains popup/capture Win32 orchestration while
-  the shell is being thinned. The exact popup/capture APIs still present are
-  `SetCapture`, `ReleaseCapture`, `GetCapture`, `SetWindowsHookExW`,
-  `UnhookWindowsHookEx`, and `WindowFromPoint`.
 - `src/shell/shell.cpp` still contains native context-menu hook and window
   styling helpers. These remain shell transition debt until popup capture and
   native context-menu behavior move behind ports or Windows adapters.
