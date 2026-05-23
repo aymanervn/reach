@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 
 project(reach LANGUAGES C CXX)
 
+enable_testing()
+set(REACH_CTEST_DEFAULT_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/CTestDefaultConfig.cmake)
+file(WRITE ${REACH_CTEST_DEFAULT_CONFIG} "if(NOT CTEST_CONFIGURATION_TYPE)\n    set(CTEST_CONFIGURATION_TYPE Debug)\nendif()\n")
+set_property(DIRECTORY PROPERTY TEST_INCLUDE_FILE ${REACH_CTEST_DEFAULT_CONFIG})
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 set(REACH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -253,6 +258,14 @@ target_link_libraries(reach_pin_config_tests PRIVATE
     shlwapi
     user32
 )
+
+if(CMAKE_CONFIGURATION_TYPES)
+    add_test(NAME reach_core_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_core_tests.exe)
+    add_test(NAME reach_pin_config_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_pin_config_tests.exe)
+else()
+    add_test(NAME reach_core_tests COMMAND reach_core_tests)
+    add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
+endif()
 
 add_custom_target(check_architecture
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py
