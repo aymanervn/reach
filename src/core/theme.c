@@ -19,6 +19,11 @@ const reach_theme *reach_theme_default(void)
         { 0.12f, 0.14f, 0.17f, 0.92f },
         { 0.22f, 0.24f, 0.28f, 1.0f },
         { 1.0f, 1.0f, 1.0f, 1.0f },
+        { 0.72f, 0.72f, 0.72f, 0.80f },
+        { 1.0f, 1.0f, 1.0f, 1.0f },
+        { 0.72f, 0.72f, 0.72f, 0.90f },
+        { 0.22f, 0.24f, 0.28f, 1.0f },
+        { 1.0f, 1.0f, 1.0f, 0.96f },
         0.32f,
         22.0f,
         1.0f,
@@ -31,7 +36,10 @@ const reach_theme *reach_theme_default(void)
         220.0f,
         120.0f,
         18.0f,
-        0.3f
+        0.3f,
+        1.0f,
+        0.56f,
+        92.0f
     };
     return &theme;
 }

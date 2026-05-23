@@ -19,8 +19,24 @@ typedef enum reach_render_command_type {
     REACH_RENDER_COMMAND_BACKPLATE_EDGE = 6,
     REACH_RENDER_COMMAND_TRIANGLE = 7,
     REACH_RENDER_COMMAND_NOTCH_STROKE = 8,
-    REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT = 9
+    REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT = 9,
+    REACH_RENDER_COMMAND_VECTOR_ICON = 10
 } reach_render_command_type;
+
+typedef enum reach_vector_icon_id {
+    REACH_VECTOR_ICON_NONE = 0,
+    REACH_VECTOR_ICON_POWER = 1,
+    REACH_VECTOR_ICON_LOCK = 2,
+    REACH_VECTOR_ICON_SLEEP = 3,
+    REACH_VECTOR_ICON_RESTART = 4,
+    REACH_VECTOR_ICON_SHUTDOWN = 5,
+    REACH_VECTOR_ICON_SIGN_OUT = 6
+} reach_vector_icon_id;
+
+typedef enum reach_text_weight {
+    REACH_TEXT_WEIGHT_NORMAL = 400,
+    REACH_TEXT_WEIGHT_BOLD = 700
+} reach_text_weight;
 
 typedef struct reach_render_command {
     reach_render_command_type type;

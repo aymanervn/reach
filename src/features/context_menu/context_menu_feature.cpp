@@ -24,6 +24,27 @@ void reach_context_menu_build_dock_item_commands(
     *out_count = count;
 }
 
+void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids, size_t *out_count)
+{
+    if (out_commands == nullptr || out_count == nullptr) {
+        return;
+    }
+
+    out_commands[0] = REACH_CONTEXT_MENU_COMMAND_POWER_LOCK;
+    out_commands[1] = REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP;
+    out_commands[2] = REACH_CONTEXT_MENU_COMMAND_POWER_RESTART;
+    out_commands[3] = REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN;
+    out_commands[4] = REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT;
+    if (out_icon_ids != nullptr) {
+        out_icon_ids[0] = REACH_VECTOR_ICON_LOCK;
+        out_icon_ids[1] = REACH_VECTOR_ICON_SLEEP;
+        out_icon_ids[2] = REACH_VECTOR_ICON_RESTART;
+        out_icon_ids[3] = REACH_VECTOR_ICON_SHUTDOWN;
+        out_icon_ids[4] = REACH_VECTOR_ICON_SIGN_OUT;
+    }
+    *out_count = 5;
+}
+
 const uint16_t *reach_context_menu_command_text(uint32_t command)
 {
     if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_NEW) {
@@ -37,6 +58,21 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE) {
         return (const uint16_t *)L"Close app";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_LOCK) {
+        return (const uint16_t *)L"Lock";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP) {
+        return (const uint16_t *)L"Sleep";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_RESTART) {
+        return (const uint16_t *)L"Restart";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN) {
+        return (const uint16_t *)L"Shutdown";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT) {
+        return (const uint16_t *)L"Sign out";
     }
     return (const uint16_t *)L"";
 }

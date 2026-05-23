@@ -11,13 +11,18 @@
 extern "C" {
 #endif
 
-#define REACH_CONTEXT_MENU_MAX_ITEMS 4
+#define REACH_CONTEXT_MENU_MAX_ITEMS 5
 
 typedef enum reach_context_menu_command {
     REACH_CONTEXT_MENU_COMMAND_UNPIN = 100,
     REACH_CONTEXT_MENU_COMMAND_CLOSE = 101,
     REACH_CONTEXT_MENU_COMMAND_OPEN_NEW = 102,
-    REACH_CONTEXT_MENU_COMMAND_PIN = 103
+    REACH_CONTEXT_MENU_COMMAND_PIN = 103,
+    REACH_CONTEXT_MENU_COMMAND_POWER_LOCK = 200,
+    REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP = 201,
+    REACH_CONTEXT_MENU_COMMAND_POWER_RESTART = 202,
+    REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN = 203,
+    REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT = 204
 } reach_context_menu_command;
 
 typedef struct reach_context_menu_render_input {
@@ -25,11 +30,14 @@ typedef struct reach_context_menu_render_input {
     reach_rect_f32 bounds;
     const reach_rect_f32 *item_slots;
     const uint32_t *item_commands;
+    const uint32_t *item_icon_ids;
     size_t item_count;
     size_t hovered_index;
     size_t target_index;
     const reach_dock_layout *dock_layout;
     int32_t has_layout;
+    int32_t use_anchor_x;
+    float anchor_x;
     int32_t text_alignment_leading;
 } reach_context_menu_render_input;
 
@@ -48,6 +56,7 @@ void reach_context_menu_build_dock_item_commands(
     int32_t has_window,
     uint32_t *out_commands,
     size_t *out_count);
+void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids, size_t *out_count);
 const uint16_t *reach_context_menu_command_text(uint32_t command);
 reach_result reach_context_menu_build_render_commands(const reach_context_menu_render_input *input, reach_render_command_buffer *out_commands);
 reach_context_menu_hit_result reach_context_menu_hit_test_items(

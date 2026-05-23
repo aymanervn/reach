@@ -26,7 +26,15 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     float notch_center = width * 0.30f;
     reach_color context_border = input->theme->dock_border;
     context_border.a = 1.0f;
-    if (input->has_layout &&
+    if (input->use_anchor_x) {
+        notch_center = input->anchor_x - input->bounds.x;
+        if (notch_center < radius + notch_width) {
+            notch_center = radius + notch_width;
+        }
+        if (notch_center > width - radius - notch_width) {
+            notch_center = width - radius - notch_width;
+        }
+    } else if (input->has_layout &&
         input->dock_layout != nullptr &&
         input->target_index < input->dock_layout->app_slot_count) {
         reach_rect_f32 slot = input->dock_layout->app_slots[input->target_index];
@@ -81,9 +89,21 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
 
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
-        command.rect.x = item.x + 14.0f;
+        float text_left = input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0 ? 40.0f : 14.0f;
+        if (input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0) {
+            reach_render_command icon_command = {};
+            icon_command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+            icon_command.rect.x = item.x + 13.0f;
+            icon_command.rect.y = item.y + (item.height - 16.0f) * 0.5f;
+            icon_command.rect.width = 16.0f;
+            icon_command.rect.height = 16.0f;
+            icon_command.color = reach_context_menu_rgb(232, 229, 224, 0.96f);
+            icon_command.icon_id = input->item_icon_ids[index];
+            reach_render_command_buffer_push(out_commands, &icon_command);
+        }
+        command.rect.x = item.x + text_left;
         command.rect.y = item.y;
-        command.rect.width = item.width - 28.0f;
+        command.rect.width = item.width - text_left - 14.0f;
         command.rect.height = item.height;
         command.color = reach_context_menu_rgb(232, 229, 224, 0.96f);
         command.text_size = 14.0f;

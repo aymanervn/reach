@@ -103,6 +103,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/wallpaper_win32.cpp
     src/adapters/windows/wallpaper_surface_win32.cpp
     src/adapters/windows/popup_capture_win32.cpp
+    src/adapters/windows/power_session_win32.cpp
 )
 
 reach_configure_common(reach_windows_adapters)
@@ -130,6 +131,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     uuid
     windowscodecs
     dwmapi
+    powrprof
 )
 
 add_library(reach_shell STATIC
@@ -199,6 +201,7 @@ target_link_libraries(reach PRIVATE
     uuid
     windowscodecs
     dwmapi
+    powrprof
 )
 
 add_executable(reachctl

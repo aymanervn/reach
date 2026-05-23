@@ -77,6 +77,9 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->popup_capture.destroy != nullptr) {
         shell->popup_capture.destroy(shell->popup_capture.userdata);
     }
+    if (shell->power_session.ops.destroy != nullptr) {
+        shell->power_session.ops.destroy(shell->power_session.session);
+    }
     shell->hotkeys = nullptr;
     shell->monitors = nullptr;
     shell->popup_capture = {};
@@ -95,6 +98,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->explorer_service = {};
     shell->wallpaper_service = {};
     shell->wallpaper_surface = {};
+    shell->power_session = {};
     reach_dock_icon_cache_init(&shell->dock_icons);
     reach_tray_model_init(&shell->tray_model);
 }
@@ -157,6 +161,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->wallpaper_service = dependencies->wallpaper_service;
     shell->wallpaper_surface = dependencies->wallpaper_surface;
     shell->popup_capture = dependencies->popup_capture;
+    shell->power_session = dependencies->power_session;
     shell->theme = reach_theme_default();
 
     if (result == REACH_OK && shell->config_store.ops.load != nullptr) {

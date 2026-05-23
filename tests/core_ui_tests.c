@@ -47,6 +47,9 @@ int main(void)
     failed += expect(layout.launcher.bounds.width == layout.launcher.search_box.width);
     failed += expect(layout.launcher.bounds.height == layout.launcher.search_box.height);
     failed += expect(layout.launcher.pinned_app_slot_count == 0);
+    failed += expect(layout.dock.tray_button.x + layout.dock.tray_button.width < layout.dock.system_separator.x);
+    failed += expect(layout.dock.system_separator.x + layout.dock.system_separator.width < layout.dock.clock.x);
+    failed += expect(layout.dock.clock.x + layout.dock.clock.width < layout.dock.power_button.x);
 
     reach_render_command_buffer buffer = {0};
     failed += expect(reach_ui_build_render_commands(&state, &layout, &buffer) == REACH_OK);

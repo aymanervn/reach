@@ -38,6 +38,7 @@ struct reach_shell {
     reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
     reach_wallpaper_surface_port wallpaper_surface;
+    reach_power_session_port power_session;
     const reach_theme *theme;
     reach_window_snapshot open_windows[REACH_MAX_PINNED_APPS];
     size_t open_window_count;
@@ -94,19 +95,25 @@ struct reach_shell {
     size_t switcher_selected_index;
     size_t switcher_visible_start;
     int32_t context_menu_open;
+    int32_t context_menu_power_open;
     size_t context_menu_target_index;
     reach_rect_f32 context_menu_bounds;
-    reach_rect_f32 context_menu_item_slots[4];
-    uint32_t context_menu_item_commands[4];
+    reach_rect_f32 context_menu_item_slots[REACH_CONTEXT_MENU_MAX_ITEMS];
+    uint32_t context_menu_item_commands[REACH_CONTEXT_MENU_MAX_ITEMS];
+    uint32_t context_menu_item_icon_ids[REACH_CONTEXT_MENU_MAX_ITEMS];
     size_t context_menu_item_count;
     size_t context_menu_hovered_index;
+    uint16_t dock_time_text[32];
+    uint16_t dock_date_text[64];
+    int32_t dock_clock_initialized;
     int32_t running;
     uint16_t wallpaper_path[260];
     reach_popup_capture_port popup_capture;
 };
 
 static const size_t REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_PINNED_APPS;
-static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 1;
+static const size_t REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON = REACH_MAX_PINNED_APPS + 1;
+static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 2;
 
 int32_t reach_shell_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
 int32_t reach_shell_opacity_equal(float a, float b);

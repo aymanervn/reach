@@ -537,6 +537,85 @@ static reach_result reach_d2d_draw_icon(reach_render_backend *backend, const rea
     return REACH_OK;
 }
 
+static void reach_d2d_draw_icon_line(ID2D1RenderTarget *target, ID2D1SolidColorBrush *brush, float x0, float y0, float x1, float y1, float stroke)
+{
+    target->DrawLine(D2D1::Point2F(x0, y0), D2D1::Point2F(x1, y1), brush, stroke);
+}
+
+static reach_result reach_d2d_draw_vector_icon(ID2D1RenderTarget *target, const reach_render_command *command)
+{
+    if (target == nullptr || command == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    ID2D1SolidColorBrush *brush = nullptr;
+    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+    if (FAILED(hr)) {
+        return REACH_ERROR;
+    }
+
+    float x = command->rect.x;
+    float y = command->rect.y;
+    float w = command->rect.width;
+    float h = command->rect.height;
+    float cx = x + w * 0.5f;
+    float cy = y + h * 0.5f;
+    float stroke = w < h ? w * 0.10f : h * 0.10f;
+    if (stroke < 1.25f) {
+        stroke = 1.25f;
+    }
+
+    switch (command->icon_id) {
+    case REACH_VECTOR_ICON_POWER:
+    case REACH_VECTOR_ICON_SHUTDOWN:
+        reach_d2d_draw_icon_line(target, brush, cx, y + h * 0.10f, cx, y + h * 0.48f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.28f, y + h * 0.30f, x + w * 0.16f, y + h * 0.58f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.16f, y + h * 0.58f, x + w * 0.34f, y + h * 0.84f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.34f, y + h * 0.84f, x + w * 0.66f, y + h * 0.84f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.66f, y + h * 0.84f, x + w * 0.84f, y + h * 0.58f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.84f, y + h * 0.58f, x + w * 0.72f, y + h * 0.30f, stroke);
+        break;
+    case REACH_VECTOR_ICON_LOCK:
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.25f, y + h * 0.48f, x + w * 0.75f, y + h * 0.48f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.75f, y + h * 0.48f, x + w * 0.75f, y + h * 0.86f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.75f, y + h * 0.86f, x + w * 0.25f, y + h * 0.86f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.25f, y + h * 0.86f, x + w * 0.25f, y + h * 0.48f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.34f, y + h * 0.48f, x + w * 0.34f, y + h * 0.30f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.34f, y + h * 0.30f, x + w * 0.50f, y + h * 0.14f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.50f, y + h * 0.14f, x + w * 0.66f, y + h * 0.30f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.66f, y + h * 0.30f, x + w * 0.66f, y + h * 0.48f, stroke);
+        break;
+    case REACH_VECTOR_ICON_SLEEP:
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.58f, y + h * 0.14f, x + w * 0.34f, y + h * 0.50f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.34f, y + h * 0.50f, x + w * 0.62f, y + h * 0.50f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.72f, y + h * 0.56f, x + w * 0.46f, y + h * 0.86f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.46f, y + h * 0.86f, x + w * 0.78f, y + h * 0.86f, stroke);
+        break;
+    case REACH_VECTOR_ICON_RESTART:
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.72f, y + h * 0.24f, x + w * 0.86f, y + h * 0.24f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.86f, y + h * 0.24f, x + w * 0.86f, y + h * 0.38f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.82f, y + h * 0.28f, x + w * 0.66f, y + h * 0.16f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.66f, y + h * 0.16f, x + w * 0.38f, y + h * 0.18f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.38f, y + h * 0.18f, x + w * 0.18f, y + h * 0.42f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.18f, y + h * 0.42f, x + w * 0.22f, y + h * 0.70f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.22f, y + h * 0.70f, x + w * 0.48f, y + h * 0.84f, stroke);
+        break;
+    case REACH_VECTOR_ICON_SIGN_OUT:
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.16f, y + h * 0.18f, x + w * 0.54f, y + h * 0.18f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.16f, y + h * 0.18f, x + w * 0.16f, y + h * 0.82f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.16f, y + h * 0.82f, x + w * 0.54f, y + h * 0.82f, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.46f, cy, x + w * 0.86f, cy, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.70f, y + h * 0.34f, x + w * 0.86f, cy, stroke);
+        reach_d2d_draw_icon_line(target, brush, x + w * 0.70f, y + h * 0.66f, x + w * 0.86f, cy, stroke);
+        break;
+    default:
+        break;
+    }
+
+    brush->Release();
+    return REACH_OK;
+}
+
 static HRESULT reach_d2d_draw_gradient_line(
     ID2D1RenderTarget *target,
     D2D1_POINT_2F start,
@@ -1000,6 +1079,13 @@ static reach_result reach_d2d_execute(reach_render_backend *backend, const reach
             if (result == REACH_OK) {
                 continue;
             }
+        }
+        if (command->type == REACH_RENDER_COMMAND_VECTOR_ICON && command->icon_id != 0) {
+            reach_result result = reach_d2d_draw_vector_icon(target, command);
+            if (result != REACH_OK) {
+                return result;
+            }
+            continue;
         }
         if (command->type == REACH_RENDER_COMMAND_BACKPLATE_EDGE) {
             reach_result result = reach_d2d_draw_backplate_edge(target, command);

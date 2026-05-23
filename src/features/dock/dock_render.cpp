@@ -227,5 +227,83 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
         reach_render_command_buffer_push(out_commands, &command);
     }
 
+    command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect.x = layout->system_separator.x - layout->bounds.x;
+    command.rect.y = layout->system_separator.y - layout->bounds.y;
+    command.rect.width = layout->system_separator.width;
+    command.rect.height = layout->system_separator.height;
+    command.color = theme->dock_system_separator;
+    command.radius = layout->system_separator.width * 0.5f;
+    reach_render_command_buffer_push(out_commands, &command);
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_TEXT;
+    command.rect.x = layout->clock.x - layout->bounds.x;
+    command.rect.y = layout->clock.y - layout->bounds.y + 2.0f;
+    command.rect.width = layout->clock.width;
+    command.rect.height = layout->clock.height * 0.48f;
+    command.color = theme->dock_clock_time;
+    command.text_size = 13.0f;
+    command.text_weight = REACH_TEXT_WEIGHT_BOLD;
+    command.text_alignment = input->text_alignment_center;
+    command.text_ellipsis = 1;
+    reach_copy_utf16(command.text, 260, input->time_text != nullptr ? input->time_text : (const uint16_t *)L"");
+    reach_render_command_buffer_push(out_commands, &command);
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_TEXT;
+    command.rect.x = layout->clock.x - layout->bounds.x;
+    command.rect.y = layout->clock.y - layout->bounds.y + layout->clock.height * 0.44f;
+    command.rect.width = layout->clock.width;
+    command.rect.height = layout->clock.height * 0.50f;
+    command.color = theme->dock_clock_date;
+    command.text_size = 11.0f;
+    command.text_alignment = input->text_alignment_center;
+    command.text_ellipsis = 1;
+    reach_copy_utf16(command.text, 260, input->date_text != nullptr ? input->date_text : (const uint16_t *)L"");
+    reach_render_command_buffer_push(out_commands, &command);
+
+    float power_box_x = layout->power_button.x - layout->bounds.x
+        + (layout->power_button.width - icon_box_size) * 0.5f;
+    float power_box_y = layout->power_button.y - layout->bounds.y
+        + (layout->power_button.height - icon_box_size) * 0.5f;
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect.x = power_box_x;
+    command.rect.y = power_box_y;
+    command.rect.width = icon_box_size;
+    command.rect.height = icon_box_size;
+    command.color = theme->dock_power_button_background;
+    command.radius = icon_box_radius;
+    reach_render_command_buffer_push(out_commands, &command);
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    command.rect.x = power_box_x + icon_box_size * 0.25f;
+    command.rect.y = power_box_y + icon_box_size * 0.25f;
+    command.rect.width = icon_box_size * 0.50f;
+    command.rect.height = icon_box_size * 0.50f;
+    command.color = theme->dock_power_glyph;
+    command.icon_id = REACH_VECTOR_ICON_POWER;
+    reach_render_command_buffer_push(out_commands, &command);
+
+    if (input->click_feedback_index == input->power_feedback_index &&
+        input->click_feedback_opacity > 0.001f) {
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect.x = power_box_x;
+        command.rect.y = power_box_y;
+        command.rect.width = icon_box_size;
+        command.rect.height = icon_box_size;
+        command.color.r = 0.0f;
+        command.color.g = 0.0f;
+        command.color.b = 0.0f;
+        command.color.a = input->click_feedback_opacity;
+        command.radius = icon_box_radius;
+        reach_render_command_buffer_push(out_commands, &command);
+    }
+
     return REACH_OK;
 }

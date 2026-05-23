@@ -69,6 +69,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
     if (result == REACH_OK) {
         result = reach_windows_create_wallpaper_service(&dependencies.wallpaper_service);
     }
+    if (result == REACH_OK) {
+        result = reach_windows_create_power_session(&dependencies.power_session);
+    }
     if (result != REACH_OK) {
         if (dependencies.launcher_window.ops.destroy != nullptr) {
             dependencies.launcher_window.ops.destroy(dependencies.launcher_window.window);
@@ -129,6 +132,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         }
         if (dependencies.wallpaper_surface.ops.destroy != nullptr) {
             dependencies.wallpaper_surface.ops.destroy(dependencies.wallpaper_surface.surface);
+        }
+        if (dependencies.power_session.ops.destroy != nullptr) {
+            dependencies.power_session.ops.destroy(dependencies.power_session.session);
         }
         return result;
     }
@@ -194,6 +200,9 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         }
         if (dependencies.wallpaper_surface.ops.destroy != nullptr) {
             dependencies.wallpaper_surface.ops.destroy(dependencies.wallpaper_surface.surface);
+        }
+        if (dependencies.power_session.ops.destroy != nullptr) {
+            dependencies.power_session.ops.destroy(dependencies.power_session.session);
         }
     }
     return result;

@@ -4,6 +4,8 @@
 #include <shlwapi.h>
 
 #include <math.h>
+#include <stdio.h>
+#include <time.h>
 
 static int32_t reach_shell_float_animation_active(const reach_float_animation *animation)
 {
@@ -175,9 +177,13 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     float icon_size = shell->ui.dock.icon_size;
     float gap = shell->ui.dock.gap;
     size_t count = shell->dock_model.item_count;
-    float dock_width = ceilf(icon_size * (float)(count + 1) + gap * (float)(count + 2));
+    const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
+    float clock_width = theme->dock_clock_width;
+    float separator_width = theme->dock_system_separator_width;
+    float separator_height = layout->bounds.height * theme->dock_system_separator_height_ratio;
+    float dock_width = ceilf(icon_size * (float)(count + 2) + clock_width + separator_width + gap * (float)(count + 5));
     if (count == 0) {
-        dock_width = ceilf(icon_size + gap * 2.0f);
+        dock_width = ceilf(icon_size * 2.0f + clock_width + separator_width + gap * 4.0f);
     }
     float old_width = layout->bounds.width;
     if (dock_width != old_width) {
@@ -194,8 +200,98 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         layout->app_slots[index].height = icon_size;
     }
 
-    layout->tray_button.x = layout->bounds.x + dock_width - icon_size - gap;
+    layout->power_button.width = icon_size;
+    layout->power_button.height = icon_size;
+    layout->power_button.x = layout->bounds.x + dock_width - icon_size - gap;
+    layout->power_button.y = top;
+    layout->clock.width = clock_width;
+    layout->clock.height = icon_size;
+    layout->clock.x = layout->power_button.x - gap - clock_width;
+    layout->clock.y = top;
+    layout->system_separator.width = separator_width;
+    layout->system_separator.height = separator_height;
+    layout->system_separator.x = layout->clock.x - gap - separator_width;
+    layout->system_separator.y = layout->bounds.y + (layout->bounds.height - separator_height) * 0.5f;
+    layout->tray_button.x = layout->system_separator.x - gap - icon_size;
     layout->tray_button.y = top;
+}
+
+static void reach_shell_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src)
+{
+    if (dst == nullptr || dst_count == 0) {
+        return;
+    }
+    size_t index = 0;
+    if (src != nullptr) {
+        while (index + 1 < dst_count && src[index] != 0) {
+            dst[index] = (uint16_t)(unsigned char)src[index];
+            ++index;
+        }
+    }
+    dst[index] = 0;
+}
+
+static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b)
+{
+    size_t index = 0;
+    if (a == nullptr || b == nullptr) {
+        return a == b;
+    }
+    while (a[index] != 0 || b[index] != 0) {
+        if (a[index] != b[index]) {
+            return 0;
+        }
+        ++index;
+    }
+    return 1;
+}
+
+static void reach_shell_update_clock_text(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    time_t now = time(nullptr);
+    struct tm local = {};
+    if (now == (time_t)-1 || localtime_s(&local, &now) != 0) {
+        return;
+    }
+
+    static const char *months[] = {
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    };
+    static const char *days[] = {
+        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+    };
+
+    int hour = local.tm_hour % 12;
+    if (hour == 0) {
+        hour = 12;
+    }
+    const char *suffix = local.tm_hour >= 12 ? "PM" : "AM";
+
+    char time_text[32] = {};
+    char date_text[64] = {};
+    snprintf(time_text, sizeof(time_text), "%d:%02d %s", hour, local.tm_min, suffix);
+    if (local.tm_mon < 0 || local.tm_mon > 11 || local.tm_wday < 0 || local.tm_wday > 6) {
+        return;
+    }
+    snprintf(date_text, sizeof(date_text), "%s %d, %s", months[local.tm_mon], local.tm_mday, days[local.tm_wday]);
+
+    uint16_t next_time[32] = {};
+    uint16_t next_date[64] = {};
+    reach_shell_copy_ascii_to_utf16(next_time, 32, time_text);
+    reach_shell_copy_ascii_to_utf16(next_date, 64, date_text);
+    if (!shell->dock_clock_initialized ||
+        !reach_shell_utf16_equal(shell->dock_time_text, next_time) ||
+        !reach_shell_utf16_equal(shell->dock_date_text, next_date)) {
+        reach_copy_utf16(shell->dock_time_text, 32, next_time);
+        reach_copy_utf16(shell->dock_date_text, 64, next_date);
+        shell->dock_clock_initialized = 1;
+        shell->dock.dirty_flags = 1;
+    }
 }
 
 reach_result reach_shell_reload_pins(reach_shell *shell)
@@ -482,7 +578,12 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
     for (size_t index = 0; index < layout->app_slot_count; ++index) {
         layout->app_slots[index].x += x_delta;
     }
-    layout->tray_button.x = layout->bounds.x + layout->bounds.width - layout->tray_button.width - shell->ui.dock.gap;
+    const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
+    float gap = shell->ui.dock.gap;
+    layout->power_button.x = layout->bounds.x + layout->bounds.width - layout->power_button.width - gap;
+    layout->clock.x = layout->power_button.x - gap - theme->dock_clock_width;
+    layout->system_separator.x = layout->clock.x - gap - theme->dock_system_separator_width;
+    layout->tray_button.x = layout->system_separator.x - gap - layout->tray_button.width;
 }
 
 float reach_shell_dock_slot_box_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index)
@@ -626,6 +727,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
 
     shell->window_manager_refresh_elapsed += delta_seconds;
+    reach_shell_update_clock_text(shell);
     if (shell->dock_click_feedback_animating) {
         reach_float_animation_update(&shell->dock_click_feedback_opacity, delta_seconds);
         shell->dock_click_feedback_animating = reach_shell_float_animation_active(&shell->dock_click_feedback_opacity);
@@ -754,6 +856,9 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     layout.dock.app_slots[index].y += dock_y_offset;
                 }
                 layout.dock.tray_button.y += dock_y_offset;
+                layout.dock.system_separator.y += dock_y_offset;
+                layout.dock.clock.y += dock_y_offset;
+                layout.dock.power_button.y += dock_y_offset;
                 if (shell->dock_items_changed) {
                     reach_shell_rebuild_dock_items_with_animations(shell, &layout.dock);
                     shell->dock_items_changed = 0;
@@ -775,6 +880,9 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         layout.dock.app_slots[index].x += dock_x_offset;
                     }
                     layout.dock.tray_button.x += dock_x_offset;
+                    layout.dock.system_separator.x += dock_x_offset;
+                    layout.dock.clock.x += dock_x_offset;
+                    layout.dock.power_button.x += dock_x_offset;
                 }
                 int32_t dock_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.dock.bounds, layout.dock.bounds);
                 int32_t launcher_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.launcher.bounds, layout.launcher.bounds);

@@ -101,9 +101,13 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_popup_capture(&dependencies.popup_capture);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_power_session(&dependencies.power_session);
+    }
+    if (result == REACH_OK) {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
         if (result == REACH_OK) {
             dependencies.popup_capture = {};
+            dependencies.power_session = {};
         }
     }
     if (result != REACH_OK) {
@@ -169,6 +173,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.popup_capture.destroy != nullptr) {
             dependencies.popup_capture.destroy(dependencies.popup_capture.userdata);
+        }
+        if (dependencies.power_session.ops.destroy != nullptr) {
+            dependencies.power_session.ops.destroy(dependencies.power_session.session);
         }
         delete app;
         return result;

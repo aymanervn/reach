@@ -40,6 +40,9 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     input.click_feedback_index = shell->dock_click_feedback_index;
     input.click_feedback_opacity = shell->dock_click_feedback_opacity.value;
     input.tray_feedback_index = REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON;
+    input.power_feedback_index = REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON;
+    input.time_text = shell->dock_time_text;
+    input.date_text = shell->dock_date_text;
     input.text_alignment_center = DWRITE_TEXT_ALIGNMENT_CENTER;
     reach_result result = reach_dock_build_render_commands(&input, &commands);
     if (result != REACH_OK) {
@@ -189,11 +192,14 @@ reach_result reach_shell_render_context_menu_surface(reach_shell *shell)
     input.bounds = shell->context_menu_bounds;
     input.item_slots = shell->context_menu_item_slots;
     input.item_commands = shell->context_menu_item_commands;
+    input.item_icon_ids = shell->context_menu_item_icon_ids;
     input.item_count = shell->context_menu_item_count;
     input.hovered_index = shell->context_menu_hovered_index;
     input.target_index = shell->context_menu_target_index;
     input.dock_layout = &shell->layout.dock;
     input.has_layout = shell->has_layout;
+    input.use_anchor_x = shell->context_menu_power_open && shell->has_layout;
+    input.anchor_x = shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
     input.text_alignment_leading = DWRITE_TEXT_ALIGNMENT_LEADING;
     reach_render_command_buffer commands = {};
     reach_result build_result = reach_context_menu_build_render_commands(&input, &commands);

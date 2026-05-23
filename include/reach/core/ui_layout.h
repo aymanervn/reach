@@ -17,6 +17,9 @@ typedef struct reach_dock_layout {
     reach_rect_f32 bounds;
     reach_rect_f32 app_slots[REACH_MAX_PINNED_APPS];
     reach_rect_f32 tray_button;
+    reach_rect_f32 system_separator;
+    reach_rect_f32 clock;
+    reach_rect_f32 power_button;
     size_t app_slot_count;
 } reach_dock_layout;
 
