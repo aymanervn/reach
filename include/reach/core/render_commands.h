@@ -30,7 +30,8 @@ typedef enum reach_vector_icon_id {
     REACH_VECTOR_ICON_SLEEP = 3,
     REACH_VECTOR_ICON_RESTART = 4,
     REACH_VECTOR_ICON_SHUTDOWN = 5,
-    REACH_VECTOR_ICON_SIGN_OUT = 6
+    REACH_VECTOR_ICON_SIGN_OUT = 6,
+    REACH_VECTOR_ICON_TRAY_ARROW = 7
 } reach_vector_icon_id;
 
 typedef enum reach_text_weight {

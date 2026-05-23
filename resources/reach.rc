@@ -2,6 +2,13 @@
 
 IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 
+201 RCDATA "power/lock.svg"
+202 RCDATA "power/sleep.svg"
+203 RCDATA "power/restart.svg"
+204 RCDATA "power/power.svg"
+205 RCDATA "power/logout.svg"
+206 RCDATA "dock/arrow.svg"
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0
  PRODUCTVERSION 0,1,0,0

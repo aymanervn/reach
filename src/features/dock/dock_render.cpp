@@ -200,15 +200,13 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     reach_render_command_buffer_push(out_commands, &command);
 
     command = {};
-    command.type = REACH_RENDER_COMMAND_TEXT;
-    command.rect.x = tray_box_x;
-    command.rect.y = tray_box_y;
-    command.rect.width = icon_box_size;
-    command.rect.height = icon_box_size;
+    command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    command.rect.x = tray_box_x + icon_box_size * 0.28f;
+    command.rect.y = tray_box_y + icon_box_size * 0.30f;
+    command.rect.width = icon_box_size * 0.44f;
+    command.rect.height = icon_box_size * 0.44f;
     command.color = theme->tray_glyph;
-    command.text_alignment = input->text_alignment_center;
-    command.text[0] = '^';
-    command.text[1] = 0;
+    command.icon_id = REACH_VECTOR_ICON_TRAY_ARROW;
     reach_render_command_buffer_push(out_commands, &command);
 
     if (input->click_feedback_index == input->tray_feedback_index &&
