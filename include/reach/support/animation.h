@@ -1,7 +1,7 @@
 #ifndef REACH_ANIMATION_H
 #define REACH_ANIMATION_H
 
-#include "reach/util.h"
+#include "reach/support/util.h"
 
 #ifdef __cplusplus
 extern "C" {

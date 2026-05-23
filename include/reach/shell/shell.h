@@ -17,7 +17,7 @@
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
-#include "reach/util.h"
+#include "reach/support/util.h"
 
 #ifdef __cplusplus
 extern "C" {

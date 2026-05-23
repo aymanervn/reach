@@ -1,4 +1,4 @@
-#include "reach/shell.h"
+#include "reach/shell/shell.h"
 
 #include "reach/platform/windows_adapters.h"
 

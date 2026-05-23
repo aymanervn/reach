@@ -1,4 +1,4 @@
-#include "reach/pin_config.h"
+#include "reach/app/pin_config.h"
 
 #include <windows.h>
 #include <shlwapi.h>

@@ -1,7 +1,7 @@
 #ifndef REACH_APP_COMPOSITION_ROOT_H
 #define REACH_APP_COMPOSITION_ROOT_H
 
-#include "reach/shell.h"
+#include "reach/shell/shell.h"
 
 #ifdef __cplusplus
 extern "C" {

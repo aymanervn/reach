@@ -29,8 +29,9 @@ function(reach_configure_windows target)
 endfunction()
 
 add_library(reach_support STATIC
-    src/util.cpp
-    src/config_path.cpp
+    src/support/util.cpp
+    src/support/animation.cpp
+    src/support/layout.cpp
 )
 
 reach_configure_common(reach_support)
@@ -50,6 +51,7 @@ add_library(reach_core STATIC
     src/core/ui_events.c
     src/core/render_commands.c
     src/core/app_controller.c
+    src/core/theme.c
 )
 
 reach_configure_common(reach_core)
@@ -138,12 +140,9 @@ add_library(reach_shell STATIC
     src/shell/shell_surfaces.cpp
     src/shell/shell_update.cpp
     src/shell/surface_runtime.cpp
-    src/pin_config.cpp
-    src/theme.c
-    src/animation.cpp
-    src/layout.cpp
-    src/monitor.cpp
-    src/hotkeys.cpp
+    src/app/pin_config.cpp
+    src/adapters/windows/monitor_win32.cpp
+    src/adapters/windows/hotkeys_win32.cpp
 )
 
 reach_configure_common(reach_shell)
@@ -166,8 +165,9 @@ target_link_libraries(reach_shell PRIVATE
 )
 
 add_executable(reach WIN32
-    src/main.cpp
+    src/app/main.cpp
     src/app/composition_root.cpp
+    src/app/config_path.cpp
     resources/reach.rc
 )
 
@@ -206,9 +206,9 @@ add_executable(reachctl
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/wallpaper_win32.cpp
-    src/config_path.cpp
-    src/pin_config.cpp
-    src/util.cpp
+    src/app/config_path.cpp
+    src/app/pin_config.cpp
+    src/support/util.cpp
 )
 
 reach_configure_common(reachctl)
@@ -253,8 +253,8 @@ target_link_libraries(reach_core_tests PRIVATE
 
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
-    src/pin_config.cpp
-    src/util.cpp
+    src/app/pin_config.cpp
+    src/support/util.cpp
 )
 
 reach_configure_common(reach_pin_config_tests)

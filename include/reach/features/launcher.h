@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/render_commands.h"
-#include "reach/theme.h"
+#include "reach/core/theme.h"
 
 #ifdef __cplusplus
 extern "C" {

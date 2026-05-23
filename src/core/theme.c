@@ -1,4 +1,4 @@
-#include "reach/theme.h"
+#include "reach/core/theme.h"
 
 static float reach_theme_min(float a, float b)
 {

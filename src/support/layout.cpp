@@ -1,4 +1,4 @@
-#include "reach/layout.h"
+#include "reach/support/layout.h"
 
 reach_result reach_layout_compute_split(reach_rect_i32 work_area, reach_split_mode mode, reach_rect_i32 *out_rect)
 {

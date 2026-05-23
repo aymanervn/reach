@@ -1,7 +1,7 @@
 #ifndef REACH_LAYOUT_H
 #define REACH_LAYOUT_H
 
-#include "reach/util.h"
+#include "reach/support/util.h"
 
 #ifdef __cplusplus
 extern "C" {

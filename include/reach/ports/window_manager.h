@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include "reach/layout.h"
-#include "reach/util.h"
+#include "reach/support/layout.h"
+#include "reach/support/util.h"
 
 #ifdef __cplusplus
 extern "C" {

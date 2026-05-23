@@ -1,23 +1,23 @@
 #ifndef REACH_SHELL_INTERNAL_H
 #define REACH_SHELL_INTERNAL_H
 
-#include "reach/shell.h"
+#include "reach/shell/shell.h"
 
 #include "reach/core/render_commands.h"
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
-#include "reach/animation.h"
+#include "reach/support/animation.h"
 #include "reach/features/context_menu.h"
 #include "reach/features/dock.h"
 #include "reach/features/launcher.h"
 #include "reach/features/switcher.h"
 #include "reach/features/tray.h"
 #include "reach/features/wallpaper.h"
-#include "reach/hotkeys.h"
-#include "reach/monitor.h"
-#include "reach/pin_config.h"
+#include "reach/platform/hotkeys.h"
+#include "reach/platform/monitor.h"
+#include "reach/app/pin_config.h"
 #include "reach/shell/surface_runtime.h"
-#include "reach/theme.h"
+#include "reach/core/theme.h"
 
 struct reach_shell {
     reach_hotkeys *hotkeys;

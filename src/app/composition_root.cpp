@@ -1,6 +1,6 @@
 #include "reach/app/composition_root.h"
 
-#include "reach/config_path.h"
+#include "reach/app/config_path.h"
 #include "reach/platform/windows_adapters.h"
 
 #include <new>

@@ -156,7 +156,7 @@ static void reach_probe_send_notify(HWND owner)
     data.uID = 0x2345;
     data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     data.uCallbackMessage = WM_APP + 77;
-    data.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    data.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
     wcscpy_s(data.szTip, L"ReachProbeAdd");
 
     reach_probe_print(L"calling Shell_NotifyIconW(NIM_ADD)");

@@ -32,16 +32,16 @@ WIN32_TOKENS = [
 # Temporary transition debt documented in docs/architecture.md. Keep this list
 # narrow so new Win32 usage outside adapters/windows is caught by default.
 WIN32_ALLOWLIST = {
-    "src/main.cpp",
+    "src/app/main.cpp",
     "src/shell/shell.cpp",
     "src/shell/shell_input.cpp",
     "src/shell/shell_render.cpp",
     "src/shell/shell_update.cpp",
-    "src/util.cpp",
-    "src/config_path.cpp",
-    "src/pin_config.cpp",
-    "src/monitor.cpp",
-    "src/hotkeys.cpp",
+    "src/support/util.cpp",
+    "src/app/config_path.cpp",
+    "src/app/pin_config.cpp",
+    "src/adapters/windows/monitor_win32.cpp",
+    "src/adapters/windows/hotkeys_win32.cpp",
 }
 
 WIN32_ALLOWED_PREFIXES = (

@@ -8,7 +8,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/window_manager.h"
-#include "reach/theme.h"
+#include "reach/core/theme.h"
 
 #ifdef __cplusplus
 extern "C" {
