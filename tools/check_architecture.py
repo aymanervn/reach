@@ -29,6 +29,9 @@ WIN32_TOKENS = [
 WIN32_ALLOWLIST = {
     "src/main.cpp",
     "src/shell/shell.cpp",
+    "src/shell/shell_input.cpp",
+    "src/shell/shell_render.cpp",
+    "src/shell/shell_update.cpp",
     "src/util.cpp",
     "src/config_path.cpp",
     "src/pin_config.cpp",

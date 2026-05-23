@@ -129,6 +129,11 @@ target_link_libraries(reach_windows_adapters PRIVATE
 
 add_library(reach_shell STATIC
     src/shell/shell.cpp
+    src/shell/shell_input.cpp
+    src/shell/shell_lifecycle.cpp
+    src/shell/shell_render.cpp
+    src/shell/shell_surfaces.cpp
+    src/shell/shell_update.cpp
     src/shell/surface_runtime.cpp
     src/pin_config.cpp
     src/theme.c
