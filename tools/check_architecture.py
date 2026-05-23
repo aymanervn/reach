@@ -22,12 +22,18 @@ WIN32_TOKENS = [
     "UnhookWindowsHookEx",
     "WindowFromPoint",
     "IDWrite",
+    "DWRITE",
+    "#include <dwrite.h>",
+    "#include <shlwapi.h>",
+    "PathFindFileNameW",
+    "reach/platform/windows_adapters.h",
 ]
 
 # Temporary transition debt documented in docs/architecture.md. Keep this list
 # narrow so new Win32 usage outside adapters/windows is caught by default.
 WIN32_ALLOWLIST = {
     "src/main.cpp",
+    "src/shell/shell.cpp",
     "src/shell/shell_input.cpp",
     "src/shell/shell_render.cpp",
     "src/shell/shell_update.cpp",
