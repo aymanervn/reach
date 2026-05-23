@@ -2,7 +2,6 @@
 
 #include <windows.h>
 #include <shellapi.h>
-#include <shlwapi.h>
 
 #include <new>
 
@@ -10,98 +9,150 @@ struct reach_app_launcher {
     int unused;
 };
 
-struct reach_explorer_window_search {
-    HWND visible_window;
-    HWND hidden_window;
-};
+static const wchar_t *reach_win32_file_name(const wchar_t *path)
+{
+    if (path == nullptr) {
+        return nullptr;
+    }
 
-static int32_t reach_is_file_explorer_window(HWND hwnd)
+    const wchar_t *file_name = path;
+    for (const wchar_t *scan = path; *scan != 0; ++scan) {
+        if (*scan == L'\\' || *scan == L'/') {
+            file_name = scan + 1;
+        }
+    }
+    return file_name;
+}
+
+static int32_t reach_window_process_is_explorer(HWND hwnd)
+{
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(hwnd, &process_id);
+    if (process_id == 0 || process_id == GetCurrentProcessId()) {
+        return 0;
+    }
+
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+    if (process == nullptr) {
+        return 0;
+    }
+
+    wchar_t image_path[260] = {};
+    DWORD image_path_count = 260;
+    BOOL ok = QueryFullProcessImageNameW(process, 0, image_path, &image_path_count);
+    CloseHandle(process);
+    if (!ok || image_path[0] == 0) {
+        return 0;
+    }
+
+    const wchar_t *file_name = reach_win32_file_name(image_path);
+    return file_name != nullptr && lstrcmpiW(file_name, L"explorer.exe") == 0;
+}
+
+static int32_t reach_window_is_minimized(HWND hwnd)
+{
+    if (IsIconic(hwnd)) {
+        return 1;
+    }
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+    return GetWindowPlacement(hwnd, &placement) &&
+        placement.showCmd == SW_SHOWMINIMIZED;
+}
+
+static int32_t reach_is_usable_explorer_folder_window(HWND hwnd)
 {
     if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return 0;
+    }
+    if (GetAncestor(hwnd, GA_ROOT) != hwnd) {
+        return 0;
+    }
+    if (!IsWindowVisible(hwnd) && !reach_window_is_minimized(hwnd)) {
         return 0;
     }
 
     wchar_t class_name[64] = {};
     GetClassNameW(hwnd, class_name, 64);
-    if (lstrcmpiW(class_name, L"CabinetWClass") != 0 && lstrcmpiW(class_name, L"ExploreWClass") != 0) {
+    if (lstrcmpiW(class_name, L"CabinetWClass") != 0 &&
+        lstrcmpiW(class_name, L"ExploreWClass") != 0) {
         return 0;
     }
 
-    DWORD process_id = 0;
-    GetWindowThreadProcessId(hwnd, &process_id);
-    HANDLE process = process_id != 0 ? OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id) : nullptr;
-    wchar_t image_path[260] = {};
-    DWORD image_path_count = 260;
-    BOOL is_explorer = FALSE;
-    if (process != nullptr) {
-        if (QueryFullProcessImageNameW(process, 0, image_path, &image_path_count)) {
-            const wchar_t *file_name = PathFindFileNameW(image_path);
-            is_explorer = file_name != nullptr && lstrcmpiW(file_name, L"explorer.exe") == 0;
-        }
-        CloseHandle(process);
-    }
-    return is_explorer ? 1 : 0;
+    return reach_window_process_is_explorer(hwnd);
 }
 
-static BOOL CALLBACK reach_find_explorer_window_proc(HWND hwnd, LPARAM param)
+static BOOL CALLBACK reach_find_usable_explorer_folder_window_proc(HWND hwnd, LPARAM param)
 {
-    reach_explorer_window_search *search = reinterpret_cast<reach_explorer_window_search *>(param);
-    if (search == nullptr || !reach_is_file_explorer_window(hwnd)) {
-        return TRUE;
-    }
-
-    if (IsWindowVisible(hwnd) || IsIconic(hwnd)) {
-        search->visible_window = hwnd;
+    HWND *out_window = reinterpret_cast<HWND *>(param);
+    if (out_window == nullptr) {
         return FALSE;
     }
-    if (search->hidden_window == nullptr) {
-        search->hidden_window = hwnd;
+
+    if (reach_is_usable_explorer_folder_window(hwnd)) {
+        *out_window = hwnd;
+        return FALSE;
     }
+
     return TRUE;
 }
 
-static HWND reach_find_explorer_window(void)
+static HWND reach_find_usable_explorer_folder_window(void)
 {
-    reach_explorer_window_search search = {};
-    EnumWindows(reach_find_explorer_window_proc, reinterpret_cast<LPARAM>(&search));
-    return search.visible_window != nullptr ? search.visible_window : search.hidden_window;
+    HWND window = nullptr;
+    EnumWindows(
+        reach_find_usable_explorer_folder_window_proc,
+        reinterpret_cast<LPARAM>(&window)
+    );
+    return window;
 }
 
-static reach_result reach_activate_explorer_window(HWND window)
+static reach_result reach_activate_explorer_folder_window(HWND hwnd)
 {
-    if (window == nullptr || !IsWindow(window)) {
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (IsIconic(window)) {
-        ShowWindow(window, SW_RESTORE);
-    } else {
-        ShowWindow(window, SW_SHOWNORMAL);
+    if (reach_window_is_minimized(hwnd)) {
+        ShowWindow(hwnd, SW_RESTORE);
+    } else if (!IsWindowVisible(hwnd)) {
+        ShowWindow(hwnd, SW_SHOW);
     }
-    return SetForegroundWindow(window) ? REACH_OK : REACH_ERROR;
+
+    SetWindowPos(
+        hwnd,
+        HWND_TOP,
+        0,
+        0,
+        0,
+        0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW
+    );
+
+    (void)SetForegroundWindow(hwnd);
+    return REACH_OK;
 }
 
-static int32_t reach_launch_request_is_default_explorer(const reach_app_launch_request *request)
+static int32_t reach_is_default_explorer_launch_request(const reach_app_launch_request *request)
 {
-    if (request == nullptr || request->path[0] == 0 || request->arguments[0] != 0) {
+    if (request == nullptr ||
+        request->path[0] == 0 ||
+        request->arguments[0] != 0 ||
+        request->force_new_instance) {
         return 0;
     }
 
     const wchar_t *path = reinterpret_cast<const wchar_t *>(request->path);
-    const wchar_t *file_name = PathFindFileNameW(path);
+    const wchar_t *file_name = reach_win32_file_name(path);
     return file_name != nullptr && lstrcmpiW(file_name, L"explorer.exe") == 0;
 }
 
-static reach_result reach_launch_default_explorer(void)
+static reach_result reach_launch_default_explorer_folder(void)
 {
-    HWND existing = reach_find_explorer_window();
-    if (existing != nullptr) {
-        return reach_activate_explorer_window(existing);
-    }
-
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_DEFAULT;
+    execute.fMask = SEE_MASK_NOASYNC;
     execute.lpFile = L"shell:MyComputerFolder";
     execute.nShow = SW_SHOWNORMAL;
     return ShellExecuteExW(&execute) ? REACH_OK : REACH_ERROR;
@@ -114,8 +165,12 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher, cons
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (!request->force_new_instance && reach_launch_request_is_default_explorer(request)) {
-        return reach_launch_default_explorer();
+    if (reach_is_default_explorer_launch_request(request)) {
+        HWND existing = reach_find_usable_explorer_folder_window();
+        if (existing != nullptr) {
+            return reach_activate_explorer_folder_window(existing);
+        }
+        return reach_launch_default_explorer_folder();
     }
 
     SHELLEXECUTEINFOW execute = {};
