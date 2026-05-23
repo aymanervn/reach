@@ -123,3 +123,4 @@ exceptions above.
   `src/adapters/windows/monitor_win32.cpp` are in the Windows adapter folder but
   still compile into `reach_shell` until hotkey and monitor access move behind
   ports.
+- `src/app/pin_config.cpp` is still compiled into `reach_shell` while pinned-app loading/matching remains shell-owned; this should move behind a cleaner app/config boundary later.
