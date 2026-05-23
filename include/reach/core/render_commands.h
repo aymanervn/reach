@@ -34,7 +34,9 @@ typedef enum reach_vector_icon_id {
 } reach_vector_icon_id;
 
 typedef enum reach_text_weight {
+    REACH_TEXT_WEIGHT_LIGHT = 200,
     REACH_TEXT_WEIGHT_NORMAL = 400,
+    REACH_TEXT_WEIGHT_SEMIBOLD = 500,
     REACH_TEXT_WEIGHT_BOLD = 700
 } reach_text_weight;
 

@@ -278,7 +278,7 @@ static void reach_shell_update_clock_text(reach_shell *shell)
     if (local.tm_mon < 0 || local.tm_mon > 11 || local.tm_wday < 0 || local.tm_wday > 6) {
         return;
     }
-    snprintf(date_text, sizeof(date_text), "%s %d, %s", months[local.tm_mon], local.tm_mday, days[local.tm_wday]);
+    snprintf(date_text, sizeof(date_text), "%.3s %d, %.3s", months[local.tm_mon], local.tm_mday, days[local.tm_wday]);
 
     uint16_t next_time[32] = {};
     uint16_t next_date[64] = {};

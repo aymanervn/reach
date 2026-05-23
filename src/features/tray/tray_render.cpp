@@ -31,7 +31,7 @@ reach_result reach_tray_build_render_commands(const reach_tray_render_input *inp
     command.rect.y = popup_inset;
     command.rect.width = input->bounds.width - popup_stroke;
     command.rect.height = input->bounds.height - popup_stroke;
-    command.color = reach_tray_rgb(32, 30, 28, 1.0f);
+    command.color = theme->tray_popup_background;
     command.radius = theme->tray_popup_corner_radius;
     reach_render_command_buffer_push(out_commands, &command);
 

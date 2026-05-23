@@ -195,7 +195,7 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     command.rect.y = tray_box_y;
     command.rect.width = icon_box_size;
     command.rect.height = icon_box_size;
-    command.color = reach_dock_rgb(116, 116, 116, 1.0f);
+    command.color = theme->tray_button_background;
     command.radius = icon_box_radius;
     reach_render_command_buffer_push(out_commands, &command);
 
@@ -244,9 +244,8 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     command.rect.width = layout->clock.width;
     command.rect.height = layout->clock.height * 0.48f;
     command.color = theme->dock_clock_time;
-    command.text_size = 13.0f;
-    command.text_weight = REACH_TEXT_WEIGHT_BOLD;
-    command.text_alignment = input->text_alignment_center;
+    command.text_size = 17.0f;
+    command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     command.text_ellipsis = 1;
     reach_copy_utf16(command.text, 260, input->time_text != nullptr ? input->time_text : (const uint16_t *)L"");
     reach_render_command_buffer_push(out_commands, &command);
@@ -256,10 +255,9 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     command.rect.x = layout->clock.x - layout->bounds.x;
     command.rect.y = layout->clock.y - layout->bounds.y + layout->clock.height * 0.44f;
     command.rect.width = layout->clock.width;
-    command.rect.height = layout->clock.height * 0.50f;
+    command.rect.height = layout->clock.height * 0.56f;
     command.color = theme->dock_clock_date;
-    command.text_size = 11.0f;
-    command.text_alignment = input->text_alignment_center;
+    command.text_size = 12.0f;
     command.text_ellipsis = 1;
     reach_copy_utf16(command.text, 260, input->date_text != nullptr ? input->date_text : (const uint16_t *)L"");
     reach_render_command_buffer_push(out_commands, &command);
@@ -276,7 +274,7 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     command.rect.width = icon_box_size;
     command.rect.height = icon_box_size;
     command.color = theme->dock_power_button_background;
-    command.radius = icon_box_radius;
+    command.radius = 100.0f;
     reach_render_command_buffer_push(out_commands, &command);
 
     command = {};

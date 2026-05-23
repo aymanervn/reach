@@ -18,6 +18,7 @@ typedef struct reach_theme {
     reach_color fallback_icon_background;
     reach_color fallback_icon_text;
     reach_color tray_button_background;
+    reach_color tray_popup_background;
     reach_color tray_glyph;
     reach_color dock_system_separator;
     reach_color dock_clock_time;
@@ -37,6 +38,7 @@ typedef struct reach_theme {
     float tray_popup_height;
     float tray_popup_corner_radius;
     float tray_slot_size_ratio;
+    float dock_power_button_corner_radius;
     float dock_system_separator_width;
     float dock_system_separator_height_ratio;
     float dock_clock_width;
