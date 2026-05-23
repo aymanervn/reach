@@ -91,7 +91,16 @@ target_link_libraries(reach_features PUBLIC
 
 add_library(reach_windows_adapters STATIC
     src/adapters/windows/window_win32.cpp
-    src/adapters/windows/render_d2d.cpp
+    src/adapters/windows/render_d2d/render_d2d_backend.cpp
+    src/adapters/windows/render_d2d/render_d2d_device.cpp
+    src/adapters/windows/render_d2d/render_d2d_dcomp.cpp
+    src/adapters/windows/render_d2d/render_d2d_wuc.cpp
+    src/adapters/windows/render_d2d/render_d2d_frame.cpp
+    src/adapters/windows/render_d2d/render_d2d_icons.cpp
+    src/adapters/windows/render_d2d/render_d2d_svg.cpp
+    src/adapters/windows/render_d2d/render_d2d_shapes.cpp
+    src/adapters/windows/render_d2d/render_d2d_text.cpp
+    src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/search_stub.cpp
     src/adapters/windows/app_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
