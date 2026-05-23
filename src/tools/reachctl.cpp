@@ -3,8 +3,8 @@
 
 #include <cwchar>
 
-#include "reach/config_path.h"
-#include "reach/pin_config.h"
+#include "reach/app/config_path.h"
+#include "reach/app/pin_config.h"
 #include "reach/platform/windows_adapters.h"
 #include "reach/platform/windows_messages.h"
 #include "reach/platform/shell_registration.h"

@@ -7,6 +7,7 @@
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/platform_window.h"
+#include "reach/ports/popup_capture.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
 #include "reach/ports/tray_provider.h"
@@ -31,6 +32,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
 reach_result reach_windows_create_explorer_service(reach_explorer_service_port *out_port);
 reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port *out_port);
 reach_result reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port *out_port);
+reach_result reach_windows_create_popup_capture(reach_popup_capture_port *out_port);
 
 #ifdef __cplusplus
 }

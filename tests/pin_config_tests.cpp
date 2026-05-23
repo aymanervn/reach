@@ -1,4 +1,4 @@
-#include "reach/pin_config.h"
+#include "reach/app/pin_config.h"
 
 struct test_store {
     reach_config_snapshot snapshot;
