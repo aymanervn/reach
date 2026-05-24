@@ -412,6 +412,14 @@ void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)
     }
 }
 
+static int32_t reach_shell_popup_blocks_dock_autohide(const reach_shell *shell)
+{
+    return shell != nullptr &&
+        (shell->tray_popup_open ||
+         shell->quick_settings_open ||
+         shell->context_menu_open);
+}
+
 int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
@@ -481,13 +489,22 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
 {
     REACH_ASSERT(shell != nullptr);
     float hidden_y = monitor_bounds.y + monitor_bounds.height + 4.0f;
-    int32_t base_hidden = shell != nullptr &&
+    int32_t popup_blocks_autohide = reach_shell_popup_blocks_dock_autohide(shell);
+    int32_t should_auto_hide =
         shell->ui.dock.auto_hide &&
         reach_shell_should_auto_hide_dock(shell);
-    if (!base_hidden) {
+
+    int32_t base_hidden = should_auto_hide && !popup_blocks_autohide;
+    if (!should_auto_hide) {
         shell->dock_reveal_active = 0;
+    } else if (popup_blocks_autohide) {
+        if (reach_shell_cursor_in_dock_reveal_bounds(shown_bounds, monitor_bounds) ||
+            reach_shell_cursor_at_dock_reveal_edge(shown_bounds, monitor_bounds)) {
+            shell->dock_reveal_active = 1;
+        }
     } else if (shell->dock_reveal_active) {
-        shell->dock_reveal_active = reach_shell_cursor_in_dock_reveal_bounds(shown_bounds, monitor_bounds);
+        shell->dock_reveal_active =
+            reach_shell_cursor_in_dock_reveal_bounds(shown_bounds, monitor_bounds);
     } else if (reach_shell_cursor_at_dock_reveal_edge(shown_bounds, monitor_bounds)) {
         shell->dock_reveal_active = 1;
     }
