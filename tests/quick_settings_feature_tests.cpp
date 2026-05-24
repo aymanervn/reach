@@ -167,7 +167,7 @@ static void test_layout_places_volume_pill_above_output_device_and_expand(void)
     bounds.x = 100.0f;
     bounds.y = 200.0f;
     bounds.width = 240.0f;
-    bounds.height = 156.0f;
+    bounds.height = 168.0f;
 
     reach_quick_settings_layout layout =
         reach_quick_settings_layout_for_content_bounds(bounds, &theme, nullptr);
@@ -356,6 +356,29 @@ static void test_output_device_button_hit_maps_to_toggle_action(void)
         "output device button maps to toggle action");
 }
 
+static void test_output_device_title_chevron_hit_maps_to_toggle_action(void)
+{
+    reach_quick_settings_model model = test_model_with_output_devices(2);
+    model.output_devices_expanded = 1;
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+    float x = layout.output_devices_title_chevron.x +
+        layout.output_devices_title_chevron.width * 0.5f;
+    float y = layout.output_devices_title_chevron.y +
+        layout.output_devices_title_chevron.height * 0.5f;
+
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(&layout, &model, x, y);
+    reach_quick_settings_action action =
+        reach_quick_settings_action_for_hit(hit);
+
+    expect_true(
+        hit.type == REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON,
+        "output device title chevron hit");
+    expect_true(
+        action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES,
+        "output device title chevron maps to toggle action");
+}
+
 static void test_slider_hit_maps_to_set_volume_action(void)
 {
     reach_quick_settings_layout layout = test_layout();
@@ -438,7 +461,7 @@ static void test_expanded_output_device_layout_shows_panel(void)
         "output devices panel matches master pill width");
     expect_near(
         layout.output_devices_panel.height,
-        80.0f,
+        88.0f,
         0.001f,
         "output devices panel height follows device rows");
     expect_true(
@@ -591,53 +614,53 @@ static void test_expanded_render_emits_app_volume_panel_rows(void)
         reach_quick_settings_build_render_commands(&input, &commands);
 
     expect_true(result == REACH_OK, "expanded render succeeds");
-    expect_true(commands.count >= 26, "expanded render emits master, output button, panel rows, and collapse commands");
+    expect_true(commands.count >= 27, "expanded render emits master, output button, panel rows, and collapse commands");
     expect_true(
-        commands.commands[8].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[8].text, "App volumes"),
+        commands.commands[9].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[9].text, "App volumes"),
         "expanded render emits app volumes title");
     expect_true(
-        commands.commands[9].type == REACH_RENDER_COMMAND_RECT,
+        commands.commands[10].type == REACH_RENDER_COMMAND_RECT,
         "expanded render emits app volumes panel background");
     expect_color_equal(
-        commands.commands[9].color,
+        commands.commands[10].color,
         theme.quick_settings_expand_button_color,
         "app volumes panel uses expand button color");
     expect_true(
-        commands.commands[10].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[10].icon_id == 9000,
+        commands.commands[11].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[11].icon_id == 9000,
         "first app row starts with app icon");
     expect_true(
-        commands.commands[11].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[11].text, "App A"),
+        commands.commands[12].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[12].text, "App A"),
         "first app row label strips exe suffix");
     expect_true(
-        commands.commands[12].type == REACH_RENDER_COMMAND_RECT &&
-            commands.commands[12].rect.height < 4.0f,
+        commands.commands[13].type == REACH_RENDER_COMMAND_RECT &&
+            commands.commands[13].rect.height < 4.0f,
         "app row uses compact slider track");
     expect_true(
-        commands.commands[15].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[15].text, "25%"),
+        commands.commands[16].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[16].text, "25%"),
         "first app row renders percentage");
     expect_true(
-        commands.commands[17].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[17].icon_id == 9001,
+        commands.commands[18].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[18].icon_id == 9001,
         "second app row follows first compact row");
     expect_true(
-        commands.commands[18].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[18].text, "App B"),
+        commands.commands[19].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[19].text, "App B"),
         "second app row label strips exe suffix");
     expect_true(
-        commands.commands[22].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[22].text, "30%"),
+        commands.commands[23].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[23].text, "30%"),
         "second app row renders percentage");
     expect_true(
-        commands.commands[24].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[24].text, "Hide app volumes"),
+        commands.commands[25].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[25].text, "Hide app volumes"),
         "expanded render keeps collapse row label inside panel");
     expect_true(
-        commands.commands[25].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[25].icon_id == REACH_VECTOR_ICON_ARROW_UP,
+        commands.commands[26].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[26].icon_id == REACH_VECTOR_ICON_ARROW_UP,
         "expanded collapse row uses arrow up icon");
 }
 
@@ -657,37 +680,33 @@ static void test_expanded_output_device_render_emits_checkmark(void)
         reach_quick_settings_build_render_commands(&input, &commands);
 
     expect_true(result == REACH_OK, "expanded output render succeeds");
-    expect_true(commands.count >= 17, "expanded output render emits device panel");
+    expect_true(commands.count >= 16, "expanded output render emits device panel");
     expect_true(
-        commands.commands[4].type == REACH_RENDER_COMMAND_RECT,
-        "output device button background follows master");
+        commands.commands[4].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[4].text, "Output devices"),
+        "expanded output title replaces output button");
     expect_true(
-        commands.commands[5].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[5].icon_id == 7001,
-        "output device button shows current device icon");
+        commands.commands[5].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[5].icon_id == REACH_VECTOR_ICON_ARROW_UP,
+        "expanded output title shows close affordance");
     expect_true(
-        commands.commands[6].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[6].text, "Headphones"),
-        "output device button shows current device label");
+        commands.commands[6].type == REACH_RENDER_COMMAND_RECT,
+        "expanded output render emits device panel background");
     expect_true(
-        commands.commands[8].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[8].text, "Output devices"),
-        "output devices title renders");
-    expect_true(
-        commands.commands[10].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[10].icon_id == 7000,
+        commands.commands[7].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[7].icon_id == 7000,
         "first output row renders device icon");
     expect_true(
-        commands.commands[12].type != REACH_RENDER_COMMAND_VECTOR_ICON ||
-            commands.commands[12].icon_id != REACH_VECTOR_ICON_CHECK,
+        commands.commands[9].type != REACH_RENDER_COMMAND_VECTOR_ICON ||
+            commands.commands[9].icon_id != REACH_VECTOR_ICON_CHECK,
         "non-default output row does not render checkmark");
     expect_true(
-        commands.commands[13].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[13].icon_id == 7001,
+        commands.commands[10].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[10].icon_id == 7001,
         "default output row renders device icon");
     expect_true(
-        commands.commands[15].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[15].icon_id == REACH_VECTOR_ICON_CHECK,
+        commands.commands[12].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[12].icon_id == REACH_VECTOR_ICON_CHECK,
         "default output row renders checkmark");
 }
 
@@ -792,25 +811,25 @@ static void test_render_emits_volume_pill_and_expand_commands(void)
         0.001f,
         "output device button uses popup corner radius");
     expect_true(
-        commands.commands[7].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[7].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
+        commands.commands[8].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[8].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
         "output device button uses arrow down icon");
 
     expect_true(
-        commands.commands[8].type == REACH_RENDER_COMMAND_RECT,
+        commands.commands[9].type == REACH_RENDER_COMMAND_RECT,
         "ninth command is expand button background");
     expect_near(
-        commands.commands[8].radius,
+        commands.commands[9].radius,
         reach_popup_radius(),
         0.001f,
         "expand button uses popup corner radius");
 
     expect_true(
-        commands.commands[10].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[10].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
+        commands.commands[11].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[11].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
         "expand button uses arrow down icon");
     expect_color_equal(
-        commands.commands[10].color,
+        commands.commands[11].color,
         theme.icon_backplate_background,
         "expand icon uses app backplate color");
 }
@@ -824,6 +843,7 @@ int main(void)
     test_hit_outside_returns_none();
     test_expand_button_hit_maps_to_expand_action();
     test_output_device_button_hit_maps_to_toggle_action();
+    test_output_device_title_chevron_hit_maps_to_toggle_action();
     test_slider_hit_maps_to_set_volume_action();
     test_expanded_output_device_layout_shows_panel();
     test_output_device_row_hit_maps_to_set_device_action();

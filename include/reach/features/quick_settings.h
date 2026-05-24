@@ -68,6 +68,7 @@ typedef struct reach_quick_settings_layout {
     reach_rect_f32 output_device_button_label;
     reach_rect_f32 output_device_button_chevron;
     reach_rect_f32 output_devices_title;
+    reach_rect_f32 output_devices_title_chevron;
     reach_rect_f32 output_devices_panel;
     reach_quick_settings_output_device_row_layout output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     size_t output_device_row_count;

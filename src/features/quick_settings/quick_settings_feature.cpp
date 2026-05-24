@@ -232,13 +232,15 @@ float reach_quick_settings_content_height_for_model(
     size_t visible_sessions = reach_quick_settings_visible_session_count(model);
     size_t visible_output_devices = reach_quick_settings_visible_output_device_count(model);
     float volume_component_height = header_height + header_gap + pill_height;
-    float output_component_height = output_button_gap + output_button_height;
+    float output_component_height = 0.0f;
     if (model != nullptr && model->output_devices_expanded) {
-        output_component_height +=
-            output_title_gap +
+        output_component_height =
+            output_button_gap +
             output_title_height +
             output_panel_gap +
             (float)visible_output_devices * output_device_row_height;
+    } else {
+        output_component_height = output_button_gap + output_button_height;
     }
     float app_volume_component_height = 0.0f;
     if (model != nullptr && model->expanded) {
@@ -329,52 +331,22 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
 
     float next_y = pill_bounds.y + pill_bounds.height;
 
-    layout.output_device_button.x = content_bounds.x + padding;
-    layout.output_device_button.y = next_y + output_button_gap;
-    layout.output_device_button.width = pill_bounds.width;
-    layout.output_device_button.height = output_button_height;
-    if (layout.output_device_button.width < 0.0f) {
-        layout.output_device_button.width = 0.0f;
-    }
-
-    layout.output_device_button_icon.width = output_icon_size;
-    layout.output_device_button_icon.height = output_icon_size;
-    layout.output_device_button_icon.x =
-        layout.output_device_button.x + output_row_horizontal_padding;
-    layout.output_device_button_icon.y =
-        layout.output_device_button.y +
-        (layout.output_device_button.height - output_icon_size) * 0.5f;
-
-    layout.output_device_button_chevron.width = icon_size;
-    layout.output_device_button_chevron.height = icon_size;
-    layout.output_device_button_chevron.x =
-        layout.output_device_button.x + layout.output_device_button.width -
-        padding - icon_size;
-    layout.output_device_button_chevron.y =
-        layout.output_device_button.y +
-        (layout.output_device_button.height - icon_size) * 0.5f;
-
-    layout.output_device_button_label.x =
-        layout.output_device_button_icon.x + output_icon_size + output_row_label_gap;
-    layout.output_device_button_label.y = layout.output_device_button.y;
-    layout.output_device_button_label.width =
-        layout.output_device_button_chevron.x -
-        layout.output_device_button_label.x -
-        padding;
-    layout.output_device_button_label.height = layout.output_device_button.height;
-    if (layout.output_device_button_label.width < 0.0f) {
-        layout.output_device_button_label.width = 0.0f;
-    }
-
-    next_y = layout.output_device_button.y + layout.output_device_button.height;
-
     layout.output_device_row_count = 0;
     size_t visible_output_devices = reach_quick_settings_visible_output_device_count(model);
     if (model != nullptr && model->output_devices_expanded) {
         layout.output_devices_title.x = pill_bounds.x;
-        layout.output_devices_title.y = next_y + output_title_gap;
+        layout.output_devices_title.y = next_y + output_button_gap;
         layout.output_devices_title.width = pill_bounds.width;
         layout.output_devices_title.height = output_title_height;
+
+        layout.output_devices_title_chevron.width = icon_size;
+        layout.output_devices_title_chevron.height = icon_size;
+        layout.output_devices_title_chevron.x =
+            layout.output_devices_title.x + layout.output_devices_title.width -
+            padding - icon_size;
+        layout.output_devices_title_chevron.y =
+            layout.output_devices_title.y +
+            (layout.output_devices_title.height - icon_size) * 0.5f;
 
         layout.output_devices_panel.x = pill_bounds.x;
         layout.output_devices_panel.y =
@@ -431,6 +403,45 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
         }
 
         next_y = layout.output_devices_panel.y + layout.output_devices_panel.height;
+    } else {
+        layout.output_device_button.x = content_bounds.x + padding;
+        layout.output_device_button.y = next_y + output_button_gap;
+        layout.output_device_button.width = pill_bounds.width;
+        layout.output_device_button.height = output_button_height;
+        if (layout.output_device_button.width < 0.0f) {
+            layout.output_device_button.width = 0.0f;
+        }
+
+        layout.output_device_button_icon.width = output_icon_size;
+        layout.output_device_button_icon.height = output_icon_size;
+        layout.output_device_button_icon.x =
+            layout.output_device_button.x + output_row_horizontal_padding;
+        layout.output_device_button_icon.y =
+            layout.output_device_button.y +
+            (layout.output_device_button.height - output_icon_size) * 0.5f;
+
+        layout.output_device_button_chevron.width = icon_size;
+        layout.output_device_button_chevron.height = icon_size;
+        layout.output_device_button_chevron.x =
+            layout.output_device_button.x + layout.output_device_button.width -
+            padding - icon_size;
+        layout.output_device_button_chevron.y =
+            layout.output_device_button.y +
+            (layout.output_device_button.height - icon_size) * 0.5f;
+
+        layout.output_device_button_label.x =
+            layout.output_device_button_icon.x + output_icon_size + output_row_label_gap;
+        layout.output_device_button_label.y = layout.output_device_button.y;
+        layout.output_device_button_label.width =
+            layout.output_device_button_chevron.x -
+            layout.output_device_button_label.x -
+            padding;
+        layout.output_device_button_label.height = layout.output_device_button.height;
+        if (layout.output_device_button_label.width < 0.0f) {
+            layout.output_device_button_label.width = 0.0f;
+        }
+
+        next_y = layout.output_device_button.y + layout.output_device_button.height;
     }
 
     layout.app_volume_row_count = 0;

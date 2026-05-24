@@ -106,7 +106,8 @@ reach_quick_settings_hit_result reach_quick_settings_hit_test(
         return result;
     }
 
-    if (reach_quick_settings_point_in_rect(layout->output_device_button, x, y)) {
+    if (reach_quick_settings_point_in_rect(layout->output_device_button, x, y) ||
+        reach_quick_settings_point_in_rect(layout->output_devices_title_chevron, x, y)) {
         result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON;
         return result;
     }
