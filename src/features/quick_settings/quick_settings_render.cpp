@@ -26,6 +26,23 @@ static reach_color reach_quick_settings_color_alpha(
     return color;
 }
 
+static void reach_quick_settings_push_rounded_rect(
+    reach_render_command_buffer *commands,
+    reach_rect_f32 rect,
+    float radius,
+    reach_color color
+);
+
+static void reach_quick_settings_push_text(
+    reach_render_command_buffer *commands,
+    reach_rect_f32 rect,
+    const uint16_t *text,
+    float size,
+    int32_t weight,
+    int32_t alignment,
+    reach_color color
+);
+
 static void reach_quick_settings_copy_utf16(
     uint16_t *dst,
     size_t dst_count,
@@ -207,6 +224,96 @@ static void reach_quick_settings_format_percent(
         dst[index++] = '%';
     }
     dst[index] = 0;
+}
+
+static uint32_t reach_quick_settings_network_icon_id(
+    const reach_network_state *state
+)
+{
+    if (state == nullptr || !state->connected) {
+        return REACH_VECTOR_ICON_NO_INTERNET;
+    }
+    if (state->kind == REACH_NETWORK_KIND_ETHERNET) {
+        return REACH_VECTOR_ICON_ETHERNET;
+    }
+    if (state->signal_strength < 34) {
+        return REACH_VECTOR_ICON_WIFI_LOW;
+    }
+    if (state->signal_strength < 67) {
+        return REACH_VECTOR_ICON_WIFI_MEDIUM;
+    }
+    return REACH_VECTOR_ICON_WIFI_HIGH;
+}
+
+static void reach_quick_settings_network_label(
+    const reach_network_state *state,
+    uint16_t *out_label,
+    size_t out_label_count
+)
+{
+    static const uint16_t no_internet[] = {
+        'N','o',' ','i','n','t','e','r','n','e','t',0
+    };
+    static const uint16_t ethernet[] = {
+        'E','t','h','e','r','n','e','t',0
+    };
+    static const uint16_t wifi[] = {
+        'W','i','-','F','i',0
+    };
+
+    if (state == nullptr || !state->connected) {
+        reach_quick_settings_copy_utf16(out_label, out_label_count, no_internet);
+        return;
+    }
+    if (state->kind == REACH_NETWORK_KIND_ETHERNET) {
+        reach_quick_settings_copy_utf16(out_label, out_label_count, ethernet);
+        return;
+    }
+    if (state->label[0] != 0) {
+        reach_quick_settings_copy_utf16(out_label, out_label_count, state->label);
+    } else {
+        reach_quick_settings_copy_utf16(out_label, out_label_count, wifi);
+    }
+}
+
+static void reach_quick_settings_push_system_tile_commands(
+    reach_render_command_buffer *commands,
+    const reach_quick_settings_tile_layout *layout,
+    uint32_t icon_id,
+    const uint16_t *label,
+    int32_t active,
+    const reach_theme *theme
+)
+{
+    if (commands == nullptr || layout == nullptr || theme == nullptr) {
+        return;
+    }
+
+    reach_color active_background = { 1.0f, 1.0f, 1.0f, 1.0f };
+    reach_color active_foreground = { 0.0f, 0.0f, 0.0f, 1.0f };
+    reach_color foreground = active ? active_foreground : theme->quick_settings_expand_text_color;
+
+    reach_quick_settings_push_rounded_rect(
+        commands,
+        layout->bounds,
+        reach_popup_radius(),
+        active ? active_background : theme->quick_settings_expand_button_color);
+
+    reach_render_command icon = {};
+    icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    icon.rect = layout->icon;
+    icon.icon_id = icon_id;
+    icon.color = foreground;
+    (void)reach_render_command_buffer_push(commands, &icon);
+
+    reach_quick_settings_push_text(
+        commands,
+        layout->label,
+        label,
+        12.0f,
+        REACH_TEXT_WEIGHT_SEMIBOLD,
+        0,
+        foreground);
 }
 
 static void reach_quick_settings_push_rounded_rect(
@@ -565,6 +672,78 @@ reach_result reach_quick_settings_build_render_commands(
     }
 
     reach_render_command_buffer_clear(commands);
+
+    uint16_t network_label[REACH_SYSTEM_NETWORK_LABEL_CAPACITY] = {};
+    reach_quick_settings_network_label(
+        &input->model.network,
+        network_label,
+        REACH_SYSTEM_NETWORK_LABEL_CAPACITY);
+    reach_quick_settings_push_system_tile_commands(
+        commands,
+        &input->layout.network_tile,
+        reach_quick_settings_network_icon_id(&input->model.network),
+        network_label,
+        input->model.network.connected,
+        &input->theme);
+
+    static const uint16_t bluetooth_label[] = {
+        'B','l','u','e','t','o','o','t','h',0
+    };
+    reach_quick_settings_push_system_tile_commands(
+        commands,
+        &input->layout.bluetooth_tile,
+        input->model.bluetooth.enabled
+            ? REACH_VECTOR_ICON_BLUETOOTH_ON
+            : REACH_VECTOR_ICON_BLUETOOTH_OFF,
+        bluetooth_label,
+        input->model.bluetooth.enabled,
+        &input->theme);
+
+    if (input->model.power.has_battery) {
+        static const uint16_t battery_saver_label[] = {
+            'B','a','t','t','e','r','y',' ','s','a','v','e','r',0
+        };
+        reach_quick_settings_push_system_tile_commands(
+            commands,
+            &input->layout.battery_saver_tile,
+            REACH_VECTOR_ICON_BATTERY_SAVER,
+            battery_saver_label,
+            input->model.power.battery_saver_on,
+            &input->theme);
+
+        static const uint16_t project_label[] = {
+            'P','r','o','j','e','c','t',0
+        };
+        reach_quick_settings_push_system_tile_commands(
+            commands,
+            &input->layout.project_tile,
+            REACH_VECTOR_ICON_PROJECT,
+            project_label,
+            0,
+            &input->theme);
+    }
+
+    if (input->model.brightness.available) {
+        static const uint16_t brightness_label[] = {
+            'B','r','i','g','h','t','n','e','s','s',0
+        };
+        reach_quick_settings_volume_pill_model brightness_model = {};
+        reach_quick_settings_volume_pill_model_init(
+            &brightness_model,
+            input->model.brightness.level,
+            0,
+            brightness_label);
+        brightness_model.icon_id = REACH_VECTOR_ICON_BRIGHTNESS;
+
+        reach_result brightness_result = reach_quick_settings_push_volume_pill_commands(
+            &brightness_model,
+            &input->layout.brightness_pill,
+            &input->theme,
+            commands);
+        if (brightness_result != REACH_OK) {
+            return brightness_result;
+        }
+    }
 
     static const uint16_t master_volume_label[] = {
         'M','a','s','t','e','r',' ','v','o','l','u','m','e',0

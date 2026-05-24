@@ -114,11 +114,15 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_audio_volume(&dependencies.audio_volume);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_system_controls(&dependencies.system_controls);
+    }
+    if (result == REACH_OK) {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
         if (result == REACH_OK) {
             dependencies.popup_capture = {};
             dependencies.power_session = {};
             dependencies.audio_volume = {};
+            dependencies.system_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
         }
@@ -198,6 +202,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.audio_volume.destroy != nullptr) {
             dependencies.audio_volume.destroy(dependencies.audio_volume.userdata);
+        }
+        if (dependencies.system_controls.destroy != nullptr) {
+            dependencies.system_controls.destroy(dependencies.system_controls.userdata);
         }
         delete app;
         return result;

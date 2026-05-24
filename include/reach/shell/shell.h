@@ -14,6 +14,7 @@
 #include "reach/ports/power_session.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
+#include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
@@ -57,6 +58,7 @@ typedef struct reach_shell_dependencies {
     reach_popup_capture_port popup_capture;
     reach_power_session_port power_session;
     reach_audio_volume_port audio_volume;
+    reach_system_controls_port system_controls;
 } reach_shell_dependencies;
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, const reach_shell_dependencies *dependencies, reach_shell **out_shell);

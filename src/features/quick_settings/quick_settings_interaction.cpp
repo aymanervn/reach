@@ -98,6 +98,36 @@ reach_quick_settings_hit_result reach_quick_settings_hit_test(
         return result;
     }
 
+    if (reach_quick_settings_point_in_rect(layout->network_tile.bounds, x, y)) {
+        result.type = REACH_QUICK_SETTINGS_HIT_NETWORK_TILE;
+        return result;
+    }
+
+    if (reach_quick_settings_point_in_rect(layout->bluetooth_tile.bounds, x, y)) {
+        result.type = REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE;
+        return result;
+    }
+
+    if (reach_quick_settings_point_in_rect(layout->battery_saver_tile.bounds, x, y)) {
+        result.type = REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE;
+        return result;
+    }
+
+    if (reach_quick_settings_point_in_rect(layout->project_tile.bounds, x, y)) {
+        result.type = REACH_QUICK_SETTINGS_HIT_PROJECT_TILE;
+        return result;
+    }
+
+    if (model != nullptr &&
+        model->brightness.available &&
+        reach_quick_settings_point_in_rect(layout->brightness_slider_track, x, y)) {
+        result.type = REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER;
+        result.volume_level = reach_quick_settings_volume_pill_level_for_x(
+            &layout->brightness_pill,
+            x);
+        return result;
+    }
+
     if (reach_quick_settings_point_in_rect(layout->main_slider_track, x, y)) {
         result.type = REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER;
         result.volume_level = reach_quick_settings_volume_pill_level_for_x(
@@ -179,6 +209,32 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(
             action.session_instance_id,
             REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
             hit.session_instance_id);
+        return action;
+    }
+
+    if (hit.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER) {
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
+        action.volume_level = reach_quick_settings_clamp01(hit.volume_level);
+        return action;
+    }
+
+    if (hit.type == REACH_QUICK_SETTINGS_HIT_NETWORK_TILE) {
+        action.type = REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE;
+        return action;
+    }
+
+    if (hit.type == REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE) {
+        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH;
+        return action;
+    }
+
+    if (hit.type == REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE) {
+        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER;
+        return action;
+    }
+
+    if (hit.type == REACH_QUICK_SETTINGS_HIT_PROJECT_TILE) {
+        action.type = REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT;
         return action;
     }
 

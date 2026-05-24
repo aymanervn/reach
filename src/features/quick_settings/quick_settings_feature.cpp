@@ -54,6 +54,17 @@ static size_t reach_quick_settings_visible_output_device_count(
         : REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES;
 }
 
+static size_t reach_quick_settings_visible_system_tile_count(
+    const reach_quick_settings_model *model
+)
+{
+    size_t count = 2;
+    if (model != nullptr && model->power.has_battery) {
+        count += 2;
+    }
+    return count;
+}
+
 void reach_quick_settings_model_init(
     reach_quick_settings_model *model
 )
@@ -68,6 +79,10 @@ void reach_quick_settings_model_init(
     model->output_devices_expanded = 0;
     model->sessions = {};
     model->output_devices = {};
+    model->network = {};
+    model->bluetooth = {};
+    model->power = {};
+    model->brightness = {};
 }
 
 void reach_quick_settings_model_set_main_volume(
@@ -149,6 +164,37 @@ void reach_quick_settings_model_set_output_devices(
     }
 }
 
+void reach_quick_settings_model_set_system_states(
+    reach_quick_settings_model *model,
+    const reach_network_state *network,
+    const reach_bluetooth_state *bluetooth,
+    const reach_power_state *power,
+    const reach_brightness_state *brightness
+)
+{
+    if (model == nullptr) {
+        return;
+    }
+
+    model->network = network != nullptr ? *network : reach_network_state {};
+    model->bluetooth = bluetooth != nullptr ? *bluetooth : reach_bluetooth_state {};
+    model->power = power != nullptr ? *power : reach_power_state {};
+    model->brightness = brightness != nullptr ? *brightness : reach_brightness_state {};
+
+    if (model->network.signal_strength < 0) {
+        model->network.signal_strength = 0;
+    }
+    if (model->network.signal_strength > 100) {
+        model->network.signal_strength = 100;
+    }
+    model->brightness.level = reach_quick_settings_clamp01(model->brightness.level);
+    model->bluetooth.available = model->bluetooth.available ? 1 : 0;
+    model->bluetooth.enabled = model->bluetooth.enabled ? 1 : 0;
+    model->power.has_battery = model->power.has_battery ? 1 : 0;
+    model->power.battery_saver_on = model->power.battery_saver_on ? 1 : 0;
+    model->brightness.available = model->brightness.available ? 1 : 0;
+}
+
 void reach_quick_settings_volume_pill_model_init(
     reach_quick_settings_volume_pill_model *model,
     float volume_level,
@@ -213,6 +259,9 @@ float reach_quick_settings_content_height_for_model(
 )
 {
     const float padding = 8.0f;
+    const float grid_tile_height = 46.0f;
+    const float grid_gap = 8.0f;
+    const float grid_bottom_gap = 10.0f;
     const float header_height = 16.0f;
     const float header_gap = 12.0f;
     const float pill_height = 24.0f;
@@ -231,7 +280,18 @@ float reach_quick_settings_content_height_for_model(
 
     size_t visible_sessions = reach_quick_settings_visible_session_count(model);
     size_t visible_output_devices = reach_quick_settings_visible_output_device_count(model);
+    size_t visible_tiles = reach_quick_settings_visible_system_tile_count(model);
+    size_t grid_rows = (visible_tiles + 1) / 2;
+    float grid_component_height =
+        (float)grid_rows * grid_tile_height +
+        (float)(grid_rows > 0 ? grid_rows - 1 : 0) * grid_gap +
+        grid_bottom_gap;
     float volume_component_height = header_height + header_gap + pill_height;
+    float brightness_component_height = 0.0f;
+    if (model != nullptr && model->brightness.available) {
+        brightness_component_height =
+            header_height + header_gap + pill_height + grid_bottom_gap;
+    }
     float output_component_height = 0.0f;
     if (model != nullptr && model->output_devices_expanded) {
         output_component_height =
@@ -254,6 +314,8 @@ float reach_quick_settings_content_height_for_model(
     }
     return padding * 2.0f +
         volume_component_height +
+        grid_component_height +
+        brightness_component_height +
         output_component_height +
         app_volume_component_height;
 }
@@ -284,6 +346,11 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
 
     const float padding = 8.0f;
     const float text_padding = 12.0f;
+    const float grid_tile_height = 46.0f;
+    const float grid_gap = 8.0f;
+    const float grid_bottom_gap = 10.0f;
+    const float grid_icon_size = 17.0f;
+    const float grid_icon_gap = 8.0f;
     const float header_height = 16.0f;
     const float header_gap = 12.0f;
     const float pill_height = 24.0f;
@@ -315,9 +382,81 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
     const float expand_height = 34.0f;
     const float icon_size = 18.0f;
 
+    reach_rect_f32 grid_bounds = {};
+    grid_bounds.x = content_bounds.x + padding;
+    grid_bounds.y = content_bounds.y + padding;
+    grid_bounds.width = content_bounds.width - padding * 2.0f;
+    if (grid_bounds.width < 0.0f) {
+        grid_bounds.width = 0.0f;
+    }
+
+    float tile_width = (grid_bounds.width - grid_gap) * 0.5f;
+    if (tile_width < 0.0f) {
+        tile_width = 0.0f;
+    }
+
+    size_t tile_index = 0;
+#define REACH_QUICK_SETTINGS_ASSIGN_TILE(tile_layout) \
+    do { \
+        size_t tile_row = tile_index / 2; \
+        size_t tile_column = tile_index % 2; \
+        (tile_layout).bounds.x = grid_bounds.x + (float)tile_column * (tile_width + grid_gap); \
+        (tile_layout).bounds.y = grid_bounds.y + (float)tile_row * (grid_tile_height + grid_gap); \
+        (tile_layout).bounds.width = tile_width; \
+        (tile_layout).bounds.height = grid_tile_height; \
+        (tile_layout).icon.x = (tile_layout).bounds.x + text_padding; \
+        (tile_layout).icon.y = (tile_layout).bounds.y + ((tile_layout).bounds.height - grid_icon_size) * 0.5f; \
+        (tile_layout).icon.width = grid_icon_size; \
+        (tile_layout).icon.height = grid_icon_size; \
+        (tile_layout).label.x = (tile_layout).icon.x + grid_icon_size + grid_icon_gap; \
+        (tile_layout).label.y = (tile_layout).bounds.y; \
+        (tile_layout).label.width = (tile_layout).bounds.x + (tile_layout).bounds.width - padding - (tile_layout).label.x; \
+        (tile_layout).label.height = (tile_layout).bounds.height; \
+        if ((tile_layout).label.width < 0.0f) { \
+            (tile_layout).label.width = 0.0f; \
+        } \
+        ++tile_index; \
+    } while (0)
+
+    REACH_QUICK_SETTINGS_ASSIGN_TILE(layout.network_tile);
+    REACH_QUICK_SETTINGS_ASSIGN_TILE(layout.bluetooth_tile);
+    if (model != nullptr && model->power.has_battery) {
+        REACH_QUICK_SETTINGS_ASSIGN_TILE(layout.battery_saver_tile);
+        REACH_QUICK_SETTINGS_ASSIGN_TILE(layout.project_tile);
+    }
+#undef REACH_QUICK_SETTINGS_ASSIGN_TILE
+
+    layout.system_tile_count = tile_index;
+    size_t grid_rows = (tile_index + 1) / 2;
+    layout.system_grid_bounds = grid_bounds;
+    layout.system_grid_bounds.height =
+        (float)grid_rows * grid_tile_height +
+        (float)(grid_rows > 0 ? grid_rows - 1 : 0) * grid_gap;
+
+    float next_y =
+        layout.system_grid_bounds.y +
+        layout.system_grid_bounds.height +
+        grid_bottom_gap;
+
+    if (model != nullptr && model->brightness.available) {
+        reach_rect_f32 brightness_bounds = {};
+        brightness_bounds.x = content_bounds.x + padding;
+        brightness_bounds.y = next_y + header_height + header_gap;
+        brightness_bounds.width = content_bounds.width - padding * 2.0f;
+        brightness_bounds.height = pill_height;
+        if (brightness_bounds.width < 0.0f) {
+            brightness_bounds.width = 0.0f;
+        }
+        layout.brightness_pill =
+            reach_quick_settings_volume_pill_layout_for_bounds(brightness_bounds, theme);
+        layout.brightness_slider_track = layout.brightness_pill.slider_track;
+        layout.brightness_slider_fill = layout.brightness_pill.slider_fill;
+        next_y = brightness_bounds.y + brightness_bounds.height + grid_bottom_gap;
+    }
+
     reach_rect_f32 pill_bounds = {};
     pill_bounds.x = content_bounds.x + padding;
-    pill_bounds.y = content_bounds.y + padding + header_height + header_gap;
+    pill_bounds.y = next_y + header_height + header_gap;
     pill_bounds.width = content_bounds.width - padding * 2.0f;
     pill_bounds.height = pill_height;
     if (pill_bounds.width < 0.0f) {
@@ -329,7 +468,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
     layout.main_slider_track = layout.main_volume_pill.slider_track;
     layout.main_slider_fill = layout.main_volume_pill.slider_fill;
 
-    float next_y = pill_bounds.y + pill_bounds.height;
+    next_y = pill_bounds.y + pill_bounds.height;
 
     layout.output_device_row_count = 0;
     size_t visible_output_devices = reach_quick_settings_visible_output_device_count(model);

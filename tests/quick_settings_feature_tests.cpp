@@ -128,6 +128,44 @@ static reach_quick_settings_model test_model_with_output_devices(size_t count)
     return model;
 }
 
+static void set_system_states(
+    reach_quick_settings_model *model,
+    reach_network_kind network_kind,
+    int32_t network_connected,
+    const char *network_label,
+    int32_t signal_strength,
+    int32_t bluetooth_enabled,
+    int32_t has_battery,
+    int32_t battery_saver_on,
+    int32_t brightness_available)
+{
+    reach_network_state network = {};
+    network.kind = network_kind;
+    network.connected = network_connected;
+    network.signal_strength = signal_strength;
+    copy_ascii(network.label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, network_label);
+
+    reach_bluetooth_state bluetooth = {};
+    bluetooth.available = 1;
+    bluetooth.enabled = bluetooth_enabled;
+
+    reach_power_state power = {};
+    power.has_battery = has_battery;
+    power.battery_percent = has_battery ? 74 : -1;
+    power.battery_saver_on = battery_saver_on;
+
+    reach_brightness_state brightness = {};
+    brightness.available = brightness_available;
+    brightness.level = 0.4f;
+
+    reach_quick_settings_model_set_system_states(
+        model,
+        &network,
+        &bluetooth,
+        &power,
+        &brightness);
+}
+
 static reach_quick_settings_layout test_layout_for_model(
     const reach_quick_settings_model *model)
 {
@@ -167,7 +205,7 @@ static void test_layout_places_volume_pill_above_output_device_and_expand(void)
     bounds.x = 100.0f;
     bounds.y = 200.0f;
     bounds.width = 240.0f;
-    bounds.height = 168.0f;
+    bounds.height = reach_quick_settings_content_height_for_model(nullptr);
 
     reach_quick_settings_layout layout =
         reach_quick_settings_layout_for_content_bounds(bounds, &theme, nullptr);
@@ -177,8 +215,15 @@ static void test_layout_places_volume_pill_above_output_device_and_expand(void)
     expect_true(
         layout.main_volume_pill.bounds.y >= bounds.y,
         "volume pill starts inside content bounds");
+    expect_true(
+        layout.system_grid_bounds.y >= bounds.y,
+        "system grid starts inside content bounds");
+    expect_true(
+        layout.system_grid_bounds.y + layout.system_grid_bounds.height <
+            layout.main_volume_pill.header_label.y,
+        "system grid is above volume section");
     expect_near(
-        layout.main_volume_pill.header_label.y - bounds.y,
+        layout.system_grid_bounds.y - bounds.y,
         expected_padding,
         0.001f,
         "top content padding is compact");
@@ -246,6 +291,72 @@ static void test_layout_places_volume_pill_above_output_device_and_expand(void)
         "master volume icon is larger");
 }
 
+static void test_desktop_system_grid_shows_network_and_bluetooth_only(void)
+{
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    set_system_states(
+        &model,
+        REACH_NETWORK_KIND_NONE,
+        0,
+        nullptr,
+        0,
+        0,
+        0,
+        0,
+        0);
+
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+
+    expect_true(layout.system_tile_count == 2, "desktop grid exposes two system tiles");
+    expect_true(layout.network_tile.bounds.width > 0.0f, "desktop grid shows network tile");
+    expect_true(layout.bluetooth_tile.bounds.width > 0.0f, "desktop grid shows bluetooth tile");
+    expect_near(layout.battery_saver_tile.bounds.width, 0.0f, 0.001f, "battery saver hidden without battery");
+    expect_near(layout.project_tile.bounds.width, 0.0f, 0.001f, "project hidden without battery");
+    expect_near(layout.brightness_pill.bounds.height, 0.0f, 0.001f, "brightness hidden when unavailable");
+}
+
+static void test_battery_system_grid_is_two_by_two(void)
+{
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    set_system_states(
+        &model,
+        REACH_NETWORK_KIND_WIFI,
+        1,
+        "Reach WiFi",
+        84,
+        1,
+        1,
+        1,
+        0);
+
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+
+    expect_true(layout.system_tile_count == 4, "battery grid exposes four system tiles");
+    expect_near(
+        layout.network_tile.bounds.width,
+        layout.bluetooth_tile.bounds.width,
+        0.001f,
+        "grid columns have matching widths");
+    expect_true(
+        layout.battery_saver_tile.bounds.y > layout.network_tile.bounds.y,
+        "battery saver is in second grid row");
+    expect_true(
+        layout.project_tile.bounds.y > layout.bluetooth_tile.bounds.y,
+        "project is in second grid row");
+    expect_near(
+        layout.battery_saver_tile.bounds.x,
+        layout.network_tile.bounds.x,
+        0.001f,
+        "battery saver aligns to first column");
+    expect_near(
+        layout.project_tile.bounds.x,
+        layout.bluetooth_tile.bounds.x,
+        0.001f,
+        "project aligns to second column");
+}
+
 static void test_slider_hit_maps_to_volume(void)
 {
     reach_quick_settings_layout layout = test_layout();
@@ -291,19 +402,19 @@ static void test_slider_fill_width_follows_volume(void)
         expect_true(result == REACH_OK, "fill width render build succeeds");
         if (levels[index] == 0.0f) {
             expect_true(
-                commands.commands[2].type == REACH_RENDER_COMMAND_RECT,
+                commands.commands[8].type == REACH_RENDER_COMMAND_RECT,
                 "track follows volume row when fill omitted at zero");
             expect_near(
-                commands.commands[2].rect.width,
+                commands.commands[8].rect.width,
                 input.layout.main_slider_track.width,
                 0.001f,
                 "zero fill is omitted");
         } else {
             expect_true(
-                commands.commands[3].type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT,
+                commands.commands[9].type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT,
                 "fill is clipped to slider pill");
             expect_near(
-                commands.commands[3].rect.width,
+                commands.commands[9].rect.width,
                 input.layout.main_slider_track.width * levels[index],
                 0.001f,
                 "fill width follows model volume");
@@ -395,6 +506,62 @@ static void test_slider_hit_maps_to_set_volume_action(void)
     expect_near(action.volume_level, 0.25f, 0.001f, "set volume action carries hit volume");
 }
 
+static void test_system_tile_hits_map_to_actions(void)
+{
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    set_system_states(
+        &model,
+        REACH_NETWORK_KIND_ETHERNET,
+        1,
+        "Ethernet",
+        0,
+        0,
+        1,
+        0,
+        0);
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(
+            &layout,
+            &model,
+            layout.network_tile.bounds.x + layout.network_tile.bounds.width * 0.5f,
+            layout.network_tile.bounds.y + layout.network_tile.bounds.height * 0.5f);
+    reach_quick_settings_action action = reach_quick_settings_action_for_hit(hit);
+    expect_true(hit.type == REACH_QUICK_SETTINGS_HIT_NETWORK_TILE, "network tile hit");
+    expect_true(action.type == REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE, "network tile maps to no-op action intent");
+
+    hit = reach_quick_settings_hit_test(
+        &layout,
+        &model,
+        layout.bluetooth_tile.bounds.x + layout.bluetooth_tile.bounds.width * 0.5f,
+        layout.bluetooth_tile.bounds.y + layout.bluetooth_tile.bounds.height * 0.5f);
+    action = reach_quick_settings_action_for_hit(hit);
+    expect_true(hit.type == REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE, "bluetooth tile hit");
+    expect_true(action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH, "bluetooth tile maps to toggle action");
+
+    hit = reach_quick_settings_hit_test(
+        &layout,
+        &model,
+        layout.battery_saver_tile.bounds.x + layout.battery_saver_tile.bounds.width * 0.5f,
+        layout.battery_saver_tile.bounds.y + layout.battery_saver_tile.bounds.height * 0.5f);
+    action = reach_quick_settings_action_for_hit(hit);
+    expect_true(hit.type == REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE, "battery saver tile hit");
+    expect_true(
+        action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER,
+        "battery saver tile maps to toggle action");
+
+    hit = reach_quick_settings_hit_test(
+        &layout,
+        &model,
+        layout.project_tile.bounds.x + layout.project_tile.bounds.width * 0.5f,
+        layout.project_tile.bounds.y + layout.project_tile.bounds.height * 0.5f);
+    action = reach_quick_settings_action_for_hit(hit);
+    expect_true(hit.type == REACH_QUICK_SETTINGS_HIT_PROJECT_TILE, "project tile hit");
+    expect_true(action.type == REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT, "project tile maps to open project action");
+}
+
 static void test_expanded_layout_shows_app_volume_panel(void)
 {
     reach_quick_settings_model model = test_model_with_sessions(2);
@@ -447,9 +614,12 @@ static void test_expanded_output_device_layout_shows_panel(void)
 
     expect_true(layout.output_device_row_count == 2, "expanded output layout exposes device rows");
     expect_true(
+        layout.output_device_button.height == 0.0f,
+        "expanded output layout hides collapsed output button");
+    expect_true(
         layout.output_devices_title.y >
-            layout.output_device_button.y + layout.output_device_button.height,
-        "output devices title is below output button");
+            layout.main_volume_pill.bounds.y + layout.main_volume_pill.bounds.height,
+        "output devices title is below master volume");
     expect_true(
         layout.output_devices_panel.y >
             layout.output_devices_title.y + layout.output_devices_title.height,
@@ -614,53 +784,53 @@ static void test_expanded_render_emits_app_volume_panel_rows(void)
         reach_quick_settings_build_render_commands(&input, &commands);
 
     expect_true(result == REACH_OK, "expanded render succeeds");
-    expect_true(commands.count >= 27, "expanded render emits master, output button, panel rows, and collapse commands");
+    expect_true(commands.count >= 33, "expanded render emits grid, master, output button, panel rows, and collapse commands");
     expect_true(
-        commands.commands[9].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[9].text, "App volumes"),
+        commands.commands[15].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[15].text, "App volumes"),
         "expanded render emits app volumes title");
     expect_true(
-        commands.commands[10].type == REACH_RENDER_COMMAND_RECT,
+        commands.commands[16].type == REACH_RENDER_COMMAND_RECT,
         "expanded render emits app volumes panel background");
     expect_color_equal(
-        commands.commands[10].color,
+        commands.commands[16].color,
         theme.quick_settings_expand_button_color,
         "app volumes panel uses expand button color");
     expect_true(
-        commands.commands[11].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[11].icon_id == 9000,
+        commands.commands[17].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[17].icon_id == 9000,
         "first app row starts with app icon");
     expect_true(
-        commands.commands[12].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[12].text, "App A"),
+        commands.commands[18].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[18].text, "App A"),
         "first app row label strips exe suffix");
     expect_true(
-        commands.commands[13].type == REACH_RENDER_COMMAND_RECT &&
-            commands.commands[13].rect.height < 4.0f,
+        commands.commands[19].type == REACH_RENDER_COMMAND_RECT &&
+            commands.commands[19].rect.height < 4.0f,
         "app row uses compact slider track");
     expect_true(
-        commands.commands[16].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[16].text, "25%"),
+        commands.commands[22].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[22].text, "25%"),
         "first app row renders percentage");
     expect_true(
-        commands.commands[18].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[18].icon_id == 9001,
+        commands.commands[24].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[24].icon_id == 9001,
         "second app row follows first compact row");
     expect_true(
-        commands.commands[19].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[19].text, "App B"),
+        commands.commands[25].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[25].text, "App B"),
         "second app row label strips exe suffix");
     expect_true(
-        commands.commands[23].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[23].text, "30%"),
+        commands.commands[29].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[29].text, "30%"),
         "second app row renders percentage");
     expect_true(
-        commands.commands[25].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[25].text, "Hide app volumes"),
+        commands.commands[31].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[31].text, "Hide app volumes"),
         "expanded render keeps collapse row label inside panel");
     expect_true(
-        commands.commands[26].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[26].icon_id == REACH_VECTOR_ICON_ARROW_UP,
+        commands.commands[32].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[32].icon_id == REACH_VECTOR_ICON_ARROW_UP,
         "expanded collapse row uses arrow up icon");
 }
 
@@ -680,34 +850,197 @@ static void test_expanded_output_device_render_emits_checkmark(void)
         reach_quick_settings_build_render_commands(&input, &commands);
 
     expect_true(result == REACH_OK, "expanded output render succeeds");
-    expect_true(commands.count >= 16, "expanded output render emits device panel");
+    expect_true(commands.count >= 22, "expanded output render emits device panel");
     expect_true(
-        commands.commands[4].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[4].text, "Output devices"),
+        commands.commands[10].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[10].text, "Output devices"),
         "expanded output title replaces output button");
     expect_true(
-        commands.commands[5].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[5].icon_id == REACH_VECTOR_ICON_ARROW_UP,
+        commands.commands[11].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[11].icon_id == REACH_VECTOR_ICON_ARROW_UP,
         "expanded output title shows close affordance");
     expect_true(
-        commands.commands[6].type == REACH_RENDER_COMMAND_RECT,
+        commands.commands[12].type == REACH_RENDER_COMMAND_RECT,
         "expanded output render emits device panel background");
     expect_true(
-        commands.commands[7].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[7].icon_id == 7000,
+        commands.commands[13].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[13].icon_id == 7000,
         "first output row renders device icon");
     expect_true(
-        commands.commands[9].type != REACH_RENDER_COMMAND_VECTOR_ICON ||
-            commands.commands[9].icon_id != REACH_VECTOR_ICON_CHECK,
+        commands.commands[15].type != REACH_RENDER_COMMAND_VECTOR_ICON ||
+            commands.commands[15].icon_id != REACH_VECTOR_ICON_CHECK,
         "non-default output row does not render checkmark");
     expect_true(
-        commands.commands[10].type == REACH_RENDER_COMMAND_ICON &&
-            commands.commands[10].icon_id == 7001,
+        commands.commands[16].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[16].icon_id == 7001,
         "default output row renders device icon");
     expect_true(
-        commands.commands[12].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[12].icon_id == REACH_VECTOR_ICON_CHECK,
+        commands.commands[18].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[18].icon_id == REACH_VECTOR_ICON_CHECK,
         "default output row renders checkmark");
+}
+
+static void test_system_grid_render_emits_labels_icons_and_active_colors(void)
+{
+    reach_theme theme = test_theme();
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    reach_quick_settings_model_set_main_volume(&model, 0.5f, 0);
+    set_system_states(
+        &model,
+        REACH_NETWORK_KIND_WIFI,
+        1,
+        "Reach WiFi",
+        82,
+        1,
+        1,
+        1,
+        0);
+
+    reach_quick_settings_render_input input = {};
+    input.model = model;
+    input.layout = test_layout_for_model(&model);
+    input.theme = theme;
+
+    reach_render_command_buffer commands = {};
+    reach_result result = reach_quick_settings_build_render_commands(&input, &commands);
+    expect_true(result == REACH_OK, "system grid render succeeds");
+
+    reach_color white = { 1.0f, 1.0f, 1.0f, 1.0f };
+    reach_color black = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+    expect_true(
+        commands.commands[1].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[1].icon_id == REACH_VECTOR_ICON_WIFI_HIGH,
+        "wifi network uses high strength icon");
+    expect_true(
+        commands.commands[2].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[2].text, "Reach WiFi"),
+        "wifi network label uses ssid");
+
+    expect_color_equal(commands.commands[3].color, white, "active bluetooth tile is white");
+    expect_true(
+        commands.commands[4].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[4].icon_id == REACH_VECTOR_ICON_BLUETOOTH_ON,
+        "enabled bluetooth uses bluetooth on icon");
+    expect_color_equal(commands.commands[4].color, black, "active bluetooth icon is black");
+    expect_color_equal(commands.commands[5].color, black, "active bluetooth text is black");
+
+    expect_true(
+        commands.commands[7].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[7].icon_id == REACH_VECTOR_ICON_BATTERY_SAVER,
+        "battery saver tile renders battery saver icon");
+    expect_color_equal(commands.commands[6].color, white, "active battery saver tile is white");
+    expect_true(
+        commands.commands[11].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[11].text, "Project"),
+        "project tile renders label");
+}
+
+static void test_network_tile_render_states(void)
+{
+    reach_theme theme = test_theme();
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    reach_quick_settings_model_set_main_volume(&model, 0.5f, 0);
+
+    set_system_states(&model, REACH_NETWORK_KIND_NONE, 0, nullptr, 0, 0, 0, 0, 0);
+    reach_quick_settings_render_input input = {};
+    input.model = model;
+    input.layout = test_layout_for_model(&model);
+    input.theme = theme;
+    reach_render_command_buffer commands = {};
+    reach_result result = reach_quick_settings_build_render_commands(&input, &commands);
+    expect_true(result == REACH_OK, "disconnected network render succeeds");
+    expect_true(
+        commands.commands[2].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[2].text, "No internet"),
+        "disconnected network label is explicit");
+    expect_true(
+        commands.commands[1].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[1].icon_id == REACH_VECTOR_ICON_NO_INTERNET,
+        "disconnected network uses no internet icon");
+
+    set_system_states(&model, REACH_NETWORK_KIND_ETHERNET, 1, "Ignored", 0, 0, 0, 0, 0);
+    input.model = model;
+    input.layout = test_layout_for_model(&model);
+    reach_render_command_buffer_clear(&commands);
+    result = reach_quick_settings_build_render_commands(&input, &commands);
+    expect_true(result == REACH_OK, "ethernet network render succeeds");
+    expect_true(
+        commands.commands[1].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[1].icon_id == REACH_VECTOR_ICON_ETHERNET,
+        "ethernet network uses ethernet icon");
+    expect_true(
+        commands.commands[2].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[2].text, "Ethernet"),
+        "ethernet network label is ethernet");
+
+    set_system_states(&model, REACH_NETWORK_KIND_WIFI, 1, "Cafe", 45, 0, 0, 0, 0);
+    input.model = model;
+    input.layout = test_layout_for_model(&model);
+    reach_render_command_buffer_clear(&commands);
+    result = reach_quick_settings_build_render_commands(&input, &commands);
+    expect_true(result == REACH_OK, "medium wifi network render succeeds");
+    expect_true(
+        commands.commands[1].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[1].icon_id == REACH_VECTOR_ICON_WIFI_MEDIUM,
+        "medium wifi uses medium icon");
+    expect_true(
+        commands.commands[2].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[2].text, "Cafe"),
+        "wifi network label uses ssid");
+
+    set_system_states(&model, REACH_NETWORK_KIND_WIFI, 1, "Cafe", 20, 0, 0, 0, 0);
+    input.model = model;
+    input.layout = test_layout_for_model(&model);
+    reach_render_command_buffer_clear(&commands);
+    result = reach_quick_settings_build_render_commands(&input, &commands);
+    expect_true(result == REACH_OK, "low wifi network render succeeds");
+    expect_true(
+        commands.commands[1].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[1].icon_id == REACH_VECTOR_ICON_WIFI_LOW,
+        "low wifi uses low icon");
+}
+
+static void test_disabled_bluetooth_uses_off_icon_and_inactive_style(void)
+{
+    reach_theme theme = test_theme();
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    reach_quick_settings_model_set_main_volume(&model, 0.5f, 0);
+    set_system_states(
+        &model,
+        REACH_NETWORK_KIND_NONE,
+        0,
+        nullptr,
+        0,
+        0,
+        0,
+        0,
+        0);
+
+    reach_quick_settings_render_input input = {};
+    input.model = model;
+    input.layout = test_layout_for_model(&model);
+    input.theme = theme;
+
+    reach_render_command_buffer commands = {};
+    reach_result result = reach_quick_settings_build_render_commands(&input, &commands);
+
+    expect_true(result == REACH_OK, "disabled bluetooth render succeeds");
+    expect_color_equal(
+        commands.commands[3].color,
+        theme.quick_settings_expand_button_color,
+        "disabled bluetooth tile uses inactive background");
+    expect_true(
+        commands.commands[4].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[4].icon_id == REACH_VECTOR_ICON_BLUETOOTH_OFF,
+        "disabled bluetooth uses bluetooth off icon");
+    expect_color_equal(
+        commands.commands[4].color,
+        theme.quick_settings_expand_text_color,
+        "disabled bluetooth icon uses inactive foreground");
 }
 
 static void test_render_emits_volume_pill_and_expand_commands(void)
@@ -727,109 +1060,121 @@ static void test_render_emits_volume_pill_and_expand_commands(void)
         reach_quick_settings_build_render_commands(&input, &commands);
 
     expect_true(result == REACH_OK, "render command build succeeds");
-    expect_true(commands.count >= 7, "render emits volume row, slider, button, label, icon commands");
+    expect_true(commands.count >= 18, "render emits grid, volume row, slider, button, label, icon commands");
 
     expect_true(
-        commands.commands[0].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[0].icon_id == REACH_VECTOR_ICON_VOLUME_HIGH,
+        commands.commands[0].type == REACH_RENDER_COMMAND_RECT,
+        "first command is network tile background");
+    expect_true(
+        commands.commands[1].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[1].icon_id == REACH_VECTOR_ICON_NO_INTERNET,
+        "network tile uses fallback status icon");
+    expect_true(
+        commands.commands[2].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[2].text, "No internet"),
+        "network tile renders no internet label");
+
+    expect_true(
+        commands.commands[6].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[6].icon_id == REACH_VECTOR_ICON_VOLUME_HIGH,
         "first command is volume icon");
     expect_color_equal(
-        commands.commands[0].color,
+        commands.commands[6].color,
         theme.icon_backplate_background,
         "volume icon uses app backplate color");
 
     expect_true(
-        commands.commands[1].type == REACH_RENDER_COMMAND_TEXT &&
-            text_equals_ascii(commands.commands[1].text, "Master volume"),
+        commands.commands[7].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[7].text, "Master volume"),
         "second command is Master volume text");
 
     expect_true(
-        commands.commands[2].type == REACH_RENDER_COMMAND_RECT,
+        commands.commands[8].type == REACH_RENDER_COMMAND_RECT,
         "third command is slider track");
     expect_near(
-        commands.commands[2].radius,
+        commands.commands[8].radius,
         reach_popup_radius(),
         0.001f,
         "slider track uses popup corner radius");
     expect_near(
-        commands.commands[2].rect.height,
+        commands.commands[8].rect.height,
         input.layout.main_volume_pill.bounds.height,
         0.001f,
         "slider track fills pill height");
 
     expect_true(
-        commands.commands[3].type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT,
+        commands.commands[9].type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT,
         "fourth command is slider fill");
 
     expect_near(
-        commands.commands[3].rect.width,
+        commands.commands[9].rect.width,
         input.layout.main_slider_track.width * 0.5f,
         0.001f,
         "slider fill width follows volume");
     expect_near(
-        commands.commands[3].rect.height,
-        commands.commands[2].rect.height,
+        commands.commands[9].rect.height,
+        commands.commands[8].rect.height,
         0.001f,
         "slider fill height matches track height");
     expect_near(
-        commands.commands[3].rect.y,
-        commands.commands[2].rect.y,
+        commands.commands[9].rect.y,
+        commands.commands[8].rect.y,
         0.001f,
         "slider fill y matches track y");
     expect_near(
-        commands.commands[3].clip_rect.x,
-        commands.commands[2].rect.x,
+        commands.commands[9].clip_rect.x,
+        commands.commands[8].rect.x,
         0.001f,
         "slider fill clips to track x");
     expect_near(
-        commands.commands[3].clip_rect.y,
-        commands.commands[2].rect.y,
+        commands.commands[9].clip_rect.y,
+        commands.commands[8].rect.y,
         0.001f,
         "slider fill clips to track y");
     expect_near(
-        commands.commands[3].clip_rect.width,
-        commands.commands[2].rect.width,
+        commands.commands[9].clip_rect.width,
+        commands.commands[8].rect.width,
         0.001f,
         "slider fill clips to track width");
     expect_near(
-        commands.commands[3].clip_rect.height,
-        commands.commands[2].rect.height,
+        commands.commands[9].clip_rect.height,
+        commands.commands[8].rect.height,
         0.001f,
         "slider fill clips to track height");
     expect_near(
-        commands.commands[3].clip_radius,
-        commands.commands[2].radius,
+        commands.commands[9].clip_radius,
+        commands.commands[8].radius,
         0.001f,
         "slider fill clips to track radius");
 
     expect_true(
-        commands.commands[4].type == REACH_RENDER_COMMAND_RECT,
+        commands.commands[10].type == REACH_RENDER_COMMAND_RECT,
         "fifth command is output device button background");
     expect_near(
-        commands.commands[4].radius,
+        commands.commands[10].radius,
         reach_popup_radius(),
         0.001f,
         "output device button uses popup corner radius");
     expect_true(
-        commands.commands[8].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[8].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
+        commands.commands[14].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[14].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
         "output device button uses arrow down icon");
 
     expect_true(
-        commands.commands[9].type == REACH_RENDER_COMMAND_RECT,
+        commands.commands[15].type == REACH_RENDER_COMMAND_RECT,
         "ninth command is expand button background");
     expect_near(
-        commands.commands[9].radius,
+        commands.commands[15].radius,
         reach_popup_radius(),
         0.001f,
         "expand button uses popup corner radius");
 
     expect_true(
-        commands.commands[11].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[11].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
+        commands.commands[17].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[17].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
         "expand button uses arrow down icon");
     expect_color_equal(
-        commands.commands[11].color,
+        commands.commands[17].color,
         theme.icon_backplate_background,
         "expand icon uses app backplate color");
 }
@@ -838,6 +1183,8 @@ int main(void)
 {
     test_model_clamps_volume();
     test_layout_places_volume_pill_above_output_device_and_expand();
+    test_desktop_system_grid_shows_network_and_bluetooth_only();
+    test_battery_system_grid_is_two_by_two();
     test_slider_hit_maps_to_volume();
     test_slider_fill_width_follows_volume();
     test_hit_outside_returns_none();
@@ -845,6 +1192,7 @@ int main(void)
     test_output_device_button_hit_maps_to_toggle_action();
     test_output_device_title_chevron_hit_maps_to_toggle_action();
     test_slider_hit_maps_to_set_volume_action();
+    test_system_tile_hits_map_to_actions();
     test_expanded_output_device_layout_shows_panel();
     test_output_device_row_hit_maps_to_set_device_action();
     test_expanded_layout_shows_app_volume_panel();
@@ -854,6 +1202,9 @@ int main(void)
     test_session_list_cap_is_respected();
     test_volume_icon_selection();
     test_render_emits_volume_pill_and_expand_commands();
+    test_system_grid_render_emits_labels_icons_and_active_colors();
+    test_network_tile_render_states();
+    test_disabled_bluetooth_uses_off_icon_and_inactive_style();
     test_expanded_output_device_render_emits_checkmark();
     test_expanded_render_emits_app_volume_panel_rows();
 

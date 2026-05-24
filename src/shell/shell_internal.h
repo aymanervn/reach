@@ -21,6 +21,8 @@
 #include "reach/shell/surface_runtime.h"
 #include "reach/core/theme.h"
 
+#include <atomic>
+
 typedef struct reach_shell_popup_bounds_animation {
     reach_float_animation width;
     reach_float_animation height;
@@ -123,6 +125,8 @@ struct reach_shell {
     int32_t running;
     uint16_t wallpaper_path[260];
     reach_audio_volume_port audio_volume;
+    reach_system_controls_port system_controls;
+    std::atomic<uint32_t> quick_settings_system_change_flags;
     int32_t quick_settings_open;
     int32_t quick_settings_dragging_volume;
     reach_quick_settings_hit_type quick_settings_drag_type;
@@ -186,11 +190,16 @@ void reach_shell_toggle_tray_popup(reach_shell *shell);
 void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open);
 void reach_shell_toggle_quick_settings(reach_shell *shell);
 void reach_shell_refresh_quick_settings_audio(reach_shell *shell);
+void reach_shell_refresh_quick_settings_system(reach_shell *shell);
+void reach_shell_process_quick_settings_system_changes(reach_shell *shell);
 void reach_shell_refresh_quick_settings_layout(reach_shell *shell);
 void reach_shell_update_quick_settings_animation(reach_shell *shell, double delta_seconds);
 void reach_shell_execute_quick_settings_action(
     reach_shell *shell,
     reach_quick_settings_action action);
+void reach_shell_on_system_controls_changed(
+    void *user,
+    uint32_t change_flags);
 reach_result reach_shell_refresh_tray_items(reach_shell *shell);
 void reach_shell_compute_tray_popup_layout(
     reach_shell *shell,

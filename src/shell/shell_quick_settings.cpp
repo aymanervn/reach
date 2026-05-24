@@ -235,6 +235,98 @@ void reach_shell_refresh_quick_settings_audio(
     }
 }
 
+void reach_shell_refresh_quick_settings_system(
+    reach_shell *shell
+)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    reach_network_state network = {};
+    if (shell->system_controls.get_network_state == nullptr ||
+        shell->system_controls.get_network_state(
+            shell->system_controls.userdata,
+            &network) != REACH_OK) {
+        network.kind = REACH_NETWORK_KIND_NONE;
+        network.connected = 0;
+    }
+
+    reach_bluetooth_state bluetooth = {};
+    if (shell->system_controls.get_bluetooth_state == nullptr ||
+        shell->system_controls.get_bluetooth_state(
+            shell->system_controls.userdata,
+            &bluetooth) != REACH_OK) {
+        bluetooth.available = 1;
+        bluetooth.enabled = 0;
+    }
+
+    reach_power_state power = {};
+    if (shell->system_controls.get_power_state == nullptr ||
+        shell->system_controls.get_power_state(
+            shell->system_controls.userdata,
+            &power) != REACH_OK) {
+        power = {};
+    }
+
+    reach_brightness_state brightness = {};
+    if (shell->system_controls.get_brightness_state == nullptr ||
+        shell->system_controls.get_brightness_state(
+            shell->system_controls.userdata,
+            &brightness) != REACH_OK) {
+        brightness = {};
+    }
+
+    reach_quick_settings_model_set_system_states(
+        &shell->quick_settings_model,
+        &network,
+        &bluetooth,
+        &power,
+        &brightness);
+}
+
+void reach_shell_on_system_controls_changed(
+    void *user,
+    uint32_t change_flags
+)
+{
+    reach_shell *shell = static_cast<reach_shell *>(user);
+    if (shell == nullptr || change_flags == 0) {
+        return;
+    }
+
+    shell->quick_settings_system_change_flags.fetch_or(change_flags);
+}
+
+void reach_shell_process_quick_settings_system_changes(
+    reach_shell *shell
+)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    uint32_t change_flags = shell->quick_settings_system_change_flags.exchange(0);
+    if (change_flags == 0 || !shell->quick_settings_open) {
+        return;
+    }
+
+    reach_power_state previous_power = shell->quick_settings_model.power;
+    reach_brightness_state previous_brightness = shell->quick_settings_model.brightness;
+
+    reach_shell_refresh_quick_settings_system(shell);
+
+    int32_t layout_changed =
+        previous_power.has_battery != shell->quick_settings_model.power.has_battery ||
+        previous_brightness.available != shell->quick_settings_model.brightness.available;
+    if (layout_changed) {
+        reach_shell_relayout_quick_settings(shell, 1);
+    }
+
+    shell->quick_settings.dirty_flags = 1;
+    shell->render_dirty = 1;
+}
+
 void reach_shell_update_quick_settings_animation(
     reach_shell *shell,
     double delta_seconds)
@@ -283,6 +375,7 @@ void reach_shell_set_quick_settings_open(
     if (next_open) {
         reach_shell_set_tray_popup_open(shell, 0);
         reach_shell_close_context_menu(shell);
+        reach_shell_refresh_quick_settings_system(shell);
         reach_shell_refresh_quick_settings_audio(shell);
         shell->quick_settings_bounds_animation = {};
         reach_shell_relayout_quick_settings(shell, 0);
@@ -381,6 +474,54 @@ void reach_shell_execute_quick_settings_action(
         return;
     }
 
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS) {
+        if (shell->system_controls.set_brightness_level != nullptr) {
+            (void)shell->system_controls.set_brightness_level(
+                shell->system_controls.userdata,
+                reach_shell_quick_settings_clamp01(action.volume_level));
+        }
+        reach_shell_refresh_quick_settings_system(shell);
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+        return;
+    }
+
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE) {
+        return;
+    }
+
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH) {
+        if (shell->system_controls.set_bluetooth_enabled != nullptr) {
+            (void)shell->system_controls.set_bluetooth_enabled(
+                shell->system_controls.userdata,
+                shell->quick_settings_model.bluetooth.enabled ? 0 : 1);
+        }
+        reach_shell_refresh_quick_settings_system(shell);
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+        return;
+    }
+
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER) {
+        if (shell->system_controls.set_battery_saver_enabled != nullptr) {
+            (void)shell->system_controls.set_battery_saver_enabled(
+                shell->system_controls.userdata,
+                shell->quick_settings_model.power.battery_saver_on ? 0 : 1);
+        }
+        reach_shell_refresh_quick_settings_system(shell);
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+        return;
+    }
+
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT) {
+        if (shell->system_controls.open_project_menu != nullptr) {
+            (void)shell->system_controls.open_project_menu(
+                shell->system_controls.userdata);
+        }
+        return;
+    }
+
     if (action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES) {
         shell->quick_settings_model.output_devices_expanded =
             shell->quick_settings_model.output_devices_expanded ? 0 : 1;
@@ -388,6 +529,7 @@ void reach_shell_execute_quick_settings_action(
             shell->quick_settings_model.expanded = 0;
         }
 
+        reach_shell_refresh_quick_settings_system(shell);
         reach_shell_refresh_quick_settings_audio(shell);
         reach_shell_relayout_quick_settings(shell, 1);
 
@@ -408,6 +550,7 @@ void reach_shell_execute_quick_settings_action(
         if (changed) {
             shell->quick_settings_model.output_devices_expanded = 0;
         }
+        reach_shell_refresh_quick_settings_system(shell);
         reach_shell_refresh_quick_settings_audio(shell);
         if (changed) {
             reach_shell_relayout_quick_settings(shell, 1);
@@ -425,6 +568,7 @@ void reach_shell_execute_quick_settings_action(
             shell->quick_settings_model.output_devices_expanded = 0;
         }
 
+        reach_shell_refresh_quick_settings_system(shell);
         reach_shell_refresh_quick_settings_audio(shell);
         reach_shell_relayout_quick_settings(shell, 1);
 

@@ -16,6 +16,16 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
     case REACH_VECTOR_ICON_VOLUME_HIGH: return 210;
     case REACH_VECTOR_ICON_ARROW_DOWN: return 211;
     case REACH_VECTOR_ICON_CHECK: return 212;
+    case REACH_VECTOR_ICON_ETHERNET: return 213;
+    case REACH_VECTOR_ICON_WIFI_LOW: return 214;
+    case REACH_VECTOR_ICON_WIFI_MEDIUM: return 215;
+    case REACH_VECTOR_ICON_WIFI_HIGH: return 216;
+    case REACH_VECTOR_ICON_BATTERY_SAVER: return 218;
+    case REACH_VECTOR_ICON_PROJECT: return 219;
+    case REACH_VECTOR_ICON_BRIGHTNESS: return 220;
+    case REACH_VECTOR_ICON_BLUETOOTH_ON: return 221;
+    case REACH_VECTOR_ICON_BLUETOOTH_OFF: return 222;
+    case REACH_VECTOR_ICON_NO_INTERNET: return 223;
     default: return 0;
     }
 }

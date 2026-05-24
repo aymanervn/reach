@@ -10,6 +10,9 @@ static void reach_shell_cleanup(reach_shell *shell)
 
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
+    if (shell->system_controls.stop_watching != nullptr) {
+        shell->system_controls.stop_watching(shell->system_controls.userdata);
+    }
     reach_shell_close_context_menu(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     reach_hotkeys_destroy(shell->hotkeys);
@@ -90,6 +93,9 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->audio_volume.destroy != nullptr) {
         shell->audio_volume.destroy(shell->audio_volume.userdata);
     }
+    if (shell->system_controls.destroy != nullptr) {
+        shell->system_controls.destroy(shell->system_controls.userdata);
+    }
 
     shell->hotkeys = nullptr;
     shell->monitors = nullptr;
@@ -112,6 +118,8 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->wallpaper_surface = {};
     shell->power_session = {};
     shell->audio_volume = {};
+    shell->system_controls = {};
+    shell->quick_settings_system_change_flags.store(0);
     reach_dock_icon_cache_init(&shell->dock_icons);
     reach_tray_model_init(&shell->tray_model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
@@ -163,6 +171,8 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->quick_settings_audio_state.muted = 0;
     shell->quick_settings_audio_sessions = {};
     shell->quick_settings_output_devices = {};
+    shell->system_controls = {};
+    shell->quick_settings_system_change_flags.store(0);
     shell->quick_settings_notch_anchor_x = 0.0f;
     shell->quick_settings_bounds = {};
     shell->quick_settings_target_bounds = {};
@@ -200,6 +210,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->popup_capture = dependencies->popup_capture;
     shell->power_session = dependencies->power_session;
     shell->audio_volume = dependencies->audio_volume;
+    shell->system_controls = dependencies->system_controls;
     shell->theme = reach_theme_default();
 
     if (result == REACH_OK && shell->config_store.ops.load != nullptr) {
@@ -301,6 +312,13 @@ reach_result reach_shell_start(reach_shell *shell)
         }
     }
 
+    if (shell->system_controls.start_watching != nullptr) {
+        (void)shell->system_controls.start_watching(
+            shell->system_controls.userdata,
+            reach_shell_on_system_controls_changed,
+            shell);
+    }
+
     if (shell->dock.window.ops.show != nullptr) {
         if (shell->wallpaper_surface.ops.show != nullptr) {
             result = shell->wallpaper_surface.ops.show(shell->wallpaper_surface.surface);
@@ -340,6 +358,9 @@ reach_result reach_shell_stop(reach_shell *shell)
     shell->context_menu_open = 0;
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
+    if (shell->system_controls.stop_watching != nullptr) {
+        shell->system_controls.stop_watching(shell->system_controls.userdata);
+    }
     if (shell->window_manager.ops.stop != nullptr) {
         (void)shell->window_manager.ops.stop(shell->window_manager.manager);
     }

@@ -753,6 +753,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         return REACH_INVALID_ARGUMENT;
     }
 
+    reach_shell_process_quick_settings_system_changes(shell);
+
     shell->window_manager_refresh_elapsed += delta_seconds;
     reach_shell_update_clock_text(shell);
     if (shell->dock_click_feedback_animating) {

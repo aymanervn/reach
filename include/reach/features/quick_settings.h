@@ -4,6 +4,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/ports/audio_volume.h"
+#include "reach/ports/system_controls.h"
 #include "reach/support/util.h"
 
 #include <stdint.h>
@@ -19,6 +20,10 @@ typedef struct reach_quick_settings_model {
     int32_t output_devices_expanded;
     reach_audio_volume_session_list sessions;
     reach_audio_output_device_list output_devices;
+    reach_network_state network;
+    reach_bluetooth_state bluetooth;
+    reach_power_state power;
+    reach_brightness_state brightness;
 } reach_quick_settings_model;
 
 typedef struct reach_quick_settings_volume_pill_model {
@@ -56,8 +61,25 @@ typedef struct reach_quick_settings_output_device_row_layout {
     reach_rect_f32 separator;
 } reach_quick_settings_output_device_row_layout;
 
+typedef struct reach_quick_settings_tile_layout {
+    reach_rect_f32 bounds;
+    reach_rect_f32 icon;
+    reach_rect_f32 label;
+} reach_quick_settings_tile_layout;
+
 typedef struct reach_quick_settings_layout {
     reach_rect_f32 content_bounds;
+
+    reach_rect_f32 system_grid_bounds;
+    reach_quick_settings_tile_layout network_tile;
+    reach_quick_settings_tile_layout bluetooth_tile;
+    reach_quick_settings_tile_layout battery_saver_tile;
+    reach_quick_settings_tile_layout project_tile;
+    size_t system_tile_count;
+
+    reach_quick_settings_volume_pill_layout brightness_pill;
+    reach_rect_f32 brightness_slider_track;
+    reach_rect_f32 brightness_slider_fill;
 
     reach_quick_settings_volume_pill_layout main_volume_pill;
     reach_rect_f32 main_slider_track;
@@ -87,6 +109,11 @@ typedef enum reach_quick_settings_hit_type {
     REACH_QUICK_SETTINGS_HIT_NONE = 0,
     REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER,
     REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER,
+    REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER,
+    REACH_QUICK_SETTINGS_HIT_NETWORK_TILE,
+    REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE,
+    REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE,
+    REACH_QUICK_SETTINGS_HIT_PROJECT_TILE,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
     REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON
@@ -106,6 +133,11 @@ typedef enum reach_quick_settings_action_type {
     REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME,
     REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME,
     REACH_QUICK_SETTINGS_ACTION_SET_SESSION_MUTED,
+    REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS,
+    REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE,
+    REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH,
+    REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER,
+    REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES,
     REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE,
     REACH_QUICK_SETTINGS_ACTION_EXPAND
@@ -145,6 +177,14 @@ void reach_quick_settings_model_set_sessions(
 void reach_quick_settings_model_set_output_devices(
     reach_quick_settings_model *model,
     const reach_audio_output_device_list *devices
+);
+
+void reach_quick_settings_model_set_system_states(
+    reach_quick_settings_model *model,
+    const reach_network_state *network,
+    const reach_bluetooth_state *bluetooth,
+    const reach_power_state *power,
+    const reach_brightness_state *brightness
 );
 
 uint32_t reach_quick_settings_volume_icon_id(
