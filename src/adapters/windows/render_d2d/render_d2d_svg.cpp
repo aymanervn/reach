@@ -15,6 +15,7 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
     case REACH_VECTOR_ICON_VOLUME_LOW: return 209;
     case REACH_VECTOR_ICON_VOLUME_HIGH: return 210;
     case REACH_VECTOR_ICON_ARROW_DOWN: return 211;
+    case REACH_VECTOR_ICON_CHECK: return 212;
     default: return 0;
     }
 }

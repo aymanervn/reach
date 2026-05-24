@@ -162,6 +162,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->quick_settings_audio_state.level = 0.0f;
     shell->quick_settings_audio_state.muted = 0;
     shell->quick_settings_audio_sessions = {};
+    shell->quick_settings_output_devices = {};
     shell->quick_settings_notch_anchor_x = 0.0f;
     shell->quick_settings_bounds = {};
     shell->quick_settings_target_bounds = {};

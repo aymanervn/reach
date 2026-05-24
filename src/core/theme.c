@@ -8,7 +8,7 @@ static float reach_theme_min(float a, float b)
 const reach_theme *reach_theme_default(void)
 {
     static const reach_theme theme = {
-        .dock_background =                { 1.0f, 1.0f, 1.0f, 0.50f },
+        .dock_background =                { 1.0f, 1.0f, 1.0f, 0.35f },
         .switcher_background =            { 0.13f, 0.12f, 0.11f, 0.85f },
         .dock_border =                    { 1.0f, 1.0f, 1.0f, 0.70f },
         .dock_shadow =                    { 0.55f, 0.57f, 0.60f, 0.16f },
@@ -17,12 +17,12 @@ const reach_theme *reach_theme_default(void)
         .icon_backplate_edge =            { 1.0f, 1.0f, 1.0f, 1.0f },
         .fallback_icon_background =       { 0.18f, 0.20f, 0.24f, 1.0f },
         .fallback_icon_text =             { 0.12f, 0.14f, 0.17f, 0.92f },
-        .tray_button_background =         { 1.0f, 0.97f, 0.91f, 0.36f },
+        .tray_button_background =         { 1.0f, 0.97f, 0.91f, 0.24f },
         .tray_popup_background =          { 0.13f, 0.12f, 0.11f, 0.85f },
         .dock_system_separator =          { 0.72f, 0.72f, 0.72f, 1.0f },
         .dock_clock_time =                { 1.0f, 0.97f, 0.91f, 0.96f },
         .dock_clock_date =                { 1.0f, 0.97f, 0.91f, 0.56f },
-        .dock_power_button_background =   { 1.0f, 0.97f, 0.91f, 0.36f },
+        .dock_power_button_background =   { 1.0f, 0.97f, 0.91f, 0.24f },
         .dock_power_glyph =               { 1.0f, 1.0f, 1.0f, 1.0f },
 
         .quick_settings_slider_track_color =      { 1.0f, 0.97f, 0.91f, 0.46f },

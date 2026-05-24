@@ -1244,10 +1244,10 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
     if (shell->quick_settings_dragging_volume) {
         reach_rect_f32 track = shell->quick_settings_layout.main_slider_track;
         if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER &&
-            shell->quick_settings_drag_session_index < shell->quick_settings_layout.session_pill_count) {
+            shell->quick_settings_drag_session_index < shell->quick_settings_layout.app_volume_row_count) {
             track = shell->quick_settings_layout
-                .session_volume_pills[shell->quick_settings_drag_session_index]
-                .slider_track;
+                .app_volume_rows[shell->quick_settings_drag_session_index]
+                .slider_full_range_line;
         }
         if (track.width > 0.0f) {
             float local_x = (float)event->x - shell->quick_settings_bounds.x;

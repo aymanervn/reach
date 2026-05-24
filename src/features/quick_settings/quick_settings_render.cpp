@@ -17,6 +17,15 @@ static float reach_quick_settings_min_f32(float a, float b)
     return a < b ? a : b;
 }
 
+static reach_color reach_quick_settings_color_alpha(
+    reach_color color,
+    float alpha
+)
+{
+    color.a = alpha;
+    return color;
+}
+
 static void reach_quick_settings_copy_utf16(
     uint16_t *dst,
     size_t dst_count,
@@ -32,6 +41,170 @@ static void reach_quick_settings_copy_utf16(
             dst[index] = src[index];
             ++index;
         }
+    }
+    dst[index] = 0;
+}
+
+static size_t reach_quick_settings_utf16_length(
+    const uint16_t *text
+)
+{
+    size_t length = 0;
+    if (text == nullptr) {
+        return 0;
+    }
+    while (text[length] != 0) {
+        ++length;
+    }
+    return length;
+}
+
+static uint16_t reach_quick_settings_ascii_lower(
+    uint16_t value
+)
+{
+    if (value >= 'A' && value <= 'Z') {
+        return (uint16_t)(value - 'A' + 'a');
+    }
+    return value;
+}
+
+static int reach_quick_settings_label_has_exe_suffix(
+    const uint16_t *text,
+    size_t length
+)
+{
+    return length > 4 &&
+        text[length - 4] == '.' &&
+        reach_quick_settings_ascii_lower(text[length - 3]) == 'e' &&
+        reach_quick_settings_ascii_lower(text[length - 2]) == 'x' &&
+        reach_quick_settings_ascii_lower(text[length - 1]) == 'e';
+}
+
+static void reach_quick_settings_copy_display_label(
+    uint16_t *dst,
+    size_t dst_count,
+    const uint16_t *src
+)
+{
+    if (dst == nullptr || dst_count == 0) {
+        return;
+    }
+
+    size_t length = reach_quick_settings_utf16_length(src);
+    if (reach_quick_settings_label_has_exe_suffix(src, length)) {
+        length -= 4;
+    }
+    if (length + 1 > dst_count) {
+        length = dst_count - 1;
+    }
+
+    for (size_t index = 0; index < length; ++index) {
+        dst[index] = src[index];
+    }
+    dst[length] = 0;
+}
+
+static void reach_quick_settings_copy_device_primary_label(
+    uint16_t *dst,
+    size_t dst_count,
+    const uint16_t *src
+)
+{
+    if (dst == nullptr || dst_count == 0) {
+        return;
+    }
+
+    size_t index = 0;
+    if (src != nullptr) {
+        while (index + 1 < dst_count && src[index] != 0 && src[index] != '(') {
+            dst[index] = src[index];
+            ++index;
+        }
+
+        while (index > 0 && dst[index - 1] == ' ') {
+            --index;
+        }
+    }
+
+    dst[index] = 0;
+}
+
+static void reach_quick_settings_copy_device_secondary_label(
+    uint16_t *dst,
+    size_t dst_count,
+    const uint16_t *src
+)
+{
+    if (dst == nullptr || dst_count == 0) {
+        return;
+    }
+
+    size_t out_index = 0;
+    size_t in_index = 0;
+
+    if (src != nullptr) {
+        while (src[in_index] != 0 && src[in_index] != '(') {
+            ++in_index;
+        }
+
+        if (src[in_index] == '(') {
+            ++in_index;
+            while (out_index + 1 < dst_count &&
+                src[in_index] != 0 &&
+                src[in_index] != ')') {
+                dst[out_index++] = src[in_index++];
+            }
+        }
+    }
+
+    dst[out_index] = 0;
+}
+
+static void reach_quick_settings_capitalize_first_utf16(
+    uint16_t *text
+)
+{
+    if (text == nullptr || text[0] == 0) {
+        return;
+    }
+
+    if (text[0] >= 'a' && text[0] <= 'z') {
+        text[0] = (uint16_t)(text[0] - 'a' + 'A');
+    }
+}
+
+static void reach_quick_settings_format_percent(
+    uint16_t *dst,
+    size_t dst_count,
+    float volume
+)
+{
+    if (dst == nullptr || dst_count == 0) {
+        return;
+    }
+
+    int percent = (int)(reach_quick_settings_clamp01(volume) * 100.0f + 0.5f);
+    if (percent < 0) {
+        percent = 0;
+    }
+    if (percent > 100) {
+        percent = 100;
+    }
+
+    size_t index = 0;
+    if (percent >= 100 && index + 1 < dst_count) {
+        dst[index++] = '1';
+        dst[index++] = '0';
+        dst[index++] = '0';
+    } else if (percent >= 10 && index + 1 < dst_count) {
+        dst[index++] = (uint16_t)('0' + (percent / 10));
+        dst[index++] = (uint16_t)('0' + (percent % 10));
+    } else if (index + 1 < dst_count) {
+        dst[index++] = (uint16_t)('0' + percent);
+    }
+    if (index + 1 < dst_count) {
+        dst[index++] = '%';
     }
     dst[index] = 0;
 }
@@ -89,6 +262,45 @@ static void reach_quick_settings_push_text(
     command.color = color;
     reach_quick_settings_copy_utf16(command.text, 260, text);
     (void)reach_render_command_buffer_push(commands, &command);
+}
+
+static const reach_audio_output_device *reach_quick_settings_current_output_device(
+    const reach_quick_settings_model *model
+)
+{
+    if (model == nullptr) {
+        return nullptr;
+    }
+
+    for (size_t index = 0; index < model->output_devices.count; ++index) {
+        if (model->output_devices.devices[index].is_default) {
+            return &model->output_devices.devices[index];
+        }
+    }
+
+    return model->output_devices.count > 0
+        ? &model->output_devices.devices[0]
+        : nullptr;
+}
+
+static void reach_quick_settings_push_output_icon(
+    reach_render_command_buffer *commands,
+    reach_rect_f32 rect,
+    uint64_t icon_id,
+    const reach_theme *theme
+)
+{
+    reach_render_command icon = {};
+    icon.rect = rect;
+    icon.color = theme->icon_backplate_background;
+    if (icon_id != 0) {
+        icon.type = REACH_RENDER_COMMAND_ICON;
+        icon.icon_id = icon_id;
+    } else {
+        icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+        icon.icon_id = REACH_VECTOR_ICON_VOLUME_HIGH;
+    }
+    (void)reach_render_command_buffer_push(commands, &icon);
 }
 
 reach_result reach_quick_settings_push_volume_pill_commands(
@@ -155,6 +367,194 @@ reach_result reach_quick_settings_push_volume_pill_commands(
     return REACH_OK;
 }
 
+static reach_result reach_quick_settings_push_output_device_row_commands(
+    const reach_audio_output_device *device,
+    const reach_quick_settings_output_device_row_layout *layout,
+    size_t row_index,
+    size_t row_count,
+    const reach_theme *theme,
+    reach_render_command_buffer *commands
+)
+{
+    if (device == nullptr || layout == nullptr || theme == nullptr || commands == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_quick_settings_push_output_icon(
+        commands,
+        layout->icon,
+        device->icon_id,
+        theme);
+
+    uint16_t primary_label[REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY] = {};
+    uint16_t secondary_label[REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY] = {};
+
+    reach_quick_settings_copy_device_primary_label(
+        primary_label,
+        REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+        device->label);
+
+    reach_quick_settings_copy_device_secondary_label(
+        secondary_label,
+        REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+        device->label);
+
+    reach_rect_f32 primary_rect = layout->label;
+    primary_rect.y += 5.0f;
+    primary_rect.height = 18.0f;
+
+    reach_quick_settings_push_text(
+        commands,
+        primary_rect,
+        primary_label,
+        12.0f,
+        REACH_TEXT_WEIGHT_NORMAL,
+        0,
+        theme->quick_settings_expand_text_color);
+
+    if (secondary_label[0] != 0) {
+        reach_rect_f32 secondary_rect = layout->label;
+        secondary_rect.y += 22.0f;
+        secondary_rect.height = 15.0f;
+
+        reach_quick_settings_push_text(
+            commands,
+            secondary_rect,
+            secondary_label,
+            10.0f,
+            REACH_TEXT_WEIGHT_NORMAL,
+            0,
+            reach_quick_settings_color_alpha(
+                theme->quick_settings_expand_text_color,
+                0.56f));
+    }
+
+    if (device->is_default) {
+        reach_render_command check = {};
+        check.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+        check.rect = layout->checkmark;
+        check.icon_id = REACH_VECTOR_ICON_CHECK;
+        check.color = theme->icon_backplate_background;
+        (void)reach_render_command_buffer_push(commands, &check);
+    }
+
+    if (row_index + 1 < row_count) {
+        reach_quick_settings_push_rounded_rect(
+            commands,
+            layout->separator,
+            0.0f,
+            reach_quick_settings_color_alpha(
+                theme->quick_settings_expand_text_color,
+                0.16f));
+    }
+
+    return REACH_OK;
+}
+
+static reach_result reach_quick_settings_push_app_volume_row_commands(
+    const reach_audio_volume_session *session,
+    const reach_quick_settings_app_volume_row_layout *layout,
+    size_t row_index,
+    size_t row_count,
+    const reach_theme *theme,
+    reach_render_command_buffer *commands
+)
+{
+    if (session == nullptr || layout == nullptr || theme == nullptr || commands == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    float volume = reach_quick_settings_clamp01(session->level);
+
+    reach_render_command icon = {};
+    icon.rect = layout->app_icon;
+    icon.color = theme->icon_backplate_background;
+    if (session->icon_id != 0) {
+        icon.type = REACH_RENDER_COMMAND_ICON;
+        icon.icon_id = session->icon_id;
+    } else {
+        icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+        icon.icon_id = REACH_VECTOR_ICON_SETTINGS;
+    }
+    (void)reach_render_command_buffer_push(commands, &icon);
+
+    uint16_t display_label[REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY] = {};
+    reach_quick_settings_copy_display_label(
+        display_label,
+        REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
+        session->label);
+    reach_quick_settings_capitalize_first_utf16(display_label);
+
+    reach_quick_settings_push_text(
+        commands,
+        layout->app_label,
+        display_label,
+        12.0f,
+        REACH_TEXT_WEIGHT_NORMAL,
+        0,
+        theme->quick_settings_expand_text_color);
+
+    reach_color line_color = reach_quick_settings_color_alpha(
+        theme->quick_settings_expand_text_color,
+        0.32f);
+    reach_color level_color = reach_quick_settings_color_alpha(
+        theme->quick_settings_expand_text_color,
+        session->muted ? 0.42f : 0.92f);
+
+    reach_quick_settings_push_rounded_rect(
+        commands,
+        layout->slider_full_range_line,
+        layout->slider_full_range_line.height * 0.5f,
+        line_color);
+
+    reach_rect_f32 level_line = layout->slider_full_range_line;
+    level_line.width = level_line.width * volume;
+    if (level_line.width > 0.0f) {
+        reach_quick_settings_push_rounded_rect(
+            commands,
+            level_line,
+            level_line.height * 0.5f,
+            level_color);
+    }
+
+    reach_rect_f32 thumb = layout->slider_thumb;
+    thumb.x =
+        layout->slider_full_range_line.x +
+        layout->slider_full_range_line.width * volume -
+        thumb.width * 0.5f;
+    reach_quick_settings_push_rounded_rect(
+        commands,
+        thumb,
+        thumb.width * 0.5f,
+        level_color);
+
+    uint16_t percent_text[8] = {};
+    reach_quick_settings_format_percent(
+        percent_text,
+        sizeof(percent_text) / sizeof(percent_text[0]),
+        volume);
+    reach_quick_settings_push_text(
+        commands,
+        layout->app_volume_percent,
+        percent_text,
+        12.0f,
+        REACH_TEXT_WEIGHT_SEMIBOLD,
+        2,
+        theme->quick_settings_expand_text_color);
+
+    if (row_index + 1 < row_count) {
+        reach_quick_settings_push_rounded_rect(
+            commands,
+            layout->separator,
+            0.0f,
+            reach_quick_settings_color_alpha(
+                theme->quick_settings_expand_text_color,
+                0.16f));
+    }
+
+    return REACH_OK;
+}
+
 reach_result reach_quick_settings_build_render_commands(
     const reach_quick_settings_render_input *input,
     reach_render_command_buffer *commands
@@ -186,47 +586,163 @@ reach_result reach_quick_settings_build_render_commands(
         return result;
     }
 
-    for (size_t index = 0;
-        index < input->layout.session_pill_count &&
-        index < input->model.sessions.count;
-        ++index) {
-        const reach_audio_volume_session *session =
-            &input->model.sessions.sessions[index];
-        reach_quick_settings_volume_pill_model session_model = {};
-        reach_quick_settings_volume_pill_model_init(
-            &session_model,
-            session->level,
-            session->muted,
-            session->label);
-        reach_quick_settings_copy_utf16(
-            session_model.session_instance_id,
-            REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
-            session->session_instance_id);
-
-        result = reach_quick_settings_push_volume_pill_commands(
-            &session_model,
-            &input->layout.session_volume_pills[index],
-            &input->theme,
-            commands);
-        if (result != REACH_OK) {
-            return result;
-        }
-    }
+    const reach_audio_output_device *current_device =
+        reach_quick_settings_current_output_device(&input->model);
+    static const uint16_t output_device_fallback_label[] = {
+        'O','u','t','p','u','t',' ','d','e','v','i','c','e',0
+    };
 
     reach_quick_settings_push_rounded_rect(
         commands,
-        input->layout.expand_button,
+        input->layout.output_device_button,
         reach_popup_radius(),
         input->theme.quick_settings_expand_button_color);
 
+    reach_quick_settings_push_output_icon(
+        commands,
+        input->layout.output_device_button_icon,
+        current_device != nullptr ? current_device->icon_id : 0,
+        &input->theme);
+
+    static const uint16_t output_title_label[] = {
+        'O','u','t','p','u','t',0
+    };
+
+    uint16_t output_device_label[REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY] = {};
+    reach_quick_settings_copy_device_primary_label(
+        output_device_label,
+        REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+        current_device != nullptr ? current_device->label : output_device_fallback_label);
+
+    reach_rect_f32 output_title_rect = input->layout.output_device_button_label;
+    output_title_rect.y += 6.0f;
+    output_title_rect.height = 16.0f;
+
+    reach_quick_settings_push_text(
+        commands,
+        output_title_rect,
+        output_title_label,
+        11.0f,
+        REACH_TEXT_WEIGHT_NORMAL,
+        0,
+        reach_quick_settings_color_alpha(
+            input->theme.quick_settings_expand_text_color,
+            0.60f));
+
+    reach_rect_f32 output_device_rect = input->layout.output_device_button_label;
+    output_device_rect.y += 23.0f;
+    output_device_rect.height = 18.0f;
+
+    reach_quick_settings_push_text(
+        commands,
+        output_device_rect,
+        output_device_label,
+        13.0f,
+        REACH_TEXT_WEIGHT_SEMIBOLD,
+        0,
+        input->theme.quick_settings_expand_text_color);
+
+    reach_render_command output_chevron = {};
+    output_chevron.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    output_chevron.rect = input->layout.output_device_button_chevron;
+    output_chevron.icon_id = input->model.output_devices_expanded
+        ? REACH_VECTOR_ICON_ARROW_UP
+        : REACH_VECTOR_ICON_ARROW_DOWN;
+    output_chevron.color = input->theme.icon_backplate_background;
+    (void)reach_render_command_buffer_push(commands, &output_chevron);
+
+    if (input->model.output_devices_expanded) {
+        static const uint16_t output_devices_title[] = {
+            'O','u','t','p','u','t',' ','d','e','v','i','c','e','s',0
+        };
+
+        reach_quick_settings_push_text(
+            commands,
+            input->layout.output_devices_title,
+            output_devices_title,
+            12.0f,
+            REACH_TEXT_WEIGHT_SEMIBOLD,
+            0,
+            input->theme.quick_settings_expand_text_color);
+
+        reach_quick_settings_push_rounded_rect(
+            commands,
+            input->layout.output_devices_panel,
+            reach_popup_radius(),
+            input->theme.quick_settings_expand_button_color);
+
+        for (size_t index = 0;
+            index < input->layout.output_device_row_count &&
+            index < input->model.output_devices.count;
+            ++index) {
+            result = reach_quick_settings_push_output_device_row_commands(
+                &input->model.output_devices.devices[index],
+                &input->layout.output_device_rows[index],
+                index,
+                input->layout.output_device_row_count,
+                &input->theme,
+                commands);
+            if (result != REACH_OK) {
+                return result;
+            }
+        }
+    }
+
+    if (input->model.expanded) {
+        static const uint16_t app_volumes_title[] = {
+            'A','p','p',' ','v','o','l','u','m','e','s',0
+        };
+        reach_quick_settings_push_text(
+            commands,
+            input->layout.app_volumes_title,
+            app_volumes_title,
+            12.0f,
+            REACH_TEXT_WEIGHT_SEMIBOLD,
+            0,
+            input->theme.quick_settings_expand_text_color);
+
+        reach_quick_settings_push_rounded_rect(
+            commands,
+            input->layout.app_volumes_panel,
+            reach_popup_radius(),
+            input->theme.quick_settings_expand_button_color);
+
+        for (size_t index = 0;
+            index < input->layout.app_volume_row_count &&
+            index < input->model.sessions.count;
+            ++index) {
+            result = reach_quick_settings_push_app_volume_row_commands(
+                &input->model.sessions.sessions[index],
+                &input->layout.app_volume_rows[index],
+                index,
+                input->layout.app_volume_row_count + 1,
+                &input->theme,
+                commands);
+            if (result != REACH_OK) {
+                return result;
+            }
+        }
+    }
+
+    if (!input->model.expanded) {
+        reach_quick_settings_push_rounded_rect(
+            commands,
+            input->layout.expand_button,
+            reach_popup_radius(),
+            input->theme.quick_settings_expand_button_color);
+    }
+
     static const uint16_t expand_label[] = {
         'A','l','l',' ','v','o','l','u','m','e',' ','s','l','i','d','e','r','s',0
+    };
+    static const uint16_t collapse_label[] = {
+        'H','i','d','e',' ','a','p','p',' ','v','o','l','u','m','e','s',0
     };
 
     reach_quick_settings_push_text(
         commands,
         input->layout.expand_button_label,
-        expand_label,
+        input->model.expanded ? collapse_label : expand_label,
         13.0f,
         REACH_TEXT_WEIGHT_NORMAL,
         0,
@@ -235,7 +751,9 @@ reach_result reach_quick_settings_build_render_commands(
     reach_render_command icon = {};
     icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
     icon.rect = input->layout.expand_button_icon;
-    icon.icon_id = REACH_VECTOR_ICON_ARROW_DOWN;
+    icon.icon_id = input->model.expanded
+        ? REACH_VECTOR_ICON_ARROW_UP
+        : REACH_VECTOR_ICON_ARROW_DOWN;
     icon.color = input->theme.icon_backplate_background;
     (void)reach_render_command_buffer_push(commands, &icon);
 

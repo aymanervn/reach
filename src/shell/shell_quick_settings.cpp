@@ -217,6 +217,22 @@ void reach_shell_refresh_quick_settings_audio(
             &shell->quick_settings_model,
             nullptr);
     }
+
+    reach_audio_output_device_list output_devices = {};
+    if (shell->audio_volume.list_output_devices != nullptr &&
+        shell->audio_volume.list_output_devices(
+            shell->audio_volume.userdata,
+            &output_devices) == REACH_OK) {
+        shell->quick_settings_output_devices = output_devices;
+        reach_quick_settings_model_set_output_devices(
+            &shell->quick_settings_model,
+            &output_devices);
+    } else {
+        shell->quick_settings_output_devices = {};
+        reach_quick_settings_model_set_output_devices(
+            &shell->quick_settings_model,
+            nullptr);
+    }
 }
 
 void reach_shell_update_quick_settings_animation(
@@ -365,9 +381,49 @@ void reach_shell_execute_quick_settings_action(
         return;
     }
 
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES) {
+        shell->quick_settings_model.output_devices_expanded =
+            shell->quick_settings_model.output_devices_expanded ? 0 : 1;
+        if (shell->quick_settings_model.output_devices_expanded) {
+            shell->quick_settings_model.expanded = 0;
+        }
+
+        reach_shell_refresh_quick_settings_audio(shell);
+        reach_shell_relayout_quick_settings(shell, 1);
+
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+        return;
+    }
+
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE) {
+        int32_t changed = 0;
+        if (shell->audio_volume.set_default_output_device != nullptr) {
+            changed =
+                shell->audio_volume.set_default_output_device(
+                    shell->audio_volume.userdata,
+                    action.output_device_id) == REACH_OK;
+        }
+
+        if (changed) {
+            shell->quick_settings_model.output_devices_expanded = 0;
+        }
+        reach_shell_refresh_quick_settings_audio(shell);
+        if (changed) {
+            reach_shell_relayout_quick_settings(shell, 1);
+        }
+
+        shell->quick_settings.dirty_flags = 1;
+        shell->render_dirty = 1;
+        return;
+    }
+
     if (action.type == REACH_QUICK_SETTINGS_ACTION_EXPAND) {
         shell->quick_settings_model.expanded =
             shell->quick_settings_model.expanded ? 0 : 1;
+        if (shell->quick_settings_model.expanded) {
+            shell->quick_settings_model.output_devices_expanded = 0;
+        }
 
         reach_shell_refresh_quick_settings_audio(shell);
         reach_shell_relayout_quick_settings(shell, 1);

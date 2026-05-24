@@ -13,6 +13,7 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 209 RCDATA "quick_settings/volume_low.svg"
 210 RCDATA "quick_settings/volume_high.svg"
 211 RCDATA "quick_settings/arrow-down.svg"
+212 RCDATA "quick_settings/check.svg"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0

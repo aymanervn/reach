@@ -37,7 +37,8 @@ typedef enum reach_vector_icon_id {
     REACH_VECTOR_ICON_VOLUME_ZERO = 9,
     REACH_VECTOR_ICON_VOLUME_LOW = 10,
     REACH_VECTOR_ICON_VOLUME_HIGH = 11,
-    REACH_VECTOR_ICON_ARROW_DOWN = 12
+    REACH_VECTOR_ICON_ARROW_DOWN = 12,
+    REACH_VECTOR_ICON_CHECK = 13
 } reach_vector_icon_id;
 
 typedef enum reach_text_weight {

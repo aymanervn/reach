@@ -86,6 +86,7 @@ static reach_quick_settings_model test_model_with_sessions(size_t count)
         sessions.sessions[index].level = 0.25f + (float)index * 0.05f;
         sessions.sessions[index].muted = 0;
         sessions.sessions[index].process_id = (uint32_t)(1000 + index);
+        sessions.sessions[index].icon_id = (uint64_t)(9000 + index);
         copy_ascii(
             sessions.sessions[index].session_instance_id,
             REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
@@ -93,10 +94,37 @@ static reach_quick_settings_model test_model_with_sessions(size_t count)
         copy_ascii(
             sessions.sessions[index].label,
             REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
-            index == 0 ? "App A" : "App B");
+            index == 0 ? "App A.exe" : "App B.exe");
     }
 
     reach_quick_settings_model_set_sessions(&model, &sessions);
+    return model;
+}
+
+static reach_quick_settings_model test_model_with_output_devices(size_t count)
+{
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    reach_quick_settings_model_set_main_volume(&model, 0.5f, 0);
+
+    reach_audio_output_device_list devices = {};
+    devices.count = count;
+    for (size_t index = 0;
+        index < count && index < REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES;
+        ++index) {
+        devices.devices[index].icon_id = (uint64_t)(7000 + index);
+        devices.devices[index].is_default = index == 1 ? 1 : 0;
+        copy_ascii(
+            devices.devices[index].device_id,
+            REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
+            index == 0 ? "device-a" : "device-b");
+        copy_ascii(
+            devices.devices[index].label,
+            REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+            index == 0 ? "Speakers" : "Headphones");
+    }
+
+    reach_quick_settings_model_set_output_devices(&model, &devices);
     return model;
 }
 
@@ -132,14 +160,14 @@ static void test_model_clamps_volume(void)
     expect_true(model.main_muted == 1, "muted flag normalizes to one");
 }
 
-static void test_layout_places_volume_pill_above_expand(void)
+static void test_layout_places_volume_pill_above_output_device_and_expand(void)
 {
     reach_theme theme = test_theme();
     reach_rect_f32 bounds = {};
     bounds.x = 100.0f;
     bounds.y = 200.0f;
     bounds.width = 240.0f;
-    bounds.height = 112.0f;
+    bounds.height = 156.0f;
 
     reach_quick_settings_layout layout =
         reach_quick_settings_layout_for_content_bounds(bounds, &theme, nullptr);
@@ -160,9 +188,13 @@ static void test_layout_places_volume_pill_above_expand(void)
         "volume header is above slider pill");
 
     expect_true(
-        layout.expand_button.y >
+        layout.output_device_button.y >
             layout.main_volume_pill.bounds.y + layout.main_volume_pill.bounds.height,
-        "expand button is below volume pill");
+        "output device button is below volume pill");
+    expect_true(
+        layout.expand_button.y >
+            layout.output_device_button.y + layout.output_device_button.height,
+        "expand button is below output device button");
 
     expect_true(
         layout.main_volume_pill.bounds.x >= bounds.x &&
@@ -196,6 +228,11 @@ static void test_layout_places_volume_pill_above_expand(void)
         layout.expand_button.width,
         0.001f,
         "volume pill and expand button have same width");
+    expect_near(
+        layout.output_device_button.width,
+        layout.main_volume_pill.bounds.width,
+        0.001f,
+        "output device button and master pill have same width");
     expect_near(
         layout.main_slider_track.height,
         layout.main_volume_pill.bounds.height,
@@ -299,6 +336,26 @@ static void test_expand_button_hit_maps_to_expand_action(void)
     expect_true(action.type == REACH_QUICK_SETTINGS_ACTION_EXPAND, "expand hit maps to expand action");
 }
 
+static void test_output_device_button_hit_maps_to_toggle_action(void)
+{
+    reach_quick_settings_model model = test_model_with_output_devices(2);
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+    float x = layout.output_device_button.x + layout.output_device_button.width * 0.5f;
+    float y = layout.output_device_button.y + layout.output_device_button.height * 0.5f;
+
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(&layout, &model, x, y);
+    reach_quick_settings_action action =
+        reach_quick_settings_action_for_hit(hit);
+
+    expect_true(
+        hit.type == REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON,
+        "output device button hit");
+    expect_true(
+        action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES,
+        "output device button maps to toggle action");
+}
+
 static void test_slider_hit_maps_to_set_volume_action(void)
 {
     reach_quick_settings_layout layout = test_layout();
@@ -315,41 +372,154 @@ static void test_slider_hit_maps_to_set_volume_action(void)
     expect_near(action.volume_level, 0.25f, 0.001f, "set volume action carries hit volume");
 }
 
-static void test_expanded_layout_stacks_session_pills(void)
+static void test_expanded_layout_shows_app_volume_panel(void)
 {
     reach_quick_settings_model model = test_model_with_sessions(2);
     model.expanded = 1;
 
     reach_quick_settings_layout layout = test_layout_for_model(&model);
 
-    expect_true(layout.session_pill_count == 2, "expanded layout exposes sessions");
+    expect_true(layout.app_volume_row_count == 2, "expanded layout exposes app rows");
     expect_true(
-        layout.session_volume_pills[0].bounds.y >
-            layout.main_volume_pill.bounds.y + layout.main_volume_pill.bounds.height,
-        "first session is below master");
+        layout.app_volumes_title.y >
+            layout.output_device_button.y + layout.output_device_button.height,
+        "app volumes title is below output device button");
     expect_true(
-        layout.session_volume_pills[1].bounds.y >
-            layout.session_volume_pills[0].bounds.y + layout.session_volume_pills[0].bounds.height,
-        "second session is below first session");
-    expect_true(
-        layout.expand_button.y >
-            layout.session_volume_pills[1].bounds.y + layout.session_volume_pills[1].bounds.height,
-        "expand button is below sessions");
+        layout.app_volumes_panel.y >
+            layout.app_volumes_title.y + layout.app_volumes_title.height,
+        "app volumes panel is below title");
     expect_near(
-        layout.session_volume_pills[0].bounds.width,
+        layout.app_volumes_panel.width,
+        layout.main_volume_pill.bounds.width,
+        0.001f,
+        "app volumes panel matches master pill width");
+    expect_near(
+        layout.app_volumes_panel.width,
         layout.expand_button.width,
         0.001f,
-        "session pill aligns to expand width");
+        "app volumes panel matches expand width");
+    expect_near(
+        layout.app_volumes_panel.height,
+        120.0f,
+        0.001f,
+        "app volumes panel height includes visible rows and hide row");
+    expect_true(
+        layout.expand_button.y >= layout.app_volumes_panel.y &&
+            layout.expand_button.y + layout.expand_button.height <=
+                layout.app_volumes_panel.y + layout.app_volumes_panel.height,
+        "hide button is inside app volumes panel");
+    expect_near(
+        layout.expand_button.y,
+        layout.app_volume_rows[1].bounds.y + layout.app_volume_rows[1].bounds.height,
+        0.001f,
+        "hide button follows app volume rows");
 }
 
-static void test_collapsed_layout_hides_session_pills(void)
+static void test_expanded_output_device_layout_shows_panel(void)
+{
+    reach_quick_settings_model model = test_model_with_output_devices(2);
+    model.output_devices_expanded = 1;
+
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+
+    expect_true(layout.output_device_row_count == 2, "expanded output layout exposes device rows");
+    expect_true(
+        layout.output_devices_title.y >
+            layout.output_device_button.y + layout.output_device_button.height,
+        "output devices title is below output button");
+    expect_true(
+        layout.output_devices_panel.y >
+            layout.output_devices_title.y + layout.output_devices_title.height,
+        "output devices panel is below title");
+    expect_near(
+        layout.output_devices_panel.width,
+        layout.main_volume_pill.bounds.width,
+        0.001f,
+        "output devices panel matches master pill width");
+    expect_near(
+        layout.output_devices_panel.height,
+        80.0f,
+        0.001f,
+        "output devices panel height follows device rows");
+    expect_true(
+        layout.output_device_rows[0].icon.x < layout.output_device_rows[0].label.x,
+        "output device icon is before label");
+    expect_true(
+        layout.output_device_rows[0].label.x + layout.output_device_rows[0].label.width <
+            layout.output_device_rows[0].checkmark.x,
+        "output device label is before checkmark");
+}
+
+static void test_output_device_row_hit_maps_to_set_device_action(void)
+{
+    reach_quick_settings_model model = test_model_with_output_devices(2);
+    model.output_devices_expanded = 1;
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+
+    float x = layout.output_device_rows[1].bounds.x +
+        layout.output_device_rows[1].bounds.width * 0.5f;
+    float y = layout.output_device_rows[1].bounds.y +
+        layout.output_device_rows[1].bounds.height * 0.5f;
+
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(&layout, &model, x, y);
+    reach_quick_settings_action action =
+        reach_quick_settings_action_for_hit(hit);
+
+    expect_true(
+        hit.type == REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
+        "output device row hit");
+    expect_true(
+        action.type == REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE,
+        "output device row maps to set output action");
+    expect_true(action.output_device_index == 1, "output action carries device index");
+    expect_true(
+        text_equals_ascii(action.output_device_id, "device-b"),
+        "output action carries device id");
+}
+
+static void test_app_volume_row_layout_is_compact(void)
+{
+    reach_quick_settings_model model = test_model_with_sessions(2);
+    model.expanded = 1;
+
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+    const reach_quick_settings_app_volume_row_layout *row = &layout.app_volume_rows[1];
+
+    expect_near(
+        row->bounds.height,
+        40.0f,
+        0.001f,
+        "app volume row uses compact fixed height");
+    expect_true(
+        row->app_icon.x < row->app_label.x,
+        "app row icon is before label");
+    expect_true(
+        row->app_label.x + row->app_label.width < row->slider_full_range_line.x,
+        "app row label is before slider");
+    expect_true(
+        row->slider_full_range_line.x + row->slider_full_range_line.width <
+            row->app_volume_percent.x,
+        "app row slider is before percent");
+    expect_true(
+        row->slider_full_range_line.x < row->slider_thumb.x + row->slider_thumb.width,
+        "app row slider is before thumb edge");
+    expect_near(
+        row->slider_level_line.width,
+        row->slider_full_range_line.width * model.sessions.sessions[1].level,
+        0.001f,
+        "app row level line follows session volume");
+}
+
+static void test_collapsed_layout_hides_app_volume_panel(void)
 {
     reach_quick_settings_model model = test_model_with_sessions(2);
     model.expanded = 0;
 
     reach_quick_settings_layout layout = test_layout_for_model(&model);
 
-    expect_true(layout.session_pill_count == 0, "collapsed layout hides sessions");
+    expect_true(layout.app_volume_row_count == 0, "collapsed layout hides app rows");
+    expect_near(layout.app_volumes_panel.height, 0.0f, 0.001f, "collapsed layout hides app panel");
     expect_true(
         layout.expand_button.y >
             layout.main_volume_pill.bounds.y + layout.main_volume_pill.bounds.height,
@@ -362,10 +532,10 @@ static void test_session_slider_hit_maps_to_session_action(void)
     model.expanded = 1;
     reach_quick_settings_layout layout = test_layout_for_model(&model);
 
-    float x = layout.session_volume_pills[1].slider_track.x +
-        layout.session_volume_pills[1].slider_track.width * 0.75f;
-    float y = layout.session_volume_pills[1].slider_track.y +
-        layout.session_volume_pills[1].slider_track.height * 0.5f;
+    float x = layout.app_volume_rows[1].slider_full_range_line.x +
+        layout.app_volume_rows[1].slider_full_range_line.width * 0.75f;
+    float y = layout.app_volume_rows[1].bounds.y +
+        layout.app_volume_rows[1].bounds.height * 0.5f;
 
     reach_quick_settings_hit_result hit =
         reach_quick_settings_hit_test(&layout, &model, x, y);
@@ -386,7 +556,7 @@ static void test_session_list_cap_is_respected(void)
     reach_quick_settings_layout layout = test_layout_for_model(&model);
 
     expect_true(model.sessions.count == REACH_AUDIO_VOLUME_MAX_SESSIONS, "session model caps list");
-    expect_true(layout.session_pill_count == REACH_AUDIO_VOLUME_MAX_SESSIONS, "layout caps session pills");
+    expect_true(layout.app_volume_row_count == REACH_AUDIO_VOLUME_MAX_SESSIONS, "layout caps app volume rows");
 }
 
 static void test_volume_icon_selection(void)
@@ -405,7 +575,7 @@ static void test_volume_icon_selection(void)
         "high volume uses high icon");
 }
 
-static void test_expanded_render_emits_session_volume_pills(void)
+static void test_expanded_render_emits_app_volume_panel_rows(void)
 {
     reach_theme theme = test_theme();
     reach_quick_settings_model model = test_model_with_sessions(2);
@@ -421,9 +591,104 @@ static void test_expanded_render_emits_session_volume_pills(void)
         reach_quick_settings_build_render_commands(&input, &commands);
 
     expect_true(result == REACH_OK, "expanded render succeeds");
-    expect_true(commands.count >= 15, "expanded render emits master, sessions, and expand commands");
-    expect_true(commands.commands[4].type == REACH_RENDER_COMMAND_VECTOR_ICON, "first session icon follows master pill");
-    expect_true(commands.commands[8].type == REACH_RENDER_COMMAND_VECTOR_ICON, "second session icon follows first session");
+    expect_true(commands.count >= 26, "expanded render emits master, output button, panel rows, and collapse commands");
+    expect_true(
+        commands.commands[8].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[8].text, "App volumes"),
+        "expanded render emits app volumes title");
+    expect_true(
+        commands.commands[9].type == REACH_RENDER_COMMAND_RECT,
+        "expanded render emits app volumes panel background");
+    expect_color_equal(
+        commands.commands[9].color,
+        theme.quick_settings_expand_button_color,
+        "app volumes panel uses expand button color");
+    expect_true(
+        commands.commands[10].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[10].icon_id == 9000,
+        "first app row starts with app icon");
+    expect_true(
+        commands.commands[11].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[11].text, "App A"),
+        "first app row label strips exe suffix");
+    expect_true(
+        commands.commands[12].type == REACH_RENDER_COMMAND_RECT &&
+            commands.commands[12].rect.height < 4.0f,
+        "app row uses compact slider track");
+    expect_true(
+        commands.commands[15].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[15].text, "25%"),
+        "first app row renders percentage");
+    expect_true(
+        commands.commands[17].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[17].icon_id == 9001,
+        "second app row follows first compact row");
+    expect_true(
+        commands.commands[18].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[18].text, "App B"),
+        "second app row label strips exe suffix");
+    expect_true(
+        commands.commands[22].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[22].text, "30%"),
+        "second app row renders percentage");
+    expect_true(
+        commands.commands[24].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[24].text, "Hide app volumes"),
+        "expanded render keeps collapse row label inside panel");
+    expect_true(
+        commands.commands[25].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[25].icon_id == REACH_VECTOR_ICON_ARROW_UP,
+        "expanded collapse row uses arrow up icon");
+}
+
+static void test_expanded_output_device_render_emits_checkmark(void)
+{
+    reach_theme theme = test_theme();
+    reach_quick_settings_model model = test_model_with_output_devices(2);
+    model.output_devices_expanded = 1;
+
+    reach_quick_settings_render_input input = {};
+    input.model = model;
+    input.layout = test_layout_for_model(&model);
+    input.theme = theme;
+
+    reach_render_command_buffer commands = {};
+    reach_result result =
+        reach_quick_settings_build_render_commands(&input, &commands);
+
+    expect_true(result == REACH_OK, "expanded output render succeeds");
+    expect_true(commands.count >= 17, "expanded output render emits device panel");
+    expect_true(
+        commands.commands[4].type == REACH_RENDER_COMMAND_RECT,
+        "output device button background follows master");
+    expect_true(
+        commands.commands[5].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[5].icon_id == 7001,
+        "output device button shows current device icon");
+    expect_true(
+        commands.commands[6].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[6].text, "Headphones"),
+        "output device button shows current device label");
+    expect_true(
+        commands.commands[8].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[8].text, "Output devices"),
+        "output devices title renders");
+    expect_true(
+        commands.commands[10].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[10].icon_id == 7000,
+        "first output row renders device icon");
+    expect_true(
+        commands.commands[12].type != REACH_RENDER_COMMAND_VECTOR_ICON ||
+            commands.commands[12].icon_id != REACH_VECTOR_ICON_CHECK,
+        "non-default output row does not render checkmark");
+    expect_true(
+        commands.commands[13].type == REACH_RENDER_COMMAND_ICON &&
+            commands.commands[13].icon_id == 7001,
+        "default output row renders device icon");
+    expect_true(
+        commands.commands[15].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[15].icon_id == REACH_VECTOR_ICON_CHECK,
+        "default output row renders checkmark");
 }
 
 static void test_render_emits_volume_pill_and_expand_commands(void)
@@ -520,19 +785,32 @@ static void test_render_emits_volume_pill_and_expand_commands(void)
 
     expect_true(
         commands.commands[4].type == REACH_RENDER_COMMAND_RECT,
-        "fifth command is expand button background");
+        "fifth command is output device button background");
     expect_near(
         commands.commands[4].radius,
+        reach_popup_radius(),
+        0.001f,
+        "output device button uses popup corner radius");
+    expect_true(
+        commands.commands[7].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[7].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
+        "output device button uses arrow down icon");
+
+    expect_true(
+        commands.commands[8].type == REACH_RENDER_COMMAND_RECT,
+        "ninth command is expand button background");
+    expect_near(
+        commands.commands[8].radius,
         reach_popup_radius(),
         0.001f,
         "expand button uses popup corner radius");
 
     expect_true(
-        commands.commands[6].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            commands.commands[6].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
+        commands.commands[10].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
+            commands.commands[10].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
         "expand button uses arrow down icon");
     expect_color_equal(
-        commands.commands[6].color,
+        commands.commands[10].color,
         theme.icon_backplate_background,
         "expand icon uses app backplate color");
 }
@@ -540,19 +818,24 @@ static void test_render_emits_volume_pill_and_expand_commands(void)
 int main(void)
 {
     test_model_clamps_volume();
-    test_layout_places_volume_pill_above_expand();
+    test_layout_places_volume_pill_above_output_device_and_expand();
     test_slider_hit_maps_to_volume();
     test_slider_fill_width_follows_volume();
     test_hit_outside_returns_none();
     test_expand_button_hit_maps_to_expand_action();
+    test_output_device_button_hit_maps_to_toggle_action();
     test_slider_hit_maps_to_set_volume_action();
-    test_expanded_layout_stacks_session_pills();
-    test_collapsed_layout_hides_session_pills();
+    test_expanded_output_device_layout_shows_panel();
+    test_output_device_row_hit_maps_to_set_device_action();
+    test_expanded_layout_shows_app_volume_panel();
+    test_app_volume_row_layout_is_compact();
+    test_collapsed_layout_hides_app_volume_panel();
     test_session_slider_hit_maps_to_session_action();
     test_session_list_cap_is_respected();
     test_volume_icon_selection();
     test_render_emits_volume_pill_and_expand_commands();
-    test_expanded_render_emits_session_volume_pills();
+    test_expanded_output_device_render_emits_checkmark();
+    test_expanded_render_emits_app_volume_panel_rows();
 
     if (g_failures != 0) {
         printf("%d quick settings feature test(s) failed.\n", g_failures);

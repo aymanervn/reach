@@ -130,6 +130,7 @@ struct reach_shell {
     uint16_t quick_settings_drag_session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
     reach_audio_volume_state quick_settings_audio_state;
     reach_audio_volume_session_list quick_settings_audio_sessions;
+    reach_audio_output_device_list quick_settings_output_devices;
     reach_quick_settings_model quick_settings_model;
     reach_quick_settings_layout quick_settings_layout;
     reach_rect_f32 quick_settings_bounds;
