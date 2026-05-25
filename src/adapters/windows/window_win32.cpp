@@ -71,6 +71,13 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             window->callback(window->callback_user, &event);
         }
         return 0;
+    case REACH_WM_LAUNCHER_SEARCH_READY:
+        if (window != nullptr && window->callback != nullptr) {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_LAUNCHER_SEARCH_READY;
+            window->callback(window->callback_user, &event);
+        }
+        return 0;
     case WM_KEYDOWN:
         if (window != nullptr && window->callback != nullptr) {
             reach_ui_event event = {};
@@ -308,6 +315,7 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
         window->role != REACH_SURFACE_CONTEXT_MENU &&
         window->role != REACH_SURFACE_QUICK_SETTINGS) {
         SetForegroundWindow(window->hwnd);
+        SetActiveWindow(window->hwnd);
         SetFocus(window->hwnd);
     }
     return REACH_OK;

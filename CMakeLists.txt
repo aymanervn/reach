@@ -156,6 +156,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
 add_library(reach_shell STATIC
     src/shell/shell.cpp
     src/shell/shell_input.cpp
+    src/shell/shell_launcher_search.cpp
     src/shell/shell_lifecycle.cpp
     src/shell/shell_popup_surface.cpp
     src/shell/shell_quick_settings.cpp

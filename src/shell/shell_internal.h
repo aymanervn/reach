@@ -22,6 +22,9 @@
 #include "reach/core/theme.h"
 
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 typedef struct reach_shell_popup_bounds_animation {
     reach_float_animation width;
@@ -102,6 +105,21 @@ struct reach_shell {
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
     reach_icon_handle launcher_result_icons[REACH_SEARCH_MAX_RESULTS];
+    std::thread launcher_search_thread;
+    std::mutex launcher_search_mutex;
+    std::condition_variable launcher_search_cv;
+    int32_t launcher_search_thread_started;
+    int32_t launcher_search_stop;
+    int32_t launcher_search_pending;
+    int32_t launcher_search_in_flight;
+    uint32_t launcher_search_generation;
+    uint32_t launcher_search_pending_generation;
+    uint16_t launcher_search_pending_query[REACH_MAX_SEARCH_CHARS + 1];
+    int32_t launcher_search_completed;
+    uint32_t launcher_search_completed_generation;
+    reach_search_candidate launcher_search_completed_results[REACH_SEARCH_MAX_RESULTS];
+    size_t launcher_search_completed_count;
+    void (*launcher_search_notify)(reach_shell *shell);
     int32_t suppress_power_button_release;
     reach_float_animation dock_drag_snap_animation;
     reach_float_animation dock_y_animation;
@@ -186,6 +204,12 @@ int32_t reach_shell_popup_bounds_animation_active(
     const reach_shell_popup_bounds_animation *animation);
 
 void reach_shell_raise_launcher(reach_shell *shell);
+void reach_shell_notify_launcher_search_ready(reach_shell *shell);
+void reach_shell_cancel_launcher_search(reach_shell *shell);
+reach_result reach_shell_schedule_launcher_search(reach_shell *shell);
+void reach_shell_apply_launcher_search_results(reach_shell *shell);
+void reach_shell_stop_launcher_search_worker(reach_shell *shell);
+void reach_shell_release_launcher_result_icons(reach_shell *shell);
 void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open);
 void reach_shell_toggle_tray_popup(reach_shell *shell);
 void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open);

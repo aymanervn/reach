@@ -10,6 +10,7 @@ static void reach_shell_cleanup(reach_shell *shell)
 
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
+    reach_shell_stop_launcher_search_worker(shell);
     if (shell->system_controls.stop_watching != nullptr) {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
     }
@@ -69,12 +70,7 @@ static void reach_shell_cleanup(reach_shell *shell)
         shell->search_provider.ops.destroy(shell->search_provider.provider);
     }
     reach_dock_release_all_icons(&shell->dock_icons, &shell->icon_provider, shell->open_window_count);
-    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index) {
-        if (shell->launcher_result_icons[index].id != 0 && shell->icon_provider.ops.release != nullptr) {
-            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->launcher_result_icons[index]);
-        }
-        shell->launcher_result_icons[index] = {};
-    }
+    reach_shell_release_launcher_result_icons(shell);
     if (shell->app_launcher.ops.destroy != nullptr) {
         shell->app_launcher.ops.destroy(shell->app_launcher.launcher);
     }
@@ -185,6 +181,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->quick_settings_bounds_animation = {};
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
+    shell->launcher_search_notify = reach_shell_notify_launcher_search_ready;
 
     reach_result result = reach_monitor_list_create(&shell->monitors);
     if (result == REACH_OK) {
@@ -357,6 +354,8 @@ reach_result reach_shell_stop(reach_shell *shell)
     shell->context_menu_open = 0;
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
+    reach_shell_cancel_launcher_search(shell);
+    reach_shell_stop_launcher_search_worker(shell);
     if (shell->system_controls.stop_watching != nullptr) {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
     }

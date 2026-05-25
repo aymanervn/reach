@@ -34,7 +34,8 @@ typedef enum reach_ui_event_type {
     REACH_UI_EVENT_ARROW_LEFT = 23,
     REACH_UI_EVENT_ARROW_RIGHT = 24,
     REACH_UI_EVENT_HOME = 25,
-    REACH_UI_EVENT_END = 26
+    REACH_UI_EVENT_END = 26,
+    REACH_UI_EVENT_LAUNCHER_SEARCH_READY = 27
 } reach_ui_event_type;
 
 #define REACH_UI_EVENT_MODIFIER_CTRL 0x1u

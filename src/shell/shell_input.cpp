@@ -1,4 +1,5 @@
 #include "shell_internal.h"
+#include "reach/platform/windows_messages.h"
 
 #include <windows.h>
 #include <dwmapi.h>
@@ -45,9 +46,47 @@ void reach_shell_raise_launcher(reach_shell *shell)
 
     HWND launcher_hwnd = (HWND)shell->launcher.window.ops.native_handle(shell->launcher.window.window);
     if (launcher_hwnd != nullptr) {
+        ShowWindow(launcher_hwnd, SW_SHOW);
+
+        HWND foreground = GetForegroundWindow();
+        DWORD foreground_thread = foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
+        DWORD launcher_thread = GetWindowThreadProcessId(launcher_hwnd, nullptr);
+        DWORD current_thread = GetCurrentThreadId();
+
+        bool attached_foreground = false;
+        bool attached_launcher = false;
+
+        if (foreground_thread != 0 && foreground_thread != current_thread) {
+            attached_foreground = AttachThreadInput(current_thread, foreground_thread, TRUE) != FALSE;
+        }
+        if (launcher_thread != 0 && launcher_thread != current_thread && launcher_thread != foreground_thread) {
+            attached_launcher = AttachThreadInput(current_thread, launcher_thread, TRUE) != FALSE;
+        }
+
         SetWindowPos(launcher_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        BringWindowToTop(launcher_hwnd);
         SetForegroundWindow(launcher_hwnd);
+        SetActiveWindow(launcher_hwnd);
         SetFocus(launcher_hwnd);
+
+        if (attached_launcher) {
+            AttachThreadInput(current_thread, launcher_thread, FALSE);
+        }
+        if (attached_foreground) {
+            AttachThreadInput(current_thread, foreground_thread, FALSE);
+        }
+    }
+}
+
+void reach_shell_notify_launcher_search_ready(reach_shell *shell)
+{
+    if (shell == nullptr || shell->launcher.window.ops.native_handle == nullptr) {
+        return;
+    }
+
+    HWND launcher_hwnd = (HWND)shell->launcher.window.ops.native_handle(shell->launcher.window.window);
+    if (launcher_hwnd != nullptr) {
+        PostMessageW(launcher_hwnd, REACH_WM_LAUNCHER_SEARCH_READY, 0, 0);
     }
 }
 
@@ -349,86 +388,13 @@ static void reach_shell_press_quick_settings_button(reach_shell *shell)
     reach_shell_start_dock_click_feedback(shell, REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON, 0.50f);
 }
 
-static void reach_shell_release_launcher_result_icons(reach_shell *shell)
-{
-    if (shell == nullptr) {
-        return;
-    }
-    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index) {
-        if (shell->launcher_result_icons[index].id != 0 && shell->icon_provider.ops.release != nullptr) {
-            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->launcher_result_icons[index]);
-        }
-        shell->launcher_result_icons[index] = {};
-        (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, 0, 0);
-    }
-}
-
-static void reach_shell_load_launcher_result_icons(reach_shell *shell)
-{
-    if (shell == nullptr || shell->icon_provider.ops.load == nullptr) {
-        return;
-    }
-    for (size_t index = 0; index < shell->ui.launcher.result_count && index < REACH_SEARCH_MAX_RESULTS; ++index) {
-        reach_icon_request request = {};
-        request.size_px = 32;
-        reach_copy_utf16(request.path, 260, shell->ui.launcher.results[index].path);
-        reach_icon_handle icon = {};
-        if (request.path[0] != 0 &&
-            shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &icon) == REACH_OK &&
-            icon.id != 0) {
-            shell->launcher_result_icons[index] = icon;
-            (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, icon.id, icon.wants_backplate);
-        }
-    }
-}
-
-static reach_result reach_shell_refresh_launcher_search(reach_shell *shell)
-{
-    if (shell == nullptr) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    reach_shell_release_launcher_result_icons(shell);
-    (void)reach_ui_state_clear_launcher_results(&shell->ui);
-
-    if (shell->ui.launcher.query_length == 0 || shell->search_provider.ops.query == nullptr) {
-        shell->layout_dirty = 1;
-        shell->launcher.dirty_flags = 1;
-        return REACH_OK;
-    }
-
-    reach_result query_result = shell->search_provider.ops.query(shell->search_provider.provider, shell->ui.launcher.query);
-    if (query_result == REACH_OK && shell->search_provider.ops.result_count != nullptr && shell->search_provider.ops.result_at != nullptr) {
-        reach_search_candidate results[REACH_SEARCH_MAX_RESULTS] = {};
-        size_t count = shell->search_provider.ops.result_count(shell->search_provider.provider);
-        if (count > REACH_SEARCH_MAX_RESULTS) {
-            count = REACH_SEARCH_MAX_RESULTS;
-        }
-        for (size_t index = 0; index < count; ++index) {
-            reach_search_result result = {};
-            if (shell->search_provider.ops.result_at(shell->search_provider.provider, index, &result) == REACH_OK) {
-                reach_copy_utf16(results[index].name, REACH_SEARCH_RESULT_NAME_CAPACITY, result.title);
-                reach_copy_utf16(results[index].path, REACH_SEARCH_RESULT_PATH_CAPACITY, result.path);
-                results[index].kind = result.kind;
-                results[index].is_directory = result.is_directory;
-                results[index].score = result.score;
-            }
-        }
-        (void)reach_ui_state_set_launcher_results(&shell->ui, results, count);
-        reach_shell_load_launcher_result_icons(shell);
-    }
-
-    shell->layout_dirty = 1;
-    shell->launcher.dirty_flags = 1;
-    return REACH_OK;
-}
-
 static void reach_shell_close_launcher(reach_shell *shell)
 {
     if (shell == nullptr || !shell->ui.launcher.open) {
         return;
     }
 
+    reach_shell_cancel_launcher_search(shell);
     reach_shell_release_launcher_result_icons(shell);
     (void)reach_ui_state_close_launcher(&shell->ui);
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
@@ -1597,6 +1563,10 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         reach_shell_reload_wallpaper(shell, 1);
         return REACH_OK;
     }
+    if (event->type == REACH_UI_EVENT_LAUNCHER_SEARCH_READY) {
+        reach_shell_apply_launcher_search_results(shell);
+        return REACH_OK;
+    }
     if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN ||
         event->type == REACH_UI_EVENT_ALT_TAB_NEXT ||
         event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS ||
@@ -1613,6 +1583,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     reach_shell_mark_dirty_for_event(shell, event);
     if (launcher_was_open != shell->ui.launcher.open) {
         if (!shell->ui.launcher.open) {
+            reach_shell_cancel_launcher_search(shell);
             reach_shell_release_launcher_result_icons(shell);
             (void)reach_ui_state_clear_launcher_results(&shell->ui);
         }
@@ -1630,7 +1601,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
             }
         }
     } else if (intent.type == REACH_UI_INTENT_RUN_SEARCH) {
-        (void)reach_shell_refresh_launcher_search(shell);
+        (void)reach_shell_schedule_launcher_search(shell);
     } else if (intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT) {
         (void)reach_shell_open_launcher_result(shell);
         reach_shell_close_launcher(shell);
