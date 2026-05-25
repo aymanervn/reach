@@ -1083,6 +1083,13 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
         shell->quick_settings_drag_session_index = 0;
         shell->quick_settings_drag_session_instance_id[0] = 0;
+
+        if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
+            (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
+                shell->quick_settings.window.window,
+                0);
+        }
+
         return REACH_OK;
     }
 
@@ -1183,7 +1190,15 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
                 shell->quick_settings_dragging_volume =
                     action.type == REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME ||
                     action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
-                shell->quick_settings_drag_type = hit.type;
+
+                if (shell->quick_settings_dragging_volume &&
+                    shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
+                    (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
+                        shell->quick_settings.window.window,
+                        1);
+                }
+
+                shell->quick_settings_drag_type = hit.type;                shell->quick_settings_drag_type = hit.type;
                 shell->quick_settings_drag_session_index = hit.session_index;
                 reach_copy_utf16(
                     shell->quick_settings_drag_session_instance_id,
@@ -1299,13 +1314,6 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         return REACH_OK;
     }
 
-    if (shell->ui.dock.auto_hide &&
-        (!shell->dock_target_hidden ||
-         shell->dock_reveal_active ||
-         shell->dock_animating)) {
-        reach_shell_request_update(shell);
-    }
-
     if (shell->context_menu_open) {
         reach_context_menu_hit_result context_hit = reach_context_menu_hit_test_items(
             shell->context_menu_item_slots,
@@ -1328,13 +1336,19 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
             track = shell->quick_settings_layout
                 .app_volume_rows[shell->quick_settings_drag_session_index]
                 .slider_full_range_line;
+        } else if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER) {
+            track = shell->quick_settings_layout.brightness_slider_track;
         }
         if (track.width > 0.0f) {
             float local_x = (float)event->x - shell->quick_settings_bounds.x;
             reach_quick_settings_action action = {};
-            action.type = shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER
-                ? REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME
-                : REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
+            if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER) {
+                action.type = REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
+            } else if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER) {
+                action.type = REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
+            } else {
+                action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
+            }
             action.volume_level = (local_x - track.x) / track.width;
             action.session_index = shell->quick_settings_drag_session_index;
             reach_copy_utf16(

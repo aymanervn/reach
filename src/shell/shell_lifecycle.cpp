@@ -187,10 +187,18 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->context_menu_hovered_index = REACH_MAX_PINNED_APPS;
 
     shell->quick_settings_open = 0;
+    if (shell->quick_settings.window.ops.hide != nullptr) {
+        (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
+    }
     shell->quick_settings_dragging_volume = 0;
     shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
     shell->quick_settings_drag_session_index = 0;
     shell->quick_settings_drag_session_instance_id[0] = 0;
+    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
+        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
+            shell->quick_settings.window.window,
+            0);
+    }
     shell->quick_settings_audio_state.level = 0.0f;
     shell->quick_settings_audio_state.muted = 0;
     shell->quick_settings_audio_sessions = {};
@@ -334,6 +342,14 @@ reach_result reach_shell_start(reach_shell *shell)
             return result;
         }
     }
+    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
+        result = shell->quick_settings.window.ops.set_pointer_move_enabled(
+            shell->quick_settings.window.window,
+            0);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
     if (shell->dock_reveal_edge.ops.set_callback != nullptr) {
         result = shell->dock_reveal_edge.ops.set_callback(
             shell->dock_reveal_edge.edge,
@@ -416,6 +432,11 @@ reach_result reach_shell_stop(reach_shell *shell)
     }
     if (shell->quick_settings.window.ops.hide != nullptr) {
         (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
+    }
+    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
+        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
+            shell->quick_settings.window.window,
+            0);
     }
     if (shell->wallpaper_surface.ops.hide != nullptr) {
         (void)shell->wallpaper_surface.ops.hide(shell->wallpaper_surface.surface);

@@ -379,6 +379,11 @@ void reach_shell_set_quick_settings_open(
     shell->quick_settings_open = next_open;
     shell->quick_settings_dragging_volume = 0;
     shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
+    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
+        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
+            shell->quick_settings.window.window,
+            0);
+    }
 
     if (next_open) {
         reach_shell_set_tray_popup_open(shell, 0);

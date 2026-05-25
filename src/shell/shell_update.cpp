@@ -1112,7 +1112,18 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (dock_window_changed && shell->dock.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->dock.window.ops.apply_rounded_corners(shell->dock.window.window, dock_radius);
                     }
-                    if (shell->render_dirty || shell->dock.dirty_flags || dock_window_changed || dock_layout_changed) {
+                    int32_t dock_reveal_position_only =
+                        shell->dock_animating &&
+                        !shell->render_dirty &&
+                        !shell->dock.dirty_flags &&
+                        !shell->dock_width_animating &&
+                        !shell->dock_drag_active &&
+                        !shell->dock_drag_snapping &&
+                        !shell->dock_click_feedback_animating;
+
+                    if (shell->render_dirty ||
+                        shell->dock.dirty_flags ||
+                        (!dock_reveal_position_only && (dock_window_changed || dock_layout_changed))) {
                         (void)reach_shell_render_dock_surface(shell, &layout.dock);
                     }
                 }

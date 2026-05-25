@@ -27,6 +27,7 @@ struct reach_platform_window {
     int height;
     float corner_radius;
     int tracking_mouse_leave;
+    int pointer_move_enabled;
 };
 
 static const wchar_t *reach_window_class_name()
@@ -167,26 +168,28 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             window->callback(window->callback_user, &event);
         }
         return 0;
-    case WM_MOUSEMOVE:
-        if (window != nullptr && window->callback != nullptr) {
-            if (!window->tracking_mouse_leave) {
-                TRACKMOUSEEVENT track = {};
-                track.cbSize = sizeof(track);
-                track.dwFlags = TME_LEAVE;
-                track.hwndTrack = hwnd;
-                window->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
+        case WM_MOUSEMOVE:
+            if (window != nullptr &&
+                window->callback != nullptr &&
+                window->pointer_move_enabled) {
+                if (!window->tracking_mouse_leave) {
+                    TRACKMOUSEEVENT track = {};
+                    track.cbSize = sizeof(track);
+                    track.dwFlags = TME_LEAVE;
+                    track.hwndTrack = hwnd;
+                    window->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
+                }
+                POINT point = {};
+                point.x = GET_X_LPARAM(lparam);
+                point.y = GET_Y_LPARAM(lparam);
+                ClientToScreen(hwnd, &point);
+                reach_ui_event event = {};
+                event.type = REACH_UI_EVENT_POINTER_MOVE;
+                event.x = point.x;
+                event.y = point.y;
+                window->callback(window->callback_user, &event);
             }
-            POINT point = {};
-            point.x = GET_X_LPARAM(lparam);
-            point.y = GET_Y_LPARAM(lparam);
-            ClientToScreen(hwnd, &point);
-            reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_POINTER_MOVE;
-            event.x = point.x;
-            event.y = point.y;
-            window->callback(window->callback_user, &event);
-        }
-        return 0;
+            return 0;
     case WM_MOUSELEAVE:
         if (window != nullptr) {
             window->tracking_mouse_leave = 0;
@@ -463,6 +466,24 @@ static reach_result reach_platform_window_set_event_callback(
     return REACH_OK;
 }
 
+static reach_result reach_platform_window_set_pointer_move_enabled(
+    reach_platform_window *window,
+    int32_t enabled
+)
+{
+    if (window == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    window->pointer_move_enabled = enabled ? 1 : 0;
+
+    if (!window->pointer_move_enabled) {
+        window->tracking_mouse_leave = 0;
+    }
+
+    return REACH_OK;
+}
+
 static void *reach_platform_window_native_handle(reach_platform_window *window)
 {
     return window == nullptr ? nullptr : window->hwnd;
@@ -498,7 +519,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
         return REACH_ERROR;
     }
     window->role = role;
-
+    window->pointer_move_enabled = 1;
     window->hwnd = CreateWindowExW(
         reach_window_ex_style(role),
         reach_window_class_name(),
@@ -526,6 +547,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
     out_port->ops.apply_rounded_corners = reach_platform_window_apply_rounded_corners;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
+    out_port->ops.set_pointer_move_enabled = reach_platform_window_set_pointer_move_enabled;
     out_port->ops.native_handle = reach_platform_window_native_handle;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;

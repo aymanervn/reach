@@ -1,9 +1,6 @@
 #ifndef REACH_ADAPTERS_WINDOWS_RENDER_D2D_INTERNAL_H
 #define REACH_ADAPTERS_WINDOWS_RENDER_D2D_INTERNAL_H
 
-#define UNICODE
-#define _UNICODE
-
 #include "reach/ports/render_backend.h"
 
 #include <windows.h>
