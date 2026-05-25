@@ -32,6 +32,7 @@ add_library(reach_support STATIC
     src/support/util.cpp
     src/support/animation.cpp
     src/support/layout.cpp
+    src/support/search_ranking.cpp
 )
 
 reach_configure_common(reach_support)
@@ -104,7 +105,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_shapes.cpp
     src/adapters/windows/render_d2d/render_d2d_text.cpp
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
-    src/adapters/windows/search_stub.cpp
+    src/adapters/windows/search_everything_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
@@ -318,16 +319,45 @@ target_link_libraries(reach_quick_settings_feature_tests PRIVATE
     reach_features
 )
 
+add_executable(reach_launcher_feature_tests
+    tests/launcher_feature_tests.cpp
+)
+
+reach_configure_common(reach_launcher_feature_tests)
+target_compile_features(reach_launcher_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_launcher_feature_tests PRIVATE
+    reach_features
+    reach_support
+)
+
+add_executable(reach_search_ranking_tests
+    tests/search_ranking_tests.cpp
+)
+
+reach_configure_common(reach_search_ranking_tests)
+target_compile_features(reach_search_ranking_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_search_ranking_tests PRIVATE
+    reach_support
+)
+
 if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_core_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_core_tests.exe)
     add_test(NAME reach_dock_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_dock_feature_tests.exe)
     add_test(NAME reach_pin_config_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_pin_config_tests.exe)
     add_test(NAME reach_quick_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_quick_settings_feature_tests.exe)
+    add_test(NAME reach_launcher_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_launcher_feature_tests.exe)
+    add_test(NAME reach_search_ranking_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_search_ranking_tests.exe)
 else()
     add_test(NAME reach_core_tests COMMAND reach_core_tests)
     add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
+    add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
+    add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
 endif()
 
 add_custom_target(check_architecture

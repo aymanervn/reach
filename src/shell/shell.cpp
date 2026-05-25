@@ -49,7 +49,7 @@ reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_
         result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.quick_settings_renderer);
     }
     if (result == REACH_OK) {
-        result = reach_windows_create_search_stub(&dependencies.search_provider);
+        result = reach_windows_create_search_provider(&dependencies.search_provider);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_app_launcher(&dependencies.app_launcher);

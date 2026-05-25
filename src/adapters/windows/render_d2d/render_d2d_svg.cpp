@@ -26,6 +26,12 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
     case REACH_VECTOR_ICON_BLUETOOTH_ON: return 221;
     case REACH_VECTOR_ICON_BLUETOOTH_OFF: return 222;
     case REACH_VECTOR_ICON_NO_INTERNET: return 223;
+    case REACH_VECTOR_ICON_FOLDER: return 224;
+    case REACH_VECTOR_ICON_PHOTO: return 225;
+    case REACH_VECTOR_ICON_VIDEO: return 226;
+    case REACH_VECTOR_ICON_MUSIC: return 227;
+    case REACH_VECTOR_ICON_DOCUMENT: return 228;
+    case REACH_VECTOR_ICON_FILE: return 229;
     default: return 0;
     }
 }

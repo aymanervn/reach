@@ -928,12 +928,12 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     &shell->launcher.bounds_valid,
                     &shell->launcher.opacity_valid,
                     &launcher_window_changed);
-                if (result != REACH_OK) {
-                    return result;
-                }
-                if (shell->ui.launcher.open && (shell->render_dirty || shell->launcher.dirty_flags || launcher_window_changed || launcher_layout_changed)) {
-                    (void)reach_shell_render_launcher_surface(shell, &layout.launcher);
-                }
+                  if (result != REACH_OK) {
+                      return result;
+                  }
+                  if (shell->ui.launcher.open && (shell->render_dirty || shell->launcher.dirty_flags || launcher_window_changed || launcher_layout_changed)) {
+                      (void)reach_shell_render_launcher_surface(shell, &layout.launcher);
+                  }
                 if (shell->dock.window.ops.set_bounds != nullptr) {
                     int32_t dock_window_changed = 0;
                     float dock_radius = reach_theme_dock_corner_radius(shell->theme, layout.dock.bounds.height);

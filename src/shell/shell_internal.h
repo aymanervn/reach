@@ -101,6 +101,7 @@ struct reach_shell {
     size_t pressed_dock_index;
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
+    reach_icon_handle launcher_result_icons[REACH_SEARCH_MAX_RESULTS];
     int32_t suppress_power_button_release;
     reach_float_animation dock_drag_snap_animation;
     reach_float_animation dock_y_animation;

@@ -1,6 +1,9 @@
 #ifndef REACH_ADAPTERS_WINDOWS_RENDER_D2D_INTERNAL_H
 #define REACH_ADAPTERS_WINDOWS_RENDER_D2D_INTERNAL_H
 
+#define UNICODE
+#define _UNICODE
+
 #include "reach/ports/render_backend.h"
 
 #include <windows.h>
@@ -107,6 +110,7 @@ reach_result reach_d2d_draw_clipped_rounded_rect(ID2D1RenderTarget *target, cons
 
 /* Text drawing */
 reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_render_command *command);
+reach_result reach_d2d_draw_text_caret(reach_render_backend *backend, const reach_render_command *command);
 
 /* Command execution */
 reach_result reach_d2d_execute(reach_render_backend *backend, const reach_render_command_buffer *commands);

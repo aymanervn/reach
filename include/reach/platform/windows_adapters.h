@@ -25,7 +25,7 @@ extern "C" {
 reach_result reach_windows_create_platform_window(reach_surface_role role, reach_platform_window_port *out_port);
 reach_result reach_windows_create_d2d_render_backend(void *native_window, reach_render_backend_port *out_port);
 reach_result reach_windows_create_dcomp_render_backend(void *native_window, reach_render_backend_port *out_port);
-reach_result reach_windows_create_search_stub(reach_search_provider_port *out_port);
+reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
 reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
 reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
 reach_result reach_windows_create_icon_provider(reach_icon_provider_port *out_port);

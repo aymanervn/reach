@@ -74,10 +74,30 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_KEYDOWN:
         if (window != nullptr && window->callback != nullptr) {
             reach_ui_event event = {};
+            event.modifiers =
+                (GetKeyState(VK_CONTROL) & 0x8000) != 0
+                    ? REACH_UI_EVENT_MODIFIER_CTRL
+                    : 0;
             if (wparam == VK_ESCAPE) {
                 event.type = REACH_UI_EVENT_ESCAPE;
             } else if (wparam == VK_BACK) {
                 event.type = REACH_UI_EVENT_BACKSPACE;
+            } else if (wparam == VK_DELETE) {
+                event.type = REACH_UI_EVENT_DELETE;
+            } else if (wparam == VK_RETURN) {
+                event.type = REACH_UI_EVENT_ENTER;
+            } else if (wparam == VK_UP) {
+                event.type = REACH_UI_EVENT_ARROW_UP;
+            } else if (wparam == VK_DOWN) {
+                event.type = REACH_UI_EVENT_ARROW_DOWN;
+            } else if (wparam == VK_LEFT) {
+                event.type = REACH_UI_EVENT_ARROW_LEFT;
+            } else if (wparam == VK_RIGHT) {
+                event.type = REACH_UI_EVENT_ARROW_RIGHT;
+            } else if (wparam == VK_HOME) {
+                event.type = REACH_UI_EVENT_HOME;
+            } else if (wparam == VK_END) {
+                event.type = REACH_UI_EVENT_END;
             }
             if (event.type != REACH_UI_EVENT_NONE) {
                 window->callback(window->callback_user, &event);
@@ -86,6 +106,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_CHAR:
+        if ((GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+            return 0;
+        }
         if (window != nullptr && window->callback != nullptr && wparam >= 0x20) {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_TEXT;

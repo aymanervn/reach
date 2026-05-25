@@ -24,6 +24,12 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 221 RCDATA "quick_settings/bluetooth_on.svg"
 222 RCDATA "quick_settings/bluetooth_off.svg"
 223 RCDATA "quick_settings/no_internet.svg"
+224 RCDATA "launcher/folder.svg"
+225 RCDATA "launcher/photo.svg"
+226 RCDATA "launcher/video.svg"
+227 RCDATA "launcher/music.svg"
+228 RCDATA "launcher/document.svg"
+229 RCDATA "launcher/file.svg"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0

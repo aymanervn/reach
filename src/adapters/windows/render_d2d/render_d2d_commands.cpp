@@ -89,6 +89,14 @@ reach_result reach_d2d_execute(
             continue;
         }
 
+        if (command->type == REACH_RENDER_COMMAND_TEXT_CARET) {
+            reach_result result = reach_d2d_draw_text_caret(backend, command);
+            if (result != REACH_OK) {
+                return result;
+            }
+            continue;
+        }
+
         if (command->type == REACH_RENDER_COMMAND_BLUR_BACKGROUND) {
             // Blur is handled through the platform surface/composition path,
             // not the core render command execution path.

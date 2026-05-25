@@ -25,6 +25,7 @@ static float reach_shell_clamp_float(float value, float min_value, float max_val
 }
 
 static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point);
+static void reach_shell_close_launcher(reach_shell *shell);
 
 static void reach_shell_on_popup_mouse_down(void *user, int32_t x, int32_t y)
 {
@@ -190,9 +191,7 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
         reach_shell_clear_sticky_dock_feedback(shell);
     }
     if (shell->ui.launcher.open && !on_launcher) {
-        (void)reach_ui_state_close_launcher(&shell->ui);
-        shell->layout_dirty = 1;
-        shell->launcher.dirty_flags = 1;
+        reach_shell_close_launcher(shell);
     }
 }
 
@@ -350,12 +349,87 @@ static void reach_shell_press_quick_settings_button(reach_shell *shell)
     reach_shell_start_dock_click_feedback(shell, REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON, 0.50f);
 }
 
+static void reach_shell_release_launcher_result_icons(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return;
+    }
+    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index) {
+        if (shell->launcher_result_icons[index].id != 0 && shell->icon_provider.ops.release != nullptr) {
+            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->launcher_result_icons[index]);
+        }
+        shell->launcher_result_icons[index] = {};
+        (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, 0, 0);
+    }
+}
+
+static void reach_shell_load_launcher_result_icons(reach_shell *shell)
+{
+    if (shell == nullptr || shell->icon_provider.ops.load == nullptr) {
+        return;
+    }
+    for (size_t index = 0; index < shell->ui.launcher.result_count && index < REACH_SEARCH_MAX_RESULTS; ++index) {
+        reach_icon_request request = {};
+        request.size_px = 32;
+        reach_copy_utf16(request.path, 260, shell->ui.launcher.results[index].path);
+        reach_icon_handle icon = {};
+        if (request.path[0] != 0 &&
+            shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &icon) == REACH_OK &&
+            icon.id != 0) {
+            shell->launcher_result_icons[index] = icon;
+            (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, icon.id, icon.wants_backplate);
+        }
+    }
+}
+
+static reach_result reach_shell_refresh_launcher_search(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_shell_release_launcher_result_icons(shell);
+    (void)reach_ui_state_clear_launcher_results(&shell->ui);
+
+    if (shell->ui.launcher.query_length == 0 || shell->search_provider.ops.query == nullptr) {
+        shell->layout_dirty = 1;
+        shell->launcher.dirty_flags = 1;
+        return REACH_OK;
+    }
+
+    reach_result query_result = shell->search_provider.ops.query(shell->search_provider.provider, shell->ui.launcher.query);
+    if (query_result == REACH_OK && shell->search_provider.ops.result_count != nullptr && shell->search_provider.ops.result_at != nullptr) {
+        reach_search_candidate results[REACH_SEARCH_MAX_RESULTS] = {};
+        size_t count = shell->search_provider.ops.result_count(shell->search_provider.provider);
+        if (count > REACH_SEARCH_MAX_RESULTS) {
+            count = REACH_SEARCH_MAX_RESULTS;
+        }
+        for (size_t index = 0; index < count; ++index) {
+            reach_search_result result = {};
+            if (shell->search_provider.ops.result_at(shell->search_provider.provider, index, &result) == REACH_OK) {
+                reach_copy_utf16(results[index].name, REACH_SEARCH_RESULT_NAME_CAPACITY, result.title);
+                reach_copy_utf16(results[index].path, REACH_SEARCH_RESULT_PATH_CAPACITY, result.path);
+                results[index].kind = result.kind;
+                results[index].is_directory = result.is_directory;
+                results[index].score = result.score;
+            }
+        }
+        (void)reach_ui_state_set_launcher_results(&shell->ui, results, count);
+        reach_shell_load_launcher_result_icons(shell);
+    }
+
+    shell->layout_dirty = 1;
+    shell->launcher.dirty_flags = 1;
+    return REACH_OK;
+}
+
 static void reach_shell_close_launcher(reach_shell *shell)
 {
     if (shell == nullptr || !shell->ui.launcher.open) {
         return;
     }
 
+    reach_shell_release_launcher_result_icons(shell);
     (void)reach_ui_state_close_launcher(&shell->ui);
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
@@ -421,6 +495,14 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
     case REACH_UI_EVENT_ESCAPE:
     case REACH_UI_EVENT_TEXT:
     case REACH_UI_EVENT_BACKSPACE:
+    case REACH_UI_EVENT_DELETE:
+    case REACH_UI_EVENT_ENTER:
+    case REACH_UI_EVENT_ARROW_UP:
+    case REACH_UI_EVENT_ARROW_DOWN:
+    case REACH_UI_EVENT_ARROW_LEFT:
+    case REACH_UI_EVENT_ARROW_RIGHT:
+    case REACH_UI_EVENT_HOME:
+    case REACH_UI_EVENT_END:
         shell->layout_dirty = 1;
         shell->launcher.dirty_flags = 1;
         break;
@@ -472,6 +554,23 @@ static reach_result reach_shell_open_launcher_result(reach_shell *shell)
     REACH_ASSERT(shell != nullptr);
     if (shell == nullptr || shell->explorer_service.service == nullptr) {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if (shell->ui.launcher.result_count > 0 &&
+        shell->ui.launcher.selected_result_index < shell->ui.launcher.result_count) {
+        const reach_search_candidate *result = &shell->ui.launcher.results[shell->ui.launcher.selected_result_index];
+        if (result->path[0] == 0) {
+            return REACH_OK;
+        }
+        if (result->kind == REACH_SEARCH_RESULT_APP && shell->app_launcher.ops.launch != nullptr) {
+            reach_app_launch_request request = {};
+            reach_copy_utf16(request.path, 260, result->path);
+            return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+        }
+        if (shell->explorer_service.ops.open_path != nullptr) {
+            return shell->explorer_service.ops.open_path(shell->explorer_service.service, result->path);
+        }
+        return REACH_OK;
     }
 
     const uint16_t *query = shell->ui.launcher.query;
@@ -1154,6 +1253,11 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
             reach_shell_close_launcher(shell);
             return REACH_OK;
         }
+        if (launcher_hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
+            launcher_hit.index < shell->ui.launcher.result_count) {
+            shell->ui.launcher.selected_result_index = launcher_hit.index;
+            shell->launcher.dirty_flags = 1;
+        }
         shell->pressed_launcher_hit_type = launcher_hit.type;
         shell->pressed_launcher_index = launcher_hit.index;
         return REACH_OK;
@@ -1508,6 +1612,10 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
     reach_shell_mark_dirty_for_event(shell, event);
     if (launcher_was_open != shell->ui.launcher.open) {
+        if (!shell->ui.launcher.open) {
+            reach_shell_release_launcher_result_icons(shell);
+            (void)reach_ui_state_clear_launcher_results(&shell->ui);
+        }
         reach_shell_sync_popup_mouse_hook(shell);
     }
 
@@ -1521,8 +1629,11 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
                 (void)shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
             }
         }
-    } else if (intent.type == REACH_UI_INTENT_RUN_SEARCH && shell->search_provider.ops.query != nullptr) {
-        (void)shell->search_provider.ops.query(shell->search_provider.provider, shell->ui.launcher.query);
+    } else if (intent.type == REACH_UI_INTENT_RUN_SEARCH) {
+        (void)reach_shell_refresh_launcher_search(shell);
+    } else if (intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT) {
+        (void)reach_shell_open_launcher_result(shell);
+        reach_shell_close_launcher(shell);
     }
 
     if (shell->launcher.window.ops.show != nullptr && shell->launcher.window.ops.hide != nullptr) {

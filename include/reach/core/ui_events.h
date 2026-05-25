@@ -26,12 +26,23 @@ typedef enum reach_ui_event_type {
     REACH_UI_EVENT_ALT_TAB_NEXT = 15,
     REACH_UI_EVENT_ALT_TAB_PREVIOUS = 16,
     REACH_UI_EVENT_ALT_TAB_COMMIT = 17,
-    REACH_UI_EVENT_ALT_TAB_CANCEL = 18
+    REACH_UI_EVENT_ALT_TAB_CANCEL = 18,
+    REACH_UI_EVENT_ENTER = 19,
+    REACH_UI_EVENT_ARROW_UP = 20,
+    REACH_UI_EVENT_ARROW_DOWN = 21,
+    REACH_UI_EVENT_DELETE = 22,
+    REACH_UI_EVENT_ARROW_LEFT = 23,
+    REACH_UI_EVENT_ARROW_RIGHT = 24,
+    REACH_UI_EVENT_HOME = 25,
+    REACH_UI_EVENT_END = 26
 } reach_ui_event_type;
+
+#define REACH_UI_EVENT_MODIFIER_CTRL 0x1u
 
 typedef struct reach_ui_event {
     reach_ui_event_type type;
     uint32_t id;
+    uint32_t modifiers;
     int32_t x;
     int32_t y;
     uint16_t text[REACH_MAX_SEARCH_CHARS + 1];
@@ -42,7 +53,8 @@ typedef enum reach_ui_intent_type {
     REACH_UI_INTENT_LAUNCH_APP = 1,
     REACH_UI_INTENT_OPEN_TRAY_MENU = 2,
     REACH_UI_INTENT_CLOSE_LAUNCHER = 3,
-    REACH_UI_INTENT_RUN_SEARCH = 4
+    REACH_UI_INTENT_RUN_SEARCH = 4,
+    REACH_UI_INTENT_OPEN_LAUNCHER_RESULT = 5
 } reach_ui_intent_type;
 
 typedef struct reach_ui_intent {

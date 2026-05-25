@@ -69,6 +69,12 @@ static void reach_shell_cleanup(reach_shell *shell)
         shell->search_provider.ops.destroy(shell->search_provider.provider);
     }
     reach_dock_release_all_icons(&shell->dock_icons, &shell->icon_provider, shell->open_window_count);
+    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index) {
+        if (shell->launcher_result_icons[index].id != 0 && shell->icon_provider.ops.release != nullptr) {
+            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->launcher_result_icons[index]);
+        }
+        shell->launcher_result_icons[index] = {};
+    }
     if (shell->app_launcher.ops.destroy != nullptr) {
         shell->app_launcher.ops.destroy(shell->app_launcher.launcher);
     }
@@ -305,13 +311,6 @@ reach_result reach_shell_start(reach_shell *shell)
             return result;
         }
     }
-    if (shell->launcher.window.ops.set_blur_enabled != nullptr) {
-        result = shell->launcher.window.ops.set_blur_enabled(shell->launcher.window.window, 1);
-        if (result != REACH_OK) {
-            return result;
-        }
-    }
-
     if (shell->system_controls.start_watching != nullptr) {
         (void)shell->system_controls.start_watching(
             shell->system_controls.userdata,
