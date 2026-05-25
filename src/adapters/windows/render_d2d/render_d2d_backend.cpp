@@ -176,6 +176,7 @@ reach_result reach_windows_create_d2d_render_backend(
     out_port->ops.begin_frame = reach_d2d_begin_frame;
     out_port->ops.end_frame = reach_d2d_end_frame;
     out_port->ops.execute = reach_d2d_execute;
+    out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.destroy = reach_d2d_destroy;
 
     return REACH_OK;
@@ -239,6 +240,7 @@ reach_result reach_windows_create_dcomp_render_backend(
     out_port->ops.begin_frame = reach_d2d_begin_frame;
     out_port->ops.end_frame = reach_d2d_end_frame;
     out_port->ops.execute = reach_d2d_execute;
+    out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.destroy = reach_d2d_destroy;
 
     return REACH_OK;

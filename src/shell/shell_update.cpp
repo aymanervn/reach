@@ -125,6 +125,7 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
     uint16_t old_paths[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
     size_t old_count = shell->open_window_count;
+
     for (size_t index = 0; index < old_count; ++index) {
         old_windows[index] = shell->open_windows[index].id;
         old_minimized[index] = shell->open_windows[index].minimized;
@@ -135,7 +136,6 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
         reach_copy_utf16(old_titles[index], 260, shell->open_windows[index].title);
     }
 
-    reach_dock_release_open_window_icons(&shell->dock_icons, &shell->icon_provider, shell->open_window_count);
     shell->open_window_count = 0;
     size_t count = shell->window_manager.ops.window_count(shell->window_manager.manager);
     for (size_t index = 0; index < count && shell->open_window_count < REACH_MAX_PINNED_APPS; ++index) {
@@ -144,12 +144,14 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
             snapshot.path[0] == 0) {
             continue;
         }
+
         size_t out_index = shell->open_window_count++;
         shell->open_windows[out_index] = snapshot;
     }
-    (void)reach_dock_load_open_window_icons(&shell->dock_icons, &shell->icon_provider, shell->open_windows, shell->open_window_count, reach_shell_dock_icon_size_px(shell));
 
     int32_t changed = old_count != shell->open_window_count;
+    int32_t icon_identity_changed = changed;
+
     if (changed) {
         shell->dock_items_changed = 1;
     } else {
@@ -157,6 +159,12 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
             int32_t dock_item_changed =
                 old_windows[index] != shell->open_windows[index].id ||
                 !reach_shell_utf16_equal(old_paths[index], shell->open_windows[index].path);
+
+            if (dock_item_changed) {
+                icon_identity_changed = 1;
+                shell->dock_items_changed = 1;
+            }
+
             if (dock_item_changed ||
                 old_minimized[index] != shell->open_windows[index].minimized ||
                 old_maximized[index] != shell->open_windows[index].maximized ||
@@ -167,12 +175,28 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
                 old_bounds[index].bottom != shell->open_windows[index].bounds.bottom ||
                 !reach_shell_utf16_equal(old_titles[index], shell->open_windows[index].title)) {
                 changed = 1;
-                if (dock_item_changed) {
-                    shell->dock_items_changed = 1;
-                }
-                break;
             }
         }
+    }
+
+    if (icon_identity_changed) {
+        if (shell->dock.renderer.ops.release_icon != nullptr) {
+            size_t release_count = old_count > REACH_MAX_PINNED_APPS ? REACH_MAX_PINNED_APPS : old_count;
+            for (size_t index = 0; index < release_count; ++index) {
+                if (shell->dock_icons.open_window_icons[index].id != 0) {
+                    shell->dock.renderer.ops.release_icon(
+                        shell->dock.renderer.backend,
+                        (uintptr_t)shell->dock_icons.open_window_icons[index].id);
+                }
+            }
+        }
+        reach_dock_release_open_window_icons(&shell->dock_icons, &shell->icon_provider, old_count);
+        (void)reach_dock_load_open_window_icons(
+            &shell->dock_icons,
+            &shell->icon_provider,
+            shell->open_windows,
+            shell->open_window_count,
+            reach_shell_dock_icon_size_px(shell));
     }
     if (out_changed != nullptr) {
         *out_changed = changed;
