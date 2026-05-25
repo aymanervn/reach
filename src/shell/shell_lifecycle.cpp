@@ -11,7 +11,7 @@ static void reach_shell_on_dock_reveal_edge(void *user)
     }
 
     shell->dock_reveal_check_dirty = 1;
-    shell->dock.dirty_flags = 1;
+    reach_shell_request_update(shell);
 }
 
 static void reach_shell_cleanup(reach_shell *shell)

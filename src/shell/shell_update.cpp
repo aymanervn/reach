@@ -663,7 +663,6 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     if (shell->dock_animating) {
         reach_float_animation_update(&shell->dock_y_animation, delta_seconds);
         shell->dock_animating = reach_shell_float_animation_active(&shell->dock_y_animation);
-        shell->dock.dirty_flags = 1;
     }
     reach_rect_f32 animated = shown_bounds;
     animated.y = shell->dock_y_animation.value;
@@ -923,12 +922,74 @@ void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_do
     }
 }
 
+static int32_t reach_shell_can_fast_update_dock_animation(const reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return 0;
+    }
+
+    return shell->dock_animating &&
+        shell->has_layout &&
+        !shell->layout_dirty &&
+        !shell->render_dirty &&
+        !shell->dock.dirty_flags &&
+        !shell->launcher.dirty_flags &&
+        !shell->tray.dirty_flags &&
+        !shell->switcher.dirty_flags &&
+        !shell->context_menu.dirty_flags &&
+        !shell->quick_settings.dirty_flags &&
+        !shell->dock_width_animating &&
+        !shell->dock_drag_active &&
+        !shell->dock_drag_snapping &&
+        !shell->dock_click_feedback_animating &&
+        !shell->tray_click_feedback_animating &&
+        !reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation);
+}
+
+static reach_result reach_shell_fast_update_dock_animation(reach_shell *shell, double delta_seconds)
+{
+    if (shell == nullptr || !shell->has_layout) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_float_animation_update(&shell->dock_y_animation, delta_seconds);
+    shell->dock_animating = reach_shell_float_animation_active(&shell->dock_y_animation);
+
+    reach_rect_f32 dock_bounds = shell->layout.dock.bounds;
+    dock_bounds.y = shell->dock_y_animation.value;
+
+    int32_t dock_window_changed = 0;
+    reach_result result = reach_shell_apply_window_state(
+        &shell->dock.window,
+        dock_bounds,
+        1.0f,
+        &shell->dock.last_bounds,
+        &shell->dock.last_opacity,
+        &shell->dock.bounds_valid,
+        &shell->dock.opacity_valid,
+        &dock_window_changed);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    shell->layout.dock.bounds = dock_bounds;
+
+    if (!shell->dock_animating) {
+        shell->dock_reveal_check_dirty = 1;
+    }
+
+    shell->update_requested = 0;
+    return REACH_OK;
+}
+
 reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 {
     if (shell == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
-
+    if (reach_shell_can_fast_update_dock_animation(shell)) {
+           return reach_shell_fast_update_dock_animation(shell, delta_seconds);
+    }
     reach_shell_process_quick_settings_system_changes(shell);
 
     reach_shell_update_clock_text(shell);
@@ -1030,9 +1091,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             input.work_area = bounds;
             input.dpi_scale = 1.0f;
             reach_ui_layout layout = {};
-            reach_render_command_buffer commands = {};
-            if (reach_ui_layout_compute(&shell->ui, &input, &layout) == REACH_OK &&
-                reach_ui_build_render_commands(&shell->ui, &layout, &commands) == REACH_OK) {
+            if (reach_ui_layout_compute(&shell->ui, &input, &layout) == REACH_OK) {
                 if (shell->dock_items_changed) {
                     reach_shell_rebuild_dock_items_with_animations(shell, &layout.dock);
                     shell->dock_items_changed = 0;
