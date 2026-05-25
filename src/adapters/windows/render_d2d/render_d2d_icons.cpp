@@ -15,6 +15,24 @@ void reach_d2d_clear_icon_cache(reach_render_backend *backend)
     backend->icon_cache.clear();
 }
 
+void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uintptr_t icon_id)
+{
+    if (backend == nullptr || icon_id == 0) {
+        return;
+    }
+
+    for (size_t index = 0; index < backend->icon_cache.size(); ++index) {
+        if (backend->icon_cache[index].icon_id == icon_id) {
+            if (backend->icon_cache[index].bitmap != nullptr) {
+                backend->icon_cache[index].bitmap->Release();
+            }
+
+            backend->icon_cache.erase(backend->icon_cache.begin() + index);
+            return;
+        }
+    }
+}
+
 static reach_result reach_d2d_create_icon_bitmap(
     reach_render_backend *backend,
     uintptr_t icon_id,

@@ -13,6 +13,7 @@ typedef struct reach_render_backend_ops {
     reach_result (*begin_frame)(reach_render_backend *backend);
     reach_result (*end_frame)(reach_render_backend *backend);
     reach_result (*execute)(reach_render_backend *backend, const reach_render_command_buffer *commands);
+    void (*release_icon)(reach_render_backend *backend, uintptr_t icon_id);
     void (*destroy)(reach_render_backend *backend);
 } reach_render_backend_ops;
 
