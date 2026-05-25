@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <time.h>
 
+static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b);
+
 static int32_t reach_shell_float_animation_active(const reach_float_animation *animation)
 {
     return animation != nullptr && animation->elapsed_seconds < animation->duration_seconds;
@@ -106,16 +108,31 @@ static int32_t reach_shell_dock_path_matches_pinned(void *user, const reach_pinn
     return pinned_name != nullptr && window_name != nullptr && lstrcmpiW(pinned_name, window_name) == 0;
 }
 
-reach_result reach_shell_refresh_open_windows(reach_shell *shell)
+reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed)
 {
     if (shell == nullptr || shell->window_manager.ops.window_count == nullptr || shell->window_manager.ops.window_at == nullptr) {
+        if (out_changed != nullptr) {
+            *out_changed = 0;
+        }
         return REACH_OK;
     }
 
     uintptr_t old_windows[REACH_MAX_PINNED_APPS] = {};
+    int32_t old_minimized[REACH_MAX_PINNED_APPS] = {};
+    int32_t old_maximized[REACH_MAX_PINNED_APPS] = {};
+    int32_t old_visible[REACH_MAX_PINNED_APPS] = {};
+    reach_rect_i32 old_bounds[REACH_MAX_PINNED_APPS] = {};
+    uint16_t old_paths[REACH_MAX_PINNED_APPS][260] = {};
+    uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
     size_t old_count = shell->open_window_count;
     for (size_t index = 0; index < old_count; ++index) {
         old_windows[index] = shell->open_windows[index].id;
+        old_minimized[index] = shell->open_windows[index].minimized;
+        old_maximized[index] = shell->open_windows[index].maximized;
+        old_visible[index] = shell->open_windows[index].visible;
+        old_bounds[index] = shell->open_windows[index].bounds;
+        reach_copy_utf16(old_paths[index], 260, shell->open_windows[index].path);
+        reach_copy_utf16(old_titles[index], 260, shell->open_windows[index].title);
     }
 
     reach_dock_release_open_window_icons(&shell->dock_icons, &shell->icon_provider, shell->open_window_count);
@@ -132,15 +149,33 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell)
     }
     (void)reach_dock_load_open_window_icons(&shell->dock_icons, &shell->icon_provider, shell->open_windows, shell->open_window_count, reach_shell_dock_icon_size_px(shell));
 
-    if (old_count != shell->open_window_count) {
+    int32_t changed = old_count != shell->open_window_count;
+    if (changed) {
         shell->dock_items_changed = 1;
     } else {
         for (size_t index = 0; index < shell->open_window_count; ++index) {
-            if (old_windows[index] != shell->open_windows[index].id) {
-                shell->dock_items_changed = 1;
+            int32_t dock_item_changed =
+                old_windows[index] != shell->open_windows[index].id ||
+                !reach_shell_utf16_equal(old_paths[index], shell->open_windows[index].path);
+            if (dock_item_changed ||
+                old_minimized[index] != shell->open_windows[index].minimized ||
+                old_maximized[index] != shell->open_windows[index].maximized ||
+                old_visible[index] != shell->open_windows[index].visible ||
+                old_bounds[index].left != shell->open_windows[index].bounds.left ||
+                old_bounds[index].top != shell->open_windows[index].bounds.top ||
+                old_bounds[index].right != shell->open_windows[index].bounds.right ||
+                old_bounds[index].bottom != shell->open_windows[index].bounds.bottom ||
+                !reach_shell_utf16_equal(old_titles[index], shell->open_windows[index].title)) {
+                changed = 1;
+                if (dock_item_changed) {
+                    shell->dock_items_changed = 1;
+                }
                 break;
             }
         }
+    }
+    if (out_changed != nullptr) {
+        *out_changed = changed;
     }
     return REACH_OK;
 }
@@ -250,6 +285,13 @@ static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b)
         ++index;
     }
     return 1;
+}
+
+void reach_shell_request_update(reach_shell *shell)
+{
+    if (shell != nullptr) {
+        shell->update_requested = 1;
+    }
 }
 
 static void reach_shell_update_clock_text(reach_shell *shell)
@@ -419,7 +461,6 @@ static int32_t reach_shell_popup_blocks_dock_autohide(const reach_shell *shell)
          shell->quick_settings_open ||
          shell->context_menu_open);
 }
-
 int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
@@ -483,6 +524,83 @@ static int32_t reach_shell_cursor_in_dock_reveal_bounds(reach_rect_f32 shown_bou
         return 0;
     }
     return reach_shell_point_in_rect(cursor, reach_shell_dock_reveal_bounds(shown_bounds, monitor_bounds));
+}
+
+static int32_t reach_shell_popup_blocks_dock_reveal_edge(const reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return 1;
+    }
+
+    return shell->ui.launcher.open ||
+        shell->switcher_open ||
+        shell->tray_popup_open ||
+        shell->quick_settings_open ||
+        shell->context_menu_open;
+}
+
+static int32_t reach_shell_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
+{
+    return fabsf(a.x - b.x) < 0.5f &&
+        fabsf(a.y - b.y) < 0.5f &&
+        fabsf(a.width - b.width) < 0.5f &&
+        fabsf(a.height - b.height) < 0.5f;
+}
+
+void reach_shell_sync_dock_reveal_edge(
+    reach_shell *shell,
+    reach_rect_f32 shown_dock_bounds,
+    reach_rect_f32 monitor_bounds
+)
+{
+    if (shell == nullptr || shell->dock_reveal_edge.edge == nullptr) {
+        return;
+    }
+
+    int32_t should_auto_hide =
+        shell->ui.dock.auto_hide &&
+        reach_shell_should_auto_hide_dock(shell);
+
+    int32_t popup_blocks = reach_shell_popup_blocks_dock_reveal_edge(shell);
+
+    int32_t should_show =
+        should_auto_hide &&
+        !popup_blocks &&
+        shell->dock_target_hidden &&
+        !shell->dock_reveal_active &&
+        !shell->dock_animating;
+
+    float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
+
+    reach_rect_f32 edge_bounds = {};
+    edge_bounds.x = monitor_bounds.x;
+    edge_bounds.y = monitor_bottom - 2.0f;
+    edge_bounds.width = monitor_bounds.width;
+    edge_bounds.height = 3.0f;
+
+    if (should_show) {
+        if (!shell->dock_reveal_edge_bounds_valid ||
+            !reach_shell_reveal_edge_rect_equal(shell->dock_reveal_edge_bounds, edge_bounds)) {
+            if (shell->dock_reveal_edge.ops.set_bounds != nullptr &&
+                shell->dock_reveal_edge.ops.set_bounds(shell->dock_reveal_edge.edge, edge_bounds) == REACH_OK) {
+                shell->dock_reveal_edge_bounds = edge_bounds;
+                shell->dock_reveal_edge_bounds_valid = 1;
+            }
+        }
+
+        if (!shell->dock_reveal_edge_visible &&
+            shell->dock_reveal_edge.ops.show != nullptr &&
+            shell->dock_reveal_edge.ops.show(shell->dock_reveal_edge.edge) == REACH_OK) {
+            shell->dock_reveal_edge_visible = 1;
+        }
+    } else if (shell->dock_reveal_edge_visible) {
+        if (shell->dock_reveal_edge.ops.hide != nullptr &&
+            shell->dock_reveal_edge.ops.hide(shell->dock_reveal_edge.edge) == REACH_OK) {
+            shell->dock_reveal_edge_visible = 0;
+        }
+    }
+
+    (void)shown_dock_bounds;
 }
 
 reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds, double delta_seconds)
@@ -611,6 +729,64 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
     layout->system_separator.x = layout->clock.x - gap - theme->dock_system_separator_width;
     layout->quick_settings_button.x = layout->system_separator.x - gap - layout->quick_settings_button.width;
     layout->tray_button.x = layout->quick_settings_button.x - gap - layout->tray_button.width;
+}
+
+static reach_result reach_shell_refresh_monitor_layout(reach_shell *shell)
+{
+    if (shell == nullptr ||
+        !shell->monitors_dirty ||
+        shell->monitors == nullptr ||
+        shell->wallpaper_surface.ops.set_bounds == nullptr) {
+        return REACH_OK;
+    }
+
+    (void)reach_monitor_refresh(shell->monitors);
+    size_t monitor_count = reach_monitor_count(shell->monitors);
+    if (monitor_count == 0) {
+        shell->monitors_dirty = 0;
+        return REACH_OK;
+    }
+
+    const reach_monitor_info *monitor = reach_monitor_get(shell->monitors, 0);
+    if (monitor == nullptr) {
+        shell->monitors_dirty = 0;
+        return REACH_OK;
+    }
+
+    int32_t left = monitor->bounds.left;
+    int32_t top = monitor->bounds.top;
+    int32_t right = monitor->bounds.right;
+    int32_t bottom = monitor->bounds.bottom;
+    for (size_t index = 1; index < monitor_count; ++index) {
+        monitor = reach_monitor_get(shell->monitors, index);
+        if (monitor == nullptr) {
+            continue;
+        }
+        if (monitor->bounds.left < left) left = monitor->bounds.left;
+        if (monitor->bounds.top < top) top = monitor->bounds.top;
+        if (monitor->bounds.right > right) right = monitor->bounds.right;
+        if (monitor->bounds.bottom > bottom) bottom = monitor->bounds.bottom;
+    }
+
+    reach_rect_f32 wallpaper_bounds = {};
+    wallpaper_bounds.x = (float)left;
+    wallpaper_bounds.y = (float)top;
+    wallpaper_bounds.width = (float)(right - left);
+    wallpaper_bounds.height = (float)(bottom - top);
+    if (!shell->wallpaper_bounds_valid ||
+        !reach_shell_rect_equal(shell->wallpaper_bounds, wallpaper_bounds)) {
+        reach_result result = shell->wallpaper_surface.ops.set_bounds(
+            shell->wallpaper_surface.surface,
+            wallpaper_bounds);
+        if (result != REACH_OK) {
+            return result;
+        }
+        shell->wallpaper_bounds = wallpaper_bounds;
+        shell->wallpaper_bounds_valid = 1;
+    }
+
+    shell->monitors_dirty = 0;
+    return REACH_OK;
 }
 
 float reach_shell_dock_slot_box_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index)
@@ -755,7 +931,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
     reach_shell_process_quick_settings_system_changes(shell);
 
-    shell->window_manager_refresh_elapsed += delta_seconds;
     reach_shell_update_clock_text(shell);
     if (shell->dock_click_feedback_animating) {
         reach_float_animation_update(&shell->dock_click_feedback_opacity, delta_seconds);
@@ -811,11 +986,18 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
     int32_t window_manager_dirty = shell->window_manager.ops.needs_refresh != nullptr &&
         shell->window_manager.ops.needs_refresh(shell->window_manager.manager);
-    if ((window_manager_dirty || shell->window_manager_refresh_elapsed >= 0.25) && shell->window_manager.ops.refresh != nullptr) {
+    if (window_manager_dirty && shell->window_manager.ops.refresh != nullptr) {
         (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
-        (void)reach_shell_refresh_open_windows(shell);
-        shell->dock.dirty_flags = 1;
-        shell->window_manager_refresh_elapsed = 0.0;
+        int32_t open_windows_changed = 0;
+        (void)reach_shell_refresh_open_windows(shell, &open_windows_changed);
+        uintptr_t foreground_window = shell->window_manager.ops.foreground != nullptr
+            ? shell->window_manager.ops.foreground(shell->window_manager.manager)
+            : 0;
+        int32_t foreground_changed = shell->foreground_window != foreground_window;
+        shell->foreground_window = foreground_window;
+        if (open_windows_changed || foreground_changed) {
+            shell->dock.dirty_flags = 1;
+        }
     }
     if (shell->tray_popup_open &&
         shell->tray_provider.ops.needs_refresh != nullptr &&
@@ -823,35 +1005,9 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         (void)reach_shell_refresh_tray_items(shell);
         shell->tray.dirty_flags = 1;
     }
-    if (shell->monitors != nullptr && shell->wallpaper_surface.ops.set_bounds != nullptr) {
-        (void)reach_monitor_refresh(shell->monitors);
-        size_t monitor_count = reach_monitor_count(shell->monitors);
-        if (monitor_count > 0) {
-            const reach_monitor_info *monitor = reach_monitor_get(shell->monitors, 0);
-            if (monitor != nullptr) {
-                int32_t left = monitor->bounds.left;
-                int32_t top = monitor->bounds.top;
-                int32_t right = monitor->bounds.right;
-                int32_t bottom = monitor->bounds.bottom;
-                for (size_t index = 1; index < monitor_count; ++index) {
-                    monitor = reach_monitor_get(shell->monitors, index);
-                    if (monitor == nullptr) {
-                        continue;
-                    }
-                    if (monitor->bounds.left < left) left = monitor->bounds.left;
-                    if (monitor->bounds.top < top) top = monitor->bounds.top;
-                    if (monitor->bounds.right > right) right = monitor->bounds.right;
-                    if (monitor->bounds.bottom > bottom) bottom = monitor->bounds.bottom;
-                }
-
-                reach_rect_f32 wallpaper_bounds = {};
-                wallpaper_bounds.x = (float)left;
-                wallpaper_bounds.y = (float)top;
-                wallpaper_bounds.width = (float)(right - left);
-                wallpaper_bounds.height = (float)(bottom - top);
-                (void)shell->wallpaper_surface.ops.set_bounds(shell->wallpaper_surface.surface, wallpaper_bounds);
-            }
-        }
+    reach_result monitor_result = reach_shell_refresh_monitor_layout(shell);
+    if (monitor_result != REACH_OK) {
+        return monitor_result;
     }
     if (shell->launcher.window.ops.set_bounds != nullptr && shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0) {
         const reach_monitor_info *monitor = reach_monitor_primary(shell->monitors);
@@ -886,6 +1042,10 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 reach_shell_apply_dock_width_animation(shell, &layout.dock, delta_seconds);
                 reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
                 reach_rect_f32 animated_dock_bounds = reach_shell_apply_dock_animation(shell, shown_dock_bounds, bounds, delta_seconds);
+                reach_shell_sync_dock_reveal_edge(shell, shown_dock_bounds, bounds);
+                if (shell->dock_reveal_check_dirty) {
+                    shell->dock_reveal_check_dirty = 0;
+                }
                 float dock_y_offset = animated_dock_bounds.y - shown_dock_bounds.y;
                 layout.dock.bounds = animated_dock_bounds;
                 for (size_t index = 0; index < layout.dock.app_slot_count; ++index) {
@@ -1081,6 +1241,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
     shell->layout_dirty = 0;
     shell->render_dirty = 0;
+    shell->update_requested = 0;
     shell->dock.dirty_flags = 0;
     shell->launcher.dirty_flags = 0;
     shell->tray.dirty_flags = 0;
@@ -1094,6 +1255,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 int32_t reach_shell_needs_frame(const reach_shell *shell)
 {
     int32_t dock_item_animating = 0;
+    int32_t window_manager_needs_refresh = 0;
+
     if (shell != nullptr) {
         for (size_t index = 0; index < shell->dock_model.item_count; ++index) {
             if (shell->dock_item_x_animating[index]) {
@@ -1101,18 +1264,25 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
                 break;
             }
         }
+
+        if (shell->window_manager.manager != nullptr &&
+            shell->window_manager.ops.needs_refresh != nullptr) {
+            window_manager_needs_refresh =
+                shell->window_manager.ops.needs_refresh(shell->window_manager.manager);
+        }
     }
+
     return shell != nullptr &&
-        (shell->render_dirty ||
+        (shell->update_requested ||
+         window_manager_needs_refresh ||
+         shell->render_dirty ||
          shell->dock.dirty_flags ||
          shell->launcher.dirty_flags ||
          shell->tray.dirty_flags ||
          shell->switcher.dirty_flags ||
          shell->context_menu.dirty_flags ||
          shell->quick_settings.dirty_flags ||
-         shell->switcher_open ||
-         shell->context_menu_open ||
-         shell->quick_settings_open ||
+         shell->dock_reveal_check_dirty ||
          reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
          shell->dock_animating ||
          shell->dock_width_animating ||
@@ -1120,8 +1290,5 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
          shell->dock_drag_snapping ||
          dock_item_animating ||
          shell->dock_click_feedback_animating ||
-         shell->tray_click_feedback_animating ||
-         (shell->ui.dock.auto_hide &&
-             (shell->dock_target_hidden ||
-              reach_shell_should_auto_hide_dock(shell))));
+         shell->tray_click_feedback_animating);
 }

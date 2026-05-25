@@ -40,6 +40,7 @@ struct reach_shell {
     reach_ui_state ui;
     reach_surface_runtime launcher;
     reach_surface_runtime dock;
+    reach_dock_reveal_edge_port dock_reveal_edge;
     reach_surface_runtime tray;
     reach_surface_runtime switcher;
     reach_surface_runtime context_menu;
@@ -58,6 +59,7 @@ struct reach_shell {
     const reach_theme *theme;
     reach_window_snapshot open_windows[REACH_MAX_PINNED_APPS];
     size_t open_window_count;
+    uintptr_t foreground_window;
     reach_dock_feature_model dock_model;
     reach_dock_icon_cache dock_icons;
     reach_float_animation dock_item_x_animations[REACH_MAX_PINNED_APPS];
@@ -71,10 +73,18 @@ struct reach_shell {
     int32_t has_layout;
     int32_t layout_dirty;
     int32_t render_dirty;
+    int32_t update_requested;
+    int32_t monitors_dirty;
+    int32_t wallpaper_bounds_valid;
+    reach_rect_f32 wallpaper_bounds;
     int32_t dock_animation_initialized;
     int32_t dock_animating;
     int32_t dock_target_hidden;
     int32_t dock_reveal_active;
+    int32_t dock_reveal_check_dirty;
+    int32_t dock_reveal_edge_visible;
+    int32_t dock_reveal_edge_bounds_valid;
+    reach_rect_f32 dock_reveal_edge_bounds;
     int32_t dock_width_animation_initialized;
     int32_t dock_width_animating;
     size_t dock_width_item_count;
@@ -123,7 +133,6 @@ struct reach_shell {
     int32_t suppress_power_button_release;
     reach_float_animation dock_drag_snap_animation;
     reach_float_animation dock_y_animation;
-    double window_manager_refresh_elapsed;
     int32_t tray_popup_open;
     reach_tray_model tray_model;
     int32_t switcher_open;
@@ -239,7 +248,7 @@ reach_result reach_shell_load_pinned_icons(reach_shell *shell);
 reach_result reach_shell_reload_pins(reach_shell *shell);
 void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot);
 void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force);
-reach_result reach_shell_refresh_open_windows(reach_shell *shell);
+reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed);
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout);
 float reach_shell_dock_slot_box_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index);
@@ -256,7 +265,7 @@ void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_do
 int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell);
 reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds, double delta_seconds);
 void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout, double delta_seconds);
-
+void reach_shell_sync_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_dock_bounds, reach_rect_f32 monitor_bounds);
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout);
 reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 bounds);
 reach_result reach_shell_render_quick_settings_surface(reach_shell *shell);
@@ -266,5 +275,6 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
 reach_result reach_shell_render_launcher_surface(reach_shell *shell, const reach_launcher_layout *layout);
 reach_result reach_shell_render_context_menu_surface(reach_shell *shell);
 void reach_shell_on_window_event(void *user, const reach_ui_event *event);
+void reach_shell_request_update(reach_shell *shell);
 
 #endif

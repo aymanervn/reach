@@ -43,6 +43,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.dock_renderer);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_dock_reveal_edge(&dependencies.dock_reveal_edge);
+    }
+    if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_TRAY_MENU, &dependencies.tray_window);
     }
     if (result == REACH_OK) {

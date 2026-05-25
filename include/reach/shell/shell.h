@@ -20,6 +20,7 @@
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
 #include "reach/ports/audio_volume.h"
+#include "reach/ports/dock_reveal_edge.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -37,6 +38,7 @@ typedef struct reach_shell_dependencies {
     reach_render_backend_port launcher_renderer;
     reach_platform_window_port dock_window;
     reach_render_backend_port dock_renderer;
+    reach_dock_reveal_edge_port dock_reveal_edge;
     reach_platform_window_port tray_window;
     reach_render_backend_port tray_renderer;
     reach_platform_window_port switcher_window;

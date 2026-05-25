@@ -236,16 +236,18 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point
 
 void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
 {
-    if (shell == nullptr || shell->popup_capture.sync_mouse_hook == nullptr) {
+    if (shell == nullptr) {
         return;
     }
 
-    int32_t should_hook = shell->tray_popup_open || shell->context_menu_open || shell->quick_settings_open || shell->ui.launcher.open;
-    (void)shell->popup_capture.sync_mouse_hook(
-        shell->popup_capture.userdata,
-        should_hook,
-        reach_shell_on_popup_mouse_down,
-        shell);
+    if (shell->popup_capture.sync_mouse_hook != nullptr) {
+        int32_t should_hook = shell->tray_popup_open || shell->context_menu_open || shell->quick_settings_open || shell->ui.launcher.open;
+        (void)shell->popup_capture.sync_mouse_hook(
+            shell->popup_capture.userdata,
+            should_hook,
+            reach_shell_on_popup_mouse_down,
+            shell);
+    }
 }
 
 void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
@@ -961,7 +963,7 @@ static reach_result reach_shell_execute_dock_item_action(reach_shell *shell, rea
         }
         if (shell->window_manager.ops.refresh != nullptr) {
             (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
-            (void)reach_shell_refresh_open_windows(shell);
+            (void)reach_shell_refresh_open_windows(shell, nullptr);
         }
         uintptr_t foreground = shell->window_manager.ops.foreground != nullptr
             ? shell->window_manager.ops.foreground(shell->window_manager.manager)
@@ -975,7 +977,7 @@ static reach_result reach_shell_execute_dock_item_action(reach_shell *shell, rea
         }
         if (shell->window_manager.ops.refresh != nullptr) {
             (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
-            (void)reach_shell_refresh_open_windows(shell);
+            (void)reach_shell_refresh_open_windows(shell, nullptr);
         }
         shell->dock.dirty_flags = 1;
         return result;
@@ -1297,6 +1299,13 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         return REACH_OK;
     }
 
+    if (shell->ui.dock.auto_hide &&
+        (!shell->dock_target_hidden ||
+         shell->dock_reveal_active ||
+         shell->dock_animating)) {
+        reach_shell_request_update(shell);
+    }
+
     if (shell->context_menu_open) {
         reach_context_menu_hit_result context_hit = reach_context_menu_hit_test_items(
             shell->context_menu_item_slots,
@@ -1312,6 +1321,7 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
     }
 
     if (shell->quick_settings_dragging_volume) {
+        reach_shell_request_update(shell);
         reach_rect_f32 track = shell->quick_settings_layout.main_slider_track;
         if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER &&
             shell->quick_settings_drag_session_index < shell->quick_settings_layout.app_volume_row_count) {
@@ -1337,6 +1347,7 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
     }
 
     if (shell->dock_drag_active) {
+        reach_shell_request_update(shell);
         int32_t dx = event->x - shell->dock_drag_start_x;
         int32_t dy = event->y - shell->dock_drag_start_y;
         if (!shell->dock_drag_moved && (dx * dx + dy * dy) >= 36) {
@@ -1398,7 +1409,18 @@ static reach_result reach_shell_handle_pointer_middle(reach_shell *shell, const 
 
 static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
 {
-    (void)shell;
+    if (shell == nullptr) {
+        return REACH_OK;
+    }
+
+    if (shell->ui.dock.auto_hide &&
+        (!shell->dock_target_hidden ||
+         shell->dock_reveal_active ||
+         shell->dock_animating)) {
+        shell->dock_reveal_check_dirty = 1;
+        reach_shell_request_update(shell);
+    }
+
     return REACH_OK;
 }
 
@@ -1472,7 +1494,7 @@ static reach_result reach_shell_handle_switcher_event(reach_shell *shell, const 
     if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN) {
         if (shell->window_manager.ops.refresh != nullptr) {
             (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
-            (void)reach_shell_refresh_open_windows(shell);
+            (void)reach_shell_refresh_open_windows(shell, nullptr);
         }
         shell->switcher_open = shell->open_window_count > 0 ? 1 : 0;
         shell->switcher_selected_index = reach_shell_foreground_open_window_index(shell);
@@ -1565,6 +1587,17 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
     if (event->type == REACH_UI_EVENT_LAUNCHER_SEARCH_READY) {
         reach_shell_apply_launcher_search_results(shell);
+        return REACH_OK;
+    }
+    if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED) {
+        shell->monitors_dirty = 1;
+        shell->layout_dirty = 1;
+        shell->dock.dirty_flags = 1;
+        shell->launcher.dirty_flags = 1;
+        shell->tray.dirty_flags = 1;
+        shell->switcher.dirty_flags = 1;
+        shell->context_menu.dirty_flags = 1;
+        shell->quick_settings.dirty_flags = 1;
         return REACH_OK;
     }
     if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN ||

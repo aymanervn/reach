@@ -166,8 +166,14 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     QueryPerformanceCounter(&previous_counter);
     int running = 1;
     while (running) {
-        DWORD wait_ms = app != nullptr && reach_app_needs_frame(app) ? 16 : 250;
-        DWORD wait_result = MsgWaitForMultipleObjectsEx(0, nullptr, wait_ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        int32_t needed_frame_before_wait = app != nullptr && reach_app_needs_frame(app);
+        DWORD wait_ms = needed_frame_before_wait ? 16 : INFINITE;
+        DWORD wait_result = MsgWaitForMultipleObjectsEx(
+            0,
+            nullptr,
+            wait_ms,
+            QS_ALLINPUT,
+            MWMO_INPUTAVAILABLE);
         (void)wait_result;
 
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -182,14 +188,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         if (app != nullptr) {
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);
-            double delta_seconds = frequency.QuadPart > 0
-                ? (double)(current_counter.QuadPart - previous_counter.QuadPart) / (double)frequency.QuadPart
-                : 0.016;
-            previous_counter = current_counter;
-            if (delta_seconds > 0.1) {
-                delta_seconds = 0.1;
+
+            int32_t needs_frame_after_messages = reach_app_needs_frame(app);
+            if (needs_frame_after_messages) {
+                double delta_seconds = frequency.QuadPart > 0
+                    ? (double)(current_counter.QuadPart - previous_counter.QuadPart) / (double)frequency.QuadPart
+                    : 0.016;
+                previous_counter = current_counter;
+                if (delta_seconds > 0.1) {
+                    delta_seconds = 0.1;
+                }
+                (void)reach_app_update(app, delta_seconds);
+            } else {
+                previous_counter = current_counter;
             }
-            (void)reach_app_update(app, delta_seconds);
         }
     }
 

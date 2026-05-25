@@ -120,6 +120,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/power_session_win32.cpp
     src/adapters/windows/audio_volume_win32.cpp
     src/adapters/windows/system_controls_win32.cpp
+    src/adapters/windows/dock_reveal_edge_win32.cpp
 )
 
 reach_configure_common(reach_windows_adapters)

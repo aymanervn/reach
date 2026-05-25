@@ -17,6 +17,7 @@
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
+#include "reach/ports/dock_reveal_edge.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +40,7 @@ reach_result reach_windows_create_popup_capture(reach_popup_capture_port *out_po
 reach_result reach_windows_create_power_session(reach_power_session_port *out_port);
 reach_result reach_windows_create_audio_volume(reach_audio_volume_port *out_port);
 reach_result reach_windows_create_system_controls(reach_system_controls_port *out_port);
+reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *out_port);
 
 #ifdef __cplusplus
 }

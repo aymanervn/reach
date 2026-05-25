@@ -78,6 +78,13 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             window->callback(window->callback_user, &event);
         }
         return 0;
+    case WM_DISPLAYCHANGE:
+        if (window != nullptr && window->callback != nullptr) {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_DISPLAY_CHANGED;
+            window->callback(window->callback_user, &event);
+        }
+        return 0;
     case WM_KEYDOWN:
         if (window != nullptr && window->callback != nullptr) {
             reach_ui_event event = {};
@@ -523,4 +530,3 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
 }
-

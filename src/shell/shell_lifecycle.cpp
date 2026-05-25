@@ -2,6 +2,18 @@
 
 #include <new>
 
+
+static void reach_shell_on_dock_reveal_edge(void *user)
+{
+    reach_shell *shell = static_cast<reach_shell *>(user);
+    if (shell == nullptr) {
+        return;
+    }
+
+    shell->dock_reveal_check_dirty = 1;
+    shell->dock.dirty_flags = 1;
+}
+
 static void reach_shell_cleanup(reach_shell *shell)
 {
     if (shell == nullptr) {
@@ -53,6 +65,12 @@ static void reach_shell_cleanup(reach_shell *shell)
     }
     if (shell->quick_settings.renderer.ops.destroy != nullptr) {
         shell->quick_settings.renderer.ops.destroy(shell->quick_settings.renderer.backend);
+    }
+    if (shell->dock_reveal_edge.ops.hide != nullptr) {
+        shell->dock_reveal_edge.ops.hide(shell->dock_reveal_edge.edge);
+    }
+    if (shell->dock_reveal_edge.ops.destroy != nullptr) {
+        shell->dock_reveal_edge.ops.destroy(shell->dock_reveal_edge.edge);
     }
     if (shell->input_source.ops.destroy != nullptr) {
         shell->input_source.ops.destroy(shell->input_source.source);
@@ -108,6 +126,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
+    shell->dock_reveal_edge = {};
+    shell->dock_reveal_edge_visible = 0;
+    shell->dock_reveal_edge_bounds_valid = 0;
+    shell->dock_reveal_edge_bounds = {};
     shell->input_source = {};
     shell->window_manager = {};
     shell->config_store = {};
@@ -192,6 +214,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->launcher.renderer = dependencies->launcher_renderer;
     shell->dock.window = dependencies->dock_window;
     shell->dock.renderer = dependencies->dock_renderer;
+    shell->dock_reveal_edge = dependencies->dock_reveal_edge;
     shell->tray.window = dependencies->tray_window;
     shell->tray.renderer = dependencies->tray_renderer;
     shell->switcher.window = dependencies->switcher_window;
@@ -237,9 +260,12 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
         *out_shell = nullptr;
         return result;
     }
-
+    shell->dock_reveal_edge_visible = 0;
+    shell->dock_reveal_edge_bounds_valid = 0;
+    shell->dock_reveal_edge_bounds = {};
     shell->layout_dirty = 1;
     shell->render_dirty = 1;
+    shell->monitors_dirty = 1;
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
@@ -308,6 +334,15 @@ reach_result reach_shell_start(reach_shell *shell)
             return result;
         }
     }
+    if (shell->dock_reveal_edge.ops.set_callback != nullptr) {
+        result = shell->dock_reveal_edge.ops.set_callback(
+            shell->dock_reveal_edge.edge,
+            reach_shell_on_dock_reveal_edge,
+            shell);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
     if (shell->system_controls.start_watching != nullptr) {
         (void)shell->system_controls.start_watching(
             shell->system_controls.userdata,
@@ -331,6 +366,7 @@ reach_result reach_shell_start(reach_shell *shell)
     shell->running = 1;
     shell->layout_dirty = 1;
     shell->render_dirty = 1;
+    shell->monitors_dirty = 1;
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->tray.dirty_flags = 1;

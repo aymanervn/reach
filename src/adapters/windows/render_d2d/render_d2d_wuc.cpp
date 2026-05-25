@@ -109,7 +109,11 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
     }
     if (SUCCEEDED(hr)) {
         hr = reach_winrt_activate_compositor(&backend->compositor);
-        reach_d2d_log_hresult(L"RoActivateInstance(Compositor)", hr);
+        static int32_t logged_compositor_activation_failure = 0;
+        if (FAILED(hr) && !logged_compositor_activation_failure) {
+            logged_compositor_activation_failure = 1;
+            reach_d2d_log_hresult(L"RoActivateInstance(Compositor)", hr);
+        }
     }
 
     ComPtr<ABI::Windows::UI::Composition::Desktop::ICompositorDesktopInterop> desktop_interop;
