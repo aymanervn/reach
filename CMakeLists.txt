@@ -149,6 +149,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     powrprof
     wlanapi
     iphlpapi
+    wbemuuid
 )
 
 add_library(reach_shell STATIC
@@ -223,6 +224,7 @@ target_link_libraries(reach PRIVATE
     powrprof
     wlanapi
     iphlpapi
+    wbemuuid
 )
 
 add_executable(reachctl

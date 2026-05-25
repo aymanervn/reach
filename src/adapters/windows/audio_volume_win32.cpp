@@ -15,9 +15,6 @@
 #include <wchar.h>
 
 struct reach_audio_volume_adapter {
-    IMMDeviceEnumerator *enumerator;
-    IMMDevice *device;
-    IAudioEndpointVolume *endpoint;
     HICON session_icons[REACH_AUDIO_VOLUME_MAX_SESSIONS];
     size_t session_icon_count;
     HICON output_device_icons[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
@@ -153,66 +150,62 @@ static void reach_audio_volume_destroy_output_device_icons(
     adapter->output_device_icon_count = 0;
 }
 
-static void reach_audio_volume_release_endpoint(
-    reach_audio_volume_adapter *adapter
+static reach_result reach_audio_volume_create_default_endpoint_volume(
+    IAudioEndpointVolume **out_endpoint
 )
 {
-    if (adapter == nullptr) {
-        return;
-    }
-
-    if (adapter->endpoint != nullptr) {
-        adapter->endpoint->Release();
-        adapter->endpoint = nullptr;
-    }
-    if (adapter->device != nullptr) {
-        adapter->device->Release();
-        adapter->device = nullptr;
-    }
-    if (adapter->enumerator != nullptr) {
-        adapter->enumerator->Release();
-        adapter->enumerator = nullptr;
-    }
-}
-
-static reach_result reach_audio_volume_ensure_endpoint(
-    reach_audio_volume_adapter *adapter
-)
-{
-    if (adapter == nullptr) {
+    if (out_endpoint == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (adapter->endpoint != nullptr) {
-        return REACH_OK;
-    }
+    *out_endpoint = nullptr;
+
+    IMMDeviceEnumerator *enumerator = nullptr;
+    IMMDevice *device = nullptr;
+    IAudioEndpointVolume *endpoint = nullptr;
 
     HRESULT hr = CoCreateInstance(
         __uuidof(MMDeviceEnumerator),
         nullptr,
         CLSCTX_ALL,
-        IID_PPV_ARGS(&adapter->enumerator));
+        IID_PPV_ARGS(&enumerator));
 
     if (SUCCEEDED(hr)) {
-        hr = adapter->enumerator->GetDefaultAudioEndpoint(
+        hr = enumerator->GetDefaultAudioEndpoint(
             eRender,
-            eConsole,
-            &adapter->device);
+            eMultimedia,
+            &device);
+        if (FAILED(hr)) {
+            hr = enumerator->GetDefaultAudioEndpoint(
+                eRender,
+                eConsole,
+                &device);
+        }
     }
 
     if (SUCCEEDED(hr)) {
-        hr = adapter->device->Activate(
+        hr = device->Activate(
             __uuidof(IAudioEndpointVolume),
             CLSCTX_ALL,
             nullptr,
-            reinterpret_cast<void **>(&adapter->endpoint));
+            reinterpret_cast<void **>(&endpoint));
     }
 
-    if (FAILED(hr)) {
-        reach_audio_volume_release_endpoint(adapter);
+    if (device != nullptr) {
+        device->Release();
+    }
+    if (enumerator != nullptr) {
+        enumerator->Release();
+    }
+
+    if (FAILED(hr) || endpoint == nullptr) {
+        if (endpoint != nullptr) {
+            endpoint->Release();
+        }
         return REACH_ERROR;
     }
 
+    *out_endpoint = endpoint;
     return REACH_OK;
 }
 
@@ -576,7 +569,8 @@ static reach_result reach_audio_volume_get_state(
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_result result = reach_audio_volume_ensure_endpoint(adapter);
+    IAudioEndpointVolume *endpoint = nullptr;
+    reach_result result = reach_audio_volume_create_default_endpoint_volume(&endpoint);
     if (result != REACH_OK) {
         return result;
     }
@@ -584,13 +578,14 @@ static reach_result reach_audio_volume_get_state(
     float level = 0.0f;
     BOOL muted = FALSE;
 
-    HRESULT hr = adapter->endpoint->GetMasterVolumeLevelScalar(&level);
+    HRESULT hr = endpoint->GetMasterVolumeLevelScalar(&level);
     if (SUCCEEDED(hr)) {
-        hr = adapter->endpoint->GetMute(&muted);
+        hr = endpoint->GetMute(&muted);
     }
 
+    endpoint->Release();
+
     if (FAILED(hr)) {
-        reach_audio_volume_release_endpoint(adapter);
         return REACH_ERROR;
     }
 
@@ -612,17 +607,18 @@ static reach_result reach_audio_volume_set_level(
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_result result = reach_audio_volume_ensure_endpoint(adapter);
+    IAudioEndpointVolume *endpoint = nullptr;
+    reach_result result = reach_audio_volume_create_default_endpoint_volume(&endpoint);
     if (result != REACH_OK) {
         return result;
     }
 
-    HRESULT hr = adapter->endpoint->SetMasterVolumeLevelScalar(
+    HRESULT hr = endpoint->SetMasterVolumeLevelScalar(
         reach_audio_volume_clamp01(level),
         nullptr);
+    endpoint->Release();
 
     if (FAILED(hr)) {
-        reach_audio_volume_release_endpoint(adapter);
         return REACH_ERROR;
     }
 
@@ -641,15 +637,16 @@ static reach_result reach_audio_volume_set_muted(
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_result result = reach_audio_volume_ensure_endpoint(adapter);
+    IAudioEndpointVolume *endpoint = nullptr;
+    reach_result result = reach_audio_volume_create_default_endpoint_volume(&endpoint);
     if (result != REACH_OK) {
         return result;
     }
 
-    HRESULT hr = adapter->endpoint->SetMute(muted ? TRUE : FALSE, nullptr);
+    HRESULT hr = endpoint->SetMute(muted ? TRUE : FALSE, nullptr);
+    endpoint->Release();
 
     if (FAILED(hr)) {
-        reach_audio_volume_release_endpoint(adapter);
         return REACH_ERROR;
     }
 
@@ -1011,14 +1008,14 @@ static reach_result reach_audio_volume_set_default_output_device(
         return REACH_ERROR;
     }
 
-    HRESULT console_hr = policy->SetDefaultEndpoint(id, eConsole);
     HRESULT multimedia_hr = policy->SetDefaultEndpoint(id, eMultimedia);
+    HRESULT console_hr = policy->SetDefaultEndpoint(id, eConsole);
     HRESULT communications_hr = policy->SetDefaultEndpoint(id, eCommunications);
 
     policy->Release();
 
-    return SUCCEEDED(console_hr) &&
-        SUCCEEDED(multimedia_hr) &&
+    return SUCCEEDED(multimedia_hr) ||
+        SUCCEEDED(console_hr) ||
         SUCCEEDED(communications_hr)
             ? REACH_OK
             : REACH_ERROR;
@@ -1033,7 +1030,6 @@ static void reach_audio_volume_destroy(void *userdata)
         return;
     }
 
-    reach_audio_volume_release_endpoint(adapter);
     reach_audio_volume_destroy_session_icons(adapter);
     reach_audio_volume_destroy_output_device_icons(adapter);
 
@@ -1062,9 +1058,6 @@ extern "C" reach_result reach_windows_create_audio_volume(
         return REACH_ERROR;
     }
 
-    adapter->enumerator = nullptr;
-    adapter->device = nullptr;
-    adapter->endpoint = nullptr;
     adapter->session_icon_count = 0;
     for (size_t index = 0; index < REACH_AUDIO_VOLUME_MAX_SESSIONS; ++index) {
         adapter->session_icons[index] = nullptr;

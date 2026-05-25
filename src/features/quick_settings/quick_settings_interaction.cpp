@@ -104,6 +104,10 @@ reach_quick_settings_hit_result reach_quick_settings_hit_test(
     }
 
     if (reach_quick_settings_point_in_rect(layout->bluetooth_tile.bounds, x, y)) {
+        if (model != nullptr && model->bluetooth_pending) {
+            result.type = REACH_QUICK_SETTINGS_HIT_NONE;
+            return result;
+        }
         result.type = REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE;
         return result;
     }

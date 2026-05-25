@@ -22,6 +22,8 @@ typedef struct reach_quick_settings_model {
     reach_audio_output_device_list output_devices;
     reach_network_state network;
     reach_bluetooth_state bluetooth;
+    int32_t bluetooth_pending;
+    int32_t bluetooth_pending_enabled;
     reach_power_state power;
     reach_brightness_state brightness;
 } reach_quick_settings_model;
@@ -185,6 +187,12 @@ void reach_quick_settings_model_set_system_states(
     const reach_bluetooth_state *bluetooth,
     const reach_power_state *power,
     const reach_brightness_state *brightness
+);
+
+void reach_quick_settings_model_set_bluetooth_pending(
+    reach_quick_settings_model *model,
+    int32_t pending,
+    int32_t pending_enabled
 );
 
 uint32_t reach_quick_settings_volume_icon_id(

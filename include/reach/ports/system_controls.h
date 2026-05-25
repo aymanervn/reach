@@ -68,6 +68,11 @@ typedef struct reach_system_controls_port {
         int32_t enabled
     );
 
+    reach_result (*request_bluetooth_enabled)(
+        void *userdata,
+        int32_t enabled
+    );
+
     reach_result (*get_power_state)(
         void *userdata,
         reach_power_state *out_state

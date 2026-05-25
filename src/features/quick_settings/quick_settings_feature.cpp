@@ -81,6 +81,8 @@ void reach_quick_settings_model_init(
     model->output_devices = {};
     model->network = {};
     model->bluetooth = {};
+    model->bluetooth_pending = 0;
+    model->bluetooth_pending_enabled = 0;
     model->power = {};
     model->brightness = {};
 }
@@ -193,6 +195,19 @@ void reach_quick_settings_model_set_system_states(
     model->power.has_battery = model->power.has_battery ? 1 : 0;
     model->power.battery_saver_on = model->power.battery_saver_on ? 1 : 0;
     model->brightness.available = model->brightness.available ? 1 : 0;
+}
+
+void reach_quick_settings_model_set_bluetooth_pending(
+    reach_quick_settings_model *model,
+    int32_t pending,
+    int32_t pending_enabled
+)
+{
+    if (model == nullptr) {
+        return;
+    }
+    model->bluetooth_pending = pending ? 1 : 0;
+    model->bluetooth_pending_enabled = pending_enabled ? 1 : 0;
 }
 
 void reach_quick_settings_volume_pill_model_init(

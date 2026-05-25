@@ -257,7 +257,7 @@ void reach_shell_refresh_quick_settings_system(
         shell->system_controls.get_bluetooth_state(
             shell->system_controls.userdata,
             &bluetooth) != REACH_OK) {
-        bluetooth.available = 1;
+        bluetooth.available = 0;
         bluetooth.enabled = 0;
     }
 
@@ -313,8 +313,16 @@ void reach_shell_process_quick_settings_system_changes(
 
     reach_power_state previous_power = shell->quick_settings_model.power;
     reach_brightness_state previous_brightness = shell->quick_settings_model.brightness;
+    int32_t bluetooth_pending = shell->quick_settings_model.bluetooth_pending;
 
     reach_shell_refresh_quick_settings_system(shell);
+    if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH) != 0 &&
+        bluetooth_pending) {
+        reach_quick_settings_model_set_bluetooth_pending(
+            &shell->quick_settings_model,
+            0,
+            0);
+    }
 
     int32_t layout_changed =
         previous_power.has_battery != shell->quick_settings_model.power.has_battery ||
@@ -375,6 +383,10 @@ void reach_shell_set_quick_settings_open(
     if (next_open) {
         reach_shell_set_tray_popup_open(shell, 0);
         reach_shell_close_context_menu(shell);
+        reach_quick_settings_model_set_bluetooth_pending(
+            &shell->quick_settings_model,
+            0,
+            0);
         reach_shell_refresh_quick_settings_system(shell);
         reach_shell_refresh_quick_settings_audio(shell);
         shell->quick_settings_bounds_animation = {};
@@ -384,6 +396,10 @@ void reach_shell_set_quick_settings_open(
             (void)shell->quick_settings.window.ops.show(shell->quick_settings.window.window);
         }
     } else {
+        reach_quick_settings_model_set_bluetooth_pending(
+            &shell->quick_settings_model,
+            0,
+            0);
         reach_shell_release_quick_settings_input(shell);
         if (shell->quick_settings.window.ops.hide != nullptr) {
             (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
@@ -491,23 +507,66 @@ void reach_shell_execute_quick_settings_action(
     }
 
     if (action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH) {
+        if (shell->quick_settings_model.bluetooth_pending) {
+            return;
+        }
+
+        reach_bluetooth_state bluetooth = {};
+        if (shell->system_controls.get_bluetooth_state == nullptr ||
+            shell->system_controls.get_bluetooth_state(
+                shell->system_controls.userdata,
+                &bluetooth) != REACH_OK ||
+            !bluetooth.available) {
+            reach_shell_refresh_quick_settings_system(shell);
+            shell->quick_settings.dirty_flags = 1;
+            shell->render_dirty = 1;
+            return;
+        }
+
+        int32_t target_enabled = bluetooth.enabled ? 0 : 1;
+        if (shell->system_controls.request_bluetooth_enabled != nullptr) {
+            reach_quick_settings_model_set_bluetooth_pending(
+                &shell->quick_settings_model,
+                1,
+                target_enabled);
+            shell->quick_settings.dirty_flags = 1;
+            shell->render_dirty = 1;
+            if (shell->system_controls.request_bluetooth_enabled(
+                shell->system_controls.userdata,
+                target_enabled) != REACH_OK) {
+                reach_quick_settings_model_set_bluetooth_pending(
+                    &shell->quick_settings_model,
+                    0,
+                    0);
+                reach_shell_refresh_quick_settings_system(shell);
+            }
+            shell->quick_settings.dirty_flags = 1;
+            shell->render_dirty = 1;
+            return;
+        }
+
         if (shell->system_controls.set_bluetooth_enabled != nullptr) {
+            reach_quick_settings_model_set_bluetooth_pending(
+                &shell->quick_settings_model,
+                1,
+                target_enabled);
+            shell->quick_settings.dirty_flags = 1;
+            shell->render_dirty = 1;
             (void)shell->system_controls.set_bluetooth_enabled(
                 shell->system_controls.userdata,
-                shell->quick_settings_model.bluetooth.enabled ? 0 : 1);
+                target_enabled);
         }
         reach_shell_refresh_quick_settings_system(shell);
+        reach_quick_settings_model_set_bluetooth_pending(
+            &shell->quick_settings_model,
+            0,
+            0);
         shell->quick_settings.dirty_flags = 1;
         shell->render_dirty = 1;
         return;
     }
 
     if (action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER) {
-        if (shell->system_controls.set_battery_saver_enabled != nullptr) {
-            (void)shell->system_controls.set_battery_saver_enabled(
-                shell->system_controls.userdata,
-                shell->quick_settings_model.power.battery_saver_on ? 0 : 1);
-        }
         reach_shell_refresh_quick_settings_system(shell);
         shell->quick_settings.dirty_flags = 1;
         shell->render_dirty = 1;

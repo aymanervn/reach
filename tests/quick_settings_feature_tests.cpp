@@ -357,6 +357,53 @@ static void test_battery_system_grid_is_two_by_two(void)
         "project aligns to second column");
 }
 
+static void test_brightness_available_shows_slider_and_hit_action(void)
+{
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+    set_system_states(
+        &model,
+        REACH_NETWORK_KIND_NONE,
+        0,
+        nullptr,
+        0,
+        0,
+        0,
+        0,
+        1);
+
+    reach_quick_settings_layout layout = test_layout_for_model(&model);
+
+    expect_true(
+        layout.brightness_pill.bounds.height > 0.0f,
+        "brightness available shows slider");
+    expect_true(
+        layout.brightness_pill.bounds.y >
+            layout.system_grid_bounds.y + layout.system_grid_bounds.height,
+        "brightness slider appears below system grid");
+    expect_true(
+        layout.main_volume_pill.bounds.y >
+            layout.brightness_pill.bounds.y + layout.brightness_pill.bounds.height,
+        "master volume remains below brightness");
+
+    float x = layout.brightness_slider_track.x +
+        layout.brightness_slider_track.width * 0.25f;
+    float y = layout.brightness_slider_track.y +
+        layout.brightness_slider_track.height * 0.5f;
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(&layout, &model, x, y);
+    reach_quick_settings_action action =
+        reach_quick_settings_action_for_hit(hit);
+
+    expect_true(
+        hit.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER,
+        "brightness slider hit");
+    expect_true(
+        action.type == REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS,
+        "brightness hit maps to brightness action");
+    expect_near(action.volume_level, 0.25f, 0.001f, "brightness hit carries level");
+}
+
 static void test_slider_hit_maps_to_volume(void)
 {
     reach_quick_settings_layout layout = test_layout();
@@ -1185,6 +1232,7 @@ int main(void)
     test_layout_places_volume_pill_above_output_device_and_expand();
     test_desktop_system_grid_shows_network_and_bluetooth_only();
     test_battery_system_grid_is_two_by_two();
+    test_brightness_available_shows_slider_and_hit_action();
     test_slider_hit_maps_to_volume();
     test_slider_fill_width_follows_volume();
     test_hit_outside_returns_none();

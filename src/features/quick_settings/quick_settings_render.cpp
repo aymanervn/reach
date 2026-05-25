@@ -689,14 +689,17 @@ reach_result reach_quick_settings_build_render_commands(
     static const uint16_t bluetooth_label[] = {
         'B','l','u','e','t','o','o','t','h',0
     };
+    int32_t bluetooth_enabled = input->model.bluetooth_pending
+        ? input->model.bluetooth_pending_enabled
+        : input->model.bluetooth.enabled;
     reach_quick_settings_push_system_tile_commands(
         commands,
         &input->layout.bluetooth_tile,
-        input->model.bluetooth.enabled
+        bluetooth_enabled
             ? REACH_VECTOR_ICON_BLUETOOTH_ON
             : REACH_VECTOR_ICON_BLUETOOTH_OFF,
         bluetooth_label,
-        input->model.bluetooth.enabled,
+        bluetooth_enabled,
         &input->theme);
 
     if (input->model.power.has_battery) {
