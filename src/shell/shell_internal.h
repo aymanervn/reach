@@ -80,6 +80,7 @@ struct reach_shell {
     int32_t dock_animating;
     int32_t dock_target_hidden;
     int32_t dock_reveal_active;
+    int32_t dock_reveal_requested;
     int32_t dock_reveal_check_dirty;
     int32_t dock_reveal_edge_visible;
     int32_t dock_reveal_edge_bounds_valid;

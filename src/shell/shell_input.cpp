@@ -1313,7 +1313,11 @@ static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
         (!shell->dock_target_hidden ||
          shell->dock_reveal_active ||
          shell->dock_animating)) {
+        shell->dock_reveal_requested = 0;
         shell->dock_reveal_check_dirty = 1;
+        if (!shell->dock_animating) {
+            shell->dock_reveal_active = 0;
+        }
         reach_shell_request_update(shell);
     }
 

@@ -10,7 +10,11 @@ static void reach_shell_on_dock_reveal_edge(void *user)
         return;
     }
 
-    shell->dock_reveal_check_dirty = 1;
+    if (shell->dock_reveal_active || !shell->dock_target_hidden) {
+        shell->dock_reveal_check_dirty = 1;
+    } else {
+        shell->dock_reveal_requested = 1;
+    }
     reach_shell_request_update(shell);
 }
 
@@ -133,6 +137,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->dock_reveal_edge = {};
     shell->dock_reveal_edge_visible = 0;
     shell->dock_reveal_edge_bounds_valid = 0;
+    shell->dock_reveal_requested = 0;
     shell->dock_reveal_edge_bounds = {};
     shell->input_source = {};
     shell->window_manager = {};
