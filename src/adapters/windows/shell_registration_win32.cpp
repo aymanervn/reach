@@ -94,6 +94,35 @@ static int32_t reach_shell_equals(const wchar_t *a, const wchar_t *b)
     return a != nullptr && b != nullptr && CompareStringOrdinal(a, -1, b, -1, TRUE) == CSTR_EQUAL;
 }
 
+static void reach_shell_command_for_reach(const wchar_t *path, wchar_t *out_command, size_t out_count)
+{
+    if (out_command == nullptr || out_count == 0) {
+        return;
+    }
+
+    out_command[0] = 0;
+    if (path == nullptr || path[0] == 0) {
+        return;
+    }
+
+    swprintf_s(out_command, out_count, L"\"%ls\" --launch", path);
+}
+
+static int32_t reach_shell_is_reach_command(const wchar_t *shell, const wchar_t *path)
+{
+    if (shell == nullptr || path == nullptr || shell[0] == 0 || path[0] == 0) {
+        return 0;
+    }
+
+    if (reach_shell_equals(shell, path)) {
+        return 1;
+    }
+
+    wchar_t expected[640] = {};
+    reach_shell_command_for_reach(path, expected, 640);
+    return reach_shell_equals(shell, expected);
+}
+
 reach_result reach_windows_shell_install_current_user(const uint16_t *exe_path)
 {
     REACH_ASSERT(exe_path != nullptr);
@@ -102,19 +131,35 @@ reach_result reach_windows_shell_install_current_user(const uint16_t *exe_path)
     }
 
     const wchar_t *path = reinterpret_cast<const wchar_t *>(exe_path);
-    wchar_t current[260] = {};
-    if (reach_read_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, current, 260) != REACH_OK) {
+
+    wchar_t shell_command[640] = {};
+    reach_shell_command_for_reach(path, shell_command, 640);
+    if (shell_command[0] == 0) {
+        return REACH_ERROR;
+    }
+
+    wchar_t current[640] = {};
+    if (reach_read_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, current, 640) != REACH_OK) {
         wcscpy_s(current, REACH_DEFAULT_SHELL);
     }
 
-    if (!reach_shell_equals(current, path)) {
-        reach_result backup_result = reach_write_string_value(HKEY_CURRENT_USER, REACH_RESTORE_KEY, REACH_PREVIOUS_SHELL_VALUE, current);
+    if (!reach_shell_is_reach_command(current, path)) {
+        reach_result backup_result = reach_write_string_value(
+            HKEY_CURRENT_USER,
+            REACH_RESTORE_KEY,
+            REACH_PREVIOUS_SHELL_VALUE,
+            current);
         if (backup_result != REACH_OK) {
             return backup_result;
         }
     }
 
-    reach_result install_result = reach_write_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, path);
+    reach_result install_result = reach_write_string_value(
+        HKEY_CURRENT_USER,
+        REACH_WINLOGON_KEY,
+        REACH_SHELL_VALUE,
+        shell_command);
+
     if (install_result == REACH_OK) {
         (void)reach_windows_shell_clear_startup_attempts();
     }
@@ -144,8 +189,8 @@ reach_result reach_windows_shell_query_current_user(const uint16_t *exe_path, re
     }
 
     *out_status = {};
-    wchar_t current[260] = {};
-    wchar_t previous[260] = {};
+    wchar_t current[640] = {};
+    wchar_t previous[640] = {};
     if (reach_read_string_value(HKEY_CURRENT_USER, REACH_WINLOGON_KEY, REACH_SHELL_VALUE, current, 260) != REACH_OK) {
         wcscpy_s(current, REACH_DEFAULT_SHELL);
     }
@@ -153,8 +198,9 @@ reach_result reach_windows_shell_query_current_user(const uint16_t *exe_path, re
 
     (void)reach_copy_utf16(out_status->current_shell, 260, reinterpret_cast<const uint16_t *>(current));
     (void)reach_copy_utf16(out_status->previous_shell, 260, reinterpret_cast<const uint16_t *>(previous));
-    out_status->reach_is_shell = exe_path != nullptr && reach_shell_equals(current, reinterpret_cast<const wchar_t *>(exe_path));
-    DWORD attempts = 0;
+    out_status->reach_is_shell =
+        exe_path != nullptr &&
+        reach_shell_is_reach_command(current, reinterpret_cast<const wchar_t *>(exe_path));    DWORD attempts = 0;
     if (reach_read_dword_value(HKEY_CURRENT_USER, REACH_RESTORE_KEY, REACH_STARTUP_ATTEMPTS_VALUE, &attempts) == REACH_OK) {
         out_status->startup_attempt_count = attempts;
     }
