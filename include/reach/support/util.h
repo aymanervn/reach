@@ -23,6 +23,11 @@ typedef struct reach_rect_i32 {
     int32_t bottom;
 } reach_rect_i32;
 
+typedef struct reach_point_i32 {
+    int32_t x;
+    int32_t y;
+} reach_point_i32;
+
 typedef struct reach_vec2 {
     float x;
     float y;

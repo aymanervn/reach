@@ -15,7 +15,7 @@ void reach_d2d_clear_icon_cache(reach_render_backend *backend)
     backend->icon_cache.clear();
 }
 
-void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uintptr_t icon_id)
+void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t icon_id)
 {
     if (backend == nullptr || icon_id == 0) {
         return;

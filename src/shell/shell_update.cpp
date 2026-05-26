@@ -1,8 +1,5 @@
 #include "shell_internal.h"
 
-#include <windows.h>
-#include <shlwapi.h>
-
 #include <math.h>
 #include <stdio.h>
 #include <time.h>
@@ -12,6 +9,27 @@ static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b);
 static int32_t reach_shell_float_animation_active(const reach_float_animation *animation)
 {
     return animation != nullptr && animation->elapsed_seconds < animation->duration_seconds;
+}
+
+static void reach_shell_dispatch_surface_events(reach_surface_runtime *surface)
+{
+    if (surface != nullptr && surface->window.ops.dispatch_events != nullptr) {
+        (void)surface->window.ops.dispatch_events(surface->window.window);
+    }
+}
+
+static void reach_shell_dispatch_window_events(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    reach_shell_dispatch_surface_events(&shell->launcher);
+    reach_shell_dispatch_surface_events(&shell->dock);
+    reach_shell_dispatch_surface_events(&shell->tray);
+    reach_shell_dispatch_surface_events(&shell->switcher);
+    reach_shell_dispatch_surface_events(&shell->context_menu);
+    reach_shell_dispatch_surface_events(&shell->quick_settings);
 }
 
 static size_t reach_shell_min_size(size_t a, size_t b)
@@ -89,19 +107,33 @@ reach_result reach_shell_load_pinned_icons(reach_shell *shell)
 
 static int32_t reach_shell_path_equals(const uint16_t *a, const uint16_t *b)
 {
-    return a != nullptr && b != nullptr &&
-        CompareStringOrdinal(reinterpret_cast<const wchar_t *>(a), -1, reinterpret_cast<const wchar_t *>(b), -1, TRUE) == CSTR_EQUAL;
+    if (a == nullptr || b == nullptr) {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (a[index] != 0 && b[index] != 0) {
+        uint16_t ca = a[index];
+        uint16_t cb = b[index];
+        if (ca >= 'A' && ca <= 'Z') {
+            ca = (uint16_t)(ca + ('a' - 'A'));
+        }
+        if (cb >= 'A' && cb <= 'Z') {
+            cb = (uint16_t)(cb + ('a' - 'A'));
+        }
+        if (ca != cb) {
+            return 0;
+        }
+        ++index;
+    }
+
+    return a[index] == b[index];
 }
 
 static int32_t reach_shell_nonempty_text_equals(const uint16_t *a, const uint16_t *b)
 {
     return a != nullptr && b != nullptr && a[0] != 0 && b[0] != 0 &&
-        CompareStringOrdinal(
-            reinterpret_cast<const wchar_t *>(a),
-            -1,
-            reinterpret_cast<const wchar_t *>(b),
-            -1,
-            TRUE) == CSTR_EQUAL;
+        reach_shell_path_equals(a, b);
 }
 
 static int32_t reach_shell_dock_window_matches_pinned(
@@ -121,8 +153,7 @@ static int32_t reach_shell_dock_window_matches_pinned(
         return 1;
     }
 
-    return reach_shell_path_equals(pinned_app->path, window->path) ||
-        reach_shell_path_equals(pinned_app->icon_ref, window->path);
+    return reach_shell_path_equals(pinned_app->path, window->path);
 }
 
 reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed)
@@ -442,16 +473,31 @@ reach_result reach_shell_reload_pins(reach_shell *shell)
 
 void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot)
 {
-    if (shell == nullptr) {
+    if (shell == nullptr || snapshot == nullptr) {
         return;
     }
-    reach_wallpaper_seed_or_apply(
-        &shell->config_store,
+    int32_t changed = reach_wallpaper_seed_or_apply(
         &shell->wallpaper_service,
         &shell->wallpaper_surface,
-        snapshot,
+        snapshot->wallpaper_path,
+        260,
+        snapshot->monitor_wallpaper_paths,
+        REACH_MAX_WALLPAPER_MONITORS,
         shell->wallpaper_path,
         260);
+    if (changed && shell->config_store.ops.save != nullptr) {
+        (void)shell->config_store.ops.save(shell->config_store.store, snapshot);
+    }
+}
+
+reach_result reach_shell_reload_config(reach_shell *shell)
+{
+    reach_result result = reach_shell_reload_pins(shell);
+    if (result != REACH_OK) {
+        return result;
+    }
+    reach_shell_reload_wallpaper(shell, 1);
+    return REACH_OK;
 }
 
 void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)
@@ -517,15 +563,17 @@ int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell)
     return 0;
 }
 
-static int32_t reach_shell_get_cursor_position(POINT *out_cursor)
+static int32_t reach_shell_get_cursor_position(reach_shell *shell, reach_point_i32 *out_cursor)
 {
-    if (out_cursor == nullptr) {
+    if (shell == nullptr ||
+        shell->input_source.ops.get_pointer_position == nullptr ||
+        out_cursor == nullptr) {
         return 0;
     }
-    return GetCursorPos(out_cursor) ? 1 : 0;
+    return shell->input_source.ops.get_pointer_position(shell->input_source.source, out_cursor) == REACH_OK;
 }
 
-static int32_t reach_shell_point_in_rect(POINT point, reach_rect_f32 rect)
+static int32_t reach_shell_point_in_rect(reach_point_i32 point, reach_rect_f32 rect)
 {
     return (float)point.x >= rect.x &&
         (float)point.x < rect.x + rect.width &&
@@ -544,10 +592,10 @@ static reach_rect_f32 reach_shell_dock_reveal_bounds(reach_rect_f32 shown_bounds
     return bounds;
 }
 
-static int32_t reach_shell_cursor_at_dock_reveal_edge(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
+static int32_t reach_shell_cursor_at_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
 {
-    POINT cursor = {};
-    if (!reach_shell_get_cursor_position(&cursor)) {
+    reach_point_i32 cursor = {};
+    if (!reach_shell_get_cursor_position(shell, &cursor)) {
         return 0;
     }
 
@@ -558,10 +606,10 @@ static int32_t reach_shell_cursor_at_dock_reveal_edge(reach_rect_f32 shown_bound
     return reach_shell_point_in_rect(cursor, reveal_bounds);
 }
 
-static int32_t reach_shell_cursor_in_dock_reveal_bounds(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
+static int32_t reach_shell_cursor_in_dock_reveal_bounds(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
 {
-    POINT cursor = {};
-    if (!reach_shell_get_cursor_position(&cursor)) {
+    reach_point_i32 cursor = {};
+    if (!reach_shell_get_cursor_position(shell, &cursor)) {
         return 0;
     }
     return reach_shell_point_in_rect(cursor, reach_shell_dock_reveal_bounds(shown_bounds, monitor_bounds));
@@ -657,14 +705,14 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     if (!should_auto_hide) {
         shell->dock_reveal_active = 0;
     } else if (popup_blocks_autohide) {
-        if (reach_shell_cursor_in_dock_reveal_bounds(shown_bounds, monitor_bounds) ||
-            reach_shell_cursor_at_dock_reveal_edge(shown_bounds, monitor_bounds)) {
+        if (reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds) ||
+            reach_shell_cursor_at_dock_reveal_edge(shell, shown_bounds, monitor_bounds)) {
             shell->dock_reveal_active = 1;
         }
     } else if (shell->dock_reveal_active) {
         shell->dock_reveal_active =
-            reach_shell_cursor_in_dock_reveal_bounds(shown_bounds, monitor_bounds);
-    } else if (reach_shell_cursor_at_dock_reveal_edge(shown_bounds, monitor_bounds)) {
+            reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds);
+    } else if (reach_shell_cursor_at_dock_reveal_edge(shell, shown_bounds, monitor_bounds)) {
         shell->dock_reveal_active = 1;
     }
 
@@ -775,19 +823,24 @@ static reach_result reach_shell_refresh_monitor_layout(reach_shell *shell)
 {
     if (shell == nullptr ||
         !shell->monitors_dirty ||
-        shell->monitors == nullptr ||
+        shell->monitors.list == nullptr ||
         shell->wallpaper_surface.ops.set_bounds == nullptr) {
         return REACH_OK;
     }
 
-    (void)reach_monitor_refresh(shell->monitors);
-    size_t monitor_count = reach_monitor_count(shell->monitors);
+    if (shell->monitors.list == nullptr || shell->monitors.ops.refresh == nullptr ||
+        shell->monitors.ops.count == nullptr || shell->monitors.ops.get == nullptr) {
+        return REACH_OK;
+    }
+
+    (void)shell->monitors.ops.refresh(shell->monitors.list);
+    size_t monitor_count = shell->monitors.ops.count(shell->monitors.list);
     if (monitor_count == 0) {
         shell->monitors_dirty = 0;
         return REACH_OK;
     }
 
-    const reach_monitor_info *monitor = reach_monitor_get(shell->monitors, 0);
+    const reach_monitor_info *monitor = shell->monitors.ops.get(shell->monitors.list, 0);
     if (monitor == nullptr) {
         shell->monitors_dirty = 0;
         return REACH_OK;
@@ -798,7 +851,7 @@ static reach_result reach_shell_refresh_monitor_layout(reach_shell *shell)
     int32_t right = monitor->bounds.right;
     int32_t bottom = monitor->bounds.bottom;
     for (size_t index = 1; index < monitor_count; ++index) {
-        monitor = reach_monitor_get(shell->monitors, index);
+        monitor = shell->monitors.ops.get(shell->monitors.list, index);
         if (monitor == nullptr) {
             continue;
         }
@@ -1028,6 +1081,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     if (shell == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
+    reach_shell_dispatch_window_events(shell);
     if (reach_shell_can_fast_update_dock_animation(shell)) {
            return reach_shell_fast_update_dock_animation(shell, delta_seconds);
     }
@@ -1111,10 +1165,12 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     if (monitor_result != REACH_OK) {
         return monitor_result;
     }
-    if (shell->launcher.window.ops.set_bounds != nullptr && shell->monitors != nullptr && reach_monitor_count(shell->monitors) > 0) {
-        const reach_monitor_info *monitor = reach_monitor_primary(shell->monitors);
+    if (shell->launcher.window.ops.set_bounds != nullptr && shell->monitors.list != nullptr &&
+        shell->monitors.ops.count != nullptr && shell->monitors.ops.primary != nullptr &&
+        shell->monitors.ops.count(shell->monitors.list) > 0) {
+        const reach_monitor_info *monitor = shell->monitors.ops.primary(shell->monitors.list);
         REACH_ASSERT(monitor != nullptr);
-        REACH_ASSERT(monitor->primary || reach_monitor_count(shell->monitors) == 1);
+        REACH_ASSERT(monitor->primary || shell->monitors.ops.count(shell->monitors.list) == 1);
         if (monitor == nullptr) {
             return REACH_ERROR;
         }

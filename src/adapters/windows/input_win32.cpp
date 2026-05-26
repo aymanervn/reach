@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "windows_adapters_internal.h"
 
 #include "reach/ports/input_source.h"
 
@@ -247,6 +247,23 @@ static reach_result reach_input_stop(reach_input_source *source)
     return REACH_OK;
 }
 
+static reach_result reach_input_get_pointer_position(reach_input_source *source, reach_point_i32 *out_position)
+{
+    (void)source;
+    if (out_position == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    POINT cursor = {};
+    if (!GetCursorPos(&cursor)) {
+        return REACH_ERROR;
+    }
+
+    out_position->x = cursor.x;
+    out_position->y = cursor.y;
+    return REACH_OK;
+}
+
 static void reach_input_destroy(reach_input_source *source)
 {
     if (source != nullptr) {
@@ -275,6 +292,7 @@ reach_result reach_windows_create_input_source(reach_input_source_port *out_port
     out_port->source = source;
     out_port->ops.start = reach_input_start;
     out_port->ops.stop = reach_input_stop;
+    out_port->ops.get_pointer_position = reach_input_get_pointer_position;
     out_port->ops.destroy = reach_input_destroy;
     return REACH_OK;
 }

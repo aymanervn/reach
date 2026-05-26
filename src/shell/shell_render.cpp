@@ -1,8 +1,5 @@
 #include "shell_internal.h"
 
-#include <dwrite.h>
-#include <shlwapi.h>
-
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout)
 {
     REACH_ASSERT(shell != nullptr);
@@ -44,7 +41,7 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     input.power_feedback_index = REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON;
     input.time_text = shell->dock_time_text;
     input.date_text = shell->dock_date_text;
-    input.text_alignment_center = DWRITE_TEXT_ALIGNMENT_CENTER;
+    input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     reach_result result = reach_dock_build_render_commands(&input, &commands);
     if (result != REACH_OK) {
@@ -77,7 +74,7 @@ reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 
     input.dock_height = shell->layout.dock.bounds.height;
     input.click_feedback_index = shell->tray_click_feedback_index;
     input.click_feedback_opacity = shell->tray_click_feedback_opacity.value;
-    input.text_alignment_center = DWRITE_TEXT_ALIGNMENT_CENTER;
+    input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     reach_result result = reach_tray_build_render_commands(&input, &commands);
     if (result != REACH_OK) {
@@ -139,6 +136,53 @@ void reach_shell_update_switcher_visible_start(reach_shell *shell)
     shell->switcher_visible_start = model.visible_start;
 }
 
+static void reach_shell_label_from_path(uint16_t *out_label, size_t out_count, const uint16_t *path)
+{
+    if (out_label == nullptr || out_count == 0) {
+        return;
+    }
+
+    out_label[0] = 0;
+    const uint16_t fallback[] = { 'A','p','p',0 };
+    if (path == nullptr || path[0] == 0) {
+        (void)reach_copy_utf16(out_label, out_count, fallback);
+        return;
+    }
+
+    const uint16_t *name = path;
+    for (const uint16_t *cursor = path; *cursor != 0; ++cursor) {
+        if (*cursor == '\\' || *cursor == '/') {
+            name = cursor + 1;
+        }
+    }
+
+    size_t name_length = 0;
+    while (name[name_length] != 0) {
+        ++name_length;
+    }
+
+    size_t end = name_length;
+    for (size_t index = name_length; index > 0; --index) {
+        if (name[index - 1] == '.') {
+            end = index - 1;
+            break;
+        }
+    }
+    if (end == 0) {
+        end = name_length;
+    }
+
+    size_t write = 0;
+    while (write + 1 < out_count && write < end) {
+        out_label[write] = name[write];
+        ++write;
+    }
+    out_label[write] = 0;
+    if (out_label[0] == 0) {
+        (void)reach_copy_utf16(out_label, out_count, fallback);
+    }
+}
+
 reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds)
 {
     if (shell == nullptr || shell->switcher.renderer.ops.begin_frame == nullptr) {
@@ -156,18 +200,7 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
     reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
     for (size_t index = 0; index < shell->open_window_count && index < REACH_MAX_PINNED_APPS; ++index) {
         items[index].icon = shell->dock_icons.open_window_icons[index];
-        const wchar_t *path = reinterpret_cast<const wchar_t *>(shell->open_windows[index].path);
-        const wchar_t *name = PathFindFileNameW(path != nullptr ? path : L"");
-
-        wchar_t name_buf[260];
-        wcsncpy_s(name_buf, name, _TRUNCATE);
-
-        wchar_t *dot = wcsrchr(name_buf, L'.');
-        if (dot != nullptr) {
-            *dot = L'\0';
-        }
-
-        reach_copy_utf16(items[index].label, 260, reinterpret_cast<const uint16_t *>(name_buf[0] != L'\0' ? name_buf : L"App"));
+        reach_shell_label_from_path(items[index].label, 260, shell->open_windows[index].path);
     }
 
     reach_render_command_buffer commands = {};
@@ -177,8 +210,8 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
     input.model = &model;
     input.items = items;
     input.item_count = shell->open_window_count;
-    input.text_alignment_center = DWRITE_TEXT_ALIGNMENT_CENTER;
-    input.text_weight_demi_bold = DWRITE_FONT_WEIGHT_DEMI_BOLD;
+    input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
+    input.text_weight_demi_bold = REACH_TEXT_WEIGHT_DEMIBOLD;
 
     reach_result build_result = reach_switcher_build_render_commands(&input, &commands);
     if (build_result != REACH_OK) {
@@ -205,7 +238,7 @@ reach_result reach_shell_render_launcher_surface(reach_shell *shell, const reach
     input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
     input.state = &shell->ui;
     input.layout = layout;
-    input.text_alignment_leading = DWRITE_TEXT_ALIGNMENT_LEADING;
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 
     reach_render_command_buffer commands = {};
     reach_result build_result = reach_launcher_build_render_commands(&input, &commands);
@@ -240,7 +273,7 @@ reach_result reach_shell_render_context_menu_surface(reach_shell *shell)
     input.has_layout = shell->has_layout;
     input.use_anchor_x = shell->context_menu_power_open && shell->has_layout;
     input.anchor_x = shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
-    input.text_alignment_leading = DWRITE_TEXT_ALIGNMENT_LEADING;
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 
     reach_render_command_buffer commands = {};
     reach_result build_result = reach_context_menu_build_render_commands(&input, &commands);

@@ -36,14 +36,8 @@ add_library(reach_support STATIC
 )
 
 reach_configure_common(reach_support)
-reach_configure_windows(reach_support)
 target_compile_features(reach_support PUBLIC
     cxx_std_17
-)
-
-target_link_libraries(reach_support PUBLIC
-    shlwapi
-    user32
 )
 
 add_library(reach_core STATIC
@@ -83,6 +77,7 @@ add_library(reach_features STATIC
     src/features/tray/tray_model.cpp
     src/features/tray/tray_render.cpp
     src/features/wallpaper/wallpaper_feature.cpp
+    src/features/pin_config.cpp
 )
 
 reach_configure_common(reach_features)
@@ -91,6 +86,7 @@ target_compile_features(reach_features PUBLIC
 )
 target_link_libraries(reach_features PUBLIC
     reach_core
+    reach_support
 )
 
 add_library(reach_windows_adapters STATIC
@@ -111,6 +107,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/icon_shell.cpp
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/config_ini.cpp
+    src/adapters/windows/config_path_win32.cpp
     src/adapters/windows/window_manager_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp
@@ -121,6 +118,8 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/audio_volume_win32.cpp
     src/adapters/windows/system_controls_win32.cpp
     src/adapters/windows/dock_reveal_edge_win32.cpp
+    src/adapters/windows/monitor_win32.cpp
+    src/adapters/windows/hotkeys_win32.cpp
 )
 
 reach_configure_common(reach_windows_adapters)
@@ -155,7 +154,6 @@ target_link_libraries(reach_windows_adapters PRIVATE
 )
 
 add_library(reach_shell STATIC
-    src/shell/shell.cpp
     src/shell/shell_input.cpp
     src/shell/shell_launcher_search.cpp
     src/shell/shell_lifecycle.cpp
@@ -165,13 +163,9 @@ add_library(reach_shell STATIC
     src/shell/shell_surfaces.cpp
     src/shell/shell_update.cpp
     src/shell/surface_runtime.cpp
-    src/app/pin_config.cpp
-    src/adapters/windows/monitor_win32.cpp
-    src/adapters/windows/hotkeys_win32.cpp
 )
 
 reach_configure_common(reach_shell)
-reach_configure_windows(reach_shell)
 target_compile_features(reach_shell PUBLIC
     c_std_11
     cxx_std_17
@@ -181,18 +175,9 @@ target_link_libraries(reach_shell PUBLIC
     reach_features
     reach_support
 )
-target_link_libraries(reach_shell PRIVATE
-    dwrite
-    user32
-    shlwapi
-    shcore
-    dwmapi
-)
-
 add_executable(reach WIN32
     src/app/main.cpp
     src/app/composition_root.cpp
-    src/app/config_path.cpp
     resources/reach.rc
 )
 
@@ -234,9 +219,8 @@ add_executable(reachctl
     src/tools/reachctl.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
+    src/adapters/windows/config_path_win32.cpp
     src/adapters/windows/wallpaper_win32.cpp
-    src/app/config_path.cpp
-    src/app/pin_config.cpp
     src/support/util.cpp
 )
 
@@ -246,6 +230,7 @@ target_compile_features(reachctl PRIVATE
     cxx_std_17
 )
 target_link_libraries(reachctl PRIVATE
+    reach_features
     shell32
     shlwapi
     user32
@@ -295,18 +280,14 @@ target_link_libraries(reach_dock_feature_tests PRIVATE
 
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
-    src/app/pin_config.cpp
-    src/support/util.cpp
 )
 
 reach_configure_common(reach_pin_config_tests)
-reach_configure_windows(reach_pin_config_tests)
 target_compile_features(reach_pin_config_tests PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_pin_config_tests PRIVATE
-    shlwapi
-    user32
+    reach_features
 )
 
 add_executable(reach_quick_settings_feature_tests
@@ -362,7 +343,7 @@ else()
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
 endif()
 
-add_custom_target(check_architecture
+add_custom_target(check_architecture ALL
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Checking Reach architecture boundaries"

@@ -16,6 +16,9 @@ reach_result reach_pin_config_set_app_user_model_id(
     reach_config_store_port *store,
     const uint16_t *path,
     const uint16_t *app_user_model_id);
+reach_result reach_pin_config_pin_app(
+    reach_config_store_port *store,
+    const reach_pinned_app_model *app);
 
 #ifdef __cplusplus
 }

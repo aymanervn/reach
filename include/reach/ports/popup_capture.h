@@ -1,6 +1,7 @@
 #ifndef REACH_PORTS_POPUP_CAPTURE_H
 #define REACH_PORTS_POPUP_CAPTURE_H
 
+#include "reach/ports/platform_window.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -18,17 +19,17 @@ typedef struct reach_popup_capture_port {
 
     reach_result (*begin_capture)(
         void *userdata,
-        void *surface_handle
+        reach_platform_window *surface
     );
 
     void (*end_capture)(
         void *userdata,
-        void *surface_handle
+        reach_platform_window *surface
     );
 
     int32_t (*is_capture_active)(
         void *userdata,
-        void *surface_handle
+        reach_platform_window *surface
     );
 
     reach_result (*sync_mouse_hook)(

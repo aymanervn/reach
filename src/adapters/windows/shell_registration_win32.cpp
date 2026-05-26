@@ -1,4 +1,4 @@
-#include "reach/platform/shell_registration.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 #include <shellapi.h>

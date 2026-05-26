@@ -1,6 +1,5 @@
 #include "reach/app/composition_root.h"
 
-#include "reach/app/config_path.h"
 #include "reach/platform/windows_adapters.h"
 
 #include <new>
@@ -32,15 +31,13 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER, &dependencies.launcher_window);
     }
     if (result == REACH_OK) {
-        void *native_window = dependencies.launcher_window.ops.native_handle(dependencies.launcher_window.window);
-        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.launcher_renderer);
+        result = reach_windows_create_dcomp_render_backend(dependencies.launcher_window.window, &dependencies.launcher_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_DOCK, &dependencies.dock_window);
     }
     if (result == REACH_OK) {
-        void *native_window = dependencies.dock_window.ops.native_handle(dependencies.dock_window.window);
-        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.dock_renderer);
+        result = reach_windows_create_dcomp_render_backend(dependencies.dock_window.window, &dependencies.dock_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_dock_reveal_edge(&dependencies.dock_reveal_edge);
@@ -49,29 +46,25 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_platform_window(REACH_SURFACE_TRAY_MENU, &dependencies.tray_window);
     }
     if (result == REACH_OK) {
-        void *native_window = dependencies.tray_window.ops.native_handle(dependencies.tray_window.window);
-        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.tray_renderer);
+        result = reach_windows_create_dcomp_render_backend(dependencies.tray_window.window, &dependencies.tray_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_SWITCHER, &dependencies.switcher_window);
     }
     if (result == REACH_OK) {
-        void *native_window = dependencies.switcher_window.ops.native_handle(dependencies.switcher_window.window);
-        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.switcher_renderer);
+        result = reach_windows_create_dcomp_render_backend(dependencies.switcher_window.window, &dependencies.switcher_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_CONTEXT_MENU, &dependencies.context_menu_window);
     }
     if (result == REACH_OK) {
-        void *native_window = dependencies.context_menu_window.ops.native_handle(dependencies.context_menu_window.window);
-        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.context_menu_renderer);
+        result = reach_windows_create_dcomp_render_backend(dependencies.context_menu_window.window, &dependencies.context_menu_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_QUICK_SETTINGS, &dependencies.quick_settings_window);
     }
     if (result == REACH_OK) {
-        void *native_window = dependencies.quick_settings_window.ops.native_handle(dependencies.quick_settings_window.window);
-        result = reach_windows_create_dcomp_render_backend(native_window, &dependencies.quick_settings_renderer);
+        result = reach_windows_create_dcomp_render_backend(dependencies.quick_settings_window.window, &dependencies.quick_settings_renderer);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_search_provider(&dependencies.search_provider);
@@ -83,13 +76,19 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_windows_create_input_source(&dependencies.input_source);
     }
     if (result == REACH_OK) {
+        result = reach_windows_create_hotkeys(&dependencies.hotkeys);
+    }
+    if (result == REACH_OK) {
+        result = reach_windows_create_monitor_list(&dependencies.monitors);
+    }
+    if (result == REACH_OK) {
         result = reach_windows_create_window_manager(&dependencies.window_manager);
     }
     if (result == REACH_OK) {
         uint16_t default_path[260] = {};
         const uint16_t *config_path = desc != nullptr && desc->config_path != nullptr ? desc->config_path : default_path;
         if (desc == nullptr || desc->config_path == nullptr) {
-            result = reach_default_config_path(default_path, 260);
+            result = reach_windows_default_config_path(default_path, 260);
         }
         if (result == REACH_OK) {
             result = reach_windows_create_config_store(config_path, &dependencies.config_store);
@@ -169,6 +168,12 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         }
         if (dependencies.input_source.ops.destroy != nullptr) {
             dependencies.input_source.ops.destroy(dependencies.input_source.source);
+        }
+        if (dependencies.hotkeys.ops.destroy != nullptr) {
+            dependencies.hotkeys.ops.destroy(dependencies.hotkeys.hotkeys);
+        }
+        if (dependencies.monitors.ops.destroy != nullptr) {
+            dependencies.monitors.ops.destroy(dependencies.monitors.list);
         }
         if (dependencies.window_manager.ops.destroy != nullptr) {
             dependencies.window_manager.ops.destroy(dependencies.window_manager.manager);

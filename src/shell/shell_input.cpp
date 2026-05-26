@@ -1,18 +1,6 @@
 #include "shell_internal.h"
-#include "reach/platform/windows_messages.h"
-
-#include <windows.h>
-#include <dwmapi.h>
 
 #include <math.h>
-
-#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
-#define DWMWA_WINDOW_CORNER_PREFERENCE 33
-#endif
-
-#ifndef DWMWCP_ROUND
-#define DWMWCP_ROUND 2
-#endif
 
 static float reach_shell_clamp_float(float value, float min_value, float max_value)
 {
@@ -25,7 +13,7 @@ static float reach_shell_clamp_float(float value, float min_value, float max_val
     return value;
 }
 
-static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point);
+static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point_i32 point);
 static void reach_shell_close_launcher(reach_shell *shell);
 
 static void reach_shell_on_popup_mouse_down(void *user, int32_t x, int32_t y)
@@ -34,160 +22,116 @@ static void reach_shell_on_popup_mouse_down(void *user, int32_t x, int32_t y)
     if (shell == nullptr) {
         return;
     }
-    POINT point = { x, y };
+    reach_point_i32 point = { x, y };
     reach_shell_handle_global_mouse_down(shell, point);
 }
 
 void reach_shell_raise_launcher(reach_shell *shell)
 {
-    if (shell == nullptr || shell->launcher.window.ops.native_handle == nullptr) {
+    if (shell == nullptr || shell->launcher.window.ops.raise == nullptr) {
         return;
     }
 
-    HWND launcher_hwnd = (HWND)shell->launcher.window.ops.native_handle(shell->launcher.window.window);
-    if (launcher_hwnd != nullptr) {
-        ShowWindow(launcher_hwnd, SW_SHOW);
-
-        HWND foreground = GetForegroundWindow();
-        DWORD foreground_thread = foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
-        DWORD launcher_thread = GetWindowThreadProcessId(launcher_hwnd, nullptr);
-        DWORD current_thread = GetCurrentThreadId();
-
-        bool attached_foreground = false;
-        bool attached_launcher = false;
-
-        if (foreground_thread != 0 && foreground_thread != current_thread) {
-            attached_foreground = AttachThreadInput(current_thread, foreground_thread, TRUE) != FALSE;
-        }
-        if (launcher_thread != 0 && launcher_thread != current_thread && launcher_thread != foreground_thread) {
-            attached_launcher = AttachThreadInput(current_thread, launcher_thread, TRUE) != FALSE;
-        }
-
-        SetWindowPos(launcher_hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-        BringWindowToTop(launcher_hwnd);
-        SetForegroundWindow(launcher_hwnd);
-        SetActiveWindow(launcher_hwnd);
-        SetFocus(launcher_hwnd);
-
-        if (attached_launcher) {
-            AttachThreadInput(current_thread, launcher_thread, FALSE);
-        }
-        if (attached_foreground) {
-            AttachThreadInput(current_thread, foreground_thread, FALSE);
-        }
-    }
+    (void)shell->launcher.window.ops.raise(shell->launcher.window.window);
 }
 
 void reach_shell_notify_launcher_search_ready(reach_shell *shell)
 {
-    if (shell == nullptr || shell->launcher.window.ops.native_handle == nullptr) {
+    if (shell == nullptr || shell->launcher.window.ops.post_event == nullptr) {
         return;
     }
 
-    HWND launcher_hwnd = (HWND)shell->launcher.window.ops.native_handle(shell->launcher.window.window);
-    if (launcher_hwnd != nullptr) {
-        PostMessageW(launcher_hwnd, REACH_WM_LAUNCHER_SEARCH_READY, 0, 0);
-    }
+    (void)shell->launcher.window.ops.post_event(
+        shell->launcher.window.window,
+        REACH_UI_EVENT_LAUNCHER_SEARCH_READY);
 }
 
 
 static void reach_shell_capture_tray_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.begin_capture == nullptr ||
-        shell->tray.window.ops.native_handle == nullptr) {
+        shell->popup_capture.begin_capture == nullptr) {
         return;
     }
 
-    void *tray_hwnd = shell->tray.window.ops.native_handle(shell->tray.window.window);
-    if (tray_hwnd != nullptr) {
+    if (shell->tray.window.window != nullptr) {
         (void)shell->popup_capture.begin_capture(
             shell->popup_capture.userdata,
-            tray_hwnd);
+            shell->tray.window.window);
     }
 }
 
 static void reach_shell_release_tray_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.end_capture == nullptr ||
-        shell->tray.window.ops.native_handle == nullptr) {
+        shell->popup_capture.end_capture == nullptr) {
         return;
     }
 
-    void *tray_hwnd = shell->tray.window.ops.native_handle(shell->tray.window.window);
-    if (tray_hwnd != nullptr) {
+    if (shell->tray.window.window != nullptr) {
         shell->popup_capture.end_capture(
             shell->popup_capture.userdata,
-            tray_hwnd);
+            shell->tray.window.window);
     }
 }
 
 static void reach_shell_capture_dock_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.begin_capture == nullptr ||
-        shell->dock.window.ops.native_handle == nullptr) {
+        shell->popup_capture.begin_capture == nullptr) {
         return;
     }
 
-    void *dock_hwnd = shell->dock.window.ops.native_handle(shell->dock.window.window);
-    if (dock_hwnd != nullptr) {
+    if (shell->dock.window.window != nullptr) {
         (void)shell->popup_capture.begin_capture(
             shell->popup_capture.userdata,
-            dock_hwnd);
+            shell->dock.window.window);
     }
 }
 
 static void reach_shell_release_dock_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.end_capture == nullptr ||
-        shell->dock.window.ops.native_handle == nullptr) {
+        shell->popup_capture.end_capture == nullptr) {
         return;
     }
 
-    void *dock_hwnd = shell->dock.window.ops.native_handle(shell->dock.window.window);
-    if (dock_hwnd != nullptr) {
+    if (shell->dock.window.window != nullptr) {
         shell->popup_capture.end_capture(
             shell->popup_capture.userdata,
-            dock_hwnd);
+            shell->dock.window.window);
     }
 }
 
 static void reach_shell_capture_context_menu_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.begin_capture == nullptr ||
-        shell->context_menu.window.ops.native_handle == nullptr) {
+        shell->popup_capture.begin_capture == nullptr) {
         return;
     }
 
-    void *hwnd = shell->context_menu.window.ops.native_handle(shell->context_menu.window.window);
-    if (hwnd != nullptr) {
+    if (shell->context_menu.window.window != nullptr) {
         (void)shell->popup_capture.begin_capture(
             shell->popup_capture.userdata,
-            hwnd);
+            shell->context_menu.window.window);
     }
 }
 
 static void reach_shell_release_context_menu_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.end_capture == nullptr ||
-        shell->context_menu.window.ops.native_handle == nullptr) {
+        shell->popup_capture.end_capture == nullptr) {
         return;
     }
 
-    void *hwnd = shell->context_menu.window.ops.native_handle(shell->context_menu.window.window);
-    if (hwnd != nullptr) {
+    if (shell->context_menu.window.window != nullptr) {
         shell->popup_capture.end_capture(
             shell->popup_capture.userdata,
-            hwnd);
+            shell->context_menu.window.window);
     }
 }
 
-static void reach_shell_handle_global_mouse_down(reach_shell *shell, POINT point)
+static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point_i32 point)
 {
     if (shell == nullptr) {
         return;
@@ -554,8 +498,9 @@ static reach_result reach_shell_open_launcher_result(reach_shell *shell)
         return shell->explorer_service.ops.open_shell_location(shell->explorer_service.service, query);
     }
 
-    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(query));
-    if (attributes != INVALID_FILE_ATTRIBUTES && shell->explorer_service.ops.open_path != nullptr) {
+    if (shell->explorer_service.ops.path_exists != nullptr &&
+        shell->explorer_service.ops.path_exists(shell->explorer_service.service, query) &&
+        shell->explorer_service.ops.open_path != nullptr) {
         return shell->explorer_service.ops.open_path(shell->explorer_service.service, query);
     }
 
@@ -563,75 +508,6 @@ static reach_result reach_shell_open_launcher_result(reach_shell *shell)
         return shell->explorer_service.ops.open_default(shell->explorer_service.service);
     }
     return REACH_OK;
-}
-
-static HHOOK g_reach_context_menu_hook;
-
-static HFONT reach_shell_create_context_menu_font()
-{
-    NONCLIENTMETRICSW metrics = {};
-    metrics.cbSize = sizeof(metrics);
-    if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0)) {
-        if (metrics.lfMenuFont.lfHeight < 0) {
-            metrics.lfMenuFont.lfHeight += 2;
-        } else if (metrics.lfMenuFont.lfHeight > 2) {
-            metrics.lfMenuFont.lfHeight -= 2;
-        }
-        return CreateFontIndirectW(&metrics.lfMenuFont);
-    }
-    return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-}
-
-static void reach_shell_delete_context_menu_font(HFONT font)
-{
-    if (font != nullptr && font != GetStockObject(DEFAULT_GUI_FONT)) {
-        DeleteObject(font);
-    }
-}
-
-static void reach_shell_apply_context_menu_corners(HWND hwnd)
-{
-    if (hwnd == nullptr) {
-        return;
-    }
-    RECT rect = {};
-    if (!GetWindowRect(hwnd, &rect)) {
-        return;
-    }
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top;
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-    int preference = DWMWCP_ROUND;
-    (void)DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
-    SetWindowPos(
-        hwnd,
-        nullptr,
-        0,
-        0,
-        0,
-        0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-}
-
-static LRESULT CALLBACK reach_shell_context_menu_hook_proc(int code, WPARAM wparam, LPARAM lparam)
-{
-    if (code == HCBT_CREATEWND || code == HCBT_ACTIVATE) {
-        HWND hwnd = reinterpret_cast<HWND>(wparam);
-        wchar_t class_name[32] = {};
-        if (hwnd != nullptr &&
-            GetClassNameW(hwnd, class_name, 32) != 0 &&
-            lstrcmpiW(class_name, L"#32768") == 0) {
-            reach_shell_apply_context_menu_corners(hwnd);
-        }
-    }
-    return CallNextHookEx(g_reach_context_menu_hook, code, wparam, lparam);
-}
-
-static void reach_shell_append_context_menu_item(HMENU menu, UINT id, const wchar_t *text)
-{
-    AppendMenuW(menu, MF_OWNERDRAW, id, reinterpret_cast<LPCWSTR>(text));
 }
 
 static const uint16_t *reach_shell_dock_item_path(const reach_shell *shell, size_t item_index)
@@ -648,55 +524,6 @@ static const uint16_t *reach_shell_dock_item_path(const reach_shell *shell, size
     return open_index < shell->open_window_count ? shell->open_windows[open_index].path : nullptr;
 }
 
-static int32_t reach_shell_context_menu_item_width(HDC dc, HFONT font, const wchar_t *text)
-{
-    if (dc == nullptr || text == nullptr) {
-        return 0;
-    }
-    SIZE size = {};
-    HGDIOBJ old_font = SelectObject(dc, font);
-    GetTextExtentPoint32W(dc, text, (int)wcslen(text), &size);
-    SelectObject(dc, old_font);
-    return size.cx + 28;
-}
-
-static int32_t reach_shell_estimate_context_menu_width(const reach_shell *shell, size_t item_index, HWND owner)
-{
-    int32_t width = 160;
-    HDC dc = GetDC(owner != nullptr ? owner : GetDesktopWindow());
-    HFONT font = reach_shell_create_context_menu_font();
-    if (dc == nullptr || font == nullptr) {
-        reach_shell_delete_context_menu_font(font);
-        if (dc != nullptr) {
-            ReleaseDC(owner != nullptr ? owner : GetDesktopWindow(), dc);
-        }
-        return width;
-    }
-
-    int32_t candidate = reach_shell_context_menu_item_width(dc, font, reinterpret_cast<const wchar_t *>(reach_context_menu_command_text(REACH_CONTEXT_MENU_COMMAND_OPEN_NEW)));
-    if (candidate > width) {
-        width = candidate;
-    }
-    if (shell != nullptr && item_index < shell->dock_model.item_count && shell->dock_model.items[item_index].pinned) {
-        candidate = reach_shell_context_menu_item_width(dc, font, reinterpret_cast<const wchar_t *>(reach_context_menu_command_text(REACH_CONTEXT_MENU_COMMAND_UNPIN)));
-    } else {
-        candidate = reach_shell_context_menu_item_width(dc, font, reinterpret_cast<const wchar_t *>(reach_context_menu_command_text(REACH_CONTEXT_MENU_COMMAND_PIN)));
-    }
-    if (candidate > width) {
-        width = candidate;
-    }
-    if (shell != nullptr && item_index < shell->dock_model.item_count && shell->dock_model.items[item_index].window != 0) {
-        candidate = reach_shell_context_menu_item_width(dc, font, reinterpret_cast<const wchar_t *>(reach_context_menu_command_text(REACH_CONTEXT_MENU_COMMAND_CLOSE)));
-        if (candidate > width) {
-            width = candidate;
-        }
-    }
-
-    reach_shell_delete_context_menu_font(font);
-    ReleaseDC(owner != nullptr ? owner : GetDesktopWindow(), dc);
-    return width;
-}
-
 static reach_result reach_shell_launch_dock_item(reach_shell *shell, size_t item_index, int32_t force_new_instance)
 {
     if (shell == nullptr || item_index >= shell->dock_model.item_count || shell->app_launcher.ops.launch == nullptr) {
@@ -710,6 +537,13 @@ static reach_result reach_shell_launch_dock_item(reach_shell *shell, size_t item
 
     reach_app_launch_request request = {};
     reach_copy_utf16(request.path, 260, path);
+    if (shell->dock_model.items[item_index].pinned &&
+        shell->dock_model.items[item_index].pinned_index < shell->ui.pinned_app_count) {
+        reach_copy_utf16(
+            request.arguments,
+            260,
+            shell->ui.pinned_apps[shell->dock_model.items[item_index].pinned_index].arguments);
+    }
     request.force_new_instance = force_new_instance;
     return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
 }
@@ -792,6 +626,9 @@ static reach_result reach_shell_execute_context_command(reach_shell *shell, uint
         }
         reach_app_launch_request request = {};
         reach_copy_utf16(request.path, 260, item_path);
+        if (pinned_index < shell->ui.pinned_app_count) {
+            reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[pinned_index].arguments);
+        }
         request.force_new_instance = 1;
         return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
     }
@@ -802,9 +639,36 @@ static reach_result reach_shell_execute_context_command(reach_shell *shell, uint
         return REACH_ERROR;
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_PIN) {
-        if (item_path[0] != 0 && reach_pin_config_pin_path(&shell->config_store, item_path) == REACH_OK) {
+        reach_pinned_app_model app = {};
+
+        size_t open_index = shell->dock_model.items[item_index].open_index;
+        if (open_index < shell->open_window_count) {
+            const reach_window_snapshot *window = &shell->open_windows[open_index];
+
+            if (shell->window_manager.ops.pin_app_for_window != nullptr &&
+                shell->window_manager.ops.pin_app_for_window(
+                    shell->window_manager.manager,
+                    window->id,
+                    window,
+                    &app) == REACH_OK) {
+            } else {
+                if (window->title[0] != 0) {
+                    (void)reach_copy_utf16(app.title, 128, window->title);
+                }
+                (void)reach_copy_utf16(app.path, 260, window->path);
+                (void)reach_copy_utf16(app.icon_ref, 260, window->path);
+                (void)reach_copy_utf16(app.app_user_model_id, 260, window->app_user_model_id);
+            }
+        } else if (item_path[0] != 0) {
+            (void)reach_copy_utf16(app.path, 260, item_path);
+            (void)reach_copy_utf16(app.icon_ref, 260, item_path);
+        }
+
+        if (app.path[0] != 0 &&
+            reach_pin_config_pin_app(&shell->config_store, &app) == REACH_OK) {
             return reach_shell_reload_pins(shell);
         }
+
         return REACH_ERROR;
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE && shell->window_manager.ops.close != nullptr) {
@@ -838,7 +702,10 @@ static reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     float popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f;
 
     reach_rect_f32 monitor = {};
-    const reach_monitor_info *primary_monitor = shell->monitors != nullptr ? reach_monitor_primary(shell->monitors) : nullptr;
+    const reach_monitor_info *primary_monitor =
+        shell->monitors.list != nullptr && shell->monitors.ops.primary != nullptr
+            ? shell->monitors.ops.primary(shell->monitors.list)
+            : nullptr;
     if (primary_monitor != nullptr) {
         monitor.x = (float)primary_monitor->bounds.left;
         monitor.y = (float)primary_monitor->bounds.top;
@@ -911,7 +778,10 @@ static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, s
         popup_x = slot.x + slot.width * 0.5f - popup_width * anchor_ratio;
         popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f;
         reach_rect_f32 monitor = {};
-        const reach_monitor_info *primary_monitor = shell->monitors != nullptr ? reach_monitor_primary(shell->monitors) : nullptr;
+        const reach_monitor_info *primary_monitor =
+            shell->monitors.list != nullptr && shell->monitors.ops.primary != nullptr
+                ? shell->monitors.ops.primary(shell->monitors.list)
+                : nullptr;
         if (primary_monitor != nullptr) {
             monitor.x = (float)primary_monitor->bounds.left;
             monitor.y = (float)primary_monitor->bounds.top;
@@ -1600,18 +1470,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         return REACH_OK;
     }
     if (event->type == REACH_UI_EVENT_CONFIG_CHANGED) {
-        reach_config_snapshot snapshot = {};
-        if (shell->config_store.ops.load != nullptr &&
-            shell->config_store.ops.load(shell->config_store.store, &snapshot) == REACH_OK) {
-            reach_dock_release_pinned_icons(&shell->dock_icons, &shell->icon_provider);
-            reach_ui_state_set_pinned_apps(&shell->ui, snapshot.pinned_apps, snapshot.pinned_app_count);
-            (void)reach_shell_load_pinned_icons(shell);
-
-            shell->dock_items_changed = 1;
-            shell->dock.dirty_flags = 1;
-            shell->render_dirty = 1;
-        }
-        return REACH_OK;
+        return reach_shell_reload_config(shell);
     }
     if (event->type == REACH_UI_EVENT_LAUNCHER_SEARCH_READY) {
         reach_shell_apply_launcher_search_results(shell);
@@ -1658,6 +1517,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
             if (shell->ui.pinned_apps[index].id == intent.id && shell->app_launcher.ops.launch != nullptr) {
                 reach_app_launch_request request = {};
                 reach_copy_utf16(request.path, 260, shell->ui.pinned_apps[index].path);
+                reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[index].arguments);
                 (void)shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
             }
         }

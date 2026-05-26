@@ -15,9 +15,7 @@
 #include "reach/features/wallpaper.h"
 #include "reach/features/quick_settings.h"
 #include "reach/features/popup.h"
-#include "reach/platform/hotkeys.h"
-#include "reach/platform/monitor.h"
-#include "reach/app/pin_config.h"
+#include "reach/features/pin_config.h"
 #include "reach/shell/surface_runtime.h"
 #include "reach/core/theme.h"
 
@@ -35,8 +33,8 @@ typedef struct reach_shell_popup_bounds_animation {
 } reach_shell_popup_bounds_animation;
 
 struct reach_shell {
-    reach_hotkeys *hotkeys;
-    reach_monitor_list *monitors;
+    reach_hotkeys_port hotkeys;
+    reach_monitor_port monitors;
     reach_ui_state ui;
     reach_surface_runtime launcher;
     reach_surface_runtime dock;
@@ -246,6 +244,7 @@ void reach_shell_clear_sticky_dock_feedback(reach_shell *shell);
 
 reach_result reach_shell_load_pinned_icons(reach_shell *shell);
 reach_result reach_shell_reload_pins(reach_shell *shell);
+reach_result reach_shell_reload_config(reach_shell *shell);
 void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot);
 void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force);
 reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed);

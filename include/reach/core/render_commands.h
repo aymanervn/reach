@@ -62,8 +62,14 @@ typedef enum reach_text_weight {
     REACH_TEXT_WEIGHT_LIGHT = 200,
     REACH_TEXT_WEIGHT_NORMAL = 400,
     REACH_TEXT_WEIGHT_SEMIBOLD = 500,
+    REACH_TEXT_WEIGHT_DEMIBOLD = 600,
     REACH_TEXT_WEIGHT_BOLD = 700
 } reach_text_weight;
+
+typedef enum reach_text_alignment {
+    REACH_TEXT_ALIGNMENT_LEADING = 0,
+    REACH_TEXT_ALIGNMENT_CENTER = 1
+} reach_text_alignment;
 
 typedef struct reach_render_command {
     reach_render_command_type type;

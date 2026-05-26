@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 #include <shellapi.h>

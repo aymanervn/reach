@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "../windows_adapters_internal.h"
 
 #include "render_d2d_internal.h"
 
@@ -124,14 +124,18 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
 }
 
 reach_result reach_windows_create_d2d_render_backend(
-    void *native_window,
+    reach_platform_window *window,
     reach_render_backend_port *out_port
 )
 {
-    REACH_ASSERT(native_window != nullptr);
+    REACH_ASSERT(window != nullptr);
     REACH_ASSERT(out_port != nullptr);
 
-    if (native_window == nullptr || out_port == nullptr) {
+    if (window == nullptr || out_port == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    void *native_window = reach_windows_platform_window_native_handle(window);
+    if (native_window == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
 
@@ -183,14 +187,18 @@ reach_result reach_windows_create_d2d_render_backend(
 }
 
 reach_result reach_windows_create_dcomp_render_backend(
-    void *native_window,
+    reach_platform_window *window,
     reach_render_backend_port *out_port
 )
 {
-    REACH_ASSERT(native_window != nullptr);
+    REACH_ASSERT(window != nullptr);
     REACH_ASSERT(out_port != nullptr);
 
-    if (native_window == nullptr || out_port == nullptr) {
+    if (window == nullptr || out_port == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    void *native_window = reach_windows_platform_window_native_handle(window);
+    if (native_window == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
 

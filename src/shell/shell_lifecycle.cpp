@@ -28,8 +28,12 @@ static void reach_shell_cleanup(reach_shell *shell)
     }
     reach_shell_close_context_menu(shell);
     reach_shell_sync_popup_mouse_hook(shell);
-    reach_hotkeys_destroy(shell->hotkeys);
-    reach_monitor_list_destroy(shell->monitors);
+    if (shell->hotkeys.ops.destroy != nullptr) {
+        shell->hotkeys.ops.destroy(shell->hotkeys.hotkeys);
+    }
+    if (shell->monitors.ops.destroy != nullptr) {
+        shell->monitors.ops.destroy(shell->monitors.list);
+    }
     if (shell->launcher.window.ops.destroy != nullptr) {
         shell->launcher.window.ops.destroy(shell->launcher.window.window);
     }
@@ -117,8 +121,8 @@ static void reach_shell_cleanup(reach_shell *shell)
         shell->system_controls.destroy(shell->system_controls.userdata);
     }
 
-    shell->hotkeys = nullptr;
-    shell->monitors = nullptr;
+    shell->hotkeys = {};
+    shell->monitors = {};
     shell->popup_capture = {};
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
@@ -213,10 +217,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->quick_settings_layout = {};
     shell->launcher_search_notify = reach_shell_notify_launcher_search_ready;
 
-    reach_result result = reach_monitor_list_create(&shell->monitors);
-    if (result == REACH_OK) {
-        result = reach_hotkeys_create(&shell->hotkeys);
-    }
+    reach_result result = REACH_OK;
 
     shell->launcher.window = dependencies->launcher_window;
     shell->launcher.renderer = dependencies->launcher_renderer;
@@ -232,6 +233,8 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->quick_settings.window = dependencies->quick_settings_window;
     shell->quick_settings.renderer = dependencies->quick_settings_renderer;
     shell->input_source = dependencies->input_source;
+    shell->hotkeys = dependencies->hotkeys;
+    shell->monitors = dependencies->monitors;
     shell->window_manager = dependencies->window_manager;
     shell->config_store = dependencies->config_store;
     shell->tray_provider = dependencies->tray_provider;
@@ -246,6 +249,10 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->audio_volume = dependencies->audio_volume;
     shell->system_controls = dependencies->system_controls;
     shell->theme = reach_theme_default();
+
+    if (shell->hotkeys.hotkeys == nullptr || shell->monitors.list == nullptr) {
+        result = REACH_INVALID_ARGUMENT;
+    }
 
     if (result == REACH_OK && shell->config_store.ops.load != nullptr) {
         (void)reach_pin_config_ensure_defaults(&shell->config_store);
@@ -414,7 +421,9 @@ reach_result reach_shell_stop(reach_shell *shell)
     if (shell->window_manager.ops.stop != nullptr) {
         (void)shell->window_manager.ops.stop(shell->window_manager.manager);
     }
-    (void)reach_hotkeys_unregister_all(shell->hotkeys);
+    if (shell->hotkeys.ops.unregister_all != nullptr) {
+        (void)shell->hotkeys.ops.unregister_all(shell->hotkeys.hotkeys);
+    }
     if (shell->dock.window.ops.hide != nullptr) {
         (void)shell->dock.window.ops.hide(shell->dock.window.window);
     }

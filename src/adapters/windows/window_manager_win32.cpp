@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 #include <dwmapi.h>
@@ -10,6 +10,7 @@
 
 #include <new>
 #include <vector>
+#include <wchar.h>
 
 struct reach_hidden_minimized_window {
     HWND hwnd;
@@ -35,24 +36,22 @@ struct reach_window_manager {
 
 static reach_window_manager *g_window_manager;
 
-static int32_t reach_window_app_user_model_id(HWND hwnd, uint16_t *out_id, size_t out_count)
+static int32_t reach_window_property_string(
+    IPropertyStore *store,
+    const PROPERTYKEY &key,
+    uint16_t *out_value,
+    size_t out_count)
 {
-    if (hwnd == nullptr || out_id == nullptr || out_count == 0) {
+    if (store == nullptr || out_value == nullptr || out_count == 0) {
         return 0;
     }
 
-    out_id[0] = 0;
-
-    IPropertyStore *store = nullptr;
-    HRESULT hr = SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&store));
-    if (FAILED(hr) || store == nullptr) {
-        return 0;
-    }
+    out_value[0] = 0;
 
     PROPVARIANT value = {};
     PropVariantInit(&value);
 
-    hr = store->GetValue(PKEY_AppUserModel_ID, &value);
+    HRESULT hr = store->GetValue(key, &value);
 
     int32_t ok = 0;
     if (SUCCEEDED(hr) &&
@@ -60,13 +59,108 @@ static int32_t reach_window_app_user_model_id(HWND hwnd, uint16_t *out_id, size_
         value.pwszVal != nullptr &&
         value.pwszVal[0] != 0) {
         ok = reach_copy_utf16(
-            out_id,
+            out_value,
             out_count,
             reinterpret_cast<const uint16_t *>(value.pwszVal)) == REACH_OK;
     }
 
     PropVariantClear(&value);
+    return ok;
+}
+
+static int32_t reach_window_property_string(
+    HWND hwnd,
+    const PROPERTYKEY &key,
+    uint16_t *out_value,
+    size_t out_count)
+{
+    if (hwnd == nullptr || out_value == nullptr || out_count == 0) {
+        return 0;
+    }
+
+    out_value[0] = 0;
+
+    IPropertyStore *store = nullptr;
+    HRESULT hr = SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&store));
+    if (FAILED(hr) || store == nullptr) {
+        return 0;
+    }
+
+    int32_t ok = reach_window_property_string(store, key, out_value, out_count);
     store->Release();
+    return ok;
+}
+
+static int32_t reach_window_app_user_model_id(HWND hwnd, uint16_t *out_id, size_t out_count)
+{
+    return reach_window_property_string(hwnd, PKEY_AppUserModel_ID, out_id, out_count);
+}
+
+static int32_t reach_wcs_needs_quotes(const wchar_t *text)
+{
+    return text != nullptr && wcspbrk(text, L" \t\"") != nullptr;
+}
+
+static int32_t reach_append_wcs(uint16_t *dst, size_t dst_count, const wchar_t *text)
+{
+    if (dst == nullptr || dst_count == 0 || text == nullptr) {
+        return 0;
+    }
+    size_t used = reach_strlen_utf16(dst);
+    size_t index = 0;
+    while (used + 1 < dst_count && text[index] != 0) {
+        dst[used++] = (uint16_t)text[index++];
+    }
+    dst[used] = 0;
+    return text[index] == 0;
+}
+
+static int32_t reach_append_relaunch_argument(uint16_t *dst, size_t dst_count, const wchar_t *argument)
+{
+    if (dst == nullptr || dst_count == 0 || argument == nullptr || argument[0] == 0) {
+        return 0;
+    }
+    if (dst[0] != 0 && !reach_append_wcs(dst, dst_count, L" ")) {
+        return 0;
+    }
+    int32_t quoted = reach_wcs_needs_quotes(argument);
+    if (quoted && !reach_append_wcs(dst, dst_count, L"\"")) {
+        return 0;
+    }
+    for (const wchar_t *scan = argument; *scan != 0; ++scan) {
+        if (*scan == L'"' && !reach_append_wcs(dst, dst_count, L"\\")) {
+            return 0;
+        }
+        wchar_t ch[2] = { *scan, 0 };
+        if (!reach_append_wcs(dst, dst_count, ch)) {
+            return 0;
+        }
+    }
+    return !quoted || reach_append_wcs(dst, dst_count, L"\"");
+}
+
+static int32_t reach_parse_relaunch_command(const uint16_t *command, reach_pinned_app_model *out_app)
+{
+    if (command == nullptr || command[0] == 0 || out_app == nullptr) {
+        return 0;
+    }
+
+    int argc = 0;
+    wchar_t **argv = CommandLineToArgvW(reinterpret_cast<const wchar_t *>(command), &argc);
+    if (argv == nullptr || argc <= 0 || argv[0] == nullptr || argv[0][0] == 0) {
+        if (argv != nullptr) {
+            LocalFree(argv);
+        }
+        return 0;
+    }
+
+    int32_t ok = reach_copy_utf16(out_app->path, 260, reinterpret_cast<const uint16_t *>(argv[0])) == REACH_OK;
+    out_app->arguments[0] = 0;
+    for (int index = 1; ok && index < argc; ++index) {
+        ok = reach_append_relaunch_argument(out_app->arguments, 260, argv[index]);
+    }
+
+    LocalFree(argv);
     return ok;
 }
 
@@ -788,6 +882,74 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
     return REACH_OK;
 }
 
+static reach_result reach_window_manager_pin_app_for_window(
+    reach_window_manager *manager,
+    uintptr_t window_id,
+    const reach_window_snapshot *snapshot,
+    reach_pinned_app_model *out_app)
+{
+    (void)manager;
+    if (window_id == 0 || out_app == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_window_snapshot local_snapshot = {};
+    if (snapshot == nullptr) {
+        if (!reach_window_manager_build_snapshot(hwnd, &local_snapshot)) {
+            return REACH_ERROR;
+        }
+        snapshot = &local_snapshot;
+    }
+
+    *out_app = {};
+    if (snapshot->title[0] != 0) {
+        (void)reach_copy_utf16(out_app->title, 128, snapshot->title);
+    }
+
+    IPropertyStore *store = nullptr;
+    HRESULT hr = SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&store));
+    if (SUCCEEDED(hr) && store != nullptr) {
+        uint16_t relaunch_command[512] = {};
+        if (reach_window_property_string(store, PKEY_AppUserModel_RelaunchCommand, relaunch_command, 512)) {
+            (void)reach_parse_relaunch_command(relaunch_command, out_app);
+        }
+
+        uint16_t display_name[128] = {};
+        if (reach_window_property_string(store, PKEY_AppUserModel_RelaunchDisplayNameResource, display_name, 128) &&
+            display_name[0] != '@') {
+            (void)reach_copy_utf16(out_app->title, 128, display_name);
+        }
+
+        uint16_t icon_resource[260] = {};
+        if (reach_window_property_string(store, PKEY_AppUserModel_RelaunchIconResource, icon_resource, 260) &&
+            icon_resource[0] != '@') {
+            (void)reach_copy_utf16(out_app->icon_ref, 260, icon_resource);
+        }
+
+        store->Release();
+    }
+
+    if (out_app->path[0] == 0) {
+        (void)reach_copy_utf16(out_app->path, 260, snapshot->path);
+    }
+    if (out_app->icon_ref[0] == 0) {
+        (void)reach_copy_utf16(out_app->icon_ref, 260, out_app->path);
+    }
+    if (out_app->app_user_model_id[0] == 0) {
+        (void)reach_copy_utf16(out_app->app_user_model_id, 260, snapshot->app_user_model_id);
+    }
+    if (out_app->title[0] == 0) {
+        (void)reach_copy_utf16(out_app->title, 128, snapshot->title);
+    }
+
+    return out_app->path[0] != 0 ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_window_manager_activate(
     reach_window_manager *manager,
     uintptr_t window_id
@@ -948,6 +1110,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;
+    out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
     out_port->ops.activate = reach_window_manager_activate;
     out_port->ops.minimize = reach_window_manager_minimize;
     out_port->ops.close = reach_window_manager_close;

@@ -3,8 +3,7 @@
 
 #include <cwchar>
 
-#include "reach/app/config_path.h"
-#include "reach/app/pin_config.h"
+#include "reach/features/pin_config.h"
 #include "reach/platform/windows_adapters.h"
 #include "reach/platform/windows_messages.h"
 #include "reach/platform/shell_registration.h"
@@ -64,7 +63,7 @@ static reach_result reachctl_current_exe(uint16_t *path, DWORD path_count)
 static reach_result reachctl_open_config_store(reach_config_store_port *out_store)
 {
     uint16_t config_path[260] = {};
-    reach_result result = reach_default_config_path(config_path, 260);
+    reach_result result = reach_windows_default_config_path(config_path, 260);
     if (result != REACH_OK) {
         return result;
     }
@@ -101,8 +100,7 @@ static reach_result reachctl_install_context_menu(void)
     const wchar_t *targets[] = {
         L"Software\\Classes\\*\\shell\\Reach.PinToDock",
         L"Software\\Classes\\Directory\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\exefile\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\lnkfile\\shell\\Reach.PinToDock"
+        L"Software\\Classes\\exefile\\shell\\Reach.PinToDock"
     };
 
     for (size_t index = 0; index < sizeof(targets) / sizeof(targets[0]); ++index) {
@@ -123,8 +121,7 @@ static reach_result reachctl_remove_context_menu(void)
     const wchar_t *targets[] = {
         L"Software\\Classes\\*\\shell\\Reach.PinToDock",
         L"Software\\Classes\\Directory\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\exefile\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\lnkfile\\shell\\Reach.PinToDock"
+        L"Software\\Classes\\exefile\\shell\\Reach.PinToDock"
     };
 
     reach_result result = REACH_OK;
@@ -432,7 +429,7 @@ int wmain(int argc, wchar_t **argv)
             if (ok) {
                 reachctl_notify_config_changed();
             }
-            reachctl_print(ok ? L"Reach pin AppUserModelID set." : L"Reach pin AppUserModelID set failed.");
+            reachctl_print(ok ? L"Reach pin AppUserModelID set (diagnostic override)." : L"Reach pin AppUserModelID set failed.");
             return ok ? 0 : 1;
         }
         if (lstrcmpiW(argv[index], L"--unpin-path") == 0) {
@@ -516,6 +513,6 @@ int wmain(int argc, wchar_t **argv)
         }
     }
 
-    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --list-monitors | --pin-path <path> | --set-pin-appid <path> <appid> | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu | --set-wallpaper <path> | --set-wallpaper-monitor <index> <path> | --clear-wallpaper | --clear-wallpaper-monitor <index>");
+    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --list-monitors | --pin-path <path> | --set-pin-appid <path> <appid> (diagnostic override) | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu | --set-wallpaper <path> | --set-wallpaper-monitor <index> <path> | --clear-wallpaper | --clear-wallpaper-monitor <index>");
     return 2;
 }

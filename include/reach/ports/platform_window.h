@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 
+#include "reach/core/geometry.h"
 #include "reach/core/ui_events.h"
-#include "reach/core/ui_state.h"
+#include "reach/support/util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,8 +31,10 @@ typedef struct reach_platform_window_ops {
     reach_result (*set_blur_enabled)(reach_platform_window *window, int32_t enabled);
     reach_result (*apply_rounded_corners)(reach_platform_window *window, float radius);
     reach_result (*set_event_callback)(reach_platform_window *window, reach_platform_window_event_callback callback, void *user);
+    reach_result (*dispatch_events)(reach_platform_window *window);
     reach_result (*set_pointer_move_enabled)(reach_platform_window *window, int32_t enabled);
-    void *(*native_handle)(reach_platform_window *window);
+    reach_result (*raise)(reach_platform_window *window);
+    reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);
     void (*destroy)(reach_platform_window *window);
 } reach_platform_window_ops;
 

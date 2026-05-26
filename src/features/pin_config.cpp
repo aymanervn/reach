@@ -1,12 +1,28 @@
-#include "reach/app/pin_config.h"
-
-#include <windows.h>
-#include <shlwapi.h>
+#include "reach/features/pin_config.h"
 
 static int32_t reach_pin_path_equals(const uint16_t *a, const uint16_t *b)
 {
-    return a != nullptr && b != nullptr &&
-        CompareStringOrdinal(reinterpret_cast<const wchar_t *>(a), -1, reinterpret_cast<const wchar_t *>(b), -1, TRUE) == CSTR_EQUAL;
+    if (a == nullptr || b == nullptr) {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (a[index] != 0 && b[index] != 0) {
+        uint16_t ca = a[index];
+        uint16_t cb = b[index];
+        if (ca >= 'A' && ca <= 'Z') {
+            ca = (uint16_t)(ca + ('a' - 'A'));
+        }
+        if (cb >= 'A' && cb <= 'Z') {
+            cb = (uint16_t)(cb + ('a' - 'A'));
+        }
+        if (ca != cb) {
+            return 0;
+        }
+        ++index;
+    }
+
+    return a[index] == b[index];
 }
 
 static void reach_pin_assign_ids(reach_config_snapshot *snapshot)
@@ -46,19 +62,35 @@ static void reach_pin_title_from_path(uint16_t *title, size_t title_count, const
         return;
     }
 
-    const wchar_t *path_w = reinterpret_cast<const wchar_t *>(path);
-    const wchar_t *name = PathFindFileNameW(path_w);
-    if (name == nullptr || name[0] == 0) {
-        name = path_w;
+    const uint16_t *name = path;
+    for (const uint16_t *cursor = path; *cursor != 0; ++cursor) {
+        if (*cursor == '\\' || *cursor == '/') {
+            name = cursor + 1;
+        }
     }
 
-    wchar_t clean[128] = {};
-    wcscpy_s(clean, name);
-    PathRemoveExtensionW(clean);
-    if (clean[0] == 0) {
-        wcscpy_s(clean, name);
+    size_t name_length = 0;
+    while (name[name_length] != 0) {
+        ++name_length;
     }
-    (void)reach_copy_utf16(title, title_count, reinterpret_cast<const uint16_t *>(clean));
+
+    size_t end = name_length;
+    for (size_t index = name_length; index > 0; --index) {
+        if (name[index - 1] == '.') {
+            end = index - 1;
+            break;
+        }
+    }
+    if (end == 0) {
+        end = name_length;
+    }
+
+    size_t write = 0;
+    while (write + 1 < title_count && write < end) {
+        title[write] = name[write];
+        ++write;
+    }
+    title[write] = 0;
 }
 
 static reach_result reach_pin_add_default_explorer(reach_config_snapshot *snapshot)
@@ -70,9 +102,11 @@ static reach_result reach_pin_add_default_explorer(reach_config_snapshot *snapsh
     reach_pinned_app_model *app = &snapshot->pinned_apps[snapshot->pinned_app_count];
     *app = {};
     app->id = (uint32_t)(snapshot->pinned_app_count + 1);
-    (void)reach_copy_utf16(app->title, 128, reinterpret_cast<const uint16_t *>(L"Explorer"));
-    (void)reach_copy_utf16(app->path, 260, reinterpret_cast<const uint16_t *>(L"explorer.exe"));
-    (void)reach_copy_utf16(app->icon_ref, 260, reinterpret_cast<const uint16_t *>(L"explorer.exe"));
+    const uint16_t explorer[] = { 'E','x','p','l','o','r','e','r',0 };
+    const uint16_t explorer_exe[] = { 'e','x','p','l','o','r','e','r','.','e','x','e',0 };
+    (void)reach_copy_utf16(app->title, 128, explorer);
+    (void)reach_copy_utf16(app->path, 260, explorer_exe);
+    (void)reach_copy_utf16(app->icon_ref, 260, explorer_exe);
     snapshot->pinned_app_count += 1;
     return REACH_OK;
 }
@@ -124,6 +158,85 @@ reach_result reach_pin_config_pin_path(reach_config_store_port *store, const uin
     reach_pin_title_from_path(app->title, 128, path);
     (void)reach_copy_utf16(app->path, 260, path);
     (void)reach_copy_utf16(app->icon_ref, 260, path);
+    snapshot.pinned_app_count += 1;
+    return reach_pin_save(store, &snapshot);
+}
+
+reach_result reach_pin_config_pin_app(
+    reach_config_store_port *store,
+    const reach_pinned_app_model *app)
+{
+    if (app == nullptr || app->path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_config_snapshot snapshot = {};
+    reach_result result = reach_pin_load(store, &snapshot);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    if (snapshot.pinned_app_count == 0) {
+        result = reach_pin_add_default_explorer(&snapshot);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
+
+    for (size_t index = 0; index < snapshot.pinned_app_count; ++index) {
+        if (reach_pin_path_equals(snapshot.pinned_apps[index].path, app->path)) {
+            int32_t changed = 0;
+            if (snapshot.pinned_apps[index].arguments[0] == 0 &&
+                app->arguments[0] != 0) {
+                (void)reach_copy_utf16(
+                    snapshot.pinned_apps[index].arguments,
+                    260,
+                    app->arguments);
+                changed = 1;
+            }
+            if (snapshot.pinned_apps[index].app_user_model_id[0] == 0 &&
+                app->app_user_model_id[0] != 0) {
+                (void)reach_copy_utf16(
+                    snapshot.pinned_apps[index].app_user_model_id,
+                    260,
+                    app->app_user_model_id);
+                changed = 1;
+            }
+            if (changed) {
+                return reach_pin_save(store, &snapshot);
+            }
+            return REACH_OK;
+        }
+    }
+
+    if (snapshot.pinned_app_count >= REACH_MAX_PINNED_APPS) {
+        return REACH_ERROR;
+    }
+
+    reach_pinned_app_model *pinned = &snapshot.pinned_apps[snapshot.pinned_app_count];
+    *pinned = {};
+    pinned->id = (uint32_t)(snapshot.pinned_app_count + 1);
+
+    if (app->title[0] != 0) {
+        (void)reach_copy_utf16(pinned->title, 128, app->title);
+    } else {
+        reach_pin_title_from_path(pinned->title, 128, app->path);
+    }
+
+    (void)reach_copy_utf16(pinned->path, 260, app->path);
+    (void)reach_copy_utf16(pinned->arguments, 260, app->arguments);
+
+    if (app->icon_ref[0] != 0) {
+        (void)reach_copy_utf16(pinned->icon_ref, 260, app->icon_ref);
+    } else {
+        (void)reach_copy_utf16(pinned->icon_ref, 260, app->path);
+    }
+
+    (void)reach_copy_utf16(
+        pinned->app_user_model_id,
+        260,
+        app->app_user_model_id);
+
     snapshot.pinned_app_count += 1;
     return reach_pin_save(store, &snapshot);
 }

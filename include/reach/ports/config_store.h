@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "reach/core/ui_state.h"
+#include "reach/core/pinned_app.h"
+#include "reach/support/util.h"
 
 #ifdef __cplusplus
 extern "C" {

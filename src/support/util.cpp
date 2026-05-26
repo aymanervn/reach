@@ -1,6 +1,6 @@
 #include "reach/support/util.h"
 
-#include <windows.h>
+#include <stdio.h>
 
 void reach_log_info(const char *message)
 {
@@ -8,9 +8,9 @@ void reach_log_info(const char *message)
         return;
     }
 
-    OutputDebugStringA("[reach] ");
-    OutputDebugStringA(message);
-    OutputDebugStringA("\n");
+    fputs("[reach] ", stderr);
+    fputs(message, stderr);
+    fputc('\n', stderr);
 }
 
 void reach_log_error(const char *message)
@@ -19,9 +19,9 @@ void reach_log_error(const char *message)
         return;
     }
 
-    OutputDebugStringA("[reach:error] ");
-    OutputDebugStringA(message);
-    OutputDebugStringA("\n");
+    fputs("[reach:error] ", stderr);
+    fputs(message, stderr);
+    fputc('\n', stderr);
 }
 
 size_t reach_strlen_utf16(const uint16_t *text)

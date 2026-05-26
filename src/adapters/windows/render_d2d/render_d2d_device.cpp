@@ -18,17 +18,8 @@ D2D1_COLOR_F reach_d2d_color(reach_color color)
 
 void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr)
 {
-    if (SUCCEEDED(hr)) {
-        return;
-    }
-
-    wchar_t message[256] = {};
-    wsprintfW(
-        message,
-        L"Reach: %s failed with HRESULT 0x%08lX\r\n",
-        context != nullptr ? context : L"renderer operation",
-        static_cast<unsigned long>(hr));
-    OutputDebugStringW(message);
+    (void)context;
+    (void)hr;
 }
 
 HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level)
