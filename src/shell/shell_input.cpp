@@ -907,6 +907,12 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         return REACH_OK;
     }
 
+    if (shell->dock.window.ops.set_pointer_move_enabled != nullptr) {
+        (void)shell->dock.window.ops.set_pointer_move_enabled(
+            shell->dock.window.window,
+            0);
+    }
+
     if (shell->dock_drag_active) {
         uint32_t pin_id = shell->dock_drag_pin_id;
         int32_t dragged_pinned = shell->dock_drag_pinned;
@@ -1157,6 +1163,11 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         reach_shell_press_dock_item(shell, index);
         if (index < shell->dock_model.item_count) {
             shell->dock_drag_active = 1;
+            if (shell->dock.window.ops.set_pointer_move_enabled != nullptr) {
+                (void)shell->dock.window.ops.set_pointer_move_enabled(
+                    shell->dock.window.window,
+                    1);
+            }
             shell->dock_drag_moved = 0;
             shell->dock_drag_source_index = index;
             shell->dock_drag_target_index = index;

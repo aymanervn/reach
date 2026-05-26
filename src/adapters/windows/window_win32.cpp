@@ -180,14 +180,16 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return 0;
         case WM_MOUSEMOVE:
-            if (window != nullptr &&
-                window->pointer_move_enabled) {
+            if (window != nullptr) {
                 if (!window->tracking_mouse_leave) {
                     TRACKMOUSEEVENT track = {};
                     track.cbSize = sizeof(track);
                     track.dwFlags = TME_LEAVE;
                     track.hwndTrack = hwnd;
                     window->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
+                }
+                if (!window->pointer_move_enabled) {
+                    return 0;
                 }
                 POINT point = {};
                 point.x = GET_X_LPARAM(lparam);

@@ -740,12 +740,25 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
         shell->ui.dock.visible = target_hidden ? 0 : 1;
         reach_float_animation_start(&shell->dock_y_animation, shell->dock_y_animation.value, target_y, 0.18);
         shell->dock_animating = 1;
-        shell->dock.dirty_flags = 1;
     }
 
+    int32_t was_animating = shell->dock_animating;
     if (shell->dock_animating) {
         reach_float_animation_update(&shell->dock_y_animation, delta_seconds);
         shell->dock_animating = reach_shell_float_animation_active(&shell->dock_y_animation);
+    }
+    if (was_animating &&
+        !shell->dock_animating &&
+        !target_hidden &&
+        should_auto_hide &&
+        !popup_blocks_autohide &&
+        shell->dock_reveal_active &&
+        !reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds)) {
+        shell->dock_reveal_active = 0;
+        shell->dock_target_hidden = 1;
+        shell->ui.dock.visible = 0;
+        reach_float_animation_start(&shell->dock_y_animation, shell->dock_y_animation.value, hidden_y, 0.18);
+        shell->dock_animating = 1;
     }
     reach_rect_f32 animated = shown_bounds;
     animated.y = shell->dock_y_animation.value;
@@ -1010,12 +1023,14 @@ void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_do
     }
 }
 
-static int32_t reach_shell_can_fast_update_dock_animation(const reach_shell *shell)
+static int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell)
 {
     if (shell == nullptr) {
         return 0;
     }
 
+    /* Dock reveal/hide changes only the native window position. Keep this path
+       content-clean so animation frames do not rebuild or execute render commands. */
     return shell->dock_animating &&
         shell->has_layout &&
         !shell->layout_dirty &&
@@ -1034,7 +1049,7 @@ static int32_t reach_shell_can_fast_update_dock_animation(const reach_shell *she
         !reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation);
 }
 
-static reach_result reach_shell_fast_update_dock_animation(reach_shell *shell, double delta_seconds)
+static reach_result reach_shell_move_dock_animation_frame(reach_shell *shell, double delta_seconds)
 {
     if (shell == nullptr || !shell->has_layout) {
         return REACH_INVALID_ARGUMENT;
@@ -1081,8 +1096,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         (void)reach_shell_dispatch_events(shell);
         shell->events_dispatched_this_cycle = 0;
     }
-    if (reach_shell_can_fast_update_dock_animation(shell)) {
-           return reach_shell_fast_update_dock_animation(shell, delta_seconds);
+    if (reach_shell_can_move_dock_without_redraw(shell)) {
+        return reach_shell_move_dock_animation_frame(shell, delta_seconds);
     }
     reach_shell_process_quick_settings_system_changes(shell);
 

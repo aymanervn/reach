@@ -362,6 +362,14 @@ reach_result reach_shell_start(reach_shell *shell)
             return result;
         }
     }
+    if (shell->dock.window.ops.set_pointer_move_enabled != nullptr) {
+        result = shell->dock.window.ops.set_pointer_move_enabled(
+            shell->dock.window.window,
+            0);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
     if (shell->dock_reveal_edge.ops.set_callback != nullptr) {
         result = shell->dock_reveal_edge.ops.set_callback(
             shell->dock_reveal_edge.edge,
