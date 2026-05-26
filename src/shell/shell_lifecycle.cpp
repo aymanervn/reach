@@ -362,9 +362,41 @@ reach_result reach_shell_start(reach_shell *shell)
             return result;
         }
     }
+    if (shell->launcher.window.ops.set_pointer_move_enabled != nullptr) {
+        result = shell->launcher.window.ops.set_pointer_move_enabled(
+            shell->launcher.window.window,
+            0);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
     if (shell->dock.window.ops.set_pointer_move_enabled != nullptr) {
         result = shell->dock.window.ops.set_pointer_move_enabled(
             shell->dock.window.window,
+            0);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
+    if (shell->tray.window.ops.set_pointer_move_enabled != nullptr) {
+        result = shell->tray.window.ops.set_pointer_move_enabled(
+            shell->tray.window.window,
+            0);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
+    if (shell->switcher.window.ops.set_pointer_move_enabled != nullptr) {
+        result = shell->switcher.window.ops.set_pointer_move_enabled(
+            shell->switcher.window.window,
+            0);
+        if (result != REACH_OK) {
+            return result;
+        }
+    }
+    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr) {
+        result = shell->context_menu.window.ops.set_pointer_move_enabled(
+            shell->context_menu.window.window,
             0);
         if (result != REACH_OK) {
             return result;

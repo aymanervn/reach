@@ -186,7 +186,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         }
 
         if (app != nullptr) {
-            (void)reach_app_dispatch_events(app);
+            if (reach_app_has_pending_events(app)) {
+                (void)reach_app_dispatch_events(app);
+            }
 
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);

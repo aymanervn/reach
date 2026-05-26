@@ -270,6 +270,11 @@ reach_result reach_app_dispatch_events(reach_app *app)
     return reach_shell_dispatch_events(app->shell);
 }
 
+int32_t reach_app_has_pending_events(const reach_app *app)
+{
+    return app != nullptr && app->shell != nullptr && reach_shell_has_pending_events(app->shell);
+}
+
 int32_t reach_app_needs_frame(const reach_app *app)
 {
     return app != nullptr && app->shell != nullptr && reach_shell_needs_frame(app->shell);

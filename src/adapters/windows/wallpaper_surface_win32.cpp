@@ -82,6 +82,10 @@ static LRESULT CALLBACK reach_wallpaper_window_proc(HWND hwnd, UINT message, WPA
         return 1;
     }
 
+    if (message == WM_NCHITTEST) {
+        return HTTRANSPARENT;
+    }
+
     if (message == WM_PAINT) {
         PAINTSTRUCT paint = {};
         HDC dc = BeginPaint(hwnd, &paint);

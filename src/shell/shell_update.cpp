@@ -13,9 +13,32 @@ static int32_t reach_shell_float_animation_active(const reach_float_animation *a
 
 static void reach_shell_dispatch_surface_events(reach_surface_runtime *surface)
 {
-    if (surface != nullptr && surface->window.ops.dispatch_events != nullptr) {
-        (void)surface->window.ops.dispatch_events(surface->window.window);
+    if (surface == nullptr || surface->window.ops.dispatch_events == nullptr) {
+        return;
     }
+    if (surface->window.ops.has_pending_events != nullptr &&
+        !surface->window.ops.has_pending_events(surface->window.window)) {
+        return;
+    }
+    (void)surface->window.ops.dispatch_events(surface->window.window);
+}
+
+static int32_t reach_shell_surface_has_pending_events(const reach_surface_runtime *surface)
+{
+    return surface != nullptr &&
+        surface->window.ops.has_pending_events != nullptr &&
+        surface->window.ops.has_pending_events(surface->window.window);
+}
+
+int32_t reach_shell_has_pending_events(const reach_shell *shell)
+{
+    return shell != nullptr &&
+        (reach_shell_surface_has_pending_events(&shell->launcher) ||
+         reach_shell_surface_has_pending_events(&shell->dock) ||
+         reach_shell_surface_has_pending_events(&shell->tray) ||
+         reach_shell_surface_has_pending_events(&shell->switcher) ||
+         reach_shell_surface_has_pending_events(&shell->context_menu) ||
+         reach_shell_surface_has_pending_events(&shell->quick_settings));
 }
 
 reach_result reach_shell_dispatch_events(reach_shell *shell)
@@ -700,6 +723,10 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     if (!should_auto_hide) {
         shell->dock_reveal_active = 0;
         shell->dock_reveal_requested = 0;
+    } else if (popup_blocks_autohide) {
+        if (reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds)) {
+            shell->dock_reveal_active = 1;
+        }
     } else if (!popup_blocks_autohide && shell->dock_reveal_requested) {
         shell->dock_reveal_active =
             reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds);

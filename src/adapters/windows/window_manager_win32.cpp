@@ -316,6 +316,11 @@ static void CALLBACK reach_window_manager_event_proc(
     }
 
     if (event == EVENT_OBJECT_LOCATIONCHANGE &&
+        window != GetForegroundWindow()) {
+        return;
+    }
+
+    if (event == EVENT_OBJECT_LOCATIONCHANGE &&
         g_window_manager->dirty &&
         g_window_manager->pending_location_change) {
         return;

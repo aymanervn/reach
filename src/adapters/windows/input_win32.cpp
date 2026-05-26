@@ -14,6 +14,9 @@ struct reach_input_source {
     ATOM window_class;
     int32_t registered_hotkey_count;
     int32_t windows_key_down;
+    int32_t windows_key_forwarded;
+    int32_t windows_key_chord;
+    DWORD windows_key_vk;
     int32_t alt_down;
     int32_t shift_down;
     int32_t alt_tab_active;
@@ -30,6 +33,15 @@ enum reach_input_hotkey_id {
     REACH_HOTKEY_WIN_SPACE = 3,
     REACH_HOTKEY_CTRL_SPACE = 4
 };
+
+static void reach_input_send_windows_key_down(DWORD vk)
+{
+    INPUT input = {};
+    input.type = INPUT_KEYBOARD;
+    input.ki.wVk = static_cast<WORD>(vk == VK_RWIN ? VK_RWIN : VK_LWIN);
+    input.ki.dwFlags = KEYEVENTF_EXTENDEDKEY;
+    (void)SendInput(1, &input, sizeof(INPUT));
+}
 
 static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
@@ -77,6 +89,9 @@ static LRESULT CALLBACK reach_input_keyboard_proc(int code, WPARAM wparam, LPARA
     reach_input_source *source = g_reach_keyboard_source;
     if (code == HC_ACTION && source != nullptr && source->window != nullptr) {
         const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
+        if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) != 0) {
+            return CallNextHookEx(source->keyboard_hook, code, wparam, lparam);
+        }
         if (keyboard != nullptr &&
             (keyboard->vkCode == VK_SHIFT || keyboard->vkCode == VK_LSHIFT || keyboard->vkCode == VK_RSHIFT)) {
             source->shift_down = (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) ? 1 : 0;
@@ -120,14 +135,33 @@ static LRESULT CALLBACK reach_input_keyboard_proc(int code, WPARAM wparam, LPARA
             if (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) {
                 if (!source->windows_key_down) {
                     source->windows_key_down = 1;
-                    PostMessageW(source->window, REACH_INPUT_WM_WINDOWS_KEY, 0, 0);
+                    source->windows_key_forwarded = 0;
+                    source->windows_key_chord = 0;
+                    source->windows_key_vk = keyboard->vkCode;
                 }
                 return 1;
             }
             if (wparam == WM_KEYUP || wparam == WM_SYSKEYUP) {
+                int32_t forwarded = source->windows_key_forwarded;
+                int32_t chord = source->windows_key_chord;
                 source->windows_key_down = 0;
+                source->windows_key_forwarded = 0;
+                source->windows_key_chord = 0;
+                source->windows_key_vk = 0;
+                if (forwarded || chord) {
+                    return CallNextHookEx(source->keyboard_hook, code, wparam, lparam);
+                }
+                PostMessageW(source->window, REACH_INPUT_WM_WINDOWS_KEY, 0, 0);
                 return 1;
             }
+        }
+        if (keyboard != nullptr &&
+            source->windows_key_down &&
+            !source->windows_key_forwarded &&
+            (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN)) {
+            source->windows_key_chord = 1;
+            source->windows_key_forwarded = 1;
+            reach_input_send_windows_key_down(source->windows_key_vk);
         }
     }
 
@@ -197,6 +231,9 @@ static reach_result reach_input_start(reach_input_source *source, reach_input_ev
 
     source->registered_hotkey_count = 0;
     source->windows_key_down = 0;
+    source->windows_key_forwarded = 0;
+    source->windows_key_chord = 0;
+    source->windows_key_vk = 0;
     source->alt_down = 0;
     source->shift_down = 0;
     source->alt_tab_active = 0;
@@ -230,6 +267,16 @@ static reach_result reach_input_stop(reach_input_source *source)
         UnregisterHotKey(source->window, REACH_HOTKEY_WIN_SPACE);
         UnregisterHotKey(source->window, REACH_HOTKEY_CTRL_SPACE);
     }
+    if (source->windows_key_down) {
+        INPUT release[2] = {};
+        release[0].type = INPUT_KEYBOARD;
+        release[0].ki.wVk = VK_LWIN;
+        release[0].ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY;
+        release[1].type = INPUT_KEYBOARD;
+        release[1].ki.wVk = VK_RWIN;
+        release[1].ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_EXTENDEDKEY;
+        (void)SendInput(2, release, sizeof(INPUT));
+    }
     if (source->keyboard_hook != nullptr) {
         UnhookWindowsHookEx(source->keyboard_hook);
         source->keyboard_hook = nullptr;
@@ -239,6 +286,9 @@ static reach_result reach_input_stop(reach_input_source *source)
     }
     source->registered_hotkey_count = 0;
     source->windows_key_down = 0;
+    source->windows_key_forwarded = 0;
+    source->windows_key_chord = 0;
+    source->windows_key_vk = 0;
     source->alt_down = 0;
     source->shift_down = 0;
     source->alt_tab_active = 0;

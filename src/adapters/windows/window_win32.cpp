@@ -476,6 +476,11 @@ static reach_result reach_platform_window_set_event_callback(
     return REACH_OK;
 }
 
+static int32_t reach_platform_window_has_pending_events(const reach_platform_window *window)
+{
+    return window != nullptr && window->pending_event_count > 0;
+}
+
 static reach_result reach_platform_window_dispatch_events(reach_platform_window *window)
 {
     if (window == nullptr) {
@@ -665,6 +670,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
     out_port->ops.apply_rounded_corners = reach_platform_window_apply_rounded_corners;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
+    out_port->ops.has_pending_events = reach_platform_window_has_pending_events;
     out_port->ops.dispatch_events = reach_platform_window_dispatch_events;
     out_port->ops.set_pointer_move_enabled = reach_platform_window_set_pointer_move_enabled;
     out_port->ops.raise = reach_platform_window_raise;

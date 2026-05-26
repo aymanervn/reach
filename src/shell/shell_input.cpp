@@ -563,6 +563,11 @@ void reach_shell_close_context_menu(reach_shell *shell)
     }
     shell->context_menu.dirty_flags = 1;
     reach_shell_release_context_menu_input(shell);
+    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr) {
+        (void)shell->context_menu.window.ops.set_pointer_move_enabled(
+            shell->context_menu.window.window,
+            0);
+    }
     if (shell->context_menu.window.ops.hide != nullptr) {
         (void)shell->context_menu.window.ops.hide(shell->context_menu.window.window);
     }
@@ -739,6 +744,11 @@ static reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     shell->context_menu_power_open = 1;
     shell->context_menu_open = 1;
     shell->context_menu.dirty_flags = 1;
+    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr) {
+        (void)shell->context_menu.window.ops.set_pointer_move_enabled(
+            shell->context_menu.window.window,
+            1);
+    }
     reach_shell_capture_context_menu_input(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     return REACH_OK;
@@ -816,6 +826,11 @@ static reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, s
     shell->context_menu_power_open = 0;
     shell->context_menu_open = 1;
     shell->context_menu.dirty_flags = 1;
+    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr) {
+        (void)shell->context_menu.window.ops.set_pointer_move_enabled(
+            shell->context_menu.window.window,
+            1);
+    }
     reach_shell_capture_context_menu_input(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     return REACH_OK;
@@ -1324,11 +1339,7 @@ static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
         (!shell->dock_target_hidden ||
          shell->dock_reveal_active ||
          shell->dock_animating)) {
-        shell->dock_reveal_requested = 0;
         shell->dock_reveal_check_dirty = 1;
-        if (!shell->dock_animating) {
-            shell->dock_reveal_active = 0;
-        }
         reach_shell_request_update(shell);
     }
 
