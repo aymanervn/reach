@@ -1076,7 +1076,14 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
     if (dock_hit.type == REACH_DOCK_HIT_ITEM && shell->pressed_dock_index == dock_hit.index) {
         shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
-        return reach_shell_execute_dock_item_action(shell, reach_dock_item_action_for_index(&shell->dock_model, dock_hit.index));
+
+        reach_dock_item_action action = reach_dock_item_action_for_index(&shell->dock_model, dock_hit.index);
+
+        reach_shell_release_dock_item(shell);
+        shell->dock.dirty_flags = 1;
+        reach_shell_request_update(shell);
+
+        return reach_shell_execute_dock_item_action(shell, action);
     }
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
 

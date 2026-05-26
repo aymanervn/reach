@@ -153,7 +153,7 @@ static reach_result reach_launch_default_explorer_folder(void)
 {
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_NOASYNC;
+    execute.fMask = 0;
     execute.lpFile = L"shell:MyComputerFolder";
     execute.nShow = SW_SHOWNORMAL;
     return ShellExecuteExW(&execute) ? REACH_OK : REACH_ERROR;
@@ -196,7 +196,7 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher, cons
 
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_NOASYNC;
+    execute.fMask = 0;
     execute.lpFile = reinterpret_cast<LPCWSTR>(request->path);
     execute.lpParameters = request->arguments[0] != 0 ? reinterpret_cast<LPCWSTR>(request->arguments) : nullptr;
     execute.lpDirectory = has_working_directory
