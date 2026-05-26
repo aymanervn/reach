@@ -26,6 +26,8 @@ struct reach_tray_provider {
     UINT taskbar_created_message;
     reach_tray_native_item items[REACH_MAX_TRAY_ITEMS];
     size_t item_count;
+    HWND active_menu_owner;
+    uint32_t active_menu_owner_id;
     int32_t dirty;
 };
 
@@ -286,6 +288,28 @@ static WPARAM reach_tray_cursor_wparam(void)
     return (WPARAM)(((point.y & 0xffff) << 16) | (point.x & 0xffff));
 }
 
+static reach_result reach_tray_cancel_active_menu(reach_tray_provider *provider)
+{
+    if (provider == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND owner = provider->active_menu_owner;
+    provider->active_menu_owner = nullptr;
+    provider->active_menu_owner_id = 0;
+
+    if (provider->host_window != nullptr && IsWindow(provider->host_window)) {
+        (void)SetForegroundWindow(provider->host_window);
+    }
+
+    if (owner != nullptr && IsWindow(owner)) {
+        (void)PostMessageW(owner, WM_CANCELMODE, 0, 0);
+        (void)PostMessageW(owner, WM_NULL, 0, 0);
+    }
+
+    return REACH_OK;
+}
+
 static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t item_id, reach_tray_action action)
 {
     REACH_ASSERT(provider != nullptr);
@@ -297,6 +321,15 @@ static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t 
         reach_tray_native_item *item = &provider->items[index];
         if (item->item.id != item_id || item->owner == nullptr || item->callback_message == 0) {
             continue;
+        }
+
+        (void)reach_tray_cancel_active_menu(provider);
+
+        provider->active_menu_owner = item->owner;
+        provider->active_menu_owner_id = item->owner_id;
+
+        if (provider->host_window != nullptr && IsWindow(provider->host_window)) {
+            (void)SetForegroundWindow(provider->host_window);
         }
 
         uint32_t mouse_message = action == REACH_TRAY_ACTION_RIGHT_CLICK ? WM_RBUTTONUP : WM_LBUTTONUP;
@@ -361,6 +394,7 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
     out_port->ops.item_count = reach_tray_item_count;
     out_port->ops.item_at = reach_tray_item_at;
     out_port->ops.activate = reach_tray_activate;
+    out_port->ops.cancel_active_menu = reach_tray_cancel_active_menu;
     out_port->ops.destroy = reach_tray_destroy;
     return REACH_OK;
 }

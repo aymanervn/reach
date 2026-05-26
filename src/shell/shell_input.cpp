@@ -212,6 +212,9 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
         (void)reach_shell_refresh_tray_items(shell);
         reach_shell_capture_tray_input(shell);
     } else {
+        if (shell->tray_provider.ops.cancel_active_menu != nullptr) {
+               (void)shell->tray_provider.ops.cancel_active_menu(shell->tray_provider.provider);
+        }
         reach_shell_release_tray_input(shell);
     }
     reach_shell_sync_popup_mouse_hook(shell);

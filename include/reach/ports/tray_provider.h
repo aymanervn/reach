@@ -32,6 +32,7 @@ typedef struct reach_tray_provider_ops {
     size_t (*item_count)(const reach_tray_provider *provider);
     reach_result (*item_at)(const reach_tray_provider *provider, size_t index, reach_tray_item *out_item);
     reach_result (*activate)(reach_tray_provider *provider, uint32_t item_id, reach_tray_action action);
+    reach_result (*cancel_active_menu)(reach_tray_provider *provider);
     void (*destroy)(reach_tray_provider *provider);
 } reach_tray_provider_ops;
 
