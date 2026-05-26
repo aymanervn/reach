@@ -14,10 +14,10 @@
 extern "C" {
 #endif
 
-typedef int32_t (*reach_dock_path_matches_pinned_fn)(
+typedef int32_t (*reach_dock_window_matches_pinned_fn)(
     void *user,
     const reach_pinned_app_model *pinned_app,
-    const uint16_t *path);
+    const reach_window_snapshot *window);
 
 typedef struct reach_dock_order_key {
     int32_t pinned;
@@ -57,20 +57,20 @@ size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *mo
 size_t reach_dock_feature_model_find_order_key(const reach_dock_feature_model *model, reach_dock_order_key key);
 void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t source, size_t target);
 size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_model *model, uint32_t pin_id);
-size_t reach_dock_find_pinned_for_path(
+size_t reach_dock_find_pinned_for_window(
     const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count,
-    const uint16_t *path,
-    reach_dock_path_matches_pinned_fn path_matches_pinned,
-    void *path_match_user);
+    const reach_window_snapshot *window,
+    reach_dock_window_matches_pinned_fn window_matches_pinned,
+    void *match_user);
 void reach_dock_feature_model_build_items(
     reach_dock_feature_model *model,
     const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count,
     const reach_window_snapshot *open_windows,
     size_t open_window_count,
-    reach_dock_path_matches_pinned_fn path_matches_pinned,
-    void *path_match_user);
+    reach_dock_window_matches_pinned_fn window_matches_pinned,
+    void *match_user);
 reach_result reach_dock_load_pinned_icons(
     reach_dock_icon_cache *cache,
     reach_icon_provider_port *icon_provider,

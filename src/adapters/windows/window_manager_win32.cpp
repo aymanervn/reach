@@ -3,6 +3,10 @@
 #include <windows.h>
 #include <dwmapi.h>
 #include <shlwapi.h>
+#include <shobjidl.h>
+#include <propkey.h>
+#include <propvarutil.h>
+#include <shellapi.h>
 
 #include <new>
 #include <vector>
@@ -30,6 +34,41 @@ struct reach_window_manager {
 };
 
 static reach_window_manager *g_window_manager;
+
+static int32_t reach_window_app_user_model_id(HWND hwnd, uint16_t *out_id, size_t out_count)
+{
+    if (hwnd == nullptr || out_id == nullptr || out_count == 0) {
+        return 0;
+    }
+
+    out_id[0] = 0;
+
+    IPropertyStore *store = nullptr;
+    HRESULT hr = SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&store));
+    if (FAILED(hr) || store == nullptr) {
+        return 0;
+    }
+
+    PROPVARIANT value = {};
+    PropVariantInit(&value);
+
+    hr = store->GetValue(PKEY_AppUserModel_ID, &value);
+
+    int32_t ok = 0;
+    if (SUCCEEDED(hr) &&
+        value.vt == VT_LPWSTR &&
+        value.pwszVal != nullptr &&
+        value.pwszVal[0] != 0) {
+        ok = reach_copy_utf16(
+            out_id,
+            out_count,
+            reinterpret_cast<const uint16_t *>(value.pwszVal)) == REACH_OK;
+    }
+
+    PropVariantClear(&value);
+    store->Release();
+    return ok;
+}
 
 static reach_hidden_minimized_window *reach_window_manager_find_hidden_minimized(
     reach_window_manager *manager,
@@ -414,7 +453,6 @@ static int32_t reach_window_manager_any_visible_maximized_on_primary(void)
     }
     return 0;
 }
-
 static int32_t reach_window_manager_build_snapshot(HWND hwnd, reach_window_snapshot *out_snapshot)
 {
     if (out_snapshot == nullptr || hwnd == nullptr || !IsWindow(hwnd)) {
@@ -427,11 +465,11 @@ static int32_t reach_window_manager_build_snapshot(HWND hwnd, reach_window_snaps
     snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
     snapshot.minimized = IsIconic(hwnd) ? 1 : 0;
 
+    (void)reach_window_app_user_model_id(hwnd, snapshot.app_user_model_id, 260);
     RECT rect = {};
     WINDOWPLACEMENT placement = {};
     placement.length = sizeof(placement);
 
-    /* Use normal placement for minimized windows to avoid icon-position jumps. */
     if (snapshot.minimized && GetWindowPlacement(hwnd, &placement)) {
         rect = placement.rcNormalPosition;
     } else {

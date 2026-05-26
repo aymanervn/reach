@@ -1,21 +1,22 @@
 #include "reach/features/dock.h"
 
-size_t reach_dock_find_pinned_for_path(
+size_t reach_dock_find_pinned_for_window(
     const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count,
-    const uint16_t *path,
-    reach_dock_path_matches_pinned_fn path_matches_pinned,
-    void *path_match_user)
+    const reach_window_snapshot *window,
+    reach_dock_window_matches_pinned_fn window_matches_pinned,
+    void *match_user)
 {
-    if (pinned_apps == nullptr || path == nullptr || path[0] == 0 || path_matches_pinned == nullptr) {
+    if (pinned_apps == nullptr || window == nullptr || window_matches_pinned == nullptr) {
         return REACH_MAX_PINNED_APPS;
     }
 
     for (size_t index = 0; index < pinned_app_count; ++index) {
-        if (path_matches_pinned(path_match_user, &pinned_apps[index], path)) {
+        if (window_matches_pinned(match_user, &pinned_apps[index], window)) {
             return index;
         }
     }
+
     return REACH_MAX_PINNED_APPS;
 }
 
@@ -25,8 +26,8 @@ static int32_t reach_dock_pinned_running(
     const reach_window_snapshot *open_windows,
     size_t open_window_count,
     size_t pinned_index,
-    reach_dock_path_matches_pinned_fn path_matches_pinned,
-    void *path_match_user,
+    reach_dock_window_matches_pinned_fn window_matches_pinned,
+    void *match_user,
     uintptr_t *out_window)
 {
     if (out_window != nullptr) {
@@ -37,12 +38,12 @@ static int32_t reach_dock_pinned_running(
     }
 
     for (size_t index = 0; index < open_window_count; ++index) {
-        if (reach_dock_find_pinned_for_path(
+        if (reach_dock_find_pinned_for_window(
                 pinned_apps,
                 pinned_app_count,
-                open_windows[index].path,
-                path_matches_pinned,
-                path_match_user) == pinned_index) {
+                &open_windows[index],
+                window_matches_pinned,
+                match_user) == pinned_index) {
             if (out_window != nullptr) {
                 *out_window = open_windows[index].id;
             }
@@ -66,8 +67,8 @@ void reach_dock_feature_model_build_items(
     size_t pinned_app_count,
     const reach_window_snapshot *open_windows,
     size_t open_window_count,
-    reach_dock_path_matches_pinned_fn path_matches_pinned,
-    void *path_match_user)
+    reach_dock_window_matches_pinned_fn window_matches_pinned,
+    void *match_user)
 {
     if (model == nullptr) {
         return;
@@ -87,22 +88,24 @@ void reach_dock_feature_model_build_items(
             open_windows,
             open_window_count,
             index,
-            path_matches_pinned,
-            path_match_user,
+            window_matches_pinned,
+            match_user,
             &window_id) ? window_id : 0;
         natural_items[natural_count].pinned_index = index;
         natural_items[natural_count].open_index = REACH_MAX_PINNED_APPS;
         ++natural_count;
     }
+
     for (size_t index = 0; open_windows != nullptr && index < open_window_count && natural_count < REACH_MAX_PINNED_APPS; ++index) {
-        if (reach_dock_find_pinned_for_path(
+        if (reach_dock_find_pinned_for_window(
                 pinned_apps,
                 pinned_app_count,
-                open_windows[index].path,
-                path_matches_pinned,
-                path_match_user) != REACH_MAX_PINNED_APPS) {
+                &open_windows[index],
+                window_matches_pinned,
+                match_user) != REACH_MAX_PINNED_APPS) {
             continue;
         }
+
         natural_items[natural_count].pinned = 0;
         natural_items[natural_count].pin_id = 0;
         natural_items[natural_count].window = open_windows[index].id;
@@ -125,6 +128,7 @@ void reach_dock_feature_model_build_items(
             }
         }
     }
+
     for (size_t natural_index = 0; natural_index < natural_count && model->item_count < REACH_MAX_PINNED_APPS; ++natural_index) {
         if (!used[natural_index]) {
             model->items[model->item_count++] = natural_items[natural_index];

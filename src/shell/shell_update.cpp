@@ -93,19 +93,36 @@ static int32_t reach_shell_path_equals(const uint16_t *a, const uint16_t *b)
         CompareStringOrdinal(reinterpret_cast<const wchar_t *>(a), -1, reinterpret_cast<const wchar_t *>(b), -1, TRUE) == CSTR_EQUAL;
 }
 
-static int32_t reach_shell_dock_path_matches_pinned(void *user, const reach_pinned_app_model *pinned_app, const uint16_t *path)
+static int32_t reach_shell_nonempty_text_equals(const uint16_t *a, const uint16_t *b)
+{
+    return a != nullptr && b != nullptr && a[0] != 0 && b[0] != 0 &&
+        CompareStringOrdinal(
+            reinterpret_cast<const wchar_t *>(a),
+            -1,
+            reinterpret_cast<const wchar_t *>(b),
+            -1,
+            TRUE) == CSTR_EQUAL;
+}
+
+static int32_t reach_shell_dock_window_matches_pinned(
+    void *user,
+    const reach_pinned_app_model *pinned_app,
+    const reach_window_snapshot *window)
 {
     (void)user;
-    if (pinned_app == nullptr || path == nullptr || path[0] == 0) {
+
+    if (pinned_app == nullptr || window == nullptr) {
         return 0;
     }
-    if (reach_shell_path_equals(pinned_app->path, path) ||
-        reach_shell_path_equals(pinned_app->icon_ref, path)) {
+
+    if (reach_shell_nonempty_text_equals(
+            pinned_app->app_user_model_id,
+            window->app_user_model_id)) {
         return 1;
     }
-    const wchar_t *pinned_name = PathFindFileNameW(reinterpret_cast<const wchar_t *>(pinned_app->path));
-    const wchar_t *window_name = PathFindFileNameW(reinterpret_cast<const wchar_t *>(path));
-    return pinned_name != nullptr && window_name != nullptr && lstrcmpiW(pinned_name, window_name) == 0;
+
+    return reach_shell_path_equals(pinned_app->path, window->path) ||
+        reach_shell_path_equals(pinned_app->icon_ref, window->path);
 }
 
 reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed)
@@ -229,7 +246,7 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         shell->ui.pinned_app_count,
         shell->open_windows,
         shell->open_window_count,
-        reach_shell_dock_path_matches_pinned,
+        reach_shell_dock_window_matches_pinned,
         shell);
 
     layout->app_slot_count = shell->dock_model.item_count;

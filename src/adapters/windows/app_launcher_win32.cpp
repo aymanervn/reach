@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <shlwapi.h>
 
 #include <new>
 
@@ -158,6 +159,20 @@ static reach_result reach_launch_default_explorer_folder(void)
     return ShellExecuteExW(&execute) ? REACH_OK : REACH_ERROR;
 }
 
+static int32_t reach_parent_directory(const uint16_t *path, uint16_t *out_directory, DWORD out_count)
+{
+    if (path == nullptr || path[0] == 0 || out_directory == nullptr || out_count == 0) {
+        return 0;
+    }
+
+    if (reach_copy_utf16(out_directory, out_count, path) != REACH_OK) {
+        return 0;
+    }
+
+    wchar_t *directory = reinterpret_cast<wchar_t *>(out_directory);
+    return PathRemoveFileSpecW(directory) && directory[0] != 0;
+}
+
 static reach_result reach_app_launcher_launch(reach_app_launcher *launcher, const reach_app_launch_request *request)
 {
     (void)launcher;
@@ -173,11 +188,20 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher, cons
         return reach_launch_default_explorer_folder();
     }
 
+    uint16_t working_directory[260] = {};
+    int32_t has_working_directory = reach_parent_directory(
+        request->path,
+        working_directory,
+        260);
+
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_DEFAULT;
+    execute.fMask = SEE_MASK_NOASYNC;
     execute.lpFile = reinterpret_cast<LPCWSTR>(request->path);
     execute.lpParameters = request->arguments[0] != 0 ? reinterpret_cast<LPCWSTR>(request->arguments) : nullptr;
+    execute.lpDirectory = has_working_directory
+        ? reinterpret_cast<LPCWSTR>(working_directory)
+        : nullptr;
     execute.nShow = SW_SHOWNORMAL;
     return ShellExecuteExW(&execute) ? REACH_OK : REACH_ERROR;
 }

@@ -33,6 +33,7 @@ typedef struct reach_pinned_app_model {
     uint16_t title[128];
     uint16_t path[260];
     uint16_t icon_ref[260];
+    uint16_t app_user_model_id[260];
 } reach_pinned_app_model;
 
 typedef struct reach_dock_model {
