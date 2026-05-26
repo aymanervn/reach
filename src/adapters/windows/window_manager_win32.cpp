@@ -32,6 +32,7 @@ struct reach_window_manager {
     std::vector<reach_window_snapshot> pending_windows;
     std::vector<reach_hidden_minimized_window> hidden_minimized_windows;
     int32_t dirty;
+    int32_t pending_location_change;
 };
 
 static reach_window_manager *g_window_manager;
@@ -314,6 +315,12 @@ static void CALLBACK reach_window_manager_event_proc(
         }
     }
 
+    if (event == EVENT_OBJECT_LOCATIONCHANGE &&
+        g_window_manager->dirty &&
+        g_window_manager->pending_location_change) {
+        return;
+    }
+
     if (event == EVENT_SYSTEM_MINIMIZEEND &&
         window != nullptr &&
         IsWindow(window) &&
@@ -321,7 +328,11 @@ static void CALLBACK reach_window_manager_event_proc(
         (void)reach_window_manager_track_hidden_minimized(g_window_manager, window);
     }
 
-    g_window_manager->foreground = GetForegroundWindow();
+    if (event == EVENT_SYSTEM_FOREGROUND || !g_window_manager->dirty) {
+        g_window_manager->foreground = GetForegroundWindow();
+    }
+    g_window_manager->pending_location_change =
+        event == EVENT_OBJECT_LOCATIONCHANGE ? 1 : 0;
     g_window_manager->dirty = 1;
 }
 
@@ -703,6 +714,7 @@ static reach_result reach_window_manager_refresh(reach_window_manager *manager)
     manager->foreground = GetForegroundWindow();
     reach_window_manager_refresh_windows(manager);
     manager->dirty = 0;
+    manager->pending_location_change = 0;
     return REACH_OK;
 }
 

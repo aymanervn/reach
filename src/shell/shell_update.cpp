@@ -18,10 +18,10 @@ static void reach_shell_dispatch_surface_events(reach_surface_runtime *surface)
     }
 }
 
-static void reach_shell_dispatch_window_events(reach_shell *shell)
+reach_result reach_shell_dispatch_events(reach_shell *shell)
 {
     if (shell == nullptr) {
-        return;
+        return REACH_INVALID_ARGUMENT;
     }
 
     reach_shell_dispatch_surface_events(&shell->launcher);
@@ -30,6 +30,8 @@ static void reach_shell_dispatch_window_events(reach_shell *shell)
     reach_shell_dispatch_surface_events(&shell->switcher);
     reach_shell_dispatch_surface_events(&shell->context_menu);
     reach_shell_dispatch_surface_events(&shell->quick_settings);
+    shell->events_dispatched_this_cycle = 1;
+    return REACH_OK;
 }
 
 static size_t reach_shell_min_size(size_t a, size_t b)
@@ -373,6 +375,12 @@ static void reach_shell_update_clock_text(reach_shell *shell)
     }
 
     time_t now = time(nullptr);
+    int64_t current_minute = (int64_t)(now / 60);
+    if (shell->dock_clock_initialized &&
+        shell->dock_clock_last_minute == current_minute) {
+        return;
+    }
+
     struct tm local = {};
     if (now == (time_t)-1 || localtime_s(&local, &now) != 0) {
         return;
@@ -412,6 +420,7 @@ static void reach_shell_update_clock_text(reach_shell *shell)
         shell->dock_clock_initialized = 1;
         shell->dock.dirty_flags = 1;
     }
+    shell->dock_clock_last_minute = current_minute;
 }
 
 reach_result reach_shell_reload_pins(reach_shell *shell)
@@ -592,13 +601,8 @@ static reach_rect_f32 reach_shell_dock_reveal_bounds(reach_rect_f32 shown_bounds
     return bounds;
 }
 
-static int32_t reach_shell_cursor_at_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
+static int32_t reach_shell_cursor_at_dock_reveal_edge(reach_point_i32 cursor, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
 {
-    reach_point_i32 cursor = {};
-    if (!reach_shell_get_cursor_position(shell, &cursor)) {
-        return 0;
-    }
-
     float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
     reach_rect_f32 reveal_bounds = reach_shell_dock_reveal_bounds(shown_bounds, monitor_bounds);
     reveal_bounds.y = monitor_bottom - 2.0f;
@@ -606,12 +610,8 @@ static int32_t reach_shell_cursor_at_dock_reveal_edge(reach_shell *shell, reach_
     return reach_shell_point_in_rect(cursor, reveal_bounds);
 }
 
-static int32_t reach_shell_cursor_in_dock_reveal_bounds(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
+static int32_t reach_shell_cursor_in_dock_reveal_bounds(reach_point_i32 cursor, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
 {
-    reach_point_i32 cursor = {};
-    if (!reach_shell_get_cursor_position(shell, &cursor)) {
-        return 0;
-    }
     return reach_shell_point_in_rect(cursor, reach_shell_dock_reveal_bounds(shown_bounds, monitor_bounds));
 }
 
@@ -700,19 +700,25 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     int32_t should_auto_hide =
         shell->ui.dock.auto_hide &&
         reach_shell_should_auto_hide_dock(shell);
+    reach_point_i32 cursor = {};
+    int32_t has_cursor = should_auto_hide
+        ? reach_shell_get_cursor_position(shell, &cursor)
+        : 0;
 
     int32_t base_hidden = should_auto_hide && !popup_blocks_autohide;
     if (!should_auto_hide) {
         shell->dock_reveal_active = 0;
     } else if (popup_blocks_autohide) {
-        if (reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds) ||
-            reach_shell_cursor_at_dock_reveal_edge(shell, shown_bounds, monitor_bounds)) {
+        if (has_cursor &&
+            (reach_shell_cursor_in_dock_reveal_bounds(cursor, shown_bounds, monitor_bounds) ||
+             reach_shell_cursor_at_dock_reveal_edge(cursor, shown_bounds, monitor_bounds))) {
             shell->dock_reveal_active = 1;
         }
     } else if (shell->dock_reveal_active) {
-        shell->dock_reveal_active =
-            reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds);
-    } else if (reach_shell_cursor_at_dock_reveal_edge(shell, shown_bounds, monitor_bounds)) {
+        shell->dock_reveal_active = has_cursor &&
+            reach_shell_cursor_in_dock_reveal_bounds(cursor, shown_bounds, monitor_bounds);
+    } else if (has_cursor &&
+        reach_shell_cursor_at_dock_reveal_edge(cursor, shown_bounds, monitor_bounds)) {
         shell->dock_reveal_active = 1;
     }
 
@@ -1081,7 +1087,12 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     if (shell == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_shell_dispatch_window_events(shell);
+    if (shell->events_dispatched_this_cycle) {
+        shell->events_dispatched_this_cycle = 0;
+    } else {
+        (void)reach_shell_dispatch_events(shell);
+        shell->events_dispatched_this_cycle = 0;
+    }
     if (reach_shell_can_fast_update_dock_animation(shell)) {
            return reach_shell_fast_update_dock_animation(shell, delta_seconds);
     }

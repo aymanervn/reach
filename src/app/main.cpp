@@ -186,18 +186,24 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         }
 
         if (app != nullptr) {
+            (void)reach_app_dispatch_events(app);
+
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);
 
-            double delta_seconds = frequency.QuadPart > 0
-                ? (double)(current_counter.QuadPart - previous_counter.QuadPart) / (double)frequency.QuadPart
-                : 0.016;
-            previous_counter = current_counter;
-            if (delta_seconds > 0.1) {
-                delta_seconds = 0.1;
-            }
             int32_t needs_frame_after_messages = reach_app_needs_frame(app);
-            (void)reach_app_update(app, needs_frame_after_messages ? delta_seconds : 0.0);
+            if (needs_frame_after_messages) {
+                double delta_seconds = frequency.QuadPart > 0
+                    ? (double)(current_counter.QuadPart - previous_counter.QuadPart) / (double)frequency.QuadPart
+                    : 0.016;
+                previous_counter = current_counter;
+                if (delta_seconds > 0.1) {
+                    delta_seconds = 0.1;
+                }
+                (void)reach_app_update(app, delta_seconds);
+            } else {
+                previous_counter = current_counter;
+            }
         }
     }
 

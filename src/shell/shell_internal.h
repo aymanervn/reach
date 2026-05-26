@@ -72,6 +72,7 @@ struct reach_shell {
     int32_t layout_dirty;
     int32_t render_dirty;
     int32_t update_requested;
+    int32_t events_dispatched_this_cycle;
     int32_t monitors_dirty;
     int32_t wallpaper_bounds_valid;
     reach_rect_f32 wallpaper_bounds;
@@ -148,6 +149,7 @@ struct reach_shell {
     uint16_t dock_time_text[32];
     uint16_t dock_date_text[64];
     int32_t dock_clock_initialized;
+    int64_t dock_clock_last_minute;
     int32_t running;
     uint16_t wallpaper_path[260];
     reach_audio_volume_port audio_volume;
@@ -156,6 +158,8 @@ struct reach_shell {
     int32_t quick_settings_open;
     int32_t quick_settings_dragging_volume;
     reach_quick_settings_hit_type quick_settings_drag_type;
+    float quick_settings_drag_last_level;
+    int32_t quick_settings_drag_level_valid;
     size_t quick_settings_drag_session_index;
     uint16_t quick_settings_drag_session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
     reach_audio_volume_state quick_settings_audio_state;

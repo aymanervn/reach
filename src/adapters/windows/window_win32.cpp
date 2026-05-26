@@ -527,6 +527,13 @@ static int32_t reach_platform_window_queue_event(reach_platform_window *window, 
         return 0;
     }
 
+    if (event->type == REACH_UI_EVENT_POINTER_MOVE &&
+        window->pending_event_count > 0 &&
+        window->pending_events[window->pending_event_count - 1].type == REACH_UI_EVENT_POINTER_MOVE) {
+        window->pending_events[window->pending_event_count - 1] = *event;
+        return 1;
+    }
+
     if (window->pending_event_count < REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS) {
         window->pending_events[window->pending_event_count++] = *event;
     } else {

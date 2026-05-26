@@ -373,6 +373,7 @@ void reach_shell_set_quick_settings_open(
     shell->quick_settings_open = next_open;
     shell->quick_settings_dragging_volume = 0;
     shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
+    shell->quick_settings_drag_level_valid = 0;
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
             shell->quick_settings.window.window,

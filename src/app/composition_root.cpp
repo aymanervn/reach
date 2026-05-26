@@ -260,6 +260,16 @@ reach_result reach_app_update(reach_app *app, double delta_seconds)
     return reach_shell_update(app->shell, delta_seconds);
 }
 
+reach_result reach_app_dispatch_events(reach_app *app)
+{
+    REACH_ASSERT(app != nullptr);
+    if (app == nullptr || app->shell == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    return reach_shell_dispatch_events(app->shell);
+}
+
 int32_t reach_app_needs_frame(const reach_app *app)
 {
     return app != nullptr && app->shell != nullptr && reach_shell_needs_frame(app->shell);
