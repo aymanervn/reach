@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/geometry.h"
+#include "reach/core/pinned_app.h"
 #include "reach/support/search_types.h"
 #include "reach/support/util.h"
 
@@ -11,30 +13,7 @@
 extern "C" {
 #endif
 
-#define REACH_MAX_PINNED_APPS 12
 #define REACH_MAX_SEARCH_CHARS 255
-
-typedef struct reach_color {
-    float r;
-    float g;
-    float b;
-    float a;
-} reach_color;
-
-typedef struct reach_rect_f32 {
-    float x;
-    float y;
-    float width;
-    float height;
-} reach_rect_f32;
-
-typedef struct reach_pinned_app_model {
-    uint32_t id;
-    uint16_t title[128];
-    uint16_t path[260];
-    uint16_t icon_ref[260];
-    uint16_t app_user_model_id[260];
-} reach_pinned_app_model;
 
 typedef struct reach_dock_model {
     float height;

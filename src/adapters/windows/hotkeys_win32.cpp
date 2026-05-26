@@ -1,4 +1,4 @@
-#include "reach/platform/hotkeys.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 
@@ -10,7 +10,9 @@ struct reach_hotkeys {
     std::vector<reach_hotkey_command> commands;
 };
 
-reach_result reach_hotkeys_create(reach_hotkeys **out_hotkeys)
+static reach_result reach_hotkeys_unregister_all(reach_hotkeys *hotkeys);
+
+static reach_result reach_hotkeys_create(reach_hotkeys **out_hotkeys)
 {
     if (out_hotkeys == nullptr) {
         return REACH_INVALID_ARGUMENT;
@@ -26,7 +28,7 @@ reach_result reach_hotkeys_create(reach_hotkeys **out_hotkeys)
     return REACH_OK;
 }
 
-void reach_hotkeys_destroy(reach_hotkeys *hotkeys)
+static void reach_hotkeys_destroy(reach_hotkeys *hotkeys)
 {
     if (hotkeys != nullptr) {
         (void)reach_hotkeys_unregister_all(hotkeys);
@@ -34,7 +36,7 @@ void reach_hotkeys_destroy(reach_hotkeys *hotkeys)
     delete hotkeys;
 }
 
-reach_result reach_hotkeys_register(reach_hotkeys *hotkeys, const reach_hotkey_config *config, uint32_t count)
+static reach_result reach_hotkeys_register(reach_hotkeys *hotkeys, const reach_hotkey_config *config, uint32_t count)
 {
     if (hotkeys == nullptr || (config == nullptr && count != 0)) {
         return REACH_INVALID_ARGUMENT;
@@ -58,7 +60,7 @@ reach_result reach_hotkeys_register(reach_hotkeys *hotkeys, const reach_hotkey_c
     return REACH_OK;
 }
 
-reach_result reach_hotkeys_unregister_all(reach_hotkeys *hotkeys)
+static reach_result reach_hotkeys_unregister_all(reach_hotkeys *hotkeys)
 {
     if (hotkeys == nullptr) {
         return REACH_INVALID_ARGUMENT;
@@ -73,27 +75,7 @@ reach_result reach_hotkeys_unregister_all(reach_hotkeys *hotkeys)
     return REACH_OK;
 }
 
-reach_hotkey_command reach_hotkeys_translate(uint32_t id)
-{
-    switch (id) {
-    case 1:
-        return REACH_HOTKEY_SNAP_LEFT;
-    case 2:
-        return REACH_HOTKEY_SNAP_RIGHT;
-    case 3:
-        return REACH_HOTKEY_SNAP_TOP;
-    case 4:
-        return REACH_HOTKEY_SNAP_BOTTOM;
-    case 5:
-        return REACH_HOTKEY_SNAP_FULL;
-    case 6:
-        return REACH_HOTKEY_SEARCH;
-    default:
-        return REACH_HOTKEY_NONE;
-    }
-}
-
-reach_hotkey_command reach_hotkeys_translate_registered(const reach_hotkeys *hotkeys, uint32_t id)
+static reach_hotkey_command reach_hotkeys_translate_registered(const reach_hotkeys *hotkeys, uint32_t id)
 {
     if (hotkeys == nullptr) {
         return REACH_HOTKEY_NONE;
@@ -106,4 +88,23 @@ reach_hotkey_command reach_hotkeys_translate_registered(const reach_hotkeys *hot
     }
 
     return REACH_HOTKEY_NONE;
+}
+
+reach_result reach_windows_create_hotkeys(reach_hotkeys_port *out_port)
+{
+    if (out_port == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_port = {};
+    reach_result result = reach_hotkeys_create(&out_port->hotkeys);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    out_port->ops.destroy = reach_hotkeys_destroy;
+    out_port->ops.register_hotkeys = reach_hotkeys_register;
+    out_port->ops.unregister_all = reach_hotkeys_unregister_all;
+    out_port->ops.translate_registered = reach_hotkeys_translate_registered;
+    return REACH_OK;
 }

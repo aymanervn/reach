@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "windows_adapters_internal.h"
 
 #include "reach/ports/config_store.h"
 
@@ -80,6 +80,7 @@ static reach_result reach_config_store_load(reach_config_store *store, reach_con
         app->id = (uint32_t)(out_snapshot->pinned_app_count + 1);
         reach_copy_utf16(app->title, 128, reinterpret_cast<const uint16_t *>(title));
         GetPrivateProfileStringW(section, L"path", L"", reinterpret_cast<wchar_t *>(app->path), 260, path);
+        GetPrivateProfileStringW(section, L"arguments", L"", reinterpret_cast<wchar_t *>(app->arguments), 260, path);
         GetPrivateProfileStringW(section, L"icon", L"", reinterpret_cast<wchar_t *>(app->icon_ref), 260, path);
         GetPrivateProfileStringW(section, L"app_user_model_id", L"", reinterpret_cast<wchar_t *>(app->app_user_model_id), 260, path);
         out_snapshot->pinned_app_count += 1;
@@ -121,6 +122,7 @@ static reach_result reach_config_store_save(reach_config_store *store, const rea
         const reach_pinned_app_model *app = &snapshot->pinned_apps[index];
         WritePrivateProfileStringW(section, L"title", reinterpret_cast<const wchar_t *>(app->title), path);
         WritePrivateProfileStringW(section, L"path", reinterpret_cast<const wchar_t *>(app->path), path);
+        WritePrivateProfileStringW(section, L"arguments", reinterpret_cast<const wchar_t *>(app->arguments), path);
         WritePrivateProfileStringW(section, L"icon", reinterpret_cast<const wchar_t *>(app->icon_ref), path);
         WritePrivateProfileStringW(section, L"app_user_model_id", reinterpret_cast<const wchar_t *>(app->app_user_model_id), path);
     }

@@ -1,126 +1,216 @@
 # Reach Architecture
 
-Reach uses a modular ports-and-adapters architecture. The core application
-policy is kept away from platform APIs, while Windows-specific code stays at
-the edge behind ports and adapter factories.
+Reach follows Clean Architecture with ports and adapters. Dependencies must
+point inward. Inner layers define policy and stable data. Outer layers perform
+composition, platform work, IO, persistence, and process integration.
+
+This document is the architecture contract for new code. Keep it short,
+strict, and timeless.
+
+## Dependency Rule
+
+- Inner layers must not depend on outer layers.
+- Product policy must not depend on implementation details.
+- Windows APIs, COM, Direct2D, DirectComposition, registry access, shell APIs,
+  process APIs, file formats, and external services are details.
+- Data crossing inward must be neutral project data, not native Windows objects.
+- Features decide behavior; shell orchestrates; adapters perform platform work;
+  app composition wires concrete dependencies.
 
 ## Layers
 
-- `app`: the executable entry point and composition root.
-- `shell`: the thin orchestrator that coordinates core state, feature logic,
-  ports, and support code.
-- `features`: user-facing behavior modules built from core models and ports.
-- `core`: pure C application state, layout, events, and render command logic.
-- `ports`: platform-neutral interfaces consumed by shell and features.
-- `support`: shared non-platform helper code.
-- `adapters/windows`: Windows implementations of ports and adapter factories.
+### `include/reach/support` and `src/support`
+
+Shared low-level utilities.
+
+Rules:
+
+- May not depend on app, shell, features, ports, platform, or adapters.
+- Must stay platform-neutral.
+- Must not include Windows headers or expose Windows types.
+
+### `include/reach/core` and `src/core`
+
+Stable product/domain types and pure state models.
+
+Rules:
+
+- May depend only on support, or on nothing.
+- Must not depend on ports, features, shell, app, platform, or adapters.
+- Must not include Windows headers or expose Windows types.
+- Shared domain models belong here when they are used across layers.
+
+### `include/reach/ports`
+
+Platform-neutral capability interfaces.
+
+Rules:
+
+- May depend only on core and support.
+- Must not depend on app, shell, features, platform, or adapters.
+- Must not include Windows headers or expose native Windows types.
+- Must describe capabilities, not Windows mechanisms.
+
+### `include/reach/features` and `src/features`
+
+Feature policy, feature models, hit testing, rendering inputs, and feature
+actions.
+
+Rules:
+
+- May depend only on core, ports, and support.
+- Must not depend on app, shell, platform, or adapters.
+- Must not include Windows headers or call Windows APIs.
+- Must not know registry, config-file formats, shell replacement mechanics,
+  Direct2D, DirectComposition, process APIs, or AppUserModel implementation
+  details.
+- Should operate on data and ports passed in.
+- Should return actions/intents when shell or adapters must perform effects.
+
+### `include/reach/shell` and `src/shell`
+
+Shell orchestration.
+
+Rules:
+
+- May depend on core, ports, features, and support.
+- Must not depend on app, platform headers, or adapter implementations.
+- Must not include Windows headers or call Windows APIs.
+- Owns lifecycle orchestration, input routing, feature coordination, reloads,
+  dirty flags, surface state, and port calls.
+- Must not absorb feature policy that belongs in `features`.
+
+### `include/reach/app` and `src/app`
+
+Executable startup and composition.
+
+Rules:
+
+- May depend on shell, ports, features, core, support, platform factory headers,
+  and adapters through composition.
+- Owns application startup, composition, and outer process lifecycle.
+- May contain deliberate executable-bound platform integration.
+- Must not become a second shell implementation.
+- Must not move feature policy or adapter implementation details into app code.
+
+### `include/reach/platform`
+
+Outer platform-facing declarations used by composition and tools.
+
+Rules:
+
+- May describe platform factories, platform messages, and platform registration
+  surfaces.
+- Must not be included by core, ports, features, or shell.
+- Must not be used as a back door around ports.
+
+### `src/adapters/windows`
+
+Windows implementations of ports and Windows-specific integration.
+
+Rules:
+
+- May depend inward on ports, core, and support.
+- May use Win32, COM, WIC, Direct2D, DirectComposition, registry, shell APIs,
+  process APIs, AppUserModel APIs, and native Windows handles.
+- Must not leak Windows types or platform assumptions into core, ports,
+  features, or shell.
+- Owns Windows metadata extraction and platform resource lifetime.
+
+### `src/tools`
+
+CLI and diagnostic tools.
+
+Rules:
+
+- May use app composition surfaces, feature policy, ports, support, platform
+  declarations, and Windows adapters as needed.
+- Must not become another shell implementation.
+- Diagnostic behavior must be labelled as diagnostic behavior.
+
+### `tests`
+
+Tests for neutral behavior and isolated platform behavior.
+
+Rules:
+
+- Prefer tests for core, features, ports-facing policy, and support without
+  requiring platform state.
+- Platform-specific tests must remain isolated.
+- New architectural rules should be covered by the architecture check.
 
 ## Allowed Dependencies
 
-- `app -> shell`
-- `app -> adapters/windows` only through adapter factories and composition root
-- `shell -> features`
-- `shell -> core`
-- `shell -> ports`
-- `shell -> support`
-- `features -> core`
-- `features -> ports`
-- `features -> support`
-- `adapters/windows -> ports`
-- `adapters/windows -> support`
-- `core -> support` only
+- support -> nothing
+- core -> support
+- ports -> core, support
+- features -> core, ports, support
+- shell -> core, ports, features, support
+- app -> shell, ports, features, core, support, platform, adapters
+- adapters/windows -> ports, core, support
+- tools -> app, platform, adapters, features, ports, core, support
+- tests -> the layer under test and its allowed inward dependencies
+
+No other dependency direction is allowed.
 
 ## Forbidden Dependencies
 
-- `core -> shell`
-- `core -> features`
-- `core -> adapters/windows`
-- `features -> shell`
-- `features -> adapters/windows`
-- `shell -> adapters/windows` internals
-- `ports -> adapters/windows`
+- core -> ports, features, shell, app, platform, adapters
+- ports -> features, shell, app, platform, adapters
+- features -> shell, app, platform, adapters
+- shell -> app, platform, adapters
+- support -> core, ports, features, shell, app, platform, adapters
+- adapters/windows -> shell or app policy
+- any inner layer -> Windows headers or native Windows types
 
-## Windows Boundary
+## Identity Rules
 
-Only files under `src/adapters/windows` should directly use Win32 APIs or
-Win32 types. The app composition root may call adapter factory functions to wire
-ports together.
+- `path` means launch identity.
+- `arguments` means launch arguments.
+- `icon_ref` means icon lookup identity only.
+- `app_user_model_id` means match/group identity.
+- Dock matching must use AppUserModelID first, then exact launch path.
+- Dock matching must not use filename, folder ancestry, launch-time
+  correlation, or icon reference as identity.
+- Pinning from a running window must ask a platform-neutral port for pin
+  metadata.
+- Platform relaunch metadata belongs in Windows adapters.
+- Relaunch metadata probing must be on demand, not part of hot window snapshot
+  refresh.
 
-Temporary transition exceptions:
+## Runtime Rules
 
-- `src/app/main.cpp`: executable entry point, command-line shell registration, COM,
-  and Windows message loop setup.
-- `src/shell/shell.cpp`: public shell creation glue still directly uses Windows
-  adapter factories while the compatibility entry point remains in shell.
-- `src/shell/shell_input.cpp`: current shell input orchestration still uses
-  Win32 types for launcher activation and transitional popup/context-menu
-  handling.
-- `src/shell/shell_render.cpp`: current shell render orchestration still uses
-  DirectWrite constants and Win32 path helpers while text alignment and
-  switcher label derivation remain shell-owned.
-- `src/shell/shell_update.cpp`: current shell update orchestration still uses
-  Win32 path comparison, cursor helpers, and wallpaper reload orchestration.
-- `src/support/util.cpp`: logging currently uses `OutputDebugStringA`.
-- `src/app/config_path.cpp`: default config path lookup currently uses Win32 path
-  APIs.
-- `src/app/pin_config.cpp`: pin matching currently uses Win32 path helpers.
-- `src/adapters/windows/monitor_win32.cpp`: monitor enumeration currently uses
-  Win32 display APIs and is still compiled into `reach_shell` until monitor
-  access moves behind a port.
-- `src/adapters/windows/hotkeys_win32.cpp`: global hotkey registration
-  currently uses Win32 APIs and is still compiled into `reach_shell` until
-  hotkey access moves behind a port.
-- `src/tools/*.cpp`: developer and support tools are Windows-specific today.
+- Window procedures must translate native messages into queued project events.
+- Heavy work must happen in shell update/orchestration, not inside native window
+  callbacks.
+- Runtime debug logging must not remain in hot paths.
+- Native resources must have clear owners and release paths.
+- Caches must have explicit refresh or eviction rules.
+- Config changes from tools must notify the running shell.
+- The running shell must reload relevant config live.
 
-These exceptions should shrink as behavior moves behind ports or into Windows
-adapters. New Win32 usage outside `src/adapters/windows` should not be added
-without updating this section.
+## Adding Code
 
-## Internal CMake Targets
+1. Put stable product data in core.
+2. Put feature behavior in features.
+3. Put capability interfaces in ports.
+4. Put orchestration in shell.
+5. Put composition and executable startup in app.
+6. Put Windows implementation details in adapters/windows.
+7. Put CLI behavior in tools.
+8. Add or update tests at the lowest layer that can verify the behavior.
+9. Extend the architecture check when adding a new boundary rule.
 
-- `reach_core`: `src/core/*.c`; pure core logic and theme defaults; no linked
-  support or platform libraries.
-- `reach_features`: feature modules such as dock item identity and ordering;
-  links `reach_core`.
-- `reach_support`: shared helper code under `src/support`.
-- `reach_windows_adapters`: `src/adapters/windows/*.cpp`; Windows port
-  implementations and adapter factories; links `reach_support`. Transitional
-  hotkey and monitor implementations live under `src/adapters/windows` but are
-  still compiled into `reach_shell` until port boundaries are added.
-- `reach_shell`: current shell implementation; links `reach_features`,
-  `reach_core`, and `reach_support`.
-- `reach`: executable and app composition root; links `reach_shell`,
-  `reach_core`, `reach_support`, and `reach_windows_adapters`.
+## Required Verification
 
-`reach_support` currently owns Windows-dependent support code in
-`src/support/util.cpp`, so pure core code must not link it.
+Before finishing architecture-affecting work, run:
 
-The target graph is intended to converge on the allowed dependency graph above.
-Where source files still violate it, the transition exceptions list is the
-contract for follow-up refactors.
+```powershell
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+cmake --build build --target check_architecture
+```
 
-## Architecture Checks
-
-The `check_architecture` CMake target runs `tools/check_architecture.py`.
-It flags forbidden includes across core, features, shell, and ports, and it
-flags direct Win32 API/type tokens outside the documented transition allowlist.
-The allowlist is intentionally temporary and should shrink with the transition
-exceptions above.
-
-## Remaining Transition Debt
-
-- `src/shell/shell.cpp` still contains public shell creation glue that directly
-  calls Windows adapter factories. New composition should continue to prefer
-  `src/app/composition_root.cpp`.
-- `src/shell/shell_input.cpp` still contains native input and context-menu
-  transition code, including Win32 window handles and native menu hook helpers.
-- `src/shell/shell_render.cpp` still owns DirectWrite text constants and
-  Win32 path-label derivation before calling feature render builders.
-- `src/shell/shell_update.cpp` still owns Win32 path comparison, cursor helpers,
-  and wallpaper reload orchestration. Wallpaper seed/apply logic has moved to
-  the wallpaper feature.
-- `src/adapters/windows/hotkeys_win32.cpp` and
-  `src/adapters/windows/monitor_win32.cpp` are in the Windows adapter folder but
-  still compile into `reach_shell` until hotkey and monitor access move behind
-  ports.
-- `src/app/pin_config.cpp` is still compiled into `reach_shell` while pinned-app loading/matching remains shell-owned; this should move behind a cleaner app/config boundary later.
+The architecture check is part of the contract. Do not weaken it or add
+allowlist entries without explicit approval.

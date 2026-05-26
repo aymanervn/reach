@@ -15,9 +15,7 @@
 #include "reach/features/wallpaper.h"
 #include "reach/features/quick_settings.h"
 #include "reach/features/popup.h"
-#include "reach/platform/hotkeys.h"
-#include "reach/platform/monitor.h"
-#include "reach/app/pin_config.h"
+#include "reach/features/pin_config.h"
 #include "reach/shell/surface_runtime.h"
 #include "reach/core/theme.h"
 
@@ -35,8 +33,8 @@ typedef struct reach_shell_popup_bounds_animation {
 } reach_shell_popup_bounds_animation;
 
 struct reach_shell {
-    reach_hotkeys *hotkeys;
-    reach_monitor_list *monitors;
+    reach_hotkeys_port hotkeys;
+    reach_monitor_port monitors;
     reach_ui_state ui;
     reach_surface_runtime launcher;
     reach_surface_runtime dock;
@@ -74,6 +72,7 @@ struct reach_shell {
     int32_t layout_dirty;
     int32_t render_dirty;
     int32_t update_requested;
+    int32_t events_dispatched_this_cycle;
     int32_t monitors_dirty;
     int32_t wallpaper_bounds_valid;
     reach_rect_f32 wallpaper_bounds;
@@ -81,6 +80,7 @@ struct reach_shell {
     int32_t dock_animating;
     int32_t dock_target_hidden;
     int32_t dock_reveal_active;
+    int32_t dock_reveal_requested;
     int32_t dock_reveal_check_dirty;
     int32_t dock_reveal_edge_visible;
     int32_t dock_reveal_edge_bounds_valid;
@@ -150,6 +150,7 @@ struct reach_shell {
     uint16_t dock_time_text[32];
     uint16_t dock_date_text[64];
     int32_t dock_clock_initialized;
+    int64_t dock_clock_last_minute;
     int32_t running;
     uint16_t wallpaper_path[260];
     reach_audio_volume_port audio_volume;
@@ -158,6 +159,8 @@ struct reach_shell {
     int32_t quick_settings_open;
     int32_t quick_settings_dragging_volume;
     reach_quick_settings_hit_type quick_settings_drag_type;
+    float quick_settings_drag_last_level;
+    int32_t quick_settings_drag_level_valid;
     size_t quick_settings_drag_session_index;
     uint16_t quick_settings_drag_session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
     reach_audio_volume_state quick_settings_audio_state;
@@ -246,6 +249,7 @@ void reach_shell_clear_sticky_dock_feedback(reach_shell *shell);
 
 reach_result reach_shell_load_pinned_icons(reach_shell *shell);
 reach_result reach_shell_reload_pins(reach_shell *shell);
+reach_result reach_shell_reload_config(reach_shell *shell);
 void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot);
 void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force);
 reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed);

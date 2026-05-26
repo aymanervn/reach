@@ -1,5 +1,4 @@
-#include "reach/platform/windows_adapters.h"
-#include "reach/platform/windows_messages.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 #include <windowsx.h>
@@ -13,6 +12,7 @@
 #endif
 
 #define IDI_ICON1 101
+#define REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS 128
 
 #ifndef DWMWCP_ROUND
 #define DWMWCP_ROUND 2
@@ -23,12 +23,16 @@ struct reach_platform_window {
     reach_surface_role role;
     reach_platform_window_event_callback callback;
     void *callback_user;
+    reach_ui_event pending_events[REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS];
+    size_t pending_event_count;
     int width;
     int height;
     float corner_radius;
     int tracking_mouse_leave;
     int pointer_move_enabled;
 };
+
+static int32_t reach_platform_window_queue_event(reach_platform_window *window, const reach_ui_event *event);
 
 static const wchar_t *reach_window_class_name()
 {
@@ -66,34 +70,35 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
         return TRUE;
     case REACH_WM_WALLPAPER_CHANGED:
-        if (window != nullptr && window->callback != nullptr) {
+        if (window != nullptr) {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_WALLPAPER_CHANGED;
-            window->callback(window->callback_user, &event);
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
     case REACH_WM_CONFIG_CHANGED:
-        if (window != nullptr && window->callback != nullptr) {
+        if (window != nullptr) {
             reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_CONFIG_CHANGED;                window->callback(window->callback_user, &event);
+            event.type = REACH_UI_EVENT_CONFIG_CHANGED;
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
     case REACH_WM_LAUNCHER_SEARCH_READY:
-        if (window != nullptr && window->callback != nullptr) {
+        if (window != nullptr) {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_LAUNCHER_SEARCH_READY;
-            window->callback(window->callback_user, &event);
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
     case WM_DISPLAYCHANGE:
-        if (window != nullptr && window->callback != nullptr) {
+        if (window != nullptr) {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_DISPLAY_CHANGED;
-            window->callback(window->callback_user, &event);
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
     case WM_KEYDOWN:
-        if (window != nullptr && window->callback != nullptr) {
+        if (window != nullptr) {
             reach_ui_event event = {};
             event.modifiers =
                 (GetKeyState(VK_CONTROL) & 0x8000) != 0
@@ -121,7 +126,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 event.type = REACH_UI_EVENT_END;
             }
             if (event.type != REACH_UI_EVENT_NONE) {
-                window->callback(window->callback_user, &event);
+                reach_platform_window_queue_event(window, &event);
                 return 0;
             }
         }
@@ -130,18 +135,18 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         if ((GetKeyState(VK_CONTROL) & 0x8000) != 0) {
             return 0;
         }
-        if (window != nullptr && window->callback != nullptr && wparam >= 0x20) {
+        if (window != nullptr && wparam >= 0x20) {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_TEXT;
             event.text[0] = static_cast<uint16_t>(wparam);
             event.text[1] = 0;
-            window->callback(window->callback_user, &event);
+            reach_platform_window_queue_event(window, &event);
             return 0;
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
-        if (window != nullptr && window->callback != nullptr) {
+        if (window != nullptr) {
             SetCapture(hwnd);
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
@@ -151,13 +156,13 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             event.type = REACH_UI_EVENT_POINTER_DOWN;
             event.x = point.x;
             event.y = point.y;
-            window->callback(window->callback_user, &event);
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
-        if (window != nullptr && window->callback != nullptr) {
+        if (window != nullptr) {
             if (GetCapture() == hwnd) {
                 ReleaseCapture();
             }
@@ -171,19 +176,20 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 : (message == WM_MBUTTONUP ? REACH_UI_EVENT_POINTER_MIDDLE : REACH_UI_EVENT_POINTER_UP);
             event.x = point.x;
             event.y = point.y;
-            window->callback(window->callback_user, &event);
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
         case WM_MOUSEMOVE:
-            if (window != nullptr &&
-                window->callback != nullptr &&
-                window->pointer_move_enabled) {
+            if (window != nullptr) {
                 if (!window->tracking_mouse_leave) {
                     TRACKMOUSEEVENT track = {};
                     track.cbSize = sizeof(track);
                     track.dwFlags = TME_LEAVE;
                     track.hwndTrack = hwnd;
                     window->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
+                }
+                if (!window->pointer_move_enabled) {
+                    return 0;
                 }
                 POINT point = {};
                 point.x = GET_X_LPARAM(lparam);
@@ -193,17 +199,15 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 event.type = REACH_UI_EVENT_POINTER_MOVE;
                 event.x = point.x;
                 event.y = point.y;
-                window->callback(window->callback_user, &event);
+                reach_platform_window_queue_event(window, &event);
             }
             return 0;
     case WM_MOUSELEAVE:
         if (window != nullptr) {
             window->tracking_mouse_leave = 0;
-            if (window->callback != nullptr) {
-                reach_ui_event event = {};
-                event.type = REACH_UI_EVENT_POINTER_LEAVE;
-                window->callback(window->callback_user, &event);
-            }
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_POINTER_LEAVE;
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
     case WM_SIZE:
@@ -472,6 +476,35 @@ static reach_result reach_platform_window_set_event_callback(
     return REACH_OK;
 }
 
+static int32_t reach_platform_window_has_pending_events(const reach_platform_window *window)
+{
+    return window != nullptr && window->pending_event_count > 0;
+}
+
+static reach_result reach_platform_window_dispatch_events(reach_platform_window *window)
+{
+    if (window == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (window->callback == nullptr || window->pending_event_count == 0) {
+        return REACH_OK;
+    }
+
+    reach_ui_event events[REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS] = {};
+    size_t event_count = window->pending_event_count;
+    for (size_t index = 0; index < event_count; ++index) {
+        events[index] = window->pending_events[index];
+    }
+    window->pending_event_count = 0;
+
+    for (size_t index = 0; index < event_count; ++index) {
+        window->callback(window->callback_user, &events[index]);
+    }
+
+    return REACH_OK;
+}
+
 static reach_result reach_platform_window_set_pointer_move_enabled(
     reach_platform_window *window,
     int32_t enabled
@@ -490,9 +523,93 @@ static reach_result reach_platform_window_set_pointer_move_enabled(
     return REACH_OK;
 }
 
-static void *reach_platform_window_native_handle(reach_platform_window *window)
+void *reach_windows_platform_window_native_handle(reach_platform_window *window)
 {
     return window == nullptr ? nullptr : window->hwnd;
+}
+
+static int32_t reach_platform_window_queue_event(reach_platform_window *window, const reach_ui_event *event)
+{
+    if (window == nullptr || event == nullptr || event->type == REACH_UI_EVENT_NONE) {
+        return 0;
+    }
+
+    if (event->type == REACH_UI_EVENT_POINTER_MOVE &&
+        window->pending_event_count > 0 &&
+        window->pending_events[window->pending_event_count - 1].type == REACH_UI_EVENT_POINTER_MOVE) {
+        window->pending_events[window->pending_event_count - 1] = *event;
+        return 1;
+    }
+
+    if (window->pending_event_count < REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS) {
+        window->pending_events[window->pending_event_count++] = *event;
+    } else {
+        window->pending_events[REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS - 1] = *event;
+    }
+    return 1;
+}
+
+static reach_result reach_platform_window_raise(reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    ShowWindow(window->hwnd, SW_SHOW);
+
+    HWND foreground = GetForegroundWindow();
+    DWORD foreground_thread = foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
+    DWORD window_thread = GetWindowThreadProcessId(window->hwnd, nullptr);
+    DWORD current_thread = GetCurrentThreadId();
+
+    bool attached_foreground = false;
+    bool attached_window = false;
+
+    if (foreground_thread != 0 && foreground_thread != current_thread) {
+        attached_foreground = AttachThreadInput(current_thread, foreground_thread, TRUE) != FALSE;
+    }
+    if (window_thread != 0 && window_thread != current_thread && window_thread != foreground_thread) {
+        attached_window = AttachThreadInput(current_thread, window_thread, TRUE) != FALSE;
+    }
+
+    SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    BringWindowToTop(window->hwnd);
+    SetForegroundWindow(window->hwnd);
+    SetActiveWindow(window->hwnd);
+    SetFocus(window->hwnd);
+
+    if (attached_window) {
+        AttachThreadInput(current_thread, window_thread, FALSE);
+    }
+    if (attached_foreground) {
+        AttachThreadInput(current_thread, foreground_thread, FALSE);
+    }
+
+    return REACH_OK;
+}
+
+static reach_result reach_platform_window_post_event(reach_platform_window *window, reach_ui_event_type type)
+{
+    if (window == nullptr || window->hwnd == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    UINT message = 0;
+    switch (type) {
+    case REACH_UI_EVENT_LAUNCHER_SEARCH_READY:
+        message = REACH_WM_LAUNCHER_SEARCH_READY;
+        break;
+    case REACH_UI_EVENT_CONFIG_CHANGED:
+        message = REACH_WM_CONFIG_CHANGED;
+        break;
+    case REACH_UI_EVENT_WALLPAPER_CHANGED:
+        message = REACH_WM_WALLPAPER_CHANGED;
+        break;
+    default:
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    return PostMessageW(window->hwnd, message, 0, 0) ? REACH_OK : REACH_ERROR;
 }
 
 static void reach_platform_window_destroy(reach_platform_window *window)
@@ -553,8 +670,11 @@ reach_result reach_windows_create_platform_window(reach_surface_role role, reach
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
     out_port->ops.apply_rounded_corners = reach_platform_window_apply_rounded_corners;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
+    out_port->ops.has_pending_events = reach_platform_window_has_pending_events;
+    out_port->ops.dispatch_events = reach_platform_window_dispatch_events;
     out_port->ops.set_pointer_move_enabled = reach_platform_window_set_pointer_move_enabled;
-    out_port->ops.native_handle = reach_platform_window_native_handle;
+    out_port->ops.raise = reach_platform_window_raise;
+    out_port->ops.post_event = reach_platform_window_post_event;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
 }

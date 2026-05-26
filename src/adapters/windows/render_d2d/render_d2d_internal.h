@@ -93,7 +93,7 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend);
 /* Raster icon drawing */
 void reach_d2d_clear_icon_cache(reach_render_backend *backend);
 reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_render_command *command);
-void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uintptr_t icon_id);
+void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t icon_id);
 /* Vector icon / SVG resource drawing */
 reach_result reach_d2d_draw_vector_icon(reach_render_backend *backend, const reach_render_command *command);
 

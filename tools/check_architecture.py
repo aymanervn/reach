@@ -3,42 +3,161 @@ from __future__ import annotations
 
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CMAKE_FILE = ROOT / "CMakeLists.txt"
 ARCHITECTURE_DOC = ROOT / "docs" / "architecture.md"
 
 SOURCE_EXTENSIONS = {".c", ".cc", ".cpp", ".h", ".hpp"}
 
-WINDOWS_LIBS = {
-    "advapi32",
-    "comctl32",
-    "d2d1",
-    "d3d11",
-    "dcomp",
-    "dwrite",
-    "dwmapi",
-    "dxgi",
-    "ole32",
-    "runtimeobject",
-    "shell32",
-    "shcore",
-    "shlwapi",
-    "user32",
-    "uuid",
-    "windowscodecs",
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RESET = "\033[0m"
+
+INCLUDE_RE = re.compile(r'^\s*#\s*include\s+([<"])([^>"]+)[>"]', re.MULTILINE)
+
+# Very small, conservative CMake parser.
+# It is not a full CMake interpreter. It catches ordinary target_link_libraries(...)
+# declarations and should be treated as an additional guardrail, not the source of truth.
+TARGET_LINK_LIBRARIES_RE = re.compile(
+    r"target_link_libraries\s*\(\s*([A-Za-z0-9_:\-\.]+)\s+(.+?)\)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+CMAKE_SCOPE_KEYWORDS = {
+    "PUBLIC",
+    "PRIVATE",
+    "INTERFACE",
+    "debug",
+    "optimized",
+    "general",
 }
 
-WIN32_TOKEN_PATTERNS = [
-    r"#\s*include\s*<\s*windows\.h\s*>",
-    r"#\s*include\s*<\s*dwrite\.h\s*>",
-    r"#\s*include\s*<\s*shlwapi\.h\s*>",
+ALLOWED_SRC_LAYER_DIRS = {
+    "adapters",
+    "app",
+    "core",
+    "features",
+    "shell",
+    "support",
+    "tools",
+}
+
+ALLOWED_INCLUDE_LAYER_DIRS = {
+    "app",
+    "core",
+    "features",
+    "platform",
+    "ports",
+    "shell",
+    "support",
+}
+
+ALLOWED_LAYER_DEPENDENCIES: dict[str, set[str]] = {
+    "support": set(),
+    "core": {"support"},
+    "ports": {"core", "support"},
+    "features": {"core", "ports", "support"},
+    "shell": {"core", "ports", "features", "support"},
+    "app": {"shell", "ports", "features", "core", "support", "platform", "adapters"},
+    "platform": {"ports", "core", "support"},
+    "adapters": {"ports", "core", "support"},
+    "tools": {"app", "platform", "adapters", "features", "ports", "core", "support"},
+    "tests": {
+        "app",
+        "shell",
+        "features",
+        "ports",
+        "core",
+        "support",
+        "platform",
+        "adapters",
+    },
+}
+
+INNER_LAYERS = {"support", "core", "ports", "features", "shell"}
+OUTER_LAYERS = {"app", "platform", "adapters", "tools", "tests"}
+WINDOWS_ALLOWED_LAYERS = OUTER_LAYERS
+
+# Map CMake targets to architectural layers. Prefer exact project targets over
+# naming heuristics so the checker does not classify Reach targets incorrectly.
+EXACT_TARGET_LAYERS = {
+    "reach_support": "support",
+    "reach_core": "core",
+    "reach_features": "features",
+    "reach_shell": "shell",
+    "reach_windows_adapters": "adapters",
+    "reach": "app",
+    "reachctl": "tools",
+    "reach_tray_probe": "tools",
+}
+
+TARGET_LAYER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"(^|::|_|-)(support)(_|-|$)", re.IGNORECASE), "support"),
+    (
+        re.compile(r"(^|::|_|-)(core|domain|entity|entities)(_|-|$)", re.IGNORECASE),
+        "core",
+    ),
+    (
+        re.compile(r"(^|::|_|-)(port|ports|boundary|boundaries)(_|-|$)", re.IGNORECASE),
+        "ports",
+    ),
+    (
+        re.compile(
+            r"(^|::|_|-)(feature|features|usecase|usecases|interactor|interactors)(_|-|$)",
+            re.IGNORECASE,
+        ),
+        "features",
+    ),
+    (re.compile(r"(^|::|_|-)(shell)(_|-|$)", re.IGNORECASE), "shell"),
+    (re.compile(r"(^|::|_|-)(app|application)(_|-|$)", re.IGNORECASE), "app"),
+    (
+        re.compile(
+            r"(^|::|_|-)(adapter|adapters|gateway|gateways|presenter|presenters|controller|controllers)(_|-|$)",
+            re.IGNORECASE,
+        ),
+        "adapters",
+    ),
+    (
+        re.compile(
+            r"(^|::|_|-)(platform|win32|windows|linux|macos|os)(_|-|$)", re.IGNORECASE
+        ),
+        "platform",
+    ),
+    (re.compile(r"(^|::|_|-)(tool|tools|cli)(_|-|$)", re.IGNORECASE), "tools"),
+    (re.compile(r"(^|::|_|-)(test|tests|testing)(_|-|$)", re.IGNORECASE), "tests"),
+]
+
+WINDOWS_HEADER_NAMES = {
+    "windows.h",
+    "dwrite.h",
+    "d2d1.h",
+    "d3d11.h",
+    "dcomp.h",
+    "dxgi.h",
+    "dwmapi.h",
+    "shlwapi.h",
+    "shlobj.h",
+    "shobjidl.h",
+    "shellapi.h",
+    "wincodec.h",
+    "wrl.h",
+}
+
+WINDOWS_TOKEN_PATTERNS = [
     r"\bHWND\b",
     r"\bHICON\b",
+    r"\bHBITMAP\b",
+    r"\bHDC\b",
     r"\bHMODULE\b",
     r"\bHHOOK\b",
+    r"\bHRESULT\b",
+    r"\bIUnknown\b",
     r"\bIDWrite\w*\b",
+    r"\bID2D1\w*\b",
+    r"\bIDComposition\w*\b",
     r"\bDWRITE_[A-Z0-9_]+\b",
     r"\bSetCapture\b",
     r"\bReleaseCapture\b",
@@ -47,68 +166,133 @@ WIN32_TOKEN_PATTERNS = [
     r"\bUnhookWindowsHookEx\b",
     r"\bWindowFromPoint\b",
     r"\bPathFindFileNameW\b",
-    r"reach/platform/windows_adapters\.h",
 ]
 
-# Temporary transition debt. Every entry here must be documented in
-# docs/architecture.md. Keep this list narrow.
-WIN32_ALLOWLIST = {
-    "src/app/main.cpp",
-    "src/app/config_path.cpp",
-    "src/app/pin_config.cpp",
-    "src/shell/shell.cpp",
-    "src/shell/shell_input.cpp",
-    "src/shell/shell_render.cpp",
-    "src/shell/shell_update.cpp",
-    "src/support/util.cpp",
-    "src/adapters/windows/monitor_win32.cpp",
-    "src/adapters/windows/hotkeys_win32.cpp",
+# These are deliberately heuristic. They catch common semantic leakage that an include
+# dependency check will miss. Keep them strict for public inner-layer headers, but expect
+# to tune the list if the project has legitimate domain words that collide.
+PUBLIC_INNER_FORBIDDEN_TOKEN_PATTERNS: dict[str, list[str]] = {
+    "support": [
+        r"\bController\b",
+        r"\bPresenter\b",
+        r"\bView(Model)?\b",
+        r"\bRepository\b",
+        r"\bSql\w*\b",
+        r"\bHttp\w*\b",
+        r"\bJson\w*\b",
+        r"\bXml\w*\b",
+        r"\bWindow\w*\b",
+        r"\bWidget\w*\b",
+    ],
+    "core": [
+        r"\bController\b",
+        r"\bPresenter\b",
+        r"\bView(Model)?\b",
+        r"\bRepository(Impl|Implementation)?\b",
+        r"\bGateway(Impl|Implementation)?\b",
+        r"\bSql\w*\b",
+        r"\bDatabase\b",
+        r"\bDb\b",
+        r"\bHttp\w*\b",
+        r"\bJson\w*\b",
+        r"\bXml\w*\b",
+        r"\bWindow\w*\b",
+        r"\bWidget\w*\b",
+        r"\bScreen\b",
+        r"\bButton\b",
+        r"\bMouse\b",
+        r"\bKeyboard\b",
+    ],
+    "ports": [
+        r"\bController\b",
+        r"\bPresenter\b",
+        r"\bView(Model)?\b",
+        r"\bRepositoryImpl\b",
+        r"\bGatewayImpl\b",
+        r"\bSql\w*\b",
+        r"\bDatabase\b",
+        r"\bDbConnection\b",
+        r"\bHttpClient\b",
+        r"\bWin32\b",
+        r"\bWindows\b",
+        r"\bNative(Window|Handle|View|Widget)\b",
+        r"\bWindow\w*\b",
+        r"\bWidget\w*\b",
+    ],
+    "features": [
+        r"\bController\b",
+        r"\bPresenterImpl\b",
+        r"\bView(Model)?Impl\b",
+        r"\bRepositoryImpl\b",
+        r"\bGatewayImpl\b",
+        r"\bSql\w*\b",
+        r"\bDatabase\b",
+        r"\bDbConnection\b",
+        r"\bHttpClient\b",
+        r"\bWin32\b",
+        r"\bWindows\b",
+        r"\bWindow\w*\b",
+        r"\bWidget\w*\b",
+    ],
+    "shell": [
+        r"\bRepositoryImpl\b",
+        r"\bGatewayImpl\b",
+        r"\bSql\w*\b",
+        r"\bDatabase\b",
+        r"\bDbConnection\b",
+        r"\bHttpClient\b",
+        r"\bWin32\b",
+        r"\bWindows\b",
+        r"\bWindow\w*\b",
+        r"\bWidget\w*\b",
+    ],
 }
 
-WIN32_ALLOWED_PREFIXES = (
-    "src/adapters/windows/",
-    "src/tools/",
-)
+# Inner-layer public headers should not expose implementation/storage/framework headers.
 
-# This include is allowed by the architecture: app composition wires concrete
-# Windows adapters into platform-neutral ports.
-WINDOWS_ADAPTER_FACTORY_INCLUDE_ALLOWLIST = {
-    "src/app/composition_root.cpp",
+# These patterns are suspicious in public ports because they often mean an untyped
+# platform handle is crossing the boundary. They are warnings, not failures, because
+# C/C++ ports often use opaque handles deliberately to keep OS headers out of the
+# inner API. Prefer named project-owned handle typedefs where possible.
+PUBLIC_INNER_WARNING_TOKEN_PATTERNS: dict[str, list[str]] = {
+    "ports": [
+        r"\buintptr_t\b",
+        r"\bintptr_t\b",
+        r"\bnative_handle\b",
+        r"\bsurface_handle\b",
+    ],
 }
 
-# Root-level files should not exist after the layer-folder cleanup.
-# Keep these empty unless you intentionally add documented compatibility wrappers.
-ROOT_SRC_ALLOWLIST: set[str] = set()
-ROOT_INCLUDE_ALLOWLIST: set[str] = set()
+PUBLIC_INNER_FORBIDDEN_INCLUDE_PATTERNS = [
+    r"(^|/)(windows|win32|d2d|dwrite|dxgi|dcomp)(/|\.|$)",
+    r"(^|/)(sqlite|mysql|postgres|pqxx|odbc)(/|\.|$)",
+    r"(^|/)(curl|boost/asio|asio|httplib)(/|\.|$)",
+    r"(^|/)(nlohmann|rapidjson|jsoncpp)(/|\.|$)",
+    r"(^|/)(qt|gtk|wx|imgui|sdl)(/|\.|$)",
+]
 
-# Current documented transition debt in CMake target membership.
-SHELL_ADAPTER_SOURCE_DEBT = {
-    "src/adapters/windows/hotkeys_win32.cpp",
-    "src/adapters/windows/monitor_win32.cpp",
-}
 
-SHELL_APP_SOURCE_DEBT = {
-    "src/app/pin_config.cpp",
-}
-
-INCLUDE_RE = re.compile(r'^\s*#\s*include\s+[<"]([^>"]+)[>"]', re.MULTILINE)
+@dataclass(frozen=True)
+class Include:
+    delimiter: str
+    value: str
 
 
 def rel(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
 
 
-def is_source(path: Path) -> bool:
-    return path.suffix.lower() in SOURCE_EXTENSIONS
-
-
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
 
 
-def iter_sources() -> list[Path]:
+def is_source(path: Path) -> bool:
+    return path.suffix.lower() in SOURCE_EXTENSIONS
+
+
+def iter_source_files() -> list[Path]:
     paths: list[Path] = []
-    for base in ("include", "src"):
+    for base in ("include", "src", "tests"):
         root = ROOT / base
         if root.exists():
             paths.extend(
@@ -117,306 +301,317 @@ def iter_sources() -> list[Path]:
     return paths
 
 
-def strip_comments_for_token_scan(text: str) -> str:
-    # Good enough for architecture checks. Prevents most false positives from comments.
+def iter_cmake_files() -> list[Path]:
+    return [p for p in ROOT.rglob("CMakeLists.txt") if ".git" not in p.parts]
+
+
+def layer_for_path(path: Path) -> str | None:
+    relative = rel(path)
+
+    if relative.startswith("include/reach/"):
+        parts = relative.split("/")
+        if len(parts) >= 3:
+            layer = parts[2]
+            if layer in ALLOWED_INCLUDE_LAYER_DIRS:
+                return layer
+
+    if relative.startswith("src/"):
+        parts = relative.split("/")
+        if len(parts) >= 2:
+            layer = parts[1]
+            if layer in ALLOWED_SRC_LAYER_DIRS:
+                return layer
+
+    if relative.startswith("tests/"):
+        return "tests"
+
+    return None
+
+
+def layer_for_reach_include(include: str) -> str | None:
+    if not include.startswith("reach/"):
+        return None
+
+    parts = include.split("/")
+    if len(parts) < 2:
+        return None
+
+    layer = parts[1]
+    if layer in ALLOWED_INCLUDE_LAYER_DIRS:
+        return layer
+    return None
+
+
+def resolve_local_include(source: Path, include: str) -> Path | None:
+    candidates = [
+        source.parent / include,
+        ROOT / include,
+        ROOT / "include" / include,
+        ROOT / "src" / include,
+    ]
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate.resolve()
+
+    return None
+
+
+def layer_for_include(source: Path, include: Include) -> str | None:
+    reach_layer = layer_for_reach_include(include.value)
+    if reach_layer is not None:
+        return reach_layer
+
+    # Resolve quoted and angle-bracket includes. System includes will simply not resolve.
+    resolved = resolve_local_include(source, include.value)
+    if resolved is not None:
+        return layer_for_path(resolved)
+
+    return None
+
+
+def includes_from(text: str) -> list[Include]:
+    return [Include(delimiter, value) for delimiter, value in INCLUDE_RE.findall(text)]
+
+
+def strip_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-    text = re.sub(r"//.*", "", text)
-    return text
+    return re.sub(r"//.*", "", text)
 
 
-def has_allowed_win32_path(relative: str) -> bool:
-    return relative in WIN32_ALLOWLIST or any(
-        relative.startswith(prefix) for prefix in WIN32_ALLOWED_PREFIXES
-    )
+def is_public_header(path: Path) -> bool:
+    return rel(path).startswith("include/reach/") and path.suffix.lower() in {
+        ".h",
+        ".hpp",
+    }
 
 
-def include_violations(relative: str, text: str) -> list[str]:
-    violations: list[str] = []
-    includes = INCLUDE_RE.findall(text)
-
-    if relative.startswith("src/core/") or relative.startswith("include/reach/core/"):
-        forbidden = (
-            "reach/shell",
-            "reach/features",
-            "reach/platform/",
-            "adapters/windows",
-        )
-        for include in includes:
-            if include.startswith(forbidden):
-                violations.append(f"{relative}: core must not include {include}")
-
-    if relative.startswith("src/features/") or relative.startswith(
-        "include/reach/features/"
-    ):
-        forbidden = (
-            "reach/shell",
-            "reach/platform/",
-            "adapters/windows",
-            "reach/platform/windows_adapters.h",
-        )
-        for include in includes:
-            if include.startswith(forbidden):
-                violations.append(f"{relative}: features must not include {include}")
-
-    if relative.startswith("src/shell/") or relative.startswith("include/reach/shell/"):
-        for include in includes:
-            if "adapters/windows" in include:
-                violations.append(
-                    f"{relative}: shell must not include adapter internals {include}"
-                )
-
-    if relative.startswith("include/reach/ports/"):
-        for include in includes:
-            if (
-                "adapters/windows" in include
-                or include.startswith("reach/platform/")
-                or include.lower() in {"windows.h", "dwrite.h", "shlwapi.h"}
-            ):
-                violations.append(f"{relative}: ports must not include {include}")
-
-    return violations
+def target_layer(target: str) -> str | None:
+    simplified = target.split("/")[-1]
+    if simplified in EXACT_TARGET_LAYERS:
+        return EXACT_TARGET_LAYERS[simplified]
+    for pattern, layer in TARGET_LAYER_PATTERNS:
+        if pattern.search(simplified):
+            return layer
+    return None
 
 
-def win32_violations(relative: str, text: str) -> list[str]:
-    if has_allowed_win32_path(relative):
-        return []
-
-    scan_text = strip_comments_for_token_scan(text)
-    violations: list[str] = []
-
-    for pattern in WIN32_TOKEN_PATTERNS:
-        if (
-            pattern == r"reach/platform/windows_adapters\.h"
-            and relative in WINDOWS_ADAPTER_FACTORY_INCLUDE_ALLOWLIST
-        ):
-            continue
-
-        if re.search(pattern, scan_text, flags=re.IGNORECASE):
-            violations.append(
-                f"{relative}: Win32/platform token outside allowed paths: {pattern}"
-            )
-
-    return violations
+def cmake_tokens(body: str) -> list[str]:
+    body = re.sub(r"#.*", "", body)
+    raw = re.split(r"[\s\n\r\t]+", body.strip())
+    return [
+        token.strip('"')
+        for token in raw
+        if token and token not in CMAKE_SCOPE_KEYWORDS and not token.startswith("$<")
+    ]
 
 
-def root_folder_violations() -> list[str]:
+def validate_layer_directories() -> list[str]:
     violations: list[str] = []
 
     src_root = ROOT / "src"
     if src_root.exists():
         for path in src_root.iterdir():
-            if path.is_file() and is_source(path):
-                relative = rel(path)
-                if relative not in ROOT_SRC_ALLOWLIST:
-                    violations.append(
-                        f"{relative}: source file must not live directly under src/"
-                    )
+            if path.is_dir() and path.name not in ALLOWED_SRC_LAYER_DIRS:
+                violations.append(f"{rel(path)}: unexpected source layer directory")
+            elif path.is_file() and is_source(path):
+                violations.append(
+                    f"{rel(path)}: source file must live inside a layer folder"
+                )
 
     include_root = ROOT / "include" / "reach"
     if include_root.exists():
         for path in include_root.iterdir():
-            if path.is_file() and is_source(path):
-                relative = rel(path)
-                if relative not in ROOT_INCLUDE_ALLOWLIST:
-                    violations.append(
-                        f"{relative}: header must not live directly under include/reach/"
-                    )
+            if path.is_dir() and path.name not in ALLOWED_INCLUDE_LAYER_DIRS:
+                violations.append(
+                    f"{rel(path)}: unexpected public include layer directory"
+                )
+            elif path.is_file() and is_source(path):
+                violations.append(
+                    f"{rel(path)}: header must live inside a layer folder"
+                )
 
     return violations
 
 
-def parse_cmake_target_blocks(cmake_text: str, command: str, target: str) -> list[str]:
-    pattern = re.compile(
-        rf"{re.escape(command)}\s*\(\s*{re.escape(target)}\b", re.IGNORECASE
+def validate_document_contract() -> list[str]:
+    text = read(ARCHITECTURE_DOC)
+    if not text:
+        return ["docs/architecture.md: missing or unreadable"]
+
+    required_terms = (
+        "Dependency Rule",
+        "Allowed Dependencies",
+        "Forbidden Dependencies",
+        "Required Verification",
+        "Do not weaken",
     )
-    bodies: list[str] = []
 
-    for match in pattern.finditer(cmake_text):
-        start = match.end()
-        depth = 1
-        i = start
-        while i < len(cmake_text) and depth > 0:
-            if cmake_text[i] == "(":
-                depth += 1
-            elif cmake_text[i] == ")":
-                depth -= 1
-            i += 1
-
-        if depth == 0:
-            bodies.append(cmake_text[start : i - 1])
-
-    return bodies
+    return [
+        f"docs/architecture.md: missing architecture contract term: {term}"
+        for term in required_terms
+        if term not in text
+    ]
 
 
-def cmake_tokens_from_bodies(bodies: list[str]) -> set[str]:
-    tokens: set[str] = set()
-
-    for body in bodies:
-        body = re.sub(r"#.*", "", body)
-        for token in re.split(r"[\s\r\n\t]+", body):
-            token = token.strip()
-            if token:
-                tokens.add(token)
-
-    return tokens
-
-
-def cmake_target_sources(cmake_text: str, target: str) -> set[str]:
-    sources: set[str] = set()
-
-    for command in ("add_library", "add_executable", "target_sources"):
-        bodies = parse_cmake_target_blocks(cmake_text, command, target)
-        for token in cmake_tokens_from_bodies(bodies):
-            if token.startswith("src/") or token.startswith("include/"):
-                sources.add(token)
-
-    return sources
-
-
-def cmake_target_links(cmake_text: str, target: str) -> set[str]:
-    bodies = parse_cmake_target_blocks(cmake_text, "target_link_libraries", target)
-    return cmake_tokens_from_bodies(bodies)
-
-
-def cmake_violations() -> list[str]:
+def validate_imports(path: Path, text: str) -> list[str]:
     violations: list[str] = []
-    cmake_text = read(CMAKE_FILE)
+    source_layer = layer_for_path(path)
+    relative = rel(path)
 
-    if not cmake_text:
-        violations.append("CMakeLists.txt: missing or unreadable")
+    if source_layer is None:
         return violations
 
-    core_links = {
-        token.lower() for token in cmake_target_links(cmake_text, "reach_core")
-    }
-    feature_links = {
-        token.lower() for token in cmake_target_links(cmake_text, "reach_features")
-    }
-    shell_links = {
-        token.lower() for token in cmake_target_links(cmake_text, "reach_shell")
-    }
+    allowed = ALLOWED_LAYER_DEPENDENCIES[source_layer]
 
-    for lib in sorted(WINDOWS_LIBS):
-        if lib in core_links:
+    for include in includes_from(text):
+        imported_layer = layer_for_include(path, include)
+        if imported_layer is None:
+            continue
+        if imported_layer == source_layer:
+            continue
+        if imported_layer not in allowed:
             violations.append(
-                f"CMakeLists.txt: reach_core must not link Windows/platform library {lib}"
-            )
-        if lib in feature_links:
-            violations.append(
-                f"CMakeLists.txt: reach_features must not link Windows/platform library {lib}"
-            )
-
-    if "reach_support" in core_links:
-        violations.append(
-            "CMakeLists.txt: reach_core must not link reach_support while support has platform debt"
-        )
-
-    if "reach_windows_adapters" in feature_links:
-        violations.append(
-            "CMakeLists.txt: reach_features must not link reach_windows_adapters"
-        )
-
-    if "reach_windows_adapters" in shell_links:
-        violations.append(
-            "CMakeLists.txt: reach_shell must not link reach_windows_adapters"
-        )
-
-    core_sources = cmake_target_sources(cmake_text, "reach_core")
-    feature_sources = cmake_target_sources(cmake_text, "reach_features")
-    shell_sources = cmake_target_sources(cmake_text, "reach_shell")
-    adapter_sources = cmake_target_sources(cmake_text, "reach_windows_adapters")
-
-    for source in sorted(core_sources):
-        if source.startswith(
-            ("src/adapters/windows/", "src/shell/", "src/features/", "src/app/")
-        ):
-            violations.append(f"CMakeLists.txt: reach_core must not compile {source}")
-
-    for source in sorted(feature_sources):
-        if source.startswith(("src/adapters/windows/", "src/shell/", "src/app/")):
-            violations.append(
-                f"CMakeLists.txt: reach_features must not compile {source}"
-            )
-
-    for source in sorted(shell_sources):
-        if (
-            source.startswith("src/adapters/windows/")
-            and source not in SHELL_ADAPTER_SOURCE_DEBT
-        ):
-            violations.append(
-                f"CMakeLists.txt: reach_shell must not compile adapter source {source}"
-            )
-        if source.startswith("src/app/") and source not in SHELL_APP_SOURCE_DEBT:
-            violations.append(
-                f"CMakeLists.txt: reach_shell should not compile app-layer source {source}"
-            )
-
-    architecture_doc = read(ARCHITECTURE_DOC)
-
-    for source in sorted(SHELL_ADAPTER_SOURCE_DEBT):
-        if source in shell_sources and source not in architecture_doc:
-            violations.append(
-                f"CMakeLists.txt/docs: {source} is compiled into reach_shell but is not documented as transition debt"
-            )
-
-    for source in sorted(SHELL_APP_SOURCE_DEBT):
-        if source in shell_sources and source not in architecture_doc:
-            violations.append(
-                f"CMakeLists.txt/docs: {source} is compiled into reach_shell but is not documented as transition debt"
-            )
-
-    for source in sorted(adapter_sources):
-        if not source.startswith("src/adapters/windows/"):
-            violations.append(
-                f"CMakeLists.txt: reach_windows_adapters should not compile non-adapter source {source}"
+                f"{relative}: {source_layer} must not include {imported_layer} "
+                f"dependency {include.value}"
             )
 
     return violations
 
 
-def docs_allowlist_violations() -> list[str]:
+def validate_windows_boundary(path: Path, text: str) -> list[str]:
     violations: list[str] = []
-    doc_text = read(ARCHITECTURE_DOC)
+    source_layer = layer_for_path(path)
+    relative = rel(path)
 
-    if not doc_text:
-        violations.append("docs/architecture.md: missing or unreadable")
+    if source_layer is None or source_layer in WINDOWS_ALLOWED_LAYERS:
         return violations
 
-    documented_allowlist_entries = set(WIN32_ALLOWLIST)
-    documented_allowlist_entries.update(ROOT_SRC_ALLOWLIST)
-    documented_allowlist_entries.update(ROOT_INCLUDE_ALLOWLIST)
-    documented_allowlist_entries.update(SHELL_ADAPTER_SOURCE_DEBT)
-    documented_allowlist_entries.update(SHELL_APP_SOURCE_DEBT)
-
-    for relative in sorted(documented_allowlist_entries):
-        if relative not in doc_text:
+    for include in includes_from(text):
+        include_name = include.value.replace("\\", "/").split("/")[-1].lower()
+        if include_name in WINDOWS_HEADER_NAMES:
             violations.append(
-                f"docs/architecture.md: architecture allowlist/debt entry is undocumented: {relative}"
+                f"{relative}: {source_layer} must not include Windows header {include.value}"
             )
+
+    scan_text = strip_comments(text)
+    for pattern in WINDOWS_TOKEN_PATTERNS:
+        if re.search(pattern, scan_text):
+            violations.append(
+                f"{relative}: {source_layer} must not use Windows/native token {pattern}"
+            )
+
+    return violations
+
+
+def validate_public_inner_api(path: Path, text: str) -> list[str]:
+    violations: list[str] = []
+    source_layer = layer_for_path(path)
+    relative = rel(path)
+
+    if source_layer not in INNER_LAYERS or not is_public_header(path):
+        return violations
+
+    scan_text = strip_comments(text)
+
+    for include in includes_from(scan_text):
+        normalized = include.value.replace("\\", "/").lower()
+        for pattern in PUBLIC_INNER_FORBIDDEN_INCLUDE_PATTERNS:
+            if re.search(pattern, normalized, re.IGNORECASE):
+                violations.append(
+                    f"{relative}: public {source_layer} header exposes forbidden include {include.value}"
+                )
+
+    for pattern in PUBLIC_INNER_FORBIDDEN_TOKEN_PATTERNS.get(source_layer, []):
+        if re.search(pattern, scan_text):
+            violations.append(
+                f"{relative}: public {source_layer} header exposes suspicious outer-layer token {pattern}"
+            )
+
+    return violations
+
+
+def validate_public_inner_api_warnings(path: Path, text: str) -> list[str]:
+    warnings: list[str] = []
+    source_layer = layer_for_path(path)
+    relative = rel(path)
+
+    if source_layer not in INNER_LAYERS or not is_public_header(path):
+        return warnings
+
+    scan_text = strip_comments(text)
+
+    for pattern in PUBLIC_INNER_WARNING_TOKEN_PATTERNS.get(source_layer, []):
+        if re.search(pattern, scan_text):
+            warnings.append(
+                f"{relative}: public {source_layer} header uses opaque handle token {pattern}; "
+                "prefer a project-owned named handle typedef if practical"
+            )
+
+    return warnings
+
+
+def validate_cmake_dependencies() -> list[str]:
+    violations: list[str] = []
+
+    for cmake_file in iter_cmake_files():
+        text = read(cmake_file)
+        relative = rel(cmake_file)
+
+        for match in TARGET_LINK_LIBRARIES_RE.finditer(text):
+            target = match.group(1)
+            deps = cmake_tokens(match.group(2))
+            target_arch_layer = target_layer(target)
+
+            if target_arch_layer is None:
+                continue
+
+            allowed = ALLOWED_LAYER_DEPENDENCIES[target_arch_layer]
+
+            for dep in deps:
+                dep_layer = target_layer(dep)
+                if dep_layer is None or dep_layer == target_arch_layer:
+                    continue
+                if dep_layer not in allowed:
+                    violations.append(
+                        f"{relative}: CMake target {target} ({target_arch_layer}) "
+                        f"must not link {dep} ({dep_layer})"
+                    )
 
     return violations
 
 
 def main() -> int:
     violations: list[str] = []
+    warnings: list[str] = []
 
-    violations.extend(root_folder_violations())
-    violations.extend(cmake_violations())
-    violations.extend(docs_allowlist_violations())
+    violations.extend(validate_layer_directories())
+    violations.extend(validate_document_contract())
+    violations.extend(validate_cmake_dependencies())
 
-    for path in iter_sources():
-        relative = rel(path)
+    for path in iter_source_files():
         text = read(path)
-        violations.extend(include_violations(relative, text))
-        violations.extend(win32_violations(relative, text))
+        violations.extend(validate_imports(path, text))
+        violations.extend(validate_windows_boundary(path, text))
+        violations.extend(validate_public_inner_api(path, text))
+        warnings.extend(validate_public_inner_api_warnings(path, text))
 
     if violations:
-        print("Architecture check failed:")
+        print(f"{RED}Architecture check failed:{RESET}")
         for violation in violations:
-            print(f"  {violation}")
+            print(f"{RED}  {violation}{RESET}")
+        if warnings:
+            print(f"{YELLOW}Architecture warnings:{RESET}")
+            for warning in warnings:
+                print(f"{YELLOW}  {warning}{RESET}")
         return 1
 
-    print("Architecture check passed.")
+    if warnings:
+        print(f"{YELLOW}Architecture warnings:{RESET}")
+        for warning in warnings:
+            print(f"{YELLOW}  {warning}{RESET}")
+
+    print(f"{GREEN}Architecture check passed.{RESET}")
     return 0
 
 

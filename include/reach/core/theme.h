@@ -1,7 +1,7 @@
 #ifndef REACH_THEME_H
 #define REACH_THEME_H
 
-#include "reach/core/ui_state.h"
+#include "reach/core/geometry.h"
 
 #ifdef __cplusplus
 extern "C" {

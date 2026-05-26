@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "windows_adapters_internal.h"
 
 #include "reach/ports/explorer_service.h"
 
@@ -57,6 +57,16 @@ static reach_result reach_explorer_open_shell_location(reach_explorer_service *s
     return reach_explorer_execute(reinterpret_cast<const wchar_t *>(shell_location));
 }
 
+static int32_t reach_explorer_path_exists(reach_explorer_service *service, const uint16_t *path)
+{
+    if (service == nullptr || path == nullptr || path[0] == 0) {
+        return 0;
+    }
+
+    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(path));
+    return attributes != INVALID_FILE_ATTRIBUTES;
+}
+
 static void reach_explorer_destroy(reach_explorer_service *service)
 {
     delete service;
@@ -79,6 +89,7 @@ reach_result reach_windows_create_explorer_service(reach_explorer_service_port *
     out_port->ops.open_default = reach_explorer_open_default;
     out_port->ops.open_path = reach_explorer_open_path;
     out_port->ops.open_shell_location = reach_explorer_open_shell_location;
+    out_port->ops.path_exists = reach_explorer_path_exists;
     out_port->ops.destroy = reach_explorer_destroy;
     return REACH_OK;
 }

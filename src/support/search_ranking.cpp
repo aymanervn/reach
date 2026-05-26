@@ -1,7 +1,5 @@
 #include "reach/support/search_types.h"
 
-#include "reach/support/util.h"
-
 static uint16_t reach_search_ascii_lower(uint16_t ch)
 {
     return ch >= 'A' && ch <= 'Z' ? (uint16_t)(ch - 'A' + 'a') : ch;

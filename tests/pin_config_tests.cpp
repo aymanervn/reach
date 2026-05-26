@@ -1,4 +1,4 @@
-#include "reach/app/pin_config.h"
+#include "reach/features/pin_config.h"
 
 struct test_store {
     reach_config_snapshot snapshot;
@@ -73,6 +73,39 @@ int main()
 
     failed += expect(reach_pin_config_move_id(&port, 99, 0) == REACH_OK);
     failed += expect(backing.save_count == 1);
+
+    reach_pinned_app_model helper_app = {};
+    copy_ascii(helper_app.path, 260, "steam.exe");
+    copy_ascii(helper_app.arguments, 260, "-silent");
+    copy_ascii(helper_app.app_user_model_id, 260, "Valve.Steam.Client");
+
+    failed += expect(reach_pin_config_pin_app(&port, &helper_app) == REACH_OK);
+    failed += expect(backing.save_count == 2);
+    failed += expect(backing.snapshot.pinned_app_count == 5);
+    failed += expect(backing.snapshot.pinned_apps[4].path[0] == 's');
+    failed += expect(backing.snapshot.pinned_apps[4].arguments[0] == '-');
+    failed += expect(backing.snapshot.pinned_apps[4].app_user_model_id[0] == 'V');
+
+    test_store update_backing = {};
+    update_backing.snapshot.pinned_app_count = 1;
+    update_backing.snapshot.pinned_apps[0].id = 1;
+    copy_ascii(update_backing.snapshot.pinned_apps[0].path, 260, "helper.exe");
+
+    reach_config_store_port update_port = {};
+    update_port.store = reinterpret_cast<reach_config_store *>(&update_backing);
+    update_port.ops.load = test_load;
+    update_port.ops.save = test_save;
+
+    reach_pinned_app_model update_app = {};
+    copy_ascii(update_app.path, 260, "HELPER.EXE");
+    copy_ascii(update_app.arguments, 260, "--app");
+    copy_ascii(update_app.app_user_model_id, 260, "Example.App");
+
+    failed += expect(reach_pin_config_pin_app(&update_port, &update_app) == REACH_OK);
+    failed += expect(update_backing.save_count == 1);
+    failed += expect(update_backing.snapshot.pinned_app_count == 1);
+    failed += expect(update_backing.snapshot.pinned_apps[0].arguments[0] == '-');
+    failed += expect(update_backing.snapshot.pinned_apps[0].app_user_model_id[0] == 'E');
 
     return failed == 0 ? 0 : 1;
 }

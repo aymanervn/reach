@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 #include <wincodec.h>
@@ -80,6 +80,10 @@ static LRESULT CALLBACK reach_wallpaper_window_proc(HWND hwnd, UINT message, WPA
 
     if (message == WM_ERASEBKGND) {
         return 1;
+    }
+
+    if (message == WM_NCHITTEST) {
+        return HTTRANSPARENT;
     }
 
     if (message == WM_PAINT) {

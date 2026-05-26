@@ -1,9 +1,9 @@
-#include "reach/app/config_path.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 #include <shlwapi.h>
 
-reach_result reach_default_config_path(uint16_t *path, uint32_t path_count)
+reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count)
 {
     if (path == nullptr || path_count == 0) {
         return REACH_INVALID_ARGUMENT;

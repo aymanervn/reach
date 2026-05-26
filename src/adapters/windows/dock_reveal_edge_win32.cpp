@@ -1,4 +1,4 @@
-#include "reach/platform/windows_adapters.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 
@@ -10,6 +10,7 @@ struct reach_dock_reveal_edge {
     void *callback_user;
     int visible;
     int bounds_valid;
+    int tracking_mouse_leave;
     reach_rect_f32 bounds;
 };
 
@@ -41,6 +42,21 @@ static LRESULT CALLBACK reach_dock_reveal_edge_proc(HWND hwnd, UINT message, WPA
     case WM_NCHITTEST:
         return HTCLIENT;
     case WM_MOUSEMOVE:
+        if (edge != nullptr && !edge->tracking_mouse_leave) {
+            TRACKMOUSEEVENT track = {};
+            track.cbSize = sizeof(track);
+            track.dwFlags = TME_LEAVE;
+            track.hwndTrack = hwnd;
+            edge->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
+        }
+        reach_dock_reveal_edge_notify(edge);
+        return 0;
+    case WM_MOUSELEAVE:
+        if (edge != nullptr) {
+            edge->tracking_mouse_leave = 0;
+        }
+        reach_dock_reveal_edge_notify(edge);
+        return 0;
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_RBUTTONDOWN:
@@ -136,6 +152,7 @@ static reach_result reach_dock_reveal_edge_hide(reach_dock_reveal_edge *edge)
 
     ShowWindow(edge->hwnd, SW_HIDE);
     edge->visible = 0;
+    edge->tracking_mouse_leave = 0;
     return REACH_OK;
 }
 

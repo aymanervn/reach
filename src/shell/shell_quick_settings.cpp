@@ -122,34 +122,28 @@ static void reach_shell_relayout_quick_settings(
 static void reach_shell_capture_quick_settings_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.begin_capture == nullptr ||
-        shell->quick_settings.window.ops.native_handle == nullptr) {
+        shell->popup_capture.begin_capture == nullptr) {
         return;
     }
 
-    void *native_window = shell->quick_settings.window.ops.native_handle(
-        shell->quick_settings.window.window);
-    if (native_window != nullptr) {
+    if (shell->quick_settings.window.window != nullptr) {
         (void)shell->popup_capture.begin_capture(
             shell->popup_capture.userdata,
-            native_window);
+            shell->quick_settings.window.window);
     }
 }
 
 static void reach_shell_release_quick_settings_input(reach_shell *shell)
 {
     if (shell == nullptr ||
-        shell->popup_capture.end_capture == nullptr ||
-        shell->quick_settings.window.ops.native_handle == nullptr) {
+        shell->popup_capture.end_capture == nullptr) {
         return;
     }
 
-    void *native_window = shell->quick_settings.window.ops.native_handle(
-        shell->quick_settings.window.window);
-    if (native_window != nullptr) {
+    if (shell->quick_settings.window.window != nullptr) {
         shell->popup_capture.end_capture(
             shell->popup_capture.userdata,
-            native_window);
+            shell->quick_settings.window.window);
     }
 }
 
@@ -379,6 +373,7 @@ void reach_shell_set_quick_settings_open(
     shell->quick_settings_open = next_open;
     shell->quick_settings_dragging_volume = 0;
     shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
+    shell->quick_settings_drag_level_valid = 0;
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
             shell->quick_settings.window.window,

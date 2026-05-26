@@ -9,6 +9,8 @@
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/input_source.h"
+#include "reach/ports/hotkeys.h"
+#include "reach/ports/monitor.h"
 #include "reach/ports/platform_window.h"
 #include "reach/ports/popup_capture.h"
 #include "reach/ports/power_session.h"
@@ -48,6 +50,8 @@ typedef struct reach_shell_dependencies {
     reach_platform_window_port quick_settings_window;
     reach_render_backend_port quick_settings_renderer;
     reach_input_source_port input_source;
+    reach_hotkeys_port hotkeys;
+    reach_monitor_port monitors;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
     reach_tray_provider_port tray_provider;
@@ -64,11 +68,12 @@ typedef struct reach_shell_dependencies {
 } reach_shell_dependencies;
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, const reach_shell_dependencies *dependencies, reach_shell **out_shell);
-reach_result reach_shell_create(const reach_shell_desc *desc, reach_shell **out_shell);
 void reach_shell_destroy(reach_shell *shell);
 reach_result reach_shell_start(reach_shell *shell);
 reach_result reach_shell_stop(reach_shell *shell);
 reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *event);
+int32_t reach_shell_has_pending_events(const reach_shell *shell);
+reach_result reach_shell_dispatch_events(reach_shell *shell);
 reach_result reach_shell_update(reach_shell *shell, double delta_seconds);
 int32_t reach_shell_needs_frame(const reach_shell *shell);
 

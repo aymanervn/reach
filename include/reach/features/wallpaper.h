@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "reach/ports/config_store.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 
@@ -12,11 +11,13 @@
 extern "C" {
 #endif
 
-void reach_wallpaper_seed_or_apply(
-    reach_config_store_port *config_store,
+int32_t reach_wallpaper_seed_or_apply(
     reach_wallpaper_service_port *wallpaper_service,
     reach_wallpaper_surface_port *wallpaper_surface,
-    reach_config_snapshot *snapshot,
+    uint16_t *wallpaper_path,
+    size_t wallpaper_path_count,
+    uint16_t monitor_wallpaper_paths[][260],
+    size_t monitor_wallpaper_count,
     uint16_t *cached_wallpaper_path,
     size_t cached_wallpaper_path_count);
 

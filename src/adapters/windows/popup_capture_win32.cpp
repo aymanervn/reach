@@ -1,4 +1,4 @@
-#include "reach/ports/popup_capture.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 
@@ -38,28 +38,30 @@ static LRESULT CALLBACK reach_popup_capture_mouse_hook_proc(
 
 static reach_result reach_popup_capture_begin_capture(
     void *userdata,
-    void *surface_handle
+    reach_platform_window *surface
 )
 {
     (void)userdata;
-    if (surface_handle == nullptr) {
+    void *native_handle = reach_windows_platform_window_native_handle(surface);
+    if (native_handle == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
-    HWND hwnd = static_cast<HWND>(surface_handle);
+    HWND hwnd = static_cast<HWND>(native_handle);
     SetCapture(hwnd);
     return REACH_OK;
 }
 
 static void reach_popup_capture_end_capture(
     void *userdata,
-    void *surface_handle
+    reach_platform_window *surface
 )
 {
     (void)userdata;
-    if (surface_handle == nullptr) {
+    void *native_handle = reach_windows_platform_window_native_handle(surface);
+    if (native_handle == nullptr) {
         return;
     }
-    HWND hwnd = static_cast<HWND>(surface_handle);
+    HWND hwnd = static_cast<HWND>(native_handle);
     if (GetCapture() == hwnd) {
         ReleaseCapture();
     }
@@ -67,14 +69,15 @@ static void reach_popup_capture_end_capture(
 
 static int32_t reach_popup_capture_is_capture_active(
     void *userdata,
-    void *surface_handle
+    reach_platform_window *surface
 )
 {
     (void)userdata;
-    if (surface_handle == nullptr) {
+    void *native_handle = reach_windows_platform_window_native_handle(surface);
+    if (native_handle == nullptr) {
         return 0;
     }
-    HWND hwnd = static_cast<HWND>(surface_handle);
+    HWND hwnd = static_cast<HWND>(native_handle);
     return GetCapture() == hwnd ? 1 : 0;
 }
 

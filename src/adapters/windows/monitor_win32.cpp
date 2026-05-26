@@ -1,4 +1,4 @@
-#include "reach/platform/monitor.h"
+#include "windows_adapters_internal.h"
 
 #include <windows.h>
 #include <shellscalingapi.h>
@@ -9,6 +9,8 @@
 struct reach_monitor_list {
     std::vector<reach_monitor_info> monitors;
 };
+
+static reach_result reach_monitor_refresh(reach_monitor_list *list);
 
 static reach_rect_i32 reach_rect_from_win32(const RECT &rect)
 {
@@ -51,7 +53,7 @@ static BOOL CALLBACK reach_monitor_enum_proc(HMONITOR monitor, HDC dc, LPRECT re
     return TRUE;
 }
 
-reach_result reach_monitor_list_create(reach_monitor_list **out_list)
+static reach_result reach_monitor_list_create(reach_monitor_list **out_list)
 {
     if (out_list == nullptr) {
         return REACH_INVALID_ARGUMENT;
@@ -67,12 +69,12 @@ reach_result reach_monitor_list_create(reach_monitor_list **out_list)
     return reach_monitor_refresh(list);
 }
 
-void reach_monitor_list_destroy(reach_monitor_list *list)
+static void reach_monitor_list_destroy(reach_monitor_list *list)
 {
     delete list;
 }
 
-reach_result reach_monitor_refresh(reach_monitor_list *list)
+static reach_result reach_monitor_refresh(reach_monitor_list *list)
 {
     if (list == nullptr) {
         return REACH_INVALID_ARGUMENT;
@@ -86,12 +88,12 @@ reach_result reach_monitor_refresh(reach_monitor_list *list)
     return REACH_OK;
 }
 
-size_t reach_monitor_count(const reach_monitor_list *list)
+static size_t reach_monitor_count(const reach_monitor_list *list)
 {
     return list == nullptr ? 0 : list->monitors.size();
 }
 
-const reach_monitor_info *reach_monitor_get(const reach_monitor_list *list, size_t index)
+static const reach_monitor_info *reach_monitor_get(const reach_monitor_list *list, size_t index)
 {
     if (list == nullptr || index >= list->monitors.size()) {
         return nullptr;
@@ -100,7 +102,7 @@ const reach_monitor_info *reach_monitor_get(const reach_monitor_list *list, size
     return &list->monitors[index];
 }
 
-const reach_monitor_info *reach_monitor_primary(const reach_monitor_list *list)
+static const reach_monitor_info *reach_monitor_primary(const reach_monitor_list *list)
 {
     if (list == nullptr || list->monitors.empty()) {
         return nullptr;
@@ -113,4 +115,24 @@ const reach_monitor_info *reach_monitor_primary(const reach_monitor_list *list)
     }
 
     return &list->monitors[0];
+}
+
+reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port)
+{
+    if (out_port == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_port = {};
+    reach_result result = reach_monitor_list_create(&out_port->list);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    out_port->ops.destroy = reach_monitor_list_destroy;
+    out_port->ops.refresh = reach_monitor_refresh;
+    out_port->ops.count = reach_monitor_count;
+    out_port->ops.get = reach_monitor_get;
+    out_port->ops.primary = reach_monitor_primary;
+    return REACH_OK;
 }
