@@ -36,7 +36,7 @@ typedef enum reach_ui_event_type {
     REACH_UI_EVENT_HOME = 25,
     REACH_UI_EVENT_END = 26,
     REACH_UI_EVENT_LAUNCHER_SEARCH_READY = 27,
-    REACH_UI_EVENT_RESERVED_28 = 28,
+    REACH_UI_EVENT_CONFIG_CHANGED = 28,
     REACH_UI_EVENT_DISPLAY_CHANGED = 29
 } reach_ui_event_type;
 

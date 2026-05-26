@@ -72,6 +72,12 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             window->callback(window->callback_user, &event);
         }
         return 0;
+    case REACH_WM_CONFIG_CHANGED:
+        if (window != nullptr && window->callback != nullptr) {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_CONFIG_CHANGED;                window->callback(window->callback_user, &event);
+        }
+        return 0;
     case REACH_WM_LAUNCHER_SEARCH_READY:
         if (window != nullptr && window->callback != nullptr) {
             reach_ui_event event = {};

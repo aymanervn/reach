@@ -158,6 +158,14 @@ static void reachctl_notify_wallpaper_changed(void)
     }
 }
 
+static void reachctl_notify_config_changed(void)
+{
+    HWND hwnd = nullptr;
+    while ((hwnd = FindWindowExW(nullptr, hwnd, L"ReachPlatformWindow", nullptr)) != nullptr) {
+        PostMessageW(hwnd, REACH_WM_CONFIG_CHANGED, 0, 0);
+    }
+}
+
 struct reachctl_monitor_list_state {
     size_t index;
 };
@@ -399,7 +407,32 @@ int wmain(int argc, wchar_t **argv)
             if (store.ops.destroy != nullptr) {
                 store.ops.destroy(store.store);
             }
+            if (ok) {
+                reachctl_notify_config_changed();
+            }
             reachctl_print(ok ? L"Pinned to Reach dock." : L"Pin to Reach dock failed.");
+            return ok ? 0 : 1;
+        }
+        if (lstrcmpiW(argv[index], L"--set-pin-appid") == 0) {
+            if (index + 2 >= argc) {
+                reachctl_print(L"--set-pin-appid requires a pinned path and AppUserModelID.");
+                return 2;
+            }
+
+            reach_config_store_port store = {};
+            int ok = reachctl_open_config_store(&store) == REACH_OK &&
+                reach_pin_config_set_app_user_model_id(
+                    &store,
+                    reinterpret_cast<const uint16_t *>(argv[index + 1]),
+                    reinterpret_cast<const uint16_t *>(argv[index + 2])) == REACH_OK;
+
+            if (store.ops.destroy != nullptr) {
+                store.ops.destroy(store.store);
+            }
+            if (ok) {
+                reachctl_notify_config_changed();
+            }
+            reachctl_print(ok ? L"Reach pin AppUserModelID set." : L"Reach pin AppUserModelID set failed.");
             return ok ? 0 : 1;
         }
         if (lstrcmpiW(argv[index], L"--unpin-path") == 0) {
@@ -412,6 +445,9 @@ int wmain(int argc, wchar_t **argv)
                 reach_pin_config_unpin_path(&store, reinterpret_cast<const uint16_t *>(argv[index + 1])) == REACH_OK;
             if (store.ops.destroy != nullptr) {
                 store.ops.destroy(store.store);
+            }
+            if (ok) {
+                reachctl_notify_config_changed();
             }
             reachctl_print(ok ? L"Unpinned from Reach dock." : L"Unpin from Reach dock failed.");
             return ok ? 0 : 1;
@@ -427,6 +463,9 @@ int wmain(int argc, wchar_t **argv)
                 reach_pin_config_unpin_id(&store, id) == REACH_OK;
             if (store.ops.destroy != nullptr) {
                 store.ops.destroy(store.store);
+            }
+            if (ok) {
+                reachctl_notify_config_changed();
             }
             reachctl_print(ok ? L"Unpinned from Reach dock." : L"Unpin from Reach dock failed.");
             return ok ? 0 : 1;
@@ -477,6 +516,6 @@ int wmain(int argc, wchar_t **argv)
         }
     }
 
-    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --list-monitors | --pin-path <path> | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu | --set-wallpaper <path> | --set-wallpaper-monitor <index> <path> | --clear-wallpaper | --clear-wallpaper-monitor <index>");
+    reachctl_print(L"Usage: reachctl.exe --install-shell | --restore-shell | --print-shell-status | --list-monitors | --pin-path <path> | --set-pin-appid <path> <appid> | --unpin-path <path> | --unpin-id <id> | --install-context-menu | --remove-context-menu | --set-wallpaper <path> | --set-wallpaper-monitor <index> <path> | --clear-wallpaper | --clear-wallpaper-monitor <index>");
     return 2;
 }

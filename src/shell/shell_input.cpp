@@ -1599,6 +1599,20 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         reach_shell_reload_wallpaper(shell, 1);
         return REACH_OK;
     }
+    if (event->type == REACH_UI_EVENT_CONFIG_CHANGED) {
+        reach_config_snapshot snapshot = {};
+        if (shell->config_store.ops.load != nullptr &&
+            shell->config_store.ops.load(shell->config_store.store, &snapshot) == REACH_OK) {
+            reach_dock_release_pinned_icons(&shell->dock_icons, &shell->icon_provider);
+            reach_ui_state_set_pinned_apps(&shell->ui, snapshot.pinned_apps, snapshot.pinned_app_count);
+            (void)reach_shell_load_pinned_icons(shell);
+
+            shell->dock_items_changed = 1;
+            shell->dock.dirty_flags = 1;
+            shell->render_dirty = 1;
+        }
+        return REACH_OK;
+    }
     if (event->type == REACH_UI_EVENT_LAUNCHER_SEARCH_READY) {
         reach_shell_apply_launcher_search_results(shell);
         return REACH_OK;

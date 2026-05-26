@@ -167,6 +167,35 @@ reach_result reach_pin_config_move_id(reach_config_store_port *store, uint32_t i
     return reach_pin_save(store, &snapshot);
 }
 
+reach_result reach_pin_config_set_app_user_model_id(
+    reach_config_store_port *store,
+    const uint16_t *path,
+    const uint16_t *app_user_model_id)
+{
+    if (path == nullptr || path[0] == 0 ||
+        app_user_model_id == nullptr || app_user_model_id[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_config_snapshot snapshot = {};
+    reach_result result = reach_pin_load(store, &snapshot);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    for (size_t index = 0; index < snapshot.pinned_app_count; ++index) {
+        if (reach_pin_path_equals(snapshot.pinned_apps[index].path, path)) {
+            (void)reach_copy_utf16(
+                snapshot.pinned_apps[index].app_user_model_id,
+                260,
+                app_user_model_id);
+            return reach_pin_save(store, &snapshot);
+        }
+    }
+
+    return REACH_ERROR;
+}
+
 reach_result reach_pin_config_unpin_id(reach_config_store_port *store, uint32_t id)
 {
     reach_config_snapshot snapshot = {};
