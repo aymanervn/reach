@@ -26,6 +26,18 @@ static void reach_shell_on_popup_mouse_down(void *user, int32_t x, int32_t y)
     reach_shell_handle_global_mouse_down(shell, point);
 }
 
+static void reach_shell_request_dock_autohide_check(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->ui.dock.auto_hide) {
+        return;
+    }
+
+    shell->dock_reveal_requested = 0;
+    shell->dock_reveal_check_dirty = 1;
+    shell->dock.dirty_flags = 1;
+    reach_shell_request_update(shell);
+}
+
 void reach_shell_raise_launcher(reach_shell *shell)
 {
     if (shell == nullptr || shell->launcher.window.ops.raise == nullptr) {
@@ -162,16 +174,28 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
     int32_t on_quick_settings_button = shell->quick_settings_open && dock_hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON;
     int32_t on_power_button = shell->context_menu_open && shell->context_menu_power_open && dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON;
 
+    int32_t closed_dock_popup = 0;
+
     if (shell->tray_popup_open && !on_tray && !on_tray_button) {
         reach_shell_set_tray_popup_open(shell, 0);
+        reach_shell_clear_sticky_dock_feedback(shell);
+        closed_dock_popup = 1;
     }
+
     if (shell->context_menu_open && !on_context && !on_power_button) {
         reach_shell_close_context_menu(shell);
         reach_shell_clear_sticky_dock_feedback(shell);
+        closed_dock_popup = 1;
     }
+
     if (shell->quick_settings_open && !on_quick_settings && !on_quick_settings_button) {
         reach_shell_set_quick_settings_open(shell, 0);
         reach_shell_clear_sticky_dock_feedback(shell);
+        closed_dock_popup = 1;
+    }
+
+    if (closed_dock_popup) {
+        reach_shell_request_dock_autohide_check(shell);
     }
     if (shell->ui.launcher.open && !on_launcher) {
         reach_shell_close_launcher(shell);
@@ -1108,6 +1132,8 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         }
 
         reach_shell_set_quick_settings_open(shell, 0);
+        reach_shell_clear_sticky_dock_feedback(shell);
+        reach_shell_request_dock_autohide_check(shell);
         return REACH_OK;
     }
 
@@ -1121,6 +1147,8 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         }
         if (!reach_rect_contains(shell->context_menu_bounds, event->x, event->y)) {
             reach_shell_close_context_menu(shell);
+            reach_shell_clear_sticky_dock_feedback(shell);
+            reach_shell_request_dock_autohide_check(shell);
         } else {
             reach_shell_capture_context_menu_input(shell);
         }
