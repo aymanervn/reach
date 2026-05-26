@@ -127,9 +127,9 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
             if (selected) {
                 command = {};
                 command.type = REACH_RENDER_COMMAND_TEXT;
-                command.rect.x = item.x - gap * 0.5f;
+                command.rect.x = item.x;
                 command.rect.y = item.y + 104.0f;
-                command.rect.width = item.width + gap;
+                command.rect.width = item.width;
                 command.rect.height = 20.0f;
                 command.color = reach_switcher_rgb(242, 240, 236, 0.96f);
                 command.text_weight = input->text_weight_demi_bold;

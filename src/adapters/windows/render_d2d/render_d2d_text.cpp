@@ -41,9 +41,12 @@ reach_result reach_d2d_draw_text(
         &format);
 
     if (SUCCEEDED(hr)) {
-        DWRITE_TEXT_ALIGNMENT alignment = command->text_alignment >= 0
-            ? static_cast<DWRITE_TEXT_ALIGNMENT>(command->text_alignment)
-            : DWRITE_TEXT_ALIGNMENT_CENTER;
+        DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
+        if (command->text_alignment == REACH_TEXT_ALIGNMENT_LEADING) {
+            alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
+        } else if (command->text_alignment == REACH_TEXT_ALIGNMENT_CENTER) {
+            alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
+        }
 
         (void)format->SetTextAlignment(alignment);
         (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
