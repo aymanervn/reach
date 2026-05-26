@@ -432,6 +432,7 @@ reach_result reach_shell_start(reach_shell *shell)
     }
 
     shell->running = 1;
+    reach_runtime_policy_init(&shell->runtime_policy);
     shell->layout_dirty = 1;
     shell->render_dirty = 1;
     shell->monitors_dirty = 1;
@@ -454,6 +455,7 @@ reach_result reach_shell_stop(reach_shell *shell)
     }
 
     shell->running = 0;
+    reach_runtime_policy_init(&shell->runtime_policy);
     shell->switcher_open = 0;
     shell->context_menu_open = 0;
     reach_shell_set_tray_popup_open(shell, 0);

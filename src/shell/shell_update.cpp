@@ -1117,18 +1117,22 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     if (shell == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
+
     if (shell->events_dispatched_this_cycle) {
         shell->events_dispatched_this_cycle = 0;
     } else {
         (void)reach_shell_dispatch_events(shell);
         shell->events_dispatched_this_cycle = 0;
     }
+
     if (reach_shell_can_move_dock_without_redraw(shell)) {
         return reach_shell_move_dock_animation_frame(shell, delta_seconds);
     }
+
     reach_shell_process_quick_settings_system_changes(shell);
 
     reach_shell_update_clock_text(shell);
+
     if (shell->dock_click_feedback_animating) {
         reach_float_animation_update(&shell->dock_click_feedback_opacity, delta_seconds);
         shell->dock_click_feedback_animating = reach_shell_float_animation_active(&shell->dock_click_feedback_opacity);
@@ -1141,6 +1145,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         }
         shell->dock.dirty_flags = 1;
     }
+
     if (shell->tray_click_feedback_animating) {
         reach_float_animation_update(&shell->tray_click_feedback_opacity, delta_seconds);
         shell->tray_click_feedback_animating = reach_shell_float_animation_active(&shell->tray_click_feedback_opacity);
@@ -1152,6 +1157,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         }
         shell->tray.dirty_flags = 1;
     }
+
     for (size_t index = 0; index < shell->dock_model.item_count; ++index) {
         if (shell->dock_item_x_animating[index]) {
             reach_float_animation_update(&shell->dock_item_x_animations[index], delta_seconds);
@@ -1159,6 +1165,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             shell->dock.dirty_flags = 1;
         }
     }
+
     if (shell->dock_drag_snapping) {
         reach_float_animation_update(&shell->dock_drag_snap_animation, delta_seconds);
         shell->dock_drag_x = shell->dock_drag_snap_animation.value;
@@ -1181,31 +1188,42 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             }
         }
     }
+
     int32_t window_manager_dirty = shell->window_manager.ops.needs_refresh != nullptr &&
         shell->window_manager.ops.needs_refresh(shell->window_manager.manager);
     if (window_manager_dirty && shell->window_manager.ops.refresh != nullptr) {
         (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
+
         int32_t open_windows_changed = 0;
         (void)reach_shell_refresh_open_windows(shell, &open_windows_changed);
+
         uintptr_t foreground_window = shell->window_manager.ops.foreground != nullptr
             ? shell->window_manager.ops.foreground(shell->window_manager.manager)
             : 0;
         int32_t foreground_changed = shell->foreground_window != foreground_window;
         shell->foreground_window = foreground_window;
+
         if (open_windows_changed || foreground_changed) {
             shell->dock.dirty_flags = 1;
         }
     }
-    if (shell->tray_popup_open &&
+
+    (void)reach_shell_update_game_mode(shell);
+    int32_t game_mode = reach_shell_game_mode_enabled(shell);
+
+    if (!game_mode &&
+        shell->tray_popup_open &&
         shell->tray_provider.ops.needs_refresh != nullptr &&
         shell->tray_provider.ops.needs_refresh(shell->tray_provider.provider)) {
         (void)reach_shell_refresh_tray_items(shell);
         shell->tray.dirty_flags = 1;
     }
+
     reach_result monitor_result = reach_shell_refresh_monitor_layout(shell);
     if (monitor_result != REACH_OK) {
         return monitor_result;
     }
+
     if (shell->launcher.window.ops.set_bounds != nullptr && shell->monitors.list != nullptr &&
         shell->monitors.ops.count != nullptr && shell->monitors.ops.primary != nullptr &&
         shell->monitors.ops.count(shell->monitors.list) > 0) {
@@ -1215,6 +1233,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         if (monitor == nullptr) {
             return REACH_ERROR;
         }
+
         reach_rect_f32 bounds = {};
         bounds.x = (float)monitor->bounds.left;
         bounds.y = (float)monitor->bounds.top;
@@ -1223,11 +1242,13 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
         reach_result result = REACH_OK;
         int32_t launcher_window_changed = 0;
+
         if (shell->launcher.renderer.ops.begin_frame != nullptr) {
             reach_ui_layout_input input = {};
             input.monitor_bounds = bounds;
             input.work_area = bounds;
             input.dpi_scale = 1.0f;
+
             reach_ui_layout layout = {};
             if (reach_ui_layout_compute(&shell->ui, &input, &layout) == REACH_OK) {
                 if (shell->dock_items_changed) {
@@ -1236,13 +1257,30 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 } else {
                     reach_shell_build_dock_items(shell, &layout.dock);
                 }
-                reach_shell_apply_dock_width_animation(shell, &layout.dock, delta_seconds);
-                reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
-                reach_rect_f32 animated_dock_bounds = reach_shell_apply_dock_animation(shell, shown_dock_bounds, bounds, delta_seconds);
-                reach_shell_sync_dock_reveal_edge(shell, shown_dock_bounds, bounds);
-                if (shell->dock_reveal_check_dirty) {
-                    shell->dock_reveal_check_dirty = 0;
+
+                if (!game_mode) {
+                    reach_shell_apply_dock_width_animation(shell, &layout.dock, delta_seconds);
                 }
+
+                reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
+                reach_rect_f32 animated_dock_bounds = game_mode
+                    ? shown_dock_bounds
+                    : reach_shell_apply_dock_animation(shell, shown_dock_bounds, bounds, delta_seconds);
+
+                if (!game_mode) {
+                    reach_shell_sync_dock_reveal_edge(shell, shown_dock_bounds, bounds);
+                    if (shell->dock_reveal_check_dirty) {
+                        shell->dock_reveal_check_dirty = 0;
+                    }
+                } else {
+                    shell->dock_reveal_requested = 0;
+                    shell->dock_reveal_check_dirty = 0;
+                    if (shell->dock_reveal_edge.ops.hide != nullptr) {
+                        (void)shell->dock_reveal_edge.ops.hide(shell->dock_reveal_edge.edge);
+                    }
+                    shell->dock_reveal_edge_visible = 0;
+                }
+
                 float dock_y_offset = animated_dock_bounds.y - shown_dock_bounds.y;
                 layout.dock.bounds = animated_dock_bounds;
                 for (size_t index = 0; index < layout.dock.app_slot_count; ++index) {
@@ -1253,6 +1291,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 layout.dock.system_separator.y += dock_y_offset;
                 layout.dock.clock.y += dock_y_offset;
                 layout.dock.power_button.y += dock_y_offset;
+
                 float dock_left_offset = bounds.x - layout.dock.bounds.x;
                 float dock_right_offset = bounds.x + bounds.width - (layout.dock.bounds.x + layout.dock.bounds.width);
                 float dock_x_offset = 0.0f;
@@ -1261,6 +1300,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 } else if (dock_right_offset < 0.0f) {
                     dock_x_offset = dock_right_offset;
                 }
+
                 if (dock_x_offset != 0.0f) {
                     layout.dock.bounds.x += dock_x_offset;
                     for (size_t index = 0; index < layout.dock.app_slot_count; ++index) {
@@ -1272,32 +1312,39 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     layout.dock.clock.x += dock_x_offset;
                     layout.dock.power_button.x += dock_x_offset;
                 }
+
                 int32_t dock_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.dock.bounds, layout.dock.bounds);
                 int32_t launcher_layout_changed = !shell->has_layout || !reach_shell_rect_equal(shell->layout.launcher.bounds, layout.launcher.bounds);
+
                 shell->layout = layout;
                 shell->has_layout = 1;
+
                 result = reach_shell_apply_window_state(
                     &shell->launcher.window,
                     layout.launcher.bounds,
-                    shell->ui.launcher.open ? 1.0f : 0.0f,
+                    (!game_mode && shell->ui.launcher.open) ? 1.0f : 0.0f,
                     &shell->launcher.last_bounds,
                     &shell->launcher.last_opacity,
                     &shell->launcher.bounds_valid,
                     &shell->launcher.opacity_valid,
                     &launcher_window_changed);
-                  if (result != REACH_OK) {
-                      return result;
-                  }
-                  if (shell->ui.launcher.open && (shell->render_dirty || shell->launcher.dirty_flags || launcher_window_changed || launcher_layout_changed)) {
-                      (void)reach_shell_render_launcher_surface(shell, &layout.launcher);
-                  }
+                if (result != REACH_OK) {
+                    return result;
+                }
+
+                if (!game_mode &&
+                    shell->ui.launcher.open &&
+                    (shell->render_dirty || shell->launcher.dirty_flags || launcher_window_changed || launcher_layout_changed)) {
+                    (void)reach_shell_render_launcher_surface(shell, &layout.launcher);
+                }
+
                 if (shell->dock.window.ops.set_bounds != nullptr) {
                     int32_t dock_window_changed = 0;
                     float dock_radius = reach_theme_dock_corner_radius(shell->theme, layout.dock.bounds.height);
                     result = reach_shell_apply_window_state(
                         &shell->dock.window,
                         layout.dock.bounds,
-                        1.0f,
+                        game_mode ? 0.0f : 1.0f,
                         &shell->dock.last_bounds,
                         &shell->dock.last_opacity,
                         &shell->dock.bounds_valid,
@@ -1306,9 +1353,11 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (result != REACH_OK) {
                         return result;
                     }
+
                     if (dock_window_changed && shell->dock.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->dock.window.ops.apply_rounded_corners(shell->dock.window.window, dock_radius);
                     }
+
                     int32_t dock_reveal_position_only =
                         shell->dock_animating &&
                         !shell->render_dirty &&
@@ -1318,20 +1367,23 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         !shell->dock_drag_snapping &&
                         !shell->dock_click_feedback_animating;
 
-                    if (shell->render_dirty ||
-                        shell->dock.dirty_flags ||
-                        (!dock_reveal_position_only && (dock_window_changed || dock_layout_changed))) {
+                    if (!game_mode &&
+                        (shell->render_dirty ||
+                         shell->dock.dirty_flags ||
+                         (!dock_reveal_position_only && (dock_window_changed || dock_layout_changed)))) {
                         (void)reach_shell_render_dock_surface(shell, &layout.dock);
                     }
                 }
+
                 if (shell->tray.window.ops.set_bounds != nullptr) {
                     reach_rect_f32 tray_bounds = {};
                     reach_shell_compute_tray_popup_layout(shell, &layout.dock, &tray_bounds, shell->tray_model.item_slots);
+
                     int32_t tray_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->tray.window,
                         tray_bounds,
-                        shell->tray_popup_open ? 1.0f : 0.0f,
+                        (!game_mode && shell->tray_popup_open) ? 1.0f : 0.0f,
                         &shell->tray.last_bounds,
                         &shell->tray.last_opacity,
                         &shell->tray.bounds_valid,
@@ -1340,10 +1392,12 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (result != REACH_OK) {
                         return result;
                     }
+
                     if (tray_window_changed && shell->tray.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->tray.window.ops.apply_rounded_corners(shell->tray.window.window, reach_popup_radius());
                     }
-                    if (shell->tray_popup_open) {
+
+                    if (!game_mode && shell->tray_popup_open) {
                         if (shell->tray.window.ops.show != nullptr) {
                             (void)shell->tray.window.ops.show(shell->tray.window.window);
                         }
@@ -1354,14 +1408,19 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)shell->tray.window.ops.hide(shell->tray.window.window);
                     }
                 }
+
                 if (shell->quick_settings.window.ops.set_bounds != nullptr) {
                     int32_t quick_window_changed = 0;
-                    reach_shell_refresh_quick_settings_layout(shell);
-                    reach_shell_update_quick_settings_animation(shell, delta_seconds);
+
+                    if (!game_mode) {
+                        reach_shell_refresh_quick_settings_layout(shell);
+                        reach_shell_update_quick_settings_animation(shell, delta_seconds);
+                    }
+
                     result = reach_shell_apply_window_state(
                         &shell->quick_settings.window,
                         shell->quick_settings_bounds,
-                        shell->quick_settings_open ? 1.0f : 0.0f,
+                        (!game_mode && shell->quick_settings_open) ? 1.0f : 0.0f,
                         &shell->quick_settings.last_bounds,
                         &shell->quick_settings.last_opacity,
                         &shell->quick_settings.bounds_valid,
@@ -1370,10 +1429,12 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (result != REACH_OK) {
                         return result;
                     }
+
                     if (quick_window_changed && shell->quick_settings.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->quick_settings.window.ops.apply_rounded_corners(shell->quick_settings.window.window, reach_popup_radius());
                     }
-                    if (shell->quick_settings_open) {
+
+                    if (!game_mode && shell->quick_settings_open) {
                         if (shell->quick_settings.window.ops.show != nullptr) {
                             (void)shell->quick_settings.window.ops.show(shell->quick_settings.window.window);
                         }
@@ -1384,6 +1445,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
                     }
                 }
+
                 if (shell->switcher.window.ops.set_bounds != nullptr) {
                     reach_rect_f32 switcher_bounds = reach_switcher_bounds_for_count(bounds, reach_shell_switcher_visible_count(shell));
                     int32_t switcher_window_changed = 0;
@@ -1399,9 +1461,11 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (result != REACH_OK) {
                         return result;
                     }
+
                     if (switcher_window_changed && shell->switcher.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->switcher.window.ops.apply_rounded_corners(shell->switcher.window.window, 16.0f);
                     }
+
                     if (shell->switcher_open) {
                         if (shell->switcher.window.ops.show != nullptr) {
                             (void)shell->switcher.window.ops.show(shell->switcher.window.window);
@@ -1413,12 +1477,13 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)shell->switcher.window.ops.hide(shell->switcher.window.window);
                     }
                 }
+
                 if (shell->context_menu.window.ops.set_bounds != nullptr) {
                     int32_t context_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->context_menu.window,
                         shell->context_menu_bounds,
-                        shell->context_menu_open ? 1.0f : 0.0f,
+                        (!game_mode && shell->context_menu_open) ? 1.0f : 0.0f,
                         &shell->context_menu.last_bounds,
                         &shell->context_menu.last_opacity,
                         &shell->context_menu.bounds_valid,
@@ -1427,10 +1492,12 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (result != REACH_OK) {
                         return result;
                     }
+
                     if (context_window_changed && shell->context_menu.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->context_menu.window.ops.apply_rounded_corners(shell->context_menu.window.window, reach_popup_radius());
                     }
-                    if (shell->context_menu_open) {
+
+                    if (!game_mode && shell->context_menu_open) {
                         if (shell->context_menu.window.ops.show != nullptr) {
                             (void)shell->context_menu.window.ops.show(shell->context_menu.window.window);
                         }
@@ -1441,12 +1508,14 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)shell->context_menu.window.ops.hide(shell->context_menu.window.window);
                     }
                 }
-                if (shell->ui.launcher.open) {
+
+                if (!game_mode && shell->ui.launcher.open) {
                     reach_shell_raise_launcher(shell);
                 }
             }
         }
     }
+
     shell->layout_dirty = 0;
     shell->render_dirty = 0;
     shell->update_requested = 0;

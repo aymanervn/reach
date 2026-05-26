@@ -48,8 +48,8 @@ static LRESULT CALLBACK reach_dock_reveal_edge_proc(HWND hwnd, UINT message, WPA
             track.dwFlags = TME_LEAVE;
             track.hwndTrack = hwnd;
             edge->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
+            reach_dock_reveal_edge_notify(edge);
         }
-        reach_dock_reveal_edge_notify(edge);
         return 0;
     case WM_MOUSELEAVE:
         if (edge != nullptr) {

@@ -46,6 +46,7 @@ add_library(reach_core STATIC
     src/core/ui_events.c
     src/core/render_commands.c
     src/core/app_controller.c
+    src/core/runtime_policy.c
     src/core/theme.c
 )
 
@@ -155,6 +156,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
 
 add_library(reach_shell STATIC
     src/shell/shell_input.cpp
+    src/shell/shell_game_mode.cpp
     src/shell/shell_launcher_search.cpp
     src/shell/shell_lifecycle.cpp
     src/shell/shell_popup_surface.cpp

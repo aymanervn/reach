@@ -17,6 +17,7 @@
 #include "reach/features/popup.h"
 #include "reach/features/pin_config.h"
 #include "reach/shell/surface_runtime.h"
+#include "reach/core/runtime_policy.h"
 #include "reach/core/theme.h"
 
 #include <atomic>
@@ -152,6 +153,7 @@ struct reach_shell {
     int32_t dock_clock_initialized;
     int64_t dock_clock_last_minute;
     int32_t running;
+    reach_runtime_policy_state runtime_policy;
     uint16_t wallpaper_path[260];
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
@@ -280,5 +282,6 @@ reach_result reach_shell_render_launcher_surface(reach_shell *shell, const reach
 reach_result reach_shell_render_context_menu_surface(reach_shell *shell);
 void reach_shell_on_window_event(void *user, const reach_ui_event *event);
 void reach_shell_request_update(reach_shell *shell);
-
+int32_t reach_shell_game_mode_enabled(const reach_shell *shell);
+reach_result reach_shell_update_game_mode(reach_shell *shell);
 #endif
