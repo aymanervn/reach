@@ -31,47 +31,16 @@ static void reach_dock_push_item(
         + (layout->app_slots[index].height - icon_box_size) * 0.5f;
 
     if (icon.id != 0) {
-        int32_t wants_backplate = icon.wants_backplate;
-        float actual_icon_size = wants_backplate ? icon_box_size * theme->icon_backplate_scale : icon_box_size;
-
-        if (wants_backplate) {
-            command = {};
-            command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect.x = box_x;
-            command.rect.y = box_y;
-            command.rect.width = icon_box_size;
-            command.rect.height = icon_box_size;
-            command.color = theme->icon_backplate_background;
-            command.radius = icon_box_radius;
-            reach_render_command_buffer_push(commands, &command);
-        }
-
-        float icon_x = box_x + (icon_box_size - actual_icon_size) * 0.5f;
-        float icon_y = box_y + (icon_box_size - actual_icon_size) * 0.5f;
-
         command = {};
         command.type = REACH_RENDER_COMMAND_ICON;
-        command.rect.x = icon_x;
-        command.rect.y = icon_y;
-        command.rect.width = actual_icon_size;
-        command.rect.height = actual_icon_size;
+        command.rect.x = box_x;
+        command.rect.y = box_y;
+        command.rect.width = icon_box_size;
+        command.rect.height = icon_box_size;
         command.icon_id = icon.id;
         command.color.a = 1.0f;
-        command.radius = wants_backplate ? 0.0f : icon_box_radius;
+        command.radius = 0.0f;
         reach_render_command_buffer_push(commands, &command);
-
-        if (wants_backplate) {
-            command = {};
-            command.type = REACH_RENDER_COMMAND_BACKPLATE_EDGE;
-            command.rect.x = box_x;
-            command.rect.y = box_y;
-            command.rect.width = icon_box_size;
-            command.rect.height = icon_box_size;
-            command.color = theme->icon_backplate_edge;
-            command.radius = icon_box_radius;
-            command.stroke_width = 0.55f;
-            reach_render_command_buffer_push(commands, &command);
-        }
     } else {
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;

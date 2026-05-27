@@ -113,9 +113,23 @@ int32_t reach_shell_dock_item_matches_key(const reach_shell *shell, size_t index
 
 static int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
 {
-    const reach_theme *theme = shell != nullptr && shell->theme != nullptr ? shell->theme : reach_theme_default();
+    const reach_theme *theme =
+        shell != nullptr && shell->theme != nullptr
+            ? shell->theme
+            : reach_theme_default();
+
     float dock_height = shell != nullptr ? shell->ui.dock.height : 48.0f;
-    return (int32_t)(reach_theme_icon_box_size(theme, dock_height) * 4.0f);
+    float icon_box_size = reach_theme_icon_box_size(theme, dock_height);
+
+    int32_t requested = (int32_t)ceilf(icon_box_size * 4.0f);
+    if (requested < 128) {
+        requested = 128;
+    }
+    if (requested > 256) {
+        requested = 256;
+    }
+
+    return requested;
 }
 
 reach_result reach_shell_load_pinned_icons(reach_shell *shell)

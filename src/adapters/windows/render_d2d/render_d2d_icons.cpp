@@ -1,4 +1,23 @@
 #include "render_d2d_internal.h"
+#include "../windows_icon_handle_internal.h"
+
+static D2D1_RECT_F reach_d2d_snap_bitmap_rect(reach_rect_f32 rect)
+{
+    float left = floorf(rect.x + 0.5f);
+    float top = floorf(rect.y + 0.5f);
+
+    float width = floorf(rect.width + 0.5f);
+    float height = floorf(rect.height + 0.5f);
+
+    if (width < 1.0f) {
+        width = 1.0f;
+    }
+    if (height < 1.0f) {
+        height = 1.0f;
+    }
+
+    return D2D1::RectF(left, top, left + width, top + height);
+}
 
 void reach_d2d_clear_icon_cache(reach_render_backend *backend)
 {
@@ -33,6 +52,63 @@ void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t 
     }
 }
 
+static reach_result reach_d2d_create_bitmap_from_hbitmap(
+    reach_render_backend *backend,
+    HBITMAP hbitmap,
+    ID2D1Bitmap **out_bitmap)
+{
+    if (backend == nullptr || backend->wic_factory == nullptr || hbitmap == nullptr || out_bitmap == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_bitmap = nullptr;
+
+    ID2D1RenderTarget *target = reach_d2d_target(backend);
+    if (target == nullptr) {
+        return REACH_ERROR;
+    }
+
+    IWICBitmap *wic_bitmap = nullptr;
+    HRESULT hr = backend->wic_factory->CreateBitmapFromHBITMAP(
+        hbitmap,
+        nullptr,
+        WICBitmapUseAlpha,
+        &wic_bitmap);
+
+    IWICFormatConverter *converter = nullptr;
+    if (SUCCEEDED(hr)) {
+        hr = backend->wic_factory->CreateFormatConverter(&converter);
+    }
+
+    if (SUCCEEDED(hr)) {
+        hr = converter->Initialize(
+            wic_bitmap,
+            GUID_WICPixelFormat32bppPBGRA,
+            WICBitmapDitherTypeNone,
+            nullptr,
+            0.0,
+            WICBitmapPaletteTypeMedianCut);
+    }
+
+    ID2D1Bitmap *bitmap = nullptr;
+    if (SUCCEEDED(hr)) {
+        hr = target->CreateBitmapFromWicBitmap(converter, nullptr, &bitmap);
+    }
+
+    if (SUCCEEDED(hr) && bitmap != nullptr) {
+        *out_bitmap = bitmap;
+    }
+
+    if (converter != nullptr) {
+        converter->Release();
+    }
+    if (wic_bitmap != nullptr) {
+        wic_bitmap->Release();
+    }
+
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_d2d_create_icon_bitmap(
     reach_render_backend *backend,
     uintptr_t icon_id,
@@ -50,12 +126,23 @@ static reach_result reach_d2d_create_icon_bitmap(
         out_bitmap == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
+    reach_windows_icon *icon = reinterpret_cast<reach_windows_icon *>(icon_id);
+    if (icon == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
 
+    if (icon->kind == REACH_WINDOWS_ICON_KIND_HBITMAP) {
+        return reach_d2d_create_bitmap_from_hbitmap(backend, icon->hbitmap, out_bitmap);
+    }
+
+    if (icon->kind != REACH_WINDOWS_ICON_KIND_HICON || icon->hicon == nullptr) {
+        return REACH_ERROR;
+    }
     *out_bitmap = nullptr;
 
     IWICBitmap *wic_bitmap = nullptr;
     HRESULT hr = backend->wic_factory->CreateBitmapFromHICON(
-        reinterpret_cast<HICON>(icon_id),
+        icon->hicon,
         &wic_bitmap);
 
     if (FAILED(hr)) {
@@ -88,8 +175,9 @@ static reach_result reach_d2d_create_icon_bitmap(
         converter->Release();
     }
 
-    wic_bitmap->Release();
-
+    if (wic_bitmap != nullptr) {
+        wic_bitmap->Release();
+    }
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
@@ -145,16 +233,11 @@ reach_result reach_d2d_draw_icon(
 
     ID2D1Bitmap *bitmap = nullptr;
     reach_result result = reach_d2d_get_icon_bitmap(backend, command->icon_id, &bitmap);
-
     if (result != REACH_OK || bitmap == nullptr) {
         return result == REACH_OK ? REACH_ERROR : result;
     }
 
-    D2D1_RECT_F rect = D2D1::RectF(
-        command->rect.x,
-        command->rect.y,
-        command->rect.x + command->rect.width,
-        command->rect.y + command->rect.height);
+    D2D1_RECT_F rect = reach_d2d_snap_bitmap_rect(command->rect);
 
     ID2D1RenderTarget *target = reach_d2d_target(backend);
     if (target == nullptr) {

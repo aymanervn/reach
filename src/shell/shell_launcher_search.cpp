@@ -16,7 +16,10 @@ static void reach_shell_load_launcher_result_icons(reach_shell *shell)
             shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &icon) == REACH_OK &&
             icon.id != 0) {
             shell->launcher_result_icons[index] = icon;
-            (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, icon.id, icon.wants_backplate);
+            (void)reach_ui_state_set_launcher_result_icon(
+                &shell->ui,
+                index,
+                icon.id);
         }
     }
 }
@@ -32,7 +35,7 @@ void reach_shell_release_launcher_result_icons(reach_shell *shell)
             (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->launcher_result_icons[index]);
         }
         shell->launcher_result_icons[index] = {};
-        (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, 0, 0);
+        (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, 0);
     }
 }
 

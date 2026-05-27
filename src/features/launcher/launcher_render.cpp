@@ -141,18 +141,6 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             uint64_t icon_id = state->launcher.result_icon_ids[index];
 
             if (icon_id != 0) {
-                if (state->launcher.result_icon_wants_backplate[index]) {
-                    command = {};
-                    command.type = REACH_RENDER_COMMAND_RECT;
-                    command.rect.x = icon_x - 2.0f;
-                    command.rect.y = icon_y - 2.0f;
-                    command.rect.width = icon_size + 4.0f;
-                    command.rect.height = icon_size + 4.0f;
-                    command.color = theme->icon_backplate_background;
-                    command.radius = 7.0f;
-                    reach_render_command_buffer_push(out_commands, &command);
-                }
-
                 command = {};
                 command.type = REACH_RENDER_COMMAND_ICON;
                 command.rect.x = icon_x;
@@ -161,7 +149,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.height = icon_size;
                 command.icon_id = icon_id;
                 command.color.a = 1.0f;
-                command.radius = 6.0f;
+                command.radius = 0.0f;
                 reach_render_command_buffer_push(out_commands, &command);
             } else {
                 command = {};

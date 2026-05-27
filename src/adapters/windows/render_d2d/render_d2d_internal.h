@@ -98,7 +98,6 @@ void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t 
 reach_result reach_d2d_draw_vector_icon(reach_render_backend *backend, const reach_render_command *command);
 
 /* Shape drawing */
-reach_result reach_d2d_draw_backplate_edge(ID2D1RenderTarget *target, const reach_render_command *command);
 reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target, const reach_render_command *command);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target, const reach_render_command *command);
 reach_result reach_d2d_draw_notch_stroke(ID2D1RenderTarget *target, const reach_render_command *command);

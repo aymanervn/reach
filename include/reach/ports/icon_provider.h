@@ -18,7 +18,6 @@ typedef struct reach_icon_request {
 
 typedef struct reach_icon_handle {
     uint64_t id;
-    int32_t wants_backplate;
     uint16_t debug_name[260];
 } reach_icon_handle;
 

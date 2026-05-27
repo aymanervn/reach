@@ -79,50 +79,16 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
-            if (icon.id != 0 && icon.wants_backplate) {
-                command = {};
-                command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = box_x;
-                command.rect.y = box_y;
-                command.rect.width = icon_box_size;
-                command.rect.height = icon_box_size;
-                command.color = theme->icon_backplate_background;
-                command.radius = icon_box_radius;
-                reach_render_command_buffer_push(out_commands, &command);
-            }
-
             command = {};
             command.type = REACH_RENDER_COMMAND_ICON;
-            if (icon.id != 0 && icon.wants_backplate) {
-                float actual_icon_size = icon_box_size * theme->icon_backplate_scale;
-                command.rect.x = box_x + (icon_box_size - actual_icon_size) * 0.5f;
-                command.rect.y = box_y + (icon_box_size - actual_icon_size) * 0.5f;
-                command.rect.width = actual_icon_size;
-                command.rect.height = actual_icon_size;
-                command.radius = 0.0f;
-            } else {
-                command.rect.x = box_x;
-                command.rect.y = box_y;
-                command.rect.width = icon_box_size;
-                command.rect.height = icon_box_size;
-                command.radius = icon_box_radius;
-            }
+            command.rect.x = box_x;
+            command.rect.y = box_y;
+            command.rect.width = icon_box_size;
+            command.rect.height = icon_box_size;
+            command.radius = 0.0f;
             command.color.a = 1.0f;
             command.icon_id = icon.id;
             reach_render_command_buffer_push(out_commands, &command);
-
-            if (icon.id != 0 && icon.wants_backplate) {
-                command = {};
-                command.type = REACH_RENDER_COMMAND_BACKPLATE_EDGE;
-                command.rect.x = box_x;
-                command.rect.y = box_y;
-                command.rect.width = icon_box_size;
-                command.rect.height = icon_box_size;
-                command.color = theme->icon_backplate_edge;
-                command.radius = icon_box_radius;
-                command.stroke_width = 0.55f;
-                reach_render_command_buffer_push(out_commands, &command);
-            }
 
             if (selected) {
                 command = {};

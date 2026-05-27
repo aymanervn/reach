@@ -14,7 +14,6 @@ typedef struct reach_theme {
     reach_color dock_shadow;
     reach_color icon_box_background;
     reach_color icon_backplate_background;
-    reach_color icon_backplate_edge;
     reach_color fallback_icon_background;
     reach_color fallback_icon_text;
     reach_color tray_button_background;
@@ -35,7 +34,6 @@ typedef struct reach_theme {
     float dock_shadow_alpha;
     float icon_box_height_ratio;
     float icon_max_box_ratio;
-    float icon_backplate_scale;
     float icon_box_corner_radius_ratio;
     float icon_box_corner_radius_max;
     float tray_slot_size_ratio;

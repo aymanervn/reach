@@ -31,7 +31,6 @@ typedef struct reach_launcher_model {
     size_t caret_index;
     reach_search_candidate results[REACH_SEARCH_MAX_RESULTS];
     uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS];
-    int32_t result_icon_wants_backplate[REACH_SEARCH_MAX_RESULTS];
     size_t result_count;
     size_t selected_result_index;
 } reach_launcher_model;
@@ -58,7 +57,7 @@ reach_result reach_ui_state_move_launcher_caret_right(reach_ui_state *state, int
 reach_result reach_ui_state_move_launcher_caret_home(reach_ui_state *state);
 reach_result reach_ui_state_move_launcher_caret_end(reach_ui_state *state);
 reach_result reach_ui_state_set_launcher_results(reach_ui_state *state, const reach_search_candidate *results, size_t count);
-reach_result reach_ui_state_set_launcher_result_icon(reach_ui_state *state, size_t index, uint64_t icon_id, int32_t wants_backplate);
+reach_result reach_ui_state_set_launcher_result_icon(reach_ui_state *state, size_t index, uint64_t icon_id);
 reach_result reach_ui_state_select_next_launcher_result(reach_ui_state *state);
 reach_result reach_ui_state_select_previous_launcher_result(reach_ui_state *state);
 reach_result reach_ui_state_clear_launcher_results(reach_ui_state *state);

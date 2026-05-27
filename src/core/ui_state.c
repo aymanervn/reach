@@ -290,7 +290,6 @@ reach_result reach_ui_state_clear_launcher_results(reach_ui_state *state)
     for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index) {
         state->launcher.results[index] = (reach_search_candidate){0};
         state->launcher.result_icon_ids[index] = 0;
-        state->launcher.result_icon_wants_backplate[index] = 0;
     }
     state->launcher.result_count = 0;
     state->launcher.selected_result_index = 0;
@@ -316,14 +315,13 @@ reach_result reach_ui_state_set_launcher_results(reach_ui_state *state, const re
     return REACH_OK;
 }
 
-reach_result reach_ui_state_set_launcher_result_icon(reach_ui_state *state, size_t index, uint64_t icon_id, int32_t wants_backplate)
+reach_result reach_ui_state_set_launcher_result_icon(reach_ui_state *state, size_t index, uint64_t icon_id)
 {
     if (state == 0 || index >= REACH_SEARCH_MAX_RESULTS) {
         return REACH_INVALID_ARGUMENT;
     }
 
     state->launcher.result_icon_ids[index] = icon_id;
-    state->launcher.result_icon_wants_backplate[index] = wants_backplate ? 1 : 0;
     return REACH_OK;
 }
 
