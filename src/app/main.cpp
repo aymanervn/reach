@@ -138,8 +138,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
 
                 previous_counter = current_counter;
 
-                if (delta_seconds > 0.1) {
-                    delta_seconds = 0.1;
+                if (delta_seconds > 0.025) {
+                    delta_seconds = 0.025;
                 }
 
                 reach_result update_result = reach_app_update(app, delta_seconds);

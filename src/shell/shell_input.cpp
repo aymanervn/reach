@@ -1560,7 +1560,8 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         return REACH_OK;
     }
     if (event->type == REACH_UI_EVENT_CONFIG_CHANGED) {
-        return reach_shell_reload_config(shell);
+        reach_result result = reach_shell_reload_config(shell);
+        return result;
     }
     if (event->type == REACH_UI_EVENT_LAUNCHER_SEARCH_READY) {
         reach_shell_apply_launcher_search_results(shell);

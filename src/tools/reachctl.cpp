@@ -7,6 +7,8 @@
 
 #include "reach/platform/windows_adapters.h"
 #include "reach/platform/shell_registration.h"
+#include "reach/features/pin_config.h"
+#include "reach/platform/windows_messages.h"
 
 static void reachctl_print(const wchar_t *message)
 {
@@ -458,24 +460,6 @@ static reach_result reachctl_start_userinit(void)
     return reachctl_start_process(userinit_path, nullptr, system_dir);
 }
 
-static reach_result reachctl_install_reach_shell_and_watchdog(const uint16_t *reach_exe)
-{
-    if (reach_exe == nullptr || reach_exe[0] == 0) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    if (!reachctl_is_process_elevated()) {
-        return REACH_ERROR;
-    }
-
-    reach_result task_result = reachctl_register_watchdog_task();
-    if (task_result != REACH_OK) {
-        return task_result;
-    }
-
-    return reach_windows_shell_install_current_user(reach_exe);
-}
-
 static reach_result reachctl_run_watchdog_task(void)
 {
     HINSTANCE result = ShellExecuteW(
@@ -517,28 +501,6 @@ static reach_result reachctl_start_reach_session(const uint16_t *reach_exe)
     return REACH_OK;
 }
 
-static reach_result reachctl_reset_to_windows_shell(void)
-{
-    reach_result restore_result = reach_windows_shell_restore_current_user();
-
-    (void)reachctl_unregister_watchdog_task();
-
-    (void)reachctl_terminate_processes_by_name(L"reach.exe");
-    (void)reachctl_terminate_processes_by_name(L"reach-watchdog.exe");
-    (void)reachctl_terminate_processes_by_name(L"explorer.exe");
-
-    reach_result start_result = reachctl_start_userinit();
-    if (start_result != REACH_OK) {
-        start_result = reachctl_start_explorer_shell();
-    }
-
-    if (restore_result != REACH_OK || start_result != REACH_OK) {
-        return REACH_ERROR;
-    }
-
-    return REACH_OK;
-}
-
 static reach_result reachctl_absolute_path(const uint16_t *path, uint16_t *out_path, DWORD out_path_count)
 {
     if (path == nullptr || path[0] == 0 || out_path == nullptr || out_path_count == 0) {
@@ -552,6 +514,327 @@ static reach_result reachctl_absolute_path(const uint16_t *path, uint16_t *out_p
     }
 
     return reach_copy_utf16(out_path, out_path_count, reinterpret_cast<const uint16_t *>(full_path));
+}
+
+struct reachctl_notify_config_state {
+    int32_t posted;
+};
+
+static BOOL CALLBACK reachctl_notify_config_window_proc(HWND hwnd, LPARAM param)
+{
+    reachctl_notify_config_state *state =
+        reinterpret_cast<reachctl_notify_config_state *>(param);
+
+    if (state == nullptr || hwnd == nullptr || !IsWindow(hwnd)) {
+        return TRUE;
+    }
+
+    wchar_t class_name[64] = {};
+    GetClassNameW(hwnd, class_name, 64);
+
+    if (lstrcmpiW(class_name, L"ReachPlatformWindow") != 0) {
+        return TRUE;
+    }
+
+    if (PostMessageW(hwnd, REACH_WM_CONFIG_CHANGED, 0, 0)) {
+        state->posted = 1;
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static reach_result reachctl_notify_config_changed(void)
+{
+    reachctl_notify_config_state state = {};
+    if (!EnumWindows(reachctl_notify_config_window_proc, reinterpret_cast<LPARAM>(&state))) {
+        return state.posted ? REACH_OK : REACH_ERROR;
+    }
+
+    return state.posted ? REACH_OK : REACH_ERROR;
+}
+
+static int32_t reachctl_is_supported_pin_path(const uint16_t *path)
+{
+    if (path == nullptr || path[0] == 0) {
+        return 0;
+    }
+
+    const wchar_t *path_w = reinterpret_cast<const wchar_t *>(path);
+    const wchar_t *extension = PathFindExtensionW(path_w);
+
+    return lstrcmpiW(extension, L".exe") == 0 ||
+        lstrcmpiW(extension, L".lnk") == 0;
+}
+
+static int32_t reachctl_path_equals_ci(const uint16_t *a, const uint16_t *b)
+{
+    if (a == nullptr || b == nullptr) {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (a[index] != 0 && b[index] != 0) {
+        uint16_t ca = a[index];
+        uint16_t cb = b[index];
+
+        if (ca >= 'A' && ca <= 'Z') {
+            ca = (uint16_t)(ca + ('a' - 'A'));
+        }
+        if (cb >= 'A' && cb <= 'Z') {
+            cb = (uint16_t)(cb + ('a' - 'A'));
+        }
+
+        if (ca != cb) {
+            return 0;
+        }
+
+        ++index;
+    }
+
+    return a[index] == b[index];
+}
+
+static reach_result reachctl_path_is_already_pinned(
+    reach_config_store_port *store,
+    const uint16_t *path,
+    int32_t *out_pinned)
+{
+    if (store == nullptr || store->ops.load == nullptr ||
+        path == nullptr || path[0] == 0 ||
+        out_pinned == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_pinned = 0;
+
+    reach_config_snapshot snapshot = {};
+    reach_result result = store->ops.load(store->store, &snapshot);
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    for (size_t index = 0; index < snapshot.pinned_app_count; ++index) {
+        if (reachctl_path_equals_ci(snapshot.pinned_apps[index].path, path)) {
+            *out_pinned = 1;
+            return REACH_OK;
+        }
+    }
+
+    return REACH_OK;
+}
+
+static int reachctl_pin_command(const wchar_t *path)
+{
+    if (path == nullptr || path[0] == 0) {
+        reachctl_print(L"--pin requires a path.");
+        return 2;
+    }
+
+    uint16_t absolute_path[260] = {};
+    reach_result path_result = reachctl_absolute_path(
+        reinterpret_cast<const uint16_t *>(path),
+        absolute_path,
+        260);
+
+    if (path_result != REACH_OK || absolute_path[0] == 0) {
+        reachctl_print(L"Could not resolve path.");
+        return 1;
+    }
+
+    if (!reachctl_is_supported_pin_path(absolute_path)) {
+        reachctl_print(L"Only .exe and .lnk files can be pinned to Reach.");
+        return 1;
+    }
+
+    reach_config_store_port store = {};
+    reach_result store_result = reachctl_open_config_store(&store);
+    if (store_result != REACH_OK) {
+        reachctl_print(L"Could not open Reach config.");
+        return 1;
+    }
+    int32_t already_pinned = 0;
+    reach_result already_result = reachctl_path_is_already_pinned(
+        &store,
+        absolute_path,
+        &already_pinned);
+
+    if (already_result != REACH_OK) {
+        if (store.ops.destroy != nullptr) {
+            store.ops.destroy(store.store);
+        }
+        return 1;
+    }
+
+    if (already_pinned) {
+        if (store.ops.destroy != nullptr) {
+            store.ops.destroy(store.store);
+        }
+        return 0;
+    }
+    reach_result pin_result = reach_pin_config_pin_path(&store, absolute_path);
+
+    if (store.ops.destroy != nullptr) {
+        store.ops.destroy(store.store);
+    }
+
+    if (pin_result != REACH_OK) {
+        reachctl_print(L"Could not pin app to Reach dock.");
+        return 1;
+    }
+
+    reach_result notify_result = reachctl_notify_config_changed();
+
+    reachctl_print(L"App pinned to Reach dock.");
+    return 0;
+}
+
+static reach_result reachctl_install_pin_context_menu_for_class(
+    const wchar_t *class_name,
+    const wchar_t *reachctl_path,
+    const wchar_t *icon_path)
+{
+    if (class_name == nullptr || reachctl_path == nullptr || icon_path == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    wchar_t verb_key[512] = {};
+    swprintf_s(
+        verb_key,
+        L"Software\\Classes\\%ls\\shell\\ReachPin",
+        class_name);
+
+    wchar_t command_key[512] = {};
+    swprintf_s(
+        command_key,
+        L"Software\\Classes\\%ls\\shell\\ReachPin\\command",
+        class_name);
+
+    wchar_t command[1024] = {};
+    swprintf_s(
+        command,
+        L"powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"Start-Process -WindowStyle Hidden -FilePath '%ls' -ArgumentList '--pin', '%%1'\"",
+        reachctl_path);
+
+    reach_result result = reachctl_write_string_value(
+        HKEY_CURRENT_USER,
+        verb_key,
+        L"MUIVerb",
+        L"Pin to Reach dock");
+
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    result = reachctl_write_string_value(
+        HKEY_CURRENT_USER,
+        verb_key,
+        L"Icon",
+        icon_path);
+
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    return reachctl_write_string_value(
+        HKEY_CURRENT_USER,
+        command_key,
+        nullptr,
+        command);
+}
+
+static reach_result reachctl_install_pin_context_menu(void)
+{
+    uint16_t reachctl_path_u16[260] = {};
+    reach_result current_result = reachctl_current_exe(reachctl_path_u16, 260);
+    if (current_result != REACH_OK) {
+        return current_result;
+    }
+
+    uint16_t reach_exe_u16[260] = {};
+    reach_result reach_result_value = reachctl_target_exe(reach_exe_u16, 260);
+    if (reach_result_value != REACH_OK) {
+        return reach_result_value;
+    }
+
+    const wchar_t *reachctl_path =
+        reinterpret_cast<const wchar_t *>(reachctl_path_u16);
+    const wchar_t *reach_exe =
+        reinterpret_cast<const wchar_t *>(reach_exe_u16);
+
+    reach_result exe_result = reachctl_install_pin_context_menu_for_class(
+        L"exefile",
+        reachctl_path,
+        reach_exe);
+
+    reach_result lnk_result = reachctl_install_pin_context_menu_for_class(
+        L"lnkfile",
+        reachctl_path,
+        reach_exe);
+
+    return exe_result == REACH_OK && lnk_result == REACH_OK
+        ? REACH_OK
+        : REACH_ERROR;
+}
+
+static reach_result reachctl_remove_pin_context_menu(void)
+{
+    reach_result exe_result = reachctl_delete_tree(
+        HKEY_CURRENT_USER,
+        L"Software\\Classes\\exefile\\shell\\ReachPin");
+
+    reach_result lnk_result = reachctl_delete_tree(
+        HKEY_CURRENT_USER,
+        L"Software\\Classes\\lnkfile\\shell\\ReachPin");
+
+    return exe_result == REACH_OK && lnk_result == REACH_OK
+        ? REACH_OK
+        : REACH_ERROR;
+}
+
+static reach_result reachctl_install_reach_shell_and_watchdog(const uint16_t *reach_exe)
+{
+    if (reach_exe == nullptr || reach_exe[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (!reachctl_is_process_elevated()) {
+        return REACH_ERROR;
+    }
+
+    reach_result task_result = reachctl_register_watchdog_task();
+    if (task_result != REACH_OK) {
+        return task_result;
+    }
+
+    reach_result context_result = reachctl_install_pin_context_menu();
+    if (context_result != REACH_OK) {
+        return context_result;
+    }
+    return reach_windows_shell_install_current_user(reach_exe);
+}
+
+static reach_result reachctl_reset_to_windows_shell(void)
+{
+    reach_result restore_result = reach_windows_shell_restore_current_user();
+
+    (void)reachctl_unregister_watchdog_task();
+
+    (void)reachctl_terminate_processes_by_name(L"reach.exe");
+    (void)reachctl_terminate_processes_by_name(L"reach-watchdog.exe");
+    (void)reachctl_terminate_processes_by_name(L"explorer.exe");
+    (void)reachctl_remove_pin_context_menu();
+
+    reach_result start_result = reachctl_start_userinit();
+    if (start_result != REACH_OK) {
+        start_result = reachctl_start_explorer_shell();
+    }
+
+    if (restore_result != REACH_OK || start_result != REACH_OK) {
+        return REACH_ERROR;
+    }
+
+    return REACH_OK;
 }
 
 struct reachctl_monitor_list_state {
@@ -643,6 +926,15 @@ int wmain(int argc, wchar_t **argv)
             }
             return ok ? 0 : 1;
         }
+
+        if (lstrcmpiW(argv[index], L"--pin") == 0) {
+            if (index + 1 >= argc) {
+                reachctl_print(L"--pin requires a path.");
+                return 2;
+            }
+
+            return reachctl_pin_command(argv[index + 1]);
+        }
     }
 
     reachctl_print(
@@ -650,7 +942,7 @@ int wmain(int argc, wchar_t **argv)
         L"  --install\n"
         L"  --start\n"
         L"  --reset\n"
-        L"  --list-monitors\n");
-    return 2;
+        L"  --list-monitors\n"
+        L"  --pin <path>\n");
     return 2;
 }

@@ -525,6 +525,7 @@ reach_result reach_shell_reload_pins(reach_shell *shell)
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->dock_items_changed = 1;
+    reach_shell_request_update(shell);
     return result;
 }
 
