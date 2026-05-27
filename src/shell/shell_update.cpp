@@ -327,10 +327,21 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     float clock_width = theme->dock_clock_width;
     float separator_width = theme->dock_system_separator_width;
     float separator_height = layout->bounds.height * theme->dock_system_separator_height_ratio;
-    float dock_width = ceilf(icon_size * (float)(count + 3) + clock_width + separator_width + gap * (float)(count + 6));
+
+    float dock_width = ceilf(
+        icon_size * (float)(count + 3) +
+        clock_width +
+        separator_width +
+        gap * (float)(count + 5));
+
     if (count == 0) {
-        dock_width = ceilf(icon_size * 3.0f + clock_width + separator_width + gap * 5.0f);
+        dock_width = ceilf(
+            icon_size * 3.0f +
+            clock_width +
+            separator_width +
+            gap * 4.0f);
     }
+
     float old_width = layout->bounds.width;
     if (dock_width != old_width) {
         layout->bounds.x += (old_width - dock_width) * 0.5f;
@@ -364,7 +375,7 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     layout->quick_settings_button.y = top;
     layout->tray_button.width = icon_size;
     layout->tray_button.height = icon_size;
-    layout->tray_button.x = layout->quick_settings_button.x - gap - icon_size;
+    layout->tray_button.x = layout->quick_settings_button.x - icon_size;
     layout->tray_button.y = top;
 }
 
@@ -864,7 +875,7 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
     layout->clock.x = layout->power_button.x - gap - theme->dock_clock_width;
     layout->system_separator.x = layout->clock.x - gap - theme->dock_system_separator_width;
     layout->quick_settings_button.x = layout->system_separator.x - gap - layout->quick_settings_button.width;
-    layout->tray_button.x = layout->quick_settings_button.x - gap - layout->tray_button.width;
+    layout->tray_button.x = layout->quick_settings_button.x - layout->tray_button.width;
 }
 
 static reach_result reach_shell_refresh_monitor_layout(reach_shell *shell)

@@ -64,7 +64,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state, const reach_ui
     out_layout->dock.quick_settings_button.y = top;
 
     out_layout->dock.tray_button.x =
-        out_layout->dock.quick_settings_button.x - gap - icon_size;
+        out_layout->dock.quick_settings_button.x - icon_size;
     out_layout->dock.tray_button.y = top;
 
     out_layout->launcher.search_box.width = reach_scale(640.0f, scale);
