@@ -241,6 +241,22 @@ target_link_libraries(reachctl PRIVATE
     uuid
 )
 
+add_executable(reach-watchdog WIN32
+    src/tools/reach_watchdog.cpp
+)
+
+reach_configure_common(reach-watchdog)
+reach_configure_windows(reach-watchdog)
+target_compile_features(reach-watchdog PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach-watchdog PRIVATE
+    shell32
+    shlwapi
+    user32
+    advapi32
+)
+
 add_executable(reach_tray_probe
     src/tools/tray_probe.cpp
 )

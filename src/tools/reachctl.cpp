@@ -1,12 +1,11 @@
 #include <windows.h>
 #include <shlwapi.h>
 #include <tlhelp32.h>
+#include <shellapi.h>
 
 #include <cwchar>
 
-#include "reach/features/pin_config.h"
 #include "reach/platform/windows_adapters.h"
-#include "reach/platform/windows_messages.h"
 #include "reach/platform/shell_registration.h"
 
 static void reachctl_print(const wchar_t *message)
@@ -95,6 +94,26 @@ static reach_result reachctl_delete_tree(HKEY root, const wchar_t *key)
 {
     LONG status = RegDeleteTreeW(root, key);
     return status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND ? REACH_OK : REACH_ERROR;
+}
+
+static int32_t reachctl_is_process_elevated(void)
+{
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        return 0;
+    }
+
+    TOKEN_ELEVATION elevation = {};
+    DWORD size = sizeof(elevation);
+    BOOL ok = GetTokenInformation(
+        token,
+        TokenElevation,
+        &elevation,
+        sizeof(elevation),
+        &size);
+
+    CloseHandle(token);
+    return ok && elevation.TokenIsElevated;
 }
 
 static reach_result reachctl_terminate_processes_by_name(const wchar_t *process_name)
@@ -191,27 +210,110 @@ static reach_result reachctl_start_process(
     return REACH_OK;
 }
 
-static reach_result reachctl_start_reach_shell(const uint16_t *reach_exe)
+static reach_result reachctl_run_process_wait(
+    const wchar_t *path,
+    const wchar_t *arguments,
+    const wchar_t *working_directory)
 {
-    if (reach_exe == nullptr || reach_exe[0] == 0) {
+    if (path == nullptr || path[0] == 0) {
         return REACH_INVALID_ARGUMENT;
     }
 
-    wchar_t path[MAX_PATH] = {};
-    if (reach_copy_utf16(reinterpret_cast<uint16_t *>(path), MAX_PATH, reach_exe) != REACH_OK) {
+    wchar_t command_line[1024] = {};
+    if (arguments != nullptr && arguments[0] != 0) {
+        swprintf_s(command_line, L"\"%ls\" %ls", path, arguments);
+    } else {
+        swprintf_s(command_line, L"\"%ls\"", path);
+    }
+
+    STARTUPINFOW startup = {};
+    startup.cb = sizeof(startup);
+
+    PROCESS_INFORMATION process = {};
+    BOOL ok = CreateProcessW(
+        nullptr,
+        command_line,
+        nullptr,
+        nullptr,
+        FALSE,
+        CREATE_NO_WINDOW,
+        nullptr,
+        working_directory,
+        &startup,
+        &process);
+
+    if (!ok) {
         return REACH_ERROR;
     }
 
-    wchar_t working_directory[MAX_PATH] = {};
-    wcscpy_s(working_directory, path);
-    if (!PathRemoveFileSpecW(working_directory)) {
-        working_directory[0] = 0;
+    CloseHandle(process.hThread);
+
+    DWORD wait_result = WaitForSingleObject(process.hProcess, 15000);
+
+    DWORD exit_code = 1;
+    if (wait_result == WAIT_OBJECT_0) {
+        (void)GetExitCodeProcess(process.hProcess, &exit_code);
     }
 
+    CloseHandle(process.hProcess);
+
+    return wait_result == WAIT_OBJECT_0 && exit_code == 0
+        ? REACH_OK
+        : REACH_ERROR;
+}
+
+static reach_result reachctl_watchdog_exe(uint16_t *path, DWORD path_count)
+{
+    if (path == nullptr || path_count == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    DWORD length = GetModuleFileNameW(nullptr, reinterpret_cast<wchar_t *>(path), path_count);
+    if (length == 0 || length >= path_count) {
+        return REACH_ERROR;
+    }
+
+    wchar_t *path_w = reinterpret_cast<wchar_t *>(path);
+    if (!PathRemoveFileSpecW(path_w)) {
+        return REACH_ERROR;
+    }
+
+    if (!PathAppendW(path_w, L"reach-watchdog.exe")) {
+        return REACH_ERROR;
+    }
+
+    return REACH_OK;
+}
+
+static reach_result reachctl_register_watchdog_task(void)
+{
+    uint16_t watchdog_path_u16[260] = {};
+    reach_result path_result = reachctl_watchdog_exe(watchdog_path_u16, 260);
+    if (path_result != REACH_OK) {
+        return path_result;
+    }
+
+    const wchar_t *watchdog_path =
+        reinterpret_cast<const wchar_t *>(watchdog_path_u16);
+
+    wchar_t arguments[1024] = {};
+    swprintf_s(
+        arguments,
+        L"/Create /F /SC ONLOGON /TN \"ReachWatchdog\" /TR \"\\\"%ls\\\"\" /RL LIMITED",
+        watchdog_path);
+
+    return reachctl_run_process_wait(
+        L"C:\\Windows\\System32\\schtasks.exe",
+        arguments,
+        nullptr);
+}
+
+static reach_result reachctl_unregister_watchdog_task(void)
+{
     return reachctl_start_process(
-        path,
-        L"--launch",
-        working_directory[0] != 0 ? working_directory : nullptr);
+        L"C:\\Windows\\System32\\schtasks.exe",
+        L"/Delete /F /TN \"ReachWatchdog\"",
+        nullptr);
 }
 
 static BOOL CALLBACK reachctl_reset_monitor_work_area_proc(
@@ -356,25 +458,59 @@ static reach_result reachctl_start_userinit(void)
     return reachctl_start_process(userinit_path, nullptr, system_dir);
 }
 
-static reach_result reachctl_install_reach_shell_and_switch(const uint16_t *reach_exe)
+static reach_result reachctl_install_reach_shell_and_watchdog(const uint16_t *reach_exe)
 {
-    reach_result install_result = reach_windows_shell_install_current_user(reach_exe);
+    if (reach_exe == nullptr || reach_exe[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (!reachctl_is_process_elevated()) {
+        return REACH_ERROR;
+    }
+
+    reach_result task_result = reachctl_register_watchdog_task();
+    if (task_result != REACH_OK) {
+        return task_result;
+    }
+
+    return reach_windows_shell_install_current_user(reach_exe);
+}
+
+static reach_result reachctl_run_watchdog_task(void)
+{
+    HINSTANCE result = ShellExecuteW(
+        nullptr,
+        L"open",
+        L"C:\\Windows\\System32\\schtasks.exe",
+        L"/Run /TN \"ReachWatchdog\"",
+        nullptr,
+        SW_HIDE);
+
+    return reinterpret_cast<intptr_t>(result) > 32
+        ? REACH_OK
+        : REACH_ERROR;
+}
+
+static reach_result reachctl_start_reach_session(const uint16_t *reach_exe)
+{
+    (void)reach_exe;
 
     reach_result kill_reach_result =
         reachctl_terminate_processes_by_name(L"reach.exe");
 
     reach_result kill_explorer_result =
         reachctl_terminate_processes_by_name(L"explorer.exe");
+
     reach_result work_area_result = reachctl_reset_monitor_work_areas();
     reach_result repair_result = reachctl_repair_maximized_windows();
-    reach_result start_reach_result = reachctl_start_reach_shell(reach_exe);
 
-    if (install_result != REACH_OK ||
-        kill_reach_result != REACH_OK ||
+    reach_result start_result = reachctl_run_watchdog_task();
+
+    if (kill_reach_result != REACH_OK ||
         kill_explorer_result != REACH_OK ||
         work_area_result != REACH_OK ||
         repair_result != REACH_OK ||
-        start_reach_result != REACH_OK) {
+        start_result != REACH_OK) {
         return REACH_ERROR;
     }
 
@@ -385,75 +521,22 @@ static reach_result reachctl_reset_to_windows_shell(void)
 {
     reach_result restore_result = reach_windows_shell_restore_current_user();
 
-    reach_result kill_reach_result =
-        reachctl_terminate_processes_by_name(L"reach.exe");
+    (void)reachctl_unregister_watchdog_task();
 
-    reach_result kill_explorer_result =
-        reachctl_terminate_processes_by_name(L"explorer.exe");
-
-    Sleep(750);
+    (void)reachctl_terminate_processes_by_name(L"reach.exe");
+    (void)reachctl_terminate_processes_by_name(L"reach-watchdog.exe");
+    (void)reachctl_terminate_processes_by_name(L"explorer.exe");
 
     reach_result start_result = reachctl_start_userinit();
     if (start_result != REACH_OK) {
         start_result = reachctl_start_explorer_shell();
     }
 
-    if (restore_result != REACH_OK ||
-        kill_reach_result != REACH_OK ||
-        kill_explorer_result != REACH_OK ||
-        start_result != REACH_OK) {
+    if (restore_result != REACH_OK || start_result != REACH_OK) {
         return REACH_ERROR;
     }
 
     return REACH_OK;
-}
-
-static reach_result reachctl_install_context_menu(void)
-{
-    uint16_t ctl_path[260] = {};
-    if (reachctl_current_exe(ctl_path, 260) != REACH_OK) {
-        return REACH_ERROR;
-    }
-
-    wchar_t command[640] = {};
-    swprintf_s(command, L"\"%ls\" --pin-path \"%%1\"", reinterpret_cast<const wchar_t *>(ctl_path));
-
-    const wchar_t *targets[] = {
-        L"Software\\Classes\\*\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\Directory\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\exefile\\shell\\Reach.PinToDock"
-    };
-
-    for (size_t index = 0; index < sizeof(targets) / sizeof(targets[0]); ++index) {
-        wchar_t command_key[260] = {};
-        swprintf_s(command_key, L"%ls\\command", targets[index]);
-
-        if (reachctl_write_string_value(HKEY_CURRENT_USER, targets[index], nullptr, L"Pin app to dock") != REACH_OK ||
-            reachctl_write_string_value(HKEY_CURRENT_USER, targets[index], L"Icon", reinterpret_cast<const wchar_t *>(ctl_path)) != REACH_OK ||
-            reachctl_write_string_value(HKEY_CURRENT_USER, command_key, nullptr, command) != REACH_OK) {
-            return REACH_ERROR;
-        }
-    }
-
-    return REACH_OK;
-}
-
-static reach_result reachctl_remove_context_menu(void)
-{
-    const wchar_t *targets[] = {
-        L"Software\\Classes\\*\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\Directory\\shell\\Reach.PinToDock",
-        L"Software\\Classes\\exefile\\shell\\Reach.PinToDock"
-    };
-
-    reach_result result = REACH_OK;
-    for (size_t index = 0; index < sizeof(targets) / sizeof(targets[0]); ++index) {
-        if (reachctl_delete_tree(HKEY_CURRENT_USER, targets[index]) != REACH_OK) {
-            result = REACH_ERROR;
-        }
-    }
-
-    return result;
 }
 
 static reach_result reachctl_absolute_path(const uint16_t *path, uint16_t *out_path, DWORD out_path_count)
@@ -469,22 +552,6 @@ static reach_result reachctl_absolute_path(const uint16_t *path, uint16_t *out_p
     }
 
     return reach_copy_utf16(out_path, out_path_count, reinterpret_cast<const uint16_t *>(full_path));
-}
-
-static void reachctl_notify_wallpaper_changed(void)
-{
-    HWND hwnd = nullptr;
-    while ((hwnd = FindWindowExW(nullptr, hwnd, L"ReachPlatformWindow", nullptr)) != nullptr) {
-        PostMessageW(hwnd, REACH_WM_WALLPAPER_CHANGED, 0, 0);
-    }
-}
-
-static void reachctl_notify_config_changed(void)
-{
-    HWND hwnd = nullptr;
-    while ((hwnd = FindWindowExW(nullptr, hwnd, L"ReachPlatformWindow", nullptr)) != nullptr) {
-        PostMessageW(hwnd, REACH_WM_CONFIG_CHANGED, 0, 0);
-    }
 }
 
 struct reachctl_monitor_list_state {
@@ -523,252 +590,6 @@ static reach_result reachctl_list_monitors(void)
     return ok && state.index > 0 ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reachctl_set_wallpaper(const uint16_t *path)
-{
-    if (path == nullptr || path[0] == 0) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    uint16_t full_path[260] = {};
-    reach_result result = reachctl_absolute_path(path, full_path, 260);
-    if (result != REACH_OK) {
-        return result;
-    }
-
-    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(full_path));
-    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    reach_config_store_port store = {};
-    result = reachctl_open_config_store(&store);
-
-    reach_config_snapshot snapshot = {};
-    if (result == REACH_OK) {
-        result = store.ops.load(store.store, &snapshot);
-    }
-    if (result == REACH_OK) {
-        result = reach_copy_utf16(snapshot.wallpaper_path, 260, full_path);
-    }
-    if (result == REACH_OK) {
-        result = store.ops.save(store.store, &snapshot);
-    }
-
-    reach_wallpaper_service_port wallpaper = {};
-    if (result == REACH_OK) {
-        result = reach_windows_create_wallpaper_service(&wallpaper);
-    }
-    if (result == REACH_OK) {
-        result = wallpaper.ops.set_wallpaper(wallpaper.service, full_path);
-    }
-
-    if (wallpaper.ops.destroy != nullptr) {
-        wallpaper.ops.destroy(wallpaper.service);
-    }
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-
-    if (result == REACH_OK) {
-        reachctl_notify_wallpaper_changed();
-    }
-
-    return result;
-}
-
-static reach_result reachctl_set_monitor_wallpaper(size_t monitor_index, const uint16_t *path)
-{
-    if (monitor_index == 0 || monitor_index > REACH_MAX_WALLPAPER_MONITORS || path == nullptr || path[0] == 0) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    size_t zero_based_index = monitor_index - 1;
-
-    uint16_t full_path[260] = {};
-    reach_result result = reachctl_absolute_path(path, full_path, 260);
-    if (result != REACH_OK) {
-        return result;
-    }
-
-    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(full_path));
-    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    reach_config_store_port store = {};
-    result = reachctl_open_config_store(&store);
-
-    reach_config_snapshot snapshot = {};
-    if (result == REACH_OK) {
-        result = store.ops.load(store.store, &snapshot);
-    }
-    if (result == REACH_OK) {
-        result = reach_copy_utf16(snapshot.monitor_wallpaper_paths[zero_based_index], 260, full_path);
-    }
-    if (result == REACH_OK) {
-        result = store.ops.save(store.store, &snapshot);
-    }
-
-    reach_wallpaper_service_port wallpaper = {};
-    if (result == REACH_OK) {
-        result = reach_windows_create_wallpaper_service(&wallpaper);
-    }
-    if (result == REACH_OK && wallpaper.ops.set_monitor_wallpaper != nullptr) {
-        (void)wallpaper.ops.set_monitor_wallpaper(wallpaper.service, zero_based_index, full_path);
-    }
-
-    if (wallpaper.ops.destroy != nullptr) {
-        wallpaper.ops.destroy(wallpaper.service);
-    }
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-
-    if (result == REACH_OK) {
-        reachctl_notify_wallpaper_changed();
-    }
-
-    return result;
-}
-
-static reach_result reachctl_clear_wallpaper(void)
-{
-    reach_config_store_port store = {};
-    reach_result result = reachctl_open_config_store(&store);
-
-    reach_config_snapshot snapshot = {};
-    if (result == REACH_OK) {
-        result = store.ops.load(store.store, &snapshot);
-    }
-    if (result == REACH_OK) {
-        snapshot.wallpaper_path[0] = 0;
-        result = store.ops.save(store.store, &snapshot);
-    }
-
-    reach_wallpaper_service_port wallpaper = {};
-    if (result == REACH_OK) {
-        result = reach_windows_create_wallpaper_service(&wallpaper);
-    }
-    if (result == REACH_OK) {
-        result = wallpaper.ops.clear_wallpaper(wallpaper.service);
-    }
-
-    if (wallpaper.ops.destroy != nullptr) {
-        wallpaper.ops.destroy(wallpaper.service);
-    }
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-
-    if (result == REACH_OK) {
-        reachctl_notify_wallpaper_changed();
-    }
-
-    return result;
-}
-
-static reach_result reachctl_clear_monitor_wallpaper(size_t monitor_index)
-{
-    if (monitor_index == 0 || monitor_index > REACH_MAX_WALLPAPER_MONITORS) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    size_t zero_based_index = monitor_index - 1;
-
-    reach_config_store_port store = {};
-    reach_result result = reachctl_open_config_store(&store);
-
-    reach_config_snapshot snapshot = {};
-    if (result == REACH_OK) {
-        result = store.ops.load(store.store, &snapshot);
-    }
-    if (result == REACH_OK) {
-        snapshot.monitor_wallpaper_paths[zero_based_index][0] = 0;
-        result = store.ops.save(store.store, &snapshot);
-    }
-
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-
-    if (result == REACH_OK) {
-        reachctl_notify_wallpaper_changed();
-    }
-
-    return result;
-}
-
-static int reachctl_pin_path_command(const wchar_t *path)
-{
-    reach_config_store_port store = {};
-    int ok = reachctl_open_config_store(&store) == REACH_OK &&
-        reach_pin_config_pin_path(&store, reinterpret_cast<const uint16_t *>(path)) == REACH_OK;
-
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-    if (ok) {
-        reachctl_notify_config_changed();
-    }
-
-    reachctl_print(ok ? L"Pinned to Reach dock." : L"Pin to Reach dock failed.");
-    return ok ? 0 : 1;
-}
-
-static int reachctl_set_pin_appid_command(const wchar_t *path, const wchar_t *appid)
-{
-    reach_config_store_port store = {};
-    int ok = reachctl_open_config_store(&store) == REACH_OK &&
-        reach_pin_config_set_app_user_model_id(
-            &store,
-            reinterpret_cast<const uint16_t *>(path),
-            reinterpret_cast<const uint16_t *>(appid)) == REACH_OK;
-
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-    if (ok) {
-        reachctl_notify_config_changed();
-    }
-
-    reachctl_print(ok ? L"Reach pin AppUserModelID set (diagnostic override)." : L"Reach pin AppUserModelID set failed.");
-    return ok ? 0 : 1;
-}
-
-static int reachctl_unpin_path_command(const wchar_t *path)
-{
-    reach_config_store_port store = {};
-    int ok = reachctl_open_config_store(&store) == REACH_OK &&
-        reach_pin_config_unpin_path(&store, reinterpret_cast<const uint16_t *>(path)) == REACH_OK;
-
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-    if (ok) {
-        reachctl_notify_config_changed();
-    }
-
-    reachctl_print(ok ? L"Unpinned from Reach dock." : L"Unpin from Reach dock failed.");
-    return ok ? 0 : 1;
-}
-
-static int reachctl_unpin_id_command(uint32_t id)
-{
-    reach_config_store_port store = {};
-    int ok = reachctl_open_config_store(&store) == REACH_OK &&
-        reach_pin_config_unpin_id(&store, id) == REACH_OK;
-
-    if (store.ops.destroy != nullptr) {
-        store.ops.destroy(store.store);
-    }
-    if (ok) {
-        reachctl_notify_config_changed();
-    }
-
-    reachctl_print(ok ? L"Unpinned from Reach dock." : L"Unpin from Reach dock failed.");
-    return ok ? 0 : 1;
-}
-
 int wmain(int argc, wchar_t **argv)
 {
     uint16_t reach_exe[260] = {};
@@ -779,36 +600,40 @@ int wmain(int argc, wchar_t **argv)
 
     for (int index = 1; index < argc; ++index) {
         if (lstrcmpiW(argv[index], L"--install") == 0) {
-            int ok = reachctl_install_reach_shell_and_switch(reach_exe) == REACH_OK;
+            if (!reachctl_is_process_elevated()) {
+                reachctl_print(
+                    L"Reach install requires Administrator privileges to create the watchdog scheduled task. "
+                    L"Open PowerShell as Administrator and run reachctl --install again.");
+                return 1;
+            }
+
+            int ok = reachctl_install_reach_shell_and_watchdog(reach_exe) == REACH_OK;
             reachctl_print(ok
-                ? L"Reach installed and started for current user."
-                : L"Reach install/start failed.");
+                ? L"Reach installed. Shell registry and watchdog task configured."
+                : L"Reach install failed.");
+            return ok ? 0 : 1;
+        }
+
+        if (lstrcmpiW(argv[index], L"--start") == 0) {
+            int ok = reachctl_start_reach_session(reach_exe) == REACH_OK;
+            reachctl_print(ok
+                ? L"Reach started for current session."
+                : L"Reach start failed.");
             return ok ? 0 : 1;
         }
 
         if (lstrcmpiW(argv[index], L"--reset") == 0) {
-            int ok = reachctl_reset_to_windows_shell() == REACH_OK;
-            reachctl_print(ok
-                ? L"Reach reset complete. Windows shell restored. If the desktop/taskbar does not appear, sign out and sign back in."
-                : L"Reach reset attempted, but one or more steps failed.");
-            return ok ? 0 : 1;
-        }
-
-        if (lstrcmpiW(argv[index], L"--print-shell-status") == 0) {
-            reach_shell_registration_status status = {};
-            if (reach_windows_shell_query_current_user(reach_exe, &status) != REACH_OK) {
-                reachctl_print(L"Reach shell status query failed.");
+            if (!reachctl_is_process_elevated()) {
+                reachctl_print(
+                    L"Reach reset requires Administrator privileges to remove the watchdog scheduled task. "
+                    L"Open PowerShell as Administrator and run reachctl --reset again.");
                 return 1;
             }
-
-            wchar_t line[640] = {};
-            swprintf_s(
-                line,
-                L"CurrentShell=%ls StartupAttemptCount=%u",
-                reinterpret_cast<const wchar_t *>(status.current_shell),
-                status.startup_attempt_count);
-            reachctl_print(line);
-            return 0;
+            int ok = reachctl_reset_to_windows_shell() == REACH_OK;
+            reachctl_print(ok
+                ? L"Reach reset complete. Windows shell restored."
+                : L"Reach reset attempted, but one or more steps failed.");
+            return ok ? 0 : 1;
         }
 
         if (lstrcmpiW(argv[index], L"--list-monitors") == 0) {
@@ -818,106 +643,14 @@ int wmain(int argc, wchar_t **argv)
             }
             return ok ? 0 : 1;
         }
-
-        if (lstrcmpiW(argv[index], L"--pin-path") == 0) {
-            if (index + 1 >= argc) {
-                reachctl_print(L"--pin-path requires a path.");
-                return 2;
-            }
-            return reachctl_pin_path_command(argv[index + 1]);
-        }
-
-        if (lstrcmpiW(argv[index], L"--set-pin-appid") == 0) {
-            if (index + 2 >= argc) {
-                reachctl_print(L"--set-pin-appid requires a pinned path and AppUserModelID.");
-                return 2;
-            }
-            return reachctl_set_pin_appid_command(argv[index + 1], argv[index + 2]);
-        }
-
-        if (lstrcmpiW(argv[index], L"--unpin-path") == 0) {
-            if (index + 1 >= argc) {
-                reachctl_print(L"--unpin-path requires a path.");
-                return 2;
-            }
-            return reachctl_unpin_path_command(argv[index + 1]);
-        }
-
-        if (lstrcmpiW(argv[index], L"--unpin-id") == 0) {
-            if (index + 1 >= argc) {
-                reachctl_print(L"--unpin-id requires an id.");
-                return 2;
-            }
-            uint32_t id = (uint32_t)wcstoul(argv[index + 1], nullptr, 10);
-            return reachctl_unpin_id_command(id);
-        }
-
-        if (lstrcmpiW(argv[index], L"--install-context-menu") == 0) {
-            int ok = reachctl_install_context_menu() == REACH_OK;
-            reachctl_print(ok ? L"Reach Explorer context menu installed." : L"Reach Explorer context menu install failed.");
-            return ok ? 0 : 1;
-        }
-
-        if (lstrcmpiW(argv[index], L"--remove-context-menu") == 0) {
-            int ok = reachctl_remove_context_menu() == REACH_OK;
-            reachctl_print(ok ? L"Reach Explorer context menu removed." : L"Reach Explorer context menu removal failed.");
-            return ok ? 0 : 1;
-        }
-
-        if (lstrcmpiW(argv[index], L"--set-wallpaper") == 0) {
-            if (index + 1 >= argc) {
-                reachctl_print(L"--set-wallpaper requires a path.");
-                return 2;
-            }
-            int ok = reachctl_set_wallpaper(reinterpret_cast<const uint16_t *>(argv[index + 1])) == REACH_OK;
-            reachctl_print(ok ? L"Reach wallpaper set." : L"Reach wallpaper set failed.");
-            return ok ? 0 : 1;
-        }
-
-        if (lstrcmpiW(argv[index], L"--set-wallpaper-monitor") == 0) {
-            if (index + 2 >= argc) {
-                reachctl_print(L"--set-wallpaper-monitor requires a 1-based monitor index and path.");
-                return 2;
-            }
-            size_t monitor_index = (size_t)wcstoul(argv[index + 1], nullptr, 10);
-            int ok = reachctl_set_monitor_wallpaper(monitor_index, reinterpret_cast<const uint16_t *>(argv[index + 2])) == REACH_OK;
-            reachctl_print(ok ? L"Reach monitor wallpaper set." : L"Reach monitor wallpaper set failed.");
-            return ok ? 0 : 1;
-        }
-
-        if (lstrcmpiW(argv[index], L"--clear-wallpaper") == 0) {
-            int ok = reachctl_clear_wallpaper() == REACH_OK;
-            reachctl_print(ok ? L"Reach wallpaper cleared." : L"Reach wallpaper clear failed.");
-            return ok ? 0 : 1;
-        }
-
-        if (lstrcmpiW(argv[index], L"--clear-wallpaper-monitor") == 0) {
-            if (index + 1 >= argc) {
-                reachctl_print(L"--clear-wallpaper-monitor requires a 1-based monitor index.");
-                return 2;
-            }
-            size_t monitor_index = (size_t)wcstoul(argv[index + 1], nullptr, 10);
-            int ok = reachctl_clear_monitor_wallpaper(monitor_index) == REACH_OK;
-            reachctl_print(ok ? L"Reach monitor wallpaper cleared." : L"Reach monitor wallpaper clear failed.");
-            return ok ? 0 : 1;
-        }
     }
 
     reachctl_print(
-        L"Usage: reachctl.exe "
-        L"--install | "
-        L"--reset | "
-        L"--print-shell-status | "
-        L"--list-monitors | "
-        L"--pin-path <path> | "
-        L"--set-pin-appid <path> <appid> (diagnostic override) | "
-        L"--unpin-path <path> | "
-        L"--unpin-id <id> | "
-        L"--install-context-menu | "
-        L"--remove-context-menu | "
-        L"--set-wallpaper <path> | "
-        L"--set-wallpaper-monitor <index> <path> | "
-        L"--clear-wallpaper | "
-        L"--clear-wallpaper-monitor <index>");
+        L"Usage: reachctl.exe\n"
+        L"  --install\n"
+        L"  --start\n"
+        L"  --reset\n"
+        L"  --list-monitors\n");
+    return 2;
     return 2;
 }

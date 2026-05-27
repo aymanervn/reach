@@ -3,7 +3,6 @@
 #include <shellapi.h>
 
 #include "reach/app/composition_root.h"
-#include "reach/platform/shell_registration.h"
 
 static const wchar_t *REACH_LAUNCH_ARG = L"--launch";
 static const wchar_t *REACH_INSTANCE_MUTEX = L"Local\\Reach.Shell.Instance";
@@ -38,57 +37,6 @@ static HANDLE reach_acquire_instance_mutex(void)
     return mutex;
 }
 
-static reach_result reach_current_exe_path(uint16_t *path, DWORD path_count)
-{
-    if (path == nullptr || path_count == 0) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    DWORD length = GetModuleFileNameW(nullptr, reinterpret_cast<wchar_t *>(path), path_count);
-    return length > 0 && length < path_count ? REACH_OK : REACH_ERROR;
-}
-
-static void reach_log_startup_line(const wchar_t *message)
-{
-    if (message == nullptr) {
-        return;
-    }
-
-    OutputDebugStringW(message);
-    OutputDebugStringW(L"\n");
-}
-
-static void reach_restore_explorer_if_current_shell(void)
-{
-    uint16_t exe_path[260] = {};
-    reach_shell_registration_status status = {};
-
-    if (reach_current_exe_path(exe_path, 260) == REACH_OK &&
-        reach_windows_shell_query_current_user(exe_path, &status) == REACH_OK &&
-        status.reach_is_shell) {
-        (void)reach_windows_shell_restore_current_user();
-        (void)reach_windows_shell_launch_explorer();
-    }
-}
-
-static int reach_guard_shell_startup(void)
-{
-    uint16_t exe_path[260] = {};
-    uint32_t attempts = 0;
-    int32_t restore_required = 0;
-
-    if (reach_current_exe_path(exe_path, 260) != REACH_OK ||
-        reach_windows_shell_mark_startup_attempt(exe_path, &attempts, &restore_required) != REACH_OK ||
-        !restore_required) {
-        return 0;
-    }
-
-    (void)attempts;
-    reach_restore_explorer_if_current_shell();
-    reach_log_startup_line(L"Reach restored Explorer after repeated early startup failures.");
-    return 1;
-}
-
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR command_line, int show_command)
 {
     (void)instance;
@@ -117,11 +65,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         return 0;
     }
 
-    if (reach_guard_shell_startup()) {
-        CloseHandle(instance_mutex);
-        return 1;
-    }
-
+    //make it crash
+    // *(volatile int *)0 = 1;
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(hr)) {
         CloseHandle(instance_mutex);
@@ -137,12 +82,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         result = reach_app_start(app);
         if (result == REACH_OK) {
             (void)reach_app_update(app, 0.0);
-            (void)reach_windows_shell_clear_startup_attempts();
         }
     }
 
     if (result != REACH_OK) {
-        reach_restore_explorer_if_current_shell();
         if (app != nullptr) {
             reach_app_destroy(app);
         }
@@ -199,7 +142,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                     delta_seconds = 0.1;
                 }
 
-                (void)reach_app_update(app, delta_seconds);
+                reach_result update_result = reach_app_update(app, delta_seconds);
+                if (update_result != REACH_OK) {
+                    running = 0;
+                    exit_code = 1;
+                    break;
+                }
             } else {
                 previous_counter = current_counter;
             }
@@ -212,7 +160,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         (void)reach_app_stop(app);
         reach_app_destroy(app);
     }
-
     CoUninitialize();
     CloseHandle(instance_mutex);
     return exit_code;
