@@ -342,7 +342,8 @@ void reach_shell_update_quick_settings_animation(
         const float gap = 8.0f;
         float anchor_x = shell->layout.dock.quick_settings_button.x +
             shell->layout.dock.quick_settings_button.width * 0.5f;
-        shell->quick_settings_bounds =
+
+        reach_rect_f32 animated =
             reach_shell_apply_popup_bounds_animation(
                 &shell->quick_settings_bounds_animation,
                 shell->quick_settings_target_bounds,
@@ -350,6 +351,12 @@ void reach_shell_update_quick_settings_animation(
                 shell->layout.dock.bounds.y,
                 gap,
                 delta_seconds);
+
+        animated.x = shell->quick_settings_target_bounds.x;
+        animated.width = shell->quick_settings_target_bounds.width;
+
+        shell->quick_settings_bounds = animated;
+
         reach_shell_refresh_quick_settings_layout(shell);
         shell->quick_settings.dirty_flags = 1;
         shell->render_dirty = 1;
