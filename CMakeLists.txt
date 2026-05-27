@@ -218,7 +218,11 @@ target_link_libraries(reach PRIVATE
 )
 
 add_executable(reachctl
-    src/tools/reachctl.cpp
+    src/tools/reachctl/reachctl.cpp
+    src/tools/reachctl/reachctl_common.cpp
+    src/tools/reachctl/reachctl_session_commands.cpp
+    src/tools/reachctl/reachctl_config_commands.cpp
+    src/tools/reachctl/reachctl_context_menu.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
