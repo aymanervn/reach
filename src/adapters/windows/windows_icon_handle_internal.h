@@ -1,17 +1,18 @@
 #ifndef REACH_WINDOWS_ICON_HANDLE_INTERNAL_H
 #define REACH_WINDOWS_ICON_HANDLE_INTERNAL_H
 
-#include <cstdint>
 #include <windows.h>
+
 #include <new>
+#include <stdint.h>
+
+#define REACH_WINDOWS_ICON_MAGIC 0x5249434Fu
 
 enum reach_windows_icon_kind {
     REACH_WINDOWS_ICON_KIND_NONE = 0,
     REACH_WINDOWS_ICON_KIND_HICON = 1,
     REACH_WINDOWS_ICON_KIND_HBITMAP = 2
 };
-
-#define REACH_WINDOWS_ICON_MAGIC 0x5249434Fu
 
 struct reach_windows_icon {
     uint32_t magic;
@@ -32,6 +33,7 @@ static inline reach_windows_icon *reach_windows_icon_from_hicon(HICON hicon)
         return nullptr;
     }
 
+    icon->magic = REACH_WINDOWS_ICON_MAGIC;
     icon->kind = REACH_WINDOWS_ICON_KIND_HICON;
     icon->hicon = hicon;
     icon->hbitmap = nullptr;
@@ -50,6 +52,7 @@ static inline reach_windows_icon *reach_windows_icon_from_hbitmap(HBITMAP hbitma
         return nullptr;
     }
 
+    icon->magic = REACH_WINDOWS_ICON_MAGIC;
     icon->kind = REACH_WINDOWS_ICON_KIND_HBITMAP;
     icon->hicon = nullptr;
     icon->hbitmap = hbitmap;
@@ -61,6 +64,8 @@ static inline void reach_windows_icon_destroy(reach_windows_icon *icon)
     if (icon == nullptr) {
         return;
     }
+
+    icon->magic = 0;
 
     if (icon->hicon != nullptr) {
         DestroyIcon(icon->hicon);

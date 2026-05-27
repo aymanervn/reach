@@ -22,7 +22,7 @@ reach_result reach_d2d_execute(
 
             reach_result result = reach_d2d_draw_icon(backend, command);
             if (result != REACH_OK) {
-                return result;
+                continue;
             }
 
             continue;
@@ -57,6 +57,19 @@ reach_result reach_d2d_execute(
             if (result != REACH_OK) {
                 return result;
             }
+            continue;
+        }
+
+        if (command->type == REACH_RENDER_COMMAND_ICON_TINT) {
+            if (command->icon_id == 0) {
+                continue;
+            }
+
+            reach_result result = reach_d2d_draw_icon_tint(backend, command);
+            if (result != REACH_OK) {
+                continue;
+            }
+
             continue;
         }
 

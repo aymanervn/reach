@@ -22,7 +22,8 @@ typedef enum reach_render_command_type {
     REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT = 9,
     REACH_RENDER_COMMAND_VECTOR_ICON = 10,
     REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11,
-    REACH_RENDER_COMMAND_TEXT_CARET = 12
+    REACH_RENDER_COMMAND_TEXT_CARET = 12,
+    REACH_RENDER_COMMAND_ICON_TINT = 13
 } reach_render_command_type;
 
 typedef enum reach_vector_icon_id {

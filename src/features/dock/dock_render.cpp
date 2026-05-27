@@ -90,7 +90,24 @@ static void reach_dock_push_item(
         reach_render_command_buffer_push(commands, &command);
     }
 
-    if (input->click_feedback_index == index && input->click_feedback_opacity > 0.001f) {
+    if (input->click_feedback_index == index &&
+        input->click_feedback_opacity > 0.001f &&
+        icon.id != 0) {
+        command = {};
+        command.type = REACH_RENDER_COMMAND_ICON_TINT;
+        command.rect.x = box_x;
+        command.rect.y = box_y;
+        command.rect.width = icon_box_size;
+        command.rect.height = icon_box_size;
+        command.icon_id = icon.id;
+        command.color.r = 0.0f;
+        command.color.g = 0.0f;
+        command.color.b = 0.0f;
+        command.color.a = input->click_feedback_opacity;
+        command.radius = 0.0f;
+        reach_render_command_buffer_push(commands, &command);
+    } else if (input->click_feedback_index == index &&
+        input->click_feedback_opacity > 0.001f) {
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect.x = box_x;
