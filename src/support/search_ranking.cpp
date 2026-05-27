@@ -197,8 +197,8 @@ int32_t reach_search_score_candidate(const uint16_t *query, const reach_search_c
         score = 200;
     }
 
-    if (candidate->is_directory && score < 500) {
-        score -= 25;
+    if (candidate->is_directory && score < 700) {
+        score -= 150;
     }
 
     size_t name_length = reach_search_strlen(name);

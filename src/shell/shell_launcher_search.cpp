@@ -31,9 +31,21 @@ void reach_shell_release_launcher_result_icons(reach_shell *shell)
     }
 
     for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index) {
-        if (shell->launcher_result_icons[index].id != 0 && shell->icon_provider.ops.release != nullptr) {
-            (void)shell->icon_provider.ops.release(shell->icon_provider.provider, shell->launcher_result_icons[index]);
+        uint64_t icon_id = shell->launcher_result_icons[index].id;
+
+        if (icon_id != 0 &&
+            shell->launcher.renderer.ops.release_icon != nullptr) {
+            shell->launcher.renderer.ops.release_icon(
+                shell->launcher.renderer.backend,
+                icon_id);
         }
+
+        if (icon_id != 0 && shell->icon_provider.ops.release != nullptr) {
+            (void)shell->icon_provider.ops.release(
+                shell->icon_provider.provider,
+                shell->launcher_result_icons[index]);
+        }
+
         shell->launcher_result_icons[index] = {};
         (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, 0);
     }

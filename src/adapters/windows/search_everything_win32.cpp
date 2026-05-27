@@ -121,6 +121,33 @@ static int32_t reach_search_query_is_regex_like(const uint16_t *query)
     return 0;
 }
 
+static void reach_search_build_app_query(
+    uint16_t *dst,
+    size_t dst_count,
+    const uint16_t *query)
+{
+    if (dst == nullptr || dst_count == 0) {
+        return;
+    }
+
+    dst[0] = 0;
+    if (query == nullptr || query[0] == 0) {
+        return;
+    }
+
+    size_t write = 0;
+    for (size_t read = 0; query[read] != 0 && write + 1 < dst_count; ++read) {
+        dst[write++] = query[read];
+    }
+
+    const wchar_t *suffix = L" ext:exe;lnk";
+    for (size_t read = 0; suffix[read] != 0 && write + 1 < dst_count; ++read) {
+        dst[write++] = (uint16_t)suffix[read];
+    }
+
+    dst[write] = 0;
+}
+
 static FARPROC reach_everything_proc(HMODULE dll, const char *name)
 {
     return dll != nullptr ? GetProcAddress(dll, name) : nullptr;
@@ -253,6 +280,17 @@ static reach_result reach_search_everything_query(reach_search_provider *provide
     candidates.reserve(REACH_SEARCH_CANDIDATE_MAX);
 
     reach_result normal_result = reach_everything_collect(provider, query, 0, &candidates);
+
+    uint16_t app_query[REACH_MAX_SEARCH_CHARS + 32] = {};
+    reach_search_build_app_query(
+        app_query,
+        sizeof(app_query) / sizeof(app_query[0]),
+        query);
+
+    if (app_query[0] != 0) {
+        (void)reach_everything_collect(provider, app_query, 0, &candidates);
+    }
+
     if (reach_search_query_is_regex_like(query)) {
         (void)reach_everything_collect(provider, query, 1, &candidates);
     }

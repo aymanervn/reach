@@ -1,18 +1,14 @@
 # Reach Architecture
 
-Reach follows Clean Architecture with ports and adapters. Dependencies must
-point inward. Inner layers define policy and stable data. Outer layers perform
-composition, platform work, IO, persistence, and process integration.
+Reach follows Clean Architecture with ports and adapters. Dependencies must point inward. Inner layers define policy and stable data. Outer layers perform composition, platform work, IO, persistence, and process integration.
 
-This document is the architecture contract for new code. Keep it short,
-strict, and timeless.
+This document is the architecture contract for new code.
 
 ## Dependency Rule
 
 - Inner layers must not depend on outer layers.
 - Product policy must not depend on implementation details.
-- Windows APIs, COM, Direct2D, DirectComposition, registry access, shell APIs,
-  process APIs, file formats, and external services are details.
+- Windows APIs, COM, Direct2D, DirectComposition, registry access, shell APIs, process APIs, file formats, and external services are details.
 - Data crossing inward must be neutral project data, not native Windows objects.
 - Features decide behavior; shell orchestrates; adapters perform platform work;
   app composition wires concrete dependencies.
@@ -53,17 +49,14 @@ Rules:
 
 ### `include/reach/features` and `src/features`
 
-Feature policy, feature models, hit testing, rendering inputs, and feature
-actions.
+Feature policy, feature models, hit testing, rendering inputs, and feature actions.
 
 Rules:
 
 - May depend only on core, ports, and support.
 - Must not depend on app, shell, platform, or adapters.
 - Must not include Windows headers or call Windows APIs.
-- Must not know registry, config-file formats, shell replacement mechanics,
-  Direct2D, DirectComposition, process APIs, or AppUserModel implementation
-  details.
+- Must not know registry, config-file formats, shell replacement mechanics, Direct2D, DirectComposition, process APIs, or AppUserModel implementation details.
 - Should operate on data and ports passed in.
 - Should return actions/intents when shell or adapters must perform effects.
 
@@ -76,8 +69,7 @@ Rules:
 - May depend on core, ports, features, and support.
 - Must not depend on app, platform headers, or adapter implementations.
 - Must not include Windows headers or call Windows APIs.
-- Owns lifecycle orchestration, input routing, feature coordination, reloads,
-  dirty flags, surface state, and port calls.
+- Owns lifecycle orchestration, input routing, feature coordination, reloads, dirty flags, surface state, and port calls.
 - Must not absorb feature policy that belongs in `features`.
 
 ### `include/reach/app` and `src/app`
@@ -99,8 +91,7 @@ Outer platform-facing declarations used by composition and tools.
 
 Rules:
 
-- May describe platform factories, platform messages, and platform registration
-  surfaces.
+- May describe platform factories, platform messages, and platform registration surfaces.
 - Must not be included by core, ports, features, or shell.
 - Must not be used as a back door around ports.
 
@@ -111,10 +102,8 @@ Windows implementations of ports and Windows-specific integration.
 Rules:
 
 - May depend inward on ports, core, and support.
-- May use Win32, COM, WIC, Direct2D, DirectComposition, registry, shell APIs,
-  process APIs, AppUserModel APIs, and native Windows handles.
-- Must not leak Windows types or platform assumptions into core, ports,
-  features, or shell.
+- May use Win32, COM, WIC, Direct2D, DirectComposition, registry, shell APIs, process APIs, AppUserModel APIs, and native Windows handles.
+- Must not leak Windows types or platform assumptions into core, ports, features, or shell.
 - Owns Windows metadata extraction and platform resource lifetime.
 
 ### `src/tools`
@@ -172,17 +161,14 @@ No other dependency direction is allowed.
 - Dock matching must use AppUserModelID first, then exact launch path.
 - Dock matching must not use filename, folder ancestry, launch-time
   correlation, or icon reference as identity.
-- Pinning from a running window must ask a platform-neutral port for pin
-  metadata.
+- Pinning from a running window must ask a platform-neutral port for pin metadata.
 - Platform relaunch metadata belongs in Windows adapters.
-- Relaunch metadata probing must be on demand, not part of hot window snapshot
-  refresh.
+- Relaunch metadata probing must be on demand, not part of hot window snapshot refresh.
 
 ## Runtime Rules
 
 - Window procedures must translate native messages into queued project events.
-- Heavy work must happen in shell update/orchestration, not inside native window
-  callbacks.
+- Heavy work must happen in shell update/orchestration, not inside native window callbacks.
 - Runtime debug logging must not remain in hot paths.
 - Native resources must have clear owners and release paths.
 - Caches must have explicit refresh or eviction rules.
@@ -212,5 +198,4 @@ ctest --test-dir build --output-on-failure
 cmake --build build --target check_architecture
 ```
 
-The architecture check is part of the contract. Do not weaken it or add
-allowlist entries without explicit approval.
+The architecture check is part of the contract. Do not weaken it or add allowlist entries without explicit approval.

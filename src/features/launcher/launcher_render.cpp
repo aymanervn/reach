@@ -10,18 +10,11 @@ static reach_color reach_launcher_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
     return color;
 }
 
-static uint64_t reach_launcher_fallback_icon(reach_search_result_kind kind)
+static uint64_t reach_launcher_fallback_icon(int32_t is_directory)
 {
-    switch (kind) {
-    case REACH_SEARCH_RESULT_FOLDER: return REACH_VECTOR_ICON_FOLDER;
-    case REACH_SEARCH_RESULT_PHOTO: return REACH_VECTOR_ICON_PHOTO;
-    case REACH_SEARCH_RESULT_VIDEO: return REACH_VECTOR_ICON_VIDEO;
-    case REACH_SEARCH_RESULT_MUSIC: return REACH_VECTOR_ICON_MUSIC;
-    case REACH_SEARCH_RESULT_DOCUMENT: return REACH_VECTOR_ICON_DOCUMENT;
-    case REACH_SEARCH_RESULT_APP:
-    case REACH_SEARCH_RESULT_FILE:
-    default: return REACH_VECTOR_ICON_FILE;
-    }
+    return is_directory
+        ? REACH_VECTOR_ICON_FOLDER
+        : REACH_VECTOR_ICON_FILE;
 }
 
 static void reach_launcher_copy_query_prefix(uint16_t *dst, size_t dst_count, const reach_ui_state *state)
@@ -169,7 +162,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.width = icon_size - 10.0f;
                 command.rect.height = icon_size - 10.0f;
                 command.color = reach_launcher_rgb(255, 255, 255, 0.78f);
-                command.icon_id = reach_launcher_fallback_icon(state->launcher.results[index].kind);
+                command.icon_id = reach_launcher_fallback_icon(state->launcher.results[index].is_directory);
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
