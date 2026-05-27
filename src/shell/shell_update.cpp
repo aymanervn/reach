@@ -132,16 +132,47 @@ static int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
     return requested;
 }
 
+static void reach_shell_release_pinned_icon_render_cache(reach_shell *shell)
+{
+    if (shell == nullptr || shell->dock.renderer.ops.release_icon == nullptr) {
+        return;
+    }
+
+    size_t count = shell->dock_icons.pinned_icon_count;
+    if (count > REACH_MAX_PINNED_APPS) {
+        count = REACH_MAX_PINNED_APPS;
+    }
+
+    for (size_t index = 0; index < count; ++index) {
+        uint64_t icon_id = shell->dock_icons.pinned_icons[index].id;
+        if (icon_id != 0) {
+            shell->dock.renderer.ops.release_icon(
+                shell->dock.renderer.backend,
+                icon_id);
+        }
+    }
+}
+
 reach_result reach_shell_load_pinned_icons(reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
     if (shell == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
+
+    reach_shell_release_pinned_icon_render_cache(shell);
+
     if (shell->icon_provider.ops.load == nullptr) {
+        reach_dock_release_pinned_icons(&shell->dock_icons, &shell->icon_provider);
         return REACH_OK;
     }
-    return reach_dock_load_pinned_icons(&shell->dock_icons, &shell->icon_provider, shell->ui.pinned_apps, shell->ui.pinned_app_count, reach_shell_dock_icon_size_px(shell));
+
+    return reach_dock_load_pinned_icons(
+        &shell->dock_icons,
+        &shell->icon_provider,
+        shell->ui.pinned_apps,
+        shell->ui.pinned_app_count,
+        reach_shell_dock_icon_size_px(shell));
 }
 
 static int32_t reach_shell_path_equals(const uint16_t *a, const uint16_t *b)
@@ -548,12 +579,53 @@ void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapsh
     }
 }
 
+static int32_t reach_shell_pinned_apps_equal(
+    const reach_pinned_app_model *a,
+    size_t a_count,
+    const reach_pinned_app_model *b,
+    size_t b_count)
+{
+    if (a_count != b_count) {
+        return 0;
+    }
+
+    for (size_t index = 0; index < a_count; ++index) {
+        if (a[index].id != b[index].id ||
+            !reach_shell_utf16_equal(a[index].title, b[index].title) ||
+            !reach_shell_utf16_equal(a[index].path, b[index].path) ||
+            !reach_shell_utf16_equal(a[index].arguments, b[index].arguments) ||
+            !reach_shell_utf16_equal(a[index].icon_ref, b[index].icon_ref) ||
+            !reach_shell_utf16_equal(a[index].app_user_model_id, b[index].app_user_model_id)) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 reach_result reach_shell_reload_config(reach_shell *shell)
 {
-    reach_result result = reach_shell_reload_pins(shell);
-    if (result != REACH_OK) {
-        return result;
+    if (shell == nullptr || shell->config_store.ops.load == nullptr) {
+        return REACH_INVALID_ARGUMENT;
     }
+
+    reach_config_snapshot snapshot = {};
+    reach_result load_result = shell->config_store.ops.load(shell->config_store.store, &snapshot);
+    if (load_result != REACH_OK) {
+        return load_result;
+    }
+
+    if (!reach_shell_pinned_apps_equal(
+            shell->ui.pinned_apps,
+            shell->ui.pinned_app_count,
+            snapshot.pinned_apps,
+            snapshot.pinned_app_count)) {
+        reach_result pin_result = reach_shell_reload_pins(shell);
+        if (pin_result != REACH_OK) {
+            return pin_result;
+        }
+    }
+
     reach_shell_reload_wallpaper(shell, 1);
     return REACH_OK;
 }
