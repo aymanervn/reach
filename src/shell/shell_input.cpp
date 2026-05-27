@@ -310,14 +310,27 @@ static void reach_shell_set_dock_click_feedback_immediate(reach_shell *shell, si
 
 static void reach_shell_stick_dock_item(reach_shell *shell)
 {
-    if (shell == nullptr || (!shell->dock_click_feedback_pressed && shell->dock_click_feedback_index == REACH_SHELL_DOCK_FEEDBACK_NONE)) {
+    if (shell == nullptr ||
+        (!shell->dock_click_feedback_pressed &&
+            shell->dock_click_feedback_index == REACH_SHELL_DOCK_FEEDBACK_NONE)) {
         return;
     }
+
     shell->dock_click_feedback_pressed = 0;
-    shell->dock_click_feedback_sticky = shell->dock_click_feedback_index != REACH_SHELL_DOCK_FEEDBACK_NONE;
+    shell->dock_click_feedback_sticky =
+        shell->dock_click_feedback_index != REACH_SHELL_DOCK_FEEDBACK_NONE;
+
     if (shell->dock_click_feedback_sticky) {
-        reach_shell_set_dock_click_feedback_immediate(shell, shell->dock_click_feedback_index, 0.50f);
-        reach_shell_capture_dock_input(shell);
+        reach_shell_set_dock_click_feedback_immediate(
+            shell,
+            shell->dock_click_feedback_index,
+            0.50f);
+
+        if (!shell->context_menu_open &&
+            !shell->tray_popup_open &&
+            !shell->quick_settings_open) {
+            reach_shell_capture_dock_input(shell);
+        }
     }
 }
 
@@ -1262,6 +1275,7 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         if (shell->context_menu_hovered_index != hovered_context) {
             shell->context_menu_hovered_index = hovered_context;
             shell->context_menu.dirty_flags = 1;
+            reach_shell_request_update(shell);
         }
         return REACH_OK;
     }
