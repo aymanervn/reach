@@ -79,16 +79,18 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
-            command = {};
-            command.type = REACH_RENDER_COMMAND_ICON;
-            command.rect.x = box_x;
-            command.rect.y = box_y;
-            command.rect.width = icon_box_size;
-            command.rect.height = icon_box_size;
-            command.radius = 0.0f;
-            command.color.a = 1.0f;
-            command.icon_id = icon.id;
-            reach_render_command_buffer_push(out_commands, &command);
+            if (icon.id != 0) {
+                command = {};
+                command.type = REACH_RENDER_COMMAND_ICON;
+                command.rect.x = box_x;
+                command.rect.y = box_y;
+                command.rect.width = icon_box_size;
+                command.rect.height = icon_box_size;
+                command.radius = 0.0f;
+                command.color.a = 1.0f;
+                command.icon_id = icon.id;
+                reach_render_command_buffer_push(out_commands, &command);
+            }
 
             if (selected) {
                 command = {};

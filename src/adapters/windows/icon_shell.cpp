@@ -163,62 +163,17 @@ static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px)
 
     HICON selected = size_px > 32 ? large_icon : small_icon;
     HICON unused = size_px > 32 ? small_icon : large_icon;
+
+    if (selected == nullptr && unused != nullptr) {
+        selected = unused;
+        unused = nullptr;
+    }
+
     if (unused != nullptr) {
         DestroyIcon(unused);
     }
+
     return selected;
-}
-
-static reach_windows_icon *reach_windows_icon_from_hicon(HICON hicon)
-{
-    if (hicon == nullptr) {
-        return nullptr;
-    }
-
-    reach_windows_icon *icon = new (std::nothrow) reach_windows_icon();
-    if (icon == nullptr) {
-        DestroyIcon(hicon);
-        return nullptr;
-    }
-
-    icon->kind = REACH_WINDOWS_ICON_KIND_HICON;
-    icon->hicon = hicon;
-    icon->hbitmap = nullptr;
-    return icon;
-}
-
-static reach_windows_icon *reach_windows_icon_from_hbitmap(HBITMAP hbitmap)
-{
-    if (hbitmap == nullptr) {
-        return nullptr;
-    }
-
-    reach_windows_icon *icon = new (std::nothrow) reach_windows_icon();
-    if (icon == nullptr) {
-        DeleteObject(hbitmap);
-        return nullptr;
-    }
-
-    icon->kind = REACH_WINDOWS_ICON_KIND_HBITMAP;
-    icon->hicon = nullptr;
-    icon->hbitmap = hbitmap;
-    return icon;
-}
-
-static void reach_windows_icon_destroy(reach_windows_icon *icon)
-{
-    if (icon == nullptr) {
-        return;
-    }
-
-    if (icon->hicon != nullptr) {
-        DestroyIcon(icon->hicon);
-    }
-    if (icon->hbitmap != nullptr) {
-        DeleteObject(icon->hbitmap);
-    }
-
-    delete icon;
 }
 
 static reach_result reach_icon_load(reach_icon_provider *provider, const reach_icon_request *request, reach_icon_handle *out_icon)
@@ -284,10 +239,12 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
 
 static reach_result reach_icon_release(reach_icon_provider *provider, reach_icon_handle icon)
 {
-    REACH_ASSERT(provider != nullptr);
+    (void)provider;
+
     if (icon.id != 0) {
         reach_windows_icon_destroy(reinterpret_cast<reach_windows_icon *>(icon.id));
     }
+
     return REACH_OK;
 }
 

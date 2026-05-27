@@ -1,6 +1,7 @@
 #include "windows_adapters_internal.h"
 
 #include "reach/ports/tray_provider.h"
+#include "windows_icon_handle_internal.h"
 
 #include <windows.h>
 #include <shellapi.h>
@@ -63,7 +64,7 @@ static void reach_tray_copy_text(uint16_t *dst, size_t dst_count, const wchar_t 
 static void reach_tray_release_item_icon(reach_tray_native_item *item)
 {
     if (item != nullptr && item->item.icon_id != 0) {
-        DestroyIcon(reinterpret_cast<HICON>(item->item.icon_id));
+        reach_windows_icon_destroy(reinterpret_cast<reach_windows_icon *>(item->item.icon_id));
         item->item.icon_id = 0;
     }
 }
@@ -116,7 +117,10 @@ static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *b
         HICON copy = incoming != nullptr ? CopyIcon(incoming) : nullptr;
         if (copy != nullptr || message == NIM_MODIFY) {
             reach_tray_release_item_icon(item);
-            item->item.icon_id = reinterpret_cast<uint64_t>(copy);
+            reach_windows_icon *wrapped = reach_windows_icon_from_hicon(copy);
+            item->item.icon_id = wrapped != nullptr
+                ? reinterpret_cast<uint64_t>(wrapped)
+                : 0;
         }
     }
 }

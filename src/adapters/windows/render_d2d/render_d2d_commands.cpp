@@ -15,12 +15,17 @@ reach_result reach_d2d_execute(
 
     for (size_t index = 0; index < commands->count; ++index) {
         const reach_render_command *command = &commands->commands[index];
-
-        if (command->type == REACH_RENDER_COMMAND_ICON && command->icon_id != 0) {
-            reach_result result = reach_d2d_draw_icon(backend, command);
-            if (result == REACH_OK) {
+        if (command->type == REACH_RENDER_COMMAND_ICON) {
+            if (command->icon_id == 0) {
                 continue;
             }
+
+            reach_result result = reach_d2d_draw_icon(backend, command);
+            if (result != REACH_OK) {
+                return result;
+            }
+
+            continue;
         }
 
         if (command->type == REACH_RENDER_COMMAND_VECTOR_ICON && command->icon_id != 0) {
@@ -55,9 +60,7 @@ reach_result reach_d2d_execute(
             continue;
         }
 
-        if (command->type == REACH_RENDER_COMMAND_RECT ||
-            command->type == REACH_RENDER_COMMAND_ICON ||
-            command->type == REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE) {
+        if (command->type == REACH_RENDER_COMMAND_RECT || command->type == REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE) {
             reach_result result = reach_d2d_draw_rect_or_rounded_rect(target, command);
             if (result != REACH_OK) {
                 return result;
