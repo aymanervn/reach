@@ -161,3 +161,22 @@ void reach_shell_load_open_window_icons(reach_shell *shell)
             &shell->dock_icons.open_window_icons[index]);
     }
 }
+
+void reach_shell_release_tray_render_icons(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    size_t count = shell->tray_model.item_count;
+    if (count > REACH_MAX_TRAY_ITEMS) {
+        count = REACH_MAX_TRAY_ITEMS;
+    }
+
+    for (size_t index = 0; index < count; ++index) {
+        uint64_t icon_id = shell->tray_model.items[index].icon_id;
+        if (icon_id != 0) {
+            reach_shell_release_render_icon(shell, icon_id);
+        }
+    }
+}

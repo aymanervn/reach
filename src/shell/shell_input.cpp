@@ -256,9 +256,20 @@ void reach_shell_toggle_tray_popup(reach_shell *shell)
 reach_result reach_shell_refresh_tray_items(reach_shell *shell)
 {
     if (shell == nullptr) {
-        return REACH_OK;
+        return REACH_INVALID_ARGUMENT;
     }
-    return reach_tray_model_refresh(&shell->tray_model, &shell->tray_provider);
+
+    reach_shell_release_tray_render_icons(shell);
+
+    reach_result result =
+        reach_tray_model_refresh(&shell->tray_model, &shell->tray_provider);
+
+    if (result != REACH_OK) {
+        return result;
+    }
+
+    shell->tray.dirty_flags = 1;
+    return REACH_OK;
 }
 
 void reach_shell_compute_tray_popup_layout(

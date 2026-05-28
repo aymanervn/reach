@@ -259,7 +259,7 @@ reach_result reach_shell_load_icon_handle(
     const uint16_t *path,
     int32_t size_px,
     reach_icon_handle *out_icon);
-
+void reach_shell_release_tray_render_icons(reach_shell *shell);
 void reach_shell_release_dock_icons(reach_shell *shell);
 void reach_shell_release_open_window_icons(reach_shell *shell, size_t old_count);
 void reach_shell_load_open_window_icons(reach_shell *shell);
