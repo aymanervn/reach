@@ -250,6 +250,19 @@ void reach_shell_sync_popup_mouse_hook(reach_shell *shell);
 void reach_shell_clear_sticky_dock_feedback(reach_shell *shell);
 
 reach_result reach_shell_load_pinned_icons(reach_shell *shell);
+int32_t reach_shell_dock_icon_size_px(const reach_shell *shell);
+
+void reach_shell_release_render_icon(reach_shell *shell, uint64_t icon_id);
+void reach_shell_release_icon_handle(reach_shell *shell, reach_icon_handle *icon);
+reach_result reach_shell_load_icon_handle(
+    reach_shell *shell,
+    const uint16_t *path,
+    int32_t size_px,
+    reach_icon_handle *out_icon);
+
+void reach_shell_release_dock_icons(reach_shell *shell);
+void reach_shell_release_open_window_icons(reach_shell *shell, size_t old_count);
+void reach_shell_load_open_window_icons(reach_shell *shell);
 reach_result reach_shell_reload_pins(reach_shell *shell);
 reach_result reach_shell_reload_config(reach_shell *shell);
 void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot);

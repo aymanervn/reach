@@ -111,7 +111,7 @@ int32_t reach_shell_dock_item_matches_key(const reach_shell *shell, size_t index
 }
 
 
-static int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
+int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
 {
     const reach_theme *theme =
         shell != nullptr && shell->theme != nullptr
@@ -132,27 +132,6 @@ static int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
     return requested;
 }
 
-static void reach_shell_release_pinned_icon_render_cache(reach_shell *shell)
-{
-    if (shell == nullptr || shell->dock.renderer.ops.release_icon == nullptr) {
-        return;
-    }
-
-    size_t count = shell->dock_icons.pinned_icon_count;
-    if (count > REACH_MAX_PINNED_APPS) {
-        count = REACH_MAX_PINNED_APPS;
-    }
-
-    for (size_t index = 0; index < count; ++index) {
-        uint64_t icon_id = shell->dock_icons.pinned_icons[index].id;
-        if (icon_id != 0) {
-            shell->dock.renderer.ops.release_icon(
-                shell->dock.renderer.backend,
-                icon_id);
-        }
-    }
-}
-
 reach_result reach_shell_load_pinned_icons(reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
@@ -160,19 +139,41 @@ reach_result reach_shell_load_pinned_icons(reach_shell *shell)
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_shell_release_pinned_icon_render_cache(shell);
-
-    if (shell->icon_provider.ops.load == nullptr) {
-        reach_dock_release_pinned_icons(&shell->dock_icons, &shell->icon_provider);
-        return REACH_OK;
+    size_t old_count = shell->dock_icons.pinned_icon_count;
+    if (old_count > REACH_MAX_PINNED_APPS) {
+        old_count = REACH_MAX_PINNED_APPS;
     }
 
-    return reach_dock_load_pinned_icons(
-        &shell->dock_icons,
-        &shell->icon_provider,
-        shell->ui.pinned_apps,
-        shell->ui.pinned_app_count,
-        reach_shell_dock_icon_size_px(shell));
+    for (size_t index = 0; index < old_count; ++index) {
+        reach_shell_release_icon_handle(
+            shell,
+            &shell->dock_icons.pinned_icons[index]);
+        shell->dock_icons.pinned_icon_initials[index] = 0;
+    }
+
+    shell->dock_icons.pinned_icon_count =
+        shell->ui.pinned_app_count > REACH_MAX_PINNED_APPS
+            ? REACH_MAX_PINNED_APPS
+            : shell->ui.pinned_app_count;
+
+    for (size_t index = 0; index < shell->dock_icons.pinned_icon_count; ++index) {
+        const reach_pinned_app_model *app = &shell->ui.pinned_apps[index];
+
+        shell->dock_icons.pinned_icon_initials[index] =
+            app->title[0] != 0 ? app->title[0] : '?';
+
+        const uint16_t *icon_path = app->icon_ref[0] != 0
+            ? app->icon_ref
+            : app->path;
+
+        (void)reach_shell_load_icon_handle(
+            shell,
+            icon_path,
+            reach_shell_dock_icon_size_px(shell),
+            &shell->dock_icons.pinned_icons[index]);
+    }
+
+    return REACH_OK;
 }
 
 static int32_t reach_shell_path_equals(const uint16_t *a, const uint16_t *b)
@@ -298,23 +299,8 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
     }
 
     if (icon_identity_changed) {
-        if (shell->dock.renderer.ops.release_icon != nullptr) {
-            size_t release_count = old_count > REACH_MAX_PINNED_APPS ? REACH_MAX_PINNED_APPS : old_count;
-            for (size_t index = 0; index < release_count; ++index) {
-                if (shell->dock_icons.open_window_icons[index].id != 0) {
-                    shell->dock.renderer.ops.release_icon(
-                        shell->dock.renderer.backend,
-                        (uintptr_t)shell->dock_icons.open_window_icons[index].id);
-                }
-            }
-        }
-        reach_dock_release_open_window_icons(&shell->dock_icons, &shell->icon_provider, old_count);
-        (void)reach_dock_load_open_window_icons(
-            &shell->dock_icons,
-            &shell->icon_provider,
-            shell->open_windows,
-            shell->open_window_count,
-            reach_shell_dock_icon_size_px(shell));
+        reach_shell_release_open_window_icons(shell, old_count);
+        reach_shell_load_open_window_icons(shell);
     }
     if (out_changed != nullptr) {
         *out_changed = changed;

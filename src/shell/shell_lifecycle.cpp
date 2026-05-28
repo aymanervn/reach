@@ -32,6 +32,8 @@ static void reach_shell_cleanup(reach_shell *shell)
     }
     reach_shell_close_context_menu(shell);
     reach_shell_sync_popup_mouse_hook(shell);
+    reach_shell_release_dock_icons(shell);
+    reach_shell_release_launcher_result_icons(shell);
     if (shell->hotkeys.ops.destroy != nullptr) {
         shell->hotkeys.ops.destroy(shell->hotkeys.hotkeys);
     }
@@ -95,8 +97,6 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->search_provider.ops.destroy != nullptr) {
         shell->search_provider.ops.destroy(shell->search_provider.provider);
     }
-    reach_dock_release_all_icons(&shell->dock_icons, &shell->icon_provider, shell->open_window_count);
-    reach_shell_release_launcher_result_icons(shell);
     if (shell->app_launcher.ops.destroy != nullptr) {
         shell->app_launcher.ops.destroy(shell->app_launcher.launcher);
     }

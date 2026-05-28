@@ -71,21 +71,13 @@ void reach_dock_feature_model_build_items(
     size_t open_window_count,
     reach_dock_window_matches_pinned_fn window_matches_pinned,
     void *match_user);
-reach_result reach_dock_load_pinned_icons(
+void reach_dock_clear_pinned_icons(reach_dock_icon_cache *cache);
+void reach_dock_clear_open_window_icons(
     reach_dock_icon_cache *cache,
-    reach_icon_provider_port *icon_provider,
-    const reach_pinned_app_model *pinned_apps,
-    size_t pinned_app_count,
-    int32_t size_px);
-void reach_dock_release_pinned_icons(reach_dock_icon_cache *cache, reach_icon_provider_port *icon_provider);
-reach_result reach_dock_load_open_window_icons(
+    size_t open_window_count);
+void reach_dock_clear_all_icons(
     reach_dock_icon_cache *cache,
-    reach_icon_provider_port *icon_provider,
-    const reach_window_snapshot *open_windows,
-    size_t open_window_count,
-    int32_t size_px);
-void reach_dock_release_open_window_icons(reach_dock_icon_cache *cache, reach_icon_provider_port *icon_provider, size_t open_window_count);
-void reach_dock_release_all_icons(reach_dock_icon_cache *cache, reach_icon_provider_port *icon_provider, size_t open_window_count);
+    size_t open_window_count);
 reach_icon_handle reach_dock_icon_for_item(
     const reach_dock_icon_cache *cache,
     const reach_dock_feature_model *model,

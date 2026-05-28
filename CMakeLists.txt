@@ -155,6 +155,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
 )
 
 add_library(reach_shell STATIC
+    src/shell/shell_icons.cpp
     src/shell/shell_input.cpp
     src/shell/shell_game_mode.cpp
     src/shell/shell_launcher_search.cpp

@@ -584,7 +584,6 @@ def validate_cmake_dependencies() -> list[str]:
 def main() -> int:
     violations: list[str] = []
     warnings: list[str] = []
-    return 0
     violations.extend(validate_layer_directories())
     violations.extend(validate_document_contract())
     violations.extend(validate_cmake_dependencies())

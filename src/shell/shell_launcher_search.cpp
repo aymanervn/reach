@@ -2,18 +2,16 @@
 
 static void reach_shell_load_launcher_result_icons(reach_shell *shell)
 {
-    if (shell == nullptr || shell->icon_provider.ops.load == nullptr) {
+    if (shell == nullptr) {
         return;
     }
 
     for (size_t index = 0; index < shell->ui.launcher.result_count && index < REACH_SEARCH_MAX_RESULTS; ++index) {
-        reach_icon_request request = {};
-        request.size_px = 32;
-        reach_copy_utf16(request.path, 260, shell->ui.launcher.results[index].path);
+        const uint16_t *path = shell->ui.launcher.results[index].path;
 
         reach_icon_handle icon = {};
-        if (request.path[0] != 0 &&
-            shell->icon_provider.ops.load(shell->icon_provider.provider, &request, &icon) == REACH_OK &&
+        if (path[0] != 0 &&
+            reach_shell_load_icon_handle(shell, path, 32, &icon) == REACH_OK &&
             icon.id != 0) {
             shell->launcher_result_icons[index] = icon;
             (void)reach_ui_state_set_launcher_result_icon(
@@ -31,22 +29,10 @@ void reach_shell_release_launcher_result_icons(reach_shell *shell)
     }
 
     for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index) {
-        uint64_t icon_id = shell->launcher_result_icons[index].id;
+        reach_shell_release_icon_handle(
+            shell,
+            &shell->launcher_result_icons[index]);
 
-        if (icon_id != 0 &&
-            shell->launcher.renderer.ops.release_icon != nullptr) {
-            shell->launcher.renderer.ops.release_icon(
-                shell->launcher.renderer.backend,
-                icon_id);
-        }
-
-        if (icon_id != 0 && shell->icon_provider.ops.release != nullptr) {
-            (void)shell->icon_provider.ops.release(
-                shell->icon_provider.provider,
-                shell->launcher_result_icons[index]);
-        }
-
-        shell->launcher_result_icons[index] = {};
         (void)reach_ui_state_set_launcher_result_icon(&shell->ui, index, 0);
     }
 }
