@@ -145,20 +145,21 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONDOWN:
-    case WM_MBUTTONDOWN:
         if (window != nullptr) {
             SetCapture(hwnd);
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
             point.y = GET_Y_LPARAM(lparam);
             ClientToScreen(hwnd, &point);
+
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_POINTER_DOWN;
             event.x = point.x;
-            event.y = point.y;
-            reach_platform_window_queue_event(window, &event);
+            event.y = point.y;                reach_platform_window_queue_event(window, &event);
         }
         return 0;
+        case WM_MBUTTONDOWN:
+            return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
