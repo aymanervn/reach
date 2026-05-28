@@ -1488,8 +1488,12 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         if (shell->render_dirty || shell->tray.dirty_flags || tray_window_changed) {
                             (void)reach_shell_render_tray_surface(shell, tray_bounds);
                         }
-                    } else if (shell->tray.window.ops.hide != nullptr) {
-                        (void)shell->tray.window.ops.hide(shell->tray.window.window);
+                    } else {
+                        if (shell->tray_popup_open) {
+                            reach_shell_set_tray_popup_open(shell, 0);
+                        } else if (shell->tray.window.ops.hide != nullptr) {
+                            (void)shell->tray.window.ops.hide(shell->tray.window.window);
+                        }
                     }
                 }
 

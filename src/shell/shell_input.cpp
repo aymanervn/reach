@@ -44,6 +44,10 @@ void reach_shell_raise_launcher(reach_shell *shell)
         return;
     }
 
+    reach_shell_set_tray_popup_open(shell, 0);
+    reach_shell_set_quick_settings_open(shell, 0);
+    reach_shell_close_context_menu(shell);
+
     (void)shell->launcher.window.ops.raise(shell->launcher.window.window);
 }
 
@@ -225,22 +229,27 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
     }
 
     int32_t next_open = open ? 1 : 0;
+
+    if (!next_open && shell->tray_provider.ops.cancel_active_menu != nullptr) {
+        (void)shell->tray_provider.ops.cancel_active_menu(
+            shell->tray_provider.provider);
+    }
+
     if (shell->tray_popup_open == next_open) {
         return;
     }
 
     shell->tray_popup_open = next_open;
+
     if (shell->tray_popup_open) {
         reach_shell_set_quick_settings_open(shell, 0);
         reach_shell_close_context_menu(shell);
         (void)reach_shell_refresh_tray_items(shell);
         reach_shell_capture_tray_input(shell);
     } else {
-        if (shell->tray_provider.ops.cancel_active_menu != nullptr) {
-               (void)shell->tray_provider.ops.cancel_active_menu(shell->tray_provider.provider);
-        }
         reach_shell_release_tray_input(shell);
     }
+
     reach_shell_sync_popup_mouse_hook(shell);
     shell->dock.dirty_flags = 1;
     shell->tray.dirty_flags = 1;

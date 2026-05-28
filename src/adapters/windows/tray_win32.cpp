@@ -442,23 +442,83 @@ static WPARAM reach_tray_cursor_wparam(void)
     return (WPARAM)(((point.y & 0xffff) << 16) | (point.x & 0xffff));
 }
 
+static void reach_tray_cancel_owner_menu(HWND owner)
+{
+    if (owner == nullptr || !IsWindow(owner)) {
+        return;
+    }
+
+    (void)SendMessageTimeoutW(
+        owner,
+        WM_CANCELMODE,
+        0,
+        0,
+        SMTO_ABORTIFHUNG,
+        200,
+        nullptr);
+
+    (void)PostMessageW(owner, WM_CANCELMODE, 0, 0);
+    (void)PostMessageW(owner, WM_NULL, 0, 0);
+}
+
+static int32_t reach_tray_owner_already_cancelled(
+    HWND *owners,
+    size_t count,
+    HWND owner)
+{
+    for (size_t index = 0; index < count; ++index) {
+        if (owners[index] == owner) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static reach_result reach_tray_cancel_active_menu(reach_tray_provider *provider)
 {
     if (provider == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
 
-    HWND owner = provider->active_menu_owner;
-    provider->active_menu_owner = nullptr;
-    provider->active_menu_owner_id = 0;
-
     if (provider->host_window != nullptr && IsWindow(provider->host_window)) {
         (void)SetForegroundWindow(provider->host_window);
     }
 
-    if (owner != nullptr && IsWindow(owner)) {
-        (void)PostMessageW(owner, WM_CANCELMODE, 0, 0);
-        (void)PostMessageW(owner, WM_NULL, 0, 0);
+    HWND owners[REACH_MAX_TRAY_ITEMS + 2] = {};
+    size_t owner_count = 0;
+    size_t owner_capacity = sizeof(owners) / sizeof(owners[0]);
+
+    HWND active_owner = provider->active_menu_owner;
+    provider->active_menu_owner = nullptr;
+    provider->active_menu_owner_id = 0;
+
+    if (active_owner != nullptr && IsWindow(active_owner)) {
+        owners[owner_count++] = active_owner;
+    }
+
+    for (size_t index = 0; index < provider->item_count; ++index) {
+        HWND owner = provider->items[index].owner;
+        if (owner == nullptr || !IsWindow(owner)) {
+            continue;
+        }
+
+        if (!reach_tray_owner_already_cancelled(owners, owner_count, owner) &&
+            owner_count < owner_capacity) {
+            owners[owner_count++] = owner;
+        }
+    }
+
+    HWND foreground = GetForegroundWindow();
+    if (foreground != nullptr &&
+        IsWindow(foreground) &&
+        !reach_tray_owner_already_cancelled(owners, owner_count, foreground) &&
+        owner_count < owner_capacity) {
+        owners[owner_count++] = foreground;
+    }
+
+    for (size_t index = 0; index < owner_count; ++index) {
+        reach_tray_cancel_owner_menu(owners[index]);
     }
 
     return REACH_OK;

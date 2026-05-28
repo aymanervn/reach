@@ -379,6 +379,11 @@ void reach_shell_set_quick_settings_open(
         return;
     }
 
+    if (next_open) {
+        reach_shell_set_tray_popup_open(shell, 0);
+        reach_shell_close_context_menu(shell);
+    }
+
     shell->quick_settings_open = next_open;
     shell->quick_settings_dragging_volume = 0;
     shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
@@ -390,8 +395,6 @@ void reach_shell_set_quick_settings_open(
     }
 
     if (next_open) {
-        reach_shell_set_tray_popup_open(shell, 0);
-        reach_shell_close_context_menu(shell);
         reach_quick_settings_model_set_bluetooth_pending(
             &shell->quick_settings_model,
             0,
