@@ -94,7 +94,9 @@ static reach_result reachctl_install_pin_context_menu_for_class(
     wchar_t command[1536] = {};
     swprintf_s(
         command,
-        L"powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"Start-Process -WindowStyle Hidden -FilePath '%ls' -ArgumentList '--pin', '%%1'\"",
+        L"powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden "
+        L"-Command \"Start-Process -WindowStyle Hidden -FilePath '%ls' "
+        L"-ArgumentList '--pin \\\"%%1\\\"'\"",
         escaped_reachctl_path);
 
     reach_result result = reachctl_write_string_value(
@@ -241,7 +243,7 @@ static reach_result reachctl_install_wallpaper_monitor_context_menu_at_key(
             command,
             L"powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden "
             L"-Command \"Start-Process -WindowStyle Hidden -FilePath '%ls' "
-            L"-ArgumentList '--wallpaper-monitor', '%zu', '%%1'\"",
+            L"-ArgumentList '--wallpaper-monitor %zu \\\"%%1\\\"'\"",
             escaped_reachctl_path,
             monitor_index);
 
