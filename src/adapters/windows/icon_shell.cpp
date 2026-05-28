@@ -154,26 +154,28 @@ static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px)
         return nullptr;
     }
 
-    HICON large_icon = nullptr;
-    HICON small_icon = nullptr;
-    UINT count = ExtractIconExW(path, 0, &large_icon, &small_icon, 1);
-    if (count == 0) {
-        return nullptr;
+    int32_t requested_size = size_px;
+    if (requested_size < 64) {
+        requested_size = 64;
+    }
+    if (requested_size > 256) {
+        requested_size = 256;
     }
 
-    HICON selected = size_px > 32 ? large_icon : small_icon;
-    HICON unused = size_px > 32 ? small_icon : large_icon;
+    HICON icon = nullptr;
+    UINT icon_id = 0;
 
-    if (selected == nullptr && unused != nullptr) {
-        selected = unused;
-        unused = nullptr;
-    }
+    UINT count = PrivateExtractIconsW(
+        path,
+        0,
+        requested_size,
+        requested_size,
+        &icon,
+        &icon_id,
+        1,
+        0);
 
-    if (unused != nullptr) {
-        DestroyIcon(unused);
-    }
-
-    return selected;
+    return count > 0 && icon != nullptr ? icon : nullptr;
 }
 
 static reach_result reach_icon_load(reach_icon_provider *provider, const reach_icon_request *request, reach_icon_handle *out_icon)
@@ -199,13 +201,22 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
     }
 
     reach_windows_icon *icon = nullptr;
-
-    HBITMAP bitmap = reach_icon_bitmap_from_shell_item_image_factory(icon_path, request->size_px);
-    if (bitmap != nullptr) {
-        icon = reach_windows_icon_from_hbitmap(bitmap);
+    HICON hicon = nullptr;
+    const wchar_t *extension = PathFindExtensionW(icon_path);
+    int32_t is_exe = lstrcmpiW(extension, L".exe") == 0;
+    if (is_exe) {
+        hicon = reach_icon_from_extract_icon(icon_path, request->size_px);
+        icon = reach_windows_icon_from_hicon(hicon);
     }
 
-    HICON hicon = nullptr;
+    HBITMAP bitmap = nullptr;
+    if (icon == nullptr) {
+        bitmap = reach_icon_bitmap_from_shell_item_image_factory(icon_path, request->size_px);
+        if (bitmap != nullptr) {
+            icon = reach_windows_icon_from_hbitmap(bitmap);
+        }
+    }
+
     if (icon == nullptr) {
         hicon = reach_icon_from_system_image_list(icon_path, request->size_px);
         icon = reach_windows_icon_from_hicon(hicon);
@@ -214,7 +225,7 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
         hicon = reach_icon_from_shell_file_info(icon_path, request->size_px);
         icon = reach_windows_icon_from_hicon(hicon);
     }
-    if (icon == nullptr) {
+    if (icon == nullptr && !is_exe) {
         hicon = reach_icon_from_extract_icon(icon_path, request->size_px);
         icon = reach_windows_icon_from_hicon(hicon);
     }
