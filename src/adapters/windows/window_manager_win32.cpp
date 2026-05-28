@@ -7,6 +7,7 @@
 #include <propkey.h>
 #include <propvarutil.h>
 #include <shellapi.h>
+#include <appmodel.h>
 
 #include <new>
 #include <vector>
@@ -114,6 +115,53 @@ static int32_t reach_append_wcs(uint16_t *dst, size_t dst_count, const wchar_t *
     }
     dst[used] = 0;
     return text[index] == 0;
+}
+
+static int32_t reach_window_process_app_user_model_id(
+    HWND hwnd,
+    uint16_t *out_id,
+    size_t out_count)
+{
+    if (hwnd == nullptr || out_id == nullptr || out_count == 0) {
+        return 0;
+    }
+
+    out_id[0] = 0;
+
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(hwnd, &process_id);
+    if (process_id == 0 || process_id == GetCurrentProcessId()) {
+        return 0;
+    }
+
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+    if (process == nullptr) {
+        return 0;
+    }
+
+    UINT32 length = 0;
+    LONG status = GetApplicationUserModelId(process, &length, nullptr);
+
+    if (status != ERROR_INSUFFICIENT_BUFFER || length == 0) {
+        CloseHandle(process);
+        return 0;
+    }
+
+    wchar_t app_id[260] = {};
+    UINT32 app_id_count = 260;
+
+    status = GetApplicationUserModelId(process, &app_id_count, app_id);
+
+    CloseHandle(process);
+
+    if (status != ERROR_SUCCESS || app_id[0] == 0) {
+        return 0;
+    }
+
+    return reach_copy_utf16(
+        out_id,
+        out_count,
+        reinterpret_cast<const uint16_t *>(app_id)) == REACH_OK;
 }
 
 static int32_t reach_append_relaunch_argument(uint16_t *dst, size_t dst_count, const wchar_t *argument)
@@ -575,7 +623,9 @@ static int32_t reach_window_manager_build_snapshot(HWND hwnd, reach_window_snaps
     snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
     snapshot.minimized = IsIconic(hwnd) ? 1 : 0;
 
-    (void)reach_window_app_user_model_id(hwnd, snapshot.app_user_model_id, 260);
+    if (!reach_window_app_user_model_id(hwnd, snapshot.app_user_model_id, 260)) {
+        (void)reach_window_process_app_user_model_id(hwnd, snapshot.app_user_model_id, 260);
+    }
     RECT rect = {};
     WINDOWPLACEMENT placement = {};
     placement.length = sizeof(placement);
@@ -639,9 +689,6 @@ static void reach_window_manager_refresh_windows(reach_window_manager *manager)
     manager->pending_windows.clear();
     EnumWindows(reach_window_manager_enum_windows_proc, reinterpret_cast<LPARAM>(manager));
 
-    /* Do not rely only on EVENT_SYSTEM_MINIMIZEEND. Some apps/event paths do not
-       produce the exact event/state combination we want. Treat refresh as the
-       source of truth: if an app is currently iconic, hide and track it. */
     for (const reach_window_snapshot &snapshot : manager->pending_windows) {
         if (!snapshot.minimized) {
             continue;
@@ -924,44 +971,40 @@ static reach_result reach_window_manager_pin_app_for_window(
     }
 
     *out_app = {};
-    if (snapshot->title[0] != 0) {
-        (void)reach_copy_utf16(out_app->title, 128, snapshot->title);
-    }
+
+    (void)reach_copy_utf16(out_app->path, 260, snapshot->path);
+    out_app->arguments[0] = 0;
 
     IPropertyStore *store = nullptr;
     HRESULT hr = SHGetPropertyStoreForWindow(hwnd, IID_PPV_ARGS(&store));
     if (SUCCEEDED(hr) && store != nullptr) {
-        uint16_t relaunch_command[512] = {};
-        if (reach_window_property_string(store, PKEY_AppUserModel_RelaunchCommand, relaunch_command, 512)) {
-            (void)reach_parse_relaunch_command(relaunch_command, out_app);
-        }
-
         uint16_t display_name[128] = {};
-        if (reach_window_property_string(store, PKEY_AppUserModel_RelaunchDisplayNameResource, display_name, 128) &&
+        if (reach_window_property_string(
+                store,
+                PKEY_AppUserModel_RelaunchDisplayNameResource,
+                display_name,
+                128) &&
             display_name[0] != '@') {
             (void)reach_copy_utf16(out_app->title, 128, display_name);
-        }
-
-        uint16_t icon_resource[260] = {};
-        if (reach_window_property_string(store, PKEY_AppUserModel_RelaunchIconResource, icon_resource, 260) &&
-            icon_resource[0] != '@') {
-            (void)reach_copy_utf16(out_app->icon_ref, 260, icon_resource);
         }
 
         store->Release();
     }
 
-    if (out_app->path[0] == 0) {
-        (void)reach_copy_utf16(out_app->path, 260, snapshot->path);
-    }
     if (out_app->icon_ref[0] == 0) {
         (void)reach_copy_utf16(out_app->icon_ref, 260, out_app->path);
     }
-    if (out_app->app_user_model_id[0] == 0) {
+
+    if (out_app->app_user_model_id[0] == 0 && snapshot->app_user_model_id[0] != 0) {
         (void)reach_copy_utf16(out_app->app_user_model_id, 260, snapshot->app_user_model_id);
     }
-    if (out_app->title[0] == 0) {
-        (void)reach_copy_utf16(out_app->title, 128, snapshot->title);
+
+    if (out_app->app_user_model_id[0] == 0) {
+        (void)reach_window_app_user_model_id(hwnd, out_app->app_user_model_id, 260);
+    }
+
+    if (out_app->app_user_model_id[0] == 0) {
+        (void)reach_window_process_app_user_model_id(hwnd, out_app->app_user_model_id, 260);
     }
 
     return out_app->path[0] != 0 ? REACH_OK : REACH_ERROR;
