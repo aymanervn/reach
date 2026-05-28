@@ -35,6 +35,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_release_dock_icons(shell);
     reach_shell_release_launcher_result_icons(shell);
     reach_shell_release_tray_render_icons(shell);
+    reach_shell_release_quick_settings_audio_render_icons(shell);
     if (shell->hotkeys.ops.destroy != nullptr) {
         shell->hotkeys.ops.destroy(shell->hotkeys.hotkeys);
     }

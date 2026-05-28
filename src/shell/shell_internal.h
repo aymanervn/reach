@@ -263,6 +263,7 @@ void reach_shell_release_tray_render_icons(reach_shell *shell);
 void reach_shell_release_dock_icons(reach_shell *shell);
 void reach_shell_release_open_window_icons(reach_shell *shell, size_t old_count);
 void reach_shell_load_open_window_icons(reach_shell *shell);
+void reach_shell_release_quick_settings_audio_render_icons(reach_shell *shell);
 reach_result reach_shell_reload_pins(reach_shell *shell);
 reach_result reach_shell_reload_config(reach_shell *shell);
 void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot);

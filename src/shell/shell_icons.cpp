@@ -180,3 +180,34 @@ void reach_shell_release_tray_render_icons(reach_shell *shell)
         }
     }
 }
+
+void reach_shell_release_quick_settings_audio_render_icons(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    size_t session_count = shell->quick_settings_audio_sessions.count;
+    if (session_count > REACH_AUDIO_VOLUME_MAX_SESSIONS) {
+        session_count = REACH_AUDIO_VOLUME_MAX_SESSIONS;
+    }
+
+    for (size_t index = 0; index < session_count; ++index) {
+        uint64_t icon_id = shell->quick_settings_audio_sessions.sessions[index].icon_id;
+        if (icon_id != 0) {
+            reach_shell_release_render_icon(shell, icon_id);
+        }
+    }
+
+    size_t device_count = shell->quick_settings_output_devices.count;
+    if (device_count > REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES) {
+        device_count = REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES;
+    }
+
+    for (size_t index = 0; index < device_count; ++index) {
+        uint64_t icon_id = shell->quick_settings_output_devices.devices[index].icon_id;
+        if (icon_id != 0) {
+            reach_shell_release_render_icon(shell, icon_id);
+        }
+    }
+}

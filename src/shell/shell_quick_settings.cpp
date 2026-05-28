@@ -184,6 +184,8 @@ void reach_shell_refresh_quick_settings_audio(
         return;
     }
 
+    reach_shell_release_quick_settings_audio_render_icons(shell);
+
     reach_audio_volume_state state = {};
     if (shell->audio_volume.get_state != nullptr &&
         shell->audio_volume.get_state(shell->audio_volume.userdata, &state) == REACH_OK) {
