@@ -255,7 +255,10 @@ void reach_shell_toggle_tray_popup(reach_shell *shell)
 
 reach_result reach_shell_refresh_tray_items(reach_shell *shell)
 {
-    return shell != nullptr ? reach_tray_model_refresh(&shell->tray_model, &shell->tray_provider) : REACH_OK;
+    if (shell == nullptr) {
+        return REACH_OK;
+    }
+    return reach_tray_model_refresh(&shell->tray_model, &shell->tray_provider);
 }
 
 void reach_shell_compute_tray_popup_layout(

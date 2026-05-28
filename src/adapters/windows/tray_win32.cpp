@@ -5,18 +5,21 @@
 
 #include <windows.h>
 #include <shellapi.h>
-
 #include <new>
 
 static const wchar_t *REACH_TRAY_HOST_CLASS = L"Shell_TrayWnd";
 static const uint32_t REACH_TRAY_WIRE_SIGNATURE = 0x34753423;
 static const size_t REACH_TRAY_WIRE_MIN_SIZE = 288;
 static const size_t REACH_TRAY_WIRE_VERSION_OFFSET = 808;
+static const size_t REACH_TRAY_WIRE_GUID_OFFSET = 964;
 
 struct reach_tray_native_item {
     reach_tray_item item;
     HWND owner;
     uint32_t owner_id;
+    GUID guid;
+    int32_t has_guid;
+    int32_t hidden;
     uint32_t callback_message;
     uint32_t version;
 };
@@ -27,10 +30,32 @@ struct reach_tray_provider {
     UINT taskbar_created_message;
     reach_tray_native_item items[REACH_MAX_TRAY_ITEMS];
     size_t item_count;
+    uint32_t next_item_id;
     HWND active_menu_owner;
     uint32_t active_menu_owner_id;
     int32_t dirty;
 };
+
+static int32_t reach_tray_read_guid(
+    const BYTE *bytes,
+    size_t count,
+    size_t offset,
+    GUID *out_guid)
+{
+    if (bytes == nullptr || out_guid == nullptr || offset + sizeof(GUID) > count) {
+        return 0;
+    }
+
+    memcpy(out_guid, bytes + offset, sizeof(GUID));
+    return 1;
+}
+
+static int32_t reach_tray_guid_equal(const GUID *a, const GUID *b)
+{
+    return a != nullptr &&
+        b != nullptr &&
+        memcmp(a, b, sizeof(GUID)) == 0;
+}
 
 static uint32_t reach_tray_read_u32(const BYTE *bytes, size_t count, size_t offset)
 {
@@ -69,17 +94,41 @@ static void reach_tray_release_item_icon(reach_tray_native_item *item)
     }
 }
 
-static size_t reach_tray_find_item(reach_tray_provider *provider, HWND owner, uint32_t owner_id)
+static size_t reach_tray_find_item(
+    reach_tray_provider *provider,
+    HWND owner,
+    uint32_t owner_id,
+    const GUID *guid,
+    int32_t has_guid)
 {
     if (provider == nullptr || owner == nullptr) {
         return REACH_MAX_TRAY_ITEMS;
     }
 
     for (size_t index = 0; index < provider->item_count; ++index) {
-        if (provider->items[index].owner == owner && provider->items[index].owner_id == owner_id) {
+        reach_tray_native_item *item = &provider->items[index];
+
+        if (item->owner != owner) {
+            continue;
+        }
+
+        if (has_guid && item->has_guid && reach_tray_guid_equal(&item->guid, guid)) {
+            return index;
+        }
+
+        if (!has_guid && !item->has_guid && item->owner_id == owner_id) {
+            return index;
+        }
+
+        if (item->owner_id == owner_id) {
+            if (has_guid && guid != nullptr && !item->has_guid) {
+                item->has_guid = 1;
+                item->guid = *guid;
+            }
             return index;
         }
     }
+
     return REACH_MAX_TRAY_ITEMS;
 }
 
@@ -104,8 +153,19 @@ static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *b
     }
 
     uint32_t flags = reach_tray_read_u32(bytes, count, 20);
-    item->callback_message = reach_tray_read_u32(bytes, count, 24);
-    item->item.id = item->owner_id;
+
+    if ((flags & NIF_MESSAGE) != 0) {
+        item->callback_message = reach_tray_read_u32(bytes, count, 24);
+    }
+
+    if ((flags & NIF_STATE) != 0) {
+        uint32_t state = reach_tray_read_u32(bytes, count, 288);
+        uint32_t state_mask = reach_tray_read_u32(bytes, count, 292);
+
+        if ((state_mask & NIS_HIDDEN) != 0) {
+            item->hidden = (state & NIS_HIDDEN) != 0;
+        }
+    }
 
     if ((flags & NIF_TIP) != 0) {
         const wchar_t *tip = reinterpret_cast<const wchar_t *>(bytes + 32);
@@ -115,14 +175,64 @@ static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *b
     if ((flags & NIF_ICON) != 0) {
         HICON incoming = reinterpret_cast<HICON>((uintptr_t)reach_tray_read_u32(bytes, count, 28));
         HICON copy = incoming != nullptr ? CopyIcon(incoming) : nullptr;
-        if (copy != nullptr || message == NIM_MODIFY) {
+
+        if (copy != nullptr) {
             reach_tray_release_item_icon(item);
+
             reach_windows_icon *wrapped = reach_windows_icon_from_hicon(copy);
             item->item.icon_id = wrapped != nullptr
                 ? reinterpret_cast<uint64_t>(wrapped)
                 : 0;
+        } else if (message == NIM_MODIFY) {
+            reach_tray_release_item_icon(item);
+            item->item.icon_id = 0;
         }
     }
+}
+
+static uint32_t reach_tray_allocate_item_id(reach_tray_provider *provider)
+{
+    if (provider == nullptr) {
+        return 0;
+    }
+
+    ++provider->next_item_id;
+    if (provider->next_item_id == 0) {
+        ++provider->next_item_id;
+    }
+
+    return provider->next_item_id;
+}
+
+static void reach_tray_initialize_item(
+    reach_tray_provider *provider,
+    reach_tray_native_item *item,
+    HWND owner,
+    uint32_t owner_id,
+    const GUID *guid,
+    int32_t has_guid)
+{
+    if (item == nullptr) {
+        return;
+    }
+
+    *item = {};
+    item->owner = owner;
+    item->owner_id = owner_id;
+    item->has_guid = has_guid;
+    if (has_guid && guid != nullptr) {
+        item->guid = *guid;
+    }
+
+    item->item.id = reach_tray_allocate_item_id(provider);
+}
+
+static int32_t reach_tray_item_is_public(const reach_tray_native_item *item)
+{
+    return item != nullptr &&
+        !item->hidden &&
+        item->owner != nullptr &&
+        (item->item.icon_id != 0 || item->item.title[0] != 0);
 }
 
 static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, const COPYDATASTRUCT *copy)
@@ -140,8 +250,14 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
     uint32_t message = reach_tray_read_u32(bytes, count, 4);
     HWND owner = reinterpret_cast<HWND>((uintptr_t)reach_tray_read_u32(bytes, count, 12));
     uint32_t owner_id = reach_tray_read_u32(bytes, count, 16);
-    size_t index = reach_tray_find_item(provider, owner, owner_id);
+    uint32_t flags = reach_tray_read_u32(bytes, count, 20);
 
+    GUID guid = {};
+    int32_t has_guid =
+        (flags & NIF_GUID) != 0 &&
+        reach_tray_read_guid(bytes, count, REACH_TRAY_WIRE_GUID_OFFSET, &guid);
+
+    size_t index = reach_tray_find_item(provider, owner, owner_id, &guid, has_guid);
     if (message == NIM_DELETE) {
         if (index != REACH_MAX_TRAY_ITEMS) {
             reach_tray_remove_item_at(provider, index);
@@ -162,13 +278,22 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
     }
 
     if (index == REACH_MAX_TRAY_ITEMS) {
-        if (message == NIM_MODIFY || provider->item_count >= REACH_MAX_TRAY_ITEMS) {
+        if (provider->item_count >= REACH_MAX_TRAY_ITEMS) {
             return REACH_ERROR;
         }
+
+        if (message == NIM_MODIFY && !has_guid) {
+            return REACH_ERROR;
+        }
+
         index = provider->item_count++;
-        provider->items[index] = {};
-        provider->items[index].owner = owner;
-        provider->items[index].owner_id = owner_id;
+        reach_tray_initialize_item(
+            provider,
+            &provider->items[index],
+            owner,
+            owner_id,
+            &guid,
+            has_guid);
     }
 
     reach_tray_apply_payload(&provider->items[index], bytes, count, message);
@@ -265,24 +390,49 @@ static int32_t reach_tray_needs_refresh(const reach_tray_provider *provider)
 static size_t reach_tray_item_count(const reach_tray_provider *provider)
 {
     REACH_ASSERT(provider != nullptr);
-    return provider != nullptr ? provider->item_count : 0;
+    if (provider == nullptr) {
+        return 0;
+    }
+
+    size_t public_count = 0;
+    for (size_t index = 0; index < provider->item_count; ++index) {
+        if (reach_tray_item_is_public(&provider->items[index])) {
+            ++public_count;
+        }
+    }
+
+    return public_count;
 }
 
 static reach_result reach_tray_item_at(const reach_tray_provider *provider, size_t index, reach_tray_item *out_item)
 {
     REACH_ASSERT(provider != nullptr);
     REACH_ASSERT(out_item != nullptr);
-    if (provider == nullptr || out_item == nullptr || index >= provider->item_count) {
+
+    if (provider == nullptr || out_item == nullptr) {
         return REACH_INVALID_ARGUMENT;
     }
 
-    *out_item = provider->items[index].item;
-    return REACH_OK;
+    size_t public_index = 0;
+    for (size_t native_index = 0; native_index < provider->item_count; ++native_index) {
+        if (!reach_tray_item_is_public(&provider->items[native_index])) {
+            continue;
+        }
+
+        if (public_index == index) {
+            *out_item = provider->items[native_index].item;
+            return REACH_OK;
+        }
+
+        ++public_index;
+    }
+
+    return REACH_INVALID_ARGUMENT;
 }
 
-static LPARAM reach_tray_v4_lparam(uint32_t message, uint32_t owner_id)
+static LPARAM reach_tray_v4_lparam(uint32_t message, uint32_t icon_id)
 {
-    return (LPARAM)(((owner_id & 0xffff) << 16) | (message & 0xffff));
+    return (LPARAM)(((icon_id & 0xffff) << 16) | (message & 0xffff));
 }
 
 static WPARAM reach_tray_cursor_wparam(void)
@@ -336,23 +486,32 @@ static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t 
             (void)SetForegroundWindow(provider->host_window);
         }
 
-        uint32_t mouse_message = action == REACH_TRAY_ACTION_RIGHT_CLICK ? WM_RBUTTONUP : WM_LBUTTONUP;
-        WPARAM wparam = item->owner_id;
-        LPARAM lparam = mouse_message;
         if (item->version >= NOTIFYICON_VERSION_4) {
-            wparam = reach_tray_cursor_wparam();
-            lparam = reach_tray_v4_lparam(mouse_message, item->owner_id);
+            uint32_t notification = action == REACH_TRAY_ACTION_RIGHT_CLICK
+                ? WM_CONTEXTMENU
+                : NIN_SELECT;
+
+            WPARAM wparam = reach_tray_cursor_wparam();
+            LPARAM lparam = reach_tray_v4_lparam(notification, item->owner_id);
+
+            return PostMessageW(item->owner, item->callback_message, wparam, lparam)
+                ? REACH_OK
+                : REACH_ERROR;
         }
+
+        uint32_t mouse_message = action == REACH_TRAY_ACTION_RIGHT_CLICK
+            ? WM_RBUTTONUP
+            : WM_LBUTTONUP;
+
         if (action == REACH_TRAY_ACTION_LEFT_CLICK) {
-            WPARAM down_wparam = item->version >= NOTIFYICON_VERSION_4 ? reach_tray_cursor_wparam() : item->owner_id;
-            LPARAM down_lparam = item->version >= NOTIFYICON_VERSION_4
-                ? reach_tray_v4_lparam(WM_LBUTTONDOWN, item->owner_id)
-                : WM_LBUTTONDOWN;
-            if (!PostMessageW(item->owner, item->callback_message, down_wparam, down_lparam)) {
+            if (!PostMessageW(item->owner, item->callback_message, item->owner_id, WM_LBUTTONDOWN)) {
                 return REACH_ERROR;
             }
         }
-        return PostMessageW(item->owner, item->callback_message, wparam, lparam) ? REACH_OK : REACH_ERROR;
+
+        return PostMessageW(item->owner, item->callback_message, item->owner_id, mouse_message)
+            ? REACH_OK
+            : REACH_ERROR;
     }
 
     return REACH_INVALID_ARGUMENT;

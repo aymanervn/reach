@@ -26,7 +26,12 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
 
     reach_shell_dependencies dependencies = {};
-    reach_result result = reach_windows_create_wallpaper_surface(&dependencies.wallpaper_surface);
+    reach_result result = reach_windows_create_tray_provider(&dependencies.tray_provider);
+
+    if (result == REACH_OK) {
+        result = reach_windows_create_wallpaper_surface(&dependencies.wallpaper_surface);
+    }
+
     if (result == REACH_OK) {
         result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER, &dependencies.launcher_window);
     }
@@ -93,9 +98,6 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         if (result == REACH_OK) {
             result = reach_windows_create_config_store(config_path, &dependencies.config_store);
         }
-    }
-    if (result == REACH_OK) {
-        result = reach_windows_create_tray_provider(&dependencies.tray_provider);
     }
     if (result == REACH_OK) {
         result = reach_windows_create_icon_provider(&dependencies.icon_provider);
