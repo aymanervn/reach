@@ -16,9 +16,9 @@
 #include <wchar.h>
 
 struct reach_audio_volume_adapter {
-    reach_windows_icon *session_icons[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+    uint64_t session_icon_ids[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+    uint64_t output_device_icon_ids[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     size_t session_icon_count;
-    reach_windows_icon *output_device_icons[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     size_t output_device_icon_count;
     int32_t com_initialized;
 };
@@ -126,11 +126,10 @@ static void reach_audio_volume_destroy_session_icons(
     }
 
     for (size_t index = 0; index < adapter->session_icon_count; ++index) {
-        if (adapter->session_icons[index] != nullptr) {
-            reach_windows_icon_destroy(adapter->session_icons[index]);
-            adapter->session_icons[index] = nullptr;
-        }
+        reach_windows_icon_id_release(adapter->session_icon_ids[index]);
+        adapter->session_icon_ids[index] = 0;
     }
+
     adapter->session_icon_count = 0;
 }
 
@@ -143,11 +142,10 @@ static void reach_audio_volume_destroy_output_device_icons(
     }
 
     for (size_t index = 0; index < adapter->output_device_icon_count; ++index) {
-        if (adapter->output_device_icons[index] != nullptr) {
-            reach_windows_icon_destroy(adapter->output_device_icons[index]);
-            adapter->output_device_icons[index] = nullptr;
-        }
+        reach_windows_icon_id_release(adapter->output_device_icon_ids[index]);
+        adapter->output_device_icon_ids[index] = 0;
     }
+
     adapter->output_device_icon_count = 0;
 }
 
@@ -693,14 +691,18 @@ static reach_result reach_audio_volume_list_sessions(
             reach_audio_volume_session session = {};
             if (reach_audio_volume_read_session(control, &session) == REACH_OK &&
                 session.session_instance_id[0] != 0) {
-                HICON icon = reach_audio_volume_icon_for_process(session.process_id);
-                if (icon != nullptr) {
-                    reach_windows_icon *wrapped = reach_windows_icon_from_hicon(icon);
-                    if (wrapped != nullptr) {
-                        adapter->session_icons[adapter->session_icon_count++] = wrapped;
-                        session.icon_id = reinterpret_cast<uint64_t>(wrapped);
+                    HICON icon = reach_audio_volume_icon_for_process(session.process_id);
+                    if (icon != nullptr) {
+                        if (adapter->session_icon_count < REACH_AUDIO_VOLUME_MAX_SESSIONS) {
+                            uint64_t icon_id = reach_windows_icon_id_from_hicon(icon);
+                            if (icon_id != 0) {
+                                adapter->session_icon_ids[adapter->session_icon_count++] = icon_id;
+                                session.icon_id = icon_id;
+                            }
+                        } else {
+                            DestroyIcon(icon);
+                        }
                     }
-                }
                 out_list->sessions[out_list->count++] = session;
             }
         }
@@ -771,15 +773,16 @@ static reach_result reach_audio_volume_read_output_device(
             icon_path,
             sizeof(icon_path) / sizeof(icon_path[0]));
         HICON icon = reach_audio_volume_icon_from_path(icon_path);
-        if (icon != nullptr &&
-            adapter->output_device_icon_count < REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES) {
-                reach_windows_icon *wrapped = reach_windows_icon_from_hicon(icon);
-                if (wrapped != nullptr) {
-                    adapter->output_device_icons[adapter->output_device_icon_count++] = wrapped;
-                    out_device->icon_id = reinterpret_cast<uint64_t>(wrapped);
+        if (icon != nullptr) {
+            if (adapter->output_device_icon_count < REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES) {
+                uint64_t icon_id = reach_windows_icon_id_from_hicon(icon);
+                if (icon_id != 0) {
+                    adapter->output_device_icon_ids[adapter->output_device_icon_count++] = icon_id;
+                    out_device->icon_id = icon_id;
                 }
-            } else if (icon != nullptr) {
-            DestroyIcon(icon);
+            } else {
+                DestroyIcon(icon);
+            }
         }
     }
 
@@ -1066,13 +1069,8 @@ extern "C" reach_result reach_windows_create_audio_volume(
     }
 
     adapter->session_icon_count = 0;
-    for (size_t index = 0; index < REACH_AUDIO_VOLUME_MAX_SESSIONS; ++index) {
-        adapter->session_icons[index] = nullptr;
-    }
+    adapter->session_icon_count = 0;
     adapter->output_device_icon_count = 0;
-    for (size_t index = 0; index < REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES; ++index) {
-        adapter->output_device_icons[index] = nullptr;
-    }
     adapter->com_initialized = 0;
 
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);

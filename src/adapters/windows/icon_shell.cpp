@@ -200,49 +200,49 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
         icon_path = resolved;
     }
 
-    reach_windows_icon *icon = nullptr;
+    uint64_t icon_id = 0;
     HICON hicon = nullptr;
     const wchar_t *extension = PathFindExtensionW(icon_path);
     int32_t is_exe = lstrcmpiW(extension, L".exe") == 0;
     if (is_exe) {
         hicon = reach_icon_from_extract_icon(icon_path, request->size_px);
-        icon = reach_windows_icon_from_hicon(hicon);
+        icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
 
     HBITMAP bitmap = nullptr;
-    if (icon == nullptr) {
+    if (icon_id == 0) {
         bitmap = reach_icon_bitmap_from_shell_item_image_factory(icon_path, request->size_px);
         if (bitmap != nullptr) {
-            icon = reach_windows_icon_from_hbitmap(bitmap);
+            icon_id = reach_windows_icon_id_from_hbitmap(bitmap);
         }
     }
 
-    if (icon == nullptr) {
+    if (icon_id == 0) {
         hicon = reach_icon_from_system_image_list(icon_path, request->size_px);
-        icon = reach_windows_icon_from_hicon(hicon);
+        icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
-    if (icon == nullptr) {
+    if (icon_id == 0) {
         hicon = reach_icon_from_shell_file_info(icon_path, request->size_px);
-        icon = reach_windows_icon_from_hicon(hicon);
+        icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
-    if (icon == nullptr && !is_exe) {
+    if (icon_id == 0 && !is_exe) {
         hicon = reach_icon_from_extract_icon(icon_path, request->size_px);
-        icon = reach_windows_icon_from_hicon(hicon);
+        icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
-    if (icon == nullptr && icon_path != requested_path) {
+    if (icon_id == 0 && icon_path != requested_path) {
         bitmap = reach_icon_bitmap_from_shell_item_image_factory(requested_path, request->size_px);
-        icon = reach_windows_icon_from_hbitmap(bitmap);
+        icon_id = reach_windows_icon_id_from_hbitmap(bitmap);
     }
-    if (icon == nullptr && icon_path != requested_path) {
+    if (icon_id == 0 && icon_path != requested_path) {
         hicon = reach_icon_from_shell_file_info(requested_path, request->size_px);
-        icon = reach_windows_icon_from_hicon(hicon);
+        icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
-    if (icon == nullptr) {
+    if (icon_id == 0) {
         return REACH_ERROR;
     }
 
     *out_icon = {};
-    out_icon->id = reinterpret_cast<uint64_t>(icon);
+    out_icon->id = icon_id;
     reach_copy_utf16(out_icon->debug_name, 260, reinterpret_cast<const uint16_t *>(icon_path));
     provider->next_id += 1;
     return REACH_OK;
@@ -251,11 +251,7 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
 static reach_result reach_icon_release(reach_icon_provider *provider, reach_icon_handle icon)
 {
     (void)provider;
-
-    if (icon.id != 0) {
-        reach_windows_icon_destroy(reinterpret_cast<reach_windows_icon *>(icon.id));
-    }
-
+    reach_windows_icon_id_release(icon.id);
     return REACH_OK;
 }
 

@@ -208,7 +208,7 @@ static void reach_tray_copy_payload_wstring(
 static void reach_tray_release_item_icon(reach_tray_native_item *item)
 {
     if (item != nullptr && item->item.icon_id != 0) {
-        reach_windows_icon_destroy(reinterpret_cast<reach_windows_icon *>(item->item.icon_id));
+        reach_windows_icon_id_release(item->item.icon_id);
         item->item.icon_id = 0;
     }
 }
@@ -227,14 +227,13 @@ static void reach_tray_update_item_icon(reach_tray_native_item *item, uint32_t r
         return;
     }
 
-    reach_windows_icon *wrapped = reach_windows_icon_from_hicon(copied);
-    if (wrapped == nullptr) {
-        DestroyIcon(copied);
+    uint64_t icon_id = reach_windows_icon_id_from_hicon(copied);
+    if (icon_id == 0) {
         return;
     }
 
     reach_tray_release_item_icon(item);
-    item->item.icon_id = reinterpret_cast<uint64_t>(wrapped);
+    item->item.icon_id = icon_id;
 }
 
 static uint32_t reach_tray_allocate_item_id(reach_tray_provider *provider)
