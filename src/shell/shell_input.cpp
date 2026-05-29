@@ -637,6 +637,101 @@ void reach_shell_close_context_menu(reach_shell *shell)
     reach_shell_sync_popup_mouse_hook(shell);
 }
 
+static void reach_shell_rebuild_dock_without_item_animations(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->has_layout) {
+        return;
+    }
+
+    reach_shell_build_dock_items(shell, &shell->layout.dock);
+
+    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
+        shell->dock_item_x_animations[index] = {};
+        shell->dock_item_x_animating[index] = 0;
+        shell->dock_item_x_valid[index] = 0;
+        shell->dock_item_x_pinned[index] = 0;
+        shell->dock_item_x_pin_ids[index] = 0;
+        shell->dock_item_x_windows[index] = 0;
+    }
+
+    shell->dock.dirty_flags = 1;
+    shell->layout_dirty = 1;
+    shell->render_dirty = 1;
+}
+
+static void reach_shell_force_dock_order_key_at(
+    reach_shell *shell,
+    size_t target_index,
+    reach_dock_order_key key)
+{
+    if (shell == nullptr || target_index >= REACH_MAX_PINNED_APPS) {
+        return;
+    }
+
+    size_t existing_index = reach_dock_feature_model_find_order_key(
+        &shell->dock_model,
+        key);
+
+    if (existing_index < shell->dock_model.order_count) {
+        reach_dock_feature_model_move_order(
+            &shell->dock_model,
+            existing_index,
+            target_index < shell->dock_model.order_count
+                ? target_index
+                : shell->dock_model.order_count - 1);
+        return;
+    }
+
+    if (target_index > shell->dock_model.order_count) {
+        target_index = shell->dock_model.order_count;
+    }
+
+    if (shell->dock_model.order_count >= REACH_MAX_PINNED_APPS) {
+        return;
+    }
+
+    for (size_t index = shell->dock_model.order_count; index > target_index; --index) {
+        shell->dock_model.order[index] = shell->dock_model.order[index - 1];
+    }
+
+    shell->dock_model.order[target_index] = key;
+    shell->dock_model.order_count += 1;
+}
+
+static int32_t reach_shell_context_utf16_equal(const uint16_t *a, const uint16_t *b)
+{
+    if (a == nullptr || b == nullptr) {
+        return a == b;
+    }
+
+    size_t index = 0;
+    while (a[index] != 0 || b[index] != 0) {
+        if (a[index] != b[index]) {
+            return 0;
+        }
+        ++index;
+    }
+
+    return 1;
+}
+
+static uint32_t reach_shell_find_pin_id_for_path(
+    const reach_shell *shell,
+    const uint16_t *path)
+{
+    if (shell == nullptr || path == nullptr || path[0] == 0) {
+        return 0;
+    }
+
+    for (size_t index = 0; index < shell->ui.pinned_app_count; ++index) {
+        if (reach_shell_context_utf16_equal(shell->ui.pinned_apps[index].path, path)) {
+            return shell->ui.pinned_apps[index].id;
+        }
+    }
+
+    return 0;
+}
+
 static reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t command)
 {
     if (shell == nullptr) {
@@ -724,8 +819,25 @@ static reach_result reach_shell_execute_context_command(reach_shell *shell, uint
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_UNPIN) {
         if (pin_id != 0 && reach_pin_config_unpin_id(&shell->config_store, pin_id) == REACH_OK) {
-            return reach_shell_reload_pins(shell);
+            size_t visual_index = item_index;
+            uintptr_t preserved_window = window_id;
+
+            reach_result result = reach_shell_reload_pins(shell);
+            if (result == REACH_OK && preserved_window != 0) {
+                reach_dock_order_key key = {};
+                key.pinned = 0;
+                key.pin_id = 0;
+                key.window = preserved_window;
+
+                reach_shell_force_dock_order_key_at(shell, visual_index, key);
+                reach_shell_rebuild_dock_without_item_animations(shell);
+            } else if (result == REACH_OK) {
+                reach_shell_rebuild_dock_without_item_animations(shell);
+            }
+
+            return result;
         }
+
         return REACH_ERROR;
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_PIN) {
@@ -756,7 +868,27 @@ static reach_result reach_shell_execute_context_command(reach_shell *shell, uint
 
         if (app.path[0] != 0 &&
             reach_pin_config_pin_app(&shell->config_store, &app) == REACH_OK) {
-            return reach_shell_reload_pins(shell);
+            size_t visual_index = item_index;
+            uint16_t pinned_path[260] = {};
+            reach_copy_utf16(pinned_path, 260, app.path);
+
+            reach_result result = reach_shell_reload_pins(shell);
+            if (result == REACH_OK) {
+                uint32_t new_pin_id = reach_shell_find_pin_id_for_path(shell, pinned_path);
+
+                if (new_pin_id != 0) {
+                    reach_dock_order_key key = {};
+                    key.pinned = 1;
+                    key.pin_id = new_pin_id;
+                    key.window = 0;
+
+                    reach_shell_force_dock_order_key_at(shell, visual_index, key);
+                }
+
+                reach_shell_rebuild_dock_without_item_animations(shell);
+            }
+
+            return result;
         }
 
         return REACH_ERROR;
