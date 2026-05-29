@@ -83,6 +83,12 @@ You don't need to run these commands again. Reach will start automatically when 
 
 You also need Voidtool's Everything installed and running to use the launcher feature.
 
+In case of a problem, you can reset windows explorer as the shell by running this as admin:
+
+```powershell
+reachctl --reset
+```
+
 ## License
 
 MIT — see [LICENSE](./LICENSE) for details.
