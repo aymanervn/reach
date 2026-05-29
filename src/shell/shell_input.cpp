@@ -742,6 +742,12 @@ static reach_result reach_shell_execute_context_command(reach_shell *shell, uint
     if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE && shell->window_manager.ops.close != nullptr) {
         return shell->window_manager.ops.close(shell->window_manager.manager, window_id);
     }
+    if (command == REACH_CONTEXT_MENU_COMMAND_KILL_PROCESS &&
+        shell->window_manager.ops.kill_process != nullptr) {
+        return shell->window_manager.ops.kill_process(
+            shell->window_manager.manager,
+            window_id);
+    }
 
     return REACH_OK;
 }

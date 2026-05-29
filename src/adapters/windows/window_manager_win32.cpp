@@ -1134,6 +1134,46 @@ static reach_result reach_window_manager_close(reach_window_manager *manager, ui
     return REACH_OK;
 }
 
+static reach_result reach_window_manager_kill_process(
+    reach_window_manager *manager,
+    uintptr_t window_id)
+{
+    if (manager == nullptr || window_id == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(hwnd, &process_id);
+
+    if (process_id == 0 || process_id == GetCurrentProcessId()) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HANDLE process = OpenProcess(
+        PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
+        FALSE,
+        process_id);
+
+    if (process == nullptr) {
+        return REACH_ERROR;
+    }
+
+    BOOL terminated = TerminateProcess(process, 1);
+    CloseHandle(process);
+
+    if (!terminated) {
+        return REACH_ERROR;
+    }
+
+    manager->dirty = 1;
+    return REACH_OK;
+}
+
 static void reach_window_manager_destroy(reach_window_manager *manager)
 {
     if (manager != nullptr) {
@@ -1174,6 +1214,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.activate = reach_window_manager_activate;
     out_port->ops.minimize = reach_window_manager_minimize;
     out_port->ops.close = reach_window_manager_close;
+    out_port->ops.kill_process = reach_window_manager_kill_process;
     out_port->ops.destroy = reach_window_manager_destroy;
     return REACH_OK;
 }
