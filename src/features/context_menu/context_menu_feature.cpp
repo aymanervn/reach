@@ -13,6 +13,9 @@ void reach_context_menu_build_dock_item_commands(
 
     size_t count = 0;
     out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_OPEN_NEW;
+    if (has_path) {
+        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN;
+    }
     if (pinned) {
         out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_UNPIN;
     } else if (has_path) {
@@ -50,6 +53,9 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
 {
     if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_NEW) {
         return (const uint16_t *)L"Open Another Instance";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN) {
+        return (const uint16_t *)L"Open as admin";
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_UNPIN) {
         return (const uint16_t *)L"Unpin app from dock";

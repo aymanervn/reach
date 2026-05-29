@@ -700,6 +700,28 @@ static reach_result reach_shell_execute_context_command(reach_shell *shell, uint
         request.force_new_instance = 1;
         return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
     }
+    if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN) {
+        if (item_path[0] == 0 || shell->app_launcher.ops.launch == nullptr) {
+            return REACH_INVALID_ARGUMENT;
+        }
+
+        reach_app_launch_request request = {};
+        reach_copy_utf16(request.path, 260, item_path);
+
+        if (pinned_index < shell->ui.pinned_app_count) {
+            reach_copy_utf16(
+                request.arguments,
+                260,
+                shell->ui.pinned_apps[pinned_index].arguments);
+        }
+
+        request.force_new_instance = 1;
+        request.run_as_admin = 1;
+
+        return shell->app_launcher.ops.launch(
+            shell->app_launcher.launcher,
+            &request);
+    }
     if (command == REACH_CONTEXT_MENU_COMMAND_UNPIN) {
         if (pin_id != 0 && reach_pin_config_unpin_id(&shell->config_store, pin_id) == REACH_OK) {
             return reach_shell_reload_pins(shell);

@@ -140,7 +140,8 @@ static int32_t reach_is_default_explorer_launch_request(const reach_app_launch_r
     if (request == nullptr ||
         request->path[0] == 0 ||
         request->arguments[0] != 0 ||
-        request->force_new_instance) {
+        request->force_new_instance||
+        request->run_as_admin) {
         return 0;
     }
 
@@ -197,6 +198,7 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher, cons
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
     execute.fMask = 0;
+    execute.lpVerb = request->run_as_admin ? L"runas" : L"open";
     execute.lpFile = reinterpret_cast<LPCWSTR>(request->path);
     execute.lpParameters = request->arguments[0] != 0 ? reinterpret_cast<LPCWSTR>(request->arguments) : nullptr;
     execute.lpDirectory = has_working_directory
