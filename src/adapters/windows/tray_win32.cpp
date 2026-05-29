@@ -34,6 +34,8 @@ static const size_t REACH_TRAY_WIRE_INFO_FLAGS_OFFSET = 0x3AC;
 static const size_t REACH_TRAY_WIRE_GUID_OFFSET = 0x3B0;
 static const size_t REACH_TRAY_WIRE_EXE_PATH_OFFSET = 0x3C4;
 static const UINT_PTR REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER = 1001;
+static const size_t REACH_TRAY_TOMBSTONE_COUNT = REACH_MAX_TRAY_ITEMS;
+static const DWORD REACH_TRAY_TOMBSTONE_TTL_MS = 30000;
 
 struct reach_tray_native_item {
     reach_tray_item item;
@@ -48,6 +50,21 @@ struct reach_tray_native_item {
     uint32_t version;
 };
 
+struct reach_tray_identity {
+    HWND owner;
+    uint32_t owner_id;
+    GUID guid;
+    int32_t has_guid;
+};
+
+struct reach_tray_tombstone {
+    reach_tray_identity identity;
+    size_t index;
+    uint32_t public_id;
+    DWORD tick;
+    int32_t used;
+};
+
 struct reach_tray_provider {
     HWND host_window;
     ATOM host_class;
@@ -57,6 +74,7 @@ struct reach_tray_provider {
     uint32_t next_item_id;
     int32_t dirty;
     int32_t startup_apps_launched;
+    reach_tray_tombstone tombstones[REACH_TRAY_TOMBSTONE_COUNT];
 };
 
 static uint32_t reach_tray_read_u32(const BYTE *bytes, size_t count, size_t offset)
@@ -89,6 +107,55 @@ static int32_t reach_tray_guid_is_null(const GUID *guid)
 static int32_t reach_tray_guid_equal(const GUID *a, const GUID *b)
 {
     return a != nullptr && b != nullptr && memcmp(a, b, sizeof(GUID)) == 0;
+}
+
+static reach_tray_identity reach_tray_make_identity(
+    HWND owner,
+    uint32_t owner_id,
+    const GUID *guid,
+    int32_t has_guid)
+{
+    reach_tray_identity identity = {};
+    identity.owner = owner;
+    identity.owner_id = owner_id;
+    identity.has_guid = has_guid;
+
+    if (has_guid && guid != nullptr) {
+        identity.guid = *guid;
+    }
+
+    return identity;
+}
+
+static int32_t reach_tray_identity_equal(
+    const reach_tray_identity *a,
+    const reach_tray_identity *b)
+{
+    if (a == nullptr || b == nullptr) {
+        return 0;
+    }
+
+    if (a->has_guid || b->has_guid) {
+        return a->has_guid &&
+            b->has_guid &&
+            reach_tray_guid_equal(&a->guid, &b->guid);
+    }
+
+    return a->owner == b->owner && a->owner_id == b->owner_id;
+}
+
+static reach_tray_identity reach_tray_item_identity(const reach_tray_native_item *item)
+{
+    reach_tray_identity identity = {};
+    if (item == nullptr) {
+        return identity;
+    }
+
+    identity.owner = item->owner;
+    identity.owner_id = item->owner_id;
+    identity.has_guid = item->has_guid;
+    identity.guid = item->guid;
+    return identity;
 }
 
 static void reach_tray_copy_wide_to_u16(uint16_t *dst, size_t dst_count, const wchar_t *src, size_t src_max_count)
@@ -260,6 +327,94 @@ static void reach_tray_remove_item_at(reach_tray_provider *provider, size_t inde
     provider->dirty = 1;
 }
 
+static void reach_tray_prune_tombstones(reach_tray_provider *provider)
+{
+    if (provider == nullptr) {
+        return;
+    }
+
+    DWORD now = GetTickCount();
+
+    for (size_t index = 0; index < REACH_TRAY_TOMBSTONE_COUNT; ++index) {
+        reach_tray_tombstone *tombstone = &provider->tombstones[index];
+        if (!tombstone->used) {
+            continue;
+        }
+
+        if ((DWORD)(now - tombstone->tick) > REACH_TRAY_TOMBSTONE_TTL_MS) {
+            *tombstone = {};
+        }
+    }
+}
+
+static void reach_tray_save_tombstone(
+    reach_tray_provider *provider,
+    const reach_tray_native_item *item,
+    size_t item_index)
+{
+    if (provider == nullptr || item == nullptr) {
+        return;
+    }
+
+    reach_tray_prune_tombstones(provider);
+
+    reach_tray_identity identity = reach_tray_item_identity(item);
+
+    size_t slot = REACH_TRAY_TOMBSTONE_COUNT;
+    for (size_t index = 0; index < REACH_TRAY_TOMBSTONE_COUNT; ++index) {
+        if (provider->tombstones[index].used &&
+            reach_tray_identity_equal(&provider->tombstones[index].identity, &identity)) {
+            slot = index;
+            break;
+        }
+
+        if (!provider->tombstones[index].used && slot == REACH_TRAY_TOMBSTONE_COUNT) {
+            slot = index;
+        }
+    }
+
+    if (slot == REACH_TRAY_TOMBSTONE_COUNT) {
+        slot = 0;
+    }
+
+    provider->tombstones[slot].identity = identity;
+    provider->tombstones[slot].index = item_index;
+    provider->tombstones[slot].public_id = item->item.id;
+    provider->tombstones[slot].tick = GetTickCount();
+    provider->tombstones[slot].used = 1;
+}
+
+static int32_t reach_tray_take_tombstone(
+    reach_tray_provider *provider,
+    const reach_tray_identity *identity,
+    size_t *out_index,
+    uint32_t *out_public_id)
+{
+    if (provider == nullptr || identity == nullptr || out_index == nullptr || out_public_id == nullptr) {
+        return 0;
+    }
+
+    reach_tray_prune_tombstones(provider);
+
+    for (size_t index = 0; index < REACH_TRAY_TOMBSTONE_COUNT; ++index) {
+        reach_tray_tombstone *tombstone = &provider->tombstones[index];
+        if (!tombstone->used) {
+            continue;
+        }
+
+        if (!reach_tray_identity_equal(&tombstone->identity, identity)) {
+            continue;
+        }
+
+        *out_index = tombstone->index;
+        *out_public_id = tombstone->public_id;
+        *tombstone = {};
+        return 1;
+    }
+
+    return 0;
+}
+
 static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *bytes, size_t count)
 {
     if (item == nullptr || bytes == nullptr || count < REACH_TRAY_WIRE_BASE_MIN_SIZE) {
@@ -343,6 +498,7 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
 
     if (message == NIM_DELETE) {
         if (index != REACH_MAX_TRAY_ITEMS) {
+            reach_tray_save_tombstone(provider, &provider->items[index], index);
             reach_tray_remove_item_at(provider, index);
         }
 
@@ -354,7 +510,6 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
             provider->items[index].version = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_VERSION_OFFSET);
             provider->dirty = 1;
         }
-
         return REACH_OK;
     }
 
@@ -367,7 +522,6 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
             reach_tray_apply_payload(&provider->items[index], bytes, count);
             provider->dirty = 1;
         }
-
         return REACH_OK;
     }
 
@@ -377,8 +531,29 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, co
                 return REACH_OK;
             }
 
-            index = provider->item_count++;
+            reach_tray_identity identity = reach_tray_make_identity(owner, owner_id, &guid, has_guid);
+
+            size_t restored_index = provider->item_count;
+            uint32_t restored_public_id = 0;
+
+            if (reach_tray_take_tombstone(provider, &identity, &restored_index, &restored_public_id)) {
+                if (restored_index > provider->item_count) {
+                    restored_index = provider->item_count;
+                }
+            }
+
+            for (size_t move = provider->item_count; move > restored_index; --move) {
+                provider->items[move] = provider->items[move - 1];
+            }
+
+            index = restored_index;
+            ++provider->item_count;
+
             reach_tray_initialize_item(provider, &provider->items[index], owner, owner_id, &guid, has_guid);
+
+            if (restored_public_id != 0) {
+                provider->items[index].item.id = restored_public_id;
+            }
         } else {
             uint32_t stable_public_id = provider->items[index].item.id;
             reach_tray_release_item_icon(&provider->items[index]);
@@ -671,6 +846,7 @@ static reach_result reach_tray_refresh(reach_tray_provider *provider)
     while (index < provider->item_count) {
         HWND owner = provider->items[index].owner;
         if (owner == nullptr || !IsWindow(owner)) {
+            reach_tray_save_tombstone(provider, &provider->items[index], index);
             reach_tray_remove_item_at(provider, index);
         } else {
             ++index;
@@ -867,7 +1043,6 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
     }
 
     reach_tray_broadcast_taskbar_created(provider);
-    SetTimer(provider->host_window, REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER, 3000, nullptr);
     if (provider->host_window != nullptr) {
         SetTimer(
             provider->host_window,
