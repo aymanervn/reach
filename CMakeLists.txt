@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach LANGUAGES C CXX)
+project(reach VERSION 0.1.0 LANGUAGES C CXX)
 
 enable_testing()
 set(REACH_CTEST_DEFAULT_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/CTestDefaultConfig.cmake)
@@ -219,6 +219,17 @@ target_link_libraries(reach PRIVATE
     wbemuuid
 )
 
+set(EVERYTHING_DLL "${CMAKE_CURRENT_SOURCE_DIR}/third_party/everything/dll/Everything64.dll")
+
+set(REACH_RELEASE_IMAGE "${CMAKE_CURRENT_SOURCE_DIR}/resources/reach.jpg")
+
+add_custom_command(TARGET reach POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${EVERYTHING_DLL}"
+        "$<TARGET_FILE_DIR:reach>/Everything64.dll"
+    COMMENT "Copying Everything64.dll next to reach.exe"
+)
+
 add_executable(reachctl
     src/tools/reachctl/reachctl.cpp
     src/tools/reachctl/reachctl_common.cpp
@@ -261,6 +272,46 @@ target_link_libraries(reach-watchdog PRIVATE
     shlwapi
     user32
     advapi32
+)
+set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
+set(REACH_DIST_DIR "${REACH_DIST_ROOT}/Release")
+set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-alpha.zip")
+
+add_custom_target(reach_release_zip
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${REACH_DIST_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${REACH_DIST_DIR}"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:reach>"
+        "${REACH_DIST_DIR}/reach.exe"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:reachctl>"
+        "${REACH_DIST_DIR}/reachctl.exe"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:reach-watchdog>"
+        "${REACH_DIST_DIR}/reach-watchdog.exe"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${EVERYTHING_DLL}"
+        "${REACH_DIST_DIR}/Everything64.dll"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${REACH_RELEASE_IMAGE}"
+        "${REACH_DIST_DIR}/reach.jpg"
+
+    COMMAND ${CMAKE_COMMAND} -E chdir "${REACH_DIST_DIR}"
+        ${CMAKE_COMMAND} -E tar "cfv" "${REACH_ZIP_PATH}" --format=zip
+        reach.exe
+        reachctl.exe
+        reach-watchdog.exe
+        Everything64.dll
+        reach.jpg
+
+    DEPENDS reach reachctl reach-watchdog
+
+    COMMENT "Creating Reach Release ZIP"
 )
 
 add_executable(reach_tray_probe
