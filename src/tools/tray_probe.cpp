@@ -1,11 +1,16 @@
 #include <windows.h>
+#include <windowsx.h>
 #include <shellapi.h>
 
 #include <cwchar>
 #include <cstdint>
 
-static const wchar_t *REACH_PROBE_TRAY_CLASS = L"Shell_TrayWnd";
 static const wchar_t *REACH_PROBE_OWNER_CLASS = L"ReachTrayProbeOwner";
+static const UINT REACH_PROBE_CALLBACK = WM_APP + 77;
+static const UINT REACH_PROBE_UID = 0x2345;
+
+static const GUID REACH_PROBE_GUID =
+    { 0x15fd0d3a, 0x7275, 0x4d86, { 0x96, 0x40, 0xb4, 0x40, 0x82, 0x35, 0xa1, 0x91 } };
 
 static void reach_probe_print(const wchar_t *message)
 {
@@ -25,109 +30,102 @@ static void reach_probe_print(const wchar_t *message)
         }
         return;
     }
+
     WriteConsoleW(output, L"\r\n", 2, &written, nullptr);
 }
 
-static void reach_probe_printf(const wchar_t *format, uintptr_t a = 0, uintptr_t b = 0, uintptr_t c = 0, uintptr_t d = 0)
+static void reach_probe_printf(
+    const wchar_t *format,
+    uintptr_t a = 0,
+    uintptr_t b = 0,
+    uintptr_t c = 0,
+    uintptr_t d = 0,
+    uintptr_t e = 0)
 {
     wchar_t buffer[1024] = {};
-    swprintf_s(buffer, format, a, b, c, d);
+    swprintf_s(buffer, format, a, b, c, d, e);
     reach_probe_print(buffer);
 }
 
-static void reach_probe_dump_bytes(const BYTE *bytes, DWORD count)
+static const wchar_t *reach_probe_message_name(UINT message)
 {
-    if (bytes == nullptr || count == 0) {
-        return;
-    }
-
-    DWORD limit = count < 256 ? count : 256;
-    for (DWORD offset = 0; offset < limit; offset += 16) {
-        wchar_t line[256] = {};
-        wchar_t *cursor = line;
-        size_t remaining = sizeof(line) / sizeof(line[0]);
-        int written = swprintf_s(cursor, remaining, L"%04X:", offset);
-        cursor += written;
-        remaining -= (size_t)written;
-
-        for (DWORD index = 0; index < 16 && offset + index < limit; ++index) {
-            written = swprintf_s(cursor, remaining, L" %02X", bytes[offset + index]);
-            cursor += written;
-            remaining -= (size_t)written;
-        }
-        reach_probe_print(line);
+    switch (message) {
+    case WM_LBUTTONDOWN: return L"WM_LBUTTONDOWN";
+    case WM_LBUTTONUP: return L"WM_LBUTTONUP";
+    case WM_LBUTTONDBLCLK: return L"WM_LBUTTONDBLCLK";
+    case WM_RBUTTONDOWN: return L"WM_RBUTTONDOWN";
+    case WM_RBUTTONUP: return L"WM_RBUTTONUP";
+    case WM_CONTEXTMENU: return L"WM_CONTEXTMENU";
+    case NIN_SELECT: return L"NIN_SELECT";
+    case NIN_KEYSELECT: return L"NIN_KEYSELECT";
+    default: return L"UNKNOWN";
     }
 }
 
-static void reach_probe_scan_payload(const BYTE *bytes, DWORD count)
+static void reach_probe_print_legacy_callback(WPARAM wparam, LPARAM lparam)
 {
-    if (bytes == nullptr || count < sizeof(DWORD)) {
-        return;
-    }
-
-    DWORD notify_size = sizeof(NOTIFYICONDATAW);
-    for (DWORD offset = 0; offset + sizeof(DWORD) <= count; offset += 4) {
-        DWORD value = *reinterpret_cast<const DWORD *>(bytes + offset);
-        if (value == notify_size ||
-            value == NIM_ADD ||
-            value == NIM_MODIFY ||
-            value == NIM_DELETE ||
-            value == NIM_SETVERSION ||
-            value == 0x2345 ||
-            value == WM_APP + 77) {
-            reach_probe_printf(L"candidate dword offset=%llu value=0x%llX", offset, value);
-        }
-    }
-
-    const wchar_t needle[] = L"ReachProbe";
-    size_t needle_bytes = (wcslen(needle) + 1) * sizeof(wchar_t);
-    for (DWORD offset = 0; offset + needle_bytes <= count; offset += 2) {
-        if (memcmp(bytes + offset, needle, needle_bytes - sizeof(wchar_t)) == 0) {
-            reach_probe_printf(L"candidate UTF-16 marker offset=%llu", offset);
-        }
-    }
+    reach_probe_printf(
+        L"legacy callback uid=0x%llX event=%s raw_wParam=0x%llX raw_lParam=0x%llX",
+        static_cast<uintptr_t>(wparam),
+        reinterpret_cast<uintptr_t>(reach_probe_message_name((UINT)lparam)),
+        static_cast<uintptr_t>(wparam),
+        static_cast<uintptr_t>(lparam));
 }
 
-static LRESULT CALLBACK reach_probe_tray_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+static void reach_probe_print_v4_callback(WPARAM wparam, LPARAM lparam)
 {
-    if (message == WM_COPYDATA) {
-        COPYDATASTRUCT *copy = reinterpret_cast<COPYDATASTRUCT *>(lparam);
-        if (copy != nullptr) {
-            reach_probe_printf(
-                L"WM_COPYDATA hwnd=0x%llX from=0x%llX dwData=0x%llX cbData=%llu",
-                reinterpret_cast<uintptr_t>(hwnd),
-                static_cast<uintptr_t>(wparam),
-                static_cast<uintptr_t>(copy->dwData),
-                copy->cbData);
-            reach_probe_scan_payload(reinterpret_cast<const BYTE *>(copy->lpData), copy->cbData);
-            reach_probe_dump_bytes(reinterpret_cast<const BYTE *>(copy->lpData), copy->cbData);
-        }
-        return TRUE;
-    }
+    int x = GET_X_LPARAM(wparam);
+    int y = GET_Y_LPARAM(wparam);
+    UINT event = LOWORD(lparam);
+    UINT uid = HIWORD(lparam);
 
-    return DefWindowProcW(hwnd, message, wparam, lparam);
+    reach_probe_printf(
+        L"v4 callback event=%s uid=0x%llX x=%lld y=%lld raw_lParam=0x%llX",
+        reinterpret_cast<uintptr_t>(reach_probe_message_name(event)),
+        uid,
+        x,
+        y,
+        static_cast<uintptr_t>(lparam));
 }
 
 static LRESULT CALLBACK reach_probe_owner_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
-    if (message == WM_APP + 77) {
-        reach_probe_printf(
-            L"callback hwnd=0x%llX wParam=0x%llX lParam=0x%llX",
-            reinterpret_cast<uintptr_t>(hwnd),
-            static_cast<uintptr_t>(wparam),
-            static_cast<uintptr_t>(lparam));
+    if (message == REACH_PROBE_CALLBACK) {
+        /*
+            Heuristic:
+            legacy: wParam == uID and lParam == mouse message.
+            v4:     LOWORD(lParam) == event, HIWORD(lParam) == uID.
+        */
+        UINT v4_uid = HIWORD(lparam);
+        UINT v4_event = LOWORD(lparam);
+
+        if (v4_uid == REACH_PROBE_UID &&
+            (v4_event == WM_LBUTTONDOWN ||
+             v4_event == WM_LBUTTONUP ||
+             v4_event == WM_RBUTTONDOWN ||
+             v4_event == WM_RBUTTONUP ||
+             v4_event == WM_CONTEXTMENU ||
+             v4_event == NIN_SELECT ||
+             v4_event == NIN_KEYSELECT)) {
+            reach_probe_print_v4_callback(wparam, lparam);
+        } else {
+            reach_probe_print_legacy_callback(wparam, lparam);
+        }
+
         return 0;
     }
+
     return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
-static HWND reach_probe_create_window(const wchar_t *class_name, WNDPROC proc)
+static HWND reach_probe_create_owner_window(void)
 {
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(wc);
-    wc.lpfnWndProc = proc;
+    wc.lpfnWndProc = reach_probe_owner_proc;
     wc.hInstance = GetModuleHandleW(nullptr);
-    wc.lpszClassName = class_name;
+    wc.lpszClassName = REACH_PROBE_OWNER_CLASS;
+
     ATOM atom = RegisterClassExW(&wc);
     if (atom == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
         return nullptr;
@@ -135,7 +133,7 @@ static HWND reach_probe_create_window(const wchar_t *class_name, WNDPROC proc)
 
     return CreateWindowExW(
         0,
-        class_name,
+        REACH_PROBE_OWNER_CLASS,
         L"",
         WS_POPUP,
         0,
@@ -148,58 +146,139 @@ static HWND reach_probe_create_window(const wchar_t *class_name, WNDPROC proc)
         nullptr);
 }
 
-static void reach_probe_send_notify(HWND owner)
+static int reach_probe_has_arg(int argc, wchar_t **argv, const wchar_t *needle)
 {
-    NOTIFYICONDATAW data = {};
-    data.cbSize = sizeof(data);
-    data.hWnd = owner;
-    data.uID = 0x2345;
-    data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
-    data.uCallbackMessage = WM_APP + 77;
-    data.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
-    wcscpy_s(data.szTip, L"ReachProbeAdd");
-
-    reach_probe_print(L"calling Shell_NotifyIconW(NIM_ADD)");
-    BOOL ok = Shell_NotifyIconW(NIM_ADD, &data);
-    reach_probe_printf(L"NIM_ADD result=%llu last_error=%llu", ok ? 1 : 0, GetLastError());
-
-    data.uVersion = NOTIFYICON_VERSION_4;
-    reach_probe_print(L"calling Shell_NotifyIconW(NIM_SETVERSION)");
-    ok = Shell_NotifyIconW(NIM_SETVERSION, &data);
-    reach_probe_printf(L"NIM_SETVERSION result=%llu last_error=%llu", ok ? 1 : 0, GetLastError());
-
-    wcscpy_s(data.szTip, L"ReachProbeModify");
-    reach_probe_print(L"calling Shell_NotifyIconW(NIM_MODIFY)");
-    ok = Shell_NotifyIconW(NIM_MODIFY, &data);
-    reach_probe_printf(L"NIM_MODIFY result=%llu last_error=%llu", ok ? 1 : 0, GetLastError());
-
-    reach_probe_print(L"calling Shell_NotifyIconW(NIM_DELETE)");
-    ok = Shell_NotifyIconW(NIM_DELETE, &data);
-    reach_probe_printf(L"NIM_DELETE result=%llu last_error=%llu", ok ? 1 : 0, GetLastError());
-}
-
-int wmain()
-{
-    HWND tray = reach_probe_create_window(REACH_PROBE_TRAY_CLASS, reach_probe_tray_proc);
-    HWND owner = reach_probe_create_window(REACH_PROBE_OWNER_CLASS, reach_probe_owner_proc);
-    if (tray == nullptr || owner == nullptr) {
-        reach_probe_print(L"failed to create probe windows");
-        return 1;
+    for (int index = 1; index < argc; ++index) {
+        if (_wcsicmp(argv[index], needle) == 0) {
+            return 1;
+        }
     }
 
-    HWND shell_tray = FindWindowW(REACH_PROBE_TRAY_CLASS, nullptr);
+    return 0;
+}
+
+static void reach_probe_fill_notify(NOTIFYICONDATAW *data, HWND owner, int use_guid)
+{
+    *data = {};
+    data->cbSize = sizeof(*data);
+    data->hWnd = owner;
+    data->uID = REACH_PROBE_UID;
+    data->uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+    data->uCallbackMessage = REACH_PROBE_CALLBACK;
+    data->hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    wcscpy_s(data->szTip, L"ReachProbeAdd");
+
+    if (use_guid) {
+        data->uFlags |= NIF_GUID;
+        data->guidItem = REACH_PROBE_GUID;
+    }
+}
+
+static void reach_probe_shell_notify(const wchar_t *label, DWORD message, NOTIFYICONDATAW *data)
+{
+    SetLastError(0);
+    BOOL ok = Shell_NotifyIconW(message, data);
     reach_probe_printf(
-        L"probe_tray=0x%llX find_shell_tray=0x%llX owner=0x%llX",
-        reinterpret_cast<uintptr_t>(tray),
-        reinterpret_cast<uintptr_t>(shell_tray),
-        reinterpret_cast<uintptr_t>(owner));
-    if (shell_tray != tray) {
-        reach_probe_print(L"FindWindow(Shell_TrayWnd) does not resolve to the probe. Stop Explorer/other shell before probing.");
+        L"%s result=%llu last_error=%llu",
+        reinterpret_cast<uintptr_t>(label),
+        ok ? 1 : 0,
+        GetLastError());
+}
+
+static void reach_probe_pump_for_seconds(double seconds)
+{
+    DWORD end = GetTickCount() + (DWORD)(seconds * 1000.0);
+
+    while (GetTickCount() < end) {
+        MSG msg = {};
+        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+
+        Sleep(10);
+    }
+}
+
+int wmain(int argc, wchar_t **argv)
+{
+    int use_guid = reach_probe_has_arg(argc, argv, L"guid") ||
+        reach_probe_has_arg(argc, argv, L"guid-v4");
+
+    int use_v4 = reach_probe_has_arg(argc, argv, L"v4") ||
+        reach_probe_has_arg(argc, argv, L"guid-v4");
+
+    int test_hidden = reach_probe_has_arg(argc, argv, L"hidden");
+
+    HWND shell_tray = FindWindowW(L"Shell_TrayWnd", nullptr);
+    reach_probe_printf(L"FindWindow(Shell_TrayWnd)=0x%llX", reinterpret_cast<uintptr_t>(shell_tray));
+
+    if (shell_tray == nullptr) {
+        reach_probe_print(L"No Shell_TrayWnd found. Start Reach first.");
         return 2;
     }
 
-    reach_probe_send_notify(owner);
+    HWND owner = reach_probe_create_owner_window();
+    if (owner == nullptr) {
+        reach_probe_print(L"failed to create owner window");
+        return 1;
+    }
+
+    reach_probe_printf(
+        L"owner=0x%llX mode=%s%s",
+        reinterpret_cast<uintptr_t>(owner),
+        reinterpret_cast<uintptr_t>(use_guid ? L"guid" : L"hwnd-uid"),
+        reinterpret_cast<uintptr_t>(use_v4 ? L" v4" : L" legacy"));
+
+    NOTIFYICONDATAW data = {};
+    reach_probe_fill_notify(&data, owner, use_guid);
+
+    reach_probe_shell_notify(L"NIM_ADD", NIM_ADD, &data);
+    if (reach_probe_has_arg(argc, argv, L"duplicate")) {
+        reach_probe_shell_notify(L"NIM_ADD duplicate", NIM_ADD, &data);
+    }
+    if (use_v4) {
+        data.uVersion = NOTIFYICON_VERSION_4;
+        reach_probe_shell_notify(L"NIM_SETVERSION", NIM_SETVERSION, &data);
+    }
+
+    wcscpy_s(data.szTip, L"ReachProbeModify");
+    data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+    if (use_guid) {
+        data.uFlags |= NIF_GUID;
+    }
+    reach_probe_shell_notify(L"NIM_MODIFY tip", NIM_MODIFY, &data);
+
+    if (test_hidden) {
+        data.uFlags = NIF_STATE;
+        if (use_guid) {
+            data.uFlags |= NIF_GUID;
+        }
+        data.dwState = NIS_HIDDEN;
+        data.dwStateMask = NIS_HIDDEN;
+        reach_probe_shell_notify(L"NIM_MODIFY hidden", NIM_MODIFY, &data);
+
+        reach_probe_print(L"hidden for 2 seconds");
+        reach_probe_pump_for_seconds(2.0);
+
+        data.dwState = 0;
+        data.dwStateMask = NIS_HIDDEN;
+        reach_probe_shell_notify(L"NIM_MODIFY visible", NIM_MODIFY, &data);
+    }
+
+    reach_probe_print(L"Probe icon should now be visible in Reach.");
+    reach_probe_print(L"Click it in Reach: left click should print callbacks; right click should print callbacks.");
+    reach_probe_print(L"Waiting 30 seconds before NIM_DELETE.");
+
+    reach_probe_pump_for_seconds(10.0);
+
+    data.uFlags = 0;
+    if (use_guid) {
+        data.uFlags |= NIF_GUID;
+    }
+
+    reach_probe_shell_notify(L"NIM_DELETE", NIM_DELETE, &data);
+
     DestroyWindow(owner);
-    DestroyWindow(tray);
     return 0;
 }

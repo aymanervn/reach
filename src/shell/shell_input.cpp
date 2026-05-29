@@ -950,15 +950,17 @@ static reach_result reach_shell_execute_tray_action(reach_shell *shell, reach_tr
     if (shell->tray_provider.ops.activate == nullptr) {
         return REACH_OK;
     }
+    reach_shell_release_tray_item(shell);
 
     reach_result result = shell->tray_provider.ops.activate(
         shell->tray_provider.provider,
         action.item_id,
         action.provider_action);
-    reach_shell_release_tray_item(shell);
+
     if (shell->tray_popup_open) {
         reach_shell_capture_tray_input(shell);
     }
+
     return result;
 }
 

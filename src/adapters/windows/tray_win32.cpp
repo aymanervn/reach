@@ -5,13 +5,35 @@
 
 #include <windows.h>
 #include <shellapi.h>
+#include <shlobj.h>
+#include <shlwapi.h>
+#include <strsafe.h>
 #include <new>
+#include <stdint.h>
+#include <string.h>
+#include <wchar.h>
 
 static const wchar_t *REACH_TRAY_HOST_CLASS = L"Shell_TrayWnd";
+
 static const uint32_t REACH_TRAY_WIRE_SIGNATURE = 0x34753423;
-static const size_t REACH_TRAY_WIRE_MIN_SIZE = 288;
-static const size_t REACH_TRAY_WIRE_VERSION_OFFSET = 808;
-static const size_t REACH_TRAY_WIRE_GUID_OFFSET = 964;
+static const size_t REACH_TRAY_WIRE_BASE_MIN_SIZE = 0x128;
+
+static const size_t REACH_TRAY_WIRE_MAGIC_OFFSET = 0x00;
+static const size_t REACH_TRAY_WIRE_MESSAGE_OFFSET = 0x04;
+static const size_t REACH_TRAY_WIRE_CBSIZE_OFFSET = 0x08;
+static const size_t REACH_TRAY_WIRE_HWND_OFFSET = 0x0C;
+static const size_t REACH_TRAY_WIRE_UID_OFFSET = 0x10;
+static const size_t REACH_TRAY_WIRE_FLAGS_OFFSET = 0x14;
+static const size_t REACH_TRAY_WIRE_CALLBACK_OFFSET = 0x18;
+static const size_t REACH_TRAY_WIRE_ICON_OFFSET = 0x1C;
+static const size_t REACH_TRAY_WIRE_TIP_OFFSET = 0x20;
+static const size_t REACH_TRAY_WIRE_STATE_OFFSET = 0x120;
+static const size_t REACH_TRAY_WIRE_STATE_MASK_OFFSET = 0x124;
+static const size_t REACH_TRAY_WIRE_VERSION_OFFSET = 0x328;
+static const size_t REACH_TRAY_WIRE_INFO_FLAGS_OFFSET = 0x3AC;
+static const size_t REACH_TRAY_WIRE_GUID_OFFSET = 0x3B0;
+static const size_t REACH_TRAY_WIRE_EXE_PATH_OFFSET = 0x3C4;
+static const UINT_PTR REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER = 1001;
 
 struct reach_tray_native_item {
     reach_tray_item item;
@@ -19,8 +41,10 @@ struct reach_tray_native_item {
     uint32_t owner_id;
     GUID guid;
     int32_t has_guid;
-    int32_t hidden;
+    uint32_t flags;
     uint32_t callback_message;
+    uint32_t raw_icon_handle;
+    uint32_t state;
     uint32_t version;
 };
 
@@ -31,31 +55,9 @@ struct reach_tray_provider {
     reach_tray_native_item items[REACH_MAX_TRAY_ITEMS];
     size_t item_count;
     uint32_t next_item_id;
-    HWND active_menu_owner;
-    uint32_t active_menu_owner_id;
     int32_t dirty;
+    int32_t startup_apps_launched;
 };
-
-static int32_t reach_tray_read_guid(
-    const BYTE *bytes,
-    size_t count,
-    size_t offset,
-    GUID *out_guid)
-{
-    if (bytes == nullptr || out_guid == nullptr || offset + sizeof(GUID) > count) {
-        return 0;
-    }
-
-    memcpy(out_guid, bytes + offset, sizeof(GUID));
-    return 1;
-}
-
-static int32_t reach_tray_guid_equal(const GUID *a, const GUID *b)
-{
-    return a != nullptr &&
-        b != nullptr &&
-        memcmp(a, b, sizeof(GUID)) == 0;
-}
 
 static uint32_t reach_tray_read_u32(const BYTE *bytes, size_t count, size_t offset)
 {
@@ -68,22 +70,72 @@ static uint32_t reach_tray_read_u32(const BYTE *bytes, size_t count, size_t offs
     return value;
 }
 
-static void reach_tray_copy_text(uint16_t *dst, size_t dst_count, const wchar_t *src)
+static int32_t reach_tray_read_guid(const BYTE *bytes, size_t count, size_t offset, GUID *out_guid)
+{
+    if (bytes == nullptr || out_guid == nullptr || offset + sizeof(GUID) > count) {
+        return 0;
+    }
+
+    memcpy(out_guid, bytes + offset, sizeof(GUID));
+    return 1;
+}
+
+static int32_t reach_tray_guid_is_null(const GUID *guid)
+{
+    static const GUID null_guid = {};
+    return guid == nullptr || memcmp(guid, &null_guid, sizeof(GUID)) == 0;
+}
+
+static int32_t reach_tray_guid_equal(const GUID *a, const GUID *b)
+{
+    return a != nullptr && b != nullptr && memcmp(a, b, sizeof(GUID)) == 0;
+}
+
+static void reach_tray_copy_wide_to_u16(uint16_t *dst, size_t dst_count, const wchar_t *src, size_t src_max_count)
 {
     if (dst == nullptr || dst_count == 0) {
         return;
     }
-    if (src == nullptr) {
-        dst[0] = 0;
+
+    dst[0] = 0;
+    if (src == nullptr || src_max_count == 0) {
         return;
     }
 
     size_t index = 0;
-    while (index + 1 < dst_count && src[index] != 0) {
+    while (index + 1 < dst_count && index < src_max_count && src[index] != 0) {
         dst[index] = (uint16_t)src[index];
         ++index;
     }
+
     dst[index] = 0;
+}
+
+static void reach_tray_copy_payload_wstring(
+    uint16_t *dst,
+    size_t dst_count,
+    const BYTE *bytes,
+    size_t count,
+    size_t offset,
+    size_t wchar_count)
+{
+    if (dst == nullptr || dst_count == 0) {
+        return;
+    }
+
+    dst[0] = 0;
+    if (bytes == nullptr || offset >= count) {
+        return;
+    }
+
+    size_t available_bytes = count - offset;
+    size_t available_wchars = available_bytes / sizeof(wchar_t);
+    if (available_wchars > wchar_count) {
+        available_wchars = wchar_count;
+    }
+
+    const wchar_t *src = reinterpret_cast<const wchar_t *>(bytes + offset);
+    reach_tray_copy_wide_to_u16(dst, dst_count, src, available_wchars);
 }
 
 static void reach_tray_release_item_icon(reach_tray_native_item *item)
@@ -94,100 +146,28 @@ static void reach_tray_release_item_icon(reach_tray_native_item *item)
     }
 }
 
-static size_t reach_tray_find_item(
-    reach_tray_provider *provider,
-    HWND owner,
-    uint32_t owner_id,
-    const GUID *guid,
-    int32_t has_guid)
+static void reach_tray_update_item_icon(reach_tray_native_item *item, uint32_t raw_icon)
 {
-    if (provider == nullptr || owner == nullptr) {
-        return REACH_MAX_TRAY_ITEMS;
-    }
-
-    for (size_t index = 0; index < provider->item_count; ++index) {
-        reach_tray_native_item *item = &provider->items[index];
-
-        if (item->owner != owner) {
-            continue;
-        }
-
-        if (has_guid && item->has_guid && reach_tray_guid_equal(&item->guid, guid)) {
-            return index;
-        }
-
-        if (!has_guid && !item->has_guid && item->owner_id == owner_id) {
-            return index;
-        }
-
-        if (item->owner_id == owner_id) {
-            if (has_guid && guid != nullptr && !item->has_guid) {
-                item->has_guid = 1;
-                item->guid = *guid;
-            }
-            return index;
-        }
-    }
-
-    return REACH_MAX_TRAY_ITEMS;
-}
-
-static void reach_tray_remove_item_at(reach_tray_provider *provider, size_t index)
-{
-    if (provider == nullptr || index >= provider->item_count) {
+    if (item == nullptr) {
         return;
     }
 
-    reach_tray_release_item_icon(&provider->items[index]);
-    for (size_t next = index + 1; next < provider->item_count; ++next) {
-        provider->items[next - 1] = provider->items[next];
-    }
-    provider->items[provider->item_count - 1] = {};
-    --provider->item_count;
-}
+    item->raw_icon_handle = raw_icon;
 
-static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *bytes, size_t count, uint32_t message)
-{
-    if (item == nullptr || bytes == nullptr || count < REACH_TRAY_WIRE_MIN_SIZE) {
+    HICON incoming = reinterpret_cast<HICON>((ULONG_PTR)raw_icon);
+    HICON copied = incoming != nullptr ? CopyIcon(incoming) : nullptr;
+    if (copied == nullptr) {
         return;
     }
 
-    uint32_t flags = reach_tray_read_u32(bytes, count, 20);
-
-    if ((flags & NIF_MESSAGE) != 0) {
-        item->callback_message = reach_tray_read_u32(bytes, count, 24);
+    reach_windows_icon *wrapped = reach_windows_icon_from_hicon(copied);
+    if (wrapped == nullptr) {
+        DestroyIcon(copied);
+        return;
     }
 
-    if ((flags & NIF_STATE) != 0) {
-        uint32_t state = reach_tray_read_u32(bytes, count, 288);
-        uint32_t state_mask = reach_tray_read_u32(bytes, count, 292);
-
-        if ((state_mask & NIS_HIDDEN) != 0) {
-            item->hidden = (state & NIS_HIDDEN) != 0;
-        }
-    }
-
-    if ((flags & NIF_TIP) != 0) {
-        const wchar_t *tip = reinterpret_cast<const wchar_t *>(bytes + 32);
-        reach_tray_copy_text(item->item.title, 128, tip);
-    }
-
-    if ((flags & NIF_ICON) != 0) {
-        HICON incoming = reinterpret_cast<HICON>((uintptr_t)reach_tray_read_u32(bytes, count, 28));
-        HICON copy = incoming != nullptr ? CopyIcon(incoming) : nullptr;
-
-        if (copy != nullptr) {
-            reach_tray_release_item_icon(item);
-
-            reach_windows_icon *wrapped = reach_windows_icon_from_hicon(copy);
-            item->item.icon_id = wrapped != nullptr
-                ? reinterpret_cast<uint64_t>(wrapped)
-                : 0;
-        } else if (message == NIM_MODIFY) {
-            reach_tray_release_item_icon(item);
-            item->item.icon_id = 0;
-        }
-    }
+    reach_tray_release_item_icon(item);
+    item->item.icon_id = reinterpret_cast<uint64_t>(wrapped);
 }
 
 static uint32_t reach_tray_allocate_item_id(reach_tray_provider *provider)
@@ -217,102 +197,249 @@ static void reach_tray_initialize_item(
     }
 
     *item = {};
+    item->item.id = reach_tray_allocate_item_id(provider);
     item->owner = owner;
     item->owner_id = owner_id;
     item->has_guid = has_guid;
+
     if (has_guid && guid != nullptr) {
         item->guid = *guid;
     }
+}
 
-    item->item.id = reach_tray_allocate_item_id(provider);
+static size_t reach_tray_find_item(
+    reach_tray_provider *provider,
+    HWND owner,
+    uint32_t owner_id,
+    const GUID *guid,
+    int32_t has_guid)
+{
+    if (provider == nullptr) {
+        return REACH_MAX_TRAY_ITEMS;
+    }
+
+    if (has_guid && !reach_tray_guid_is_null(guid)) {
+        for (size_t index = 0; index < provider->item_count; ++index) {
+            reach_tray_native_item *item = &provider->items[index];
+            if (item->has_guid && reach_tray_guid_equal(&item->guid, guid)) {
+                return index;
+            }
+        }
+
+        return REACH_MAX_TRAY_ITEMS;
+    }
+
+    if (owner == nullptr) {
+        return REACH_MAX_TRAY_ITEMS;
+    }
+
+    for (size_t index = 0; index < provider->item_count; ++index) {
+        reach_tray_native_item *item = &provider->items[index];
+        if (!item->has_guid && item->owner == owner && item->owner_id == owner_id) {
+            return index;
+        }
+    }
+
+    return REACH_MAX_TRAY_ITEMS;
+}
+
+static void reach_tray_remove_item_at(reach_tray_provider *provider, size_t index)
+{
+    if (provider == nullptr || index >= provider->item_count) {
+        return;
+    }
+
+    reach_tray_release_item_icon(&provider->items[index]);
+
+    for (size_t next = index + 1; next < provider->item_count; ++next) {
+        provider->items[next - 1] = provider->items[next];
+    }
+
+    provider->items[provider->item_count - 1] = {};
+    --provider->item_count;
+    provider->dirty = 1;
+}
+
+static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *bytes, size_t count)
+{
+    if (item == nullptr || bytes == nullptr || count < REACH_TRAY_WIRE_BASE_MIN_SIZE) {
+        return;
+    }
+
+    uint32_t flags = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_FLAGS_OFFSET);
+    item->flags = flags;
+
+    if ((flags & NIF_MESSAGE) != 0) {
+        item->callback_message = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_CALLBACK_OFFSET);
+    }
+
+    if ((flags & NIF_ICON) != 0) {
+        uint32_t raw_icon = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_ICON_OFFSET);
+        reach_tray_update_item_icon(item, raw_icon);
+    }
+
+    if ((flags & NIF_TIP) != 0) {
+        reach_tray_copy_payload_wstring(
+            item->item.title,
+            128,
+            bytes,
+            count,
+            REACH_TRAY_WIRE_TIP_OFFSET,
+            128);
+    }
+
+    if ((flags & NIF_STATE) != 0) {
+        uint32_t state = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_STATE_OFFSET);
+        uint32_t state_mask = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_STATE_MASK_OFFSET);
+        item->state = (item->state & ~state_mask) | (state & state_mask);
+    }
+
+    reach_tray_copy_payload_wstring(
+        item->item.icon_ref,
+        260,
+        bytes,
+        count,
+        REACH_TRAY_WIRE_EXE_PATH_OFFSET,
+        MAX_PATH);
 }
 
 static int32_t reach_tray_item_is_public(const reach_tray_native_item *item)
 {
     return item != nullptr &&
-        !item->hidden &&
         item->owner != nullptr &&
+        (item->state & NIS_HIDDEN) == 0 &&
         (item->item.icon_id != 0 || item->item.title[0] != 0);
 }
 
 static reach_result reach_tray_handle_copydata(reach_tray_provider *provider, const COPYDATASTRUCT *copy)
 {
-    if (provider == nullptr || copy == nullptr || copy->lpData == nullptr || copy->cbData < REACH_TRAY_WIRE_MIN_SIZE) {
-        return REACH_INVALID_ARGUMENT;
+    if (provider == nullptr || copy == nullptr || copy->lpData == nullptr) {
+        return REACH_OK;
+    }
+
+    if (copy->dwData != 1 || copy->cbData < REACH_TRAY_WIRE_BASE_MIN_SIZE) {
+        return REACH_OK;
     }
 
     const BYTE *bytes = reinterpret_cast<const BYTE *>(copy->lpData);
     size_t count = copy->cbData;
-    if (reach_tray_read_u32(bytes, count, 0) != REACH_TRAY_WIRE_SIGNATURE) {
-        return REACH_ERROR;
+
+    if (reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_MAGIC_OFFSET) != REACH_TRAY_WIRE_SIGNATURE) {
+        return REACH_OK;
     }
 
-    uint32_t message = reach_tray_read_u32(bytes, count, 4);
-    HWND owner = reinterpret_cast<HWND>((uintptr_t)reach_tray_read_u32(bytes, count, 12));
-    uint32_t owner_id = reach_tray_read_u32(bytes, count, 16);
-    uint32_t flags = reach_tray_read_u32(bytes, count, 20);
+    uint32_t message = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_MESSAGE_OFFSET);
+    HWND owner = reinterpret_cast<HWND>((ULONG_PTR)reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_HWND_OFFSET));
+    uint32_t owner_id = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_UID_OFFSET);
+    uint32_t flags = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_FLAGS_OFFSET);
 
     GUID guid = {};
     int32_t has_guid =
         (flags & NIF_GUID) != 0 &&
-        reach_tray_read_guid(bytes, count, REACH_TRAY_WIRE_GUID_OFFSET, &guid);
+        reach_tray_read_guid(bytes, count, REACH_TRAY_WIRE_GUID_OFFSET, &guid) &&
+        !reach_tray_guid_is_null(&guid);
 
     size_t index = reach_tray_find_item(provider, owner, owner_id, &guid, has_guid);
+
     if (message == NIM_DELETE) {
         if (index != REACH_MAX_TRAY_ITEMS) {
             reach_tray_remove_item_at(provider, index);
-            provider->dirty = 1;
         }
+
         return REACH_OK;
     }
 
     if (message == NIM_SETVERSION) {
-        if (index != REACH_MAX_TRAY_ITEMS) {
+        if (index != REACH_MAX_TRAY_ITEMS && REACH_TRAY_WIRE_VERSION_OFFSET + sizeof(uint32_t) <= count) {
             provider->items[index].version = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_VERSION_OFFSET);
+            provider->dirty = 1;
         }
+
         return REACH_OK;
     }
 
-    if (message != NIM_ADD && message != NIM_MODIFY) {
+    if (message == NIM_SETFOCUS) {
         return REACH_OK;
     }
 
-    if (index == REACH_MAX_TRAY_ITEMS) {
-        if (provider->item_count >= REACH_MAX_TRAY_ITEMS) {
-            return REACH_ERROR;
+    if (message == NIM_MODIFY) {
+        if (index != REACH_MAX_TRAY_ITEMS) {
+            reach_tray_apply_payload(&provider->items[index], bytes, count);
+            provider->dirty = 1;
         }
 
-        if (message == NIM_MODIFY && !has_guid) {
-            return REACH_ERROR;
-        }
-
-        index = provider->item_count++;
-        reach_tray_initialize_item(
-            provider,
-            &provider->items[index],
-            owner,
-            owner_id,
-            &guid,
-            has_guid);
+        return REACH_OK;
     }
 
-    reach_tray_apply_payload(&provider->items[index], bytes, count, message);
-    provider->dirty = 1;
+    if (message == NIM_ADD) {
+        if (index == REACH_MAX_TRAY_ITEMS) {
+            if (provider->item_count >= REACH_MAX_TRAY_ITEMS) {
+                return REACH_OK;
+            }
+
+            index = provider->item_count++;
+            reach_tray_initialize_item(provider, &provider->items[index], owner, owner_id, &guid, has_guid);
+        } else {
+            uint32_t stable_public_id = provider->items[index].item.id;
+            reach_tray_release_item_icon(&provider->items[index]);
+            reach_tray_initialize_item(provider, &provider->items[index], owner, owner_id, &guid, has_guid);
+            provider->items[index].item.id = stable_public_id;
+        }
+
+        provider->items[index].version = 0;
+        reach_tray_apply_payload(&provider->items[index], bytes, count);
+        provider->dirty = 1;
+        return REACH_OK;
+    }
+
+    (void)reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_CBSIZE_OFFSET);
+    (void)reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_INFO_FLAGS_OFFSET);
     return REACH_OK;
+}
+
+static void reach_tray_broadcast_taskbar_created(reach_tray_provider *provider)
+{
+    if (provider == nullptr) {
+        return;
+    }
+
+    provider->taskbar_created_message = RegisterWindowMessageW(L"TaskbarCreated");
+    if (provider->taskbar_created_message == 0) {
+        return;
+    }
+
+    SendMessageTimeoutW(
+        HWND_BROADCAST,
+        provider->taskbar_created_message,
+        0,
+        0,
+        SMTO_ABORTIFHUNG | SMTO_NORMAL,
+        2000,
+        nullptr);
 }
 
 static LRESULT CALLBACK reach_tray_host_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
-    reach_tray_provider *provider = reinterpret_cast<reach_tray_provider *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
     if (message == WM_NCCREATE) {
         CREATESTRUCTW *create = reinterpret_cast<CREATESTRUCTW *>(lparam);
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(create->lpCreateParams));
         return TRUE;
     }
 
+    reach_tray_provider *provider = reinterpret_cast<reach_tray_provider *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+
     if (message == WM_COPYDATA) {
-        reach_result result = reach_tray_handle_copydata(provider, reinterpret_cast<const COPYDATASTRUCT *>(lparam));
-        return result == REACH_OK ? TRUE : FALSE;
+        (void)reach_tray_handle_copydata(provider, reinterpret_cast<const COPYDATASTRUCT *>(lparam));
+        return TRUE;
+    }
+    if (message == WM_TIMER && wparam == REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER) {
+        KillTimer(hwnd, REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER);
+
+        reach_tray_provider *provider =
+            reinterpret_cast<reach_tray_provider *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+
+        reach_tray_broadcast_taskbar_created(provider);
+        return 0;
     }
 
     (void)wparam;
@@ -331,6 +458,7 @@ static reach_result reach_tray_create_host_window(reach_tray_provider *provider)
     wc.lpfnWndProc = reach_tray_host_proc;
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.lpszClassName = REACH_TRAY_HOST_CLASS;
+
     provider->host_class = RegisterClassExW(&wc);
     if (provider->host_class == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
         return REACH_ERROR;
@@ -349,18 +477,187 @@ static reach_result reach_tray_create_host_window(reach_tray_provider *provider)
         nullptr,
         GetModuleHandleW(nullptr),
         provider);
+
     return provider->host_window != nullptr ? REACH_OK : REACH_ERROR;
 }
 
-static void reach_tray_broadcast_taskbar_created(reach_tray_provider *provider)
+static int32_t reach_tray_startup_extension_supported(const wchar_t *path)
 {
-    if (provider == nullptr) {
+    const wchar_t *extension = PathFindExtensionW(path);
+    if (extension == nullptr || extension[0] == 0) {
+        return 0;
+    }
+
+    return _wcsicmp(extension, L".lnk") == 0 ||
+        _wcsicmp(extension, L".exe") == 0 ||
+        _wcsicmp(extension, L".bat") == 0 ||
+        _wcsicmp(extension, L".cmd") == 0 ||
+        _wcsicmp(extension, L".url") == 0;
+}
+
+static void reach_tray_launch_path(const wchar_t *path)
+{
+    if (path == nullptr || path[0] == 0) {
         return;
     }
-    provider->taskbar_created_message = RegisterWindowMessageW(L"TaskbarCreated");
-    if (provider->taskbar_created_message != 0) {
-        SendMessageTimeoutW(HWND_BROADCAST, provider->taskbar_created_message, 0, 0, SMTO_ABORTIFHUNG, 2000, nullptr);
+
+    SHELLEXECUTEINFOW sei = {};
+    sei.cbSize = sizeof(sei);
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpVerb = L"open";
+    sei.lpFile = path;
+    sei.nShow = SW_SHOWNORMAL;
+
+    if (ShellExecuteExW(&sei) && sei.hProcess != nullptr) {
+        CloseHandle(sei.hProcess);
     }
+}
+
+static void reach_tray_launch_startup_folder_known_id(REFKNOWNFOLDERID folder_id)
+{
+    PWSTR folder = nullptr;
+    HRESULT hr = SHGetKnownFolderPath(folder_id, 0, nullptr, &folder);
+    if (FAILED(hr) || folder == nullptr) {
+        return;
+    }
+
+    wchar_t search_path[MAX_PATH * 2] = {};
+    if (FAILED(StringCchPrintfW(search_path, sizeof(search_path) / sizeof(search_path[0]), L"%s\\*", folder))) {
+        CoTaskMemFree(folder);
+        return;
+    }
+
+    WIN32_FIND_DATAW data = {};
+    HANDLE find = FindFirstFileW(search_path, &data);
+    if (find == INVALID_HANDLE_VALUE) {
+        CoTaskMemFree(folder);
+        return;
+    }
+
+    do {
+        if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            continue;
+        }
+
+        wchar_t entry_path[MAX_PATH * 2] = {};
+        if (FAILED(StringCchPrintfW(entry_path, sizeof(entry_path) / sizeof(entry_path[0]), L"%s\\%s", folder, data.cFileName))) {
+            continue;
+        }
+
+        if (reach_tray_startup_extension_supported(entry_path)) {
+            reach_tray_launch_path(entry_path);
+        }
+    } while (FindNextFileW(find, &data));
+
+    FindClose(find);
+    CoTaskMemFree(folder);
+}
+
+static void reach_tray_launch_run_value(const wchar_t *command)
+{
+    if (command == nullptr || command[0] == 0) {
+        return;
+    }
+
+    wchar_t mutable_command[4096] = {};
+    StringCchCopyW(mutable_command, sizeof(mutable_command) / sizeof(mutable_command[0]), command);
+
+    STARTUPINFOW startup = {};
+    startup.cb = sizeof(startup);
+
+    PROCESS_INFORMATION process = {};
+    if (CreateProcessW(
+            nullptr,
+            mutable_command,
+            nullptr,
+            nullptr,
+            FALSE,
+            0,
+            nullptr,
+            nullptr,
+            &startup,
+            &process)) {
+        if (process.hThread != nullptr) {
+            CloseHandle(process.hThread);
+        }
+        if (process.hProcess != nullptr) {
+            CloseHandle(process.hProcess);
+        }
+    }
+}
+
+static void reach_tray_launch_run_key(HKEY root)
+{
+    HKEY key = nullptr;
+    LONG open_result = RegOpenKeyExW(
+        root,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        0,
+        KEY_READ,
+        &key);
+
+    if (open_result != ERROR_SUCCESS) {
+        return;
+    }
+
+    for (DWORD index = 0;; ++index) {
+        wchar_t value_name[512] = {};
+        DWORD value_name_count = sizeof(value_name) / sizeof(value_name[0]);
+
+        wchar_t raw_data[4096] = {};
+        DWORD data_size = sizeof(raw_data);
+        DWORD type = 0;
+
+        LONG enum_result = RegEnumValueW(
+            key,
+            index,
+            value_name,
+            &value_name_count,
+            nullptr,
+            &type,
+            reinterpret_cast<LPBYTE>(raw_data),
+            &data_size);
+
+        if (enum_result == ERROR_NO_MORE_ITEMS) {
+            break;
+        }
+
+        if (enum_result != ERROR_SUCCESS) {
+            continue;
+        }
+
+        if (type != REG_SZ && type != REG_EXPAND_SZ) {
+            continue;
+        }
+
+        raw_data[(sizeof(raw_data) / sizeof(raw_data[0])) - 1] = 0;
+
+        if (type == REG_EXPAND_SZ) {
+            wchar_t expanded[4096] = {};
+            if (ExpandEnvironmentStringsW(raw_data, expanded, sizeof(expanded) / sizeof(expanded[0])) > 0) {
+                reach_tray_launch_run_value(expanded);
+            }
+        } else {
+            reach_tray_launch_run_value(raw_data);
+        }
+    }
+
+    RegCloseKey(key);
+}
+
+static void reach_tray_launch_startup_apps_once(reach_tray_provider *provider)
+{
+    if (provider == nullptr || provider->startup_apps_launched) {
+        return;
+    }
+
+    provider->startup_apps_launched = 1;
+
+    reach_tray_launch_startup_folder_known_id(FOLDERID_Startup);
+    reach_tray_launch_startup_folder_known_id(FOLDERID_CommonStartup);
+
+    reach_tray_launch_run_key(HKEY_CURRENT_USER);
+    reach_tray_launch_run_key(HKEY_LOCAL_MACHINE);
 }
 
 static reach_result reach_tray_refresh(reach_tray_provider *provider)
@@ -372,12 +669,14 @@ static reach_result reach_tray_refresh(reach_tray_provider *provider)
 
     size_t index = 0;
     while (index < provider->item_count) {
-        if (provider->items[index].owner == nullptr || !IsWindow(provider->items[index].owner)) {
+        HWND owner = provider->items[index].owner;
+        if (owner == nullptr || !IsWindow(owner)) {
             reach_tray_remove_item_at(provider, index);
         } else {
             ++index;
         }
     }
+
     provider->dirty = 0;
     return REACH_OK;
 }
@@ -430,98 +729,61 @@ static reach_result reach_tray_item_at(const reach_tray_provider *provider, size
     return REACH_INVALID_ARGUMENT;
 }
 
-static LPARAM reach_tray_v4_lparam(uint32_t message, uint32_t icon_id)
+static LPARAM reach_tray_v4_lparam(uint32_t notification, uint32_t icon_id)
 {
-    return (LPARAM)(((icon_id & 0xffff) << 16) | (message & 0xffff));
+    return MAKELPARAM(notification & 0xffff, icon_id & 0xffff);
 }
 
 static WPARAM reach_tray_cursor_wparam(void)
 {
     POINT point = {};
     GetCursorPos(&point);
-    return (WPARAM)(((point.y & 0xffff) << 16) | (point.x & 0xffff));
+    return (WPARAM)MAKELPARAM(point.x, point.y);
 }
 
-static void reach_tray_cancel_owner_menu(HWND owner)
+static int32_t reach_tray_post_v4_sequence(
+    HWND owner,
+    UINT callback,
+    uint32_t uid,
+    reach_tray_action action)
 {
-    if (owner == nullptr || !IsWindow(owner)) {
-        return;
+    WPARAM wparam = reach_tray_cursor_wparam();
+
+    if (action == REACH_TRAY_ACTION_RIGHT_CLICK) {
+        return
+            PostMessageW(owner, callback, wparam, reach_tray_v4_lparam(WM_RBUTTONDOWN, uid)) &&
+            PostMessageW(owner, callback, wparam, reach_tray_v4_lparam(WM_RBUTTONUP, uid)) &&
+            PostMessageW(owner, callback, wparam, reach_tray_v4_lparam(WM_CONTEXTMENU, uid));
     }
 
-    (void)SendMessageTimeoutW(
-        owner,
-        WM_CANCELMODE,
-        0,
-        0,
-        SMTO_ABORTIFHUNG,
-        200,
-        nullptr);
-
-    (void)PostMessageW(owner, WM_CANCELMODE, 0, 0);
-    (void)PostMessageW(owner, WM_NULL, 0, 0);
+    return
+        PostMessageW(owner, callback, wparam, reach_tray_v4_lparam(WM_LBUTTONDOWN, uid)) &&
+        PostMessageW(owner, callback, wparam, reach_tray_v4_lparam(WM_LBUTTONUP, uid)) &&
+        PostMessageW(owner, callback, wparam, reach_tray_v4_lparam(NIN_SELECT, uid));
 }
 
-static int32_t reach_tray_owner_already_cancelled(
-    HWND *owners,
-    size_t count,
-    HWND owner)
+static int32_t reach_tray_post_legacy_sequence(
+    HWND owner,
+    UINT callback,
+    uint32_t uid,
+    reach_tray_action action)
 {
-    for (size_t index = 0; index < count; ++index) {
-        if (owners[index] == owner) {
-            return 1;
-        }
+    if (action == REACH_TRAY_ACTION_RIGHT_CLICK) {
+        return
+            PostMessageW(owner, callback, uid, WM_RBUTTONDOWN) &&
+            PostMessageW(owner, callback, uid, WM_RBUTTONUP);
     }
 
-    return 0;
+    return
+        PostMessageW(owner, callback, uid, WM_LBUTTONDOWN) &&
+        PostMessageW(owner, callback, uid, WM_LBUTTONUP) &&
+        PostMessageW(owner, callback, uid, WM_LBUTTONDBLCLK) &&
+        PostMessageW(owner, callback, uid, WM_LBUTTONUP);
 }
 
 static reach_result reach_tray_cancel_active_menu(reach_tray_provider *provider)
 {
-    if (provider == nullptr) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    if (provider->host_window != nullptr && IsWindow(provider->host_window)) {
-        (void)SetForegroundWindow(provider->host_window);
-    }
-
-    HWND owners[REACH_MAX_TRAY_ITEMS + 2] = {};
-    size_t owner_count = 0;
-    size_t owner_capacity = sizeof(owners) / sizeof(owners[0]);
-
-    HWND active_owner = provider->active_menu_owner;
-    provider->active_menu_owner = nullptr;
-    provider->active_menu_owner_id = 0;
-
-    if (active_owner != nullptr && IsWindow(active_owner)) {
-        owners[owner_count++] = active_owner;
-    }
-
-    for (size_t index = 0; index < provider->item_count; ++index) {
-        HWND owner = provider->items[index].owner;
-        if (owner == nullptr || !IsWindow(owner)) {
-            continue;
-        }
-
-        if (!reach_tray_owner_already_cancelled(owners, owner_count, owner) &&
-            owner_count < owner_capacity) {
-            owners[owner_count++] = owner;
-        }
-    }
-
-    HWND foreground = GetForegroundWindow();
-    if (foreground != nullptr &&
-        IsWindow(foreground) &&
-        !reach_tray_owner_already_cancelled(owners, owner_count, foreground) &&
-        owner_count < owner_capacity) {
-        owners[owner_count++] = foreground;
-    }
-
-    for (size_t index = 0; index < owner_count; ++index) {
-        reach_tray_cancel_owner_menu(owners[index]);
-    }
-
-    return REACH_OK;
+    return provider != nullptr ? REACH_OK : REACH_INVALID_ARGUMENT;
 }
 
 static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t item_id, reach_tray_action action)
@@ -537,39 +799,30 @@ static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t 
             continue;
         }
 
-        (void)reach_tray_cancel_active_menu(provider);
+        if (!IsWindow(item->owner)) {
+            reach_tray_remove_item_at(provider, index);
+            return REACH_INVALID_ARGUMENT;
+        }
 
-        provider->active_menu_owner = item->owner;
-        provider->active_menu_owner_id = item->owner_id;
-
-        if (provider->host_window != nullptr && IsWindow(provider->host_window)) {
-            (void)SetForegroundWindow(provider->host_window);
+        if (action == REACH_TRAY_ACTION_RIGHT_CLICK) {
+            SetForegroundWindow(item->owner);
         }
 
         if (item->version >= NOTIFYICON_VERSION_4) {
-            uint32_t notification = action == REACH_TRAY_ACTION_RIGHT_CLICK
-                ? WM_CONTEXTMENU
-                : NIN_SELECT;
-
-            WPARAM wparam = reach_tray_cursor_wparam();
-            LPARAM lparam = reach_tray_v4_lparam(notification, item->owner_id);
-
-            return PostMessageW(item->owner, item->callback_message, wparam, lparam)
+            return reach_tray_post_v4_sequence(
+                item->owner,
+                item->callback_message,
+                item->owner_id,
+                action)
                 ? REACH_OK
                 : REACH_ERROR;
         }
 
-        uint32_t mouse_message = action == REACH_TRAY_ACTION_RIGHT_CLICK
-            ? WM_RBUTTONUP
-            : WM_LBUTTONUP;
-
-        if (action == REACH_TRAY_ACTION_LEFT_CLICK) {
-            if (!PostMessageW(item->owner, item->callback_message, item->owner_id, WM_LBUTTONDOWN)) {
-                return REACH_ERROR;
-            }
-        }
-
-        return PostMessageW(item->owner, item->callback_message, item->owner_id, mouse_message)
+        return reach_tray_post_legacy_sequence(
+            item->owner,
+            item->callback_message,
+            item->owner_id,
+            action)
             ? REACH_OK
             : REACH_ERROR;
     }
@@ -583,11 +836,13 @@ static void reach_tray_destroy(reach_tray_provider *provider)
         for (size_t index = 0; index < provider->item_count; ++index) {
             reach_tray_release_item_icon(&provider->items[index]);
         }
+
         if (provider->host_window != nullptr) {
             DestroyWindow(provider->host_window);
             provider->host_window = nullptr;
         }
     }
+
     delete provider;
 }
 
@@ -599,6 +854,7 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
     }
 
     *out_port = {};
+
     reach_tray_provider *provider = new (std::nothrow) reach_tray_provider();
     if (provider == nullptr) {
         return REACH_ERROR;
@@ -609,7 +865,17 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
         delete provider;
         return result;
     }
+
     reach_tray_broadcast_taskbar_created(provider);
+    SetTimer(provider->host_window, REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER, 3000, nullptr);
+    if (provider->host_window != nullptr) {
+        SetTimer(
+            provider->host_window,
+            REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER,
+            3000,
+            nullptr);
+    }
+    reach_tray_launch_startup_apps_once(provider);
 
     out_port->provider = provider;
     out_port->ops.refresh = reach_tray_refresh;
@@ -619,5 +885,6 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
     out_port->ops.activate = reach_tray_activate;
     out_port->ops.cancel_active_menu = reach_tray_cancel_active_menu;
     out_port->ops.destroy = reach_tray_destroy;
+
     return REACH_OK;
 }
