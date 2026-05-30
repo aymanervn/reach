@@ -185,10 +185,10 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
-    shell->dock_click_feedback_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
-    shell->dock_click_feedback_opacity = {};
-    shell->tray_click_feedback_index = REACH_MAX_TRAY_ITEMS;
-    shell->tray_click_feedback_opacity = {};
+    shell->feedback.dock_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
+    shell->feedback.dock_opacity = {};
+    shell->feedback.tray_index = REACH_MAX_TRAY_ITEMS;
+    shell->feedback.tray_opacity = {};
     shell->dock_drag.source_index = REACH_MAX_PINNED_APPS;
     shell->dock_drag.target_index = REACH_MAX_PINNED_APPS;
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;

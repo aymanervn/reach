@@ -34,8 +34,8 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     input.focused_window = focused_window;
     input.dragged_render_index = dragged_render_index;
     input.dragged_box_x = dragged_x;
-    input.click_feedback_index = shell->dock_click_feedback_index;
-    input.click_feedback_opacity = shell->dock_click_feedback_opacity.value;
+    input.click_feedback_index = shell->feedback.dock_index;
+    input.click_feedback_opacity = shell->feedback.dock_opacity.value;
     input.tray_feedback_index = REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON;
     input.quick_settings_feedback_index = REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON;
     input.power_feedback_index = REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON;
@@ -72,8 +72,8 @@ reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 
     input.model = &shell->tray_model;
     input.bounds = bounds;
     input.dock_height = shell->layout.dock.bounds.height;
-    input.click_feedback_index = shell->tray_click_feedback_index;
-    input.click_feedback_opacity = shell->tray_click_feedback_opacity.value;
+    input.click_feedback_index = shell->feedback.tray_index;
+    input.click_feedback_opacity = shell->feedback.tray_opacity.value;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     reach_result result = reach_tray_build_render_commands(&input, &commands);

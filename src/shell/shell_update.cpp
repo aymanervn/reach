@@ -832,7 +832,7 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     if (target_hidden && shell->context_menu_open) {
         reach_shell_close_context_menu(shell);
         reach_shell_clear_sticky_dock_feedback(shell);
-    } else if (target_hidden && shell->dock_click_feedback_sticky) {
+    } else if (target_hidden && shell->feedback.dock_sticky) {
         reach_shell_clear_sticky_dock_feedback(shell);
     }
 
@@ -1155,8 +1155,8 @@ static int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell
         !shell->dock_width_animating &&
         !shell->dock_drag.active &&
         !shell->dock_drag.snapping &&
-        !shell->dock_click_feedback_animating &&
-        !shell->tray_click_feedback_animating &&
+        !shell->feedback.dock_animating &&
+        !shell->feedback.tray_animating &&
         !reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation);
 }
 
@@ -1216,28 +1216,32 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     reach_shell_process_quick_settings_system_changes(shell);
 
     reach_shell_update_clock_text(shell);
+    if (shell->feedback.dock_animating) {
+        reach_float_animation_update(&shell->feedback.dock_opacity, delta_seconds);
+        shell->feedback.dock_animating =
+            reach_shell_float_animation_active(&shell->feedback.dock_opacity);
 
-    if (shell->dock_click_feedback_animating) {
-        reach_float_animation_update(&shell->dock_click_feedback_opacity, delta_seconds);
-        shell->dock_click_feedback_animating = reach_shell_float_animation_active(&shell->dock_click_feedback_opacity);
-        if (!shell->dock_click_feedback_animating &&
-            !shell->dock_click_feedback_pressed &&
-            !shell->dock_click_feedback_sticky &&
-            shell->dock_click_feedback_opacity.value <= 0.001f) {
-            shell->dock_click_feedback_opacity.value = 0.0f;
-            shell->dock_click_feedback_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
+        if (!shell->feedback.dock_animating &&
+            !shell->feedback.dock_pressed &&
+            !shell->feedback.dock_sticky &&
+            shell->feedback.dock_opacity.value <= 0.001f) {
+            shell->feedback.dock_opacity.value = 0.0f;
+            shell->feedback.dock_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
         }
+
         shell->dock.dirty_flags = 1;
     }
 
-    if (shell->tray_click_feedback_animating) {
-        reach_float_animation_update(&shell->tray_click_feedback_opacity, delta_seconds);
-        shell->tray_click_feedback_animating = reach_shell_float_animation_active(&shell->tray_click_feedback_opacity);
-        if (!shell->tray_click_feedback_animating &&
-            !shell->tray_click_feedback_pressed &&
-            shell->tray_click_feedback_opacity.value <= 0.001f) {
-            shell->tray_click_feedback_opacity.value = 0.0f;
-            shell->tray_click_feedback_index = REACH_MAX_TRAY_ITEMS;
+    if (shell->feedback.tray_animating) {
+        reach_float_animation_update(&shell->feedback.tray_opacity, delta_seconds);
+        shell->feedback.tray_animating =
+            reach_shell_float_animation_active(&shell->feedback.tray_opacity);
+
+        if (!shell->feedback.tray_animating &&
+            !shell->feedback.tray_pressed &&
+            shell->feedback.tray_opacity.value <= 0.001f) {
+            shell->feedback.tray_opacity.value = 0.0f;
+            shell->feedback.tray_index = REACH_MAX_TRAY_ITEMS;
         }
         shell->tray.dirty_flags = 1;
     }
@@ -1449,7 +1453,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         !shell->dock_width_animating &&
                         !shell->dock_drag.active &&
                         !shell->dock_drag.snapping &&
-                        !shell->dock_click_feedback_animating;
+                        !shell->feedback.dock_animating;
 
                     if (!game_mode &&
                         (shell->render_dirty ||
@@ -1654,6 +1658,6 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
          shell->dock_drag.active ||
          shell->dock_drag.snapping ||
          dock_item_animating ||
-         shell->dock_click_feedback_animating ||
-         shell->tray_click_feedback_animating);
+         shell->feedback.dock_animating ||
+         shell->feedback.tray_animating);
 }

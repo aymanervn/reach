@@ -106,7 +106,7 @@ reach_result reach_shell_update_dock_drag(
         }
 
         shell->dock_drag.target_index = target;
-        shell->dock_click_feedback_index = target;
+        shell->feedback.dock_index = target;
         shell->dock.dirty_flags = 1;
         return REACH_OK;
     }
@@ -118,8 +118,8 @@ reach_result reach_shell_update_dock_drag(
         shell->dock_drag.window);
 
     if (current != REACH_MAX_PINNED_APPS &&
-        shell->dock_click_feedback_index != current) {
-        shell->dock_click_feedback_index = current;
+        shell->feedback.dock_index != current) {
+        shell->feedback.dock_index = current;
         shell->dock.dirty_flags = 1;
     }
 

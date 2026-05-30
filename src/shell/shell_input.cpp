@@ -458,8 +458,8 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell, const
     if (dock_hit.type == REACH_DOCK_HIT_ITEM) {
         size_t index = dock_hit.index;
 
-        shell->dock_click_feedback_pressed = 1;
-        shell->dock_click_feedback_sticky = 0;
+        shell->feedback.dock_pressed = 1;
+        shell->feedback.dock_sticky = 0;
 
         reach_shell_set_dock_click_feedback_immediate(shell, index, 0.50f);
         (void)reach_shell_render_dock_surface(shell, &shell->layout.dock);

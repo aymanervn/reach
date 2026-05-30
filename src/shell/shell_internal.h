@@ -52,6 +52,19 @@ typedef struct reach_shell_dock_drag_state {
     reach_float_animation snap_animation;
 } reach_shell_dock_drag_state;
 
+typedef struct reach_shell_feedback_state {
+    size_t dock_index;
+    int32_t dock_pressed;
+    int32_t dock_sticky;
+    int32_t dock_animating;
+    reach_float_animation dock_opacity;
+
+    size_t tray_index;
+    int32_t tray_pressed;
+    int32_t tray_animating;
+    reach_float_animation tray_opacity;
+} reach_shell_feedback_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -109,16 +122,8 @@ struct reach_shell {
     int32_t dock_width_animating;
     size_t dock_width_item_count;
     reach_float_animation dock_width_animation;
-    size_t dock_click_feedback_index;
-    int32_t dock_click_feedback_pressed;
-    int32_t dock_click_feedback_sticky;
-    int32_t dock_click_feedback_animating;
-    reach_float_animation dock_click_feedback_opacity;
     reach_shell_dock_drag_state dock_drag;
-    size_t tray_click_feedback_index;
-    int32_t tray_click_feedback_pressed;
-    int32_t tray_click_feedback_animating;
-    reach_float_animation tray_click_feedback_opacity;
+    reach_shell_feedback_state feedback;
     size_t pressed_dock_index;
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
