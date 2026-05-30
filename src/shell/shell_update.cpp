@@ -727,7 +727,7 @@ static int32_t reach_shell_popup_blocks_dock_reveal_edge(const reach_shell *shel
     }
 
     return shell->ui.launcher.open ||
-        shell->switcher_open ||
+        shell->switcher_state.open ||
         shell->tray_state.popup_open ||
         shell->quick_settings_open ||
         shell->context_menu_state.open;
@@ -1545,7 +1545,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     result = reach_shell_apply_window_state(
                         &shell->switcher.window,
                         switcher_bounds,
-                        shell->switcher_open ? 1.0f : 0.0f,
+                        shell->switcher_state.open ? 1.0f : 0.0f,
                         &shell->switcher.last_bounds,
                         &shell->switcher.last_opacity,
                         &shell->switcher.bounds_valid,
@@ -1558,8 +1558,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (switcher_window_changed && shell->switcher.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->switcher.window.ops.apply_rounded_corners(shell->switcher.window.window, 16.0f);
                     }
-
-                    if (shell->switcher_open) {
+                    if (shell->switcher_state.open) {
                         if (shell->switcher.window.ops.show != nullptr) {
                             (void)shell->switcher.window.ops.show(shell->switcher.window.window);
                         }
@@ -1576,7 +1575,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     result = reach_shell_apply_window_state(
                         &shell->context_menu.window,
                         shell->context_menu_state.bounds,
-                                                (!game_mode && shell->context_menu_state.open) ? 1.0f : 0.0f,
+                        (!game_mode && shell->context_menu_state.open) ? 1.0f : 0.0f,
                         &shell->context_menu.last_bounds,
                         &shell->context_menu.last_opacity,
                         &shell->context_menu.bounds_valid,

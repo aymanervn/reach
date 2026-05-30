@@ -130,10 +130,10 @@ void reach_shell_update_switcher_visible_start(reach_shell *shell)
 
     reach_switcher_model model = {};
     model.window_count = shell->open_window_count;
-    model.selected_index = shell->switcher_selected_index;
-    model.visible_start = shell->switcher_visible_start;
+    model.selected_index = shell->switcher_state.selected_index;
+    model.visible_start = shell->switcher_state.visible_start;
     reach_switcher_update_visible_start(&model);
-    shell->switcher_visible_start = model.visible_start;
+    shell->switcher_state.visible_start = model.visible_start;
 }
 
 static void reach_shell_label_from_path(uint16_t *out_label, size_t out_count, const uint16_t *path)
@@ -194,8 +194,8 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
 
     reach_switcher_model model = {};
     model.window_count = shell->open_window_count;
-    model.selected_index = shell->switcher_selected_index;
-    model.visible_start = shell->switcher_visible_start;
+    model.selected_index = shell->switcher_state.selected_index;
+    model.visible_start = shell->switcher_state.visible_start;
 
     reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
     for (size_t index = 0; index < shell->open_window_count && index < REACH_MAX_PINNED_APPS; ++index) {

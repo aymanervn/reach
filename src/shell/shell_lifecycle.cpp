@@ -456,9 +456,8 @@ reach_result reach_shell_stop(reach_shell *shell)
         return REACH_INVALID_ARGUMENT;
     }
 
-    shell->running = 0;
-    reach_runtime_policy_init(&shell->runtime_policy);
-    shell->switcher_open = 0;
+    shell->running = 0;    reach_runtime_policy_init(&shell->runtime_policy);
+    shell->switcher_state.open = 0;
     shell->context_menu_state.open = 0;
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);

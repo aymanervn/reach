@@ -32,8 +32,8 @@ reach_result reach_shell_handle_switcher_event(
             (void)reach_shell_refresh_open_windows(shell, nullptr);
         }
 
-        shell->switcher_open = shell->open_window_count > 0 ? 1 : 0;
-        shell->switcher_selected_index = reach_shell_foreground_open_window_index(shell);
+        shell->switcher_state.open = shell->open_window_count > 0 ? 1 : 0;
+        shell->switcher_state.selected_index = reach_shell_foreground_open_window_index(shell);
 
         reach_shell_update_switcher_visible_start(shell);
 
@@ -41,14 +41,14 @@ reach_result reach_shell_handle_switcher_event(
         return REACH_OK;
     }
 
-    if (!shell->switcher_open) {
+    if (!shell->switcher_state.open) {
         return REACH_OK;
     }
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_NEXT &&
         shell->open_window_count > 0) {
-        shell->switcher_selected_index =
-            (shell->switcher_selected_index + 1) % shell->open_window_count;
+        shell->switcher_state.selected_index =
+            (shell->switcher_state.selected_index + 1) % shell->open_window_count;
 
         reach_shell_update_switcher_visible_start(shell);
 
@@ -58,9 +58,9 @@ reach_result reach_shell_handle_switcher_event(
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS &&
         shell->open_window_count > 0) {
-        shell->switcher_selected_index = shell->switcher_selected_index == 0
+        shell->switcher_state.selected_index = shell->switcher_state.selected_index == 0
             ? shell->open_window_count - 1
-            : shell->switcher_selected_index - 1;
+            : shell->switcher_state.selected_index - 1;
 
         reach_shell_update_switcher_visible_start(shell);
 
@@ -69,7 +69,7 @@ reach_result reach_shell_handle_switcher_event(
     }
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_CANCEL) {
-        shell->switcher_open = 0;
+        shell->switcher_state.open = 0;
         shell->switcher.dirty_flags = 1;
 
         if (shell->switcher.window.ops.hide != nullptr) {
@@ -80,11 +80,11 @@ reach_result reach_shell_handle_switcher_event(
     }
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_COMMIT) {
-        uintptr_t selected = shell->switcher_selected_index < shell->open_window_count
-            ? shell->open_windows[shell->switcher_selected_index].id
+        uintptr_t selected = shell->switcher_state.selected_index < shell->open_window_count
+            ? shell->open_windows[shell->switcher_state.selected_index].id
             : 0;
 
-        shell->switcher_open = 0;
+        shell->switcher_state.open = 0;
         shell->switcher.dirty_flags = 1;
 
         if (shell->switcher.window.ops.hide != nullptr) {

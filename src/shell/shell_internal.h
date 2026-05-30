@@ -115,6 +115,12 @@ typedef struct reach_shell_tray_state {
     reach_tray_model model;
 } reach_shell_tray_state;
 
+typedef struct reach_shell_switcher_state {
+    int32_t open;
+    size_t selected_index;
+    size_t visible_start;
+} reach_shell_switcher_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -181,9 +187,7 @@ struct reach_shell {
     int32_t suppress_power_button_release;
     reach_float_animation dock_y_animation;
     reach_shell_tray_state tray_state;
-    int32_t switcher_open;
-    size_t switcher_selected_index;
-    size_t switcher_visible_start;
+    reach_shell_switcher_state switcher_state;
     reach_shell_context_menu_state context_menu_state;
     uint16_t dock_time_text[32];
     uint16_t dock_date_text[64];
