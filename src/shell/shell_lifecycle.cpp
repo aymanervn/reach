@@ -194,8 +194,8 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_target_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_hovered_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
 
     shell->quick_settings_open = 0;
     if (shell->quick_settings.window.ops.hide != nullptr) {
@@ -443,7 +443,7 @@ reach_result reach_shell_start(reach_shell *shell)
     shell->tray.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
     shell->quick_settings.dirty_flags = 1;
-    shell->context_menu_open = 0;
+    shell->context_menu_state.open = 0;
     shell->quick_settings_open = 0;
     shell->quick_settings_drag.active = 0;
     shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
@@ -459,7 +459,7 @@ reach_result reach_shell_stop(reach_shell *shell)
     shell->running = 0;
     reach_runtime_policy_init(&shell->runtime_policy);
     shell->switcher_open = 0;
-    shell->context_menu_open = 0;
+    shell->context_menu_state.open = 0;
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
     reach_shell_cancel_launcher_search(shell);

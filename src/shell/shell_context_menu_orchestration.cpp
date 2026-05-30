@@ -5,13 +5,13 @@ void reach_shell_close_context_menu(reach_shell *shell)
     if (shell == nullptr) {
         return;
     }
-    shell->context_menu_open = 0;
-    shell->context_menu_power_open = 0;
-    shell->context_menu_target_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_hovered_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_item_count = 0;
+    shell->context_menu_state.open = 0;
+    shell->context_menu_state.power_open = 0;
+    shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.item_count = 0;
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index) {
-        shell->context_menu_item_icon_ids[index] = 0;
+        shell->context_menu_state.item_icon_ids[index] = 0;
     }
     shell->context_menu.dirty_flags = 1;
     reach_shell_release_context_menu_input(shell);
@@ -63,10 +63,10 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
             : REACH_ERROR;
     }
 
-    if (shell->context_menu_target_index >= shell->dock_model.item_count) {
+    if (shell->context_menu_state.target_index >= shell->dock_model.item_count) {
         return REACH_OK;
     }
-    size_t item_index = shell->context_menu_target_index;
+    size_t item_index = shell->context_menu_state.target_index;
     uint16_t item_path[260] = {};
     const uint16_t *path = reach_shell_dock_item_path(shell, item_index);
     if (path != nullptr) {
@@ -144,15 +144,15 @@ reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     reach_shell_set_tray_popup_open(shell, 0);
 
     reach_context_menu_build_power_commands(
-        shell->context_menu_item_commands,
-        shell->context_menu_item_icon_ids,
-        &shell->context_menu_item_count);
+        shell->context_menu_state.item_commands,
+        shell->context_menu_state.item_icon_ids,
+        &shell->context_menu_state.item_count);
 
     float popup_width = 176.0f;
     float item_height = 34.0f;
     float padding = 8.0f;
     float notch_height = reach_popup_notch_height();
-    float popup_body_height = padding * 2.0f + item_height * (float)shell->context_menu_item_count;
+    float popup_body_height = padding * 2.0f + item_height * (float)shell->context_menu_state.item_count;
     float popup_height = popup_body_height + notch_height;
     float anchor_x = shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
     float popup_x = anchor_x - popup_width * 0.72f;
@@ -182,19 +182,19 @@ reach_result reach_shell_show_power_context_menu(reach_shell *shell)
         popup_y = monitor.y + 8.0f;
     }
 
-    shell->context_menu_bounds = { popup_x, popup_y, popup_width, popup_height };
-    for (size_t index = 0; index < shell->context_menu_item_count; ++index) {
-        shell->context_menu_item_slots[index] = {
+    shell->context_menu_state.bounds = { popup_x, popup_y, popup_width, popup_height };
+    for (size_t index = 0; index < shell->context_menu_state.item_count; ++index) {
+        shell->context_menu_state.item_slots[index] = {
             popup_x + padding,
             popup_y + padding + item_height * (float)index,
             popup_width - padding * 2.0f,
             item_height
         };
     }
-    shell->context_menu_target_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_hovered_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_power_open = 1;
-    shell->context_menu_open = 1;
+    shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.power_open = 1;
+    shell->context_menu_state.open = 1;
     shell->context_menu.dirty_flags = 1;
     if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->context_menu.window.ops.set_pointer_move_enabled(
@@ -220,10 +220,10 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
         shell->dock_model.items[item_index].pinned,
         reach_shell_dock_item_path(shell, item_index) != nullptr,
         shell->dock_model.items[item_index].window != 0,
-        shell->context_menu_item_commands,
-        &shell->context_menu_item_count);
+        shell->context_menu_state.item_commands,
+        &shell->context_menu_state.item_count);
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index) {
-        shell->context_menu_item_icon_ids[index] = 0;
+        shell->context_menu_state.item_icon_ids[index] = 0;
     }
 
     float popup_width = 208.0f;
@@ -231,7 +231,7 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     float padding = 8.0f;
     float notch_height = reach_popup_notch_height();
     float anchor_ratio = 0.30f;
-    float popup_body_height = padding * 2.0f + item_height * (float)shell->context_menu_item_count;
+    float popup_body_height = padding * 2.0f + item_height * (float)shell->context_menu_state.item_count;
     float popup_height = popup_body_height + notch_height;
     float popup_x = (float)x - popup_width * anchor_ratio;
     float popup_y = (float)y - popup_height;
@@ -264,19 +264,19 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
         }
     }
 
-    shell->context_menu_bounds = { popup_x, popup_y, popup_width, popup_height };
-    for (size_t index = 0; index < shell->context_menu_item_count; ++index) {
-        shell->context_menu_item_slots[index] = {
+    shell->context_menu_state.bounds = { popup_x, popup_y, popup_width, popup_height };
+    for (size_t index = 0; index < shell->context_menu_state.item_count; ++index) {
+        shell->context_menu_state.item_slots[index] = {
             popup_x + padding,
             popup_y + padding + item_height * (float)index,
             popup_width - padding * 2.0f,
             item_height
         };
     }
-    shell->context_menu_target_index = item_index;
-    shell->context_menu_hovered_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_power_open = 0;
-    shell->context_menu_open = 1;
+    shell->context_menu_state.target_index = item_index;
+    shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.power_open = 0;
+    shell->context_menu_state.open = 1;
     shell->context_menu.dirty_flags = 1;
     if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->context_menu.window.ops.set_pointer_move_enabled(

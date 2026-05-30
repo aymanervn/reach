@@ -662,7 +662,7 @@ static int32_t reach_shell_popup_blocks_dock_autohide(const reach_shell *shell)
     return shell != nullptr &&
         (shell->tray_popup_open ||
          shell->quick_settings_open ||
-         shell->context_menu_open);
+         shell->context_menu_state.open);
 }
 int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell)
 {
@@ -730,7 +730,7 @@ static int32_t reach_shell_popup_blocks_dock_reveal_edge(const reach_shell *shel
         shell->switcher_open ||
         shell->tray_popup_open ||
         shell->quick_settings_open ||
-        shell->context_menu_open;
+        shell->context_menu_state.open;
 }
 
 static int32_t reach_shell_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
@@ -829,7 +829,7 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     if (target_hidden && shell->quick_settings_open) {
         reach_shell_set_quick_settings_open(shell, 0);
     }
-    if (target_hidden && shell->context_menu_open) {
+    if (target_hidden && shell->context_menu_state.open) {
         reach_shell_close_context_menu(shell);
         reach_shell_clear_sticky_dock_feedback(shell);
     } else if (target_hidden && shell->feedback.dock_sticky) {
@@ -1574,8 +1574,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     int32_t context_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->context_menu.window,
-                        shell->context_menu_bounds,
-                        (!game_mode && shell->context_menu_open) ? 1.0f : 0.0f,
+                        shell->context_menu_state.bounds,
+                                                (!game_mode && shell->context_menu_state.open) ? 1.0f : 0.0f,
                         &shell->context_menu.last_bounds,
                         &shell->context_menu.last_opacity,
                         &shell->context_menu.bounds_valid,
@@ -1588,8 +1588,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (context_window_changed && shell->context_menu.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->context_menu.window.ops.apply_rounded_corners(shell->context_menu.window.window, reach_popup_radius());
                     }
-
-                    if (!game_mode && shell->context_menu_open) {
+                    if (!game_mode && shell->context_menu_state.open) {
                         if (shell->context_menu.window.ops.show != nullptr) {
                             (void)shell->context_menu.window.ops.show(shell->context_menu.window.window);
                         }

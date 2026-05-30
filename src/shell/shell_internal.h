@@ -98,6 +98,18 @@ typedef struct reach_shell_launcher_search_state {
     void (*notify)(reach_shell *shell);
 } reach_shell_launcher_search_state;
 
+typedef struct reach_shell_context_menu_state {
+    int32_t open;
+    int32_t power_open;
+    size_t target_index;
+    reach_rect_f32 bounds;
+    reach_rect_f32 item_slots[REACH_CONTEXT_MENU_MAX_ITEMS];
+    uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS];
+    uint32_t item_icon_ids[REACH_CONTEXT_MENU_MAX_ITEMS];
+    size_t item_count;
+    size_t hovered_index;
+} reach_shell_context_menu_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -168,15 +180,7 @@ struct reach_shell {
     int32_t switcher_open;
     size_t switcher_selected_index;
     size_t switcher_visible_start;
-    int32_t context_menu_open;
-    int32_t context_menu_power_open;
-    size_t context_menu_target_index;
-    reach_rect_f32 context_menu_bounds;
-    reach_rect_f32 context_menu_item_slots[REACH_CONTEXT_MENU_MAX_ITEMS];
-    uint32_t context_menu_item_commands[REACH_CONTEXT_MENU_MAX_ITEMS];
-    uint32_t context_menu_item_icon_ids[REACH_CONTEXT_MENU_MAX_ITEMS];
-    size_t context_menu_item_count;
-    size_t context_menu_hovered_index;
+    reach_shell_context_menu_state context_menu_state;
     uint16_t dock_time_text[32];
     uint16_t dock_date_text[64];
     int32_t dock_clock_initialized;

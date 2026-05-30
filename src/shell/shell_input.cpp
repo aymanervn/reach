@@ -54,16 +54,16 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         return REACH_OK;
     }
 
-    if (shell->context_menu_open) {
+    if (shell->context_menu_state.open) {
         reach_context_menu_hit_result context_hit = reach_context_menu_hit_test_items(
-            shell->context_menu_item_slots,
-            shell->context_menu_item_count,
+            shell->context_menu_state.item_slots,
+            shell->context_menu_state.item_count,
             event->x,
             event->y);
 
         reach_context_menu_action context_action = reach_context_menu_action_for_hit(
-            shell->context_menu_item_commands,
-            shell->context_menu_item_count,
+            shell->context_menu_state.item_commands,
+            shell->context_menu_state.item_count,
             context_hit);
 
         if (context_action.command != 0) {
@@ -175,7 +175,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
             return REACH_OK;
         }
 
-        if (shell->context_menu_open && shell->context_menu_power_open) {
+        if (shell->context_menu_state.open && shell->context_menu_state.power_open) {
             reach_shell_close_context_menu(shell);
             return REACH_OK;
         }
@@ -237,13 +237,13 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         return REACH_OK;
     }
 
-    if (shell->context_menu_open) {
+    if (shell->context_menu_state.open) {
         reach_dock_hit_result dock_hit = reach_dock_hit_test(
             &shell->layout.dock,
             event->x,
             event->y);
 
-        if (shell->context_menu_power_open &&
+        if (shell->context_menu_state.power_open &&
             dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON) {
             reach_shell_close_context_menu(shell);
             reach_shell_clear_sticky_dock_feedback(shell);
@@ -251,7 +251,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
             return REACH_OK;
         }
 
-        if (!reach_rect_contains(shell->context_menu_bounds, event->x, event->y)) {
+        if (!reach_rect_contains(shell->context_menu_state.bounds, event->x, event->y)) {
             reach_shell_close_context_menu(shell);
         } else {
             reach_shell_capture_context_menu_input(shell);
@@ -348,10 +348,10 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         return REACH_OK;
     }
 
-    if (shell->context_menu_open) {
+    if (shell->context_menu_state.open) {
         reach_context_menu_hit_result context_hit = reach_context_menu_hit_test_items(
-            shell->context_menu_item_slots,
-            shell->context_menu_item_count,
+            shell->context_menu_state.item_slots,
+            shell->context_menu_state.item_count,
             event->x,
             event->y);
 
@@ -359,8 +359,8 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
             ? context_hit.index
             : REACH_MAX_PINNED_APPS;
 
-        if (shell->context_menu_hovered_index != hovered_context) {
-            shell->context_menu_hovered_index = hovered_context;
+        if (shell->context_menu_state.hovered_index != hovered_context) {
+            shell->context_menu_state.hovered_index = hovered_context;
             shell->context_menu.dirty_flags = 1;
         }
 
@@ -424,7 +424,7 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell, const
 
     reach_shell_clear_sticky_dock_feedback(shell);
 
-    if (shell->context_menu_open) {
+    if (shell->context_menu_state.open) {
         reach_shell_close_context_menu(shell);
     }
 
@@ -502,7 +502,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         return REACH_OK;
     }
 
-    if (event->type == REACH_UI_EVENT_ESCAPE && shell->context_menu_open) {
+    if (event->type == REACH_UI_EVENT_ESCAPE && shell->context_menu_state.open) {
         reach_shell_close_context_menu(shell);
         return REACH_OK;
     }
