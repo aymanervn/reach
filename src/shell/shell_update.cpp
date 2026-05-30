@@ -750,7 +750,7 @@ void reach_shell_sync_dock_reveal_edge(reach_shell *shell,
   int32_t should_show =
       should_auto_hide && !popup_blocks &&
       (shell->dock_reveal.target_hidden || shell->dock_reveal.active) &&
-      !shell->dock_animating;
+      !shell->dock_animation.animating;
 
   float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
 
@@ -831,43 +831,43 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell,
     reach_shell_clear_sticky_dock_feedback(shell);
   }
 
-  if (!shell->dock_animation_initialized) {
-    shell->dock_animation_initialized = 1;
+  if (!shell->dock_animation.initialized) {
+    shell->dock_animation.initialized = 1;
     shell->dock_reveal.target_hidden = target_hidden;
-    shell->dock_y_animation = {};
-    shell->dock_y_animation.from = target_y;
-    shell->dock_y_animation.to = target_y;
-    shell->dock_y_animation.value = target_y;
+    shell->dock_animation.y = {};
+    shell->dock_animation.y.from = target_y;
+    shell->dock_animation.y.to = target_y;
+    shell->dock_animation.y.value = target_y;
     shell->ui.dock.visible = target_hidden ? 0 : 1;
   }
 
   if (shell->dock_reveal.target_hidden != target_hidden) {
     shell->dock_reveal.target_hidden = target_hidden;
     shell->ui.dock.visible = target_hidden ? 0 : 1;
-    reach_float_animation_start(&shell->dock_y_animation,
-                                shell->dock_y_animation.value, target_y, 0.18);
-    shell->dock_animating = 1;
+    reach_float_animation_start(&shell->dock_animation.y,
+                                shell->dock_animation.y.value, target_y, 0.18);
+    shell->dock_animation.animating = 1;
   }
 
-  int32_t was_animating = shell->dock_animating;
-  if (shell->dock_animating) {
-    reach_float_animation_update(&shell->dock_y_animation, delta_seconds);
-    shell->dock_animating =
-        reach_shell_float_animation_active(&shell->dock_y_animation);
+  int32_t was_animating = shell->dock_animation.animating;
+  if (shell->dock_animation.animating) {
+    reach_float_animation_update(&shell->dock_animation.y, delta_seconds);
+    shell->dock_animation.animating =
+        reach_shell_float_animation_active(&shell->dock_animation.y);
   }
-  if (was_animating && !shell->dock_animating && !target_hidden &&
+  if (was_animating && !shell->dock_animation.animating && !target_hidden &&
       should_auto_hide && !popup_blocks_autohide && shell->dock_reveal.active &&
       !reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds,
                                                 monitor_bounds)) {
     shell->dock_reveal.active = 0;
     shell->dock_reveal.target_hidden = 1;
     shell->ui.dock.visible = 0;
-    reach_float_animation_start(&shell->dock_y_animation,
-                                shell->dock_y_animation.value, hidden_y, 0.18);
-    shell->dock_animating = 1;
+    reach_float_animation_start(&shell->dock_animation.y,
+                                shell->dock_animation.y.value, hidden_y, 0.18);
+    shell->dock_animation.animating = 1;
   }
   reach_rect_f32 animated = shown_bounds;
-  animated.y = shell->dock_y_animation.value;
+  animated.y = shell->dock_animation.y.value;
   return animated;
 }
 
@@ -1178,7 +1178,7 @@ reach_shell_can_move_dock_without_redraw(const reach_shell *shell) {
   /* Dock reveal/hide changes only the native window position. Keep this path
      content-clean so animation frames do not rebuild or execute render
      commands. */
-  return shell->dock_animating && shell->has_layout && !shell->dirty.layout &&
+  return shell->dock_animation.animating && shell->has_layout && !shell->dirty.layout &&
          !shell->dirty.render && !shell->dock.dirty_flags &&
          !shell->launcher.dirty_flags && !shell->tray.dirty_flags &&
          !shell->switcher.dirty_flags && !shell->context_menu.dirty_flags &&
@@ -1196,12 +1196,12 @@ reach_shell_move_dock_animation_frame(reach_shell *shell,
     return REACH_INVALID_ARGUMENT;
   }
 
-  reach_float_animation_update(&shell->dock_y_animation, delta_seconds);
-  shell->dock_animating =
-      reach_shell_float_animation_active(&shell->dock_y_animation);
+  reach_float_animation_update(&shell->dock_animation.y, delta_seconds);
+  shell->dock_animation.animating =
+      reach_shell_float_animation_active(&shell->dock_animation.y);
 
   reach_rect_f32 dock_bounds = shell->layout.dock.bounds;
-  dock_bounds.y = shell->dock_y_animation.value;
+  dock_bounds.y = shell->dock_animation.y.value;
 
   int32_t dock_window_changed = 0;
   reach_result result = reach_shell_apply_window_state(
@@ -1214,7 +1214,7 @@ reach_shell_move_dock_animation_frame(reach_shell *shell,
 
   shell->layout.dock.bounds = dock_bounds;
 
-  if (!shell->dock_animating) {
+  if (!shell->dock_animation.animating) {
     shell->dock_reveal.check_dirty = 1;
   }
 
@@ -1479,7 +1479,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds) {
           }
 
           int32_t dock_reveal_position_only =
-              shell->dock_animating && !shell->dirty.render &&
+              shell->dock_animation.animating && !shell->dirty.render &&
               !shell->dock.dirty_flags && !shell->dock_width.animating &&
               !shell->dock_drag.active && !shell->dock_drag.snapping &&
               !shell->feedback.dock_animating;
@@ -1683,7 +1683,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell) {
           shell->quick_settings.dirty_flags || shell->dock_reveal.check_dirty ||
           reach_shell_popup_bounds_animation_active(
               &shell->quick_settings_bounds_animation) ||
-          shell->dock_animating || shell->dock_width.animating ||
+          shell->dock_animation.animating || shell->dock_width.animating ||
           shell->dock_drag.active || shell->dock_drag.snapping ||
           dock_item_animating || shell->feedback.dock_animating ||
           shell->feedback.tray_animating);

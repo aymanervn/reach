@@ -135,6 +135,11 @@ typedef struct reach_shell_dirty_state {
   int32_t monitors;
 } reach_shell_dirty_state;
 
+typedef struct reach_shell_dock_animation_state {
+  int32_t initialized;
+  int32_t animating;
+  reach_float_animation y;
+} reach_shell_dock_animation_state;
 typedef struct reach_shell_dock_reveal_state {
   int32_t target_hidden;
   int32_t active;
@@ -191,8 +196,7 @@ struct reach_shell {
   int32_t has_layout;
   reach_shell_dirty_state dirty;
   reach_shell_wallpaper_state wallpaper_state;
-  int32_t dock_animation_initialized;
-  int32_t dock_animating;
+  reach_shell_dock_animation_state dock_animation;
   reach_shell_dock_reveal_state dock_reveal;
   reach_shell_dock_width_state dock_width;
   reach_shell_dock_drag_state dock_drag;
@@ -202,7 +206,6 @@ struct reach_shell {
   size_t pressed_launcher_index;
   reach_shell_launcher_search_state launcher_search;
   int32_t suppress_power_button_release;
-  reach_float_animation dock_y_animation;
   reach_shell_tray_state tray_state;
   reach_shell_switcher_state switcher_state;
   reach_shell_context_menu_state context_menu_state;
