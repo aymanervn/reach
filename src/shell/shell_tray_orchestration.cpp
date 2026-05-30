@@ -7,12 +7,12 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
     }
 
     int32_t next_open = open ? 1 : 0;
-    if (shell->tray_popup_open == next_open) {
+    if (shell->tray_state.popup_open == next_open) {
         return;
     }
 
-    shell->tray_popup_open = next_open;
-    if (shell->tray_popup_open) {
+    shell->tray_state.popup_open = next_open;
+    if (shell->tray_state.popup_open) {
         reach_shell_set_quick_settings_open(shell, 0);
         reach_shell_close_context_menu(shell);
         (void)reach_shell_refresh_tray_items(shell);
@@ -28,13 +28,13 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
 void reach_shell_toggle_tray_popup(reach_shell *shell)
 {
     if (shell != nullptr) {
-        reach_shell_set_tray_popup_open(shell, !shell->tray_popup_open);
+        reach_shell_set_tray_popup_open(shell, !shell->tray_state.popup_open);
     }
 }
 
 reach_result reach_shell_refresh_tray_items(reach_shell *shell)
 {
-    return shell != nullptr ? reach_tray_model_refresh(&shell->tray_model, &shell->tray_provider) : REACH_OK;
+    return shell != nullptr ? reach_tray_model_refresh(&shell->tray_state.model, &shell->tray_provider) : REACH_OK;
 }
 
 void reach_shell_compute_tray_popup_layout(
@@ -49,7 +49,7 @@ void reach_shell_compute_tray_popup_layout(
 
     (void)out_slots;
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    reach_tray_compute_popup_layout(&shell->tray_model, theme, dock_layout, out_bounds);
+    reach_tray_compute_popup_layout(&shell->tray_state.model, theme, dock_layout, out_bounds);
 }
 
 reach_result reach_shell_execute_tray_action(reach_shell *shell, reach_tray_feature_action action)
@@ -66,7 +66,7 @@ reach_result reach_shell_execute_tray_action(reach_shell *shell, reach_tray_feat
         action.item_id,
         action.provider_action);
     reach_shell_release_tray_item(shell);
-    if (shell->tray_popup_open) {
+    if (shell->tray_state.popup_open) {
         reach_shell_capture_tray_input(shell);
     }
     return result;

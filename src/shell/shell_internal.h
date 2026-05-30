@@ -110,6 +110,11 @@ typedef struct reach_shell_context_menu_state {
     size_t hovered_index;
 } reach_shell_context_menu_state;
 
+typedef struct reach_shell_tray_state {
+    int32_t popup_open;
+    reach_tray_model model;
+} reach_shell_tray_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -175,8 +180,7 @@ struct reach_shell {
     reach_shell_launcher_search_state launcher_search;
     int32_t suppress_power_button_release;
     reach_float_animation dock_y_animation;
-    int32_t tray_popup_open;
-    reach_tray_model tray_model;
+    reach_shell_tray_state tray_state;
     int32_t switcher_open;
     size_t switcher_selected_index;
     size_t switcher_visible_start;

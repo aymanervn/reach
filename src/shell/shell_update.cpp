@@ -660,7 +660,7 @@ void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)
 static int32_t reach_shell_popup_blocks_dock_autohide(const reach_shell *shell)
 {
     return shell != nullptr &&
-        (shell->tray_popup_open ||
+        (shell->tray_state.popup_open ||
          shell->quick_settings_open ||
          shell->context_menu_state.open);
 }
@@ -728,7 +728,7 @@ static int32_t reach_shell_popup_blocks_dock_reveal_edge(const reach_shell *shel
 
     return shell->ui.launcher.open ||
         shell->switcher_open ||
-        shell->tray_popup_open ||
+        shell->tray_state.popup_open ||
         shell->quick_settings_open ||
         shell->context_menu_state.open;
 }
@@ -823,7 +823,7 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
 
     int32_t target_hidden = base_hidden && !shell->dock_reveal_active;
     float target_y = target_hidden ? hidden_y : shown_bounds.y;
-    if (target_hidden && shell->tray_popup_open) {
+    if (target_hidden && shell->tray_state.popup_open) {
         reach_shell_set_tray_popup_open(shell, 0);
     }
     if (target_hidden && shell->quick_settings_open) {
@@ -1295,12 +1295,11 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             shell->dock.dirty_flags = 1;
         }
     }
-
     (void)reach_shell_update_game_mode(shell);
     int32_t game_mode = reach_shell_game_mode_enabled(shell);
 
     if (!game_mode &&
-        shell->tray_popup_open &&
+        shell->tray_state.popup_open &&
         shell->tray_provider.ops.needs_refresh != nullptr &&
         shell->tray_provider.ops.needs_refresh(shell->tray_provider.provider)) {
         (void)reach_shell_refresh_tray_items(shell);
@@ -1465,13 +1464,16 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
                 if (shell->tray.window.ops.set_bounds != nullptr) {
                     reach_rect_f32 tray_bounds = {};
-                    reach_shell_compute_tray_popup_layout(shell, &layout.dock, &tray_bounds, shell->tray_model.item_slots);
-
+                    reach_shell_compute_tray_popup_layout(
+                                            shell,
+                                            &layout.dock,
+                                            &tray_bounds,
+                                            shell->tray_state.model.item_slots);
                     int32_t tray_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->tray.window,
                         tray_bounds,
-                        (!game_mode && shell->tray_popup_open) ? 1.0f : 0.0f,
+                        (!game_mode && shell->tray_state.popup_open) ? 1.0f : 0.0f,
                         &shell->tray.last_bounds,
                         &shell->tray.last_opacity,
                         &shell->tray.bounds_valid,
@@ -1484,8 +1486,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     if (tray_window_changed && shell->tray.window.ops.apply_rounded_corners != nullptr) {
                         (void)shell->tray.window.ops.apply_rounded_corners(shell->tray.window.window, reach_popup_radius());
                     }
-
-                    if (!game_mode && shell->tray_popup_open) {
+                    if (shell->tray_state.popup_open) {
                         if (shell->tray.window.ops.show != nullptr) {
                             (void)shell->tray.window.ops.show(shell->tray.window.window);
                         }
@@ -1493,7 +1494,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                             (void)reach_shell_render_tray_surface(shell, tray_bounds);
                         }
                     } else {
-                        if (shell->tray_popup_open) {
+                        if (shell->tray_state.popup_open) {
                             reach_shell_set_tray_popup_open(shell, 0);
                         } else if (shell->tray.window.ops.hide != nullptr) {
                             (void)shell->tray.window.ops.hide(shell->tray.window.window);

@@ -69,7 +69,7 @@ reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 
     reach_render_command_buffer commands = {};
     reach_tray_render_input input = {};
     input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    input.model = &shell->tray_model;
+    input.model = &shell->tray_state.model;
     input.bounds = bounds;
     input.dock_height = shell->layout.dock.bounds.height;
     input.click_feedback_index = shell->feedback.tray_index;

@@ -132,15 +132,15 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         }
     }
 
-    if (shell->tray_popup_open && shell->tray_provider.ops.activate != nullptr) {
+    if (shell->tray_state.popup_open && shell->tray_provider.ops.activate != nullptr) {
         reach_tray_hit_result tray_hit = reach_tray_hit_test_popup(
-            &shell->tray_model,
+            &shell->tray_state.model,
             shell->tray.last_bounds,
             event->x,
             event->y);
 
         reach_tray_feature_action tray_action = reach_tray_action_for_hit(
-            &shell->tray_model,
+            &shell->tray_state.model,
             tray_hit,
             REACH_TRAY_ACTION_LEFT_CLICK);
 
@@ -157,7 +157,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     if (dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON) {
         reach_shell_toggle_tray_popup(shell);
 
-        if (!shell->tray_popup_open && shell->tray.window.ops.hide != nullptr) {
+        if (!shell->tray_state.popup_open && shell->tray.window.ops.hide != nullptr) {
             return shell->tray.window.ops.hide(shell->tray.window.window);
         }
 
@@ -183,7 +183,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         return reach_shell_show_power_context_menu(shell);
     }
 
-    if (shell->tray_popup_open &&
+    if (shell->tray_state.popup_open &&
         !reach_rect_contains(shell->tray.last_bounds, event->x, event->y)) {
         reach_shell_set_tray_popup_open(shell, 0);
 
@@ -309,9 +309,9 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         return REACH_OK;
     }
 
-    if (shell->tray_popup_open) {
+    if (shell->tray_state.popup_open) {
         reach_tray_hit_result tray_hit = reach_tray_hit_test_popup(
-            &shell->tray_model,
+            &shell->tray_state.model,
             shell->tray.last_bounds,
             event->x,
             event->y);
@@ -432,15 +432,15 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell, const
         reach_shell_set_quick_settings_open(shell, 0);
     }
 
-    if (shell->tray_popup_open && shell->tray_provider.ops.activate != nullptr) {
+    if (shell->tray_state.popup_open && shell->tray_provider.ops.activate != nullptr) {
         reach_tray_hit_result tray_hit = reach_tray_hit_test_popup(
-            &shell->tray_model,
+            &shell->tray_state.model,
             shell->tray.last_bounds,
             event->x,
             event->y);
 
         reach_tray_feature_action tray_action = reach_tray_action_for_hit(
-            &shell->tray_model,
+            &shell->tray_state.model,
             tray_hit,
             REACH_TRAY_ACTION_RIGHT_CLICK);
 

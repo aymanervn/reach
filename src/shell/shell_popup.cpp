@@ -14,7 +14,7 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
         return;
     }
 
-    int32_t on_tray = shell->tray_popup_open &&
+    int32_t on_tray = shell->tray_state.popup_open &&
         (float)point.x >= shell->tray.last_bounds.x &&
         (float)point.x <= shell->tray.last_bounds.x + shell->tray.last_bounds.width &&
         (float)point.y >= shell->tray.last_bounds.y &&
@@ -35,11 +35,11 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
         (float)point.y >= shell->layout.launcher.bounds.y &&
         (float)point.y <= shell->layout.launcher.bounds.y + shell->layout.launcher.bounds.height;
     reach_dock_hit_result dock_hit = shell->has_layout ? reach_dock_hit_test(&shell->layout.dock, point.x, point.y) : reach_dock_hit_result {};
-    int32_t on_tray_button = shell->tray_popup_open && dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON;
+    int32_t on_tray_button = shell->tray_state.popup_open && dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON;
     int32_t on_quick_settings_button = shell->quick_settings_open && dock_hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON;
     int32_t on_power_button = shell->context_menu_state.open && shell->context_menu_state.power_open && dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON;
 
-    if (shell->tray_popup_open && !on_tray && !on_tray_button) {
+    if (shell->tray_state.popup_open && !on_tray && !on_tray_button) {
         reach_shell_set_tray_popup_open(shell, 0);
     }
     if (shell->context_menu_state.open && !on_context && !on_power_button) {
@@ -72,7 +72,7 @@ void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
     }
 
     if (shell->popup_capture.sync_mouse_hook != nullptr) {
-        int32_t should_hook = shell->tray_popup_open || shell->context_menu_state.open || shell->quick_settings_open || shell->ui.launcher.open;
+        int32_t should_hook = shell->tray_state.popup_open || shell->context_menu_state.open || shell->quick_settings_open || shell->ui.launcher.open;
         (void)shell->popup_capture.sync_mouse_hook(
             shell->popup_capture.userdata,
             should_hook,

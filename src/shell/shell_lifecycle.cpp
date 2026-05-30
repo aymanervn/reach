@@ -156,7 +156,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->system_controls = {};
     shell->quick_settings_system_change_flags.store(0);
     reach_dock_icon_cache_init(&shell->dock_icons);
-    reach_tray_model_init(&shell->tray_model);
+    reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
 }
 
@@ -177,7 +177,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     reach_ui_state_init(&shell->ui);
     reach_dock_feature_model_init(&shell->dock_model);
     reach_dock_icon_cache_init(&shell->dock_icons);
-    reach_tray_model_init(&shell->tray_model);
+    reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
