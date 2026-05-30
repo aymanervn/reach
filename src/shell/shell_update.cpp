@@ -880,41 +880,41 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell,
 
   float target_width = layout->bounds.width;
   size_t target_count = layout->app_slot_count;
-  if (!shell->dock_width_animation_initialized) {
-    shell->dock_width_animation_initialized = 1;
-    shell->dock_width_item_count = target_count;
-    shell->dock_width_animation = {};
-    shell->dock_width_animation.from = target_width;
-    shell->dock_width_animation.to = target_width;
-    shell->dock_width_animation.value = target_width;
+  if (!shell->dock_width.initialized) {
+    shell->dock_width.initialized = 1;
+    shell->dock_width.item_count = target_count;
+    shell->dock_width.animation = {};
+    shell->dock_width.animation.from = target_width;
+    shell->dock_width.animation.to = target_width;
+    shell->dock_width.animation.value = target_width;
   }
 
-  if (shell->dock_width_item_count != target_count &&
-      fabsf(shell->dock_width_animation.to - target_width) >= 0.5f) {
-    float from = shell->dock_width_animation.value > 0.0f
-                     ? shell->dock_width_animation.value
+  if (shell->dock_width.item_count != target_count &&
+      fabsf(shell->dock_width.animation.to - target_width) >= 0.5f) {
+    float from = shell->dock_width.animation.value > 0.0f
+                     ? shell->dock_width.animation.value
                      : target_width;
-    reach_float_animation_start(&shell->dock_width_animation, from,
+    reach_float_animation_start(&shell->dock_width.animation, from,
                                 target_width, 0.18);
-    shell->dock_width_animating = 1;
-    shell->dock_width_item_count = target_count;
+    shell->dock_width.animating = 1;
+    shell->dock_width.item_count = target_count;
     shell->dock.dirty_flags = 1;
-  } else if (!shell->dock_width_animating &&
-             fabsf(shell->dock_width_animation.value - target_width) >= 0.5f) {
-    shell->dock_width_animation.from = target_width;
-    shell->dock_width_animation.to = target_width;
-    shell->dock_width_animation.value = target_width;
-    shell->dock_width_item_count = target_count;
+  } else if (!shell->dock_width.animating &&
+             fabsf(shell->dock_width.animation.value - target_width) >= 0.5f) {
+    shell->dock_width.animation.from = target_width;
+    shell->dock_width.animation.to = target_width;
+    shell->dock_width.animation.value = target_width;
+    shell->dock_width.item_count = target_count;
   }
 
-  if (shell->dock_width_animating) {
-    reach_float_animation_update(&shell->dock_width_animation, delta_seconds);
-    shell->dock_width_animating =
-        reach_shell_float_animation_active(&shell->dock_width_animation);
+  if (shell->dock_width.animating) {
+    reach_float_animation_update(&shell->dock_width.animation, delta_seconds);
+    shell->dock_width.animating =
+        reach_shell_float_animation_active(&shell->dock_width.animation);
     shell->dock.dirty_flags = 1;
   }
 
-  float animated_width = shell->dock_width_animation.value;
+  float animated_width = shell->dock_width.animation.value;
   if (animated_width <= 0.0f) {
     animated_width = target_width;
   }
@@ -1182,7 +1182,7 @@ reach_shell_can_move_dock_without_redraw(const reach_shell *shell) {
          !shell->dirty.render && !shell->dock.dirty_flags &&
          !shell->launcher.dirty_flags && !shell->tray.dirty_flags &&
          !shell->switcher.dirty_flags && !shell->context_menu.dirty_flags &&
-         !shell->quick_settings.dirty_flags && !shell->dock_width_animating &&
+         !shell->quick_settings.dirty_flags && !shell->dock_width.animating &&
          !shell->dock_drag.active && !shell->dock_drag.snapping &&
          !shell->feedback.dock_animating && !shell->feedback.tray_animating &&
          !reach_shell_popup_bounds_animation_active(
@@ -1480,7 +1480,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds) {
 
           int32_t dock_reveal_position_only =
               shell->dock_animating && !shell->dirty.render &&
-              !shell->dock.dirty_flags && !shell->dock_width_animating &&
+              !shell->dock.dirty_flags && !shell->dock_width.animating &&
               !shell->dock_drag.active && !shell->dock_drag.snapping &&
               !shell->feedback.dock_animating;
 
@@ -1683,7 +1683,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell) {
           shell->quick_settings.dirty_flags || shell->dock_reveal.check_dirty ||
           reach_shell_popup_bounds_animation_active(
               &shell->quick_settings_bounds_animation) ||
-          shell->dock_animating || shell->dock_width_animating ||
+          shell->dock_animating || shell->dock_width.animating ||
           shell->dock_drag.active || shell->dock_drag.snapping ||
           dock_item_animating || shell->feedback.dock_animating ||
           shell->feedback.tray_animating);
