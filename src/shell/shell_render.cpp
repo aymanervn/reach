@@ -13,12 +13,12 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
         item_box_x[index] = reach_shell_dock_item_current_x(shell, layout, index);
     }
 
-    size_t dragged_render_index = (shell->dock_drag_active || shell->dock_drag_snapping)
-        ? reach_shell_find_dock_item_key(shell, shell->dock_drag_pinned, shell->dock_drag_pin_id, shell->dock_drag_window)
+    size_t dragged_render_index = (shell->dock_drag.active || shell->dock_drag.snapping)
+        ? reach_shell_find_dock_item_key(shell, shell->dock_drag.pinned, shell->dock_drag.pin_id, shell->dock_drag.window)
         : REACH_MAX_PINNED_APPS;
-    float dragged_x = shell->dock_drag_snapping
-        ? shell->dock_drag_snap_animation.value
-        : shell->dock_drag_x;
+    float dragged_x = shell->dock_drag.snapping
+        ? shell->dock_drag.snap_animation.value
+        : shell->dock_drag.x;
     uintptr_t focused_window = shell->window_manager.ops.foreground != nullptr
         ? shell->window_manager.ops.foreground(shell->window_manager.manager)
         : 0;
@@ -34,8 +34,8 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     input.focused_window = focused_window;
     input.dragged_render_index = dragged_render_index;
     input.dragged_box_x = dragged_x;
-    input.click_feedback_index = shell->dock_click_feedback_index;
-    input.click_feedback_opacity = shell->dock_click_feedback_opacity.value;
+    input.click_feedback_index = shell->feedback.dock_index;
+    input.click_feedback_opacity = shell->feedback.dock_opacity.value;
     input.tray_feedback_index = REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON;
     input.quick_settings_feedback_index = REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON;
     input.power_feedback_index = REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON;
@@ -69,11 +69,11 @@ reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 
     reach_render_command_buffer commands = {};
     reach_tray_render_input input = {};
     input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    input.model = &shell->tray_model;
+    input.model = &shell->tray_state.model;
     input.bounds = bounds;
     input.dock_height = shell->layout.dock.bounds.height;
-    input.click_feedback_index = shell->tray_click_feedback_index;
-    input.click_feedback_opacity = shell->tray_click_feedback_opacity.value;
+    input.click_feedback_index = shell->feedback.tray_index;
+    input.click_feedback_opacity = shell->feedback.tray_opacity.value;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     reach_result result = reach_tray_build_render_commands(&input, &commands);
@@ -130,10 +130,10 @@ void reach_shell_update_switcher_visible_start(reach_shell *shell)
 
     reach_switcher_model model = {};
     model.window_count = shell->open_window_count;
-    model.selected_index = shell->switcher_selected_index;
-    model.visible_start = shell->switcher_visible_start;
+    model.selected_index = shell->switcher_state.selected_index;
+    model.visible_start = shell->switcher_state.visible_start;
     reach_switcher_update_visible_start(&model);
-    shell->switcher_visible_start = model.visible_start;
+    shell->switcher_state.visible_start = model.visible_start;
 }
 
 static void reach_shell_label_from_path(uint16_t *out_label, size_t out_count, const uint16_t *path)
@@ -194,8 +194,8 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
 
     reach_switcher_model model = {};
     model.window_count = shell->open_window_count;
-    model.selected_index = shell->switcher_selected_index;
-    model.visible_start = shell->switcher_visible_start;
+    model.selected_index = shell->switcher_state.selected_index;
+    model.visible_start = shell->switcher_state.visible_start;
 
     reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
     for (size_t index = 0; index < shell->open_window_count && index < REACH_MAX_PINNED_APPS; ++index) {
@@ -262,16 +262,16 @@ reach_result reach_shell_render_context_menu_surface(reach_shell *shell)
 
     reach_context_menu_render_input input = {};
     input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    input.bounds = shell->context_menu_bounds;
-    input.item_slots = shell->context_menu_item_slots;
-    input.item_commands = shell->context_menu_item_commands;
-    input.item_icon_ids = shell->context_menu_item_icon_ids;
-    input.item_count = shell->context_menu_item_count;
-    input.hovered_index = shell->context_menu_hovered_index;
-    input.target_index = shell->context_menu_target_index;
+    input.bounds = shell->context_menu_state.bounds;
+    input.item_slots = shell->context_menu_state.item_slots;
+    input.item_commands = shell->context_menu_state.item_commands;
+    input.item_icon_ids = shell->context_menu_state.item_icon_ids;
+    input.item_count = shell->context_menu_state.item_count;
+    input.hovered_index = shell->context_menu_state.hovered_index;
+    input.target_index = shell->context_menu_state.target_index;
     input.dock_layout = &shell->layout.dock;
     input.has_layout = shell->has_layout;
-    input.use_anchor_x = shell->context_menu_power_open && shell->has_layout;
+    input.use_anchor_x = shell->context_menu_state.power_open && shell->has_layout;
     input.anchor_x = shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 

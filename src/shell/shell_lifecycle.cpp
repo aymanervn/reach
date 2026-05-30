@@ -10,10 +10,10 @@ static void reach_shell_on_dock_reveal_edge(void *user)
         return;
     }
 
-    if (shell->dock_reveal_active || !shell->dock_target_hidden) {
-        shell->dock_reveal_check_dirty = 1;
+    if (shell->dock_reveal.active || !shell->dock_reveal.target_hidden) {
+        shell->dock_reveal.check_dirty = 1;
     } else {
-        shell->dock_reveal_requested = 1;
+        shell->dock_reveal.requested = 1;
     }
     reach_shell_request_update(shell);
 }
@@ -137,10 +137,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
     shell->dock_reveal_edge = {};
-    shell->dock_reveal_edge_visible = 0;
-    shell->dock_reveal_edge_bounds_valid = 0;
-    shell->dock_reveal_requested = 0;
-    shell->dock_reveal_edge_bounds = {};
+    shell->dock_reveal.edge_visible = 0;
+    shell->dock_reveal.edge_bounds_valid = 0;
+    shell->dock_reveal.requested = 0;
+    shell->dock_reveal.edge_bounds = {};
     shell->input_source = {};
     shell->window_manager = {};
     shell->config_store = {};
@@ -156,7 +156,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->system_controls = {};
     shell->quick_settings_system_change_flags.store(0);
     reach_dock_icon_cache_init(&shell->dock_icons);
-    reach_tray_model_init(&shell->tray_model);
+    reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
 }
 
@@ -177,7 +177,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     reach_ui_state_init(&shell->ui);
     reach_dock_feature_model_init(&shell->dock_model);
     reach_dock_icon_cache_init(&shell->dock_icons);
-    reach_tray_model_init(&shell->tray_model);
+    reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
@@ -185,26 +185,26 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
-    shell->dock_click_feedback_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
-    shell->dock_click_feedback_opacity = {};
-    shell->tray_click_feedback_index = REACH_MAX_TRAY_ITEMS;
-    shell->tray_click_feedback_opacity = {};
-    shell->dock_drag_source_index = REACH_MAX_PINNED_APPS;
-    shell->dock_drag_target_index = REACH_MAX_PINNED_APPS;
+    shell->feedback.dock_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
+    shell->feedback.dock_opacity = {};
+    shell->feedback.tray_index = REACH_MAX_TRAY_ITEMS;
+    shell->feedback.tray_opacity = {};
+    shell->dock_drag.source_index = REACH_MAX_PINNED_APPS;
+    shell->dock_drag.target_index = REACH_MAX_PINNED_APPS;
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_target_index = REACH_MAX_PINNED_APPS;
-    shell->context_menu_hovered_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
+    shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
 
     shell->quick_settings_open = 0;
     if (shell->quick_settings.window.ops.hide != nullptr) {
         (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
     }
-    shell->quick_settings_dragging_volume = 0;
-    shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
-    shell->quick_settings_drag_session_index = 0;
-    shell->quick_settings_drag_session_instance_id[0] = 0;
+    shell->quick_settings_drag.active = 0;
+    shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
+    shell->quick_settings_drag.session_index = 0;
+    shell->quick_settings_drag.session_instance_id[0] = 0;
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
             shell->quick_settings.window.window,
@@ -222,7 +222,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->quick_settings_bounds_animation = {};
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
-    shell->launcher_search_notify = reach_shell_notify_launcher_search_ready;
+    shell->launcher_search.notify = reach_shell_notify_launcher_search_ready;
 
     reach_result result = REACH_OK;
 
@@ -282,12 +282,12 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
         *out_shell = nullptr;
         return result;
     }
-    shell->dock_reveal_edge_visible = 0;
-    shell->dock_reveal_edge_bounds_valid = 0;
-    shell->dock_reveal_edge_bounds = {};
-    shell->layout_dirty = 1;
-    shell->render_dirty = 1;
-    shell->monitors_dirty = 1;
+    shell->dock_reveal.edge_visible = 0;
+    shell->dock_reveal.edge_bounds_valid = 0;
+    shell->dock_reveal.edge_bounds = {};
+    shell->dirty.layout = 1;
+    shell->dirty.render = 1;
+    shell->dirty.monitors = 1;
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
@@ -435,18 +435,18 @@ reach_result reach_shell_start(reach_shell *shell)
 
     shell->running = 1;
     reach_runtime_policy_init(&shell->runtime_policy);
-    shell->layout_dirty = 1;
-    shell->render_dirty = 1;
-    shell->monitors_dirty = 1;
+    shell->dirty.layout = 1;
+    shell->dirty.render = 1;
+    shell->dirty.monitors = 1;
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->tray.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
     shell->quick_settings.dirty_flags = 1;
-    shell->context_menu_open = 0;
+    shell->context_menu_state.open = 0;
     shell->quick_settings_open = 0;
-    shell->quick_settings_dragging_volume = 0;
-    shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
+    shell->quick_settings_drag.active = 0;
+    shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     return REACH_OK;
 }
 
@@ -458,8 +458,8 @@ reach_result reach_shell_stop(reach_shell *shell)
 
     shell->running = 0;
     reach_runtime_policy_init(&shell->runtime_policy);
-    shell->switcher_open = 0;
-    shell->context_menu_open = 0;
+    shell->switcher_state.open = 0;
+    shell->context_menu_state.open = 0;
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
     reach_shell_cancel_launcher_search(shell);

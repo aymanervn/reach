@@ -168,13 +168,13 @@ void reach_shell_release_tray_render_icons(reach_shell *shell)
         return;
     }
 
-    size_t count = shell->tray_model.item_count;
+    size_t count = shell->tray_state.model.item_count;
     if (count > REACH_MAX_TRAY_ITEMS) {
         count = REACH_MAX_TRAY_ITEMS;
     }
 
     for (size_t index = 0; index < count; ++index) {
-        uint64_t icon_id = shell->tray_model.items[index].icon_id;
+        uint64_t icon_id = shell->tray_state.model.items[index].icon_id;
         if (icon_id != 0) {
             reach_shell_release_render_icon(shell, icon_id);
         }

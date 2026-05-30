@@ -25,15 +25,15 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
         (void)reach_ui_state_close_launcher(&shell->ui);
     }
 
-    shell->dock_reveal_requested = 0;
-    shell->dock_reveal_check_dirty = 0;
+    shell->dock_reveal.requested = 0;
+    shell->dock_reveal.check_dirty = 0;
 
     shell->launcher.dirty_flags = 1;
     shell->tray.dirty_flags = 1;
     shell->context_menu.dirty_flags = 1;
     shell->quick_settings.dirty_flags = 1;
     shell->dock.dirty_flags = 1;
-    shell->render_dirty = 1;
+    shell->dirty.render = 1;
 }
 
 int32_t reach_shell_game_mode_enabled(const reach_shell *shell)
@@ -61,8 +61,8 @@ reach_result reach_shell_update_game_mode(reach_shell *shell)
     if (next_active) {
         reach_shell_close_transient_ui_for_game_mode(shell);
     } else {
-        shell->layout_dirty = 1;
-        shell->render_dirty = 1;
+        shell->dirty.layout = 1;
+        shell->dirty.render = 1;
         shell->dock.dirty_flags = 1;
         shell->launcher.dirty_flags = 1;
         shell->tray.dirty_flags = 1;

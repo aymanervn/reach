@@ -328,7 +328,7 @@ void reach_shell_process_quick_settings_system_changes(
     }
 
     shell->quick_settings.dirty_flags = 1;
-    shell->render_dirty = 1;
+    shell->dirty.render = 1;
 }
 
 void reach_shell_update_quick_settings_animation(
@@ -361,7 +361,7 @@ void reach_shell_update_quick_settings_animation(
 
         reach_shell_refresh_quick_settings_layout(shell);
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
     }
 }
 
@@ -385,9 +385,9 @@ void reach_shell_set_quick_settings_open(
     }
 
     shell->quick_settings_open = next_open;
-    shell->quick_settings_dragging_volume = 0;
-    shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
-    shell->quick_settings_drag_level_valid = 0;
+    shell->quick_settings_drag.active = 0;
+    shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
+    shell->quick_settings_drag.level_valid = 0;
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
             shell->quick_settings.window.window,
@@ -421,7 +421,7 @@ void reach_shell_set_quick_settings_open(
     reach_shell_sync_popup_mouse_hook(shell);
 
     shell->quick_settings.dirty_flags = 1;
-    shell->render_dirty = 1;
+    shell->dirty.render = 1;
 }
 
 void reach_shell_toggle_quick_settings(
@@ -460,7 +460,7 @@ void reach_shell_execute_quick_settings_action(
         }
 
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
@@ -485,7 +485,7 @@ void reach_shell_execute_quick_settings_action(
         }
 
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
@@ -498,7 +498,7 @@ void reach_shell_execute_quick_settings_action(
         }
         reach_shell_refresh_quick_settings_audio(shell);
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
@@ -510,7 +510,7 @@ void reach_shell_execute_quick_settings_action(
         }
         reach_shell_refresh_quick_settings_system(shell);
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
@@ -531,7 +531,7 @@ void reach_shell_execute_quick_settings_action(
             !bluetooth.available) {
             reach_shell_refresh_quick_settings_system(shell);
             shell->quick_settings.dirty_flags = 1;
-            shell->render_dirty = 1;
+            shell->dirty.render = 1;
             return;
         }
 
@@ -542,7 +542,7 @@ void reach_shell_execute_quick_settings_action(
                 1,
                 target_enabled);
             shell->quick_settings.dirty_flags = 1;
-            shell->render_dirty = 1;
+            shell->dirty.render = 1;
             if (shell->system_controls.request_bluetooth_enabled(
                 shell->system_controls.userdata,
                 target_enabled) != REACH_OK) {
@@ -553,7 +553,7 @@ void reach_shell_execute_quick_settings_action(
                 reach_shell_refresh_quick_settings_system(shell);
             }
             shell->quick_settings.dirty_flags = 1;
-            shell->render_dirty = 1;
+            shell->dirty.render = 1;
             return;
         }
 
@@ -563,7 +563,7 @@ void reach_shell_execute_quick_settings_action(
                 1,
                 target_enabled);
             shell->quick_settings.dirty_flags = 1;
-            shell->render_dirty = 1;
+            shell->dirty.render = 1;
             (void)shell->system_controls.set_bluetooth_enabled(
                 shell->system_controls.userdata,
                 target_enabled);
@@ -574,14 +574,14 @@ void reach_shell_execute_quick_settings_action(
             0,
             0);
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
     if (action.type == REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER) {
         reach_shell_refresh_quick_settings_system(shell);
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
@@ -605,7 +605,7 @@ void reach_shell_execute_quick_settings_action(
         reach_shell_relayout_quick_settings(shell, 1);
 
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
@@ -628,7 +628,7 @@ void reach_shell_execute_quick_settings_action(
         }
 
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 
@@ -644,7 +644,7 @@ void reach_shell_execute_quick_settings_action(
         reach_shell_relayout_quick_settings(shell, 1);
 
         shell->quick_settings.dirty_flags = 1;
-        shell->render_dirty = 1;
+        shell->dirty.render = 1;
         return;
     }
 }
