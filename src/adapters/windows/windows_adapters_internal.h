@@ -58,7 +58,7 @@ reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *
 reach_result reach_windows_create_hotkeys(reach_hotkeys_port *out_port);
 reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
 reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
-
+reach_result reach_windows_launch_startup_apps(void);
 reach_result reach_windows_shell_install_current_user(const uint16_t *exe_path);
 reach_result reach_windows_shell_install_command_current_user(const uint16_t *identity_exe_path, const uint16_t *shell_command);
 reach_result reach_windows_shell_restore_current_user(void);

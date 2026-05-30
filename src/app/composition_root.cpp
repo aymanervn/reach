@@ -233,6 +233,9 @@ reach_result reach_app_start(reach_app *app)
     }
 
     reach_result result = reach_shell_start(app->shell);
+    if (result == REACH_OK) {
+        (void)reach_windows_launch_startup_apps();
+    }
     if (result == REACH_OK && app->input_source.ops.start != nullptr) {
         result = app->input_source.ops.start(app->input_source.source, reach_app_on_input, app);
     }

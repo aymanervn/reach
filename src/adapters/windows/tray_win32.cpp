@@ -5,9 +5,6 @@
 
 #include <windows.h>
 #include <shellapi.h>
-#include <shlobj.h>
-#include <shlwapi.h>
-#include <strsafe.h>
 #include <new>
 #include <stdint.h>
 #include <string.h>
@@ -73,7 +70,6 @@ struct reach_tray_provider {
     size_t item_count;
     uint32_t next_item_id;
     int32_t dirty;
-    int32_t startup_apps_launched;
     reach_tray_tombstone tombstones[REACH_TRAY_TOMBSTONE_COUNT];
 };
 
@@ -655,185 +651,6 @@ static reach_result reach_tray_create_host_window(reach_tray_provider *provider)
     return provider->host_window != nullptr ? REACH_OK : REACH_ERROR;
 }
 
-static int32_t reach_tray_startup_extension_supported(const wchar_t *path)
-{
-    const wchar_t *extension = PathFindExtensionW(path);
-    if (extension == nullptr || extension[0] == 0) {
-        return 0;
-    }
-
-    return _wcsicmp(extension, L".lnk") == 0 ||
-        _wcsicmp(extension, L".exe") == 0 ||
-        _wcsicmp(extension, L".bat") == 0 ||
-        _wcsicmp(extension, L".cmd") == 0 ||
-        _wcsicmp(extension, L".url") == 0;
-}
-
-static void reach_tray_launch_path(const wchar_t *path)
-{
-    if (path == nullptr || path[0] == 0) {
-        return;
-    }
-
-    SHELLEXECUTEINFOW sei = {};
-    sei.cbSize = sizeof(sei);
-    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-    sei.lpVerb = L"open";
-    sei.lpFile = path;
-    sei.nShow = SW_SHOWNORMAL;
-
-    if (ShellExecuteExW(&sei) && sei.hProcess != nullptr) {
-        CloseHandle(sei.hProcess);
-    }
-}
-
-static void reach_tray_launch_startup_folder_known_id(REFKNOWNFOLDERID folder_id)
-{
-    PWSTR folder = nullptr;
-    HRESULT hr = SHGetKnownFolderPath(folder_id, 0, nullptr, &folder);
-    if (FAILED(hr) || folder == nullptr) {
-        return;
-    }
-
-    wchar_t search_path[MAX_PATH * 2] = {};
-    if (FAILED(StringCchPrintfW(search_path, sizeof(search_path) / sizeof(search_path[0]), L"%s\\*", folder))) {
-        CoTaskMemFree(folder);
-        return;
-    }
-
-    WIN32_FIND_DATAW data = {};
-    HANDLE find = FindFirstFileW(search_path, &data);
-    if (find == INVALID_HANDLE_VALUE) {
-        CoTaskMemFree(folder);
-        return;
-    }
-
-    do {
-        if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-            continue;
-        }
-
-        wchar_t entry_path[MAX_PATH * 2] = {};
-        if (FAILED(StringCchPrintfW(entry_path, sizeof(entry_path) / sizeof(entry_path[0]), L"%s\\%s", folder, data.cFileName))) {
-            continue;
-        }
-
-        if (reach_tray_startup_extension_supported(entry_path)) {
-            reach_tray_launch_path(entry_path);
-        }
-    } while (FindNextFileW(find, &data));
-
-    FindClose(find);
-    CoTaskMemFree(folder);
-}
-
-static void reach_tray_launch_run_value(const wchar_t *command)
-{
-    if (command == nullptr || command[0] == 0) {
-        return;
-    }
-
-    wchar_t mutable_command[4096] = {};
-    StringCchCopyW(mutable_command, sizeof(mutable_command) / sizeof(mutable_command[0]), command);
-
-    STARTUPINFOW startup = {};
-    startup.cb = sizeof(startup);
-
-    PROCESS_INFORMATION process = {};
-    if (CreateProcessW(
-            nullptr,
-            mutable_command,
-            nullptr,
-            nullptr,
-            FALSE,
-            0,
-            nullptr,
-            nullptr,
-            &startup,
-            &process)) {
-        if (process.hThread != nullptr) {
-            CloseHandle(process.hThread);
-        }
-        if (process.hProcess != nullptr) {
-            CloseHandle(process.hProcess);
-        }
-    }
-}
-
-static void reach_tray_launch_run_key(HKEY root)
-{
-    HKEY key = nullptr;
-    LONG open_result = RegOpenKeyExW(
-        root,
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-        0,
-        KEY_READ,
-        &key);
-
-    if (open_result != ERROR_SUCCESS) {
-        return;
-    }
-
-    for (DWORD index = 0;; ++index) {
-        wchar_t value_name[512] = {};
-        DWORD value_name_count = sizeof(value_name) / sizeof(value_name[0]);
-
-        wchar_t raw_data[4096] = {};
-        DWORD data_size = sizeof(raw_data);
-        DWORD type = 0;
-
-        LONG enum_result = RegEnumValueW(
-            key,
-            index,
-            value_name,
-            &value_name_count,
-            nullptr,
-            &type,
-            reinterpret_cast<LPBYTE>(raw_data),
-            &data_size);
-
-        if (enum_result == ERROR_NO_MORE_ITEMS) {
-            break;
-        }
-
-        if (enum_result != ERROR_SUCCESS) {
-            continue;
-        }
-
-        if (type != REG_SZ && type != REG_EXPAND_SZ) {
-            continue;
-        }
-
-        raw_data[(sizeof(raw_data) / sizeof(raw_data[0])) - 1] = 0;
-
-        if (type == REG_EXPAND_SZ) {
-            wchar_t expanded[4096] = {};
-            if (ExpandEnvironmentStringsW(raw_data, expanded, sizeof(expanded) / sizeof(expanded[0])) > 0) {
-                reach_tray_launch_run_value(expanded);
-            }
-        } else {
-            reach_tray_launch_run_value(raw_data);
-        }
-    }
-
-    RegCloseKey(key);
-}
-
-static void reach_tray_launch_startup_apps_once(reach_tray_provider *provider)
-{
-    if (provider == nullptr || provider->startup_apps_launched) {
-        return;
-    }
-
-    provider->startup_apps_launched = 1;
-
-    reach_tray_launch_startup_folder_known_id(FOLDERID_Startup);
-    reach_tray_launch_startup_folder_known_id(FOLDERID_CommonStartup);
-
-    reach_tray_launch_run_key(HKEY_CURRENT_USER);
-    reach_tray_launch_run_key(HKEY_LOCAL_MACHINE);
-}
-
 static reach_result reach_tray_refresh(reach_tray_provider *provider)
 {
     REACH_ASSERT(provider != nullptr);
@@ -1049,7 +866,6 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
             3000,
             nullptr);
     }
-    reach_tray_launch_startup_apps_once(provider);
 
     out_port->provider = provider;
     out_port->ops.refresh = reach_tray_refresh;

@@ -122,6 +122,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/dock_reveal_edge_win32.cpp
     src/adapters/windows/monitor_win32.cpp
     src/adapters/windows/hotkeys_win32.cpp
+    src/adapters/windows/startup_apps_win32.cpp
 )
 
 reach_configure_common(reach_windows_adapters)

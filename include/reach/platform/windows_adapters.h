@@ -46,6 +46,7 @@ reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *
 reach_result reach_windows_create_hotkeys(reach_hotkeys_port *out_port);
 reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
 reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
+reach_result reach_windows_launch_startup_apps(void);
 
 #ifdef __cplusplus
 }
