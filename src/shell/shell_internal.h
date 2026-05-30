@@ -121,6 +121,12 @@ typedef struct reach_shell_switcher_state {
     size_t visible_start;
 } reach_shell_switcher_state;
 
+typedef struct reach_shell_wallpaper_state {
+    int32_t bounds_valid;
+    reach_rect_f32 bounds;
+    uint16_t path[260];
+} reach_shell_wallpaper_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -163,8 +169,7 @@ struct reach_shell {
     int32_t update_requested;
     int32_t events_dispatched_this_cycle;
     int32_t monitors_dirty;
-    int32_t wallpaper_bounds_valid;
-    reach_rect_f32 wallpaper_bounds;
+    reach_shell_wallpaper_state wallpaper_state;
     int32_t dock_animation_initialized;
     int32_t dock_animating;
     int32_t dock_target_hidden;
@@ -195,7 +200,6 @@ struct reach_shell {
     int64_t dock_clock_last_minute;
     int32_t running;
     reach_runtime_policy_state runtime_policy;
-    uint16_t wallpaper_path[260];
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
     std::atomic<uint32_t> quick_settings_system_change_flags;

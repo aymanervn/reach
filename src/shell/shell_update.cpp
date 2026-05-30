@@ -558,7 +558,7 @@ void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapsh
         260,
         snapshot->monitor_wallpaper_paths,
         REACH_MAX_WALLPAPER_MONITORS,
-        shell->wallpaper_path,
+        shell->wallpaper_state.path,
         260);
     if (changed && shell->config_store.ops.save != nullptr) {
         (void)shell->config_store.ops.save(shell->config_store.store, snapshot);
@@ -632,11 +632,11 @@ void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force)
         reach_copy_utf16(new_path, 260, snapshot.wallpaper_path);
     }
 
-    if (!force && reach_shell_path_equals(shell->wallpaper_path, new_path)) {
+    if (!force && reach_shell_path_equals(shell->wallpaper_state.path, new_path)) {
         return;
     }
 
-    reach_copy_utf16(shell->wallpaper_path, 260, new_path);
+    reach_copy_utf16(shell->wallpaper_state.path, 260, new_path);
     if (new_path[0] != 0 && shell->wallpaper_surface.ops.set_wallpaper != nullptr) {
         (void)shell->wallpaper_surface.ops.set_wallpaper(shell->wallpaper_surface.surface, new_path);
     } else if (new_path[0] == 0 && shell->wallpaper_surface.ops.clear != nullptr) {
@@ -984,16 +984,16 @@ static reach_result reach_shell_refresh_monitor_layout(reach_shell *shell)
     wallpaper_bounds.y = (float)top;
     wallpaper_bounds.width = (float)(right - left);
     wallpaper_bounds.height = (float)(bottom - top);
-    if (!shell->wallpaper_bounds_valid ||
-        !reach_shell_rect_equal(shell->wallpaper_bounds, wallpaper_bounds)) {
+    if (!shell->wallpaper_state.bounds_valid ||
+        !reach_shell_rect_equal(shell->wallpaper_state.bounds, wallpaper_bounds)) {
         reach_result result = shell->wallpaper_surface.ops.set_bounds(
             shell->wallpaper_surface.surface,
             wallpaper_bounds);
         if (result != REACH_OK) {
             return result;
         }
-        shell->wallpaper_bounds = wallpaper_bounds;
-        shell->wallpaper_bounds_valid = 1;
+        shell->wallpaper_state.bounds = wallpaper_bounds;
+        shell->wallpaper_state.bounds_valid = 1;
     }
 
     shell->monitors_dirty = 0;
