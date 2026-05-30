@@ -10,10 +10,10 @@ static void reach_shell_on_dock_reveal_edge(void *user)
         return;
     }
 
-    if (shell->dock_reveal_active || !shell->dock_target_hidden) {
-        shell->dock_reveal_check_dirty = 1;
+    if (shell->dock_reveal.active || !shell->dock_reveal.target_hidden) {
+        shell->dock_reveal.check_dirty = 1;
     } else {
-        shell->dock_reveal_requested = 1;
+        shell->dock_reveal.requested = 1;
     }
     reach_shell_request_update(shell);
 }
@@ -137,10 +137,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
     shell->dock_reveal_edge = {};
-    shell->dock_reveal_edge_visible = 0;
-    shell->dock_reveal_edge_bounds_valid = 0;
-    shell->dock_reveal_requested = 0;
-    shell->dock_reveal_edge_bounds = {};
+    shell->dock_reveal.edge_visible = 0;
+    shell->dock_reveal.edge_bounds_valid = 0;
+    shell->dock_reveal.requested = 0;
+    shell->dock_reveal.edge_bounds = {};
     shell->input_source = {};
     shell->window_manager = {};
     shell->config_store = {};
@@ -282,9 +282,9 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
         *out_shell = nullptr;
         return result;
     }
-    shell->dock_reveal_edge_visible = 0;
-    shell->dock_reveal_edge_bounds_valid = 0;
-    shell->dock_reveal_edge_bounds = {};
+    shell->dock_reveal.edge_visible = 0;
+    shell->dock_reveal.edge_bounds_valid = 0;
+    shell->dock_reveal.edge_bounds = {};
     shell->dirty.layout = 1;
     shell->dirty.render = 1;
     shell->dirty.monitors = 1;

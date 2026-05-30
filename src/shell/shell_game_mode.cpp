@@ -25,8 +25,8 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
         (void)reach_ui_state_close_launcher(&shell->ui);
     }
 
-    shell->dock_reveal_requested = 0;
-    shell->dock_reveal_check_dirty = 0;
+    shell->dock_reveal.requested = 0;
+    shell->dock_reveal.check_dirty = 0;
 
     shell->launcher.dirty_flags = 1;
     shell->tray.dirty_flags = 1;

@@ -135,6 +135,16 @@ typedef struct reach_shell_dirty_state {
     int32_t monitors;
 } reach_shell_dirty_state;
 
+typedef struct reach_shell_dock_reveal_state {
+    int32_t target_hidden;
+    int32_t active;
+    int32_t requested;
+    int32_t check_dirty;
+    int32_t edge_visible;
+    int32_t edge_bounds_valid;
+    reach_rect_f32 edge_bounds;
+} reach_shell_dock_reveal_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -176,13 +186,7 @@ struct reach_shell {
     reach_shell_wallpaper_state wallpaper_state;
     int32_t dock_animation_initialized;
     int32_t dock_animating;
-    int32_t dock_target_hidden;
-    int32_t dock_reveal_active;
-    int32_t dock_reveal_requested;
-    int32_t dock_reveal_check_dirty;
-    int32_t dock_reveal_edge_visible;
-    int32_t dock_reveal_edge_bounds_valid;
-    reach_rect_f32 dock_reveal_edge_bounds;
+    reach_shell_dock_reveal_state dock_reveal;
     int32_t dock_width_animation_initialized;
     int32_t dock_width_animating;
     size_t dock_width_item_count;
