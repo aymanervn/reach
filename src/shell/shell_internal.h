@@ -4,21 +4,23 @@
 #include "reach/shell/shell.h"
 
 #include "reach/core/render_commands.h"
+#include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
-#include "reach/support/animation.h"
+
 #include "reach/features/context_menu.h"
 #include "reach/features/dock.h"
 #include "reach/features/launcher.h"
+#include "reach/features/pin_config.h"
+#include "reach/features/popup.h"
+#include "reach/features/quick_settings.h"
 #include "reach/features/switcher.h"
 #include "reach/features/tray.h"
 #include "reach/features/wallpaper.h"
-#include "reach/features/quick_settings.h"
-#include "reach/features/popup.h"
-#include "reach/features/pin_config.h"
+
 #include "reach/shell/surface_runtime.h"
 #include "reach/core/runtime_policy.h"
-#include "reach/core/theme.h"
+#include "reach/support/animation.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -183,8 +185,11 @@ static const size_t REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON = REACH_MAX_
 static const size_t REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON = REACH_MAX_PINNED_APPS + 2;
 static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 3;
 
+/* Generic shell/window helpers */
+
 int32_t reach_shell_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
 int32_t reach_shell_opacity_equal(float a, float b);
+
 reach_result reach_shell_apply_window_state(
     reach_platform_window_port *window,
     reach_rect_f32 bounds,
@@ -194,12 +199,19 @@ reach_result reach_shell_apply_window_state(
     int32_t *bounds_valid,
     int32_t *opacity_valid,
     int32_t *out_changed);
+
+void reach_shell_request_update(reach_shell *shell);
+void reach_shell_on_window_event(void *user, const reach_ui_event *event);
+
+/* Popup/window capture helpers */
+
 reach_result reach_shell_render_popup_surface(
     reach_shell *shell,
     reach_surface_runtime *surface,
     reach_rect_f32 bounds,
     float notch_anchor_x,
     const reach_render_command_buffer *content_commands);
+
 void reach_shell_start_popup_bounds_animation(
     reach_shell_popup_bounds_animation *animation,
     reach_rect_f32 current_bounds,
@@ -207,6 +219,7 @@ void reach_shell_start_popup_bounds_animation(
     int32_t animate_width,
     int32_t animate_height,
     double duration_seconds);
+
 reach_rect_f32 reach_shell_apply_popup_bounds_animation(
     reach_shell_popup_bounds_animation *animation,
     reach_rect_f32 target_bounds,
@@ -214,40 +227,64 @@ reach_rect_f32 reach_shell_apply_popup_bounds_animation(
     float reference_y,
     float gap,
     double delta_seconds);
+
 int32_t reach_shell_popup_bounds_animation_active(
     const reach_shell_popup_bounds_animation *animation);
 
+void reach_shell_sync_popup_mouse_hook(reach_shell *shell);
+
+void reach_shell_capture_tray_input(reach_shell *shell);
+void reach_shell_release_tray_input(reach_shell *shell);
+
+void reach_shell_capture_dock_input(reach_shell *shell);
+void reach_shell_release_dock_input(reach_shell *shell);
+
+void reach_shell_capture_context_menu_input(reach_shell *shell);
+void reach_shell_release_context_menu_input(reach_shell *shell);
+
+/* Launcher orchestration */
+
 void reach_shell_raise_launcher(reach_shell *shell);
 void reach_shell_notify_launcher_search_ready(reach_shell *shell);
+
+void reach_shell_close_launcher(reach_shell *shell);
+reach_result reach_shell_open_launcher_result(reach_shell *shell);
+
 void reach_shell_cancel_launcher_search(reach_shell *shell);
 reach_result reach_shell_schedule_launcher_search(reach_shell *shell);
 void reach_shell_apply_launcher_search_results(reach_shell *shell);
 void reach_shell_stop_launcher_search_worker(reach_shell *shell);
 void reach_shell_release_launcher_result_icons(reach_shell *shell);
+
+/* Tray orchestration */
+
 void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open);
 void reach_shell_toggle_tray_popup(reach_shell *shell);
-void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open);
-void reach_shell_toggle_quick_settings(reach_shell *shell);
-void reach_shell_refresh_quick_settings_audio(reach_shell *shell);
-void reach_shell_refresh_quick_settings_system(reach_shell *shell);
-void reach_shell_process_quick_settings_system_changes(reach_shell *shell);
-void reach_shell_refresh_quick_settings_layout(reach_shell *shell);
-void reach_shell_update_quick_settings_animation(reach_shell *shell, double delta_seconds);
-void reach_shell_execute_quick_settings_action(
-    reach_shell *shell,
-    reach_quick_settings_action action);
-void reach_shell_on_system_controls_changed(
-    void *user,
-    uint32_t change_flags);
 reach_result reach_shell_refresh_tray_items(reach_shell *shell);
+
 void reach_shell_compute_tray_popup_layout(
     reach_shell *shell,
     const reach_dock_layout *dock_layout,
     reach_rect_f32 *out_bounds,
     reach_rect_f32 *out_item_slots);
+
+reach_result reach_shell_execute_tray_action(
+    reach_shell *shell,
+    reach_tray_feature_action action);
+
+/* Context-menu orchestration */
+
 void reach_shell_close_context_menu(reach_shell *shell);
-void reach_shell_sync_popup_mouse_hook(reach_shell *shell);
-void reach_shell_clear_sticky_dock_feedback(reach_shell *shell);
+reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t command);
+reach_result reach_shell_show_power_context_menu(reach_shell *shell);
+
+reach_result reach_shell_show_dock_app_context_menu(
+    reach_shell *shell,
+    size_t item_index,
+    int32_t x,
+    int32_t y);
+
+/* Dock model/sync/orchestration */
 
 reach_result reach_shell_load_pinned_icons(reach_shell *shell);
 int32_t reach_shell_dock_icon_size_px(const reach_shell *shell);
@@ -265,34 +302,196 @@ void reach_shell_release_open_window_icons(reach_shell *shell, size_t old_count)
 void reach_shell_load_open_window_icons(reach_shell *shell);
 void reach_shell_release_quick_settings_audio_render_icons(reach_shell *shell);
 reach_result reach_shell_reload_pins(reach_shell *shell);
-reach_result reach_shell_reload_config(reach_shell *shell);
-void reach_shell_seed_or_apply_wallpaper(reach_shell *shell, reach_config_snapshot *snapshot);
-void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force);
 reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed);
+
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
+
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout);
-float reach_shell_dock_slot_box_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index);
-float reach_shell_dock_drag_clamped_x(const reach_shell *shell, const reach_dock_layout *layout, int32_t cursor_x);
-size_t reach_shell_dock_reorder_target(const reach_shell *shell, size_t current_index, float dragged_box_x);
-size_t reach_shell_find_dock_item_key(const reach_shell *shell, int32_t pinned, uint32_t pin_id, uintptr_t window);
-size_t reach_shell_find_dock_order_key(const reach_shell *shell, int32_t pinned, uint32_t pin_id, uintptr_t window);
+
+float reach_shell_dock_slot_box_x(
+    const reach_shell *shell,
+    const reach_dock_layout *layout,
+    size_t index);
+
+float reach_shell_dock_drag_clamped_x(
+    const reach_shell *shell,
+    const reach_dock_layout *layout,
+    int32_t cursor_x);
+
+size_t reach_shell_dock_reorder_target(
+    const reach_shell *shell,
+    size_t current_index,
+    float dragged_box_x);
+
+size_t reach_shell_find_dock_item_key(
+    const reach_shell *shell,
+    int32_t pinned,
+    uint32_t pin_id,
+    uintptr_t window);
+
+size_t reach_shell_find_dock_order_key(
+    const reach_shell *shell,
+    int32_t pinned,
+    uint32_t pin_id,
+    uintptr_t window);
+
 void reach_shell_move_dock_order(reach_shell *shell, size_t source, size_t target);
+
 uint32_t reach_shell_dock_item_pin_id(const reach_shell *shell, size_t index);
-int32_t reach_shell_dock_item_matches_key(const reach_shell *shell, size_t index, int32_t pinned, uint32_t pin_id, uintptr_t window);
+
+int32_t reach_shell_dock_item_matches_key(
+    const reach_shell *shell,
+    size_t index,
+    int32_t pinned,
+    uint32_t pin_id,
+    uintptr_t window);
+
 size_t reach_shell_pinned_order_index(const reach_shell *shell, uint32_t pin_id);
-float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock_layout *layout, size_t index);
-void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_dock_layout *layout);
+
+float reach_shell_dock_item_current_x(
+    const reach_shell *shell,
+    const reach_dock_layout *layout,
+    size_t index);
+
+void reach_shell_rebuild_dock_items_with_animations(
+    reach_shell *shell,
+    reach_dock_layout *layout);
+
 int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell);
-reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds, double delta_seconds);
-void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout, double delta_seconds);
-void reach_shell_sync_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_dock_bounds, reach_rect_f32 monitor_bounds);
-reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout);
-reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 bounds);
-reach_result reach_shell_render_quick_settings_surface(reach_shell *shell);
+
+reach_rect_f32 reach_shell_apply_dock_animation(
+    reach_shell *shell,
+    reach_rect_f32 shown_bounds,
+    reach_rect_f32 monitor_bounds,
+    double delta_seconds);
+
+void reach_shell_apply_dock_width_animation(
+    reach_shell *shell,
+    reach_dock_layout *layout,
+    double delta_seconds);
+
+void reach_shell_sync_dock_reveal_edge(
+    reach_shell *shell,
+    reach_rect_f32 shown_dock_bounds,
+    reach_rect_f32 monitor_bounds);
+
+const uint16_t *reach_shell_dock_item_path(
+    const reach_shell *shell,
+    size_t item_index);
+
+reach_result reach_shell_launch_dock_item(
+    reach_shell *shell,
+    size_t item_index,
+    int32_t force_new_instance);
+
+reach_result reach_shell_execute_dock_item_action(
+    reach_shell *shell,
+    reach_dock_item_action action);
+
+/* Dock drag orchestration */
+
+void reach_shell_begin_dock_drag(
+    reach_shell *shell,
+    size_t index,
+    const reach_ui_event *event);
+
+reach_result reach_shell_update_dock_drag(
+    reach_shell *shell,
+    const reach_ui_event *event);
+
+reach_result reach_shell_end_dock_drag(reach_shell *shell);
+
+/* Dock/tray feedback */
+
+void reach_shell_press_dock_item(reach_shell *shell, size_t index);
+void reach_shell_stick_dock_item(reach_shell *shell);
+void reach_shell_release_dock_item(reach_shell *shell);
+
+void reach_shell_clear_sticky_dock_feedback(reach_shell *shell);
+
+void reach_shell_press_tray_button(reach_shell *shell);
+void reach_shell_press_quick_settings_button(reach_shell *shell);
+void reach_shell_press_power_button(reach_shell *shell);
+
+void reach_shell_press_tray_item(reach_shell *shell, size_t index);
+void reach_shell_release_tray_item(reach_shell *shell);
+
+void reach_shell_set_dock_click_feedback_immediate(
+    reach_shell *shell,
+    size_t index,
+    float opacity);
+
+/* Quick-settings orchestration */
+
+void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open);
+void reach_shell_toggle_quick_settings(reach_shell *shell);
+
+void reach_shell_refresh_quick_settings_audio(reach_shell *shell);
+void reach_shell_refresh_quick_settings_system(reach_shell *shell);
+void reach_shell_process_quick_settings_system_changes(reach_shell *shell);
+void reach_shell_refresh_quick_settings_layout(reach_shell *shell);
+
+void reach_shell_update_quick_settings_animation(
+    reach_shell *shell,
+    double delta_seconds);
+
+void reach_shell_execute_quick_settings_action(
+    reach_shell *shell,
+    reach_quick_settings_action action);
+
+void reach_shell_on_system_controls_changed(
+    void *user,
+    uint32_t change_flags);
+
+void reach_shell_end_quick_settings_drag(reach_shell *shell);
+
+reach_result reach_shell_begin_quick_settings_drag_if_hit(
+    reach_shell *shell,
+    const reach_ui_event *event);
+
+reach_result reach_shell_update_quick_settings_drag(
+    reach_shell *shell,
+    const reach_ui_event *event);
+
+/* Switcher orchestration */
+
 size_t reach_shell_switcher_visible_count(const reach_shell *shell);
 void reach_shell_update_switcher_visible_start(reach_shell *shell);
-reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds);
-reach_result reach_shell_render_launcher_surface(reach_shell *shell, const reach_launcher_layout *layout);
+
+reach_result reach_shell_handle_switcher_event(
+    reach_shell *shell,
+    const reach_ui_event *event);
+
+/* Config and wallpaper */
+
+reach_result reach_shell_reload_config(reach_shell *shell);
+
+void reach_shell_seed_or_apply_wallpaper(
+    reach_shell *shell,
+    reach_config_snapshot *snapshot);
+
+void reach_shell_reload_wallpaper(reach_shell *shell, int32_t force);
+
+/* Surface rendering */
+
+reach_result reach_shell_render_dock_surface(
+    reach_shell *shell,
+    const reach_dock_layout *layout);
+
+reach_result reach_shell_render_tray_surface(
+    reach_shell *shell,
+    reach_rect_f32 bounds);
+
+reach_result reach_shell_render_quick_settings_surface(reach_shell *shell);
+
+reach_result reach_shell_render_switcher_surface(
+    reach_shell *shell,
+    reach_rect_f32 bounds);
+
+reach_result reach_shell_render_launcher_surface(
+    reach_shell *shell,
+    const reach_launcher_layout *layout);
+
 reach_result reach_shell_render_context_menu_surface(reach_shell *shell);
 void reach_shell_on_window_event(void *user, const reach_ui_event *event);
 void reach_shell_request_update(reach_shell *shell);
