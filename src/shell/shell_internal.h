@@ -74,6 +74,30 @@ typedef struct reach_shell_quick_settings_drag_state {
     uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
 } reach_shell_quick_settings_drag_state;
 
+typedef struct reach_shell_launcher_search_state {
+    reach_icon_handle result_icons[REACH_SEARCH_MAX_RESULTS];
+
+    std::thread thread;
+    std::mutex mutex;
+    std::condition_variable cv;
+
+    int32_t thread_started;
+    int32_t stop;
+    int32_t pending;
+    int32_t in_flight;
+
+    uint32_t generation;
+    uint32_t pending_generation;
+    uint16_t pending_query[REACH_MAX_SEARCH_CHARS + 1];
+
+    int32_t completed;
+    uint32_t completed_generation;
+    reach_search_candidate completed_results[REACH_SEARCH_MAX_RESULTS];
+    size_t completed_count;
+
+    void (*notify)(reach_shell *shell);
+} reach_shell_launcher_search_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -136,22 +160,7 @@ struct reach_shell {
     size_t pressed_dock_index;
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
-    reach_icon_handle launcher_result_icons[REACH_SEARCH_MAX_RESULTS];
-    std::thread launcher_search_thread;
-    std::mutex launcher_search_mutex;
-    std::condition_variable launcher_search_cv;
-    int32_t launcher_search_thread_started;
-    int32_t launcher_search_stop;
-    int32_t launcher_search_pending;
-    int32_t launcher_search_in_flight;
-    uint32_t launcher_search_generation;
-    uint32_t launcher_search_pending_generation;
-    uint16_t launcher_search_pending_query[REACH_MAX_SEARCH_CHARS + 1];
-    int32_t launcher_search_completed;
-    uint32_t launcher_search_completed_generation;
-    reach_search_candidate launcher_search_completed_results[REACH_SEARCH_MAX_RESULTS];
-    size_t launcher_search_completed_count;
-    void (*launcher_search_notify)(reach_shell *shell);
+    reach_shell_launcher_search_state launcher_search;
     int32_t suppress_power_button_release;
     reach_float_animation dock_y_animation;
     int32_t tray_popup_open;

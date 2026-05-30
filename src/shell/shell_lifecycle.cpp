@@ -222,7 +222,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->quick_settings_bounds_animation = {};
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
-    shell->launcher_search_notify = reach_shell_notify_launcher_search_ready;
+    shell->launcher_search.notify = reach_shell_notify_launcher_search_ready;
 
     reach_result result = REACH_OK;
 
