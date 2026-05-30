@@ -93,7 +93,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         reach_shell_release_dock_item(shell);
     }
 
-    if (shell->quick_settings_dragging_volume) {
+    if (shell->quick_settings_drag.active) {
         reach_shell_end_quick_settings_drag(shell);
         return REACH_OK;
     }
@@ -367,7 +367,7 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         return REACH_OK;
     }
 
-    if (shell->quick_settings_dragging_volume) {
+    if (shell->quick_settings_drag.active) {
         return reach_shell_update_quick_settings_drag(shell, event);
     }
 

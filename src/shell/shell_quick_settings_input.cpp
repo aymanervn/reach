@@ -19,11 +19,11 @@ void reach_shell_end_quick_settings_drag(reach_shell *shell)
         return;
     }
 
-    shell->quick_settings_dragging_volume = 0;
-    shell->quick_settings_drag_type = REACH_QUICK_SETTINGS_HIT_NONE;
-    shell->quick_settings_drag_level_valid = 0;
-    shell->quick_settings_drag_session_index = 0;
-    shell->quick_settings_drag_session_instance_id[0] = 0;
+    shell->quick_settings_drag.active = 0;
+    shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
+    shell->quick_settings_drag.level_valid = 0;
+    shell->quick_settings_drag.session_index = 0;
+    shell->quick_settings_drag.session_instance_id[0] = 0;
 
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
@@ -51,25 +51,25 @@ reach_result reach_shell_begin_quick_settings_drag_if_hit(
         return REACH_OK;
     }
 
-    shell->quick_settings_dragging_volume =
+    shell->quick_settings_drag.active =
         action.type == REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME ||
         action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME ||
         action.type == REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
 
-    if (shell->quick_settings_dragging_volume &&
+    if (shell->quick_settings_drag.active &&
         shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr) {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
             shell->quick_settings.window.window,
             1);
     }
 
-    shell->quick_settings_drag_type = hit.type;
-    shell->quick_settings_drag_last_level = action.volume_level;
-    shell->quick_settings_drag_level_valid = shell->quick_settings_dragging_volume;
-    shell->quick_settings_drag_session_index = hit.session_index;
+    shell->quick_settings_drag.type = hit.type;
+    shell->quick_settings_drag.last_level = action.volume_level;
+    shell->quick_settings_drag.level_valid = shell->quick_settings_drag.active;
+    shell->quick_settings_drag.session_index = hit.session_index;
 
     reach_copy_utf16(
-        shell->quick_settings_drag_session_instance_id,
+        shell->quick_settings_drag.session_instance_id,
         REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
         hit.session_instance_id);
 
@@ -88,12 +88,12 @@ reach_result reach_shell_update_quick_settings_drag(
     reach_shell_request_update(shell);
 
     reach_rect_f32 track = shell->quick_settings_layout.main_slider_track;
-    if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER &&
-        shell->quick_settings_drag_session_index < shell->quick_settings_layout.app_volume_row_count) {
+    if (shell->quick_settings_drag.type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER &&
+        shell->quick_settings_drag.session_index < shell->quick_settings_layout.app_volume_row_count) {
         track = shell->quick_settings_layout
-            .app_volume_rows[shell->quick_settings_drag_session_index]
+            .app_volume_rows[shell->quick_settings_drag.session_index]
             .slider_full_range_line;
-    } else if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER) {
+    } else if (shell->quick_settings_drag.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER) {
         track = shell->quick_settings_layout.brightness_slider_track;
     }
 
@@ -107,30 +107,30 @@ reach_result reach_shell_update_quick_settings_drag(
         0.0f,
         1.0f);
 
-    if (shell->quick_settings_drag_level_valid &&
-        fabsf(next_level - shell->quick_settings_drag_last_level) < 0.005f) {
+    if (shell->quick_settings_drag.level_valid &&
+        fabsf(next_level - shell->quick_settings_drag.last_level) < 0.005f) {
         return REACH_OK;
     }
 
-    shell->quick_settings_drag_last_level = next_level;
-    shell->quick_settings_drag_level_valid = 1;
+    shell->quick_settings_drag.last_level = next_level;
+    shell->quick_settings_drag.level_valid = 1;
 
     reach_quick_settings_action action = {};
-    if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER) {
+    if (shell->quick_settings_drag.type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER) {
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
-    } else if (shell->quick_settings_drag_type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER) {
+    } else if (shell->quick_settings_drag.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER) {
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
     } else {
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
     }
 
     action.volume_level = next_level;
-    action.session_index = shell->quick_settings_drag_session_index;
+    action.session_index = shell->quick_settings_drag.session_index;
 
     reach_copy_utf16(
         action.session_instance_id,
         REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
-        shell->quick_settings_drag_session_instance_id);
+        shell->quick_settings_drag.session_instance_id);
 
     reach_shell_execute_quick_settings_action(shell, action);
     return REACH_OK;

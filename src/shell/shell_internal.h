@@ -65,6 +65,15 @@ typedef struct reach_shell_feedback_state {
     reach_float_animation tray_opacity;
 } reach_shell_feedback_state;
 
+typedef struct reach_shell_quick_settings_drag_state {
+    int32_t active;
+    reach_quick_settings_hit_type type;
+    float last_level;
+    int32_t level_valid;
+    size_t session_index;
+    uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
+} reach_shell_quick_settings_drag_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -170,12 +179,7 @@ struct reach_shell {
     reach_system_controls_port system_controls;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     int32_t quick_settings_open;
-    int32_t quick_settings_dragging_volume;
-    reach_quick_settings_hit_type quick_settings_drag_type;
-    float quick_settings_drag_last_level;
-    int32_t quick_settings_drag_level_valid;
-    size_t quick_settings_drag_session_index;
-    uint16_t quick_settings_drag_session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
+    reach_shell_quick_settings_drag_state quick_settings_drag;
     reach_audio_volume_state quick_settings_audio_state;
     reach_audio_volume_session_list quick_settings_audio_sessions;
     reach_audio_output_device_list quick_settings_output_devices;
