@@ -209,7 +209,7 @@ static reach_result reachctl_register_watchdog_task(void)
 
 static reach_result reachctl_unregister_watchdog_task(void)
 {
-    return reachctl_start_process(
+    return reachctl_run_process_wait(
         L"C:\\Windows\\System32\\schtasks.exe",
         L"/Delete /F /TN \"ReachWatchdog\"",
         nullptr);

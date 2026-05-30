@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 0.1.0 LANGUAGES C CXX)
+project(reach VERSION 0.1.1 LANGUAGES C CXX)
 
 enable_testing()
 set(REACH_CTEST_DEFAULT_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/CTestDefaultConfig.cmake)
@@ -184,6 +184,13 @@ add_executable(reach WIN32
     src/app/composition_root.cpp
     resources/reach.rc
 )
+
+if (MSVC)
+    target_link_options(reach PRIVATE
+        "/MANIFEST:EMBED"
+        "/MANIFESTINPUT:${CMAKE_SOURCE_DIR}/resources/app.manifest"
+    )
+endif()
 
 reach_configure_common(reach)
 reach_configure_windows(reach)

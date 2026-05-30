@@ -97,6 +97,23 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
+    case WM_DPICHANGED: {
+        RECT* suggested = reinterpret_cast<RECT*>(lparam);
+        SetWindowPos(
+            hwnd,
+            nullptr,
+            suggested->left,
+            suggested->top,
+            suggested->right - suggested->left,
+            suggested->bottom - suggested->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        if (window != nullptr) {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_DISPLAY_CHANGED;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return 0;
+    }
     case WM_KEYDOWN:
         if (window != nullptr) {
             reach_ui_event event = {};
@@ -155,7 +172,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_POINTER_DOWN;
             event.x = point.x;
-            event.y = point.y;                reach_platform_window_queue_event(window, &event);
+            event.y = point.y;
+            reach_platform_window_queue_event(window, &event);
         }
         return 0;
         case WM_MBUTTONDOWN:
@@ -227,8 +245,10 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 reach_delete_menu_font(font);
                 ReleaseDC(hwnd, dc);
             }
-            measure->itemWidth = (UINT)(size.cx + 28);
-            measure->itemHeight = 30;
+            UINT dpi = GetDpiForWindow(hwnd);
+
+            measure->itemWidth = (UINT)(size.cx + MulDiv(28, dpi, 96));
+            measure->itemHeight = MulDiv(30, dpi, 96);
             return TRUE;
         }
         break;
@@ -236,6 +256,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_DRAWITEM: {
         DRAWITEMSTRUCT *draw = reinterpret_cast<DRAWITEMSTRUCT *>(lparam);
         if (draw != nullptr && draw->CtlType == ODT_MENU) {
+            UINT dpi = GetDpiForWindow(hwnd);
+
             const wchar_t *text = reinterpret_cast<const wchar_t *>(draw->itemData);
             COLORREF background = (draw->itemState & ODS_SELECTED) ? RGB(48, 45, 42) : RGB(32, 30, 28);
             HBRUSH brush = CreateSolidBrush(background);
@@ -243,14 +265,20 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 FillRect(draw->hDC, &draw->rcItem, brush);
                 DeleteObject(brush);
             }
+
             SetBkMode(draw->hDC, TRANSPARENT);
             SetTextColor(draw->hDC, RGB(218, 216, 212));
+
             HFONT font = reach_create_windows_menu_font();
             HGDIOBJ old_font = SelectObject(draw->hDC, font);
+
             RECT text_rect = draw->rcItem;
-            text_rect.left += 13;
-            text_rect.right -= 13;
+            int padding = MulDiv(13, dpi, 96);
+            text_rect.left += padding;
+            text_rect.right -= padding;
+
             DrawTextW(draw->hDC, text != nullptr ? text : L"", -1, &text_rect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+
             SelectObject(draw->hDC, old_font);
             reach_delete_menu_font(font);
             return TRUE;
