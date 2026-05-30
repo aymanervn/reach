@@ -80,7 +80,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
             0);
     }
 
-    if (shell->dock_drag_active) {
+    if (shell->dock_drag.active) {
         reach_result drag_result = reach_shell_end_dock_drag(shell);
         if (drag_result != REACH_OK) {
             return drag_result;
@@ -371,7 +371,7 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         return reach_shell_update_quick_settings_drag(shell, event);
     }
 
-    if (shell->dock_drag_active) {
+    if (shell->dock_drag.active) {
         return reach_shell_update_dock_drag(shell, event);
     }
 

@@ -35,6 +35,23 @@ typedef struct reach_shell_popup_bounds_animation {
     int32_t active;
 } reach_shell_popup_bounds_animation;
 
+typedef struct reach_shell_dock_drag_state {
+    int32_t active;
+    int32_t moved;
+    size_t source_index;
+    size_t target_index;
+    int32_t pinned;
+    uint32_t pin_id;
+    uintptr_t window;
+    int32_t start_x;
+    int32_t start_y;
+    float grab_offset_x;
+    float x;
+    int32_t snapping;
+    int32_t reload_pins_after_snap;
+    reach_float_animation snap_animation;
+} reach_shell_dock_drag_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -97,23 +114,11 @@ struct reach_shell {
     int32_t dock_click_feedback_sticky;
     int32_t dock_click_feedback_animating;
     reach_float_animation dock_click_feedback_opacity;
+    reach_shell_dock_drag_state dock_drag;
     size_t tray_click_feedback_index;
     int32_t tray_click_feedback_pressed;
     int32_t tray_click_feedback_animating;
     reach_float_animation tray_click_feedback_opacity;
-    int32_t dock_drag_active;
-    int32_t dock_drag_moved;
-    size_t dock_drag_source_index;
-    size_t dock_drag_target_index;
-    int32_t dock_drag_pinned;
-    uint32_t dock_drag_pin_id;
-    uintptr_t dock_drag_window;
-    int32_t dock_drag_start_x;
-    int32_t dock_drag_start_y;
-    float dock_drag_grab_offset_x;
-    float dock_drag_x;
-    int32_t dock_drag_snapping;
-    int32_t dock_reload_pins_after_snap;
     size_t pressed_dock_index;
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
@@ -134,7 +139,6 @@ struct reach_shell {
     size_t launcher_search_completed_count;
     void (*launcher_search_notify)(reach_shell *shell);
     int32_t suppress_power_button_release;
-    reach_float_animation dock_drag_snap_animation;
     reach_float_animation dock_y_animation;
     int32_t tray_popup_open;
     reach_tray_model tray_model;

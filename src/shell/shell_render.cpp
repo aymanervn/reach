@@ -13,12 +13,12 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
         item_box_x[index] = reach_shell_dock_item_current_x(shell, layout, index);
     }
 
-    size_t dragged_render_index = (shell->dock_drag_active || shell->dock_drag_snapping)
-        ? reach_shell_find_dock_item_key(shell, shell->dock_drag_pinned, shell->dock_drag_pin_id, shell->dock_drag_window)
+    size_t dragged_render_index = (shell->dock_drag.active || shell->dock_drag.snapping)
+        ? reach_shell_find_dock_item_key(shell, shell->dock_drag.pinned, shell->dock_drag.pin_id, shell->dock_drag.window)
         : REACH_MAX_PINNED_APPS;
-    float dragged_x = shell->dock_drag_snapping
-        ? shell->dock_drag_snap_animation.value
-        : shell->dock_drag_x;
+    float dragged_x = shell->dock_drag.snapping
+        ? shell->dock_drag.snap_animation.value
+        : shell->dock_drag.x;
     uintptr_t focused_window = shell->window_manager.ops.foreground != nullptr
         ? shell->window_manager.ops.foreground(shell->window_manager.manager)
         : 0;

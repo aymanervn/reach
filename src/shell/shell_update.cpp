@@ -1009,7 +1009,7 @@ float reach_shell_dock_slot_box_x(const reach_shell *shell, const reach_dock_lay
 float reach_shell_dock_drag_clamped_x(const reach_shell *shell, const reach_dock_layout *layout, int32_t cursor_x)
 {
     const reach_theme *theme = shell != nullptr && shell->theme != nullptr ? shell->theme : reach_theme_default();
-    return reach_dock_drag_clamped_x(theme, layout, cursor_x, shell != nullptr ? shell->dock_drag_grab_offset_x : 0.0f);
+    return reach_dock_drag_clamped_x(theme, layout, cursor_x, shell != nullptr ? shell->dock_drag.grab_offset_x : 0.0f);
 }
 
 size_t reach_shell_find_dock_item_key(const reach_shell *shell, int32_t pinned, uint32_t pin_id, uintptr_t window)
@@ -1042,9 +1042,9 @@ float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock
     if (shell == nullptr || layout == nullptr || index >= shell->dock_model.item_count || index >= layout->app_slot_count) {
         return 0.0f;
     }
-    if ((shell->dock_drag_active || shell->dock_drag_snapping) &&
-        reach_shell_dock_item_matches_key(shell, index, shell->dock_drag_pinned, shell->dock_drag_pin_id, shell->dock_drag_window)) {
-        return shell->dock_drag_snapping ? shell->dock_drag_snap_animation.value : shell->dock_drag_x;
+    if ((shell->dock_drag.active || shell->dock_drag.snapping) &&
+        reach_shell_dock_item_matches_key(shell, index, shell->dock_drag.pinned, shell->dock_drag.pin_id, shell->dock_drag.window)) {
+        return shell->dock_drag.snapping ? shell->dock_drag.snap_animation.value : shell->dock_drag.x;
     }
     if ((shell->dock_item_x_animating[index] || shell->dock_item_x_valid[index]) &&
         reach_shell_dock_key_equal(
@@ -1118,8 +1118,8 @@ void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_do
         shell->dock_item_x_pinned[index] = shell->dock_model.items[index].pinned;
         shell->dock_item_x_pin_ids[index] = pin_id;
         shell->dock_item_x_windows[index] = shell->dock_model.items[index].window;
-        if (reach_shell_dock_item_matches_key(shell, index, shell->dock_drag_pinned, shell->dock_drag_pin_id, shell->dock_drag_window) &&
-            (shell->dock_drag_active || shell->dock_drag_snapping)) {
+        if (reach_shell_dock_item_matches_key(shell, index, shell->dock_drag.pinned, shell->dock_drag.pin_id, shell->dock_drag.window) &&
+            (shell->dock_drag.active || shell->dock_drag.snapping)) {
             reach_shell_start_dock_item_x_animation(shell, index, target_x, target_x);
         } else {
             reach_shell_start_dock_item_x_animation(shell, index, from_x, target_x);
@@ -1153,8 +1153,8 @@ static int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell
         !shell->context_menu.dirty_flags &&
         !shell->quick_settings.dirty_flags &&
         !shell->dock_width_animating &&
-        !shell->dock_drag_active &&
-        !shell->dock_drag_snapping &&
+        !shell->dock_drag.active &&
+        !shell->dock_drag.snapping &&
         !shell->dock_click_feedback_animating &&
         !shell->tray_click_feedback_animating &&
         !reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation);
@@ -1249,20 +1249,20 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             shell->dock.dirty_flags = 1;
         }
     }
-
-    if (shell->dock_drag_snapping) {
-        reach_float_animation_update(&shell->dock_drag_snap_animation, delta_seconds);
-        shell->dock_drag_x = shell->dock_drag_snap_animation.value;
-        shell->dock_drag_snapping = reach_shell_float_animation_active(&shell->dock_drag_snap_animation);
+    if (shell->dock_drag.snapping) {
+        reach_float_animation_update(&shell->dock_drag.snap_animation, delta_seconds);
+        shell->dock_drag.x = shell->dock_drag.snap_animation.value;
+        shell->dock_drag.snapping =
+            reach_shell_float_animation_active(&shell->dock_drag.snap_animation);
         shell->dock.dirty_flags = 1;
-        if (!shell->dock_drag_snapping) {
-            shell->dock_drag_source_index = REACH_MAX_PINNED_APPS;
-            shell->dock_drag_target_index = REACH_MAX_PINNED_APPS;
-            shell->dock_drag_pinned = 0;
-            shell->dock_drag_pin_id = 0;
-            shell->dock_drag_window = 0;
-            if (shell->dock_reload_pins_after_snap) {
-                shell->dock_reload_pins_after_snap = 0;
+        if (!shell->dock_drag.snapping) {
+            shell->dock_drag.source_index = REACH_MAX_PINNED_APPS;
+            shell->dock_drag.target_index = REACH_MAX_PINNED_APPS;
+            shell->dock_drag.pinned = 0;
+            shell->dock_drag.pin_id = 0;
+            shell->dock_drag.window = 0;
+            if (shell->dock_drag.reload_pins_after_snap) {
+                shell->dock_drag.reload_pins_after_snap = 0;
                 (void)reach_shell_reload_pins(shell);
                 shell->dock_model.item_count = 0;
                 for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
@@ -1447,8 +1447,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         !shell->render_dirty &&
                         !shell->dock.dirty_flags &&
                         !shell->dock_width_animating &&
-                        !shell->dock_drag_active &&
-                        !shell->dock_drag_snapping &&
+                        !shell->dock_drag.active &&
+                        !shell->dock_drag.snapping &&
                         !shell->dock_click_feedback_animating;
 
                     if (!game_mode &&
@@ -1651,8 +1651,8 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
          reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
          shell->dock_animating ||
          shell->dock_width_animating ||
-         shell->dock_drag_active ||
-         shell->dock_drag_snapping ||
+         shell->dock_drag.active ||
+         shell->dock_drag.snapping ||
          dock_item_animating ||
          shell->dock_click_feedback_animating ||
          shell->tray_click_feedback_animating);

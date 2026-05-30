@@ -189,8 +189,8 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->dock_click_feedback_opacity = {};
     shell->tray_click_feedback_index = REACH_MAX_TRAY_ITEMS;
     shell->tray_click_feedback_opacity = {};
-    shell->dock_drag_source_index = REACH_MAX_PINNED_APPS;
-    shell->dock_drag_target_index = REACH_MAX_PINNED_APPS;
+    shell->dock_drag.source_index = REACH_MAX_PINNED_APPS;
+    shell->dock_drag.target_index = REACH_MAX_PINNED_APPS;
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
