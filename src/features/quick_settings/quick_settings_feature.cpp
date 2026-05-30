@@ -243,7 +243,7 @@ reach_quick_settings_volume_pill_layout reach_quick_settings_volume_pill_layout_
     reach_quick_settings_volume_pill_layout layout = {};
     layout.bounds = bounds;
 
-    const float icon_size = 16.0f;
+    const float icon_size = 22.0f;
     const float label_gap = 6.0f;
     const float header_height = 16.0f;
     const float header_gap = 12.0f;
@@ -274,7 +274,7 @@ float reach_quick_settings_content_height_for_model(
 )
 {
     const float padding = 8.0f;
-    const float grid_tile_height = 46.0f;
+    const float grid_tile_height = 60.0f;
     const float grid_gap = 8.0f;
     const float grid_bottom_gap = 10.0f;
     const float header_height = 16.0f;
@@ -364,10 +364,10 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
     const float grid_tile_height = 46.0f;
     const float grid_gap = 8.0f;
     const float grid_bottom_gap = 10.0f;
-    const float grid_icon_size = 17.0f;
+    const float grid_icon_size = 20.0f;
     const float grid_icon_gap = 8.0f;
     const float header_height = 16.0f;
-    const float header_gap = 12.0f;
+    const float header_gap = 26.0f;
     const float pill_height = 24.0f;
     const float output_button_gap = 10.0f;
     const float output_button_height = 46.0f;
@@ -376,14 +376,14 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
     const float output_panel_gap = 8.0f;
     const float output_device_row_height = 44.0f;
     const float output_icon_size = 16.0f;
-    const float output_check_size = 16.0f;
+    const float output_check_size = 14.0f;
     const float output_row_horizontal_padding = 12.0f;
     const float output_row_label_gap = 8.0f;
     const float title_height = 18.0f;
     const float title_gap = 12.0f;
     const float panel_gap = 8.0f;
     const float app_volume_row_height = 40.0f;
-    const float app_icon_size = 16.0f;
+    const float app_icon_size = 18.0f;
     const float row_horizontal_padding = 12.0f;
     const float row_label_gap = 8.0f;
     const float row_slider_width = 78.0f;
@@ -395,7 +395,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
     const float separator_inset = 12.0f;
     const float expand_gap = 10.0f;
     const float expand_height = 34.0f;
-    const float icon_size = 18.0f;
+    const float icon_size = 14.0f;
 
     reach_rect_f32 grid_bounds = {};
     grid_bounds.x = content_bounds.x + padding;
@@ -578,7 +578,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
         layout.output_device_button_chevron.height = icon_size;
         layout.output_device_button_chevron.x =
             layout.output_device_button.x + layout.output_device_button.width -
-            padding - icon_size;
+            2.0f * padding - icon_size;
         layout.output_device_button_chevron.y =
             layout.output_device_button.y +
             (layout.output_device_button.height - icon_size) * 0.5f;
@@ -705,7 +705,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds(
     layout.expand_button_icon.width = icon_size;
     layout.expand_button_icon.height = icon_size;
     layout.expand_button_icon.x =
-        layout.expand_button.x + layout.expand_button.width - padding - icon_size;
+        layout.expand_button.x + layout.expand_button.width - 2.0f * padding - icon_size;
     layout.expand_button_icon.y =
         layout.expand_button.y + (layout.expand_button.height - icon_size) * 0.5f;
 

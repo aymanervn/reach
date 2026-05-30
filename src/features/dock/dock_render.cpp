@@ -10,6 +10,16 @@ static reach_color reach_dock_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
     return color;
 }
 
+static reach_rect_f32 reach_dock_center_square(reach_rect_f32 outer, float size)
+{
+    reach_rect_f32 rect = {};
+    rect.width = size;
+    rect.height = size;
+    rect.x = outer.x + (outer.width - size) * 0.5f;
+    rect.y = outer.y + (outer.height - size) * 0.5f;
+    return rect;
+}
+
 static void reach_dock_push_item(
     const reach_dock_render_input *input,
     reach_render_command_buffer *commands,
@@ -209,20 +219,26 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
 
     command = {};
     command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-    command.rect.x = tray_box_x + icon_box_size * 0.22f;
-    command.rect.y = tray_box_y + icon_box_size * 0.22f;
-    command.rect.width = icon_box_size * 0.56f;
-    command.rect.height = icon_box_size * 0.56f;
+    reach_rect_f32 tray_icon_box = {};
+    tray_icon_box.x = tray_box_x;
+    tray_icon_box.y = tray_box_y;
+    tray_icon_box.width = icon_box_size;
+    tray_icon_box.height = icon_box_size;
+
+    command.rect = reach_dock_center_square(tray_icon_box, icon_box_size * 0.50f);
     command.color = theme->icon_backplate_background;
     command.icon_id = REACH_VECTOR_ICON_ARROW_UP;
     reach_render_command_buffer_push(out_commands, &command);
 
     command = {};
     command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-    command.rect.x = quick_settings_box_x + icon_box_size * 0.31f;
-    command.rect.y = quick_settings_box_y + icon_box_size * 0.31f;
-    command.rect.width = icon_box_size * 0.38f;
-    command.rect.height = icon_box_size * 0.38f;
+    reach_rect_f32 quick_settings_icon_box = {};
+    quick_settings_icon_box.x = quick_settings_box_x;
+    quick_settings_icon_box.y = quick_settings_box_y;
+    quick_settings_icon_box.width = icon_box_size;
+    quick_settings_icon_box.height = icon_box_size;
+
+    command.rect = reach_dock_center_square(quick_settings_icon_box, icon_box_size * 0.50f);
     command.color = theme->icon_backplate_background;
     command.icon_id = REACH_VECTOR_ICON_SETTINGS;
     reach_render_command_buffer_push(out_commands, &command);
@@ -311,10 +327,13 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
 
     command = {};
     command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-    command.rect.x = power_box_x + icon_box_size * 0.25f;
-    command.rect.y = power_box_y + icon_box_size * 0.25f;
-    command.rect.width = icon_box_size * 0.50f;
-    command.rect.height = icon_box_size * 0.50f;
+    reach_rect_f32 power_icon_box = {};
+    power_icon_box.x = power_box_x;
+    power_icon_box.y = power_box_y;
+    power_icon_box.width = icon_box_size;
+    power_icon_box.height = icon_box_size;
+
+    command.rect = reach_dock_center_square(power_icon_box, icon_box_size * 0.50f);
     command.color = theme->dock_power_glyph;
     command.icon_id = REACH_VECTOR_ICON_POWER;
     reach_render_command_buffer_push(out_commands, &command);

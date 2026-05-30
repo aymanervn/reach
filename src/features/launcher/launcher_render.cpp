@@ -157,10 +157,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
                 command = {};
                 command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-                command.rect.x = icon_x + 5.0f;
-                command.rect.y = icon_y + 5.0f;
-                command.rect.width = icon_size - 10.0f;
-                command.rect.height = icon_size - 10.0f;
+                command.rect.x = icon_x;
+                command.rect.y = icon_y;
+                command.rect.width = icon_size;
+                command.rect.height = icon_size;
                 command.color = reach_launcher_rgb(255, 255, 255, 0.78f);
                 command.icon_id = reach_launcher_fallback_icon(state->launcher.results[index].is_directory);
                 reach_render_command_buffer_push(out_commands, &command);
