@@ -286,9 +286,9 @@ static void test_layout_places_volume_pill_above_output_device_and_expand(void)
 
     expect_near(
         layout.main_volume_pill.header_icon.width,
-        16.0f,
+        22.0f,
         0.001f,
-        "master volume icon is larger");
+        "master volume icon uses header icon size");
 }
 
 static void test_desktop_system_grid_shows_network_and_bluetooth_only(void)

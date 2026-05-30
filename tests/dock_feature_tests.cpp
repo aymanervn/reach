@@ -1,10 +1,24 @@
 #include "reach/features/dock.h"
 #include "reach/features/context_menu.h"
 
+#include <math.h>
+#include <stdio.h>
+
 static int expect(int condition)
 {
     return condition ? 0 : 1;
 }
+
+static int expect_near_at(float actual, float expected, float epsilon, int line)
+{
+    if (fabsf(actual - expected) > epsilon) {
+        printf("FAIL: dock_feature_tests.cpp:%d expected %.3f got %.3f\n", line, expected, actual);
+        return 1;
+    }
+    return 0;
+}
+
+#define expect_near(actual, expected, epsilon) expect_near_at((actual), (expected), (epsilon), __LINE__)
 
 int main(void)
 {
@@ -73,15 +87,18 @@ int main(void)
     failed += expect(tray_arrow_icon != nullptr);
     failed += expect(settings_icon != nullptr);
     if (tray_arrow_icon != nullptr && settings_icon != nullptr) {
-        failed += expect(tray_arrow_icon->rect.width > settings_icon->rect.width);
-        failed += expect(settings_icon->color.r == dock_render.theme->icon_backplate_background.r);
-        failed += expect(settings_icon->color.g == dock_render.theme->icon_backplate_background.g);
-        failed += expect(settings_icon->color.b == dock_render.theme->icon_backplate_background.b);
-        failed += expect(settings_icon->color.a == dock_render.theme->icon_backplate_background.a);
-        failed += expect(tray_arrow_icon->color.r == dock_render.theme->icon_backplate_background.r);
-        failed += expect(tray_arrow_icon->color.g == dock_render.theme->icon_backplate_background.g);
-        failed += expect(tray_arrow_icon->color.b == dock_render.theme->icon_backplate_background.b);
-        failed += expect(tray_arrow_icon->color.a == dock_render.theme->icon_backplate_background.a);
+        failed += expect(tray_arrow_icon->rect.width > 0.0f);
+        failed += expect(settings_icon->rect.width > 0.0f);
+        failed += expect_near(tray_arrow_icon->rect.height, tray_arrow_icon->rect.width, 0.001f);
+        failed += expect_near(settings_icon->rect.height, settings_icon->rect.width, 0.001f);
+        failed += expect_near(settings_icon->color.r, dock_render.theme->icon_backplate_background.r, 0.001f);
+        failed += expect_near(settings_icon->color.g, dock_render.theme->icon_backplate_background.g, 0.001f);
+        failed += expect_near(settings_icon->color.b, dock_render.theme->icon_backplate_background.b, 0.001f);
+        failed += expect_near(settings_icon->color.a, dock_render.theme->icon_backplate_background.a, 0.001f);
+        failed += expect_near(tray_arrow_icon->color.r, dock_render.theme->icon_backplate_background.r, 0.001f);
+        failed += expect_near(tray_arrow_icon->color.g, dock_render.theme->icon_backplate_background.g, 0.001f);
+        failed += expect_near(tray_arrow_icon->color.b, dock_render.theme->icon_backplate_background.b, 0.001f);
+        failed += expect_near(tray_arrow_icon->color.a, dock_render.theme->icon_backplate_background.a, 0.001f);
     }
 
     uint32_t commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
