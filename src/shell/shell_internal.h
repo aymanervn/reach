@@ -502,8 +502,6 @@ reach_shell_render_launcher_surface(reach_shell *shell,
                                     const reach_launcher_layout *layout);
 
 reach_result reach_shell_render_context_menu_surface(reach_shell *shell);
-void reach_shell_on_window_event(void *user, const reach_ui_event *event);
-void reach_shell_request_update(reach_shell *shell);
 int32_t reach_shell_game_mode_enabled(const reach_shell *shell);
 reach_result reach_shell_update_game_mode(reach_shell *shell);
 #endif
