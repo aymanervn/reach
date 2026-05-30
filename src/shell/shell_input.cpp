@@ -21,7 +21,7 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
     case REACH_UI_EVENT_ARROW_RIGHT:
     case REACH_UI_EVENT_HOME:
     case REACH_UI_EVENT_END:
-        shell->layout_dirty = 1;
+        shell->dirty.layout = 1;
         shell->launcher.dirty_flags = 1;
         break;
 
@@ -548,8 +548,8 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
 
     if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED) {
-        shell->monitors_dirty = 1;
-        shell->layout_dirty = 1;
+        shell->dirty.monitors = 1;
+        shell->dirty.layout = 1;
         shell->dock.dirty_flags = 1;
         shell->launcher.dirty_flags = 1;
         shell->tray.dirty_flags = 1;

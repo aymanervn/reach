@@ -127,6 +127,14 @@ typedef struct reach_shell_wallpaper_state {
     uint16_t path[260];
 } reach_shell_wallpaper_state;
 
+typedef struct reach_shell_dirty_state {
+    int32_t layout;
+    int32_t render;
+    int32_t update_requested;
+    int32_t events_dispatched_this_cycle;
+    int32_t monitors;
+} reach_shell_dirty_state;
+
 struct reach_shell {
     reach_hotkeys_port hotkeys;
     reach_monitor_port monitors;
@@ -164,11 +172,7 @@ struct reach_shell {
     int32_t dock_items_changed;
     reach_ui_layout layout;
     int32_t has_layout;
-    int32_t layout_dirty;
-    int32_t render_dirty;
-    int32_t update_requested;
-    int32_t events_dispatched_this_cycle;
-    int32_t monitors_dirty;
+    reach_shell_dirty_state dirty;
     reach_shell_wallpaper_state wallpaper_state;
     int32_t dock_animation_initialized;
     int32_t dock_animating;

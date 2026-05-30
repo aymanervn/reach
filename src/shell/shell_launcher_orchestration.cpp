@@ -62,7 +62,7 @@ void reach_shell_close_launcher(reach_shell *shell)
     (void)reach_ui_state_close_launcher(&shell->ui);
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
-    shell->layout_dirty = 1;
+    shell->dirty.layout = 1;
     shell->launcher.dirty_flags = 1;
     reach_shell_sync_popup_mouse_hook(shell);
     if (shell->launcher.window.ops.hide != nullptr) {

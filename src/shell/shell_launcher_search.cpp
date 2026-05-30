@@ -201,7 +201,7 @@ reach_result reach_shell_schedule_launcher_search(reach_shell *shell)
         }
         reach_shell_release_launcher_result_icons(shell);
         (void)reach_ui_state_clear_launcher_results(&shell->ui);
-        shell->layout_dirty = 1;
+        shell->dirty.layout = 1;
         shell->launcher.dirty_flags = 1;
         return REACH_OK;
     }
@@ -250,6 +250,6 @@ void reach_shell_apply_launcher_search_results(reach_shell *shell)
     reach_shell_release_launcher_result_icons(shell);
     (void)reach_ui_state_set_launcher_results(&shell->ui, results, count);
     reach_shell_load_launcher_result_icons(shell);
-    shell->layout_dirty = 1;
+    shell->dirty.layout = 1;
     shell->launcher.dirty_flags = 1;
 }

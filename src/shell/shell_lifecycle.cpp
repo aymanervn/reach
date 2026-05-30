@@ -285,9 +285,9 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc, 
     shell->dock_reveal_edge_visible = 0;
     shell->dock_reveal_edge_bounds_valid = 0;
     shell->dock_reveal_edge_bounds = {};
-    shell->layout_dirty = 1;
-    shell->render_dirty = 1;
-    shell->monitors_dirty = 1;
+    shell->dirty.layout = 1;
+    shell->dirty.render = 1;
+    shell->dirty.monitors = 1;
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
@@ -435,9 +435,9 @@ reach_result reach_shell_start(reach_shell *shell)
 
     shell->running = 1;
     reach_runtime_policy_init(&shell->runtime_policy);
-    shell->layout_dirty = 1;
-    shell->render_dirty = 1;
-    shell->monitors_dirty = 1;
+    shell->dirty.layout = 1;
+    shell->dirty.render = 1;
+    shell->dirty.monitors = 1;
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->tray.dirty_flags = 1;
@@ -456,7 +456,8 @@ reach_result reach_shell_stop(reach_shell *shell)
         return REACH_INVALID_ARGUMENT;
     }
 
-    shell->running = 0;    reach_runtime_policy_init(&shell->runtime_policy);
+    shell->running = 0;
+    reach_runtime_policy_init(&shell->runtime_policy);
     shell->switcher_state.open = 0;
     shell->context_menu_state.open = 0;
     reach_shell_set_tray_popup_open(shell, 0);
