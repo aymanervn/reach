@@ -27,6 +27,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
     reach_shell_stop_launcher_search_worker(shell);
+    reach_shell_stop_open_window_icon_worker(shell);
     if (shell->system_controls.stop_watching != nullptr) {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
     }
@@ -464,6 +465,7 @@ reach_result reach_shell_stop(reach_shell *shell)
     reach_shell_set_quick_settings_open(shell, 0);
     reach_shell_cancel_launcher_search(shell);
     reach_shell_stop_launcher_search_worker(shell);
+    reach_shell_stop_open_window_icon_worker(shell);
     if (shell->system_controls.stop_watching != nullptr) {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
     }

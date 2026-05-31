@@ -234,6 +234,8 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell,
   reach_rect_i32 old_bounds[REACH_MAX_PINNED_APPS] = {};
   uint16_t old_paths[REACH_MAX_PINNED_APPS][260] = {};
   uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
+  reach_icon_handle old_icons[REACH_MAX_PINNED_APPS] = {};
+  uint16_t old_initials[REACH_MAX_PINNED_APPS] = {};
   size_t old_count = shell->open_window_count;
 
   for (size_t index = 0; index < old_count; ++index) {
@@ -244,6 +246,8 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell,
     old_bounds[index] = shell->open_windows[index].bounds;
     reach_copy_utf16(old_paths[index], 260, shell->open_windows[index].path);
     reach_copy_utf16(old_titles[index], 260, shell->open_windows[index].title);
+    old_icons[index] = shell->dock_icons.open_window_icons[index];
+    old_initials[index] = shell->dock_icons.open_window_initials[index];
   }
 
   shell->open_window_count = 0;
@@ -297,8 +301,8 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell,
   }
 
   if (icon_identity_changed) {
-    reach_shell_release_open_window_icons(shell, old_count);
-    reach_shell_load_open_window_icons(shell);
+    reach_shell_sync_open_window_icons(shell, old_windows, old_paths, old_icons,
+                                       old_initials, old_count);
   }
   if (out_changed != nullptr) {
     *out_changed = changed;
@@ -1238,6 +1242,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds) {
   }
 
   reach_shell_process_quick_settings_system_changes(shell);
+  reach_shell_apply_open_window_icon_results(shell);
 
   reach_shell_update_clock_text(shell);
   if (shell->feedback.dock_animating) {
@@ -1681,6 +1686,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell) {
           shell->launcher.dirty_flags || shell->tray.dirty_flags ||
           shell->switcher.dirty_flags || shell->context_menu.dirty_flags ||
           shell->quick_settings.dirty_flags || shell->dock_reveal.check_dirty ||
+          reach_shell_open_window_icon_work_pending(shell) ||
           reach_shell_popup_bounds_animation_active(
               &shell->quick_settings_bounds_animation) ||
           shell->dock_animation.animating || shell->dock_width.animating ||

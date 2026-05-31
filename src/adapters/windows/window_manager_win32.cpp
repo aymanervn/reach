@@ -18,6 +18,15 @@ struct reach_hidden_minimized_window {
   WINDOWPLACEMENT placement;
 };
 
+struct reach_window_metadata_cache_entry {
+  HWND hwnd;
+  DWORD process_id;
+  int32_t app_user_model_id_queried;
+  uint16_t app_user_model_id[260];
+  int32_t process_path_queried;
+  uint16_t process_path[260];
+};
+
 struct reach_window_manager {
   HWINEVENTHOOK create_hook;
   HWINEVENTHOOK destroy_hook;
@@ -32,6 +41,7 @@ struct reach_window_manager {
   std::vector<HWND> window_order;
   std::vector<reach_window_snapshot> pending_windows;
   std::vector<reach_hidden_minimized_window> hidden_minimized_windows;
+  std::vector<reach_window_metadata_cache_entry> metadata_cache;
   int32_t dirty;
   int32_t pending_location_change;
 };
@@ -109,17 +119,14 @@ static int32_t reach_append_wcs(uint16_t *dst, size_t dst_count,
   return text[index] == 0;
 }
 
-static int32_t reach_window_process_app_user_model_id(HWND hwnd,
-                                                      uint16_t *out_id,
-                                                      size_t out_count) {
-  if (hwnd == nullptr || out_id == nullptr || out_count == 0) {
+static int32_t reach_window_process_app_user_model_id_for_process(
+    DWORD process_id, uint16_t *out_id, size_t out_count) {
+  if (process_id == 0 || out_id == nullptr || out_count == 0) {
     return 0;
   }
 
   out_id[0] = 0;
 
-  DWORD process_id = 0;
-  GetWindowThreadProcessId(hwnd, &process_id);
   if (process_id == 0 || process_id == GetCurrentProcessId()) {
     return 0;
   }
@@ -152,6 +159,19 @@ static int32_t reach_window_process_app_user_model_id(HWND hwnd,
   return reach_copy_utf16(out_id, out_count,
                           reinterpret_cast<const uint16_t *>(app_id)) ==
          REACH_OK;
+}
+
+static int32_t reach_window_process_app_user_model_id(HWND hwnd,
+                                                      uint16_t *out_id,
+                                                      size_t out_count) {
+  if (hwnd == nullptr || out_id == nullptr || out_count == 0) {
+    return 0;
+  }
+
+  DWORD process_id = 0;
+  GetWindowThreadProcessId(hwnd, &process_id);
+  return reach_window_process_app_user_model_id_for_process(process_id, out_id,
+                                                            out_count);
 }
 
 static int32_t reach_append_relaunch_argument(uint16_t *dst, size_t dst_count,
@@ -541,6 +561,9 @@ static int32_t reach_window_manager_contains(const std::vector<HWND> &windows,
   return 0;
 }
 
+static int32_t reach_window_manager_query_process_path_for_process(
+    DWORD process_id, uint16_t *out_path, size_t out_path_count);
+
 static int32_t reach_window_manager_query_process_path(HWND hwnd,
                                                        uint16_t *out_path,
                                                        size_t out_path_count) {
@@ -550,6 +573,16 @@ static int32_t reach_window_manager_query_process_path(HWND hwnd,
   out_path[0] = 0;
   DWORD process_id = 0;
   GetWindowThreadProcessId(hwnd, &process_id);
+  return reach_window_manager_query_process_path_for_process(
+      process_id, out_path, out_path_count);
+}
+
+static int32_t reach_window_manager_query_process_path_for_process(
+    DWORD process_id, uint16_t *out_path, size_t out_path_count) {
+  if (out_path == nullptr || out_path_count == 0) {
+    return 0;
+  }
+  out_path[0] = 0;
   if (process_id == 0 || process_id == GetCurrentProcessId()) {
     return 0;
   }
@@ -670,12 +703,66 @@ static int32_t reach_window_manager_any_visible_maximized_on_primary(void) {
   }
   return 0;
 }
+
+static reach_window_metadata_cache_entry *
+reach_window_manager_find_metadata_cache(reach_window_manager *manager,
+                                         HWND hwnd, DWORD process_id) {
+  if (manager == nullptr || hwnd == nullptr || process_id == 0) {
+    return nullptr;
+  }
+
+  for (reach_window_metadata_cache_entry &entry : manager->metadata_cache) {
+    if (entry.hwnd == hwnd && entry.process_id == process_id) {
+      return &entry;
+    }
+  }
+
+  reach_window_metadata_cache_entry entry = {};
+  entry.hwnd = hwnd;
+  entry.process_id = process_id;
+  manager->metadata_cache.push_back(entry);
+  return &manager->metadata_cache.back();
+}
+
+static int32_t reach_window_manager_window_snapshot_contains(
+    const std::vector<reach_window_snapshot> &windows, HWND hwnd) {
+  uintptr_t id = reinterpret_cast<uintptr_t>(hwnd);
+  for (const reach_window_snapshot &snapshot : windows) {
+    if (snapshot.id == id) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static void reach_window_manager_trim_metadata_cache(
+    reach_window_manager *manager) {
+  if (manager == nullptr) {
+    return;
+  }
+
+  for (size_t index = 0; index < manager->metadata_cache.size();) {
+    HWND hwnd = manager->metadata_cache[index].hwnd;
+    if (hwnd == nullptr || !IsWindow(hwnd) ||
+        !reach_window_manager_window_snapshot_contains(manager->windows,
+                                                       hwnd)) {
+      manager->metadata_cache.erase(manager->metadata_cache.begin() + index);
+    } else {
+      ++index;
+    }
+  }
+}
+
 static int32_t
-reach_window_manager_build_snapshot(HWND hwnd,
+reach_window_manager_build_snapshot(reach_window_manager *manager, HWND hwnd,
                                     reach_window_snapshot *out_snapshot) {
-  if (out_snapshot == nullptr || hwnd == nullptr || !IsWindow(hwnd)) {
+  if (manager == nullptr || out_snapshot == nullptr || hwnd == nullptr ||
+      !IsWindow(hwnd)) {
     return 0;
   }
+
+  DWORD process_id = 0;
+  GetWindowThreadProcessId(hwnd, &process_id);
 
   reach_window_snapshot snapshot = {};
   snapshot.id = reinterpret_cast<uintptr_t>(hwnd);
@@ -683,9 +770,23 @@ reach_window_manager_build_snapshot(HWND hwnd,
   snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
   snapshot.minimized = IsIconic(hwnd) ? 1 : 0;
 
-  if (!reach_window_app_user_model_id(hwnd, snapshot.app_user_model_id, 260)) {
-    (void)reach_window_process_app_user_model_id(
-        hwnd, snapshot.app_user_model_id, 260);
+  reach_window_metadata_cache_entry *cache =
+      reach_window_manager_find_metadata_cache(manager, hwnd, process_id);
+  if (cache != nullptr) {
+    if (!cache->app_user_model_id_queried) {
+      if (!reach_window_app_user_model_id(hwnd, cache->app_user_model_id,
+                                          260)) {
+        (void)reach_window_process_app_user_model_id_for_process(
+            process_id, cache->app_user_model_id, 260);
+      }
+      cache->app_user_model_id_queried = 1;
+    }
+    reach_copy_utf16(snapshot.app_user_model_id, 260,
+                     cache->app_user_model_id);
+  } else if (!reach_window_app_user_model_id(hwnd, snapshot.app_user_model_id,
+                                             260)) {
+    (void)reach_window_process_app_user_model_id_for_process(
+        process_id, snapshot.app_user_model_id, 260);
   }
   RECT rect = {};
   WINDOWPLACEMENT placement = {};
@@ -704,7 +805,18 @@ reach_window_manager_build_snapshot(HWND hwnd,
   (void)reach_copy_utf16(snapshot.title, 260,
                          reinterpret_cast<const uint16_t *>(title));
 
-  if (!reach_window_manager_query_process_path(hwnd, snapshot.path, 260)) {
+  if (cache != nullptr) {
+    if (!cache->process_path_queried) {
+      (void)reach_window_manager_query_process_path_for_process(
+          process_id, cache->process_path, 260);
+      cache->process_path_queried = 1;
+    }
+    reach_copy_utf16(snapshot.path, 260, cache->process_path);
+  } else {
+    (void)reach_window_manager_query_process_path_for_process(
+        process_id, snapshot.path, 260);
+  }
+  if (snapshot.path[0] == 0) {
     return 0;
   }
 
@@ -721,7 +833,7 @@ static BOOL CALLBACK reach_window_manager_enum_windows_proc(HWND hwnd,
   }
 
   reach_window_snapshot snapshot = {};
-  if (reach_window_manager_build_snapshot(hwnd, &snapshot)) {
+  if (reach_window_manager_build_snapshot(manager, hwnd, &snapshot)) {
     if (snapshot.minimized) {
       snapshot.visible = 0;
     }
@@ -781,7 +893,7 @@ reach_window_manager_refresh_windows(reach_window_manager *manager) {
     if (reach_window_manager_find_pending(manager->pending_windows, hwnd) ==
         nullptr) {
       reach_window_snapshot snapshot = {};
-      if (reach_window_manager_build_snapshot(hwnd, &snapshot)) {
+      if (reach_window_manager_build_snapshot(manager, hwnd, &snapshot)) {
         snapshot.visible = 0;
         snapshot.minimized = 1;
 
@@ -821,6 +933,7 @@ reach_window_manager_refresh_windows(reach_window_manager *manager) {
     }
   }
   manager->pending_windows.clear();
+  reach_window_manager_trim_metadata_cache(manager);
 }
 
 static reach_result
@@ -1036,7 +1149,7 @@ static reach_result reach_window_manager_pin_app_for_window(
 
   reach_window_snapshot local_snapshot = {};
   if (snapshot == nullptr) {
-    if (!reach_window_manager_build_snapshot(hwnd, &local_snapshot)) {
+    if (!reach_window_manager_build_snapshot(manager, hwnd, &local_snapshot)) {
       return REACH_ERROR;
     }
     snapshot = &local_snapshot;

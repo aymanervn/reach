@@ -84,6 +84,248 @@ reach_result reach_shell_load_icon_handle(
         out_icon);
 }
 
+static void reach_shell_query_open_window_icon(
+    reach_shell *shell,
+    const reach_shell_open_window_icon_job *job,
+    reach_icon_handle *out_icon)
+{
+    if (out_icon != nullptr) {
+        *out_icon = {};
+    }
+    if (shell == nullptr || job == nullptr || out_icon == nullptr) {
+        return;
+    }
+
+    (void)reach_shell_load_icon_handle(
+        shell,
+        job->path,
+        job->size_px,
+        out_icon);
+}
+
+static void reach_shell_open_window_icon_thread_main(reach_shell *shell)
+{
+    for (;;) {
+        reach_shell_open_window_icon_job job = {};
+        {
+            std::unique_lock<std::mutex> lock(shell->open_window_icons.mutex);
+            shell->open_window_icons.cv.wait(lock, [shell]() {
+                return shell->open_window_icons.stop ||
+                       shell->open_window_icons.job_count > 0;
+            });
+
+            if (shell->open_window_icons.stop) {
+                return;
+            }
+
+            job = shell->open_window_icons.jobs[0];
+            for (size_t index = 1; index < shell->open_window_icons.job_count;
+                 ++index) {
+                shell->open_window_icons.jobs[index - 1] =
+                    shell->open_window_icons.jobs[index];
+            }
+            shell->open_window_icons.job_count -= 1;
+            shell->open_window_icons.in_flight = 1;
+        }
+
+        reach_icon_handle icon = {};
+        reach_shell_query_open_window_icon(shell, &job, &icon);
+
+        {
+            std::lock_guard<std::mutex> lock(shell->open_window_icons.mutex);
+            shell->open_window_icons.in_flight = 0;
+            if (!shell->open_window_icons.stop &&
+                shell->open_window_icons.result_count <
+                    REACH_MAX_PINNED_APPS) {
+                reach_shell_open_window_icon_result *result =
+                    &shell->open_window_icons
+                         .results[shell->open_window_icons.result_count++];
+                result->generation = job.generation;
+                result->window = job.window;
+                reach_copy_utf16(result->path, 260, job.path);
+                result->initial = job.initial;
+                result->icon = icon;
+                icon = {};
+            }
+        }
+
+        if (icon.id != 0) {
+            reach_shell_release_icon_handle(shell, &icon);
+        }
+    }
+}
+
+static reach_result reach_shell_start_open_window_icon_worker(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (shell->open_window_icons.thread_started) {
+        return REACH_OK;
+    }
+
+    shell->open_window_icons.stop = 0;
+    try {
+        shell->open_window_icons.thread =
+            std::thread(reach_shell_open_window_icon_thread_main, shell);
+    } catch (...) {
+        return REACH_ERROR;
+    }
+
+    shell->open_window_icons.thread_started = 1;
+    return REACH_OK;
+}
+
+void reach_shell_stop_open_window_icon_worker(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->open_window_icons.thread_started) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(shell->open_window_icons.mutex);
+        shell->open_window_icons.stop = 1;
+        shell->open_window_icons.job_count = 0;
+    }
+    shell->open_window_icons.cv.notify_one();
+
+    if (shell->open_window_icons.thread.joinable()) {
+        shell->open_window_icons.thread.join();
+    }
+
+    for (size_t index = 0; index < shell->open_window_icons.result_count;
+         ++index) {
+        reach_shell_release_icon_handle(
+            shell,
+            &shell->open_window_icons.results[index].icon);
+    }
+
+    shell->open_window_icons.thread_started = 0;
+    shell->open_window_icons.stop = 0;
+    shell->open_window_icons.in_flight = 0;
+    shell->open_window_icons.job_count = 0;
+    shell->open_window_icons.result_count = 0;
+}
+
+static void reach_shell_schedule_open_window_icon_load(reach_shell *shell,
+                                                       size_t index)
+{
+    if (shell == nullptr || index >= shell->open_window_count ||
+        index >= REACH_MAX_PINNED_APPS ||
+        shell->open_windows[index].path[0] == 0) {
+        return;
+    }
+
+    if (reach_shell_start_open_window_icon_worker(shell) != REACH_OK) {
+        (void)reach_shell_load_icon_handle(
+            shell,
+            shell->open_windows[index].path,
+            reach_shell_dock_icon_size_px(shell),
+            &shell->dock_icons.open_window_icons[index]);
+        return;
+    }
+
+    reach_shell_open_window_icon_job job = {};
+    job.generation = shell->open_window_icons.generation;
+    job.window = shell->open_windows[index].id;
+    job.initial = shell->dock_icons.open_window_initials[index];
+    job.size_px = reach_shell_dock_icon_size_px(shell);
+    reach_copy_utf16(job.path, 260, shell->open_windows[index].path);
+
+    {
+        std::lock_guard<std::mutex> lock(shell->open_window_icons.mutex);
+        if (shell->open_window_icons.job_count >= REACH_MAX_PINNED_APPS) {
+            return;
+        }
+        shell->open_window_icons.jobs[shell->open_window_icons.job_count++] =
+            job;
+    }
+    shell->open_window_icons.cv.notify_one();
+}
+
+int32_t reach_shell_open_window_icon_work_pending(const reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return 0;
+    }
+
+    reach_shell *mutable_shell = const_cast<reach_shell *>(shell);
+    std::lock_guard<std::mutex> lock(mutable_shell->open_window_icons.mutex);
+    return mutable_shell->open_window_icons.job_count > 0 ||
+           mutable_shell->open_window_icons.result_count > 0 ||
+           mutable_shell->open_window_icons.in_flight;
+}
+
+static int32_t reach_shell_open_window_icon_result_matches(
+    const reach_window_snapshot *window,
+    const reach_shell_open_window_icon_result *result)
+{
+    if (window == nullptr || result == nullptr || window->id != result->window) {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (window->path[index] != 0 || result->path[index] != 0) {
+        if (window->path[index] != result->path[index]) {
+            return 0;
+        }
+        ++index;
+    }
+
+    return 1;
+}
+
+void reach_shell_apply_open_window_icon_results(reach_shell *shell)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    reach_shell_open_window_icon_result results[REACH_MAX_PINNED_APPS] = {};
+    size_t result_count = 0;
+    {
+        std::lock_guard<std::mutex> lock(shell->open_window_icons.mutex);
+        result_count = shell->open_window_icons.result_count;
+        for (size_t index = 0; index < result_count; ++index) {
+            results[index] = shell->open_window_icons.results[index];
+            shell->open_window_icons.results[index].icon = {};
+        }
+        shell->open_window_icons.result_count = 0;
+    }
+
+    for (size_t result_index = 0; result_index < result_count; ++result_index) {
+        reach_shell_open_window_icon_result *result = &results[result_index];
+        int32_t used = 0;
+        if (result->generation == shell->open_window_icons.generation &&
+            result->icon.id != 0) {
+            for (size_t window_index = 0;
+                 window_index < shell->open_window_count &&
+                 window_index < REACH_MAX_PINNED_APPS;
+                 ++window_index) {
+                if (shell->dock_icons.open_window_icons[window_index].id != 0 ||
+                    !reach_shell_open_window_icon_result_matches(
+                        &shell->open_windows[window_index],
+                        result)) {
+                    continue;
+                }
+
+                shell->dock_icons.open_window_icons[window_index] =
+                    result->icon;
+                shell->dock_icons.open_window_initials[window_index] =
+                    result->initial;
+                result->icon = {};
+                used = 1;
+                shell->dock.dirty_flags = 1;
+                break;
+            }
+        }
+
+        if (!used && result->icon.id != 0) {
+            reach_shell_release_icon_handle(shell, &result->icon);
+        }
+    }
+}
+
 void reach_shell_release_dock_icons(reach_shell *shell)
 {
     if (shell == nullptr) {
@@ -137,6 +379,112 @@ void reach_shell_release_open_window_icons(reach_shell *shell, size_t old_count)
     }
 }
 
+static void reach_shell_load_open_window_icon(reach_shell *shell, size_t index)
+{
+    if (shell == nullptr || index >= shell->open_window_count ||
+        index >= REACH_MAX_PINNED_APPS) {
+        return;
+    }
+
+    reach_shell_release_icon_handle(
+        shell,
+        &shell->dock_icons.open_window_icons[index]);
+
+    shell->dock_icons.open_window_initials[index] =
+        shell->open_windows[index].title[0] != 0
+            ? shell->open_windows[index].title[0]
+            : '?';
+
+    reach_shell_schedule_open_window_icon_load(shell, index);
+}
+
+static int32_t reach_shell_open_window_icon_match(
+    const reach_window_snapshot *window,
+    uintptr_t old_window,
+    const uint16_t *old_path)
+{
+    if (window == nullptr || old_window == 0 || old_path == nullptr) {
+        return 0;
+    }
+
+    if (window->id != old_window) {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (window->path[index] != 0 || old_path[index] != 0) {
+        if (window->path[index] != old_path[index]) {
+            return 0;
+        }
+        ++index;
+    }
+
+    return 1;
+}
+
+void reach_shell_sync_open_window_icons(
+    reach_shell *shell, const uintptr_t *old_windows,
+    const uint16_t old_paths[][260], const reach_icon_handle *old_icons,
+    const uint16_t *old_initials, size_t old_count)
+{
+    if (shell == nullptr) {
+        return;
+    }
+
+    reach_icon_handle next_icons[REACH_MAX_PINNED_APPS] = {};
+    uint16_t next_initials[REACH_MAX_PINNED_APPS] = {};
+    int32_t old_used[REACH_MAX_PINNED_APPS] = {};
+
+    size_t new_count = shell->open_window_count;
+    if (new_count > REACH_MAX_PINNED_APPS) {
+        new_count = REACH_MAX_PINNED_APPS;
+    }
+    if (old_count > REACH_MAX_PINNED_APPS) {
+        old_count = REACH_MAX_PINNED_APPS;
+    }
+    shell->open_window_icons.generation += 1;
+    {
+        std::lock_guard<std::mutex> lock(shell->open_window_icons.mutex);
+        shell->open_window_icons.job_count = 0;
+    }
+
+    for (size_t new_index = 0; new_index < new_count; ++new_index) {
+        for (size_t old_index = 0; old_index < old_count; ++old_index) {
+            if (old_used[old_index]) {
+                continue;
+            }
+            if (!reach_shell_open_window_icon_match(&shell->open_windows[new_index],
+                                                    old_windows[old_index],
+                                                    old_paths[old_index])) {
+                continue;
+            }
+
+            next_icons[new_index] = old_icons[old_index];
+            next_initials[new_index] = old_initials[old_index];
+            old_used[old_index] = 1;
+            break;
+        }
+    }
+
+    for (size_t old_index = 0; old_index < old_count; ++old_index) {
+        if (!old_used[old_index]) {
+            reach_icon_handle icon = old_icons[old_index];
+            reach_shell_release_icon_handle(shell, &icon);
+        }
+    }
+
+    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index) {
+        shell->dock_icons.open_window_icons[index] = next_icons[index];
+        shell->dock_icons.open_window_initials[index] = next_initials[index];
+    }
+
+    for (size_t index = 0; index < new_count; ++index) {
+        if (shell->dock_icons.open_window_icons[index].id == 0) {
+            reach_shell_load_open_window_icon(shell, index);
+        }
+    }
+}
+
 void reach_shell_load_open_window_icons(reach_shell *shell)
 {
     if (shell == nullptr) {
@@ -149,16 +497,7 @@ void reach_shell_load_open_window_icons(reach_shell *shell)
     }
 
     for (size_t index = 0; index < count; ++index) {
-        shell->dock_icons.open_window_initials[index] =
-            shell->open_windows[index].title[0] != 0
-                ? shell->open_windows[index].title[0]
-                : '?';
-
-        (void)reach_shell_load_icon_handle(
-            shell,
-            shell->open_windows[index].path,
-            reach_shell_dock_icon_size_px(shell),
-            &shell->dock_icons.open_window_icons[index]);
+        reach_shell_load_open_window_icon(shell, index);
     }
 }
 

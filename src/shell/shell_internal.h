@@ -98,6 +98,38 @@ typedef struct reach_shell_launcher_search_state {
   void (*notify)(reach_shell *shell);
 } reach_shell_launcher_search_state;
 
+typedef struct reach_shell_open_window_icon_job {
+  uint32_t generation;
+  uintptr_t window;
+  uint16_t path[260];
+  uint16_t initial;
+  int32_t size_px;
+} reach_shell_open_window_icon_job;
+
+typedef struct reach_shell_open_window_icon_result {
+  uint32_t generation;
+  uintptr_t window;
+  uint16_t path[260];
+  uint16_t initial;
+  reach_icon_handle icon;
+} reach_shell_open_window_icon_result;
+
+typedef struct reach_shell_open_window_icon_state {
+  std::thread thread;
+  std::mutex mutex;
+  std::condition_variable cv;
+
+  int32_t thread_started;
+  int32_t stop;
+  int32_t in_flight;
+  uint32_t generation;
+
+  reach_shell_open_window_icon_job jobs[REACH_MAX_PINNED_APPS];
+  size_t job_count;
+  reach_shell_open_window_icon_result results[REACH_MAX_PINNED_APPS];
+  size_t result_count;
+} reach_shell_open_window_icon_state;
+
 typedef struct reach_shell_context_menu_state {
   int32_t open;
   int32_t power_open;
@@ -205,6 +237,7 @@ struct reach_shell {
   reach_launcher_hit_type pressed_launcher_hit_type;
   size_t pressed_launcher_index;
   reach_shell_launcher_search_state launcher_search;
+  reach_shell_open_window_icon_state open_window_icons;
   int32_t suppress_power_button_release;
   reach_shell_tray_state tray_state;
   reach_shell_switcher_state switcher_state;
@@ -337,6 +370,13 @@ void reach_shell_release_tray_render_icons(reach_shell *shell);
 void reach_shell_release_dock_icons(reach_shell *shell);
 void reach_shell_release_open_window_icons(reach_shell *shell,
                                            size_t old_count);
+void reach_shell_stop_open_window_icon_worker(reach_shell *shell);
+void reach_shell_apply_open_window_icon_results(reach_shell *shell);
+int32_t reach_shell_open_window_icon_work_pending(const reach_shell *shell);
+void reach_shell_sync_open_window_icons(
+    reach_shell *shell, const uintptr_t *old_windows,
+    const uint16_t old_paths[][260], const reach_icon_handle *old_icons,
+    const uint16_t *old_initials, size_t old_count);
 void reach_shell_load_open_window_icons(reach_shell *shell);
 void reach_shell_release_quick_settings_audio_render_icons(reach_shell *shell);
 reach_result reach_shell_reload_pins(reach_shell *shell);

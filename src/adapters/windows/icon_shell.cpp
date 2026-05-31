@@ -9,10 +9,30 @@
 #include <shlwapi.h>
 #include <shobjidl.h>
 
+#include <mutex>
 #include <new>
 
 struct reach_icon_provider {
     uint64_t next_id;
+    std::mutex mutex;
+};
+
+struct reach_icon_com_scope {
+    HRESULT hr;
+    int32_t uninitialize;
+
+    reach_icon_com_scope()
+        : hr(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)),
+          uninitialize(SUCCEEDED(hr) ? 1 : 0)
+    {
+    }
+
+    ~reach_icon_com_scope()
+    {
+        if (uninitialize) {
+            CoUninitialize();
+        }
+    }
 };
 
 static int32_t reach_icon_copy_path(wchar_t *dst, DWORD dst_count, const wchar_t *src)
@@ -187,6 +207,9 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
         return REACH_INVALID_ARGUMENT;
     }
 
+    reach_icon_com_scope com_scope;
+    std::lock_guard<std::mutex> lock(provider->mutex);
+
     const wchar_t *requested_path = reinterpret_cast<const wchar_t *>(request->path);
     wchar_t resolved[260] = {};
     wchar_t shortcut_target[260] = {};
@@ -250,7 +273,11 @@ static reach_result reach_icon_load(reach_icon_provider *provider, const reach_i
 
 static reach_result reach_icon_release(reach_icon_provider *provider, reach_icon_handle icon)
 {
-    (void)provider;
+    if (provider != nullptr) {
+        std::lock_guard<std::mutex> lock(provider->mutex);
+        reach_windows_icon_id_release(icon.id);
+        return REACH_OK;
+    }
     reach_windows_icon_id_release(icon.id);
     return REACH_OK;
 }
