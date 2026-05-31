@@ -13,13 +13,15 @@
 
 Reach replaces Windows Explorer as the shell, and Explorer does not run in the background. This breaks a few apps that rely on it, most importantly Settings. I haven't tested other Windows Store apps as I don't use them.
 
-Reach uses no external dependencies other than the Windows native APIs and VoidTools Everything SDK [0]. The launcher uses Voidtools Everything SDK for search, so you need Everything installed and running if you want launcher search to work.
+Reach uses no external dependencies other than the Windows native APIs and VoidTools Everything SDK [0]. The launcher uses Voidtools Everything SDK for search, so you need Everything app installed and running.
 
-Don't install Reach if you are not comfortable using the command line. It may break and leave you with a blank screen. A few hotkeys will work even when Explorer is not running:
+A few hotkeys will work even when Explorer is not running:
 
-Task manager: CTRL + SHIFT + ESC
-Windows quick settings: WIN + A
-Project menu: WIN + P
+- Task manager: CTRL + SHIFT + ESC
+- Windows quick settings: WIN + A
+- Project menu: WIN + P
+
+In case of an emergency, you can always open Task manager, click on Run, type powershell, then press CTRL + SHIFT + ENTER. This will open an elevated powershell session, and you can follow the instructions below to restore explorer.
 
 ## Features
 
