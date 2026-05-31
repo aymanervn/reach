@@ -4,7 +4,10 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <shobjidl.h>
+#include <shlwapi.h>
 #include <strsafe.h>
+#include <tlhelp32.h>
 
 static int32_t reach_windows_startup_extension_supported(const wchar_t *path)
 {
@@ -24,9 +27,179 @@ static int32_t reach_windows_startup_extension_supported(const wchar_t *path)
         _wcsicmp(extension, L".cmd") == 0;
 }
 
+static int32_t reach_windows_paths_equal(const wchar_t *a, const wchar_t *b)
+{
+    return a != nullptr && b != nullptr && a[0] != 0 && b[0] != 0 &&
+           _wcsicmp(a, b) == 0;
+}
+
+struct reach_windows_startup_com_scope {
+    HRESULT hr;
+    int32_t uninitialize;
+
+    reach_windows_startup_com_scope()
+        : hr(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)),
+          uninitialize(SUCCEEDED(hr) ? 1 : 0)
+    {
+    }
+
+    ~reach_windows_startup_com_scope()
+    {
+        if (uninitialize) {
+            CoUninitialize();
+        }
+    }
+};
+
+static int32_t reach_windows_resolve_shortcut_target(
+    const wchar_t *path,
+    wchar_t *out_target,
+    DWORD out_target_count)
+{
+    if (path == nullptr ||
+        out_target == nullptr ||
+        out_target_count == 0 ||
+        _wcsicmp(PathFindExtensionW(path), L".lnk") != 0) {
+        return 0;
+    }
+
+    out_target[0] = 0;
+
+    reach_windows_startup_com_scope com_scope;
+
+    IShellLinkW *link = nullptr;
+    HRESULT hr = CoCreateInstance(
+        CLSID_ShellLink,
+        nullptr,
+        CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(&link));
+    if (FAILED(hr) || link == nullptr) {
+        return 0;
+    }
+
+    IPersistFile *persist = nullptr;
+    hr = link->QueryInterface(IID_PPV_ARGS(&persist));
+    if (SUCCEEDED(hr)) {
+        hr = persist->Load(path, STGM_READ);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = link->GetPath(out_target, out_target_count, nullptr, SLGP_UNCPRIORITY);
+    }
+
+    if (persist != nullptr) {
+        persist->Release();
+    }
+    link->Release();
+
+    return SUCCEEDED(hr) && out_target[0] != 0;
+}
+
+static int32_t reach_windows_resolve_executable_path(
+    const wchar_t *path,
+    wchar_t *out_path,
+    DWORD out_path_count)
+{
+    if (path == nullptr || path[0] == 0 || out_path == nullptr ||
+        out_path_count == 0) {
+        return 0;
+    }
+
+    out_path[0] = 0;
+
+    wchar_t shortcut_target[MAX_PATH] = {};
+    const wchar_t *candidate = path;
+    if (reach_windows_resolve_shortcut_target(path, shortcut_target, MAX_PATH)) {
+        candidate = shortcut_target;
+    }
+
+    wchar_t expanded[4096] = {};
+    DWORD expanded_count = ExpandEnvironmentStringsW(
+        candidate,
+        expanded,
+        _countof(expanded));
+    if (expanded_count > 0 && expanded_count < _countof(expanded)) {
+        candidate = expanded;
+    }
+
+    wchar_t full_path[MAX_PATH] = {};
+    DWORD full_count = GetFullPathNameW(
+        candidate,
+        MAX_PATH,
+        full_path,
+        nullptr);
+    if (full_count > 0 && full_count < MAX_PATH && GetFileAttributesW(full_path) != INVALID_FILE_ATTRIBUTES) {
+        return SUCCEEDED(StringCchCopyW(out_path, out_path_count, full_path));
+    }
+
+    wchar_t searched[MAX_PATH] = {};
+    DWORD search_count = SearchPathW(
+        nullptr,
+        candidate,
+        nullptr,
+        MAX_PATH,
+        searched,
+        nullptr);
+    if (search_count > 0 && search_count < MAX_PATH) {
+        return SUCCEEDED(StringCchCopyW(out_path, out_path_count, searched));
+    }
+
+    return SUCCEEDED(StringCchCopyW(out_path, out_path_count, candidate));
+}
+
+static int32_t reach_windows_executable_running(const wchar_t *executable)
+{
+    wchar_t target[MAX_PATH] = {};
+    if (!reach_windows_resolve_executable_path(executable, target, MAX_PATH)) {
+        return 0;
+    }
+
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    PROCESSENTRY32W entry = {};
+    entry.dwSize = sizeof(entry);
+
+    int32_t running = 0;
+    if (Process32FirstW(snapshot, &entry)) {
+        do {
+            HANDLE process = OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION,
+                FALSE,
+                entry.th32ProcessID);
+            if (process == nullptr) {
+                continue;
+            }
+
+            wchar_t process_path[MAX_PATH] = {};
+            DWORD process_path_count = MAX_PATH;
+            if (QueryFullProcessImageNameW(
+                    process,
+                    0,
+                    process_path,
+                    &process_path_count) &&
+                reach_windows_paths_equal(target, process_path)) {
+                running = 1;
+                CloseHandle(process);
+                break;
+            }
+
+            CloseHandle(process);
+        } while (Process32NextW(snapshot, &entry));
+    }
+
+    CloseHandle(snapshot);
+    return running;
+}
+
 static void reach_windows_launch_path(const wchar_t *path)
 {
     if (path == nullptr || path[0] == 0) {
+        return;
+    }
+
+    if (reach_windows_executable_running(path)) {
         return;
     }
 
@@ -185,6 +358,10 @@ static void reach_windows_launch_run_command(const wchar_t *command)
 
     if (*cursor != 0) {
         StringCchCopyW(arguments, _countof(arguments), cursor);
+    }
+
+    if (reach_windows_executable_running(executable)) {
+        return;
     }
 
     SHELLEXECUTEINFOW execute = {};
