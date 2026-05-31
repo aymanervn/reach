@@ -119,4 +119,4 @@ There are tests for core UI logic, pin configuration, search ranking, dock behav
 
 MIT — see [LICENSE](./LICENSE) for details.
 
-[0] License found under third_party/licnese
+[0] License found under third_party/liceneses
