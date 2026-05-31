@@ -48,6 +48,11 @@ struct reach_window_manager {
 
 static reach_window_manager *g_window_manager;
 
+static int32_t reach_window_manager_is_app_window(HWND hwnd);
+
+static void reach_window_manager_mark_seen(reach_window_manager *manager,
+                                           HWND hwnd);
+
 static int32_t reach_window_property_string(IPropertyStore *store,
                                             const PROPERTYKEY &key,
                                             uint16_t *out_value,
@@ -380,6 +385,13 @@ static void CALLBACK reach_window_manager_event_proc(
   if (event == EVENT_SYSTEM_FOREGROUND || !g_window_manager->dirty) {
     g_window_manager->foreground = GetForegroundWindow();
   }
+
+  if (event == EVENT_SYSTEM_FOREGROUND &&
+      reach_window_manager_is_app_window(g_window_manager->foreground)) {
+    reach_window_manager_mark_seen(g_window_manager,
+                                   g_window_manager->foreground);
+  }
+
   g_window_manager->pending_location_change =
       event == EVENT_OBJECT_LOCATIONCHANGE ? 1 : 0;
   g_window_manager->dirty = 1;
@@ -561,6 +573,28 @@ static int32_t reach_window_manager_contains(const std::vector<HWND> &windows,
   return 0;
 }
 
+static void
+reach_window_manager_remove_ordered_window(std::vector<HWND> &windows,
+                                           HWND hwnd) {
+  for (size_t index = 0; index < windows.size();) {
+    if (windows[index] == hwnd) {
+      windows.erase(windows.begin() + index);
+    } else {
+      ++index;
+    }
+  }
+}
+
+static void reach_window_manager_mark_seen(reach_window_manager *manager,
+                                           HWND hwnd) {
+  if (manager == nullptr || hwnd == nullptr) {
+    return;
+  }
+
+  reach_window_manager_remove_ordered_window(manager->window_order, hwnd);
+  manager->window_order.insert(manager->window_order.begin(), hwnd);
+}
+
 static int32_t reach_window_manager_query_process_path_for_process(
     DWORD process_id, uint16_t *out_path, size_t out_path_count);
 
@@ -735,8 +769,8 @@ static int32_t reach_window_manager_window_snapshot_contains(
   return 0;
 }
 
-static void reach_window_manager_trim_metadata_cache(
-    reach_window_manager *manager) {
+static void
+reach_window_manager_trim_metadata_cache(reach_window_manager *manager) {
   if (manager == nullptr) {
     return;
   }
@@ -781,8 +815,7 @@ reach_window_manager_build_snapshot(reach_window_manager *manager, HWND hwnd,
       }
       cache->app_user_model_id_queried = 1;
     }
-    reach_copy_utf16(snapshot.app_user_model_id, 260,
-                     cache->app_user_model_id);
+    reach_copy_utf16(snapshot.app_user_model_id, 260, cache->app_user_model_id);
   } else if (!reach_window_app_user_model_id(hwnd, snapshot.app_user_model_id,
                                              260)) {
     (void)reach_window_process_app_user_model_id_for_process(
@@ -924,6 +957,12 @@ reach_window_manager_refresh_windows(reach_window_manager *manager) {
     }
   }
 
+  manager->foreground = GetForegroundWindow();
+  if (reach_window_manager_find_pending(manager->pending_windows,
+                                        manager->foreground) != nullptr) {
+    reach_window_manager_mark_seen(manager, manager->foreground);
+  }
+
   manager->windows.clear();
   for (HWND hwnd : manager->window_order) {
     const reach_window_snapshot *snapshot =
@@ -943,7 +982,6 @@ reach_window_manager_refresh(reach_window_manager *manager) {
     return REACH_INVALID_ARGUMENT;
   }
 
-  manager->foreground = GetForegroundWindow();
   reach_window_manager_refresh_windows(manager);
   manager->dirty = 0;
   manager->pending_location_change = 0;
@@ -1278,6 +1316,7 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
   }
 
   manager->foreground = hwnd;
+  reach_window_manager_mark_seen(manager, hwnd);
   manager->dirty = 1;
 
   return REACH_OK;
