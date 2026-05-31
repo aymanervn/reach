@@ -4,6 +4,7 @@
 #include "reach/ports/app_launcher.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/config_store.h"
+#include "reach/ports/dock_reveal_edge.h"
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/hotkeys.h"
 #include "reach/ports/icon_provider.h"
@@ -19,33 +20,58 @@
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
-#include "reach/ports/dock_reveal_edge.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-reach_result reach_windows_create_platform_window(reach_surface_role role, reach_platform_window_port *out_port);
-reach_result reach_windows_create_d2d_render_backend(reach_platform_window *window, reach_render_backend_port *out_port);
-reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window, reach_render_backend_port *out_port);
-reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
-reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
-reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
-reach_result reach_windows_create_icon_provider(reach_icon_provider_port *out_port);
-reach_result reach_windows_create_input_source(reach_input_source_port *out_port);
-reach_result reach_windows_create_config_store(const uint16_t *path, reach_config_store_port *out_port);
-reach_result reach_windows_create_window_manager(reach_window_manager_port *out_port);
-reach_result reach_windows_create_explorer_service(reach_explorer_service_port *out_port);
-reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port *out_port);
-reach_result reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port *out_port);
-reach_result reach_windows_create_popup_capture(reach_popup_capture_port *out_port);
-reach_result reach_windows_create_power_session(reach_power_session_port *out_port);
-reach_result reach_windows_create_audio_volume(reach_audio_volume_port *out_port);
-reach_result reach_windows_create_system_controls(reach_system_controls_port *out_port);
-reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *out_port);
+reach_result
+reach_windows_create_platform_window(reach_surface_role role,
+                                     reach_platform_window_port *out_port);
+reach_result
+reach_windows_create_d2d_render_backend(reach_platform_window *window,
+                                        reach_render_backend_port *out_port);
+reach_result
+reach_windows_create_dcomp_render_backend(reach_platform_window *window,
+                                          reach_render_backend_port *out_port);
+reach_result
+reach_windows_create_search_provider(reach_search_provider_port *out_port);
+reach_result
+reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
+reach_result
+reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
+reach_result
+reach_windows_create_icon_provider(reach_icon_provider_port *out_port);
+reach_result
+reach_windows_create_input_source(reach_input_source_port *out_port);
+reach_result
+reach_windows_create_config_store(const uint16_t *path,
+                                  reach_config_store_port *out_port);
+reach_result
+reach_windows_create_window_manager(reach_window_manager_port *out_port);
+reach_result
+reach_windows_create_explorer_service(reach_explorer_service_port *out_port);
+reach_result
+reach_windows_create_wallpaper_service(reach_wallpaper_service_port *out_port);
+reach_result
+reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port *out_port);
+reach_result
+reach_windows_create_popup_capture(reach_popup_capture_port *out_port);
+reach_result
+reach_windows_create_power_session(reach_power_session_port *out_port);
+reach_result
+reach_windows_create_audio_volume(reach_audio_volume_port *out_port);
+reach_result
+reach_windows_create_system_controls(reach_system_controls_port *out_port);
+reach_result
+reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *out_port);
 reach_result reach_windows_create_hotkeys(reach_hotkeys_port *out_port);
 reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
-reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
+reach_result reach_windows_create_explorer_desktop_compat_host(void);
+void reach_windows_destroy_explorer_desktop_compat_host(void);
+void reach_windows_notify_desktop_environment_changed(void);
+reach_result reach_windows_default_config_path(uint16_t *path,
+                                               uint32_t path_count);
 reach_result reach_windows_launch_startup_apps(void);
 
 #ifdef __cplusplus

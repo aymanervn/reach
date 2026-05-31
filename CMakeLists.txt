@@ -92,6 +92,7 @@ target_link_libraries(reach_features PUBLIC
 
 add_library(reach_windows_adapters STATIC
     src/adapters/windows/window_win32.cpp
+    src/adapters/windows/explorer_desktop_compat_host_win32.cpp
     src/adapters/windows/render_d2d/render_d2d_backend.cpp
     src/adapters/windows/render_d2d/render_d2d_device.cpp
     src/adapters/windows/render_d2d/render_d2d_dcomp.cpp
