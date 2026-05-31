@@ -1258,10 +1258,14 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
         AttachThreadInput(current_thread, target_thread, TRUE) != FALSE;
   }
 
-  SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
+  SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+  SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
 
+  BringWindowToTop(hwnd);
   SetForegroundWindow(hwnd);
+  SwitchToThisWindow(hwnd, TRUE);
   SetFocus(hwnd);
   SetActiveWindow(hwnd);
 
