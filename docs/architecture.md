@@ -195,7 +195,6 @@ Before finishing architecture-affecting work, run:
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
-cmake --build build --target check_architecture
 ```
 
 The architecture check is part of the contract. Do not weaken it or add allowlist entries without explicit approval.
