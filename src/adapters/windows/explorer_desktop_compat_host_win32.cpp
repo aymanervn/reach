@@ -10,10 +10,14 @@ static HWND g_workerwHwnd = nullptr;
 static std::vector<HWND> g_hiddenReachWallpaperHwnds;
 static HWINEVENTHOOK g_wpeCreateHook = nullptr;
 static HWINEVENTHOOK g_wpeDestroyHook = nullptr;
+static int32_t g_syncScheduled = 0;
+static int32_t g_wallpaperEngineRendererPresent = -1;
 
-static const UINT REACH_WM_EXPLORER_DESKTOP_COMPAT_SYNC = WM_APP + 0x381;
+static const UINT_PTR REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER = 0x381;
+static const UINT REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS = 33;
 
 extern "C" void reach_windows_notify_desktop_environment_changed(void);
+extern "C" void reach_windows_request_desktop_environment_sync(void);
 
 static const wchar_t *reach_explorer_desktop_compat_progman_class(void) {
   return L"Progman";
@@ -23,9 +27,17 @@ static const wchar_t *reach_explorer_desktop_compat_workerw_class(void) {
   return L"WorkerW";
 }
 
-static void reach_explorer_desktop_compat_post_sync(void) {
+static void reach_explorer_desktop_compat_request_sync(void) {
   if (g_progmanHwnd != nullptr && IsWindow(g_progmanHwnd)) {
-    PostMessageW(g_progmanHwnd, REACH_WM_EXPLORER_DESKTOP_COMPAT_SYNC, 0, 0);
+    if (g_syncScheduled) {
+      return;
+    }
+
+    if (SetTimer(g_progmanHwnd, REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER,
+                 REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS,
+                 nullptr) != 0) {
+      g_syncScheduled = 1;
+    }
   }
 }
 
@@ -42,16 +54,21 @@ static LRESULT CALLBACK reach_explorer_desktop_compat_host_proc(HWND hwnd,
 
   case WM_PARENTNOTIFY:
     if (LOWORD(wparam) == WM_CREATE || LOWORD(wparam) == WM_DESTROY) {
-      reach_explorer_desktop_compat_post_sync();
+      reach_explorer_desktop_compat_request_sync();
     }
     return DefWindowProcW(hwnd, message, wparam, lparam);
 
-  default:
-    if (message == REACH_WM_EXPLORER_DESKTOP_COMPAT_SYNC) {
+  case WM_TIMER:
+    if (wparam == REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER) {
+      KillTimer(hwnd, REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER);
+      g_syncScheduled = 0;
       reach_windows_notify_desktop_environment_changed();
       return 0;
     }
 
+    return DefWindowProcW(hwnd, message, wparam, lparam);
+
+  default:
     return DefWindowProcW(hwnd, message, wparam, lparam);
   }
 }
@@ -152,28 +169,24 @@ reach_explorer_desktop_compat_is_wallpaper_engine_child(HWND hwnd) {
     return 0;
   }
 
-  if (!reach_explorer_desktop_compat_process_basename_matches(
-          hwnd, L"wallpaper32.exe", L"wallpaper64.exe")) {
-    return 0;
-  }
-
   wchar_t class_name[128] = {};
   wchar_t title[128] = {};
 
   GetClassNameW(hwnd, class_name, 128);
   GetWindowTextW(hwnd, title, 128);
 
-  if (lstrcmpiW(class_name, L"WPEDesktopDX11Window") == 0 &&
-      lstrcmpW(title, L"WPELiveWallpaper") == 0) {
-    return 1;
+  int32_t candidate =
+      (lstrcmpiW(class_name, L"WPEDesktopDX11Window") == 0 &&
+       lstrcmpW(title, L"WPELiveWallpaper") == 0) ||
+      (lstrcmpiW(class_name, L"WPEVideoWallpaper") == 0 &&
+       lstrcmpW(title, L"WPEVideoWallpaper") == 0);
+
+  if (!candidate) {
+    return 0;
   }
 
-  if (lstrcmpiW(class_name, L"WPEVideoWallpaper") == 0 &&
-      lstrcmpW(title, L"WPEVideoWallpaper") == 0) {
-    return 1;
-  }
-
-  return 0;
+  return reach_explorer_desktop_compat_process_basename_matches(
+      hwnd, L"wallpaper32.exe", L"wallpaper64.exe");
 }
 
 static void CALLBACK reach_explorer_desktop_compat_winevent_proc(
@@ -188,16 +201,8 @@ static void CALLBACK reach_explorer_desktop_compat_winevent_proc(
     return;
   }
 
-  if (event == EVENT_OBJECT_CREATE) {
-    if (reach_explorer_desktop_compat_is_wallpaper_engine_child(hwnd)) {
-      reach_explorer_desktop_compat_post_sync();
-    }
-
-    return;
-  }
-
-  if (event == EVENT_OBJECT_DESTROY) {
-    reach_explorer_desktop_compat_post_sync();
+  if (event == EVENT_OBJECT_CREATE || event == EVENT_OBJECT_DESTROY) {
+    reach_explorer_desktop_compat_request_sync();
   }
 }
 
@@ -235,6 +240,7 @@ static void reach_explorer_desktop_compat_stop_winevent_hooks(void) {
 
 struct reach_explorer_desktop_compat_resize_children_state {
   RECT worker_client;
+  int32_t found_wallpaper_engine_renderer;
 };
 
 static BOOL CALLBACK
@@ -251,6 +257,8 @@ reach_explorer_desktop_compat_resize_child_proc(HWND hwnd, LPARAM param) {
     return TRUE;
   }
 
+  state->found_wallpaper_engine_renderer = 1;
+
   int width = state->worker_client.right - state->worker_client.left;
   int height = state->worker_client.bottom - state->worker_client.top;
 
@@ -266,35 +274,6 @@ reach_explorer_desktop_compat_resize_child_proc(HWND hwnd, LPARAM param) {
                SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
   return TRUE;
-}
-
-static BOOL CALLBACK
-reach_explorer_desktop_compat_has_renderer_proc(HWND hwnd, LPARAM param) {
-  int32_t *found = reinterpret_cast<int32_t *>(param);
-  if (found == nullptr || *found) {
-    return FALSE;
-  }
-
-  if (reach_explorer_desktop_compat_is_wallpaper_engine_child(hwnd)) {
-    *found = 1;
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-static int32_t
-reach_explorer_desktop_compat_has_wallpaper_engine_renderer(void) {
-  if (g_workerwHwnd == nullptr || !IsWindow(g_workerwHwnd)) {
-    return 0;
-  }
-
-  int32_t found = 0;
-  EnumChildWindows(g_workerwHwnd,
-                   reach_explorer_desktop_compat_has_renderer_proc,
-                   reinterpret_cast<LPARAM>(&found));
-
-  return found;
 }
 
 static int32_t
@@ -368,12 +347,20 @@ reach_explorer_desktop_compat_restore_reach_wallpaper_fallback(void) {
   }
 }
 
-static void reach_explorer_desktop_compat_sync_reach_wallpaper_fallback(void) {
-  if (reach_explorer_desktop_compat_has_wallpaper_engine_renderer()) {
-    EnumWindows(reach_explorer_desktop_compat_hide_reach_wallpaper_proc, 0);
-  } else {
+static void reach_explorer_desktop_compat_sync_reach_wallpaper_fallback(
+    int32_t wallpaper_engine_renderer_present) {
+  if (wallpaper_engine_renderer_present) {
+    if (g_wallpaperEngineRendererPresent != 1 ||
+        g_hiddenReachWallpaperHwnds.empty()) {
+      EnumWindows(reach_explorer_desktop_compat_hide_reach_wallpaper_proc, 0);
+    }
+  } else if (g_wallpaperEngineRendererPresent != 0 ||
+             !g_hiddenReachWallpaperHwnds.empty()) {
     reach_explorer_desktop_compat_restore_reach_wallpaper_fallback();
   }
+
+  g_wallpaperEngineRendererPresent =
+      wallpaper_engine_renderer_present ? 1 : 0;
 }
 
 static void reach_explorer_desktop_compat_resize_wallpaper_children(void) {
@@ -388,7 +375,8 @@ static void reach_explorer_desktop_compat_resize_wallpaper_children(void) {
                    reach_explorer_desktop_compat_resize_child_proc,
                    reinterpret_cast<LPARAM>(&state));
 
-  reach_explorer_desktop_compat_sync_reach_wallpaper_fallback();
+  reach_explorer_desktop_compat_sync_reach_wallpaper_fallback(
+      state.found_wallpaper_engine_renderer);
 }
 
 static void reach_explorer_desktop_compat_resize_host(void) {
@@ -500,8 +488,14 @@ reach_windows_create_explorer_desktop_compat_host(void) {
 extern "C" void reach_windows_destroy_explorer_desktop_compat_host(void) {
   reach_explorer_desktop_compat_stop_winevent_hooks();
 
+  if (g_progmanHwnd != nullptr && IsWindow(g_progmanHwnd)) {
+    KillTimer(g_progmanHwnd, REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER);
+  }
+  g_syncScheduled = 0;
+
   reach_explorer_desktop_compat_restore_reach_wallpaper_fallback();
   g_hiddenReachWallpaperHwnds.clear();
+  g_wallpaperEngineRendererPresent = -1;
 
   if (g_workerwHwnd != nullptr) {
     DestroyWindow(g_workerwHwnd);
@@ -516,4 +510,8 @@ extern "C" void reach_windows_destroy_explorer_desktop_compat_host(void) {
 
 extern "C" void reach_windows_notify_desktop_environment_changed(void) {
   reach_explorer_desktop_compat_resize_host();
+}
+
+extern "C" void reach_windows_request_desktop_environment_sync(void) {
+  reach_explorer_desktop_compat_request_sync();
 }

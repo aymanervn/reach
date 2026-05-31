@@ -91,7 +91,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message,
     }
     return 0;
   case WM_DISPLAYCHANGE:
-    reach_windows_notify_desktop_environment_changed();
+    reach_windows_request_desktop_environment_sync();
 
     if (window != nullptr) {
       reach_ui_event event = {};
@@ -106,7 +106,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message,
                  suggested->bottom - suggested->top,
                  SWP_NOZORDER | SWP_NOACTIVATE);
 
-    reach_windows_notify_desktop_environment_changed();
+    reach_windows_request_desktop_environment_sync();
 
     if (window != nullptr) {
       reach_ui_event event = {};
@@ -118,7 +118,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message,
   case WM_DEVICECHANGE:
   case WM_SETTINGCHANGE:
   case WM_POWERBROADCAST:
-    reach_windows_notify_desktop_environment_changed();
+    reach_windows_request_desktop_environment_sync();
     return DefWindowProcW(hwnd, message, wparam, lparam);
   case WM_KEYDOWN:
     if (window != nullptr) {

@@ -82,6 +82,7 @@ reach_result reach_windows_create_hotkeys(reach_hotkeys_port *out_port);
 reach_result reach_windows_create_explorer_desktop_compat_host(void);
 void reach_windows_destroy_explorer_desktop_compat_host(void);
 void reach_windows_notify_desktop_environment_changed(void);
+void reach_windows_request_desktop_environment_sync(void);
 reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
 reach_result reach_windows_default_config_path(uint16_t *path,
                                                uint32_t path_count);
