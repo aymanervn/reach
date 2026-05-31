@@ -215,6 +215,14 @@ static reach_result reachctl_unregister_watchdog_task(void)
         nullptr);
 }
 
+static int32_t reachctl_watchdog_task_is_registered(void)
+{
+    return reachctl_run_process_wait(
+        L"C:\\Windows\\System32\\schtasks.exe",
+        L"/Query /TN \"ReachWatchdog\"",
+        nullptr) == REACH_OK;
+}
+
 static BOOL CALLBACK reachctl_reset_monitor_work_area_proc(
     HMONITOR monitor,
     HDC dc,
@@ -448,6 +456,42 @@ int32_t reachctl_is_process_elevated(void)
 
     CloseHandle(token);
     return ok && elevation.TokenIsElevated;
+}
+
+int32_t reachctl_is_reach_installed(void)
+{
+    uint16_t reach_exe[260] = {};
+    if (reachctl_target_exe(reach_exe, 260) != REACH_OK) {
+        return 0;
+    }
+
+    const wchar_t *reach_exe_w = reinterpret_cast<const wchar_t *>(reach_exe);
+    DWORD attributes = GetFileAttributesW(reach_exe_w);
+    if (attributes == INVALID_FILE_ATTRIBUTES ||
+        (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return 0;
+    }
+
+    uint16_t watchdog_exe[260] = {};
+    if (reachctl_watchdog_exe(watchdog_exe, 260) != REACH_OK) {
+        return 0;
+    }
+
+    const wchar_t *watchdog_exe_w =
+        reinterpret_cast<const wchar_t *>(watchdog_exe);
+    attributes = GetFileAttributesW(watchdog_exe_w);
+    if (attributes == INVALID_FILE_ATTRIBUTES ||
+        (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return 0;
+    }
+
+    reach_shell_registration_status shell_status = {};
+    if (reach_windows_shell_query_current_user(reach_exe, &shell_status) != REACH_OK ||
+        !shell_status.reach_is_shell) {
+        return 0;
+    }
+
+    return reachctl_watchdog_task_is_registered();
 }
 
 reach_result reachctl_reset_to_windows_shell(void)
