@@ -42,6 +42,33 @@ static const wchar_t *reach_wallpaper_window_class_name()
     return L"ReachWallpaperWindow";
 }
 
+static const wchar_t *reach_wallpaper_visible_property_name()
+{
+    return L"ReachWallpaperIntendedVisible";
+}
+
+static void reach_wallpaper_apply_visibility(reach_wallpaper_window *window, int32_t visible)
+{
+    if (window == nullptr || window->hwnd == nullptr) {
+        return;
+    }
+
+    if (visible) {
+        SetPropW(window->hwnd, reach_wallpaper_visible_property_name(), reinterpret_cast<HANDLE>(1));
+    } else {
+        RemovePropW(window->hwnd, reach_wallpaper_visible_property_name());
+    }
+
+    if (!visible || reach_windows_desktop_compat_external_wallpaper_active()) {
+        ShowWindow(window->hwnd, SW_HIDE);
+    } else {
+        ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
+        SetWindowPos(window->hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+        InvalidateRect(window->hwnd, nullptr, FALSE);
+    }
+    reach_windows_request_desktop_environment_sync();
+}
+
 static int reach_wallpaper_width(reach_rect_f32 bounds)
 {
     int width = (int)bounds.width;
@@ -475,6 +502,7 @@ static void reach_wallpaper_window_destroy(reach_wallpaper_window *window)
     reach_wallpaper_unload_bitmap(window);
 
     if (window->hwnd != nullptr) {
+        RemovePropW(window->hwnd, reach_wallpaper_visible_property_name());
         SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, 0);
         DestroyWindow(window->hwnd);
         window->hwnd = nullptr;
@@ -584,8 +612,7 @@ static reach_wallpaper_window *reach_wallpaper_create_window(
     window->bounds_valid = 1;
 
     if (surface->visible) {
-        ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
-        SetWindowPos(window->hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+        reach_wallpaper_apply_visibility(window, 1);
     }
 
     return window;
@@ -627,6 +654,7 @@ static reach_result reach_wallpaper_apply_window_bounds(
     window->last_bounds = bounds;
     window->bounds_valid = 1;
     reach_wallpaper_unload_bitmap(window);
+    reach_windows_request_desktop_environment_sync();
 
     if (out_changed != nullptr) {
         *out_changed = 1;
@@ -680,15 +708,7 @@ static reach_result reach_wallpaper_sync_monitors(
         }
 
         if (surface->visible) {
-            ShowWindow(surface->windows[index]->hwnd, SW_SHOWNOACTIVATE);
-            SetWindowPos(
-                surface->windows[index]->hwnd,
-                HWND_BOTTOM,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+            reach_wallpaper_apply_visibility(surface->windows[index], 1);
         }
     }
 
@@ -711,9 +731,7 @@ static reach_result reach_wallpaper_surface_show(reach_wallpaper_surface *surfac
 
     for (reach_wallpaper_window *window : surface->windows) {
         if (window != nullptr && window->hwnd != nullptr) {
-            ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
-            SetWindowPos(window->hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
-            InvalidateRect(window->hwnd, nullptr, FALSE);
+            reach_wallpaper_apply_visibility(window, 1);
         }
     }
 
@@ -728,7 +746,7 @@ static reach_result reach_wallpaper_surface_hide(reach_wallpaper_surface *surfac
 
     for (reach_wallpaper_window *window : surface->windows) {
         if (window != nullptr && window->hwnd != nullptr) {
-            ShowWindow(window->hwnd, SW_HIDE);
+            reach_wallpaper_apply_visibility(window, 0);
         }
     }
 
@@ -738,7 +756,11 @@ static reach_result reach_wallpaper_surface_hide(reach_wallpaper_surface *surfac
 
 static reach_result reach_wallpaper_surface_set_bounds(reach_wallpaper_surface *surface, reach_rect_f32 bounds)
 {
-    return reach_wallpaper_sync_monitors(surface, bounds);
+    reach_result result = reach_wallpaper_sync_monitors(surface, bounds);
+    if (result == REACH_OK) {
+        reach_windows_request_desktop_environment_sync();
+    }
+    return result;
 }
 
 static reach_result reach_wallpaper_surface_set_wallpaper(
