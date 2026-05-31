@@ -69,7 +69,9 @@ void reach_shell_stick_dock_item(reach_shell *shell)
             shell->feedback.dock_index,
             0.50f);
 
-        reach_shell_capture_dock_input(shell);
+        if (!shell->context_menu_state.open) {
+            reach_shell_capture_dock_input(shell);
+        }
     }
 }
 
