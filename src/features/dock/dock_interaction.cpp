@@ -1,5 +1,8 @@
 #include "reach/features/dock.h"
 
+#include "dock_common.h"
+#include "dock_metrics.h"
+
 static int32_t reach_dock_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
     return (float)x >= rect.x &&
@@ -81,7 +84,10 @@ float reach_dock_slot_box_x(const reach_theme *theme, const reach_dock_layout *l
     }
 
     float icon_box_size = reach_theme_icon_box_size(theme, layout->bounds.height);
-    return layout->app_slots[index].x - layout->bounds.x + (layout->app_slots[index].width - icon_box_size) * 0.5f;
+    return reach_dock_icon_box_for_slot(
+        layout->app_slots[index],
+        layout->bounds,
+        icon_box_size).x;
 }
 
 float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layout *layout, int32_t cursor_x, float grab_offset_x)
@@ -122,7 +128,9 @@ size_t reach_dock_reorder_target(const reach_dock_feature_model *model, const re
     size_t target = current_index;
 
     while (target > 0) {
-        float threshold = layout->app_slots[target - 1].x + layout->app_slots[target - 1].width * 0.25f;
+        float threshold = layout->app_slots[target - 1].x +
+            layout->app_slots[target - 1].width *
+                reach_dock_metrics_values.reorder_neighbor_threshold_ratio;
         if (dragged_box_x > threshold) {
             break;
         }
@@ -130,7 +138,9 @@ size_t reach_dock_reorder_target(const reach_dock_feature_model *model, const re
     }
 
     while (target + 1 < count) {
-        float threshold = layout->app_slots[target + 1].x - layout->app_slots[target + 1].width * 0.25f;
+        float threshold = layout->app_slots[target + 1].x -
+            layout->app_slots[target + 1].width *
+                reach_dock_metrics_values.reorder_neighbor_threshold_ratio;
         if (dragged_box_x < threshold) {
             break;
         }
