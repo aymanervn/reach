@@ -1,5 +1,7 @@
 #include "reach/features/quick_settings.h"
 
+#include "quick_settings_common.h"
+
 static int reach_quick_settings_point_in_rect(
     reach_rect_f32 rect,
     float x,
@@ -10,17 +12,6 @@ static int reach_quick_settings_point_in_rect(
         x <= rect.x + rect.width &&
         y >= rect.y &&
         y <= rect.y + rect.height;
-}
-
-static float reach_quick_settings_clamp01(float value)
-{
-    if (value < 0.0f) {
-        return 0.0f;
-    }
-    if (value > 1.0f) {
-        return 1.0f;
-    }
-    return value;
 }
 
 static float reach_quick_settings_level_for_slider_line(
@@ -52,35 +43,6 @@ static int reach_quick_settings_point_in_app_slider(
     }
 
     return reach_quick_settings_point_in_rect(row->slider_thumb, x, y);
-}
-
-static void reach_quick_settings_copy_utf16(
-    uint16_t *dst,
-    size_t dst_count,
-    const uint16_t *src
-)
-{
-    if (dst == nullptr || dst_count == 0) {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr) {
-        while (index + 1 < dst_count && src[index] != 0) {
-            dst[index] = src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
-static void reach_quick_settings_copy_device_id(
-    uint16_t *dst,
-    size_t dst_count,
-    const uint16_t *src
-)
-{
-    reach_quick_settings_copy_utf16(dst, dst_count, src);
 }
 
 reach_quick_settings_hit_result reach_quick_settings_hit_test(
@@ -154,7 +116,7 @@ reach_quick_settings_hit_result reach_quick_settings_hit_test(
             result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW;
             result.output_device_index = index;
             if (model != nullptr && index < model->output_devices.count) {
-                reach_quick_settings_copy_device_id(
+                reach_quick_settings_copy_utf16(
                     result.output_device_id,
                     REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
                     model->output_devices.devices[index].device_id);
@@ -250,7 +212,7 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(
     if (hit.type == REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW) {
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE;
         action.output_device_index = hit.output_device_index;
-        reach_quick_settings_copy_device_id(
+        reach_quick_settings_copy_utf16(
             action.output_device_id,
             REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
             hit.output_device_id);

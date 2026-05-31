@@ -1,16 +1,8 @@
 #include "reach/features/quick_settings.h"
 #include "reach/features/popup.h"
 
-static float reach_quick_settings_clamp01(float value)
-{
-    if (value < 0.0f) {
-        return 0.0f;
-    }
-    if (value > 1.0f) {
-        return 1.0f;
-    }
-    return value;
-}
+#include "quick_settings_common.h"
+#include "quick_settings_metrics.h"
 
 static float reach_quick_settings_min_f32(float a, float b)
 {
@@ -42,25 +34,6 @@ static void reach_quick_settings_push_text(
     int32_t alignment,
     reach_color color
 );
-
-static void reach_quick_settings_copy_utf16(
-    uint16_t *dst,
-    size_t dst_count,
-    const uint16_t *src)
-{
-    if (dst == nullptr || dst_count == 0) {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr) {
-        while (index + 1 < dst_count && src[index] != 0) {
-            dst[index] = src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
 
 static size_t reach_quick_settings_utf16_length(
     const uint16_t *text
@@ -310,7 +283,7 @@ static void reach_quick_settings_push_system_tile_commands(
         commands,
         layout->label,
         label,
-        12.0f,
+        reach_quick_settings_metrics_values.system_tile_text_size,
         REACH_TEXT_WEIGHT_SEMIBOLD,
         0,
         foreground);
@@ -410,11 +383,13 @@ static void reach_quick_settings_push_output_icon(
     (void)reach_render_command_buffer_push(commands, &icon);
 }
 
-reach_result reach_quick_settings_push_volume_pill_commands(
+static reach_result reach_quick_settings_push_volume_pill_commands_with_label(
     const reach_quick_settings_volume_pill_model *model,
     const reach_quick_settings_volume_pill_layout *layout,
     const reach_theme *theme,
-    reach_render_command_buffer *commands
+    reach_render_command_buffer *commands,
+    float label_text_size,
+    int32_t label_centered_with_icon
 )
 {
     if (model == nullptr || layout == nullptr || theme == nullptr || commands == nullptr) {
@@ -437,12 +412,19 @@ reach_result reach_quick_settings_push_volume_pill_commands(
     icon.color = theme->icon_backplate_background;
     (void)reach_render_command_buffer_push(commands, &icon);
 
+    reach_rect_f32 label_rect = pill.header_label;
+    if (label_centered_with_icon) {
+        label_rect.height = label_text_size;
+        label_rect.y = pill.header_icon.y +
+            (pill.header_icon.height - label_rect.height) * 0.5f;
+    }
+
     reach_quick_settings_push_text(
         commands,
-        pill.header_label,
+        label_rect,
         model->label,
-        13.0f,
-        REACH_TEXT_WEIGHT_SEMIBOLD,
+        label_text_size,
+        reach_quick_settings_metrics_values.pill_label_text_weight,
         0,
         theme->quick_settings_expand_text_color);
 
@@ -472,6 +454,22 @@ reach_result reach_quick_settings_push_volume_pill_commands(
     }
 
     return REACH_OK;
+}
+
+reach_result reach_quick_settings_push_volume_pill_commands(
+    const reach_quick_settings_volume_pill_model *model,
+    const reach_quick_settings_volume_pill_layout *layout,
+    const reach_theme *theme,
+    reach_render_command_buffer *commands
+)
+{
+    return reach_quick_settings_push_volume_pill_commands_with_label(
+        model,
+        layout,
+        theme,
+        commands,
+        reach_quick_settings_metrics_values.default_pill_label_text_size,
+        0);
 }
 
 static reach_result reach_quick_settings_push_output_device_row_commands(
@@ -507,28 +505,31 @@ static reach_result reach_quick_settings_push_output_device_row_commands(
         device->label);
 
     reach_rect_f32 primary_rect = layout->label;
-    primary_rect.y += 5.0f;
-    primary_rect.height = 18.0f;
+    primary_rect.y += reach_quick_settings_metrics_values.output_row_primary_top;
+    primary_rect.height =
+        reach_quick_settings_metrics_values.output_row_primary_height;
 
     reach_quick_settings_push_text(
         commands,
         primary_rect,
         primary_label,
-        12.0f,
+        reach_quick_settings_metrics_values.output_row_primary_text_size,
         REACH_TEXT_WEIGHT_NORMAL,
         0,
         theme->quick_settings_expand_text_color);
 
     if (secondary_label[0] != 0) {
         reach_rect_f32 secondary_rect = layout->label;
-        secondary_rect.y += 22.0f;
-        secondary_rect.height = 15.0f;
+        secondary_rect.y +=
+            reach_quick_settings_metrics_values.output_row_secondary_top;
+        secondary_rect.height =
+            reach_quick_settings_metrics_values.output_row_secondary_height;
 
         reach_quick_settings_push_text(
             commands,
             secondary_rect,
             secondary_label,
-            10.0f,
+            reach_quick_settings_metrics_values.output_row_secondary_text_size,
             REACH_TEXT_WEIGHT_NORMAL,
             0,
             reach_quick_settings_color_alpha(
@@ -596,7 +597,7 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
         commands,
         layout->app_label,
         display_label,
-        12.0f,
+        reach_quick_settings_metrics_values.app_row_text_size,
         REACH_TEXT_WEIGHT_NORMAL,
         0,
         theme->quick_settings_expand_text_color);
@@ -644,7 +645,7 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
         commands,
         layout->app_volume_percent,
         percent_text,
-        12.0f,
+        reach_quick_settings_metrics_values.app_row_percent_text_size,
         REACH_TEXT_WEIGHT_SEMIBOLD,
         2,
         theme->quick_settings_expand_text_color);
@@ -759,11 +760,13 @@ reach_result reach_quick_settings_build_render_commands(
         input->model.main_muted,
         master_volume_label);
 
-    reach_result result = reach_quick_settings_push_volume_pill_commands(
+    reach_result result = reach_quick_settings_push_volume_pill_commands_with_label(
         &pill_model,
         &input->layout.main_volume_pill,
         &input->theme,
-        commands);
+        commands,
+        reach_quick_settings_metrics_values.master_pill_label_text_size,
+        1);
     if (result != REACH_OK) {
         return result;
     }
@@ -798,14 +801,16 @@ reach_result reach_quick_settings_build_render_commands(
             current_device != nullptr ? current_device->label : output_device_fallback_label);
 
         reach_rect_f32 output_title_rect = input->layout.output_device_button_label;
-        output_title_rect.y += 6.0f;
-        output_title_rect.height = 16.0f;
+        output_title_rect.y +=
+            reach_quick_settings_metrics_values.output_button_title_top;
+        output_title_rect.height =
+            reach_quick_settings_metrics_values.output_button_title_height;
 
         reach_quick_settings_push_text(
             commands,
             output_title_rect,
             output_title_label,
-            11.0f,
+            reach_quick_settings_metrics_values.output_button_title_text_size,
             REACH_TEXT_WEIGHT_NORMAL,
             0,
             reach_quick_settings_color_alpha(
@@ -813,14 +818,16 @@ reach_result reach_quick_settings_build_render_commands(
                 0.60f));
 
         reach_rect_f32 output_device_rect = input->layout.output_device_button_label;
-        output_device_rect.y += 23.0f;
-        output_device_rect.height = 18.0f;
+        output_device_rect.y +=
+            reach_quick_settings_metrics_values.output_button_device_top;
+        output_device_rect.height =
+            reach_quick_settings_metrics_values.output_button_device_height;
 
         reach_quick_settings_push_text(
             commands,
             output_device_rect,
             output_device_label,
-            13.0f,
+            reach_quick_settings_metrics_values.output_button_device_text_size,
             REACH_TEXT_WEIGHT_SEMIBOLD,
             0,
             input->theme.quick_settings_expand_text_color);
@@ -840,7 +847,7 @@ reach_result reach_quick_settings_build_render_commands(
             commands,
             input->layout.output_devices_title,
             output_devices_title,
-            12.0f,
+            reach_quick_settings_metrics_values.section_title_text_size,
             REACH_TEXT_WEIGHT_SEMIBOLD,
             0,
             input->theme.quick_settings_expand_text_color);
@@ -883,7 +890,7 @@ reach_result reach_quick_settings_build_render_commands(
             commands,
             input->layout.app_volumes_title,
             app_volumes_title,
-            12.0f,
+            reach_quick_settings_metrics_values.section_title_text_size,
             REACH_TEXT_WEIGHT_SEMIBOLD,
             0,
             input->theme.quick_settings_expand_text_color);
@@ -930,7 +937,7 @@ reach_result reach_quick_settings_build_render_commands(
         commands,
         input->layout.expand_button_label,
         input->model.expanded ? collapse_label : expand_label,
-        13.0f,
+        reach_quick_settings_metrics_values.expand_button_text_size,
         REACH_TEXT_WEIGHT_NORMAL,
         0,
         input->theme.quick_settings_expand_text_color);
