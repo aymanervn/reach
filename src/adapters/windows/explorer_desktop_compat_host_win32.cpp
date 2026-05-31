@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <atomic>
 #include <vector>
 #include <wchar.h>
 
@@ -10,11 +11,18 @@ static HWND g_workerwHwnd = nullptr;
 static std::vector<HWND> g_hiddenReachWallpaperHwnds;
 static HWINEVENTHOOK g_wpeCreateHook = nullptr;
 static HWINEVENTHOOK g_wpeDestroyHook = nullptr;
+static HANDLE g_hostThread = nullptr;
+static HANDLE g_hostReadyEvent = nullptr;
+static std::atomic<DWORD> g_hostThreadId{0};
+static std::atomic<int32_t> g_hostCreateResult{REACH_ERROR};
 static int32_t g_syncScheduled = 0;
 static int32_t g_wallpaperEngineRendererPresent = -1;
 
 static const UINT_PTR REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER = 0x381;
 static const UINT REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS = 33;
+static const UINT REACH_EXPLORER_DESKTOP_COMPAT_REQUEST_SYNC =
+    WM_APP + 0x321;
+static const UINT REACH_EXPLORER_DESKTOP_COMPAT_SHUTDOWN = WM_APP + 0x322;
 
 extern "C" void reach_windows_notify_desktop_environment_changed(void);
 extern "C" void reach_windows_request_desktop_environment_sync(void);
@@ -27,15 +35,14 @@ static const wchar_t *reach_explorer_desktop_compat_workerw_class(void) {
   return L"WorkerW";
 }
 
-static void reach_explorer_desktop_compat_request_sync(void) {
+static void reach_explorer_desktop_compat_schedule_sync(UINT delay_ms) {
   if (g_progmanHwnd != nullptr && IsWindow(g_progmanHwnd)) {
     if (g_syncScheduled) {
       return;
     }
 
     if (SetTimer(g_progmanHwnd, REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER,
-                 REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS,
-                 nullptr) != 0) {
+                 delay_ms, nullptr) != 0) {
       g_syncScheduled = 1;
     }
   }
@@ -46,6 +53,11 @@ static LRESULT CALLBACK reach_explorer_desktop_compat_host_proc(HWND hwnd,
                                                                 WPARAM wparam,
                                                                 LPARAM lparam) {
   switch (message) {
+  case REACH_EXPLORER_DESKTOP_COMPAT_REQUEST_SYNC:
+    reach_explorer_desktop_compat_schedule_sync(
+        REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS);
+    return 0;
+
   case WM_MOUSEACTIVATE:
     return MA_NOACTIVATE;
 
@@ -54,7 +66,8 @@ static LRESULT CALLBACK reach_explorer_desktop_compat_host_proc(HWND hwnd,
 
   case WM_PARENTNOTIFY:
     if (LOWORD(wparam) == WM_CREATE || LOWORD(wparam) == WM_DESTROY) {
-      reach_explorer_desktop_compat_request_sync();
+      reach_explorer_desktop_compat_schedule_sync(
+          REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS);
     }
     return DefWindowProcW(hwnd, message, wparam, lparam);
 
@@ -202,7 +215,11 @@ static void CALLBACK reach_explorer_desktop_compat_winevent_proc(
   }
 
   if (event == EVENT_OBJECT_CREATE || event == EVENT_OBJECT_DESTROY) {
-    reach_explorer_desktop_compat_request_sync();
+    DWORD host_thread_id = g_hostThreadId.load();
+    if (host_thread_id != 0) {
+      PostThreadMessageW(host_thread_id,
+                         REACH_EXPLORER_DESKTOP_COMPAT_REQUEST_SYNC, 0, 0);
+    }
   }
 }
 
@@ -401,13 +418,7 @@ static void reach_explorer_desktop_compat_resize_host(void) {
   reach_explorer_desktop_compat_resize_wallpaper_children();
 }
 
-extern "C" reach_result
-reach_windows_create_explorer_desktop_compat_host(void) {
-  if (g_progmanHwnd != nullptr && g_workerwHwnd != nullptr &&
-      IsWindow(g_progmanHwnd) && IsWindow(g_workerwHwnd)) {
-    return REACH_OK;
-  }
-
+static reach_result reach_explorer_desktop_compat_create_host_windows(void) {
   HINSTANCE instance = GetModuleHandleW(nullptr);
   if (instance == nullptr) {
     return REACH_ERROR;
@@ -481,11 +492,10 @@ reach_windows_create_explorer_desktop_compat_host(void) {
     return result;
   }
 
-  reach_explorer_desktop_compat_resize_host();
   return REACH_OK;
 }
 
-extern "C" void reach_windows_destroy_explorer_desktop_compat_host(void) {
+static void reach_explorer_desktop_compat_destroy_host_windows(void) {
   reach_explorer_desktop_compat_stop_winevent_hooks();
 
   if (g_progmanHwnd != nullptr && IsWindow(g_progmanHwnd)) {
@@ -508,10 +518,138 @@ extern "C" void reach_windows_destroy_explorer_desktop_compat_host(void) {
   }
 }
 
+static DWORD WINAPI
+reach_explorer_desktop_compat_host_thread_proc(void *param) {
+  (void)param;
+
+  MSG message = {};
+  PeekMessageW(&message, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
+
+  g_hostThreadId.store(GetCurrentThreadId());
+  reach_result create_result =
+      reach_explorer_desktop_compat_create_host_windows();
+  g_hostCreateResult.store(create_result);
+  if (g_hostReadyEvent != nullptr) {
+    SetEvent(g_hostReadyEvent);
+  }
+
+  if (create_result != REACH_OK) {
+    reach_explorer_desktop_compat_destroy_host_windows();
+    return 1;
+  }
+
+  reach_explorer_desktop_compat_schedule_sync(
+      REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS);
+
+  while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+    if (message.message == REACH_EXPLORER_DESKTOP_COMPAT_REQUEST_SYNC) {
+      reach_explorer_desktop_compat_schedule_sync(
+          REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS);
+      continue;
+    }
+
+    if (message.message == REACH_EXPLORER_DESKTOP_COMPAT_SHUTDOWN) {
+      break;
+    }
+
+    TranslateMessage(&message);
+    DispatchMessageW(&message);
+  }
+
+  reach_explorer_desktop_compat_destroy_host_windows();
+  return 0;
+}
+
+extern "C" reach_result
+reach_windows_create_explorer_desktop_compat_host(void) {
+  if (g_hostThread != nullptr) {
+    DWORD wait_result = WaitForSingleObject(g_hostThread, 0);
+    if (wait_result == WAIT_TIMEOUT) {
+      return static_cast<reach_result>(g_hostCreateResult.load());
+    }
+
+    CloseHandle(g_hostThread);
+    g_hostThread = nullptr;
+    g_hostThreadId.store(0);
+    reach_result previous_result =
+        static_cast<reach_result>(g_hostCreateResult.load());
+    if (previous_result != REACH_OK) {
+      return previous_result;
+    }
+    g_hostCreateResult.store(REACH_ERROR);
+  }
+
+  g_hostCreateResult.store(REACH_ERROR);
+  g_hostReadyEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  if (g_hostReadyEvent == nullptr) {
+    return REACH_ERROR;
+  }
+
+  g_hostThread = CreateThread(
+      nullptr, 0, reach_explorer_desktop_compat_host_thread_proc, nullptr, 0,
+      nullptr);
+  if (g_hostThread == nullptr) {
+    CloseHandle(g_hostReadyEvent);
+    g_hostReadyEvent = nullptr;
+    g_hostThreadId.store(0);
+    return REACH_ERROR;
+  }
+
+  WaitForSingleObject(g_hostReadyEvent, INFINITE);
+  CloseHandle(g_hostReadyEvent);
+  g_hostReadyEvent = nullptr;
+
+  reach_result create_result =
+      static_cast<reach_result>(g_hostCreateResult.load());
+  if (create_result != REACH_OK) {
+    WaitForSingleObject(g_hostThread, INFINITE);
+    CloseHandle(g_hostThread);
+    g_hostThread = nullptr;
+    g_hostThreadId.store(0);
+    return create_result;
+  }
+
+  return REACH_OK;
+}
+
+extern "C" void reach_windows_destroy_explorer_desktop_compat_host(void) {
+  if (g_hostThread == nullptr) {
+    reach_explorer_desktop_compat_destroy_host_windows();
+    g_hostThreadId.store(0);
+    return;
+  }
+
+  DWORD host_thread_id = g_hostThreadId.load();
+  if (host_thread_id != 0) {
+    PostThreadMessageW(host_thread_id, REACH_EXPLORER_DESKTOP_COMPAT_SHUTDOWN,
+                       0, 0);
+  }
+
+  WaitForSingleObject(g_hostThread, INFINITE);
+  CloseHandle(g_hostThread);
+  g_hostThread = nullptr;
+  g_hostThreadId.store(0);
+  g_hostCreateResult.store(REACH_ERROR);
+}
+
 extern "C" void reach_windows_notify_desktop_environment_changed(void) {
+  DWORD host_thread_id = g_hostThreadId.load();
+  if (host_thread_id == 0) {
+    return;
+  }
+
+  if (GetCurrentThreadId() != host_thread_id) {
+    reach_windows_request_desktop_environment_sync();
+    return;
+  }
+
   reach_explorer_desktop_compat_resize_host();
 }
 
 extern "C" void reach_windows_request_desktop_environment_sync(void) {
-  reach_explorer_desktop_compat_request_sync();
+  DWORD host_thread_id = g_hostThreadId.load();
+  if (host_thread_id != 0) {
+    PostThreadMessageW(host_thread_id,
+                       REACH_EXPLORER_DESKTOP_COMPAT_REQUEST_SYNC, 0, 0);
+  }
 }
