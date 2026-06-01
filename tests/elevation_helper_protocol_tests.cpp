@@ -55,5 +55,50 @@ int main(void) {
   expect_true(!reach_elevation_helper_request_valid(&request),
               "bad split mode is rejected");
 
+  request = valid_request();
+  request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;
+  request.window = 0;
+  request.flags = 0;
+  request.hotkey_mask = 0;
+  expect_true(reach_elevation_helper_request_valid(&request),
+              "disabled hotkey forwarding request is accepted");
+
+  request = valid_request();
+  request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;
+  request.window = 0;
+  request.flags = 1;
+  request.hotkey_mask = REACH_ELEVATION_HELPER_HOTKEY_ALT_TAB |
+                        REACH_ELEVATION_HELPER_HOTKEY_WINDOWS_KEY;
+  request.event_pipe[0] = L'a';
+  expect_true(reach_elevation_helper_request_valid(&request),
+              "enabled hotkey forwarding request is accepted");
+
+  request = valid_request();
+  request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;
+  request.window = 0;
+  request.flags = 1;
+  request.hotkey_mask = 0;
+  request.event_pipe[0] = L'a';
+  expect_true(!reach_elevation_helper_request_valid(&request),
+              "enabled hotkey forwarding requires a hotkey mask");
+
+  request = valid_request();
+  request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;
+  request.window = 0;
+  request.flags = 1;
+  request.hotkey_mask = REACH_ELEVATION_HELPER_HOTKEY_ALT_TAB;
+  request.event_pipe[0] = 0;
+  expect_true(!reach_elevation_helper_request_valid(&request),
+              "enabled hotkey forwarding requires an event pipe");
+
+  request = valid_request();
+  request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;
+  request.window = 0;
+  request.flags = 1;
+  request.hotkey_mask = 1u << 16;
+  request.event_pipe[0] = L'a';
+  expect_true(!reach_elevation_helper_request_valid(&request),
+              "unknown hotkey forwarding mask is rejected");
+
   return failures == 0 ? 0 : 1;
 }

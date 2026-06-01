@@ -15,6 +15,7 @@ typedef struct reach_input_source_ops {
     reach_result (*start)(reach_input_source *source, reach_input_event_callback callback, void *user);
     reach_result (*stop)(reach_input_source *source);
     reach_result (*get_pointer_position)(reach_input_source *source, reach_point_i32 *out_position);
+    reach_result (*set_external_hotkey_forwarding_enabled)(reach_input_source *source, int32_t enabled);
     void (*destroy)(reach_input_source *source);
 } reach_input_source_ops;
 

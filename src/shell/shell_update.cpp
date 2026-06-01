@@ -231,6 +231,7 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell,
   int32_t old_minimized[REACH_MAX_PINNED_APPS] = {};
   int32_t old_maximized[REACH_MAX_PINNED_APPS] = {};
   int32_t old_visible[REACH_MAX_PINNED_APPS] = {};
+  reach_window_control_level old_control_levels[REACH_MAX_PINNED_APPS] = {};
   reach_rect_i32 old_bounds[REACH_MAX_PINNED_APPS] = {};
   uint16_t old_paths[REACH_MAX_PINNED_APPS][260] = {};
   uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
@@ -243,6 +244,7 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell,
     old_minimized[index] = shell->open_windows[index].minimized;
     old_maximized[index] = shell->open_windows[index].maximized;
     old_visible[index] = shell->open_windows[index].visible;
+    old_control_levels[index] = shell->open_windows[index].control_level;
     old_bounds[index] = shell->open_windows[index].bounds;
     reach_copy_utf16(old_paths[index], 260, shell->open_windows[index].path);
     reach_copy_utf16(old_titles[index], 260, shell->open_windows[index].title);
@@ -288,6 +290,8 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell,
           old_minimized[index] != shell->open_windows[index].minimized ||
           old_maximized[index] != shell->open_windows[index].maximized ||
           old_visible[index] != shell->open_windows[index].visible ||
+          old_control_levels[index] !=
+              shell->open_windows[index].control_level ||
           old_bounds[index].left != shell->open_windows[index].bounds.left ||
           old_bounds[index].top != shell->open_windows[index].bounds.top ||
           old_bounds[index].right != shell->open_windows[index].bounds.right ||
@@ -321,6 +325,48 @@ int32_t reach_shell_window_is_minimized(const reach_shell *shell,
     }
   }
   return 0;
+}
+
+static const reach_window_snapshot *
+reach_shell_find_open_window(const reach_shell *shell, uintptr_t window_id) {
+  if (shell == nullptr || window_id == 0) {
+    return nullptr;
+  }
+  for (size_t index = 0; index < shell->open_window_count; ++index) {
+    if (shell->open_windows[index].id == window_id) {
+      return &shell->open_windows[index];
+    }
+  }
+  return nullptr;
+}
+
+static int32_t reach_shell_foreground_needs_external_hotkeys(
+    const reach_shell *shell) {
+  if (shell != nullptr &&
+      shell->window_manager.ops.foreground_control_level != nullptr &&
+      shell->window_manager.ops.foreground_control_level(
+          shell->window_manager.manager) == REACH_WINDOW_CONTROL_LIMITED) {
+    return 1;
+  }
+
+  const reach_window_snapshot *foreground =
+      reach_shell_find_open_window(shell, shell != nullptr
+                                              ? shell->foreground_window
+                                              : 0);
+  return foreground != nullptr &&
+         foreground->control_level == REACH_WINDOW_CONTROL_LIMITED;
+}
+
+static void reach_shell_sync_external_hotkey_forwarding(reach_shell *shell) {
+  if (shell == nullptr ||
+      shell->input_source.ops.set_external_hotkey_forwarding_enabled ==
+          nullptr) {
+    return;
+  }
+
+  (void)shell->input_source.ops.set_external_hotkey_forwarding_enabled(
+      shell->input_source.source,
+      reach_shell_foreground_needs_external_hotkeys(shell));
 }
 
 void reach_shell_build_dock_items(reach_shell *shell,
@@ -1328,6 +1374,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds) {
       shell->dock.dirty_flags = 1;
     }
   }
+  reach_shell_sync_external_hotkey_forwarding(shell);
   (void)reach_shell_update_game_mode(shell);
   int32_t game_mode = reach_shell_game_mode_enabled(shell);
 

@@ -1,11 +1,35 @@
 #include "../../adapters/windows/window_management/elevation_helper_protocol.h"
 #include "../../adapters/windows/window_management/window_actions_win32.h"
 
+#include "reach/core/ui_events.h"
+
 #include <windows.h>
 #include <sddl.h>
 
 #include <new>
 #include <vector>
+
+struct reach_helper_hotkey_event {
+  uint32_t version;
+  uint32_t event_count;
+  uint32_t event_types[2];
+};
+
+struct reach_helper_hotkey_state {
+  HHOOK hook;
+  HANDLE thread;
+  DWORD thread_id;
+  uint32_t hotkey_mask;
+  wchar_t event_pipe[128];
+  HANDLE event_pipe_handle;
+  int32_t alt_down;
+  int32_t shift_down;
+  int32_t alt_tab_active;
+  int32_t windows_key_down;
+  DWORD windows_key_vk;
+};
+
+static reach_helper_hotkey_state g_hotkeys;
 
 static reach_result reach_helper_query_token_user(HANDLE token,
                                                   std::vector<BYTE> *out_user) {
@@ -76,10 +100,281 @@ static int32_t reach_helper_same_user_client(HANDLE pipe) {
   return EqualSid(process_token_user->User.Sid, client_token_user->User.Sid);
 }
 
+static void reach_helper_close_event_pipe(void) {
+  if (g_hotkeys.event_pipe_handle != nullptr) {
+    CloseHandle(g_hotkeys.event_pipe_handle);
+    g_hotkeys.event_pipe_handle = nullptr;
+  }
+}
+
+static int32_t reach_helper_connect_event_pipe(void) {
+  if (g_hotkeys.event_pipe[0] == 0) {
+    return 0;
+  }
+
+  if (g_hotkeys.event_pipe_handle != nullptr) {
+    return 1;
+  }
+
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    HANDLE pipe = CreateFileW(g_hotkeys.event_pipe, GENERIC_WRITE, 0, nullptr,
+                              OPEN_EXISTING, 0, nullptr);
+    if (pipe != INVALID_HANDLE_VALUE) {
+      g_hotkeys.event_pipe_handle = pipe;
+      return 1;
+    }
+    if (GetLastError() == ERROR_PIPE_BUSY) {
+      (void)WaitNamedPipeW(g_hotkeys.event_pipe, 50);
+    } else {
+      Sleep(10);
+    }
+  }
+
+  return 0;
+}
+
+static int32_t reach_helper_hotkeys_armed(void) {
+  return g_hotkeys.hotkey_mask != 0 && g_hotkeys.event_pipe_handle != nullptr;
+}
+
+static void reach_helper_reset_windows_key_state(void) {
+  g_hotkeys.windows_key_down = 0;
+  g_hotkeys.windows_key_vk = 0;
+}
+
+static void reach_helper_disarm_hotkeys_after_channel_failure(void) {
+  reach_helper_close_event_pipe();
+  g_hotkeys.hotkey_mask = 0;
+  g_hotkeys.alt_down = 0;
+  g_hotkeys.shift_down = 0;
+  g_hotkeys.alt_tab_active = 0;
+  reach_helper_reset_windows_key_state();
+}
+
+static int32_t reach_helper_send_events(const reach_ui_event_type *event_types,
+                                        uint32_t event_count) {
+  if (event_types == nullptr || event_count == 0 || event_count > 2) {
+    return 0;
+  }
+
+  HANDLE pipe = g_hotkeys.event_pipe_handle;
+  if (pipe == nullptr || pipe == INVALID_HANDLE_VALUE) {
+    return 0;
+  }
+
+  reach_helper_hotkey_event event = {};
+  event.version = reach_elevation_helper_protocol_version();
+  event.event_count = event_count;
+  for (uint32_t index = 0; index < event_count; ++index) {
+    event.event_types[index] = static_cast<uint32_t>(event_types[index]);
+  }
+
+  DWORD written = 0;
+  if (!WriteFile(pipe, &event, sizeof(event), &written, nullptr) ||
+      written != sizeof(event)) {
+    reach_helper_disarm_hotkeys_after_channel_failure();
+    return 0;
+  }
+
+  return 1;
+}
+
+static int32_t reach_helper_send_event(reach_ui_event_type event_type) {
+  return reach_helper_send_events(&event_type, 1);
+}
+
+static void reach_helper_send_windows_key(DWORD vk, DWORD flags) {
+  INPUT input = {};
+  input.type = INPUT_KEYBOARD;
+  input.ki.wVk = static_cast<WORD>(vk == VK_RWIN ? VK_RWIN : VK_LWIN);
+  input.ki.dwFlags = flags | KEYEVENTF_EXTENDEDKEY;
+  (void)SendInput(1, &input, sizeof(INPUT));
+}
+
+static void reach_helper_release_windows_key_state(void) {
+  if (g_hotkeys.windows_key_down && g_hotkeys.windows_key_vk != 0) {
+    reach_helper_send_windows_key(g_hotkeys.windows_key_vk, KEYEVENTF_KEYUP);
+  }
+  reach_helper_reset_windows_key_state();
+}
+
+static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam,
+                                                   LPARAM lparam) {
+  if (code == HC_ACTION) {
+    const KBDLLHOOKSTRUCT *keyboard =
+        reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
+    if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) == 0 &&
+        reach_helper_hotkeys_armed()) {
+      const bool key_down = wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN;
+      const bool key_up = wparam == WM_KEYUP || wparam == WM_SYSKEYUP;
+
+      if (keyboard->vkCode == VK_SHIFT || keyboard->vkCode == VK_LSHIFT ||
+          keyboard->vkCode == VK_RSHIFT) {
+        g_hotkeys.shift_down = key_down ? 1 : 0;
+      }
+
+      if ((g_hotkeys.hotkey_mask & REACH_ELEVATION_HELPER_HOTKEY_ALT_TAB) !=
+          0) {
+        if (keyboard->vkCode == VK_MENU || keyboard->vkCode == VK_LMENU ||
+            keyboard->vkCode == VK_RMENU) {
+          if (key_down) {
+            g_hotkeys.alt_down = 1;
+          } else if (key_up) {
+            g_hotkeys.alt_down = 0;
+            if (g_hotkeys.alt_tab_active) {
+              g_hotkeys.alt_tab_active = 0;
+              (void)reach_helper_send_event(REACH_UI_EVENT_ALT_TAB_COMMIT);
+            }
+          }
+        }
+
+        if (keyboard->vkCode == VK_TAB && key_down &&
+            (g_hotkeys.alt_down || (keyboard->flags & LLKHF_ALTDOWN) != 0)) {
+          reach_ui_event_type direction = g_hotkeys.shift_down
+                                              ? REACH_UI_EVENT_ALT_TAB_PREVIOUS
+                                              : REACH_UI_EVENT_ALT_TAB_NEXT;
+          int32_t sent = 0;
+          if (!g_hotkeys.alt_tab_active) {
+            reach_ui_event_type events[2] = {
+                REACH_UI_EVENT_ALT_TAB_BEGIN,
+                direction,
+            };
+            sent = reach_helper_send_events(events, 2);
+          } else {
+            sent = reach_helper_send_event(direction);
+          }
+          if (sent) {
+            g_hotkeys.alt_tab_active = 1;
+            return 1;
+          }
+          g_hotkeys.alt_tab_active = 0;
+          reach_helper_disarm_hotkeys_after_channel_failure();
+          return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
+        }
+
+        if (keyboard->vkCode == VK_ESCAPE && g_hotkeys.alt_tab_active &&
+            key_down) {
+          if (reach_helper_send_event(REACH_UI_EVENT_ALT_TAB_CANCEL)) {
+            g_hotkeys.alt_tab_active = 0;
+            return 1;
+          }
+          return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
+        }
+      }
+
+      if ((g_hotkeys.hotkey_mask &
+           REACH_ELEVATION_HELPER_HOTKEY_WINDOWS_KEY) != 0) {
+        if (keyboard->vkCode == VK_LWIN || keyboard->vkCode == VK_RWIN) {
+          if (key_down) {
+            if (!g_hotkeys.windows_key_down) {
+              g_hotkeys.windows_key_down = 1;
+              g_hotkeys.windows_key_vk = keyboard->vkCode;
+              reach_helper_send_windows_key(g_hotkeys.windows_key_vk,
+                                            KEYEVENTF_KEYUP);
+              if (!reach_helper_send_event(REACH_UI_EVENT_WINDOWS_KEY)) {
+                reach_helper_disarm_hotkeys_after_channel_failure();
+              }
+            }
+            return 1;
+          }
+          if (key_up) {
+            if (!g_hotkeys.windows_key_down) {
+              return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
+            }
+            reach_helper_reset_windows_key_state();
+            return 1;
+          }
+        }
+      }
+    }
+  }
+
+  return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
+}
+
+static DWORD WINAPI reach_helper_hotkey_thread(void *param) {
+  (void)param;
+  MSG message = {};
+  PeekMessageW(&message, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
+  g_hotkeys.thread_id = GetCurrentThreadId();
+  g_hotkeys.hook = SetWindowsHookExW(WH_KEYBOARD_LL,
+                                     reach_helper_keyboard_proc,
+                                     GetModuleHandleW(nullptr),
+                                     0);
+  while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+  }
+  if (g_hotkeys.hook != nullptr) {
+    UnhookWindowsHookEx(g_hotkeys.hook);
+    g_hotkeys.hook = nullptr;
+  }
+  return 0;
+}
+
+static void reach_helper_stop_hotkeys(void) {
+  reach_helper_release_windows_key_state();
+  reach_helper_close_event_pipe();
+  if (g_hotkeys.thread != nullptr) {
+    if (g_hotkeys.thread_id != 0) {
+      PostThreadMessageW(g_hotkeys.thread_id, WM_QUIT, 0, 0);
+    }
+    WaitForSingleObject(g_hotkeys.thread, 1000);
+    CloseHandle(g_hotkeys.thread);
+    g_hotkeys.thread = nullptr;
+  }
+
+  g_hotkeys = {};
+}
+
+static reach_result reach_helper_set_hotkey_forwarding(
+    const reach_elevation_helper_request *request) {
+  if (request == nullptr) {
+    return REACH_INVALID_ARGUMENT;
+  }
+
+  reach_helper_stop_hotkeys();
+  if (request->flags == 0) {
+    return REACH_OK;
+  }
+
+  g_hotkeys.hotkey_mask = request->hotkey_mask;
+  for (size_t index = 0; index < 128; ++index) {
+    g_hotkeys.event_pipe[index] = request->event_pipe[index];
+    if (request->event_pipe[index] == 0) {
+      break;
+    }
+  }
+
+  if (!reach_helper_connect_event_pipe()) {
+    reach_helper_stop_hotkeys();
+    return REACH_ERROR;
+  }
+
+  g_hotkeys.thread = CreateThread(nullptr, 0, reach_helper_hotkey_thread,
+                                  nullptr, 0, nullptr);
+  for (int attempt = 0;
+       g_hotkeys.thread != nullptr &&
+           (g_hotkeys.thread_id == 0 || g_hotkeys.hook == nullptr) &&
+           attempt < 20;
+       ++attempt) {
+    Sleep(10);
+  }
+
+  if (g_hotkeys.thread == nullptr || g_hotkeys.hook == nullptr) {
+    reach_helper_stop_hotkeys();
+    return REACH_ERROR;
+  }
+
+  return REACH_OK;
+}
+
 static reach_result reach_helper_execute(
     const reach_elevation_helper_request *request) {
   if (!reach_elevation_helper_request_valid(request)) {
     return REACH_INVALID_ARGUMENT;
+  }
+
+  if (request->command == REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING) {
+    return reach_helper_set_hotkey_forwarding(request);
   }
 
   HWND hwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(request->window));

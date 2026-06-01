@@ -1,5 +1,20 @@
 #include "shell_internal.h"
 
+static size_t reach_shell_switcher_foreground_index(const reach_shell *shell)
+{
+    if (shell == nullptr || shell->foreground_window == 0) {
+        return REACH_MAX_PINNED_APPS;
+    }
+
+    for (size_t index = 0; index < shell->open_window_count; ++index) {
+        if (shell->open_windows[index].id == shell->foreground_window) {
+            return index;
+        }
+    }
+
+    return REACH_MAX_PINNED_APPS;
+}
+
 reach_result reach_shell_handle_switcher_event(
     reach_shell *shell,
     const reach_ui_event *event)
@@ -12,10 +27,16 @@ reach_result reach_shell_handle_switcher_event(
         if (shell->window_manager.ops.refresh != nullptr) {
             (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
             (void)reach_shell_refresh_open_windows(shell, nullptr);
+            if (shell->window_manager.ops.foreground != nullptr) {
+                shell->foreground_window =
+                    shell->window_manager.ops.foreground(shell->window_manager.manager);
+            }
         }
 
         shell->switcher_state.open = shell->open_window_count > 0 ? 1 : 0;
-        shell->switcher_state.selected_index = 0;
+        size_t foreground_index = reach_shell_switcher_foreground_index(shell);
+        shell->switcher_state.selected_index =
+            foreground_index < shell->open_window_count ? foreground_index : 0;
         shell->switcher_state.visible_start = 0;
 
         reach_shell_update_switcher_visible_start(shell);

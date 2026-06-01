@@ -1127,6 +1127,14 @@ reach_window_manager_foreground(const reach_window_manager *manager) {
   return reinterpret_cast<uintptr_t>(manager->foreground);
 }
 
+static reach_window_control_level
+reach_window_manager_foreground_control_level(
+    const reach_window_manager *manager) {
+  REACH_ASSERT(manager != nullptr);
+  return reach_window_manager_control_level_for_window(
+      manager, GetForegroundWindow());
+}
+
 static int32_t reach_window_manager_foreground_is_maximized(
     const reach_window_manager *manager) {
   REACH_ASSERT(manager != nullptr);
@@ -1501,6 +1509,8 @@ reach_windows_create_window_manager(reach_window_manager_port *out_port) {
   out_port->ops.refresh = reach_window_manager_refresh;
   out_port->ops.snap = reach_window_manager_snap;
   out_port->ops.foreground = reach_window_manager_foreground;
+  out_port->ops.foreground_control_level =
+      reach_window_manager_foreground_control_level;
   out_port->ops.foreground_is_maximized =
       reach_window_manager_foreground_is_maximized;
   out_port->ops.foreground_is_fullscreen =
