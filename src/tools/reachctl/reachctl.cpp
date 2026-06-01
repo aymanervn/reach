@@ -1,5 +1,6 @@
 #include "reachctl_common.h"
 #include "reachctl_config_commands.h"
+#include "reachctl_elevation_helper.h"
 #include "reachctl_session_commands.h"
 
 #include <windows.h>
@@ -21,9 +22,13 @@ int wmain(int argc, wchar_t **argv) {
         return 1;
       }
 
-      int ok = reachctl_install_reach_shell_and_watchdog(reach_exe) == REACH_OK;
+      reach_result shell_result =
+          reachctl_install_reach_shell_and_watchdog(reach_exe);
+      reach_result helper_result = reachctl_install_elevation_helper();
+      int ok = shell_result == REACH_OK && helper_result == REACH_OK;
       reachctl_print(ok ? L"Reach installed. Shell registry, watchdog task, "
-                          L"and Explorer context menus configured."
+                          L"elevation helper task, and Explorer context menus "
+                          L"configured."
                         : L"Reach install failed.");
       return ok ? 0 : 1;
     }

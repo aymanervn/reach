@@ -83,6 +83,58 @@ reach_result reachctl_absolute_path(const uint16_t *path, uint16_t *out_path, DW
     return reach_copy_utf16(out_path, out_path_count, reinterpret_cast<const uint16_t *>(full_path));
 }
 
+reach_result reachctl_run_process_wait(
+    const wchar_t *path,
+    const wchar_t *arguments,
+    const wchar_t *working_directory)
+{
+    if (path == nullptr || path[0] == 0) {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    wchar_t command_line[1024] = {};
+    if (arguments != nullptr && arguments[0] != 0) {
+        swprintf_s(command_line, L"\"%ls\" %ls", path, arguments);
+    } else {
+        swprintf_s(command_line, L"\"%ls\"", path);
+    }
+
+    STARTUPINFOW startup = {};
+    startup.cb = sizeof(startup);
+
+    PROCESS_INFORMATION process = {};
+    BOOL ok = CreateProcessW(
+        nullptr,
+        command_line,
+        nullptr,
+        nullptr,
+        FALSE,
+        CREATE_NO_WINDOW,
+        nullptr,
+        working_directory,
+        &startup,
+        &process);
+
+    if (!ok) {
+        return REACH_ERROR;
+    }
+
+    CloseHandle(process.hThread);
+
+    DWORD wait_result = WaitForSingleObject(process.hProcess, 15000);
+
+    DWORD exit_code = 1;
+    if (wait_result == WAIT_OBJECT_0) {
+        (void)GetExitCodeProcess(process.hProcess, &exit_code);
+    }
+
+    CloseHandle(process.hProcess);
+
+    return wait_result == WAIT_OBJECT_0 && exit_code == 0
+        ? REACH_OK
+        : REACH_ERROR;
+}
+
 struct reachctl_notify_config_state {
     int32_t posted;
 };

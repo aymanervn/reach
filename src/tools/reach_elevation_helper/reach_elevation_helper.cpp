@@ -30,6 +30,8 @@ struct reach_helper_hotkey_state {
 };
 
 static reach_helper_hotkey_state g_hotkeys;
+static const wchar_t *REACH_HELPER_INSTANCE_MUTEX =
+    L"Local\\ReachElevationHelperInstance";
 
 static reach_result reach_helper_query_token_user(HANDLE token,
                                                   std::vector<BYTE> *out_user) {
@@ -464,6 +466,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line,
   (void)previous;
   (void)command_line;
   (void)show_command;
+
+  HANDLE instance_mutex =
+      CreateMutexW(nullptr, TRUE, REACH_HELPER_INSTANCE_MUTEX);
+  if (instance_mutex == nullptr || GetLastError() == ERROR_ALREADY_EXISTS) {
+    if (instance_mutex != nullptr) {
+      CloseHandle(instance_mutex);
+    }
+    return 0;
+  }
 
   for (;;) {
     HANDLE pipe = reach_helper_create_pipe();

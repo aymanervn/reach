@@ -2,6 +2,7 @@
 
 #include "reachctl_common.h"
 #include "reachctl_context_menu.h"
+#include "reachctl_elevation_helper.h"
 
 #include "reach/platform/shell_registration.h"
 
@@ -107,58 +108,6 @@ static reach_result reachctl_terminate_processes_by_name(const wchar_t *process_
 
     CloseHandle(snapshot);
     return result;
-}
-
-static reach_result reachctl_run_process_wait(
-    const wchar_t *path,
-    const wchar_t *arguments,
-    const wchar_t *working_directory)
-{
-    if (path == nullptr || path[0] == 0) {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    wchar_t command_line[1024] = {};
-    if (arguments != nullptr && arguments[0] != 0) {
-        swprintf_s(command_line, L"\"%ls\" %ls", path, arguments);
-    } else {
-        swprintf_s(command_line, L"\"%ls\"", path);
-    }
-
-    STARTUPINFOW startup = {};
-    startup.cb = sizeof(startup);
-
-    PROCESS_INFORMATION process = {};
-    BOOL ok = CreateProcessW(
-        nullptr,
-        command_line,
-        nullptr,
-        nullptr,
-        FALSE,
-        CREATE_NO_WINDOW,
-        nullptr,
-        working_directory,
-        &startup,
-        &process);
-
-    if (!ok) {
-        return REACH_ERROR;
-    }
-
-    CloseHandle(process.hThread);
-
-    DWORD wait_result = WaitForSingleObject(process.hProcess, 15000);
-
-    DWORD exit_code = 1;
-    if (wait_result == WAIT_OBJECT_0) {
-        (void)GetExitCodeProcess(process.hProcess, &exit_code);
-    }
-
-    CloseHandle(process.hProcess);
-
-    return wait_result == WAIT_OBJECT_0 && exit_code == 0
-        ? REACH_OK
-        : REACH_ERROR;
 }
 
 static reach_result reachctl_watchdog_exe(uint16_t *path, DWORD path_count)
@@ -491,7 +440,8 @@ int32_t reachctl_is_reach_installed(void)
         return 0;
     }
 
-    return reachctl_watchdog_task_is_registered();
+    return reachctl_watchdog_task_is_registered() &&
+        reachctl_elevation_helper_is_installed();
 }
 
 reach_result reachctl_reset_to_windows_shell(void)
@@ -499,6 +449,7 @@ reach_result reachctl_reset_to_windows_shell(void)
     reach_result restore_result = reach_windows_shell_restore_current_user();
 
     (void)reachctl_unregister_watchdog_task();
+    (void)reachctl_unregister_elevation_helper();
     (void)reachctl_remove_context_menus();
 
     (void)reachctl_terminate_processes_by_name(L"reach.exe");

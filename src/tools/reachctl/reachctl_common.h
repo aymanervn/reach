@@ -16,6 +16,10 @@ reach_result reachctl_absolute_path(
     const uint16_t *path,
     uint16_t *out_path,
     DWORD out_path_count);
+reach_result reachctl_run_process_wait(
+    const wchar_t *path,
+    const wchar_t *arguments,
+    const wchar_t *working_directory);
 
 reach_result reachctl_notify_config_changed(void);
 

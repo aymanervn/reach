@@ -257,6 +257,7 @@ add_executable(reachctl
     src/tools/reachctl/reachctl_session_commands.cpp
     src/tools/reachctl/reachctl_config_commands.cpp
     src/tools/reachctl/reachctl_context_menu.cpp
+    src/tools/reachctl/reachctl_elevation_helper.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
@@ -302,6 +303,14 @@ add_executable(reach_elevation_helper WIN32
     src/support/layout.cpp
     src/support/util.cpp
 )
+
+if (MSVC)
+    target_link_options(reach_elevation_helper PRIVATE
+        "/MANIFEST:EMBED"
+        "/MANIFESTUAC:NO"
+        "/MANIFESTINPUT:${CMAKE_SOURCE_DIR}/resources/elevation_helper.manifest"
+    )
+endif()
 
 reach_configure_common(reach_elevation_helper)
 reach_configure_windows(reach_elevation_helper)
