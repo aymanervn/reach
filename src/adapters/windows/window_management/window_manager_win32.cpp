@@ -1,4 +1,7 @@
-#include "windows_adapters_internal.h"
+#include "../windows_adapters_internal.h"
+
+#include "elevation_helper_client_win32.h"
+#include "window_actions_win32.h"
 
 #include <windows.h>
 #include <dwmapi.h>
@@ -44,11 +47,17 @@ struct reach_window_manager {
   std::vector<reach_window_metadata_cache_entry> metadata_cache;
   int32_t dirty;
   int32_t pending_location_change;
+  DWORD process_integrity;
+  int32_t process_integrity_valid;
 };
 
 static reach_window_manager *g_window_manager;
 
 static int32_t reach_window_manager_is_app_window(HWND hwnd);
+static reach_window_control_level reach_window_manager_control_level_for_window(
+    const reach_window_manager *manager, HWND hwnd);
+static int32_t reach_window_manager_window_has_limited_control(
+    const reach_window_manager *manager, HWND hwnd);
 
 static void reach_window_manager_mark_seen(reach_window_manager *manager,
                                            HWND hwnd);
@@ -319,13 +328,21 @@ reach_window_manager_track_hidden_minimized(reach_window_manager *manager,
     return REACH_ERROR;
   }
 
+  if (reach_window_manager_window_has_limited_control(manager, hwnd)) {
+    if (reach_elevation_helper_send(REACH_ELEVATION_HELPER_COMMAND_HIDE,
+                                    reinterpret_cast<uintptr_t>(hwnd),
+                                    REACH_SPLIT_LEFT) != REACH_OK) {
+      return REACH_OK;
+    }
+  } else {
+    (void)reach_window_management_hide(hwnd);
+  }
+
   reach_hidden_minimized_window entry = {};
   entry.hwnd = hwnd;
   entry.placement = placement;
 
   manager->hidden_minimized_windows.push_back(entry);
-  ShowWindowAsync(hwnd, SW_HIDE);
-
   manager->dirty = 1;
   return REACH_OK;
 }
@@ -595,6 +612,94 @@ static void reach_window_manager_mark_seen(reach_window_manager *manager,
   manager->window_order.insert(manager->window_order.begin(), hwnd);
 }
 
+static int32_t reach_window_manager_query_process_integrity(
+    HANDLE process, DWORD *out_integrity) {
+  if (process == nullptr || out_integrity == nullptr) {
+    return 0;
+  }
+
+  *out_integrity = 0;
+
+  HANDLE token = nullptr;
+  if (!OpenProcessToken(process, TOKEN_QUERY, &token)) {
+    return 0;
+  }
+
+  DWORD needed = 0;
+  (void)GetTokenInformation(token, TokenIntegrityLevel, nullptr, 0, &needed);
+  if (needed == 0) {
+    CloseHandle(token);
+    return 0;
+  }
+
+  std::vector<BYTE> buffer(needed);
+  BOOL ok = GetTokenInformation(token, TokenIntegrityLevel, buffer.data(),
+                                needed, &needed);
+  CloseHandle(token);
+
+  if (!ok) {
+    return 0;
+  }
+
+  TOKEN_MANDATORY_LABEL *label =
+      reinterpret_cast<TOKEN_MANDATORY_LABEL *>(buffer.data());
+  if (label == nullptr || label->Label.Sid == nullptr) {
+    return 0;
+  }
+
+  DWORD subauth_count = *GetSidSubAuthorityCount(label->Label.Sid);
+  if (subauth_count == 0) {
+    return 0;
+  }
+
+  *out_integrity = *GetSidSubAuthority(label->Label.Sid, subauth_count - 1);
+  return 1;
+}
+
+static reach_window_control_level reach_window_manager_control_level_for_process(
+    const reach_window_manager *manager, DWORD process_id) {
+  if (manager == nullptr || !manager->process_integrity_valid ||
+      process_id == 0) {
+    return REACH_WINDOW_CONTROL_UNKNOWN;
+  }
+
+  HANDLE process =
+      OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+  if (process == nullptr) {
+    return REACH_WINDOW_CONTROL_UNKNOWN;
+  }
+
+  DWORD target_integrity = 0;
+  int32_t ok =
+      reach_window_manager_query_process_integrity(process, &target_integrity);
+  CloseHandle(process);
+
+  if (!ok) {
+    return REACH_WINDOW_CONTROL_UNKNOWN;
+  }
+
+  return target_integrity > manager->process_integrity
+             ? REACH_WINDOW_CONTROL_LIMITED
+             : REACH_WINDOW_CONTROL_NORMAL;
+}
+
+static reach_window_control_level reach_window_manager_control_level_for_window(
+    const reach_window_manager *manager, HWND hwnd) {
+  if (manager == nullptr || hwnd == nullptr || !IsWindow(hwnd)) {
+    return REACH_WINDOW_CONTROL_UNKNOWN;
+  }
+
+  DWORD process_id = 0;
+  GetWindowThreadProcessId(hwnd, &process_id);
+  return reach_window_manager_control_level_for_process(manager, process_id);
+}
+
+static int32_t reach_window_manager_window_has_limited_control(
+    const reach_window_manager *manager, HWND hwnd) {
+  return reach_window_manager_control_level_for_window(manager, hwnd) ==
+         REACH_WINDOW_CONTROL_LIMITED;
+}
+
 static int32_t reach_window_manager_query_process_path_for_process(
     DWORD process_id, uint16_t *out_path, size_t out_path_count);
 
@@ -803,6 +908,8 @@ reach_window_manager_build_snapshot(reach_window_manager *manager, HWND hwnd,
   snapshot.visible = IsWindowVisible(hwnd) ? 1 : 0;
   snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
   snapshot.minimized = IsIconic(hwnd) ? 1 : 0;
+  snapshot.control_level =
+      reach_window_manager_control_level_for_process(manager, process_id);
 
   reach_window_metadata_cache_entry *cache =
       reach_window_manager_find_metadata_cache(manager, hwnd, process_id);
@@ -1002,30 +1109,16 @@ static reach_result reach_window_manager_snap(reach_window_manager *manager,
     return REACH_INVALID_ARGUMENT;
   }
 
-  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-  MONITORINFO info = {};
-  info.cbSize = sizeof(info);
-  if (!GetMonitorInfoW(monitor, &info)) {
-    return REACH_ERROR;
+  if (reach_window_manager_window_has_limited_control(manager, hwnd)) {
+    (void)reach_elevation_helper_send(REACH_ELEVATION_HELPER_COMMAND_SNAP,
+                                      window_id, mode);
+    manager->dirty = 1;
+    return REACH_OK;
   }
 
-  reach_rect_i32 work_area = {info.rcWork.left, info.rcWork.top,
-                              info.rcWork.right, info.rcWork.bottom};
-  reach_rect_i32 target = {};
-  reach_result result = reach_layout_compute_split(work_area, mode, &target);
-  if (result != REACH_OK) {
-    return result;
-  }
-
-  if (IsZoomed(hwnd)) {
-    ShowWindow(hwnd, SW_RESTORE);
-  }
-
-  BOOL ok = SetWindowPos(hwnd, nullptr, target.left, target.top,
-                         target.right - target.left, target.bottom - target.top,
-                         SWP_NOZORDER | SWP_NOACTIVATE);
+  reach_result result = reach_window_management_snap(hwnd, mode);
   manager->foreground = GetForegroundWindow();
-  return ok ? REACH_OK : REACH_ERROR;
+  return result;
 }
 
 static uintptr_t
@@ -1248,6 +1341,18 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
   reach_hidden_minimized_window *hidden =
       reach_window_manager_find_hidden_minimized(manager, hwnd);
 
+  if (reach_window_manager_window_has_limited_control(manager, hwnd)) {
+    reach_result helper_result = reach_elevation_helper_send(
+        REACH_ELEVATION_HELPER_COMMAND_ACTIVATE, window_id, REACH_SPLIT_LEFT);
+    if (hidden != nullptr && helper_result == REACH_OK) {
+      reach_window_manager_remove_hidden_minimized(manager, hwnd);
+    }
+    manager->foreground = GetForegroundWindow();
+    reach_window_manager_mark_seen(manager, hwnd);
+    manager->dirty = 1;
+    return REACH_OK;
+  }
+
   if (hidden != nullptr) {
     WINDOWPLACEMENT placement = hidden->placement;
 
@@ -1276,44 +1381,7 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     ShowWindow(hwnd, SW_SHOW);
   }
 
-  HWND foreground = GetForegroundWindow();
-  DWORD foreground_thread =
-      foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
-  DWORD target_thread = GetWindowThreadProcessId(hwnd, nullptr);
-  DWORD current_thread = GetCurrentThreadId();
-
-  bool attached_foreground = false;
-  bool attached_target = false;
-
-  if (foreground_thread != 0 && foreground_thread != current_thread) {
-    attached_foreground =
-        AttachThreadInput(current_thread, foreground_thread, TRUE) != FALSE;
-  }
-
-  if (target_thread != 0 && target_thread != current_thread &&
-      target_thread != foreground_thread) {
-    attached_target =
-        AttachThreadInput(current_thread, target_thread, TRUE) != FALSE;
-  }
-
-  SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-               SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-  SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-               SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-
-  BringWindowToTop(hwnd);
-  SetForegroundWindow(hwnd);
-  SwitchToThisWindow(hwnd, TRUE);
-  SetFocus(hwnd);
-  SetActiveWindow(hwnd);
-
-  if (attached_target) {
-    AttachThreadInput(current_thread, target_thread, FALSE);
-  }
-
-  if (attached_foreground) {
-    AttachThreadInput(current_thread, foreground_thread, FALSE);
-  }
+  (void)reach_window_management_activate(hwnd);
 
   manager->foreground = hwnd;
   reach_window_manager_mark_seen(manager, hwnd);
@@ -1333,7 +1401,13 @@ static reach_result reach_window_manager_minimize(reach_window_manager *manager,
     return REACH_INVALID_ARGUMENT;
   }
 
-  ShowWindowAsync(hwnd, SW_MINIMIZE);
+  reach_window_manager_remove_hidden_minimized(manager, hwnd);
+  if (reach_window_manager_window_has_limited_control(manager, hwnd)) {
+    (void)reach_elevation_helper_send(REACH_ELEVATION_HELPER_COMMAND_MINIMIZE,
+                                      window_id, REACH_SPLIT_LEFT);
+  } else {
+    (void)reach_window_management_minimize(hwnd);
+  }
 
   manager->foreground = GetForegroundWindow();
   manager->dirty = 1;
@@ -1350,7 +1424,13 @@ static reach_result reach_window_manager_close(reach_window_manager *manager,
   if (!IsWindow(hwnd)) {
     return REACH_INVALID_ARGUMENT;
   }
-  PostMessageW(hwnd, WM_CLOSE, 0, 0);
+  if (reach_window_manager_window_has_limited_control(manager, hwnd)) {
+    (void)reach_elevation_helper_send(REACH_ELEVATION_HELPER_COMMAND_CLOSE,
+                                      window_id, REACH_SPLIT_LEFT);
+  } else {
+    (void)reach_window_management_close(hwnd);
+  }
+  manager->dirty = 1;
   return REACH_OK;
 }
 
@@ -1411,6 +1491,8 @@ reach_windows_create_window_manager(reach_window_manager_port *out_port) {
     return REACH_ERROR;
   }
 
+  manager->process_integrity_valid = reach_window_manager_query_process_integrity(
+      GetCurrentProcess(), &manager->process_integrity);
   manager->foreground = GetForegroundWindow();
   reach_window_manager_refresh_windows(manager);
   out_port->manager = manager;

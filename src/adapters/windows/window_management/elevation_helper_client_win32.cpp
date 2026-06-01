@@ -1,0 +1,51 @@
+#include "elevation_helper_client_win32.h"
+
+#include <windows.h>
+
+reach_result reach_elevation_helper_send(
+    reach_elevation_helper_command command,
+    uintptr_t window_id,
+    reach_split_mode mode) {
+  if (window_id == 0 || !reach_elevation_helper_command_valid(command)) {
+    return REACH_INVALID_ARGUMENT;
+  }
+
+  if (!WaitNamedPipeW(REACH_ELEVATION_HELPER_PIPE_NAME, 50)) {
+    return REACH_ERROR;
+  }
+
+  HANDLE pipe = CreateFileW(REACH_ELEVATION_HELPER_PIPE_NAME,
+                            GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+                            OPEN_EXISTING, 0, nullptr);
+  if (pipe == INVALID_HANDLE_VALUE) {
+    return REACH_ERROR;
+  }
+
+  DWORD mode_bytes = PIPE_READMODE_MESSAGE;
+  (void)SetNamedPipeHandleState(pipe, &mode_bytes, nullptr, nullptr);
+
+  reach_elevation_helper_request request = {};
+  request.version = reach_elevation_helper_protocol_version();
+  request.command = command;
+  request.window = static_cast<uint64_t>(window_id);
+  request.split_mode = static_cast<int32_t>(mode);
+
+  DWORD written = 0;
+  BOOL ok = WriteFile(pipe, &request, sizeof(request), &written, nullptr);
+  if (!ok || written != sizeof(request)) {
+    CloseHandle(pipe);
+    return REACH_ERROR;
+  }
+
+  reach_elevation_helper_response response = {};
+  DWORD read = 0;
+  ok = ReadFile(pipe, &response, sizeof(response), &read, nullptr);
+  CloseHandle(pipe);
+
+  if (!ok || read != sizeof(response) ||
+      response.version != reach_elevation_helper_protocol_version()) {
+    return REACH_ERROR;
+  }
+
+  return static_cast<reach_result>(response.result);
+}

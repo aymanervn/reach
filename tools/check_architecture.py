@@ -91,6 +91,7 @@ EXACT_TARGET_LAYERS = {
     "reach_windows_adapters": "adapters",
     "reach": "app",
     "reachctl": "tools",
+    "reach_elevation_helper": "tools",
     "reach_tray_probe": "tools",
 }
 

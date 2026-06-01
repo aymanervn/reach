@@ -14,6 +14,12 @@ extern "C" {
 
 typedef struct reach_window_manager reach_window_manager;
 
+typedef enum reach_window_control_level {
+    REACH_WINDOW_CONTROL_NORMAL = 0,
+    REACH_WINDOW_CONTROL_LIMITED = 1,
+    REACH_WINDOW_CONTROL_UNKNOWN = 2
+} reach_window_control_level;
+
 typedef struct reach_window_snapshot {
     reach_window_id id;
     uint16_t title[260];
@@ -23,6 +29,7 @@ typedef struct reach_window_snapshot {
     int32_t visible;
     int32_t maximized;
     int32_t minimized;
+    reach_window_control_level control_level;
 } reach_window_snapshot;
 
 typedef struct reach_window_manager_ops {

@@ -111,7 +111,10 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
-    src/adapters/windows/window_manager_win32.cpp
+    src/adapters/windows/window_management/window_actions_win32.cpp
+    src/adapters/windows/window_management/elevation_helper_protocol.cpp
+    src/adapters/windows/window_management/elevation_helper_client_win32.cpp
+    src/adapters/windows/window_management/window_manager_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp
     src/adapters/windows/wallpaper_win32.cpp
@@ -291,6 +294,24 @@ target_link_libraries(reach-watchdog PRIVATE
     user32
     advapi32
 )
+
+add_executable(reach_elevation_helper WIN32
+    src/tools/reach_elevation_helper/reach_elevation_helper.cpp
+    src/adapters/windows/window_management/window_actions_win32.cpp
+    src/adapters/windows/window_management/elevation_helper_protocol.cpp
+    src/support/layout.cpp
+    src/support/util.cpp
+)
+
+reach_configure_common(reach_elevation_helper)
+reach_configure_windows(reach_elevation_helper)
+target_compile_features(reach_elevation_helper PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_elevation_helper PRIVATE
+    user32
+    advapi32
+)
 set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
 set(REACH_DIST_DIR "${REACH_DIST_ROOT}/Release")
 set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-alpha.zip")
@@ -312,6 +333,10 @@ add_custom_target(reach_release_zip
         "${REACH_DIST_DIR}/reach-watchdog.exe"
 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:reach_elevation_helper>"
+        "${REACH_DIST_DIR}/reach_elevation_helper.exe"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${EVERYTHING_DLL}"
         "${REACH_DIST_DIR}/Everything64.dll"
 
@@ -324,10 +349,11 @@ add_custom_target(reach_release_zip
         reach.exe
         reachctl.exe
         reach-watchdog.exe
+        reach_elevation_helper.exe
         Everything64.dll
         reach.jpg
 
-    DEPENDS reach reachctl reach-watchdog
+    DEPENDS reach reachctl reach-watchdog reach_elevation_helper
 
     COMMENT "Creating Reach Release ZIP"
 )
@@ -420,6 +446,17 @@ target_link_libraries(reach_search_ranking_tests PRIVATE
     reach_support
 )
 
+add_executable(reach_elevation_helper_protocol_tests
+    tests/elevation_helper_protocol_tests.cpp
+    src/adapters/windows/window_management/elevation_helper_protocol.cpp
+)
+
+reach_configure_common(reach_elevation_helper_protocol_tests)
+reach_configure_windows(reach_elevation_helper_protocol_tests)
+target_compile_features(reach_elevation_helper_protocol_tests PRIVATE
+    cxx_std_17
+)
+
 if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_core_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_core_tests.exe)
     add_test(NAME reach_dock_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_dock_feature_tests.exe)
@@ -427,6 +464,7 @@ if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_quick_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_quick_settings_feature_tests.exe)
     add_test(NAME reach_launcher_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_launcher_feature_tests.exe)
     add_test(NAME reach_search_ranking_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_search_ranking_tests.exe)
+    add_test(NAME reach_elevation_helper_protocol_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_elevation_helper_protocol_tests.exe)
 else()
     add_test(NAME reach_core_tests COMMAND reach_core_tests)
     add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
@@ -434,6 +472,7 @@ else()
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
+    add_test(NAME reach_elevation_helper_protocol_tests COMMAND reach_elevation_helper_protocol_tests)
 endif()
 
 add_custom_target(check_architecture ALL
