@@ -17,12 +17,6 @@
 #include <thread>
 #include <vector>
 
-struct reach_hidden_minimized_window
-{
-    HWND hwnd;
-    WINDOWPLACEMENT placement;
-};
-
 struct reach_window_metadata_cache_entry
 {
     HWND hwnd;
@@ -68,7 +62,6 @@ struct reach_window_manager
     std::vector<reach_window_snapshot> windows;
     std::vector<HWND> window_order;
     std::vector<reach_window_snapshot> pending_windows;
-    std::vector<reach_hidden_minimized_window> hidden_minimized_windows;
     std::vector<reach_window_metadata_cache_entry> metadata_cache;
     std::thread metadata_thread;
     std::mutex metadata_mutex;
@@ -284,86 +277,6 @@ static int32_t reach_window_manager_apply_metadata_results(reach_window_manager 
     return changed;
 }
 
-static reach_hidden_minimized_window *
-reach_window_manager_find_hidden_minimized(reach_window_manager *manager, HWND hwnd)
-{
-    if (manager == nullptr || hwnd == nullptr)
-    {
-        return nullptr;
-    }
-
-    for (reach_hidden_minimized_window &entry : manager->hidden_minimized_windows)
-    {
-        if (entry.hwnd == hwnd)
-        {
-            return &entry;
-        }
-    }
-
-    return nullptr;
-}
-
-static const reach_hidden_minimized_window *
-reach_window_manager_find_hidden_minimized(const reach_window_manager *manager, HWND hwnd)
-{
-    if (manager == nullptr || hwnd == nullptr)
-    {
-        return nullptr;
-    }
-
-    for (const reach_hidden_minimized_window &entry : manager->hidden_minimized_windows)
-    {
-        if (entry.hwnd == hwnd)
-        {
-            return &entry;
-        }
-    }
-
-    return nullptr;
-}
-
-static void reach_window_manager_remove_hidden_minimized(reach_window_manager *manager, HWND hwnd)
-{
-    if (manager == nullptr || hwnd == nullptr)
-    {
-        return;
-    }
-
-    for (size_t index = 0; index < manager->hidden_minimized_windows.size();)
-    {
-        if (manager->hidden_minimized_windows[index].hwnd == hwnd)
-        {
-            manager->hidden_minimized_windows.erase(manager->hidden_minimized_windows.begin() +
-                                                    index);
-        }
-        else
-        {
-            ++index;
-        }
-    }
-}
-
-static int32_t reach_window_manager_capture_placement(HWND hwnd, WINDOWPLACEMENT *out_placement)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd) || out_placement == nullptr)
-    {
-        return 0;
-    }
-
-    WINDOWPLACEMENT placement = {};
-    placement.length = sizeof(placement);
-
-    if (!GetWindowPlacement(hwnd, &placement))
-    {
-        return 0;
-    }
-
-    placement.flags &= ~WPF_SETMINPOSITION;
-
-    *out_placement = placement;
-    return 1;
-}
-
 static int32_t reach_window_manager_helper_is_absent_after_failure(void)
 {
     return !reach_elevation_helper_available();
@@ -386,42 +299,6 @@ static reach_result reach_window_manager_send_or_fallback(
     }
 
     return fallback != nullptr ? fallback(hwnd) : REACH_ERROR;
-}
-
-static reach_result reach_window_manager_track_hidden_minimized(reach_window_manager *manager,
-                                                                HWND hwnd)
-{
-    if (manager == nullptr || hwnd == nullptr || !IsWindow(hwnd))
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    if (reach_window_manager_find_hidden_minimized(manager, hwnd) != nullptr)
-    {
-        return REACH_OK;
-    }
-
-    WINDOWPLACEMENT placement = {};
-    if (!reach_window_manager_capture_placement(hwnd, &placement))
-    {
-        return REACH_ERROR;
-    }
-
-    reach_result hide_result = reach_window_manager_send_or_fallback(
-        REACH_ELEVATION_HELPER_COMMAND_HIDE, reinterpret_cast<uintptr_t>(hwnd), REACH_SPLIT_LEFT,
-        reach_window_management_hide);
-    if (hide_result != REACH_OK)
-    {
-        return REACH_OK;
-    }
-
-    reach_hidden_minimized_window entry = {};
-    entry.hwnd = hwnd;
-    entry.placement = placement;
-
-    manager->hidden_minimized_windows.push_back(entry);
-    manager->dirty = 1;
-    return REACH_OK;
 }
 
 static void CALLBACK reach_window_manager_event_proc(HWINEVENTHOOK hook, DWORD event, HWND window,
@@ -479,12 +356,6 @@ static void CALLBACK reach_window_manager_event_proc(HWINEVENTHOOK hook, DWORD e
         g_window_manager->pending_location_change)
     {
         return;
-    }
-
-    if (event == EVENT_SYSTEM_MINIMIZEEND && window != nullptr && IsWindow(window) &&
-        IsIconic(window))
-    {
-        (void)reach_window_manager_track_hidden_minimized(g_window_manager, window);
     }
 
     if (event == EVENT_SYSTEM_FOREGROUND || !g_window_manager->dirty)
@@ -922,55 +793,6 @@ static void reach_window_manager_refresh_windows(reach_window_manager *manager)
     manager->pending_windows.clear();
     EnumWindows(reach_window_manager_enum_windows_proc, reinterpret_cast<LPARAM>(manager));
 
-    for (const reach_window_snapshot &snapshot : manager->pending_windows)
-    {
-        if (!snapshot.minimized)
-        {
-            continue;
-        }
-
-        HWND hwnd = reinterpret_cast<HWND>(snapshot.id);
-        if (hwnd == nullptr || !IsWindow(hwnd))
-        {
-            continue;
-        }
-
-        if (reach_window_manager_find_hidden_minimized(manager, hwnd) == nullptr)
-        {
-            (void)reach_window_manager_track_hidden_minimized(manager, hwnd);
-        }
-    }
-
-    for (size_t index = 0; index < manager->hidden_minimized_windows.size();)
-    {
-        const reach_hidden_minimized_window &entry = manager->hidden_minimized_windows[index];
-        HWND hwnd = entry.hwnd;
-
-        if (hwnd == nullptr || !IsWindow(hwnd) || !reach_window_is_app_candidate(hwnd))
-        {
-            manager->hidden_minimized_windows.erase(manager->hidden_minimized_windows.begin() +
-                                                    index);
-            continue;
-        }
-
-        if (reach_window_manager_find_pending(manager->pending_windows, hwnd) == nullptr)
-        {
-            reach_window_snapshot snapshot = {};
-            if (reach_window_manager_build_snapshot(manager, hwnd, &snapshot))
-            {
-                snapshot.visible = 0;
-                snapshot.minimized = 1;
-
-                RECT rect = entry.placement.rcNormalPosition;
-                snapshot.bounds = {rect.left, rect.top, rect.right, rect.bottom};
-
-                manager->pending_windows.push_back(snapshot);
-            }
-        }
-
-        ++index;
-    }
-
     for (size_t index = 0; index < manager->window_order.size();)
     {
         if (reach_window_manager_find_pending(manager->pending_windows,
@@ -1236,17 +1058,10 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_hidden_minimized_window *hidden =
-        reach_window_manager_find_hidden_minimized(manager, hwnd);
-
     reach_result helper_result = reach_elevation_helper_send(
         REACH_ELEVATION_HELPER_COMMAND_ACTIVATE, window_id, REACH_SPLIT_LEFT);
     if (helper_result == REACH_OK)
     {
-        if (hidden != nullptr)
-        {
-            reach_window_manager_remove_hidden_minimized(manager, hwnd);
-        }
         manager->foreground = GetForegroundWindow();
         reach_window_manager_mark_seen(manager, hwnd);
         manager->dirty = 1;
@@ -1256,37 +1071,6 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     {
         manager->dirty = 1;
         return helper_result;
-    }
-
-    if (hidden != nullptr)
-    {
-        WINDOWPLACEMENT placement = hidden->placement;
-
-        const bool restore_to_maximized = placement.showCmd == SW_SHOWMAXIMIZED ||
-                                          (placement.flags & WPF_RESTORETOMAXIMIZED) != 0;
-
-        placement.showCmd = restore_to_maximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
-
-        reach_window_manager_remove_hidden_minimized(manager, hwnd);
-
-        ShowWindow(hwnd, SW_SHOW);
-        SetWindowPlacement(hwnd, &placement);
-        ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
-    }
-    else if (IsIconic(hwnd))
-    {
-        WINDOWPLACEMENT placement = {};
-        placement.length = sizeof(placement);
-
-        const bool restore_to_maximized = GetWindowPlacement(hwnd, &placement) &&
-                                          (placement.showCmd == SW_SHOWMAXIMIZED ||
-                                           (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
-
-        ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
-    }
-    else if (!IsWindowVisible(hwnd))
-    {
-        ShowWindow(hwnd, SW_SHOW);
     }
 
     reach_result activate_result = reach_window_management_activate(hwnd);
@@ -1317,7 +1101,6 @@ static reach_result reach_window_manager_minimize(reach_window_manager *manager,
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_window_manager_remove_hidden_minimized(manager, hwnd);
     (void)reach_window_manager_send_or_fallback(REACH_ELEVATION_HELPER_COMMAND_MINIMIZE,
                                                 window_id, REACH_SPLIT_LEFT,
                                                 reach_window_management_minimize);

@@ -73,9 +73,7 @@ reach_result reach_window_management_minimize(HWND hwnd)
         target = hwnd;
     }
 
-    ShowWindowAsync(target, SW_FORCEMINIMIZE);
     PostMessageW(target, WM_SYSCOMMAND, SC_MINIMIZE, 0);
-    CloseWindow(target);
     return REACH_OK;
 }
 
