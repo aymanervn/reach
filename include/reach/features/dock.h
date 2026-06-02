@@ -47,6 +47,7 @@ extern "C"
     {
         reach_icon_handle pinned_icons[REACH_MAX_PINNED_APPS];
         size_t pinned_icon_count;
+        uint32_t pinned_icon_pin_ids[REACH_MAX_PINNED_APPS];
         uint16_t pinned_icon_initials[REACH_MAX_PINNED_APPS];
         reach_icon_handle open_window_icons[REACH_MAX_PINNED_APPS];
         uint16_t open_window_initials[REACH_MAX_PINNED_APPS];

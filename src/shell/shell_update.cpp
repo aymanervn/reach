@@ -73,6 +73,11 @@ void reach_shell_refresh_pinned_icon_slots(reach_shell *shell)
         return;
     }
 
+    uint32_t old_pin_ids[REACH_MAX_PINNED_APPS] = {};
+    reach_icon_handle old_icons[REACH_MAX_PINNED_APPS] = {};
+    uint16_t old_initials[REACH_MAX_PINNED_APPS] = {};
+    int32_t old_used[REACH_MAX_PINNED_APPS] = {};
+
     size_t old_count = shell->dock_icons.pinned_icon_count;
     if (old_count > REACH_MAX_PINNED_APPS)
     {
@@ -81,7 +86,11 @@ void reach_shell_refresh_pinned_icon_slots(reach_shell *shell)
 
     for (size_t index = 0; index < old_count; ++index)
     {
-        reach_shell_release_icon_handle(shell, &shell->dock_icons.pinned_icons[index]);
+        old_pin_ids[index] = shell->dock_icons.pinned_icon_pin_ids[index];
+        old_icons[index] = shell->dock_icons.pinned_icons[index];
+        old_initials[index] = shell->dock_icons.pinned_icon_initials[index];
+        shell->dock_icons.pinned_icons[index] = {};
+        shell->dock_icons.pinned_icon_pin_ids[index] = 0;
         shell->dock_icons.pinned_icon_initials[index] = 0;
     }
 
@@ -93,7 +102,28 @@ void reach_shell_refresh_pinned_icon_slots(reach_shell *shell)
     {
         const reach_pinned_app_model *app = &shell->ui.pinned_apps[index];
 
+        shell->dock_icons.pinned_icon_pin_ids[index] = app->id;
         shell->dock_icons.pinned_icon_initials[index] = app->title[0] != 0 ? app->title[0] : '?';
+
+        for (size_t old_index = 0; old_index < old_count; ++old_index)
+        {
+            if (old_used[old_index] || old_icons[old_index].id == 0 ||
+                old_pin_ids[old_index] != app->id)
+            {
+                continue;
+            }
+
+            shell->dock_icons.pinned_icons[index] = old_icons[old_index];
+            shell->dock_icons.pinned_icon_initials[index] = old_initials[old_index];
+            old_icons[old_index] = {};
+            old_used[old_index] = 1;
+            break;
+        }
+    }
+
+    for (size_t index = 0; index < old_count; ++index)
+    {
+        reach_shell_release_icon_handle(shell, &old_icons[index]);
     }
 
     reach_shell_schedule_pinned_icon_loads(shell);

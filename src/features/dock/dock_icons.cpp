@@ -26,6 +26,7 @@ void reach_dock_clear_pinned_icons(reach_dock_icon_cache *cache)
     for (size_t index = 0; index < count; ++index)
     {
         cache->pinned_icons[index] = {};
+        cache->pinned_icon_pin_ids[index] = 0;
         cache->pinned_icon_initials[index] = 0;
     }
 

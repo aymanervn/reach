@@ -410,6 +410,8 @@ static void reach_shell_apply_pinned_icon_results(reach_shell *shell)
         {
             reach_shell_release_icon_handle(shell, &shell->dock_icons.pinned_icons[result->index]);
             shell->dock_icons.pinned_icons[result->index] = result->icon;
+            shell->dock_icons.pinned_icon_pin_ids[result->index] =
+                shell->ui.pinned_apps[result->index].id;
             shell->dock_icons.pinned_icon_initials[result->index] = result->initial;
             result->icon = {};
             shell->dock.dirty_flags = 1;
@@ -523,6 +525,7 @@ void reach_shell_release_dock_icons(reach_shell *shell)
     for (size_t index = 0; index < pinned_count; ++index)
     {
         reach_shell_release_icon_handle(shell, &shell->dock_icons.pinned_icons[index]);
+        shell->dock_icons.pinned_icon_pin_ids[index] = 0;
         shell->dock_icons.pinned_icon_initials[index] = 0;
     }
 
