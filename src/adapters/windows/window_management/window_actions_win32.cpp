@@ -77,16 +77,6 @@ reach_result reach_window_management_minimize(HWND hwnd)
     return REACH_OK;
 }
 
-reach_result reach_window_management_hide(HWND hwnd)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd))
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    ShowWindowAsync(hwnd, SW_HIDE);
-    return REACH_OK;
-}
-
 reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))

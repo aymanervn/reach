@@ -502,8 +502,6 @@ static reach_result reach_helper_execute(const reach_elevation_helper_request *r
                                             static_cast<reach_split_mode>(request->split_mode));
     case REACH_ELEVATION_HELPER_COMMAND_CLOSE:
         return reach_window_management_close(hwnd);
-    case REACH_ELEVATION_HELPER_COMMAND_HIDE:
-        return reach_window_management_hide(hwnd);
     default:
         return REACH_INVALID_ARGUMENT;
     }
