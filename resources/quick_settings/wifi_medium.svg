@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 27 25" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <rect id="wifi_medium" x="1.006" y="0" width="25" height="25" style="fill:none;"/>
+    <path d="M21.577,14.64L18.006,17.126C17.022,15.717 15.389,14.795 13.542,14.795C11.694,14.795 10.061,15.717 9.078,17.126L5.506,14.64C7.277,12.103 10.217,10.442 13.542,10.442C16.867,10.442 19.807,12.103 21.577,14.64ZM17.113,17.748C17.113,17.748 15.127,19.131 14.117,19.834C13.771,20.075 13.312,20.075 12.966,19.834C11.956,19.131 9.97,17.748 9.97,17.748C10.757,16.621 12.064,15.883 13.542,15.883C15.019,15.883 16.326,16.621 17.113,17.748Z"/>
+</svg>

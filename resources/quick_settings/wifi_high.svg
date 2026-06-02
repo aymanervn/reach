@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 25 25" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <rect id="wifi_high" x="0" y="0" width="25" height="25" style="fill-opacity:0;"/>
+    <g id="wifi_high1" serif:id="wifi_high">
+        <path d="M3.572,14.018L-0,11.531C2.754,7.586 7.328,5.002 12.5,5.002C17.672,5.002 22.246,7.586 25,11.531L21.428,14.018C19.461,11.2 16.194,9.354 12.5,9.354C8.806,9.354 5.539,11.2 3.572,14.018ZM20.535,14.64L16.964,17.126C15.981,15.717 14.347,14.795 12.5,14.795C10.653,14.795 9.019,15.717 8.036,17.126L4.465,14.64C6.235,12.103 9.175,10.442 12.5,10.442C15.825,10.442 18.765,12.103 20.535,14.64ZM16.071,17.748C16.071,17.748 14.143,19.091 13.12,19.803C12.747,20.063 12.253,20.063 11.88,19.803C10.857,19.091 8.929,17.748 8.929,17.748C9.716,16.621 11.022,15.883 12.5,15.883C13.978,15.883 15.284,16.621 16.071,17.748Z"/>
+    </g>
+</svg>
