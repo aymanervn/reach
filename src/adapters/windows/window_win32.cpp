@@ -420,6 +420,37 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     return style;
 }
 
+static void reach_platform_window_focus(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd))
+    {
+        return;
+    }
+
+    DWORD current_thread = GetCurrentThreadId();
+    DWORD foreground_thread = 0;
+    HWND foreground = GetForegroundWindow();
+    if (foreground != nullptr)
+    {
+        foreground_thread = GetWindowThreadProcessId(foreground, nullptr);
+    }
+
+    BOOL attached = FALSE;
+    if (foreground_thread != 0 && foreground_thread != current_thread)
+    {
+        attached = AttachThreadInput(current_thread, foreground_thread, TRUE);
+    }
+
+    SetForegroundWindow(hwnd);
+    SetActiveWindow(hwnd);
+    SetFocus(hwnd);
+
+    if (attached)
+    {
+        AttachThreadInput(current_thread, foreground_thread, FALSE);
+    }
+}
+
 static reach_result reach_platform_window_show(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -439,9 +470,7 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
         window->role != REACH_SURFACE_SWITCHER && window->role != REACH_SURFACE_CONTEXT_MENU &&
         window->role != REACH_SURFACE_QUICK_SETTINGS)
     {
-        SetForegroundWindow(window->hwnd);
-        SetActiveWindow(window->hwnd);
-        SetFocus(window->hwnd);
+        reach_platform_window_focus(window->hwnd);
     }
     return REACH_OK;
 }
@@ -672,9 +701,7 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
 
     SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     BringWindowToTop(window->hwnd);
-    SetForegroundWindow(window->hwnd);
-    SetActiveWindow(window->hwnd);
-    SetFocus(window->hwnd);
+    reach_platform_window_focus(window->hwnd);
 
     return REACH_OK;
 }
