@@ -111,7 +111,6 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
-    src/adapters/windows/window_management/window_actions_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
     src/adapters/windows/window_management/window_filter_win32.cpp
     src/adapters/windows/window_management/window_display_state_win32.cpp
