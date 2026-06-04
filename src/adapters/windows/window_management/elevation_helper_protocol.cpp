@@ -2,7 +2,7 @@
 
 uint32_t reach_elevation_helper_protocol_version(void)
 {
-    return 1;
+    return 2;
 }
 
 int32_t reach_elevation_helper_command_valid(uint32_t command)
@@ -14,6 +14,7 @@ int32_t reach_elevation_helper_command_valid(uint32_t command)
     case REACH_ELEVATION_HELPER_COMMAND_MINIMIZE:
     case REACH_ELEVATION_HELPER_COMMAND_SNAP:
     case REACH_ELEVATION_HELPER_COMMAND_CLOSE:
+    case REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL:
     case REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING:
         return 1;
     default:
@@ -29,6 +30,15 @@ int32_t reach_elevation_helper_request_valid(const reach_elevation_helper_reques
         return 0;
     }
 
+    if (request->command == REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL)
+    {
+        if (request->flags != 0 && request->event_pipe[0] == 0)
+        {
+            return 0;
+        }
+        return 1;
+    }
+
     if (request->command == REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING)
     {
         const uint32_t valid_mask =
@@ -37,7 +47,7 @@ int32_t reach_elevation_helper_request_valid(const reach_elevation_helper_reques
         {
             return 0;
         }
-        if (request->flags != 0 && (request->hotkey_mask == 0 || request->event_pipe[0] == 0))
+        if (request->flags != 0 && request->hotkey_mask == 0)
         {
             return 0;
         }

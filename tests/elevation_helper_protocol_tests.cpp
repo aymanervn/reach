@@ -25,7 +25,7 @@ static reach_elevation_helper_request valid_request(void)
 
 int main(void)
 {
-    expect_true(reach_elevation_helper_protocol_version() == 1, "protocol version is stable");
+    expect_true(reach_elevation_helper_protocol_version() == 2, "protocol version is stable");
 
     reach_elevation_helper_request request = valid_request();
     request.command = REACH_ELEVATION_HELPER_COMMAND_PING;
@@ -60,6 +60,29 @@ int main(void)
     expect_true(!reach_elevation_helper_request_valid(&request), "bad split mode is rejected");
 
     request = valid_request();
+    request.command = REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL;
+    request.window = 0;
+    request.flags = 0;
+    expect_true(reach_elevation_helper_request_valid(&request),
+                "disabled event channel request is accepted");
+
+    request = valid_request();
+    request.command = REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL;
+    request.window = 0;
+    request.flags = 1;
+    request.event_pipe[0] = L'a';
+    expect_true(reach_elevation_helper_request_valid(&request),
+                "enabled event channel request is accepted");
+
+    request = valid_request();
+    request.command = REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL;
+    request.window = 0;
+    request.flags = 1;
+    request.event_pipe[0] = 0;
+    expect_true(!reach_elevation_helper_request_valid(&request),
+                "enabled event channel requires an event pipe");
+
+    request = valid_request();
     request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;
     request.window = 0;
     request.flags = 0;
@@ -73,7 +96,7 @@ int main(void)
     request.flags = 1;
     request.hotkey_mask =
         REACH_ELEVATION_HELPER_HOTKEY_ALT_TAB | REACH_ELEVATION_HELPER_HOTKEY_WINDOWS_KEY;
-    request.event_pipe[0] = L'a';
+    request.event_pipe[0] = 0;
     expect_true(reach_elevation_helper_request_valid(&request),
                 "enabled hotkey forwarding request is accepted");
 
@@ -86,14 +109,6 @@ int main(void)
     expect_true(!reach_elevation_helper_request_valid(&request),
                 "enabled hotkey forwarding requires a hotkey mask");
 
-    request = valid_request();
-    request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;
-    request.window = 0;
-    request.flags = 1;
-    request.hotkey_mask = REACH_ELEVATION_HELPER_HOTKEY_ALT_TAB;
-    request.event_pipe[0] = 0;
-    expect_true(!reach_elevation_helper_request_valid(&request),
-                "enabled hotkey forwarding requires an event pipe");
 
     request = valid_request();
     request.command = REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING;

@@ -14,6 +14,7 @@ enum reach_elevation_helper_command : uint32_t
     REACH_ELEVATION_HELPER_COMMAND_MINIMIZE = 2,
     REACH_ELEVATION_HELPER_COMMAND_SNAP = 3,
     REACH_ELEVATION_HELPER_COMMAND_CLOSE = 4,
+    REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL = 5,
     REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING = 6,
 };
 
@@ -32,6 +33,21 @@ struct reach_elevation_helper_request
     uint32_t flags;
     uint32_t hotkey_mask;
     wchar_t event_pipe[128];
+};
+
+enum reach_elevation_helper_event_type : uint32_t
+{
+    REACH_ELEVATION_HELPER_EVENT_CONNECTED = 1,
+    REACH_ELEVATION_HELPER_EVENT_HOTKEY = 2,
+    REACH_ELEVATION_HELPER_EVENT_DISCONNECTING = 3,
+};
+
+struct reach_elevation_helper_event
+{
+    uint32_t version;
+    uint32_t type;
+    uint32_t event_count;
+    uint32_t event_types[2];
 };
 
 struct reach_elevation_helper_response

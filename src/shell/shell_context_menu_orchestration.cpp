@@ -140,9 +140,10 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
 
         return app.path[0] != 0 ? reach_shell_schedule_pin_app(shell, &app) : REACH_ERROR;
     }
-    if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE && shell->window_manager.ops.close != nullptr)
+    if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE)
     {
-        return shell->window_manager.ops.close(shell->window_manager.manager, window_id);
+        return reach_shell_execute_window_control(shell, REACH_SHELL_WINDOW_CONTROL_CLOSE,
+                                                  window_id);
     }
 
     return REACH_OK;

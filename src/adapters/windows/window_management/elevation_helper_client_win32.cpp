@@ -155,6 +155,24 @@ reach_result reach_elevation_helper_send(reach_elevation_helper_command command,
     return reach_elevation_helper_send_request(&request);
 }
 
+reach_result reach_elevation_helper_set_event_channel(int32_t enabled, const wchar_t *event_pipe)
+{
+    reach_elevation_helper_request request = {};
+    request.version = reach_elevation_helper_protocol_version();
+    request.command = REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL;
+    request.flags = enabled ? 1u : 0u;
+    if (enabled && event_pipe != nullptr)
+    {
+        size_t index = 0;
+        while (index + 1 < 128 && event_pipe[index] != 0)
+        {
+            request.event_pipe[index] = event_pipe[index];
+            ++index;
+        }
+    }
+    return reach_elevation_helper_send_request(&request);
+}
+
 reach_result reach_elevation_helper_set_hotkey_forwarding(int32_t enabled, uint32_t hotkey_mask,
                                                           const wchar_t *event_pipe)
 {
@@ -173,12 +191,4 @@ reach_result reach_elevation_helper_set_hotkey_forwarding(int32_t enabled, uint3
         }
     }
     return reach_elevation_helper_send_request(&request);
-}
-
-int32_t reach_elevation_helper_available(void)
-{
-    reach_elevation_helper_request request = {};
-    request.version = reach_elevation_helper_protocol_version();
-    request.command = REACH_ELEVATION_HELPER_COMMAND_PING;
-    return reach_elevation_helper_send_request(&request) == REACH_OK;
 }

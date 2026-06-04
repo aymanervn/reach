@@ -1,8 +1,7 @@
 #include "../windows_adapters_internal.h"
 
-#include "elevation_helper_client_win32.h"
+#include "elevation_helper_session_win32.h"
 #include "window_display_state_win32.h"
-#include "window_actions_win32.h"
 #include "window_filter_win32.h"
 #include "window_query_win32.h"
 
@@ -10,6 +9,7 @@
 #include <shobjidl.h>
 #include <propkey.h>
 #include <shellapi.h>
+#include <shlwapi.h>
 
 #include <condition_variable>
 #include <mutex>
@@ -277,28 +277,107 @@ static int32_t reach_window_manager_apply_metadata_results(reach_window_manager 
     return changed;
 }
 
-static int32_t reach_window_manager_helper_is_absent_after_failure(void)
+static reach_result reach_window_manager_send_helper(reach_elevation_helper_command command,
+                                                     uintptr_t window_id, reach_split_mode mode)
 {
-    return !reach_elevation_helper_available();
+    if (reach_elevation_helper_session_get_state() == REACH_ELEVATION_HELPER_SESSION_CONNECTED)
+    {
+        reach_result helper_result =
+            reach_elevation_helper_session_send(command, window_id, mode);
+        if (helper_result == REACH_OK)
+        {
+            return REACH_OK;
+        }
+
+        if (reach_elevation_helper_session_get_state() ==
+            REACH_ELEVATION_HELPER_SESSION_CONNECTED)
+        {
+            return helper_result;
+        }
+    }
+
+    return REACH_ERROR;
 }
 
-static reach_result reach_window_manager_send_or_fallback(
-    reach_elevation_helper_command command, uintptr_t window_id, reach_split_mode mode,
-    reach_result (*fallback)(HWND))
+static int32_t reach_window_manager_privileged_control_available(
+    const reach_window_manager *manager)
 {
-    HWND hwnd = reinterpret_cast<HWND>(window_id);
-    reach_result helper_result = reach_elevation_helper_send(command, window_id, mode);
-    if (helper_result == REACH_OK)
+    (void)manager;
+    return reach_elevation_helper_session_get_state() == REACH_ELEVATION_HELPER_SESSION_CONNECTED;
+}
+
+static int32_t reach_window_manager_confirm_privileged_control_restart(
+    reach_window_manager *manager)
+{
+    (void)manager;
+    int response = MessageBoxW(nullptr, L"Reach elevation helper is not running. Restart it?",
+                               L"Reach", MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON1);
+    return response == IDYES;
+}
+
+static reach_result reach_window_manager_helper_path(wchar_t *path, size_t path_count)
+{
+    if (path == nullptr || path_count == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    DWORD length = GetModuleFileNameW(nullptr, path, static_cast<DWORD>(path_count));
+    if (length == 0 || length >= path_count)
+    {
+        return REACH_ERROR;
+    }
+    if (!PathRemoveFileSpecW(path) || !PathAppendW(path, L"reach_elevation_helper.exe"))
+    {
+        return REACH_ERROR;
+    }
+    return REACH_OK;
+}
+
+static reach_result reach_window_manager_start_privileged_control(reach_window_manager *manager)
+{
+    (void)manager;
+    if (reach_window_manager_privileged_control_available(manager))
     {
         return REACH_OK;
     }
 
-    if (!reach_window_manager_helper_is_absent_after_failure())
+    if (reach_elevation_helper_session_reconnect() == REACH_OK)
     {
-        return helper_result;
+        return reach_elevation_helper_session_wait_connected(1000);
     }
 
-    return fallback != nullptr ? fallback(hwnd) : REACH_ERROR;
+    wchar_t helper_path[MAX_PATH] = {};
+    if (reach_window_manager_helper_path(helper_path, MAX_PATH) != REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+
+    SHELLEXECUTEINFOW execute = {};
+    execute.cbSize = sizeof(execute);
+    execute.fMask = SEE_MASK_NOCLOSEPROCESS;
+    execute.lpVerb = L"runas";
+    execute.lpFile = helper_path;
+    execute.nShow = SW_HIDE;
+    if (!ShellExecuteExW(&execute))
+    {
+        return REACH_ERROR;
+    }
+    if (execute.hProcess != nullptr)
+    {
+        CloseHandle(execute.hProcess);
+    }
+
+    for (int attempt = 0; attempt < 40; ++attempt)
+    {
+        if (reach_elevation_helper_session_reconnect() == REACH_OK)
+        {
+            return reach_elevation_helper_session_wait_connected(1000);
+        }
+        Sleep(50);
+    }
+
+    return REACH_ERROR;
 }
 
 static void CALLBACK reach_window_manager_event_proc(HWINEVENTHOOK hook, DWORD event, HWND window,
@@ -876,17 +955,9 @@ static reach_result reach_window_manager_snap(reach_window_manager *manager, uin
     }
 
     reach_result result =
-        reach_elevation_helper_send(REACH_ELEVATION_HELPER_COMMAND_SNAP, window_id, mode);
-    if (result != REACH_OK)
-    {
-        if (!reach_window_manager_helper_is_absent_after_failure())
-        {
-            manager->dirty = 1;
-            return result;
-        }
-        result = reach_window_management_snap(hwnd, mode);
-    }
+        reach_window_manager_send_helper(REACH_ELEVATION_HELPER_COMMAND_SNAP, window_id, mode);
     manager->foreground = GetForegroundWindow();
+    manager->dirty = 1;
     return result;
 }
 
@@ -1058,22 +1129,8 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_result helper_result = reach_elevation_helper_send(
+    reach_result activate_result = reach_window_manager_send_helper(
         REACH_ELEVATION_HELPER_COMMAND_ACTIVATE, window_id, REACH_SPLIT_LEFT);
-    if (helper_result == REACH_OK)
-    {
-        manager->foreground = GetForegroundWindow();
-        reach_window_manager_mark_seen(manager, hwnd);
-        manager->dirty = 1;
-        return REACH_OK;
-    }
-    if (!reach_window_manager_helper_is_absent_after_failure())
-    {
-        manager->dirty = 1;
-        return helper_result;
-    }
-
-    reach_result activate_result = reach_window_management_activate(hwnd);
     manager->foreground = GetForegroundWindow();
     if (activate_result != REACH_OK)
     {
@@ -1101,14 +1158,13 @@ static reach_result reach_window_manager_minimize(reach_window_manager *manager,
         return REACH_INVALID_ARGUMENT;
     }
 
-    (void)reach_window_manager_send_or_fallback(REACH_ELEVATION_HELPER_COMMAND_MINIMIZE,
-                                                window_id, REACH_SPLIT_LEFT,
-                                                reach_window_management_minimize);
+    reach_result result = reach_window_manager_send_helper(REACH_ELEVATION_HELPER_COMMAND_MINIMIZE,
+                                                           window_id, REACH_SPLIT_LEFT);
 
     manager->foreground = GetForegroundWindow();
     manager->dirty = 1;
 
-    return REACH_OK;
+    return result;
 }
 
 static reach_result reach_window_manager_close(reach_window_manager *manager, uintptr_t window_id)
@@ -1122,10 +1178,10 @@ static reach_result reach_window_manager_close(reach_window_manager *manager, ui
     {
         return REACH_INVALID_ARGUMENT;
     }
-    (void)reach_window_manager_send_or_fallback(REACH_ELEVATION_HELPER_COMMAND_CLOSE, window_id,
-                                                REACH_SPLIT_LEFT, reach_window_management_close);
+    reach_result result = reach_window_manager_send_helper(REACH_ELEVATION_HELPER_COMMAND_CLOSE,
+                                                           window_id, REACH_SPLIT_LEFT);
     manager->dirty = 1;
-    return REACH_OK;
+    return result;
 }
 
 static reach_result reach_window_manager_kill_process(reach_window_manager *manager,
@@ -1211,6 +1267,11 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;
     out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
+    out_port->ops.privileged_control_available =
+        reach_window_manager_privileged_control_available;
+    out_port->ops.confirm_privileged_control_restart =
+        reach_window_manager_confirm_privileged_control_restart;
+    out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;
     out_port->ops.activate = reach_window_manager_activate;
     out_port->ops.minimize = reach_window_manager_minimize;
     out_port->ops.close = reach_window_manager_close;

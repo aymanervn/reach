@@ -8,11 +8,10 @@
 
 #include <vector>
 
-struct reach_helper_hotkey_event
+struct reach_helper_session_state
 {
-    uint32_t version;
-    uint32_t event_count;
-    uint32_t event_types[2];
+    wchar_t event_pipe[128];
+    HANDLE event_pipe_handle;
 };
 
 struct reach_helper_hotkey_state
@@ -21,8 +20,6 @@ struct reach_helper_hotkey_state
     HANDLE thread;
     DWORD thread_id;
     uint32_t hotkey_mask;
-    wchar_t event_pipe[128];
-    HANDLE event_pipe_handle;
     int32_t alt_down;
     int32_t shift_down;
     int32_t alt_tab_active;
@@ -30,6 +27,7 @@ struct reach_helper_hotkey_state
     int32_t windows_key_chord;
 };
 
+static reach_helper_session_state g_session;
 static reach_helper_hotkey_state g_hotkeys;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachElevationHelperInstance";
 static const UINT REACH_HELPER_WM_HOTKEY_EVENTS = WM_APP + 1;
@@ -108,37 +106,58 @@ static int32_t reach_helper_same_user_client(HANDLE pipe)
 
 static void reach_helper_close_event_pipe(void)
 {
-    if (g_hotkeys.event_pipe_handle != nullptr)
+    if (g_session.event_pipe_handle != nullptr)
     {
-        CloseHandle(g_hotkeys.event_pipe_handle);
-        g_hotkeys.event_pipe_handle = nullptr;
+        CloseHandle(g_session.event_pipe_handle);
+        g_session.event_pipe_handle = nullptr;
     }
 }
 
-static int32_t reach_helper_connect_event_pipe(void)
+static int32_t reach_helper_send_session_event(uint32_t type)
 {
-    if (g_hotkeys.event_pipe[0] == 0)
+    HANDLE pipe = g_session.event_pipe_handle;
+    if (pipe == nullptr || pipe == INVALID_HANDLE_VALUE)
     {
         return 0;
     }
 
-    if (g_hotkeys.event_pipe_handle != nullptr)
+    reach_elevation_helper_event event = {};
+    event.version = reach_elevation_helper_protocol_version();
+    event.type = type;
+
+    DWORD written = 0;
+    return WriteFile(pipe, &event, sizeof(event), &written, nullptr) && written == sizeof(event);
+}
+
+static int32_t reach_helper_connect_event_pipe(const wchar_t *event_pipe)
+{
+    if (event_pipe == nullptr || event_pipe[0] == 0)
     {
-        return 1;
+        return 0;
+    }
+
+    reach_helper_close_event_pipe();
+    for (size_t index = 0; index < 128; ++index)
+    {
+        g_session.event_pipe[index] = event_pipe[index];
+        if (event_pipe[index] == 0)
+        {
+            break;
+        }
     }
 
     for (int attempt = 0; attempt < 20; ++attempt)
     {
         HANDLE pipe =
-            CreateFileW(g_hotkeys.event_pipe, GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+            CreateFileW(g_session.event_pipe, GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
         if (pipe != INVALID_HANDLE_VALUE)
         {
-            g_hotkeys.event_pipe_handle = pipe;
-            return 1;
+            g_session.event_pipe_handle = pipe;
+            return reach_helper_send_session_event(REACH_ELEVATION_HELPER_EVENT_CONNECTED);
         }
         if (GetLastError() == ERROR_PIPE_BUSY)
         {
-            (void)WaitNamedPipeW(g_hotkeys.event_pipe, 50);
+            (void)WaitNamedPipeW(g_session.event_pipe, 50);
         }
         else
         {
@@ -151,7 +170,7 @@ static int32_t reach_helper_connect_event_pipe(void)
 
 static int32_t reach_helper_hotkeys_armed(void)
 {
-    return g_hotkeys.hotkey_mask != 0 && g_hotkeys.event_pipe_handle != nullptr;
+    return g_hotkeys.hotkey_mask != 0 && g_session.event_pipe_handle != nullptr;
 }
 
 static void reach_helper_reset_windows_key_state(void)
@@ -178,14 +197,15 @@ static int32_t reach_helper_send_events(const reach_ui_event_type *event_types,
         return 0;
     }
 
-    HANDLE pipe = g_hotkeys.event_pipe_handle;
+    HANDLE pipe = g_session.event_pipe_handle;
     if (pipe == nullptr || pipe == INVALID_HANDLE_VALUE)
     {
         return 0;
     }
 
-    reach_helper_hotkey_event event = {};
+    reach_elevation_helper_event event = {};
     event.version = reach_elevation_helper_protocol_version();
+    event.type = REACH_ELEVATION_HELPER_EVENT_HOTKEY;
     event.event_count = event_count;
     for (uint32_t index = 0; index < event_count; ++index)
     {
@@ -406,7 +426,6 @@ static DWORD WINAPI reach_helper_hotkey_thread(void *param)
 
 static void reach_helper_stop_hotkeys(void)
 {
-    reach_helper_close_event_pipe();
     if (g_hotkeys.thread != nullptr)
     {
         if (g_hotkeys.thread_id != 0)
@@ -419,6 +438,25 @@ static void reach_helper_stop_hotkeys(void)
     }
 
     g_hotkeys = {};
+}
+
+static reach_result reach_helper_set_event_channel(const reach_elevation_helper_request *request)
+{
+    if (request == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (request->flags == 0)
+    {
+        (void)reach_helper_send_session_event(REACH_ELEVATION_HELPER_EVENT_DISCONNECTING);
+        reach_helper_stop_hotkeys();
+        reach_helper_close_event_pipe();
+        g_session.event_pipe[0] = 0;
+        return REACH_OK;
+    }
+
+    return reach_helper_connect_event_pipe(request->event_pipe) ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result
@@ -435,22 +473,12 @@ reach_helper_set_hotkey_forwarding(const reach_elevation_helper_request *request
         return REACH_OK;
     }
 
-    g_hotkeys.hotkey_mask = request->hotkey_mask;
-    for (size_t index = 0; index < 128; ++index)
+    if (g_session.event_pipe_handle == nullptr)
     {
-        g_hotkeys.event_pipe[index] = request->event_pipe[index];
-        if (request->event_pipe[index] == 0)
-        {
-            break;
-        }
-    }
-
-    if (!reach_helper_connect_event_pipe())
-    {
-        reach_helper_stop_hotkeys();
         return REACH_ERROR;
     }
 
+    g_hotkeys.hotkey_mask = request->hotkey_mask;
     g_hotkeys.thread = CreateThread(nullptr, 0, reach_helper_hotkey_thread, nullptr, 0, nullptr);
     for (int attempt = 0; g_hotkeys.thread != nullptr &&
                           (g_hotkeys.thread_id == 0 || g_hotkeys.hook == nullptr) && attempt < 20;
@@ -473,6 +501,11 @@ static reach_result reach_helper_execute(const reach_elevation_helper_request *r
     if (!reach_elevation_helper_request_valid(request))
     {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if (request->command == REACH_ELEVATION_HELPER_COMMAND_SET_EVENT_CHANNEL)
+    {
+        return reach_helper_set_event_channel(request);
     }
 
     if (request->command == REACH_ELEVATION_HELPER_COMMAND_SET_HOTKEY_FORWARDING)

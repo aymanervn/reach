@@ -194,6 +194,72 @@ int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t wind
     return 0;
 }
 
+static reach_result reach_shell_dispatch_window_control(reach_shell *shell,
+                                                        reach_shell_window_control_action action,
+                                                        uintptr_t window_id)
+{
+    if (shell == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    switch (action)
+    {
+    case REACH_SHELL_WINDOW_CONTROL_ACTIVATE:
+        return shell->window_manager.ops.activate != nullptr
+                   ? shell->window_manager.ops.activate(shell->window_manager.manager, window_id)
+                   : REACH_ERROR;
+    case REACH_SHELL_WINDOW_CONTROL_MINIMIZE:
+        return shell->window_manager.ops.minimize != nullptr
+                   ? shell->window_manager.ops.minimize(shell->window_manager.manager, window_id)
+                   : REACH_ERROR;
+    case REACH_SHELL_WINDOW_CONTROL_CLOSE:
+        return shell->window_manager.ops.close != nullptr
+                   ? shell->window_manager.ops.close(shell->window_manager.manager, window_id)
+                   : REACH_ERROR;
+    default:
+        return REACH_INVALID_ARGUMENT;
+    }
+}
+
+reach_result reach_shell_execute_window_control(reach_shell *shell,
+                                                reach_shell_window_control_action action,
+                                                uintptr_t window_id)
+{
+    if (shell == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (shell->window_manager.ops.privileged_control_available != nullptr &&
+        shell->window_manager.ops.privileged_control_available(shell->window_manager.manager))
+    {
+        return reach_shell_dispatch_window_control(shell, action, window_id);
+    }
+
+    if (shell->window_manager.ops.confirm_privileged_control_restart == nullptr ||
+        !shell->window_manager.ops.confirm_privileged_control_restart(
+            shell->window_manager.manager))
+    {
+        return REACH_ERROR;
+    }
+
+    if (shell->window_manager.ops.start_privileged_control == nullptr ||
+        shell->window_manager.ops.start_privileged_control(shell->window_manager.manager) !=
+            REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+
+    if (shell->window_manager.ops.privileged_control_available != nullptr &&
+        !shell->window_manager.ops.privileged_control_available(shell->window_manager.manager))
+    {
+        return REACH_ERROR;
+    }
+
+    return reach_shell_dispatch_window_control(shell, action, window_id);
+}
+
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
 {
     if (shell == nullptr || layout == nullptr)

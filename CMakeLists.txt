@@ -117,6 +117,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/window_management/window_display_state_win32.cpp
     src/adapters/windows/window_management/elevation_helper_protocol.cpp
     src/adapters/windows/window_management/elevation_helper_client_win32.cpp
+    src/adapters/windows/window_management/elevation_helper_session_win32.cpp
     src/adapters/windows/window_management/window_manager_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp

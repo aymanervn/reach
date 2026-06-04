@@ -107,9 +107,10 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
             (void)shell->switcher.window.ops.hide(shell->switcher.window.window);
         }
 
-        if (selected != 0 && shell->window_manager.ops.activate != nullptr)
+        if (selected != 0)
         {
-            (void)shell->window_manager.ops.activate(shell->window_manager.manager, selected);
+            (void)reach_shell_execute_window_control(
+                shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE, selected);
         }
 
         return REACH_OK;

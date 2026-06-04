@@ -229,6 +229,13 @@ typedef struct reach_shell_dirty_state
     int32_t monitors;
 } reach_shell_dirty_state;
 
+enum reach_shell_window_control_action
+{
+    REACH_SHELL_WINDOW_CONTROL_ACTIVATE,
+    REACH_SHELL_WINDOW_CONTROL_MINIMIZE,
+    REACH_SHELL_WINDOW_CONTROL_CLOSE,
+};
+
 typedef struct reach_shell_config_reload_state
 {
     std::thread thread;
@@ -527,6 +534,9 @@ void reach_shell_release_quick_settings_audio_render_icons(reach_shell *shell);
 reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed);
 
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
+reach_result reach_shell_execute_window_control(reach_shell *shell,
+                                                reach_shell_window_control_action action,
+                                                uintptr_t window_id);
 
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout);
 

@@ -69,13 +69,15 @@ reach_result reach_shell_execute_dock_item_action(reach_shell *shell, reach_dock
                 : 0;
         int32_t minimized = reach_shell_window_is_minimized(shell, window_id);
         reach_result result = REACH_OK;
-        if (foreground == window_id && !minimized && shell->window_manager.ops.minimize != nullptr)
+        if (foreground == window_id && !minimized)
         {
-            result = shell->window_manager.ops.minimize(shell->window_manager.manager, window_id);
+            result = reach_shell_execute_window_control(
+                shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE, window_id);
         }
-        else if (shell->window_manager.ops.activate != nullptr)
+        else
         {
-            result = shell->window_manager.ops.activate(shell->window_manager.manager, window_id);
+            result = reach_shell_execute_window_control(
+                shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE, window_id);
         }
         if (shell->window_manager.ops.refresh != nullptr)
         {
