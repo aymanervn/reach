@@ -73,9 +73,14 @@ struct reach_window_manager
     int32_t metadata_stop_requested;
     int32_t dirty;
     int32_t pending_location_change;
+    LONG helper_prompt_active;
+    LONG helper_start_active;
+    DWORD helper_retry_suppressed_until;
 };
 
 static reach_window_manager *g_window_manager;
+static const DWORD REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS = 10000;
+static const DWORD REACH_HELPER_RESTART_FAILED_COOLDOWN_MS = 5000;
 
 static void reach_window_manager_mark_seen(reach_window_manager *manager, HWND hwnd);
 
@@ -302,17 +307,73 @@ static reach_result reach_window_manager_send_helper(reach_elevation_helper_comm
 static int32_t reach_window_manager_privileged_control_available(
     const reach_window_manager *manager)
 {
-    (void)manager;
+    if (manager != nullptr &&
+        reach_elevation_helper_session_get_state() == REACH_ELEVATION_HELPER_SESSION_CONNECTED)
+    {
+        const_cast<reach_window_manager *>(manager)->helper_retry_suppressed_until = 0;
+        return 1;
+    }
     return reach_elevation_helper_session_get_state() == REACH_ELEVATION_HELPER_SESSION_CONNECTED;
+}
+
+static int32_t reach_window_manager_retry_suppressed(const reach_window_manager *manager)
+{
+    if (manager == nullptr || manager->helper_retry_suppressed_until == 0)
+    {
+        return 0;
+    }
+
+    DWORD now = GetTickCount();
+    return static_cast<LONG>(now - manager->helper_retry_suppressed_until) < 0;
+}
+
+static void reach_window_manager_suppress_helper_retry(reach_window_manager *manager,
+                                                       DWORD cooldown_ms)
+{
+    if (manager != nullptr)
+    {
+        manager->helper_retry_suppressed_until = GetTickCount() + cooldown_ms;
+    }
 }
 
 static int32_t reach_window_manager_confirm_privileged_control_restart(
     reach_window_manager *manager)
 {
-    (void)manager;
+    if (manager == nullptr)
+    {
+        return 0;
+    }
+
+    if (reach_window_manager_privileged_control_available(manager))
+    {
+        return 1;
+    }
+
+    if (reach_window_manager_retry_suppressed(manager) ||
+        InterlockedCompareExchange(&manager->helper_start_active, 0, 0) != 0)
+    {
+        return 0;
+    }
+
+    if (InterlockedCompareExchange(&manager->helper_prompt_active, 1, 0) != 0)
+    {
+        return 0;
+    }
+
     int response = MessageBoxW(nullptr, L"Reach elevation helper is not running. Restart it?",
-                               L"Reach", MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON1);
-    return response == IDYES;
+                               L"Reach",
+                               MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON1 | MB_SETFOREGROUND |
+                                   MB_TOPMOST | MB_TASKMODAL);
+    InterlockedExchange(&manager->helper_prompt_active, 0);
+
+    if (response != IDYES)
+    {
+        reach_window_manager_suppress_helper_retry(
+            manager, REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS);
+        return 0;
+    }
+
+    return 1;
 }
 
 static reach_result reach_window_manager_helper_path(wchar_t *path, size_t path_count)
@@ -336,20 +397,48 @@ static reach_result reach_window_manager_helper_path(wchar_t *path, size_t path_
 
 static reach_result reach_window_manager_start_privileged_control(reach_window_manager *manager)
 {
-    (void)manager;
+    if (manager == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
     if (reach_window_manager_privileged_control_available(manager))
     {
         return REACH_OK;
     }
 
+    if (reach_window_manager_retry_suppressed(manager))
+    {
+        return REACH_ERROR;
+    }
+
+    if (InterlockedCompareExchange(&manager->helper_start_active, 1, 0) != 0)
+    {
+        return REACH_ERROR;
+    }
+
     if (reach_elevation_helper_session_reconnect() == REACH_OK)
     {
-        return reach_elevation_helper_session_wait_connected(1000);
+        reach_result wait_result = reach_elevation_helper_session_wait_connected(1000);
+        InterlockedExchange(&manager->helper_start_active, 0);
+        if (wait_result == REACH_OK)
+        {
+            manager->helper_retry_suppressed_until = 0;
+        }
+        else
+        {
+            reach_window_manager_suppress_helper_retry(
+                manager, REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
+        }
+        return wait_result;
     }
 
     wchar_t helper_path[MAX_PATH] = {};
     if (reach_window_manager_helper_path(helper_path, MAX_PATH) != REACH_OK)
     {
+        InterlockedExchange(&manager->helper_start_active, 0);
+        reach_window_manager_suppress_helper_retry(manager,
+                                                   REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
         return REACH_ERROR;
     }
 
@@ -361,6 +450,9 @@ static reach_result reach_window_manager_start_privileged_control(reach_window_m
     execute.nShow = SW_HIDE;
     if (!ShellExecuteExW(&execute))
     {
+        InterlockedExchange(&manager->helper_start_active, 0);
+        reach_window_manager_suppress_helper_retry(manager,
+                                                   REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
         return REACH_ERROR;
     }
     if (execute.hProcess != nullptr)
@@ -372,11 +464,24 @@ static reach_result reach_window_manager_start_privileged_control(reach_window_m
     {
         if (reach_elevation_helper_session_reconnect() == REACH_OK)
         {
-            return reach_elevation_helper_session_wait_connected(1000);
+            reach_result wait_result = reach_elevation_helper_session_wait_connected(1000);
+            InterlockedExchange(&manager->helper_start_active, 0);
+            if (wait_result == REACH_OK)
+            {
+                manager->helper_retry_suppressed_until = 0;
+            }
+            else
+            {
+                reach_window_manager_suppress_helper_retry(
+                    manager, REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
+            }
+            return wait_result;
         }
         Sleep(50);
     }
 
+    InterlockedExchange(&manager->helper_start_active, 0);
+    reach_window_manager_suppress_helper_retry(manager, REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
     return REACH_ERROR;
 }
 
