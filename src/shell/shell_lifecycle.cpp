@@ -38,6 +38,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_stop_launcher_result_icon_worker(shell);
     reach_shell_stop_launcher_search_worker(shell);
     reach_shell_stop_open_window_icon_worker(shell);
+    reach_shell_stop_window_control_worker(shell);
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);

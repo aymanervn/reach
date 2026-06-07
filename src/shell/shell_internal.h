@@ -263,6 +263,22 @@ typedef struct reach_shell_config_reload_state
     reach_config_snapshot completed_snapshot;
 } reach_shell_config_reload_state;
 
+typedef struct reach_shell_window_control_state
+{
+    std::thread thread;
+    std::mutex mutex;
+    std::condition_variable cv;
+
+    int32_t thread_started;
+    int32_t stop;
+    int32_t pending;
+    int32_t completed;
+
+    reach_shell_window_control_action pending_action;
+    uintptr_t pending_window;
+    reach_result completed_result;
+} reach_shell_window_control_state;
+
 typedef struct reach_shell_dock_animation_state
 {
     int32_t initialized;
@@ -426,6 +442,7 @@ struct reach_shell
     int64_t dock_clock_last_minute;
     int32_t running;
     reach_runtime_policy_state runtime_policy;
+    reach_shell_window_control_state window_control;
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
     std::atomic<uint32_t> quick_settings_system_change_flags;
@@ -564,6 +581,11 @@ int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t wind
 reach_result reach_shell_execute_window_control(reach_shell *shell,
                                                 reach_shell_window_control_action action,
                                                 uintptr_t window_id);
+reach_result reach_shell_schedule_window_control(reach_shell *shell,
+                                                 reach_shell_window_control_action action,
+                                                 uintptr_t window_id);
+void reach_shell_apply_window_control_result(reach_shell *shell);
+void reach_shell_stop_window_control_worker(reach_shell *shell);
 
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout);
 

@@ -386,6 +386,161 @@ reach_result reach_shell_execute_window_control(reach_shell *shell,
     return reach_shell_dispatch_window_control(shell, action, window_id);
 }
 
+static void reach_shell_window_control_thread_main(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    for (;;)
+    {
+        reach_shell_window_control_action action = REACH_SHELL_WINDOW_CONTROL_ACTIVATE;
+        uintptr_t window_id = 0;
+
+        {
+            std::unique_lock<std::mutex> lock(shell->window_control.mutex);
+            shell->window_control.cv.wait(lock, [shell]() {
+                return shell->window_control.stop || shell->window_control.pending;
+            });
+
+            if (shell->window_control.stop)
+            {
+                return;
+            }
+
+            action = shell->window_control.pending_action;
+            window_id = shell->window_control.pending_window;
+            shell->window_control.pending = 0;
+        }
+
+        reach_result result = reach_shell_execute_window_control(shell, action, window_id);
+
+        {
+            std::lock_guard<std::mutex> lock(shell->window_control.mutex);
+            if (!shell->window_control.stop)
+            {
+                shell->window_control.completed_result = result;
+                shell->window_control.completed = 1;
+            }
+        }
+
+        reach_shell_request_update(shell);
+    }
+}
+
+static reach_result reach_shell_start_window_control_worker(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (shell->window_control.thread_started)
+    {
+        return REACH_OK;
+    }
+
+    shell->window_control.stop = 0;
+    try
+    {
+        shell->window_control.thread = std::thread(reach_shell_window_control_thread_main, shell);
+    }
+    catch (...)
+    {
+        return REACH_ERROR;
+    }
+
+    shell->window_control.thread_started = 1;
+    return REACH_OK;
+}
+
+reach_result reach_shell_schedule_window_control(reach_shell *shell,
+                                                 reach_shell_window_control_action action,
+                                                 uintptr_t window_id)
+{
+    if (shell == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_result result = reach_shell_start_window_control_worker(shell);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(shell->window_control.mutex);
+        shell->window_control.pending_action = action;
+        shell->window_control.pending_window = window_id;
+        shell->window_control.pending = 1;
+    }
+
+    shell->window_control.cv.notify_one();
+    reach_shell_request_update(shell);
+    return REACH_OK;
+}
+
+void reach_shell_apply_window_control_result(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    int32_t completed = 0;
+    reach_result result = REACH_OK;
+
+    {
+        std::lock_guard<std::mutex> lock(shell->window_control.mutex);
+        completed = shell->window_control.completed;
+        result = shell->window_control.completed_result;
+        shell->window_control.completed = 0;
+    }
+
+    if (!completed)
+    {
+        return;
+    }
+
+    if (shell->window_manager.ops.refresh != nullptr)
+    {
+        (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
+        (void)reach_shell_refresh_open_windows(shell, nullptr);
+    }
+
+    if (result == REACH_OK)
+    {
+        shell->dock.dirty_flags = 1;
+    }
+}
+
+void reach_shell_stop_window_control_worker(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->window_control.thread_started)
+    {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(shell->window_control.mutex);
+        shell->window_control.stop = 1;
+        shell->window_control.pending = 0;
+    }
+    shell->window_control.cv.notify_one();
+
+    if (shell->window_control.thread.joinable())
+    {
+        shell->window_control.thread.join();
+    }
+
+    shell->window_control.thread_started = 0;
+    shell->window_control.stop = 0;
+    shell->window_control.pending = 0;
+    shell->window_control.completed = 0;
+    shell->window_control.pending_window = 0;
+}
+
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
 {
     if (shell == nullptr || layout == nullptr)

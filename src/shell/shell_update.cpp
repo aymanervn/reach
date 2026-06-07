@@ -319,6 +319,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         shell->dirty.events_dispatched_this_cycle = 0;
     }
 
+    reach_shell_apply_window_control_result(shell);
+
     if (reach_shell_can_move_dock_without_redraw(shell))
     {
         return reach_shell_move_dock_animation_frame(shell, delta_seconds);
