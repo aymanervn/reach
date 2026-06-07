@@ -182,6 +182,7 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
         return;
     }
 
+    int32_t was_open = shell->quick_settings_open;
     if (next_open)
     {
         reach_shell_set_tray_popup_open(shell, 0);
@@ -218,6 +219,10 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
         if (shell->quick_settings.window.ops.hide != nullptr)
         {
             (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
+        }
+        if (was_open)
+        {
+            reach_shell_schedule_dock_reveal_recheck(shell);
         }
     }
 

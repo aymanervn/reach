@@ -13,12 +13,17 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
         return;
     }
 
+    int32_t was_open = shell->tray_state.popup_open;
     shell->tray_state.popup_open = next_open;
     if (shell->tray_state.popup_open)
     {
         reach_shell_set_quick_settings_open(shell, 0);
         reach_shell_close_context_menu(shell);
         (void)reach_shell_refresh_tray_items(shell);
+    }
+    else if (was_open)
+    {
+        reach_shell_schedule_dock_reveal_recheck(shell);
     }
     reach_shell_sync_popup_mouse_hook(shell);
     shell->dock.dirty_flags = 1;

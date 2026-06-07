@@ -6,6 +6,7 @@ void reach_shell_close_context_menu(reach_shell *shell)
     {
         return;
     }
+    int32_t was_open = shell->context_menu_state.open;
     shell->context_menu_state.open = 0;
     shell->context_menu_state.power_open = 0;
     shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
@@ -24,6 +25,10 @@ void reach_shell_close_context_menu(reach_shell *shell)
     if (shell->context_menu.window.ops.hide != nullptr)
     {
         (void)shell->context_menu.window.ops.hide(shell->context_menu.window.window);
+    }
+    if (was_open)
+    {
+        reach_shell_schedule_dock_reveal_recheck(shell);
     }
     reach_shell_sync_popup_mouse_hook(shell);
 }
