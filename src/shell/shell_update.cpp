@@ -570,14 +570,29 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 {
                     (void)reach_shell_render_launcher_surface(shell, &layout.launcher);
                 }
-                if (shell->dock.window.ops.set_bounds != nullptr)
+                if (game_mode && shell->launcher.window.ops.hide != nullptr)
                 {
+                    (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
+                }
+                if (game_mode)
+                {
+                    if (shell->dock.window.ops.hide != nullptr)
+                    {
+                        (void)shell->dock.window.ops.hide(shell->dock.window.window);
+                    }
+                }
+                else if (shell->dock.window.ops.set_bounds != nullptr)
+                {
+                    if (shell->dock.window.ops.show != nullptr)
+                    {
+                        (void)shell->dock.window.ops.show(shell->dock.window.window);
+                    }
                     int32_t dock_window_changed = 0;
                     float dock_radius =
                         reach_theme_dock_corner_radius(shell->theme, layout.dock.bounds.height);
                     result = reach_shell_apply_window_state(
-                        &shell->dock.window, layout.dock.bounds, game_mode ? 0.0f : 1.0f,
-                        &shell->dock.last_bounds, &shell->dock.last_opacity,
+                        &shell->dock.window, layout.dock.bounds, 1.0f, &shell->dock.last_bounds,
+                        &shell->dock.last_opacity,
                         &shell->dock.bounds_valid, &shell->dock.opacity_valid,
                         &dock_window_changed);
                     if (result != REACH_OK)
@@ -598,9 +613,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         !shell->dock_drag.active && !shell->dock_drag.snapping &&
                         !shell->feedback.dock_animating;
 
-                    if (!game_mode && (shell->dirty.render || shell->dock.dirty_flags ||
-                                       (!dock_reveal_position_only &&
-                                        (dock_window_changed || dock_layout_changed))))
+                    if (shell->dirty.render || shell->dock.dirty_flags ||
+                        (!dock_reveal_position_only && (dock_window_changed || dock_layout_changed)))
                     {
                         (void)reach_shell_render_dock_surface(shell, &layout.dock);
                     }
@@ -710,9 +724,10 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     int32_t switcher_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->switcher.window, switcher_bounds,
-                        shell->switcher_state.open ? 1.0f : 0.0f, &shell->switcher.last_bounds,
-                        &shell->switcher.last_opacity, &shell->switcher.bounds_valid,
-                        &shell->switcher.opacity_valid, &switcher_window_changed);
+                        (!game_mode && shell->switcher_state.open) ? 1.0f : 0.0f,
+                        &shell->switcher.last_bounds, &shell->switcher.last_opacity,
+                        &shell->switcher.bounds_valid, &shell->switcher.opacity_valid,
+                        &switcher_window_changed);
                     if (result != REACH_OK)
                     {
                         return result;
@@ -724,7 +739,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)shell->switcher.window.ops.apply_rounded_corners(
                             shell->switcher.window.window, 16.0f);
                     }
-                    if (shell->switcher_state.open)
+                    if (!game_mode && shell->switcher_state.open)
                     {
                         if (shell->switcher.window.ops.show != nullptr)
                         {

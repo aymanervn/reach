@@ -9,6 +9,10 @@ static void reach_shell_on_dock_reveal_edge(void *user)
     {
         return;
     }
+    if (reach_shell_game_mode_enabled(shell))
+    {
+        return;
+    }
 
     if (shell->dock_reveal.active || !shell->dock_reveal.target_hidden)
     {

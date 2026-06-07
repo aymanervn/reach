@@ -16,6 +16,7 @@ struct reach_window_manager
     int32_t dirty;
     CRITICAL_SECTION lock;
     int32_t lock_initialized;
+    int32_t game_mode_active;
     LONG helper_prompt_active;
     LONG helper_start_active;
     DWORD helper_retry_suppressed_until;
@@ -281,6 +282,22 @@ static void reach_window_manager_copy_shared_windows(reach_window_manager *manag
     reach_window_manager_unlock(manager);
 }
 
+static void reach_window_manager_copy_shared_game_mode(reach_window_manager *manager)
+{
+    if (manager == nullptr)
+    {
+        return;
+    }
+
+    int32_t active = 0;
+    (void)reach_elevation_helper_shared_copy_game_mode(&active);
+
+    reach_window_manager_lock(manager);
+    manager->game_mode_active = active ? 1 : 0;
+    manager->dirty = 1;
+    reach_window_manager_unlock(manager);
+}
+
 static void reach_window_manager_shared_callback(void *user,
                                                  reach_elevation_helper_shared_reader_event event)
 {
@@ -290,10 +307,22 @@ static void reach_window_manager_shared_callback(void *user,
         return;
     }
 
-    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_WINDOWS_CHANGED ||
-        event == REACH_ELEVATION_HELPER_SHARED_EVENT_CONNECTED)
+    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_CONNECTED)
     {
         reach_window_manager_copy_shared_windows(manager);
+        reach_window_manager_copy_shared_game_mode(manager);
+        return;
+    }
+
+    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_WINDOWS_CHANGED)
+    {
+        reach_window_manager_copy_shared_windows(manager);
+        return;
+    }
+
+    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_GAME_MODE_CHANGED)
+    {
+        reach_window_manager_copy_shared_game_mode(manager);
         return;
     }
 
@@ -301,6 +330,7 @@ static void reach_window_manager_shared_callback(void *user,
     {
         reach_window_manager_lock(manager);
         manager->helper_windows.clear();
+        manager->game_mode_active = 0;
         manager->dirty = 1;
         reach_window_manager_unlock(manager);
     }
@@ -317,6 +347,7 @@ static reach_result reach_window_manager_start(reach_window_manager *manager)
     (void)reach_elevation_helper_shared_reader_subscribe(reach_window_manager_shared_callback,
                                                          manager);
     reach_window_manager_copy_shared_windows(manager);
+    reach_window_manager_copy_shared_game_mode(manager);
     (void)reach_window_manager_start_privileged_control(manager);
     return REACH_OK;
 }
@@ -330,6 +361,7 @@ static reach_result reach_window_manager_stop(reach_window_manager *manager)
 
     reach_window_manager_lock(manager);
     manager->helper_windows.clear();
+    manager->game_mode_active = 0;
     manager->dirty = 0;
     reach_window_manager_unlock(manager);
     reach_elevation_helper_shared_reader_unsubscribe(manager);
@@ -393,6 +425,19 @@ static int32_t reach_window_manager_foreground_is_maximized(const reach_window_m
     }
     reach_window_manager_unlock(manager);
     return maximized;
+}
+
+static int32_t reach_window_manager_game_mode_active(const reach_window_manager *manager)
+{
+    if (manager == nullptr)
+    {
+        return 0;
+    }
+
+    reach_window_manager_lock(manager);
+    int32_t active = manager->game_mode_active;
+    reach_window_manager_unlock(manager);
+    return active;
 }
 
 static int32_t reach_window_manager_needs_refresh(const reach_window_manager *manager)
@@ -546,6 +591,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.snap = reach_window_manager_snap;
     out_port->ops.foreground = reach_window_manager_foreground;
     out_port->ops.foreground_is_maximized = reach_window_manager_foreground_is_maximized;
+    out_port->ops.game_mode_active = reach_window_manager_game_mode_active;
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;

@@ -38,6 +38,7 @@ struct reach_helper_hotkey_state
 
 static reach_helper_session_state g_session;
 static reach_helper_hotkey_state g_hotkeys;
+static LONG g_game_mode_active;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachElevationHelperInstance";
 
 static reach_result reach_helper_execute(const reach_elevation_helper_request *request,
@@ -407,6 +408,68 @@ static reach_elevation_helper_window_snapshot reach_helper_inspect_window(HWND h
     return snapshot;
 }
 
+static LONG reach_helper_abs_long(LONG value)
+{
+    return value < 0 ? -value : value;
+}
+
+static int32_t reach_helper_rect_matches_monitor(RECT window_rect, RECT monitor_rect)
+{
+    const LONG tolerance = 2;
+    return reach_helper_abs_long(window_rect.left - monitor_rect.left) <= tolerance &&
+           reach_helper_abs_long(window_rect.top - monitor_rect.top) <= tolerance &&
+           reach_helper_abs_long(window_rect.right - monitor_rect.right) <= tolerance &&
+           reach_helper_abs_long(window_rect.bottom - monitor_rect.bottom) <= tolerance;
+}
+
+static int32_t reach_helper_window_occupies_whole_monitor(HWND hwnd, RECT window_rect)
+{
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    if (monitor == nullptr)
+    {
+        return 0;
+    }
+
+    MONITORINFO info = {};
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoW(monitor, &info))
+    {
+        return 0;
+    }
+
+    return reach_helper_rect_matches_monitor(window_rect, info.rcMonitor);
+}
+
+static int32_t reach_helper_detect_game_mode(void)
+{
+    HWND foreground = GetForegroundWindow();
+    if (foreground == nullptr || !IsWindow(foreground) || !IsWindowVisible(foreground) ||
+        IsIconic(foreground) || IsZoomed(foreground))
+    {
+        return 0;
+    }
+
+    RECT rect = {};
+    if (!GetWindowRect(foreground, &rect))
+    {
+        return 0;
+    }
+
+    return reach_helper_window_occupies_whole_monitor(foreground, rect);
+}
+
+static void reach_helper_publish_game_mode(void)
+{
+    int32_t active = reach_helper_detect_game_mode();
+    if (active)
+    {
+        g_hotkeys.alt_tab_active = 0;
+        g_hotkeys.windows_key_chord = 0;
+    }
+    InterlockedExchange(&g_game_mode_active, active ? 1 : 0);
+    (void)reach_elevation_helper_shared_publish_game_mode(active);
+}
+
 struct reach_helper_snapshot_builder
 {
     reach_elevation_helper_response *response;
@@ -457,6 +520,7 @@ static void reach_helper_publish_window_state(void)
     }
 
     (void)reach_elevation_helper_shared_publish_windows(windows, window_count);
+    reach_helper_publish_game_mode();
 }
 
 static void reach_helper_close_window_event_hooks(void)
@@ -771,6 +835,11 @@ static void reach_helper_stop_hotkeys(void);
 
 static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPARAM lparam)
 {
+    if (InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0)
+    {
+        return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
+    }
+
     if (code == HC_ACTION)
     {
         const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);

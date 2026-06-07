@@ -42,6 +42,12 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
     }
 }
 
+static int32_t reach_shell_game_mode_allows_event(reach_ui_event_type type)
+{
+    return type == REACH_UI_EVENT_CONFIG_CHANGED || type == REACH_UI_EVENT_DISPLAY_CHANGED ||
+           type == REACH_UI_EVENT_WINDOW_STATE_CHANGED || type == REACH_UI_EVENT_WALLPAPER_CHANGED;
+}
+
 static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
     return (float)x >= rect.x && (float)x <= rect.x + rect.width && (float)y >= rect.y &&
@@ -499,6 +505,11 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
     reach_ui_intent intent = {};
 
+    if (reach_shell_game_mode_enabled(shell) && !reach_shell_game_mode_allows_event(event->type))
+    {
+        return REACH_OK;
+    }
+
     if (event->type == REACH_UI_EVENT_ESCAPE && shell->quick_settings_open)
     {
         reach_shell_set_quick_settings_open(shell, 0);
@@ -606,6 +617,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
             reach_shell_clear_launcher_restore_window(shell);
             reach_shell_close_launcher(shell);
         }
+        (void)reach_shell_update_game_mode(shell);
         return REACH_OK;
     }
 

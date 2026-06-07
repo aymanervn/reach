@@ -169,7 +169,8 @@ static void reach_input_shared_callback(void *user, reach_elevation_helper_share
         return;
     }
 
-    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_WINDOWS_CHANGED)
+    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_WINDOWS_CHANGED ||
+        event == REACH_ELEVATION_HELPER_SHARED_EVENT_GAME_MODE_CHANGED)
     {
         reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOW_STATE_CHANGED, 0);
     }
