@@ -135,9 +135,8 @@ static int32_t reach_helper_window_has_foreground(HWND hwnd)
 
     HWND root_owner = GetAncestor(hwnd, GA_ROOTOWNER);
     HWND popup = root_owner != nullptr ? GetLastActivePopup(root_owner) : nullptr;
-    return popup != nullptr &&
-           (foreground == popup || GetAncestor(foreground, GA_ROOT) == popup ||
-            GetAncestor(foreground, GA_ROOTOWNER) == popup);
+    return popup != nullptr && (foreground == popup || GetAncestor(foreground, GA_ROOT) == popup ||
+                                GetAncestor(foreground, GA_ROOTOWNER) == popup);
 }
 
 static void reach_helper_process_path(DWORD process_id, wchar_t *path, size_t path_count)
@@ -334,8 +333,7 @@ static void reach_helper_classify_window(reach_elevation_helper_window_snapshot 
     {
         snapshot->kind = REACH_ELEVATION_HELPER_WINDOW_MINIMIZED_APP;
         snapshot->include_in_switcher = 1;
-        reach_helper_copy_wide(snapshot->classification_reason, 160,
-                               L"accepted minimized app");
+        reach_helper_copy_wide(snapshot->classification_reason, 160, L"accepted minimized app");
         return;
     }
 
@@ -480,19 +478,27 @@ struct reach_helper_snapshot_builder
 {
     reach_elevation_helper_response *response;
 };
-
 static BOOL CALLBACK reach_helper_enum_windows_proc(HWND hwnd, LPARAM param)
 {
     reach_helper_snapshot_builder *builder =
         reinterpret_cast<reach_helper_snapshot_builder *>(param);
-    if (builder == nullptr || builder->response == nullptr ||
-        builder->response->window_count >= REACH_ELEVATION_HELPER_MAX_WINDOWS)
+    if (builder == nullptr || builder->response == nullptr)
     {
         return FALSE;
     }
 
-    builder->response->windows[builder->response->window_count++] =
-        reach_helper_inspect_window(hwnd);
+    reach_elevation_helper_window_snapshot snapshot = reach_helper_inspect_window(hwnd);
+    if (!snapshot.include_in_switcher)
+    {
+        return TRUE;
+    }
+
+    if (builder->response->window_count >= REACH_ELEVATION_HELPER_MAX_WINDOWS)
+    {
+        return FALSE;
+    }
+
+    builder->response->windows[builder->response->window_count++] = snapshot;
     return TRUE;
 }
 
@@ -532,15 +538,9 @@ static void reach_helper_publish_window_state(void)
 static void reach_helper_close_window_event_hooks(void)
 {
     HWINEVENTHOOK *hooks[] = {
-        &g_session.create_hook,
-        &g_session.destroy_hook,
-        &g_session.show_hook,
-        &g_session.hide_hook,
-        &g_session.minimize_start_hook,
-        &g_session.minimize_end_hook,
-        &g_session.foreground_hook,
-        &g_session.location_hook,
-        &g_session.name_hook,
+        &g_session.create_hook,     &g_session.destroy_hook,        &g_session.show_hook,
+        &g_session.hide_hook,       &g_session.minimize_start_hook, &g_session.minimize_end_hook,
+        &g_session.foreground_hook, &g_session.location_hook,       &g_session.name_hook,
     };
     for (HWINEVENTHOOK *hook : hooks)
     {
@@ -636,9 +636,8 @@ static void reach_helper_start_window_events(void)
     {
         g_session.window_event_thread =
             CreateThread(nullptr, 0, reach_helper_window_event_thread, nullptr, 0, nullptr);
-        for (int attempt = 0;
-             g_session.window_event_thread != nullptr && g_session.window_event_thread_id == 0 &&
-             attempt < 20;
+        for (int attempt = 0; g_session.window_event_thread != nullptr &&
+                              g_session.window_event_thread_id == 0 && attempt < 20;
              ++attempt)
         {
             Sleep(10);
@@ -662,8 +661,8 @@ static void reach_helper_stop_window_events(void)
     g_session.window_event_thread_id = 0;
 }
 
-static int32_t reach_helper_validate_window_identity(
-    const reach_elevation_helper_request *request, HWND hwnd)
+static int32_t reach_helper_validate_window_identity(const reach_elevation_helper_request *request,
+                                                     HWND hwnd)
 {
     if (request == nullptr || hwnd == nullptr || !IsWindow(hwnd))
     {
@@ -841,12 +840,12 @@ static int32_t reach_helper_virtual_key_down(int virtual_key)
 
 static void reach_helper_reconcile_modifier_state(void)
 {
-    g_hotkeys.alt_down =
-        reach_helper_virtual_key_down(VK_MENU) || reach_helper_virtual_key_down(VK_LMENU) ||
-        reach_helper_virtual_key_down(VK_RMENU);
-    g_hotkeys.shift_down =
-        reach_helper_virtual_key_down(VK_SHIFT) || reach_helper_virtual_key_down(VK_LSHIFT) ||
-        reach_helper_virtual_key_down(VK_RSHIFT);
+    g_hotkeys.alt_down = reach_helper_virtual_key_down(VK_MENU) ||
+                         reach_helper_virtual_key_down(VK_LMENU) ||
+                         reach_helper_virtual_key_down(VK_RMENU);
+    g_hotkeys.shift_down = reach_helper_virtual_key_down(VK_SHIFT) ||
+                           reach_helper_virtual_key_down(VK_LSHIFT) ||
+                           reach_helper_virtual_key_down(VK_RSHIFT);
     g_hotkeys.left_win_down = reach_helper_virtual_key_down(VK_LWIN);
     g_hotkeys.right_win_down = reach_helper_virtual_key_down(VK_RWIN);
     if (!g_hotkeys.left_win_down && !g_hotkeys.right_win_down)
@@ -885,8 +884,7 @@ static int32_t reach_helper_post_minimize_game(HWND hwnd)
 
 static int32_t reach_helper_hotkey_is_modifier(uint32_t key)
 {
-    return key == REACH_ELEVATION_HELPER_HOTKEY_ALT ||
-           key == REACH_ELEVATION_HELPER_HOTKEY_SHIFT ||
+    return key == REACH_ELEVATION_HELPER_HOTKEY_ALT || key == REACH_ELEVATION_HELPER_HOTKEY_SHIFT ||
            key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
            key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN;
 }
@@ -908,8 +906,7 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
             key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
             if (game_mode_active)
             {
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down &&
-                    reach_helper_alt_down())
+                if (key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down && reach_helper_alt_down())
                 {
                     HWND game = GetForegroundWindow();
                     reach_helper_clear_reach_hotkey_state();
@@ -964,8 +961,7 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
                     g_hotkeys.alt_tab_active = 0;
                     return 1;
                 }
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_ALT && key_up &&
-                    g_hotkeys.alt_tab_active)
+                if (key == REACH_ELEVATION_HELPER_HOTKEY_ALT && key_up && g_hotkeys.alt_tab_active)
                 {
                     g_hotkeys.alt_tab_active = 0;
                 }
@@ -1088,8 +1084,8 @@ static reach_result reach_helper_execute(const reach_elevation_helper_request *r
         result = reach_window_management_activate(hwnd);
         break;
     case REACH_ELEVATION_HELPER_COMMAND_SNAP:
-        result = reach_window_management_snap(hwnd,
-                                              static_cast<reach_split_mode>(request->split_mode));
+        result =
+            reach_window_management_snap(hwnd, static_cast<reach_split_mode>(request->split_mode));
         break;
     case REACH_ELEVATION_HELPER_COMMAND_CLOSE:
         result = reach_window_management_close(hwnd);
