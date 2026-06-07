@@ -596,6 +596,7 @@ float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock
 void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_dock_layout *layout);
 
 int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell);
+void reach_shell_keep_dock_revealed(reach_shell *shell);
 void reach_shell_schedule_dock_reveal_recheck(reach_shell *shell);
 
 reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds,

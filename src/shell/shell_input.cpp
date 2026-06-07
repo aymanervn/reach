@@ -269,6 +269,8 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         return REACH_OK;
     }
 
+    reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+
     if (shell->ui.launcher.open)
     {
         reach_launcher_hit_result launcher_hit =
@@ -277,23 +279,31 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         if (launcher_hit.type == REACH_LAUNCHER_HIT_NONE &&
             !reach_rect_contains(shell->layout.launcher.bounds, event->x, event->y))
         {
-            reach_shell_close_launcher(shell);
+            if (dock_hit.type != REACH_DOCK_HIT_NONE)
+            {
+                reach_shell_keep_dock_revealed(shell);
+                reach_shell_close_launcher(shell);
+            }
+            else
+            {
+                reach_shell_close_launcher(shell);
+                return REACH_OK;
+            }
+        }
+        else
+        {
+            if (launcher_hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
+                launcher_hit.index < shell->ui.launcher.result_count)
+            {
+                shell->ui.launcher.selected_result_index = launcher_hit.index;
+                shell->launcher.dirty_flags = 1;
+            }
+
+            shell->pressed_launcher_hit_type = launcher_hit.type;
+            shell->pressed_launcher_index = launcher_hit.index;
             return REACH_OK;
         }
-
-        if (launcher_hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
-            launcher_hit.index < shell->ui.launcher.result_count)
-        {
-            shell->ui.launcher.selected_result_index = launcher_hit.index;
-            shell->launcher.dirty_flags = 1;
-        }
-
-        shell->pressed_launcher_hit_type = launcher_hit.type;
-        shell->pressed_launcher_index = launcher_hit.index;
-        return REACH_OK;
     }
-
-    reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
 
     if (shell->suppress_power_button_release && dock_hit.type != REACH_DOCK_HIT_POWER_BUTTON)
     {

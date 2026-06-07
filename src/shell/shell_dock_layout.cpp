@@ -46,6 +46,19 @@ void reach_shell_schedule_dock_reveal_recheck(reach_shell *shell)
     reach_shell_request_update(shell);
 }
 
+void reach_shell_keep_dock_revealed(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->ui.dock.auto_hide)
+    {
+        return;
+    }
+
+    shell->dock_reveal.active = 1;
+    shell->dock_reveal.requested = 0;
+    shell->dock_reveal.check_dirty = 0;
+    reach_shell_request_update(shell);
+}
+
 static int32_t reach_shell_get_cursor_position(reach_shell *shell, reach_point_i32 *out_cursor)
 {
     if (shell == nullptr || shell->input_source.ops.get_pointer_position == nullptr ||

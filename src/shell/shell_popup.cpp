@@ -60,6 +60,10 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
     }
     if (shell->ui.launcher.open && !on_launcher)
     {
+        if (dock_hit.type != REACH_DOCK_HIT_NONE)
+        {
+            reach_shell_keep_dock_revealed(shell);
+        }
         reach_shell_close_launcher(shell);
     }
 }
