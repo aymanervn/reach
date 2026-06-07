@@ -23,6 +23,7 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
     shell->switcher_state.visible_start = 0;
     shell->switcher_state.width_animation = {};
     shell->switcher_state.width_animating = 0;
+    shell->dock_animation.animating = 0;
     shell->dock_reveal.requested = 0;
     shell->dock_reveal.check_dirty = 0;
     shell->dock_reveal.active = 0;

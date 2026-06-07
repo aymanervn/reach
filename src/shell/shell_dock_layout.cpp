@@ -561,6 +561,10 @@ int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell)
     {
         return 0;
     }
+    if (reach_shell_game_mode_enabled(shell))
+    {
+        return 0;
+    }
 
     return shell->dock_animation.animating && shell->has_layout && !shell->dirty.layout &&
            !shell->dirty.render && !shell->dock.dirty_flags && !shell->launcher.dirty_flags &&
