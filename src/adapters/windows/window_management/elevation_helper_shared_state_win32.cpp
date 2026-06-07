@@ -606,6 +606,45 @@ static void reach_shared_writer_end_publish(void)
     }
 }
 
+static int32_t reach_shared_window_snapshot_equal(
+    const reach_elevation_helper_window_snapshot *a,
+    const reach_elevation_helper_window_snapshot *b)
+{
+    if (a == nullptr || b == nullptr)
+    {
+        return 0;
+    }
+
+    return a->window == b->window && a->process_id == b->process_id &&
+           a->thread_id == b->thread_id && a->kind == b->kind &&
+           a->include_in_switcher == b->include_in_switcher && a->visible == b->visible &&
+           a->iconic == b->iconic && a->cloaked == b->cloaked && a->focused == b->focused &&
+           a->enabled == b->enabled && a->maximized == b->maximized &&
+           lstrcmpW(a->title, b->title) == 0 && lstrcmpW(a->class_name, b->class_name) == 0 &&
+           lstrcmpW(a->process_path, b->process_path) == 0 &&
+           lstrcmpW(a->app_user_model_id, b->app_user_model_id) == 0 &&
+           lstrcmpW(a->integrity, b->integrity) == 0 &&
+           lstrcmpW(a->classification_reason, b->classification_reason) == 0;
+}
+
+static int32_t reach_shared_windows_equal(const reach_elevation_helper_window_snapshot *windows,
+                                          uint32_t window_count)
+{
+    if (g_writer.view == nullptr || g_writer.view->window_count != window_count)
+    {
+        return 0;
+    }
+
+    for (uint32_t index = 0; index < window_count; ++index)
+    {
+        if (!reach_shared_window_snapshot_equal(&g_writer.view->windows[index], &windows[index]))
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 reach_result reach_elevation_helper_shared_publish_windows(
     const reach_elevation_helper_window_snapshot *windows, uint32_t window_count)
 {
@@ -620,6 +659,10 @@ reach_result reach_elevation_helper_shared_publish_windows(
     if (window_count > REACH_ELEVATION_HELPER_MAX_WINDOWS)
     {
         window_count = REACH_ELEVATION_HELPER_MAX_WINDOWS;
+    }
+    if (reach_shared_windows_equal(windows, window_count))
+    {
+        return REACH_OK;
     }
 
     reach_shared_writer_begin_publish();
