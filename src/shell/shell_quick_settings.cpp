@@ -201,6 +201,7 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
     if (next_open)
     {
         reach_quick_settings_model_set_bluetooth_pending(&shell->quick_settings_model, 0, 0);
+        shell->quick_settings_bluetooth_pending = {};
         reach_shell_start_quick_settings_system_refresh(shell, 0);
         reach_shell_start_quick_settings_audio_refresh(shell);
         shell->quick_settings_bounds_animation = {};
@@ -213,6 +214,7 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
     else
     {
         reach_quick_settings_model_set_bluetooth_pending(&shell->quick_settings_model, 0, 0);
+        shell->quick_settings_bluetooth_pending = {};
         if (shell->quick_settings.window.ops.hide != nullptr)
         {
             (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
@@ -332,7 +334,6 @@ void reach_shell_execute_quick_settings_action(reach_shell *shell,
             return;
         }
 
-        reach_bluetooth_state bluetooth = {};
         if (!shell->quick_settings_model.bluetooth.available)
         {
             reach_shell_start_quick_settings_system_refresh(shell, 0);
@@ -346,6 +347,9 @@ void reach_shell_execute_quick_settings_action(reach_shell *shell,
         {
             reach_quick_settings_model_set_bluetooth_pending(&shell->quick_settings_model, 1,
                                                              target_enabled);
+            shell->quick_settings_bluetooth_pending.active = 1;
+            shell->quick_settings_bluetooth_pending.elapsed_seconds = 0.0;
+            shell->quick_settings_bluetooth_pending.refresh_elapsed_seconds = 0.0;
             shell->quick_settings.dirty_flags = 1;
             shell->dirty.render = 1;
             if (shell->system_controls.request_bluetooth_enabled(shell->system_controls.userdata,
@@ -353,6 +357,7 @@ void reach_shell_execute_quick_settings_action(reach_shell *shell,
             {
                 reach_quick_settings_model_set_bluetooth_pending(&shell->quick_settings_model, 0,
                                                                  0);
+                shell->quick_settings_bluetooth_pending = {};
                 reach_shell_start_quick_settings_system_refresh(shell, 0);
             }
             shell->quick_settings.dirty_flags = 1;

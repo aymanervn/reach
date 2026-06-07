@@ -1,5 +1,8 @@
 #include "shell_internal.h"
 
+static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_REFRESH_SECONDS = 0.35;
+static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_TIMEOUT_SECONDS = 8.0;
+
 static float reach_shell_quick_settings_clamp01(float value)
 {
     if (value < 0.0f)
@@ -440,14 +443,18 @@ void reach_shell_apply_quick_settings_system_refresh_result(reach_shell *shell)
     reach_power_state previous_power = shell->quick_settings_model.power;
     reach_brightness_state previous_brightness = shell->quick_settings_model.brightness;
     int32_t bluetooth_pending = shell->quick_settings_model.bluetooth_pending;
+    int32_t bluetooth_pending_enabled = shell->quick_settings_model.bluetooth_pending_enabled;
 
     reach_quick_settings_model_set_system_states(&shell->quick_settings_model, &result.network,
                                                  &result.bluetooth, &result.power,
                                                  &result.brightness);
 
-    if ((result.change_flags & REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH) != 0 && bluetooth_pending)
+    if (bluetooth_pending && result.bluetooth_valid &&
+        (!shell->quick_settings_model.bluetooth.available ||
+         shell->quick_settings_model.bluetooth.enabled == bluetooth_pending_enabled))
     {
         reach_quick_settings_model_set_bluetooth_pending(&shell->quick_settings_model, 0, 0);
+        shell->quick_settings_bluetooth_pending = {};
     }
 
     int32_t layout_changed =
@@ -489,7 +496,7 @@ void reach_shell_on_system_controls_changed(void *user, uint32_t change_flags)
     shell->quick_settings_system_change_flags.fetch_or(change_flags);
 }
 
-void reach_shell_process_quick_settings_system_changes(reach_shell *shell)
+void reach_shell_process_quick_settings_system_changes(reach_shell *shell, double delta_seconds)
 {
     if (shell == nullptr)
     {
@@ -497,10 +504,50 @@ void reach_shell_process_quick_settings_system_changes(reach_shell *shell)
     }
 
     uint32_t change_flags = shell->quick_settings_system_change_flags.exchange(0);
-    if (change_flags == 0 || !shell->quick_settings_open)
+    if (!shell->quick_settings_open)
     {
         return;
     }
 
-    reach_shell_start_quick_settings_system_refresh(shell, change_flags);
+    if (change_flags != 0)
+    {
+        reach_shell_start_quick_settings_system_refresh(shell, change_flags);
+    }
+
+    if (!shell->quick_settings_model.bluetooth_pending ||
+        !shell->quick_settings_bluetooth_pending.active)
+    {
+        return;
+    }
+
+    if (delta_seconds < 0.0)
+    {
+        delta_seconds = 0.0;
+    }
+
+    shell->quick_settings_bluetooth_pending.elapsed_seconds += delta_seconds;
+    shell->quick_settings_bluetooth_pending.refresh_elapsed_seconds += delta_seconds;
+
+    if (shell->quick_settings_bluetooth_pending.elapsed_seconds >=
+        REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_TIMEOUT_SECONDS)
+    {
+        reach_quick_settings_model_set_bluetooth_pending(&shell->quick_settings_model, 0, 0);
+        shell->quick_settings_bluetooth_pending = {};
+        reach_shell_start_quick_settings_system_refresh(shell,
+                                                        REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
+        shell->quick_settings.dirty_flags = 1;
+        shell->dirty.render = 1;
+        return;
+    }
+
+    if (shell->quick_settings_bluetooth_pending.refresh_elapsed_seconds >=
+            REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_REFRESH_SECONDS &&
+        !reach_shell_quick_settings_system_refresh_work_pending(shell))
+    {
+        shell->quick_settings_bluetooth_pending.refresh_elapsed_seconds = 0.0;
+        reach_shell_start_quick_settings_system_refresh(shell,
+                                                        REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
+    }
+
+    reach_shell_request_update(shell);
 }

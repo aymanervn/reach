@@ -354,6 +354,13 @@ typedef struct reach_shell_quick_settings_system_refresh_state
     void (*notify)(reach_shell *shell);
 } reach_shell_quick_settings_system_refresh_state;
 
+typedef struct reach_shell_quick_settings_bluetooth_pending_state
+{
+    int32_t active;
+    double elapsed_seconds;
+    double refresh_elapsed_seconds;
+} reach_shell_quick_settings_bluetooth_pending_state;
+
 struct reach_shell
 {
     reach_monitor_port monitors;
@@ -424,6 +431,7 @@ struct reach_shell
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_shell_quick_settings_audio_refresh_state quick_settings_audio_refresh;
     reach_shell_quick_settings_system_refresh_state quick_settings_system_refresh;
+    reach_shell_quick_settings_bluetooth_pending_state quick_settings_bluetooth_pending;
     int32_t quick_settings_open;
     reach_shell_quick_settings_drag_state quick_settings_drag;
     reach_audio_volume_state quick_settings_audio_state;
@@ -648,7 +656,7 @@ void reach_shell_start_quick_settings_system_refresh(reach_shell *shell, uint32_
 void reach_shell_apply_quick_settings_system_refresh_result(reach_shell *shell);
 void reach_shell_stop_quick_settings_system_refresh(reach_shell *shell);
 int32_t reach_shell_quick_settings_system_refresh_work_pending(const reach_shell *shell);
-void reach_shell_process_quick_settings_system_changes(reach_shell *shell);
+void reach_shell_process_quick_settings_system_changes(reach_shell *shell, double delta_seconds);
 void reach_shell_refresh_quick_settings_layout(reach_shell *shell);
 void reach_shell_relayout_quick_settings(reach_shell *shell, int32_t animate_height);
 

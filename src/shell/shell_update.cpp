@@ -324,7 +324,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         return reach_shell_move_dock_animation_frame(shell, delta_seconds);
     }
 
-    reach_shell_process_quick_settings_system_changes(shell);
+    reach_shell_process_quick_settings_system_changes(shell, delta_seconds);
     reach_shell_apply_quick_settings_system_refresh_result(shell);
     reach_shell_apply_quick_settings_audio_refresh_result(shell);
     reach_shell_apply_open_window_icon_results(shell);
@@ -851,6 +851,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             reach_shell_config_reload_work_pending(shell) ||
             reach_shell_quick_settings_audio_refresh_work_pending(shell) ||
             reach_shell_quick_settings_system_refresh_work_pending(shell) ||
+            shell->quick_settings_bluetooth_pending.active ||
             reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
             shell->dock_animation.animating || shell->dock_width.animating ||
             reach_shell_switcher_width_animation_active(shell) || shell->dock_drag.active ||
