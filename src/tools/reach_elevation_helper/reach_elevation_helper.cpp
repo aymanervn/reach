@@ -31,7 +31,6 @@ struct reach_helper_hotkey_state
     int32_t alt_down;
     int32_t shift_down;
     int32_t alt_tab_active;
-    int32_t native_alt_tab_passthrough;
     int32_t left_win_down;
     int32_t right_win_down;
     int32_t windows_key_chord;
@@ -41,10 +40,12 @@ static reach_helper_session_state g_session;
 static reach_helper_hotkey_state g_hotkeys;
 static LONG g_game_mode_active;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachElevationHelperInstance";
+static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
 
 static reach_result reach_helper_execute(const reach_elevation_helper_request *request,
                                          reach_elevation_helper_response *response);
 static void reach_helper_clear_reach_hotkey_state(void);
+static void reach_helper_publish_window_state(void);
 
 static void reach_helper_copy_wide(wchar_t *destination, size_t destination_count,
                                    const wchar_t *source)
@@ -442,22 +443,26 @@ static int32_t reach_helper_window_occupies_whole_monitor(HWND hwnd, RECT window
     return reach_helper_rect_matches_monitor(window_rect, info.rcMonitor);
 }
 
-static int32_t reach_helper_detect_game_mode(void)
+static int32_t reach_helper_window_is_game(HWND hwnd)
 {
-    HWND foreground = GetForegroundWindow();
-    if (foreground == nullptr || !IsWindow(foreground) || !IsWindowVisible(foreground) ||
-        IsIconic(foreground) || IsZoomed(foreground))
+    if (hwnd == nullptr || !IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
+        IsZoomed(hwnd))
     {
         return 0;
     }
 
     RECT rect = {};
-    if (!GetWindowRect(foreground, &rect))
+    if (!GetWindowRect(hwnd, &rect))
     {
         return 0;
     }
 
-    return reach_helper_window_occupies_whole_monitor(foreground, rect);
+    return reach_helper_window_occupies_whole_monitor(hwnd, rect);
+}
+
+static int32_t reach_helper_detect_game_mode(void)
+{
+    return reach_helper_window_is_game(GetForegroundWindow());
 }
 
 static void reach_helper_publish_game_mode(void)
@@ -565,9 +570,23 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
     }
 }
 
+static void reach_helper_minimize_game(HWND hwnd)
+{
+    if (!reach_helper_window_is_game(hwnd))
+    {
+        reach_helper_publish_window_state();
+        return;
+    }
+
+    (void)reach_window_management_minimize(hwnd);
+    reach_helper_publish_window_state();
+}
+
 static DWORD WINAPI reach_helper_window_event_thread(void *param)
 {
     (void)param;
+    MSG message = {};
+    PeekMessageW(&message, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
     g_session.window_event_thread_id = GetCurrentThreadId();
 
     const DWORD flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
@@ -596,9 +615,13 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
 
     reach_helper_publish_window_state();
 
-    MSG message = {};
     while (GetMessageW(&message, nullptr, 0, 0) > 0)
     {
+        if (message.message == REACH_HELPER_WM_MINIMIZE_GAME)
+        {
+            HWND hwnd = reinterpret_cast<HWND>(message.wParam);
+            reach_helper_minimize_game(hwnd);
+        }
     }
 
     reach_helper_close_window_event_hooks();
@@ -612,6 +635,13 @@ static void reach_helper_start_window_events(void)
     {
         g_session.window_event_thread =
             CreateThread(nullptr, 0, reach_helper_window_event_thread, nullptr, 0, nullptr);
+        for (int attempt = 0;
+             g_session.window_event_thread != nullptr && g_session.window_event_thread_id == 0 &&
+             attempt < 20;
+             ++attempt)
+        {
+            Sleep(10);
+        }
     }
 }
 
@@ -834,6 +864,24 @@ static void reach_helper_clear_reach_hotkey_state(void)
     g_hotkeys.windows_key_chord = 0;
 }
 
+static int32_t reach_helper_alt_down(void)
+{
+    return reach_helper_virtual_key_down(VK_MENU) || reach_helper_virtual_key_down(VK_LMENU) ||
+           reach_helper_virtual_key_down(VK_RMENU);
+}
+
+static int32_t reach_helper_post_minimize_game(HWND hwnd)
+{
+    if (hwnd != nullptr && g_session.window_event_thread_id != 0)
+    {
+        return PostThreadMessageW(g_session.window_event_thread_id, REACH_HELPER_WM_MINIMIZE_GAME,
+                                  reinterpret_cast<WPARAM>(hwnd), 0)
+                   ? 1
+                   : 0;
+    }
+    return 0;
+}
+
 static int32_t reach_helper_hotkey_is_modifier(uint32_t key)
 {
     return key == REACH_ELEVATION_HELPER_HOTKEY_ALT ||
@@ -849,34 +897,7 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
     const int32_t game_mode_active = InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0;
     const bool key_down = wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN;
     const bool key_up = wparam == WM_KEYUP || wparam == WM_SYSKEYUP;
-    const int32_t native_alt_tab_passthrough = g_hotkeys.native_alt_tab_passthrough;
     uint32_t key = 0;
-    if (code == HC_ACTION)
-    {
-        const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
-        if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) == 0)
-        {
-            key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
-            if (g_hotkeys.native_alt_tab_passthrough &&
-                key == REACH_ELEVATION_HELPER_HOTKEY_ALT && key_up)
-            {
-                g_hotkeys.native_alt_tab_passthrough = 0;
-            }
-            if (game_mode_active && !g_hotkeys.native_alt_tab_passthrough &&
-                key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down &&
-                (reach_helper_virtual_key_down(VK_MENU) || reach_helper_virtual_key_down(VK_LMENU) ||
-                 reach_helper_virtual_key_down(VK_RMENU)))
-            {
-                reach_helper_clear_reach_hotkey_state();
-                g_hotkeys.native_alt_tab_passthrough = 1;
-            }
-        }
-    }
-
-    if (game_mode_active || native_alt_tab_passthrough || g_hotkeys.native_alt_tab_passthrough)
-    {
-        return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
-    }
 
     if (code == HC_ACTION)
     {
@@ -884,6 +905,20 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
         if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) == 0)
         {
             key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
+            if (game_mode_active)
+            {
+                if (key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down &&
+                    reach_helper_alt_down())
+                {
+                    HWND game = GetForegroundWindow();
+                    reach_helper_clear_reach_hotkey_state();
+                    if (reach_helper_post_minimize_game(game))
+                    {
+                        return 1;
+                    }
+                }
+                return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
+            }
             if (key == 0 && key_down && (g_hotkeys.left_win_down || g_hotkeys.right_win_down))
             {
                 g_hotkeys.windows_key_chord = 1;

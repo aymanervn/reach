@@ -75,7 +75,9 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         source->shift_down = pressed;
         break;
     case REACH_ELEVATION_HELPER_HOTKEY_TAB:
-        if (pressed && source->alt_down)
+        if (pressed &&
+            (source->alt_down ||
+             (record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_ALT) != 0))
         {
             if (!source->alt_tab_active)
             {
@@ -83,8 +85,11 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
                 source->alt_tab_active = 1;
                 break;
             }
+            int32_t shift_down =
+                source->shift_down ||
+                ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_SHIFT) != 0);
             reach_ui_event_type direction =
-                source->shift_down ? REACH_UI_EVENT_ALT_TAB_PREVIOUS : REACH_UI_EVENT_ALT_TAB_NEXT;
+                shift_down ? REACH_UI_EVENT_ALT_TAB_PREVIOUS : REACH_UI_EVENT_ALT_TAB_NEXT;
             reach_input_post_ui_event(source, direction, 0);
         }
         break;
