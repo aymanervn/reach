@@ -50,7 +50,8 @@ int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
         shell != nullptr && shell->theme != nullptr ? shell->theme : reach_theme_default();
 
     float dock_height = shell != nullptr ? shell->ui.dock.height : 48.0f;
-    float icon_box_size = reach_theme_icon_box_size(theme, dock_height);
+    float dpi_scale = reach_shell_layout_dpi_scale(shell);
+    float icon_box_size = reach_theme_icon_box_size(theme, dock_height) * dpi_scale;
 
     int32_t requested = (int32_t)ceilf(icon_box_size * 4.0f);
     if (requested < 128)
@@ -63,6 +64,17 @@ int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
     }
 
     return requested;
+}
+
+static float reach_shell_monitor_dpi_scale(const reach_monitor_info *monitor)
+{
+    if (monitor == nullptr)
+    {
+        return 1.0f;
+    }
+
+    int32_t dpi = monitor->dpi_y > 0 ? monitor->dpi_y : monitor->dpi_x;
+    return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
 }
 
 void reach_shell_refresh_pinned_icon_slots(reach_shell *shell)
@@ -389,7 +401,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
             reach_ui_layout_input input = {};
             input.monitor_bounds = bounds;
             input.work_area = bounds;
-            input.dpi_scale = 1.0f;
+            input.dpi_scale = reach_shell_monitor_dpi_scale(monitor);
+            shell->layout_dpi_scale = input.dpi_scale;
 
             reach_ui_layout layout = {};
             if (reach_ui_layout_compute(&shell->ui, &input, &layout) == REACH_OK)

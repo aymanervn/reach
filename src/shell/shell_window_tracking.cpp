@@ -398,12 +398,13 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         shell->open_window_count, reach_shell_dock_window_matches_pinned, shell);
 
     layout->app_slot_count = shell->dock_model.item_count;
-    float icon_size = shell->ui.dock.icon_size;
-    float gap = shell->ui.dock.gap;
+    float scale = reach_shell_layout_dpi_scale(shell);
+    float icon_size = shell->ui.dock.icon_size * scale;
+    float gap = shell->ui.dock.gap * scale;
     size_t count = shell->dock_model.item_count;
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    float clock_width = theme->dock_clock_width;
-    float separator_width = theme->dock_system_separator_width;
+    float clock_width = theme->dock_clock_width * scale;
+    float separator_width = theme->dock_system_separator_width * scale;
     float separator_height = layout->bounds.height * theme->dock_system_separator_height_ratio;
 
     float dock_width = ceilf(icon_size * (float)(count + 3) + clock_width + separator_width +

@@ -382,6 +382,7 @@ struct reach_shell
     size_t focus_history_count;
     reach_dock_feature_model dock_model;
     reach_dock_icon_cache dock_icons;
+    float layout_dpi_scale;
     reach_float_animation dock_item_x_animations[REACH_MAX_PINNED_APPS];
     int32_t dock_item_x_animating[REACH_MAX_PINNED_APPS];
     int32_t dock_item_x_valid[REACH_MAX_PINNED_APPS];
@@ -440,6 +441,11 @@ static const size_t REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_PINNED_APP
 static const size_t REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON = REACH_MAX_PINNED_APPS + 1;
 static const size_t REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON = REACH_MAX_PINNED_APPS + 2;
 static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 3;
+
+static inline float reach_shell_layout_dpi_scale(const reach_shell *shell)
+{
+    return shell != nullptr && shell->layout_dpi_scale > 0.0f ? shell->layout_dpi_scale : 1.0f;
+}
 
 /* Generic shell/window helpers */
 
