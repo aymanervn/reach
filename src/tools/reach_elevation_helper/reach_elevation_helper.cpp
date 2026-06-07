@@ -572,9 +572,10 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
 
 static void reach_helper_minimize_game(HWND hwnd)
 {
+    reach_helper_publish_window_state();
+
     if (!reach_helper_window_is_game(hwnd))
     {
-        reach_helper_publish_window_state();
         return;
     }
 
