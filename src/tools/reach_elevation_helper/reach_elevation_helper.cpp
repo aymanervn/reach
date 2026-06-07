@@ -31,6 +31,7 @@ struct reach_helper_hotkey_state
     int32_t alt_down;
     int32_t shift_down;
     int32_t alt_tab_active;
+    int32_t native_alt_tab_passthrough;
     int32_t left_win_down;
     int32_t right_win_down;
     int32_t windows_key_chord;
@@ -43,6 +44,7 @@ static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachElevationHelpe
 
 static reach_result reach_helper_execute(const reach_elevation_helper_request *request,
                                          reach_elevation_helper_response *response);
+static void reach_helper_clear_reach_hotkey_state(void);
 
 static void reach_helper_copy_wide(wchar_t *destination, size_t destination_count,
                                    const wchar_t *source)
@@ -463,8 +465,7 @@ static void reach_helper_publish_game_mode(void)
     int32_t active = reach_helper_detect_game_mode();
     if (active)
     {
-        g_hotkeys.alt_tab_active = 0;
-        g_hotkeys.windows_key_chord = 0;
+        reach_helper_clear_reach_hotkey_state();
     }
     InterlockedExchange(&g_game_mode_active, active ? 1 : 0);
     (void)reach_elevation_helper_shared_publish_game_mode(active);
@@ -823,6 +824,16 @@ static void reach_helper_reconcile_modifier_state(void)
     }
 }
 
+static void reach_helper_clear_reach_hotkey_state(void)
+{
+    g_hotkeys.alt_down = 0;
+    g_hotkeys.shift_down = 0;
+    g_hotkeys.alt_tab_active = 0;
+    g_hotkeys.left_win_down = 0;
+    g_hotkeys.right_win_down = 0;
+    g_hotkeys.windows_key_chord = 0;
+}
+
 static int32_t reach_helper_hotkey_is_modifier(uint32_t key)
 {
     return key == REACH_ELEVATION_HELPER_HOTKEY_ALT ||
@@ -835,7 +846,34 @@ static void reach_helper_stop_hotkeys(void);
 
 static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPARAM lparam)
 {
-    if (InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0)
+    const int32_t game_mode_active = InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0;
+    const bool key_down = wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN;
+    const bool key_up = wparam == WM_KEYUP || wparam == WM_SYSKEYUP;
+    const int32_t native_alt_tab_passthrough = g_hotkeys.native_alt_tab_passthrough;
+    uint32_t key = 0;
+    if (code == HC_ACTION)
+    {
+        const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
+        if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) == 0)
+        {
+            key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
+            if (g_hotkeys.native_alt_tab_passthrough &&
+                key == REACH_ELEVATION_HELPER_HOTKEY_ALT && key_up)
+            {
+                g_hotkeys.native_alt_tab_passthrough = 0;
+            }
+            if (game_mode_active && !g_hotkeys.native_alt_tab_passthrough &&
+                key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down &&
+                (reach_helper_virtual_key_down(VK_MENU) || reach_helper_virtual_key_down(VK_LMENU) ||
+                 reach_helper_virtual_key_down(VK_RMENU)))
+            {
+                reach_helper_clear_reach_hotkey_state();
+                g_hotkeys.native_alt_tab_passthrough = 1;
+            }
+        }
+    }
+
+    if (game_mode_active || native_alt_tab_passthrough || g_hotkeys.native_alt_tab_passthrough)
     {
         return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
     }
@@ -845,9 +883,7 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
         const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
         if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) == 0)
         {
-            const bool key_down = wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN;
-            const bool key_up = wparam == WM_KEYUP || wparam == WM_SYSKEYUP;
-            uint32_t key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
+            key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
             if (key == 0 && key_down && (g_hotkeys.left_win_down || g_hotkeys.right_win_down))
             {
                 g_hotkeys.windows_key_chord = 1;
