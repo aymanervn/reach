@@ -487,7 +487,6 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
                            reinterpret_cast<const uint16_t *>(helper.title));
     (void)reach_copy_utf16(snapshot.path, 260,
                            reinterpret_cast<const uint16_t *>(helper.process_path));
-    snapshot.bounds = {helper.rect.left, helper.rect.top, helper.rect.right, helper.rect.bottom};
     snapshot.visible = helper.visible;
     snapshot.maximized = helper.maximized;
     snapshot.minimized = helper.iconic;

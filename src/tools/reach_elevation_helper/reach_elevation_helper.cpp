@@ -19,7 +19,6 @@ struct reach_helper_session_state
     HWINEVENTHOOK minimize_start_hook;
     HWINEVENTHOOK minimize_end_hook;
     HWINEVENTHOOK foreground_hook;
-    HWINEVENTHOOK location_hook;
     HWINEVENTHOOK name_hook;
 };
 
@@ -351,15 +350,6 @@ static void reach_helper_classify_window(reach_elevation_helper_window_snapshot 
         return;
     }
 
-    LONG width = snapshot->rect.right - snapshot->rect.left;
-    LONG height = snapshot->rect.bottom - snapshot->rect.top;
-    if (width <= 1 || height <= 1)
-    {
-        snapshot->kind = REACH_ELEVATION_HELPER_WINDOW_HELPER;
-        reach_helper_copy_wide(snapshot->classification_reason, 160, L"tiny non-minimized rect");
-        return;
-    }
-
     snapshot->kind = REACH_ELEVATION_HELPER_WINDOW_APP;
     snapshot->include_in_switcher = 1;
     reach_helper_copy_wide(snapshot->classification_reason, 160, L"accepted visible app");
@@ -395,16 +385,6 @@ static reach_elevation_helper_window_snapshot reach_helper_inspect_window(HWND h
     snapshot.focused = reach_helper_window_has_foreground(hwnd);
     snapshot.enabled = IsWindowEnabled(hwnd) ? 1 : 0;
     snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
-    snapshot.placement.length = sizeof(snapshot.placement);
-    (void)GetWindowPlacement(hwnd, &snapshot.placement);
-    if (snapshot.iconic && snapshot.placement.length == sizeof(snapshot.placement))
-    {
-        snapshot.rect = snapshot.placement.rcNormalPosition;
-    }
-    else
-    {
-        (void)GetWindowRect(hwnd, &snapshot.rect);
-    }
     reach_helper_classify_window(&snapshot);
     return snapshot;
 }
@@ -540,7 +520,7 @@ static void reach_helper_close_window_event_hooks(void)
     HWINEVENTHOOK *hooks[] = {
         &g_session.create_hook,     &g_session.destroy_hook,        &g_session.show_hook,
         &g_session.hide_hook,       &g_session.minimize_start_hook, &g_session.minimize_end_hook,
-        &g_session.foreground_hook, &g_session.location_hook,       &g_session.name_hook,
+        &g_session.foreground_hook, &g_session.name_hook,
     };
     for (HWINEVENTHOOK *hook : hooks)
     {
@@ -607,9 +587,6 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
                         reach_helper_window_event_proc, 0, 0, flags);
     g_session.foreground_hook =
         SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
-                        reach_helper_window_event_proc, 0, 0, flags);
-    g_session.location_hook =
-        SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, nullptr,
                         reach_helper_window_event_proc, 0, 0, flags);
     g_session.name_hook = SetWinEventHook(EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_NAMECHANGE, nullptr,
                                           reach_helper_window_event_proc, 0, 0, flags);

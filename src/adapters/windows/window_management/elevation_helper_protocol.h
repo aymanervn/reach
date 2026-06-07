@@ -4,8 +4,6 @@
 #include "../windows_adapters_internal.h"
 
 #include <stdint.h>
-#include <windows.h>
-
 static const wchar_t REACH_ELEVATION_HELPER_PIPE_NAME[] = L"\\\\.\\pipe\\ReachElevationHelper";
 static const wchar_t REACH_ELEVATION_HELPER_STATE_NAME[] = L"Local\\ReachElevationHelperState";
 static const wchar_t REACH_ELEVATION_HELPER_UPDATE_EVENT_NAME[] =
@@ -75,8 +73,6 @@ struct reach_elevation_helper_window_snapshot
     int32_t focused;
     int32_t enabled;
     int32_t maximized;
-    RECT rect;
-    WINDOWPLACEMENT placement;
     wchar_t classification_reason[160];
 };
 

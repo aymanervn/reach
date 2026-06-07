@@ -210,7 +210,6 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
     int32_t old_minimized[REACH_MAX_PINNED_APPS] = {};
     int32_t old_maximized[REACH_MAX_PINNED_APPS] = {};
     int32_t old_visible[REACH_MAX_PINNED_APPS] = {};
-    reach_rect_i32 old_bounds[REACH_MAX_PINNED_APPS] = {};
     uint16_t old_paths[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_app_user_model_ids[REACH_MAX_PINNED_APPS][260] = {};
@@ -228,7 +227,6 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
         old_minimized[index] = shell->open_windows[index].minimized;
         old_maximized[index] = shell->open_windows[index].maximized;
         old_visible[index] = shell->open_windows[index].visible;
-        old_bounds[index] = shell->open_windows[index].bounds;
         reach_copy_utf16(old_paths[index], 260, shell->open_windows[index].path);
         reach_copy_utf16(old_titles[index], 260, shell->open_windows[index].title);
         reach_copy_utf16(old_app_user_model_ids[index], 260,
@@ -282,10 +280,6 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
             if (dock_item_changed || old_minimized[index] != shell->open_windows[index].minimized ||
                 old_maximized[index] != shell->open_windows[index].maximized ||
                 old_visible[index] != shell->open_windows[index].visible ||
-                old_bounds[index].left != shell->open_windows[index].bounds.left ||
-                old_bounds[index].top != shell->open_windows[index].bounds.top ||
-                old_bounds[index].right != shell->open_windows[index].bounds.right ||
-                old_bounds[index].bottom != shell->open_windows[index].bounds.bottom ||
                 !reach_shell_utf16_equal(old_titles[index], shell->open_windows[index].title))
             {
                 changed = 1;

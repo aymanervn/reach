@@ -21,7 +21,6 @@ extern "C"
         uint16_t title[260];
         uint16_t path[260];
         uint16_t app_user_model_id[260];
-        reach_rect_i32 bounds;
         int32_t visible;
         int32_t maximized;
         int32_t minimized;
