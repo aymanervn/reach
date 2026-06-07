@@ -138,7 +138,7 @@ void reach_shell_close_launcher(reach_shell *shell)
     reach_shell_close_launcher_impl(shell, 1);
 }
 
-void reach_shell_close_launcher_for_dock_click(reach_shell *shell)
+void reach_shell_close_launcher_without_focus_restore(reach_shell *shell)
 {
     reach_shell_close_launcher_impl(shell, 0);
 }

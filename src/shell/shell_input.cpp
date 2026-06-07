@@ -283,7 +283,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
             if (dock_hit.type != REACH_DOCK_HIT_NONE)
             {
                 reach_shell_keep_dock_revealed(shell);
-                reach_shell_close_launcher_for_dock_click(shell);
+                reach_shell_close_launcher_without_focus_restore(shell);
             }
             else
             {
@@ -671,6 +671,12 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
     else if (intent.type == REACH_UI_INTENT_LAUNCH_APP)
     {
+        int32_t launcher_launch = shell->ui.launcher.open;
+        if (launcher_launch)
+        {
+            reach_shell_clear_launcher_restore_window(shell);
+        }
+
         for (size_t index = 0; index < shell->ui.pinned_app_count; ++index)
         {
             if (shell->ui.pinned_apps[index].id == intent.id &&
@@ -684,6 +690,11 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
                 (void)shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
             }
+        }
+
+        if (launcher_launch)
+        {
+            reach_shell_close_launcher_without_focus_restore(shell);
         }
     }
     else if (intent.type == REACH_UI_INTENT_RUN_SEARCH)

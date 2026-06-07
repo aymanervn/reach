@@ -499,7 +499,7 @@ void reach_shell_raise_launcher(reach_shell *shell);
 void reach_shell_notify_launcher_search_ready(reach_shell *shell);
 
 void reach_shell_close_launcher(reach_shell *shell);
-void reach_shell_close_launcher_for_dock_click(reach_shell *shell);
+void reach_shell_close_launcher_without_focus_restore(reach_shell *shell);
 void reach_shell_remember_launcher_restore_window(reach_shell *shell);
 void reach_shell_clear_launcher_restore_window(reach_shell *shell);
 void reach_shell_restore_launcher_focus(reach_shell *shell);
