@@ -516,6 +516,7 @@ reach_result reachctl_reset_to_windows_shell(void)
 
     (void)reachctl_terminate_processes_by_name(L"reach.exe");
     (void)reachctl_terminate_processes_by_name(L"reach-watchdog.exe");
+    (void)reachctl_terminate_processes_by_name(L"reach_elevation_helper.exe");
     (void)reachctl_terminate_processes_by_name(L"explorer.exe");
 
     reach_result start_result = reachctl_start_userinit();
