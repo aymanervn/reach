@@ -35,8 +35,23 @@ struct reach_helper_hotkey_state
     int32_t windows_key_chord;
 };
 
+struct reach_helper_window_metadata
+{
+    HWND hwnd;
+    DWORD process_id;
+    uint64_t seen_generation;
+    wchar_t class_name[128];
+    wchar_t process_path[260];
+    wchar_t app_user_model_id[260];
+    wchar_t integrity[32];
+};
+
 static reach_helper_session_state g_session;
 static reach_helper_hotkey_state g_hotkeys;
+static INIT_ONCE g_metadata_cache_once = INIT_ONCE_STATIC_INIT;
+static CRITICAL_SECTION g_metadata_cache_lock;
+static std::vector<reach_helper_window_metadata> g_metadata_cache;
+static uint64_t g_metadata_generation;
 static LONG g_game_mode_active;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachElevationHelperInstance";
 static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
@@ -138,6 +153,28 @@ static int32_t reach_helper_window_has_foreground(HWND hwnd)
                                 GetAncestor(foreground, GA_ROOTOWNER) == popup);
 }
 
+static BOOL CALLBACK reach_helper_initialize_metadata_cache(PINIT_ONCE init_once, PVOID parameter,
+                                                            PVOID *context)
+{
+    (void)init_once;
+    (void)parameter;
+    (void)context;
+    InitializeCriticalSection(&g_metadata_cache_lock);
+    return TRUE;
+}
+
+static void reach_helper_lock_metadata_cache(void)
+{
+    InitOnceExecuteOnce(&g_metadata_cache_once, reach_helper_initialize_metadata_cache, nullptr,
+                        nullptr);
+    EnterCriticalSection(&g_metadata_cache_lock);
+}
+
+static void reach_helper_unlock_metadata_cache(void)
+{
+    LeaveCriticalSection(&g_metadata_cache_lock);
+}
+
 static void reach_helper_process_path(DWORD process_id, wchar_t *path, size_t path_count)
 {
     if (path == nullptr || path_count == 0)
@@ -219,6 +256,137 @@ static void reach_helper_process_integrity_text(DWORD process_id, wchar_t *text,
     {
         reach_helper_copy_wide(text, text_count, L"unknown");
     }
+}
+
+static void reach_helper_copy_metadata_to_snapshot(
+    const reach_helper_window_metadata *metadata, reach_elevation_helper_window_snapshot *snapshot)
+{
+    if (metadata == nullptr || snapshot == nullptr)
+    {
+        return;
+    }
+    reach_helper_copy_wide(snapshot->class_name, 128, metadata->class_name);
+    reach_helper_copy_wide(snapshot->process_path, 260, metadata->process_path);
+    reach_helper_copy_wide(snapshot->app_user_model_id, 260, metadata->app_user_model_id);
+    reach_helper_copy_wide(snapshot->integrity, 32, metadata->integrity);
+}
+
+static int32_t reach_helper_cached_window_metadata(HWND hwnd, DWORD process_id,
+                                                  uint64_t seen_generation,
+                                                  reach_elevation_helper_window_snapshot *snapshot)
+{
+    if (hwnd == nullptr || snapshot == nullptr)
+    {
+        return 0;
+    }
+
+    int32_t found = 0;
+    reach_helper_lock_metadata_cache();
+    for (reach_helper_window_metadata &metadata : g_metadata_cache)
+    {
+        if (metadata.hwnd == hwnd && metadata.process_id == process_id)
+        {
+            metadata.seen_generation = seen_generation;
+            reach_helper_copy_metadata_to_snapshot(&metadata, snapshot);
+            found = 1;
+            break;
+        }
+    }
+    reach_helper_unlock_metadata_cache();
+    return found;
+}
+
+static void reach_helper_query_window_metadata(HWND hwnd, DWORD process_id,
+                                               uint64_t seen_generation,
+                                               reach_elevation_helper_window_snapshot *snapshot)
+{
+    if (hwnd == nullptr || snapshot == nullptr)
+    {
+        return;
+    }
+
+    reach_helper_window_metadata metadata = {};
+    metadata.hwnd = hwnd;
+    metadata.process_id = process_id;
+    metadata.seen_generation = seen_generation;
+    GetClassNameW(hwnd, metadata.class_name, 128);
+    reach_helper_process_path(process_id, metadata.process_path, 260);
+    if (!reach_window_app_user_model_id(
+            hwnd, reinterpret_cast<uint16_t *>(metadata.app_user_model_id), 260))
+    {
+        (void)reach_window_process_app_user_model_id_for_process(
+            process_id, reinterpret_cast<uint16_t *>(metadata.app_user_model_id), 260);
+    }
+    reach_helper_process_integrity_text(process_id, metadata.integrity, 32);
+
+    reach_helper_lock_metadata_cache();
+    int32_t updated = 0;
+    for (reach_helper_window_metadata &cached : g_metadata_cache)
+    {
+        if (cached.hwnd == hwnd)
+        {
+            cached = metadata;
+            updated = 1;
+            break;
+        }
+    }
+    if (!updated)
+    {
+        g_metadata_cache.push_back(metadata);
+    }
+    reach_helper_unlock_metadata_cache();
+
+    reach_helper_copy_metadata_to_snapshot(&metadata, snapshot);
+}
+
+static void reach_helper_load_window_metadata(HWND hwnd, DWORD process_id,
+                                              uint64_t seen_generation,
+                                              reach_elevation_helper_window_snapshot *snapshot)
+{
+    if (!reach_helper_cached_window_metadata(hwnd, process_id, seen_generation, snapshot))
+    {
+        reach_helper_query_window_metadata(hwnd, process_id, seen_generation, snapshot);
+    }
+}
+
+static void reach_helper_forget_window_metadata(HWND hwnd)
+{
+    if (hwnd == nullptr)
+    {
+        return;
+    }
+
+    reach_helper_lock_metadata_cache();
+    for (size_t index = 0; index < g_metadata_cache.size();)
+    {
+        if (g_metadata_cache[index].hwnd == hwnd)
+        {
+            g_metadata_cache.erase(g_metadata_cache.begin() + index);
+        }
+        else
+        {
+            ++index;
+        }
+    }
+    reach_helper_unlock_metadata_cache();
+}
+
+static void reach_helper_prune_window_metadata(uint64_t seen_generation)
+{
+    reach_helper_lock_metadata_cache();
+    for (size_t index = 0; index < g_metadata_cache.size();)
+    {
+        if (g_metadata_cache[index].seen_generation != seen_generation ||
+            !IsWindow(g_metadata_cache[index].hwnd))
+        {
+            g_metadata_cache.erase(g_metadata_cache.begin() + index);
+        }
+        else
+        {
+            ++index;
+        }
+    }
+    reach_helper_unlock_metadata_cache();
 }
 
 static void reach_helper_classify_window(reach_elevation_helper_window_snapshot *snapshot)
@@ -370,15 +538,7 @@ static reach_elevation_helper_window_snapshot reach_helper_inspect_window(HWND h
     snapshot.process_id = process_id;
     snapshot.thread_id = thread_id;
     GetWindowTextW(hwnd, snapshot.title, 260);
-    GetClassNameW(hwnd, snapshot.class_name, 128);
-    reach_helper_process_path(snapshot.process_id, snapshot.process_path, 260);
-    if (!reach_window_app_user_model_id(
-            hwnd, reinterpret_cast<uint16_t *>(snapshot.app_user_model_id), 260))
-    {
-        (void)reach_window_process_app_user_model_id_for_process(
-            snapshot.process_id, reinterpret_cast<uint16_t *>(snapshot.app_user_model_id), 260);
-    }
-    reach_helper_process_integrity_text(snapshot.process_id, snapshot.integrity, 32);
+    reach_helper_load_window_metadata(hwnd, process_id, g_metadata_generation, &snapshot);
     snapshot.visible = IsWindowVisible(hwnd) ? 1 : 0;
     snapshot.iconic = IsIconic(hwnd) ? 1 : 0;
     snapshot.cloaked = reach_helper_window_cloaked(hwnd);
@@ -490,7 +650,9 @@ static void reach_helper_build_snapshot_response(reach_elevation_helper_response
     }
     reach_helper_snapshot_builder builder = {};
     builder.response = response;
+    ++g_metadata_generation;
     EnumWindows(reach_helper_enum_windows_proc, reinterpret_cast<LPARAM>(&builder));
+    reach_helper_prune_window_metadata(g_metadata_generation);
 }
 
 static void reach_helper_publish_window_state(void)
@@ -546,6 +708,10 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
 
     if (object_id == OBJID_WINDOW && child_id == CHILDID_SELF)
     {
+        if (event == EVENT_OBJECT_DESTROY)
+        {
+            reach_helper_forget_window_metadata(hwnd);
+        }
         reach_helper_publish_window_state();
     }
 }
