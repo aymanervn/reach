@@ -46,12 +46,21 @@ struct reach_helper_window_metadata
     wchar_t integrity[32];
 };
 
+struct reach_helper_window_state
+{
+    uint32_t window_count;
+    reach_elevation_helper_window_snapshot windows[REACH_ELEVATION_HELPER_MAX_WINDOWS];
+};
+
 static reach_helper_session_state g_session;
 static reach_helper_hotkey_state g_hotkeys;
 static INIT_ONCE g_metadata_cache_once = INIT_ONCE_STATIC_INIT;
 static CRITICAL_SECTION g_metadata_cache_lock;
 static std::vector<reach_helper_window_metadata> g_metadata_cache;
 static uint64_t g_metadata_generation;
+static INIT_ONCE g_window_state_once = INIT_ONCE_STATIC_INIT;
+static CRITICAL_SECTION g_window_state_lock;
+static reach_helper_window_state g_window_state;
 static LONG g_game_mode_active;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachElevationHelperInstance";
 static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
@@ -173,6 +182,28 @@ static void reach_helper_lock_metadata_cache(void)
 static void reach_helper_unlock_metadata_cache(void)
 {
     LeaveCriticalSection(&g_metadata_cache_lock);
+}
+
+static BOOL CALLBACK reach_helper_initialize_window_state(PINIT_ONCE init_once, PVOID parameter,
+                                                          PVOID *context)
+{
+    (void)init_once;
+    (void)parameter;
+    (void)context;
+    InitializeCriticalSection(&g_window_state_lock);
+    return TRUE;
+}
+
+static void reach_helper_lock_window_state(void)
+{
+    InitOnceExecuteOnce(&g_window_state_once, reach_helper_initialize_window_state, nullptr,
+                        nullptr);
+    EnterCriticalSection(&g_window_state_lock);
+}
+
+static void reach_helper_unlock_window_state(void)
+{
+    LeaveCriticalSection(&g_window_state_lock);
 }
 
 static void reach_helper_process_path(DWORD process_id, wchar_t *path, size_t path_count)
@@ -674,7 +705,107 @@ static void reach_helper_publish_window_state(void)
     }
 
     (void)reach_elevation_helper_shared_publish_windows(windows, window_count);
+    reach_helper_lock_window_state();
+    g_window_state.window_count = window_count;
+    for (uint32_t index = 0; index < window_count; ++index)
+    {
+        g_window_state.windows[index] = windows[index];
+    }
+    for (uint32_t index = window_count; index < REACH_ELEVATION_HELPER_MAX_WINDOWS; ++index)
+    {
+        g_window_state.windows[index] = {};
+    }
+    reach_helper_unlock_window_state();
     reach_helper_publish_game_mode();
+}
+
+static reach_helper_window_state reach_helper_current_window_state(void)
+{
+    reach_helper_window_state state = {};
+    reach_helper_lock_window_state();
+    state = g_window_state;
+    reach_helper_unlock_window_state();
+    return state;
+}
+
+static void reach_helper_publish_cached_window_state(const reach_helper_window_state *state)
+{
+    if (state == nullptr)
+    {
+        return;
+    }
+    (void)reach_elevation_helper_shared_publish_windows(state->windows, state->window_count);
+    reach_helper_lock_window_state();
+    g_window_state = *state;
+    reach_helper_unlock_window_state();
+}
+
+static int32_t reach_helper_publish_foreground_change(void)
+{
+    reach_helper_window_state state = reach_helper_current_window_state();
+    if (state.window_count == 0)
+    {
+        return 0;
+    }
+
+    int32_t changed = 0;
+    for (uint32_t index = 0; index < state.window_count; ++index)
+    {
+        HWND hwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(state.windows[index].window));
+        if (hwnd == nullptr || !IsWindow(hwnd))
+        {
+            return 0;
+        }
+        int32_t focused = reach_helper_window_has_foreground(hwnd);
+        if (state.windows[index].focused != focused)
+        {
+            state.windows[index].focused = focused;
+            changed = 1;
+        }
+    }
+
+    if (changed)
+    {
+        reach_helper_publish_cached_window_state(&state);
+    }
+    reach_helper_publish_game_mode();
+    return 1;
+}
+
+static int32_t reach_helper_publish_name_change(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd))
+    {
+        return 0;
+    }
+
+    reach_helper_window_state state = reach_helper_current_window_state();
+    uint32_t target_index = REACH_ELEVATION_HELPER_MAX_WINDOWS;
+    uint64_t window_id = reinterpret_cast<uint64_t>(hwnd);
+    for (uint32_t index = 0; index < state.window_count; ++index)
+    {
+        if (state.windows[index].window == window_id)
+        {
+            target_index = index;
+            break;
+        }
+    }
+
+    if (target_index == REACH_ELEVATION_HELPER_MAX_WINDOWS)
+    {
+        return 0;
+    }
+
+    reach_elevation_helper_window_snapshot updated = reach_helper_inspect_window(hwnd);
+    if (!updated.include_in_switcher)
+    {
+        return 0;
+    }
+
+    state.windows[target_index] = updated;
+    reach_helper_publish_cached_window_state(&state);
+    reach_helper_publish_game_mode();
+    return 1;
 }
 
 static void reach_helper_close_window_event_hooks(void)
@@ -711,6 +842,15 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
         if (event == EVENT_OBJECT_DESTROY)
         {
             reach_helper_forget_window_metadata(hwnd);
+        }
+
+        if (event == EVENT_SYSTEM_FOREGROUND && reach_helper_publish_foreground_change())
+        {
+            return;
+        }
+        if (event == EVENT_OBJECT_NAMECHANGE && reach_helper_publish_name_change(hwnd))
+        {
+            return;
         }
         reach_helper_publish_window_state();
     }
