@@ -211,6 +211,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
         reach_shell_release_dock_item(shell);
         shell->dock.dirty_flags = 1;
+        reach_shell_schedule_dock_reveal_recheck(shell);
         reach_shell_request_update(shell);
 
         return reach_shell_execute_dock_item_action(shell, action);
