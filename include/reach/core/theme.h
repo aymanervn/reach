@@ -10,29 +10,29 @@ extern "C"
 
     typedef struct reach_theme
     {
-        reach_color dock_background;
-        reach_color switcher_background;
-        reach_color dock_border;
+        reach_color light_background;
+        reach_color dark_background;
+        reach_color light_border;
+        reach_color dark_border;
         reach_color dock_shadow;
         reach_color icon_box_background;
         reach_color icon_backplate_background;
         reach_color fallback_icon_background;
         reach_color fallback_icon_text;
-        reach_color tray_button_background;
-        reach_color tray_popup_background;
         reach_color dock_system_separator;
         reach_color dock_clock_time;
         reach_color dock_clock_date;
-        reach_color dock_power_button_background;
+        reach_color dock_button_background;
         reach_color dock_power_glyph;
         reach_color quick_settings_slider_track_color;
         reach_color quick_settings_slider_fill_color;
         reach_color quick_settings_slider_muted_fill_color;
-        reach_color quick_settings_expand_button_color;
-        reach_color quick_settings_expand_text_color;
+        reach_color quick_settings_button_color;
         float dock_corner_radius_ratio;
+        reach_color light_text;
+        reach_color dark_text;
         float dock_corner_radius_max;
-        float dock_border_thickness;
+        float border_thickness;
         float dock_shadow_alpha;
         float icon_box_height_ratio;
         float icon_max_box_ratio;

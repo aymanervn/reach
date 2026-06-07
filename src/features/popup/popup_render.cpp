@@ -50,16 +50,15 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     float notch_width = reach_popup_notch_width();
     float notch_height = reach_popup_notch_height();
     float notch_center = reach_popup_clamp_notch_center(input->notch_center_x, input->bounds.width);
-    reach_color border = input->theme->dock_border;
-    border.a = 1.0f;
-
+    reach_color border = input->theme->dark_border;
+    float border_thickness = input->theme->border_thickness;
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
     command.rect.x = 0.5f;
     command.rect.y = 0.5f;
     command.rect.width = input->bounds.width - 1.0f;
     command.rect.height = input->bounds.height - 1.0f;
-    command.color = input->theme->tray_popup_background;
+    command.color = input->theme->dark_background;
     command.radius = radius;
     command.notch_center_x = notch_center;
     command.notch_width = notch_width;
@@ -74,7 +73,7 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     command.rect.height = input->bounds.height - 1.0f;
     command.color = border;
     command.radius = radius;
-    command.stroke_width = 1.0f;
+    command.stroke_width = border_thickness;
     command.notch_center_x = notch_center;
     command.notch_width = notch_width;
     command.notch_height = notch_height;

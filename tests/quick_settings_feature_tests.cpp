@@ -54,8 +54,8 @@ static reach_theme test_theme(void)
     theme.quick_settings_slider_track_color = {0.20f, 0.20f, 0.20f, 1.0f};
     theme.quick_settings_slider_fill_color = {0.85f, 0.85f, 0.85f, 1.0f};
     theme.quick_settings_slider_muted_fill_color = {0.45f, 0.45f, 0.45f, 1.0f};
-    theme.quick_settings_expand_button_color = {0.16f, 0.16f, 0.16f, 1.0f};
-    theme.quick_settings_expand_text_color = {0.90f, 0.90f, 0.90f, 1.0f};
+    theme.quick_settings_button_color = {0.16f, 0.16f, 0.16f, 1.0f};
+    theme.light_text = {0.90f, 0.90f, 0.90f, 1.0f};
     theme.icon_backplate_background = {0.98f, 0.92f, 0.84f, 0.96f};
     return theme;
 }
@@ -363,13 +363,14 @@ static void test_slider_fill_width_follows_volume(void)
             const size_t track_index = 8 + project_tile_command_offset;
             expect_true(commands.commands[track_index].type == REACH_RENDER_COMMAND_RECT,
                         "track follows volume row when fill omitted at zero");
-            expect_near(commands.commands[track_index].rect.width, input.layout.main_slider_track.width,
-                        0.001f, "zero fill is omitted");
+            expect_near(commands.commands[track_index].rect.width,
+                        input.layout.main_slider_track.width, 0.001f, "zero fill is omitted");
         }
         else
         {
             const size_t fill_index = 9 + project_tile_command_offset;
-            expect_true(commands.commands[fill_index].type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT,
+            expect_true(commands.commands[fill_index].type ==
+                            REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT,
                         "fill is clipped to slider pill");
             expect_near(commands.commands[fill_index].rect.width,
                         input.layout.main_slider_track.width * levels[index], 0.001f,
@@ -678,30 +679,38 @@ static void test_expanded_render_emits_app_volume_panel_rows(void)
                 "expanded render emits app volumes title");
     expect_true(commands.commands[app_panel].type == REACH_RENDER_COMMAND_RECT,
                 "expanded render emits app volumes panel background");
-    expect_color_equal(commands.commands[app_panel].color, theme.quick_settings_expand_button_color,
+    expect_color_equal(commands.commands[app_panel].color, theme.quick_settings_button_color,
                        "app volumes panel uses expand button color");
-    expect_true(commands.commands[17 + project_tile_command_offset].type == REACH_RENDER_COMMAND_ICON &&
+    expect_true(commands.commands[17 + project_tile_command_offset].type ==
+                        REACH_RENDER_COMMAND_ICON &&
                     commands.commands[17 + project_tile_command_offset].icon_id == 9000,
                 "first app row starts with app icon");
-    expect_true(commands.commands[18 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
-                    text_equals_ascii(commands.commands[18 + project_tile_command_offset].text, "App A"),
-                "first app row label strips exe suffix");
-    expect_true(commands.commands[19 + project_tile_command_offset].type == REACH_RENDER_COMMAND_RECT &&
+    expect_true(
+        commands.commands[18 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[18 + project_tile_command_offset].text, "App A"),
+        "first app row label strips exe suffix");
+    expect_true(commands.commands[19 + project_tile_command_offset].type ==
+                        REACH_RENDER_COMMAND_RECT &&
                     commands.commands[19 + project_tile_command_offset].rect.height < 4.0f,
                 "app row uses compact slider track");
-    expect_true(commands.commands[22 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
-                    text_equals_ascii(commands.commands[22 + project_tile_command_offset].text, "25%"),
-                "first app row renders percentage");
-    expect_true(commands.commands[24 + project_tile_command_offset].type == REACH_RENDER_COMMAND_ICON &&
+    expect_true(
+        commands.commands[22 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[22 + project_tile_command_offset].text, "25%"),
+        "first app row renders percentage");
+    expect_true(commands.commands[24 + project_tile_command_offset].type ==
+                        REACH_RENDER_COMMAND_ICON &&
                     commands.commands[24 + project_tile_command_offset].icon_id == 9001,
                 "second app row follows first compact row");
-    expect_true(commands.commands[25 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
-                    text_equals_ascii(commands.commands[25 + project_tile_command_offset].text, "App B"),
-                "second app row label strips exe suffix");
-    expect_true(commands.commands[29 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
-                    text_equals_ascii(commands.commands[29 + project_tile_command_offset].text, "30%"),
-                "second app row renders percentage");
-    expect_true(commands.commands[31 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
+    expect_true(
+        commands.commands[25 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[25 + project_tile_command_offset].text, "App B"),
+        "second app row label strips exe suffix");
+    expect_true(
+        commands.commands[29 + project_tile_command_offset].type == REACH_RENDER_COMMAND_TEXT &&
+            text_equals_ascii(commands.commands[29 + project_tile_command_offset].text, "30%"),
+        "second app row renders percentage");
+    expect_true(commands.commands[31 + project_tile_command_offset].type ==
+                        REACH_RENDER_COMMAND_TEXT &&
                     text_equals_ascii(commands.commands[31 + project_tile_command_offset].text,
                                       "Hide app volumes"),
                 "expanded render keeps collapse row label inside panel");
@@ -738,9 +747,11 @@ static void test_expanded_output_device_render_emits_checkmark(void)
                     commands.commands[11 + project_tile_command_offset].icon_id ==
                         REACH_VECTOR_ICON_ARROW_UP,
                 "expanded output title shows close affordance");
-    expect_true(commands.commands[12 + project_tile_command_offset].type == REACH_RENDER_COMMAND_RECT,
+    expect_true(commands.commands[12 + project_tile_command_offset].type ==
+                    REACH_RENDER_COMMAND_RECT,
                 "expanded output render emits device panel background");
-    expect_true(commands.commands[13 + project_tile_command_offset].type == REACH_RENDER_COMMAND_ICON &&
+    expect_true(commands.commands[13 + project_tile_command_offset].type ==
+                        REACH_RENDER_COMMAND_ICON &&
                     commands.commands[13 + project_tile_command_offset].icon_id == 7000,
                 "first output row renders device icon");
     expect_true(commands.commands[15 + project_tile_command_offset].type !=
@@ -748,7 +759,8 @@ static void test_expanded_output_device_render_emits_checkmark(void)
                     commands.commands[15 + project_tile_command_offset].icon_id !=
                         REACH_VECTOR_ICON_CHECK,
                 "non-default output row does not render checkmark");
-    expect_true(commands.commands[16 + project_tile_command_offset].type == REACH_RENDER_COMMAND_ICON &&
+    expect_true(commands.commands[16 + project_tile_command_offset].type ==
+                        REACH_RENDER_COMMAND_ICON &&
                     commands.commands[16 + project_tile_command_offset].icon_id == 7001,
                 "default output row renders device icon");
     expect_true(commands.commands[18 + project_tile_command_offset].type ==
@@ -877,12 +889,12 @@ static void test_disabled_bluetooth_uses_off_icon_and_inactive_style(void)
     reach_result result = reach_quick_settings_build_render_commands(&input, &commands);
 
     expect_true(result == REACH_OK, "disabled bluetooth render succeeds");
-    expect_color_equal(commands.commands[3].color, theme.quick_settings_expand_button_color,
+    expect_color_equal(commands.commands[3].color, theme.quick_settings_button_color,
                        "disabled bluetooth tile uses inactive background");
     expect_true(commands.commands[4].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
                     commands.commands[4].icon_id == REACH_VECTOR_ICON_BLUETOOTH_OFF,
                 "disabled bluetooth uses bluetooth off icon");
-    expect_color_equal(commands.commands[4].color, theme.quick_settings_expand_text_color,
+    expect_color_equal(commands.commands[4].color, theme.light_text,
                        "disabled bluetooth icon uses inactive foreground");
 }
 
@@ -937,28 +949,33 @@ static void test_render_emits_volume_pill_and_expand_commands(void)
                 "third command is slider track");
     expect_near(commands.commands[slider_track].radius, reach_popup_radius(), 0.001f,
                 "slider track uses popup corner radius");
-    expect_near(commands.commands[slider_track].rect.height, input.layout.main_volume_pill.bounds.height,
-                0.001f, "slider track fills pill height");
+    expect_near(commands.commands[slider_track].rect.height,
+                input.layout.main_volume_pill.bounds.height, 0.001f,
+                "slider track fills pill height");
 
     expect_true(commands.commands[slider_fill].type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT,
                 "fourth command is slider fill");
 
-    expect_near(commands.commands[slider_fill].rect.width, input.layout.main_slider_track.width * 0.5f,
-                0.001f, "slider fill width follows volume");
-    expect_near(commands.commands[slider_fill].rect.height, commands.commands[slider_track].rect.height, 0.001f,
+    expect_near(commands.commands[slider_fill].rect.width,
+                input.layout.main_slider_track.width * 0.5f, 0.001f,
+                "slider fill width follows volume");
+    expect_near(commands.commands[slider_fill].rect.height,
+                commands.commands[slider_track].rect.height, 0.001f,
                 "slider fill height matches track height");
-    expect_near(commands.commands[slider_fill].rect.y, commands.commands[slider_track].rect.y, 0.001f,
-                "slider fill y matches track y");
-    expect_near(commands.commands[slider_fill].clip_rect.x, commands.commands[slider_track].rect.x, 0.001f,
-                "slider fill clips to track x");
-    expect_near(commands.commands[slider_fill].clip_rect.y, commands.commands[slider_track].rect.y, 0.001f,
-                "slider fill clips to track y");
-    expect_near(commands.commands[slider_fill].clip_rect.width, commands.commands[slider_track].rect.width, 0.001f,
+    expect_near(commands.commands[slider_fill].rect.y, commands.commands[slider_track].rect.y,
+                0.001f, "slider fill y matches track y");
+    expect_near(commands.commands[slider_fill].clip_rect.x, commands.commands[slider_track].rect.x,
+                0.001f, "slider fill clips to track x");
+    expect_near(commands.commands[slider_fill].clip_rect.y, commands.commands[slider_track].rect.y,
+                0.001f, "slider fill clips to track y");
+    expect_near(commands.commands[slider_fill].clip_rect.width,
+                commands.commands[slider_track].rect.width, 0.001f,
                 "slider fill clips to track width");
-    expect_near(commands.commands[slider_fill].clip_rect.height, commands.commands[slider_track].rect.height, 0.001f,
+    expect_near(commands.commands[slider_fill].clip_rect.height,
+                commands.commands[slider_track].rect.height, 0.001f,
                 "slider fill clips to track height");
-    expect_near(commands.commands[slider_fill].clip_radius, commands.commands[slider_track].radius, 0.001f,
-                "slider fill clips to track radius");
+    expect_near(commands.commands[slider_fill].clip_radius, commands.commands[slider_track].radius,
+                0.001f, "slider fill clips to track radius");
 
     expect_true(commands.commands[output_button].type == REACH_RENDER_COMMAND_RECT,
                 "fifth command is output device button background");
@@ -976,8 +993,8 @@ static void test_render_emits_volume_pill_and_expand_commands(void)
     expect_true(commands.commands[expand_button_arrow].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
                     commands.commands[expand_button_arrow].icon_id == REACH_VECTOR_ICON_ARROW_DOWN,
                 "expand button uses arrow down icon");
-    expect_color_equal(commands.commands[expand_button_arrow].color, theme.icon_backplate_background,
-                       "expand icon uses app backplate color");
+    expect_color_equal(commands.commands[expand_button_arrow].color,
+                       theme.icon_backplate_background, "expand icon uses app backplate color");
 }
 
 int main(void)

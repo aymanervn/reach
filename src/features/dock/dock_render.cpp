@@ -216,22 +216,21 @@ static void reach_dock_push_background(const reach_theme *theme, const reach_doc
 {
     reach_dock_push_rect(commands,
                          reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height),
-                         theme->dock_background, dock_radius);
+                         theme->light_background, dock_radius);
 
-    if (theme->dock_border_thickness <= 0.0f || theme->dock_border.a <= 0.0f)
+    if (theme->border_thickness <= 0.0f || theme->light_border.a <= 0.0f)
     {
         return;
     }
 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect =
-        reach_dock_rect(theme->dock_border_thickness * 0.5f, theme->dock_border_thickness * 0.5f,
-                        layout->bounds.width - theme->dock_border_thickness,
-                        layout->bounds.height - theme->dock_border_thickness);
-    command.color = theme->dock_border;
+    command.rect = reach_dock_rect(theme->border_thickness * 0.5f, theme->border_thickness * 0.5f,
+                                   layout->bounds.width - theme->border_thickness,
+                                   layout->bounds.height - theme->border_thickness);
+    command.color = theme->light_border;
     command.radius = dock_radius;
-    command.stroke_width = theme->dock_border_thickness;
+    command.stroke_width = theme->border_thickness;
     reach_render_command_buffer_push(commands, &command);
 }
 
@@ -249,7 +248,7 @@ static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
         reach_dock_icon_box_for_slot(layout->quick_settings_button, layout->bounds, icon_box_size);
 
     reach_dock_push_rect(commands, reach_dock_union_rect(tray_box, quick_settings_box),
-                         theme->tray_button_background, icon_box_radius);
+                         theme->dock_button_background, icon_box_radius);
     reach_dock_push_vector_icon(commands, reach_dock_center_square(tray_box, system_icon_size),
                                 REACH_VECTOR_ICON_ARROW_UP, theme->icon_backplate_background);
     reach_dock_push_vector_icon(commands,
@@ -298,7 +297,7 @@ static void reach_dock_push_power_button(const reach_dock_render_input *input,
     reach_rect_f32 power_box =
         reach_dock_icon_box_for_slot(layout->power_button, layout->bounds, icon_box_size);
 
-    reach_dock_push_rect(commands, power_box, theme->dock_power_button_background,
+    reach_dock_push_rect(commands, power_box, theme->dock_button_background,
                          theme->dock_power_button_corner_radius);
     reach_dock_push_vector_icon(commands, reach_dock_center_square(power_box, system_icon_size),
                                 REACH_VECTOR_ICON_POWER, theme->dock_power_glyph);

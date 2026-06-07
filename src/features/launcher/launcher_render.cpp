@@ -57,7 +57,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     command.rect.y = layout->search_box.y - layout->bounds.y;
     command.rect.width = layout->search_box.width;
     command.rect.height = layout->search_box.height;
-    command.color = theme->tray_popup_background;
+    command.color = theme->dark_background;
     command.radius = launcher_radius;
     reach_render_command_buffer_push(out_commands, &command);
 
@@ -67,10 +67,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     command.rect.y = layout->search_box.y - layout->bounds.y + 0.5f;
     command.rect.width = layout->search_box.width - 1.0f;
     command.rect.height = layout->search_box.height - 1.0f;
-    command.color = theme->dock_border;
-    command.color.a = 0.88f;
+    command.color = theme->dark_border;
     command.radius = launcher_radius;
-    command.stroke_width = 1.0f;
+    command.stroke_width = theme->border_thickness;
     reach_render_command_buffer_push(out_commands, &command);
 
     command = {};
@@ -113,7 +112,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.rect.y = layout->search_results.y - layout->bounds.y;
         command.rect.width = layout->search_results.width;
         command.rect.height = layout->search_results.height;
-        command.color = theme->tray_popup_background;
+        command.color = theme->dark_background;
         command.color.a = 0.96f;
         command.radius = launcher_radius;
         reach_render_command_buffer_push(out_commands, &command);

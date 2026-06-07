@@ -37,7 +37,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     command.rect.y = 0.5f;
     command.rect.width = input->bounds.width - 1.0f;
     command.rect.height = input->bounds.height - 1.0f;
-    command.color = theme->switcher_background;
+    command.color = theme->dark_background;
     command.radius = radius;
     reach_render_command_buffer_push(out_commands, &command);
 
@@ -47,7 +47,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     command.rect.y = 0.5f;
     command.rect.width = input->bounds.width - 1.0f;
     command.rect.height = input->bounds.height - 1.0f;
-    command.color = theme->dock_border;
+    command.color = theme->dark_border;
     command.radius = radius;
     command.stroke_width = 1.0f;
     reach_render_command_buffer_push(out_commands, &command);
