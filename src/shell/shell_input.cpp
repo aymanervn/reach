@@ -597,6 +597,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
         if (open_windows_changed || foreground_changed)
         {
+            reach_shell_refresh_switcher_windows(shell);
             shell->dock.dirty_flags = 1;
             shell->switcher.dirty_flags = 1;
         }

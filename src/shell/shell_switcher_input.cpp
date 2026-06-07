@@ -77,6 +77,73 @@ static void reach_shell_rebuild_switcher_windows(reach_shell *shell)
     }
 }
 
+static int32_t reach_shell_switcher_window_index(const reach_shell_switcher_state *state,
+                                                 uintptr_t window_id, size_t *out_index)
+{
+    if (state == nullptr || window_id == 0)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < state->window_count; ++index)
+    {
+        if (state->windows[index] == window_id)
+        {
+            if (out_index != nullptr)
+            {
+                *out_index = index;
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void reach_shell_refresh_switcher_windows(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->switcher_state.open)
+    {
+        return;
+    }
+
+    uintptr_t selected_window = 0;
+    size_t old_selected = shell->switcher_state.selected_index;
+    if (old_selected < shell->switcher_state.window_count)
+    {
+        selected_window = shell->switcher_state.windows[old_selected];
+    }
+
+    reach_shell_rebuild_switcher_windows(shell);
+    if (shell->switcher_state.window_count == 0)
+    {
+        shell->switcher_state.open = 0;
+        shell->switcher_state.selected_index = 0;
+        shell->switcher_state.visible_start = 0;
+        shell->switcher_state.width_animation = {};
+        shell->switcher_state.width_animating = 0;
+        shell->switcher.dirty_flags = 1;
+        return;
+    }
+
+    size_t selected_index = 0;
+    if (reach_shell_switcher_window_index(&shell->switcher_state, selected_window,
+                                          &selected_index))
+    {
+        shell->switcher_state.selected_index = selected_index;
+    }
+    else if (old_selected < shell->switcher_state.window_count)
+    {
+        shell->switcher_state.selected_index = old_selected;
+    }
+    else
+    {
+        shell->switcher_state.selected_index = shell->switcher_state.window_count - 1;
+    }
+
+    reach_shell_update_switcher_visible_start(shell);
+    shell->switcher.dirty_flags = 1;
+}
+
 reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_ui_event *event)
 {
     if (shell == nullptr || event == nullptr)
@@ -103,6 +170,8 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
         shell->switcher_state.open = shell->switcher_state.window_count > 0 ? 1 : 0;
         shell->switcher_state.selected_index = shell->switcher_state.window_count > 1 ? 1 : 0;
         shell->switcher_state.visible_start = 0;
+        shell->switcher_state.width_animation = {};
+        shell->switcher_state.width_animating = 0;
 
         reach_shell_update_switcher_visible_start(shell);
 
@@ -142,6 +211,8 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
     if (event->type == REACH_UI_EVENT_ALT_TAB_CANCEL)
     {
         shell->switcher_state.open = 0;
+        shell->switcher_state.width_animation = {};
+        shell->switcher_state.width_animating = 0;
         shell->switcher.dirty_flags = 1;
 
         if (shell->switcher.window.ops.hide != nullptr)
@@ -164,6 +235,8 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
         }
 
         shell->switcher_state.open = 0;
+        shell->switcher_state.width_animation = {};
+        shell->switcher_state.width_animating = 0;
         shell->switcher.dirty_flags = 1;
 
         if (shell->switcher.window.ops.hide != nullptr)

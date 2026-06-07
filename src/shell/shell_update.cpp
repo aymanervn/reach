@@ -77,6 +77,65 @@ static float reach_shell_monitor_dpi_scale(const reach_monitor_info *monitor)
     return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
 }
 
+static int32_t reach_shell_switcher_width_animation_active(const reach_shell *shell)
+{
+    return shell != nullptr && shell->switcher_state.width_animating &&
+           shell->switcher_state.width_animation.elapsed_seconds <
+               shell->switcher_state.width_animation.duration_seconds;
+}
+
+static reach_rect_f32 reach_shell_apply_switcher_bounds_animation(reach_shell *shell,
+                                                                  reach_rect_f32 target,
+                                                                  double delta_seconds)
+{
+    if (shell == nullptr || !shell->switcher_state.open)
+    {
+        return target;
+    }
+
+    reach_float_animation *animation = &shell->switcher_state.width_animation;
+    if (!shell->switcher.bounds_valid || animation->to <= 0.0f)
+    {
+        *animation = {};
+        animation->from = target.width;
+        animation->to = target.width;
+        animation->value = target.width;
+        shell->switcher_state.width_animating = 0;
+    }
+    else if (fabsf(animation->to - target.width) >= 0.5f)
+    {
+        float from = shell->switcher_state.width_animating ? animation->value
+                                                           : shell->switcher.last_bounds.width;
+        reach_float_animation_start(animation, from, target.width, 0.18);
+        shell->switcher_state.width_animating = 1;
+    }
+
+    float width = target.width;
+    if (shell->switcher_state.width_animating)
+    {
+        reach_float_animation_update(animation, delta_seconds);
+        width = animation->value;
+        shell->switcher_state.width_animating =
+            reach_shell_switcher_width_animation_active(shell);
+        shell->switcher.dirty_flags = 1;
+    }
+    else if (animation->to > 0.0f)
+    {
+        width = animation->to;
+    }
+
+    if (fabsf(width - target.width) < 0.5f)
+    {
+        width = target.width;
+    }
+
+    reach_rect_f32 animated = target;
+    float center = target.x + target.width * 0.5f;
+    animated.width = width;
+    animated.x = center - width * 0.5f;
+    return animated;
+}
+
 void reach_shell_refresh_pinned_icon_slots(reach_shell *shell)
 {
     REACH_ASSERT(shell != nullptr);
@@ -349,6 +408,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
         if (open_windows_changed || foreground_changed)
         {
+            reach_shell_refresh_switcher_windows(shell);
             shell->dock.dirty_flags = 1;
             shell->switcher.dirty_flags = 1;
         }
@@ -643,8 +703,10 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
                 if (shell->switcher.window.ops.set_bounds != nullptr)
                 {
-                    reach_rect_f32 switcher_bounds = reach_switcher_bounds_for_count(
+                    reach_rect_f32 target_switcher_bounds = reach_switcher_bounds_for_count(
                         bounds, reach_shell_switcher_visible_count(shell));
+                    reach_rect_f32 switcher_bounds = reach_shell_apply_switcher_bounds_animation(
+                        shell, target_switcher_bounds, delta_seconds);
                     int32_t switcher_window_changed = 0;
                     result = reach_shell_apply_window_state(
                         &shell->switcher.window, switcher_bounds,
@@ -776,6 +838,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             reach_shell_quick_settings_system_refresh_work_pending(shell) ||
             reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
             shell->dock_animation.animating || shell->dock_width.animating ||
-            shell->dock_drag.active || shell->dock_drag.snapping || dock_item_animating ||
-            shell->feedback.dock_animating || shell->feedback.tray_animating);
+            reach_shell_switcher_width_animation_active(shell) || shell->dock_drag.active ||
+            shell->dock_drag.snapping || dock_item_animating || shell->feedback.dock_animating ||
+            shell->feedback.tray_animating);
 }

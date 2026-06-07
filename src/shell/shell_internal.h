@@ -213,6 +213,8 @@ typedef struct reach_shell_switcher_state
     size_t visible_start;
     uintptr_t windows[REACH_MAX_PINNED_APPS];
     size_t window_count;
+    reach_float_animation width_animation;
+    int32_t width_animating;
 } reach_shell_switcher_state;
 
 typedef struct reach_shell_wallpaper_state
@@ -669,6 +671,7 @@ reach_result reach_shell_update_quick_settings_drag(reach_shell *shell,
 
 size_t reach_shell_switcher_visible_count(const reach_shell *shell);
 void reach_shell_update_switcher_visible_start(reach_shell *shell);
+void reach_shell_refresh_switcher_windows(reach_shell *shell);
 
 reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_ui_event *event);
 
