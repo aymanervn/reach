@@ -211,6 +211,8 @@ typedef struct reach_shell_switcher_state
     int32_t open;
     size_t selected_index;
     size_t visible_start;
+    uintptr_t windows[REACH_MAX_PINNED_APPS];
+    size_t window_count;
 } reach_shell_switcher_state;
 
 typedef struct reach_shell_wallpaper_state
@@ -376,6 +378,8 @@ struct reach_shell
     reach_window_snapshot open_windows[REACH_MAX_PINNED_APPS];
     size_t open_window_count;
     uintptr_t foreground_window;
+    uintptr_t focus_history[REACH_MAX_PINNED_APPS];
+    size_t focus_history_count;
     reach_dock_feature_model dock_model;
     reach_dock_icon_cache dock_icons;
     reach_float_animation dock_item_x_animations[REACH_MAX_PINNED_APPS];
@@ -532,6 +536,7 @@ void reach_shell_sync_open_window_icons(reach_shell *shell, const uintptr_t *old
 void reach_shell_load_open_window_icons(reach_shell *shell);
 void reach_shell_release_quick_settings_audio_render_icons(reach_shell *shell);
 reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_changed);
+void reach_shell_note_foreground_window(reach_shell *shell, uintptr_t foreground_window);
 
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
 reach_result reach_shell_execute_window_control(reach_shell *shell,

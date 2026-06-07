@@ -1,6 +1,4 @@
-#include "window_actions_win32.h"
-
-#include <stdio.h>
+#include "window_actions.h"
 
 struct reach_window_action_state
 {
@@ -59,80 +57,6 @@ static reach_window_action_state reach_window_management_capture_state(HWND hwnd
     }
 
     return state;
-}
-
-static DWORD reach_window_management_process_integrity(HWND hwnd)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd))
-    {
-        return 0;
-    }
-
-    DWORD process_id = 0;
-    GetWindowThreadProcessId(hwnd, &process_id);
-    if (process_id == 0)
-    {
-        return 0;
-    }
-
-    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
-    if (process == nullptr)
-    {
-        return 0;
-    }
-
-    HANDLE token = nullptr;
-    if (!OpenProcessToken(process, TOKEN_QUERY, &token))
-    {
-        CloseHandle(process);
-        return 0;
-    }
-
-    BYTE buffer[512] = {};
-    DWORD needed = 0;
-    DWORD integrity = 0;
-    if (GetTokenInformation(token, TokenIntegrityLevel, buffer, sizeof(buffer), &needed))
-    {
-        TOKEN_MANDATORY_LABEL *label = reinterpret_cast<TOKEN_MANDATORY_LABEL *>(buffer);
-        DWORD sub_authority_count = *GetSidSubAuthorityCount(label->Label.Sid);
-        integrity = *GetSidSubAuthority(label->Label.Sid, sub_authority_count - 1);
-    }
-
-    CloseHandle(token);
-    CloseHandle(process);
-    return integrity;
-}
-
-static DWORD reach_window_management_current_integrity(void)
-{
-    HANDLE token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
-    {
-        return 0;
-    }
-
-    BYTE buffer[512] = {};
-    DWORD needed = 0;
-    DWORD integrity = 0;
-    if (GetTokenInformation(token, TokenIntegrityLevel, buffer, sizeof(buffer), &needed))
-    {
-        TOKEN_MANDATORY_LABEL *label = reinterpret_cast<TOKEN_MANDATORY_LABEL *>(buffer);
-        DWORD sub_authority_count = *GetSidSubAuthorityCount(label->Label.Sid);
-        integrity = *GetSidSubAuthority(label->Label.Sid, sub_authority_count - 1);
-    }
-
-    CloseHandle(token);
-    return integrity;
-}
-
-static DWORD reach_window_management_process_id(HWND hwnd)
-{
-    DWORD process_id = 0;
-    if (hwnd != nullptr)
-    {
-        GetWindowThreadProcessId(hwnd, &process_id);
-    }
-    return process_id;
 }
 
 static int32_t reach_window_management_rect_equalish(RECT a, RECT b)
@@ -216,30 +140,58 @@ static void reach_window_management_log_failure(const char *action, HWND hwnd,
                                                 const reach_window_action_state *before,
                                                 const reach_window_action_state *after)
 {
-    char message[768] = {};
-    snprintf(message, sizeof(message),
-             "window action failed action=%s hwnd=%p pid=%lu target_integrity=0x%lx "
-             "controller_integrity=0x%lx before={window=%d visible=%d iconic=%d show=%u "
-             "rect=%ld,%ld,%ld,%ld ptMin=%ld,%ld} after={window=%d visible=%d iconic=%d "
-             "show=%u rect=%ld,%ld,%ld,%ld ptMin=%ld,%ld}",
-             action != nullptr ? action : "unknown", hwnd,
-             (unsigned long)reach_window_management_process_id(hwnd),
-             (unsigned long)reach_window_management_process_integrity(hwnd),
-             (unsigned long)reach_window_management_current_integrity(),
-             before != nullptr ? before->is_window : 0, before != nullptr ? before->visible : 0,
-             before != nullptr ? before->iconic : 0, before != nullptr ? before->show_cmd : 0,
-             before != nullptr ? before->rect.left : 0, before != nullptr ? before->rect.top : 0,
-             before != nullptr ? before->rect.right : 0,
-             before != nullptr ? before->rect.bottom : 0,
-             before != nullptr ? before->min_position.x : 0,
-             before != nullptr ? before->min_position.y : 0,
-             after != nullptr ? after->is_window : 0, after != nullptr ? after->visible : 0,
-             after != nullptr ? after->iconic : 0, after != nullptr ? after->show_cmd : 0,
-             after != nullptr ? after->rect.left : 0, after != nullptr ? after->rect.top : 0,
-             after != nullptr ? after->rect.right : 0, after != nullptr ? after->rect.bottom : 0,
-             after != nullptr ? after->min_position.x : 0,
-             after != nullptr ? after->min_position.y : 0);
-    reach_log_error(message);
+    (void)action;
+    (void)hwnd;
+    (void)before;
+    (void)after;
+}
+
+static int32_t reach_window_management_foreground_matches(HWND target)
+{
+    HWND foreground = GetForegroundWindow();
+    return target != nullptr && foreground != nullptr &&
+           (foreground == target || GetAncestor(foreground, GA_ROOT) == target ||
+            GetAncestor(foreground, GA_ROOTOWNER) == target);
+}
+
+static int32_t reach_window_management_focus_target(HWND target)
+{
+    if (target == nullptr || !IsWindow(target))
+    {
+        return 0;
+    }
+
+    DWORD target_thread = GetWindowThreadProcessId(target, nullptr);
+    DWORD foreground_thread = GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
+    DWORD current_thread = GetCurrentThreadId();
+
+    BOOL attached_target = FALSE;
+    BOOL attached_foreground = FALSE;
+    if (target_thread != 0 && target_thread != current_thread)
+    {
+        attached_target = AttachThreadInput(current_thread, target_thread, TRUE);
+    }
+    if (foreground_thread != 0 && foreground_thread != current_thread &&
+        foreground_thread != target_thread)
+    {
+        attached_foreground = AttachThreadInput(current_thread, foreground_thread, TRUE);
+    }
+
+    (void)SetActiveWindow(target);
+    (void)SetFocus(target);
+    BOOL foreground_ok = SetForegroundWindow(target);
+    BringWindowToTop(target);
+
+    if (attached_foreground)
+    {
+        (void)AttachThreadInput(current_thread, foreground_thread, FALSE);
+    }
+    if (attached_target)
+    {
+        (void)AttachThreadInput(current_thread, target_thread, FALSE);
+    }
+
+    return foreground_ok || reach_window_management_foreground_matches(target);
 }
 
 reach_result reach_window_management_activate(HWND hwnd)
@@ -281,9 +233,7 @@ reach_result reach_window_management_activate(HWND hwnd)
     SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     BringWindowToTop(target);
 
-    BOOL foreground_ok = SetForegroundWindow(target);
-    HWND actual_foreground = GetForegroundWindow();
-    if (foreground_ok || actual_foreground == target)
+    if (reach_window_management_focus_target(target))
     {
         return REACH_OK;
     }
@@ -300,11 +250,7 @@ reach_result reach_window_management_minimize(HWND hwnd)
         return REACH_INVALID_ARGUMENT;
     }
 
-    HWND target = reach_window_management_activation_target(hwnd);
-    if (target == nullptr)
-    {
-        target = hwnd;
-    }
+    HWND target = hwnd;
 
     reach_window_action_state before = reach_window_management_capture_state(target);
     (void)ShowWindowAsync(target, SW_MINIMIZE);

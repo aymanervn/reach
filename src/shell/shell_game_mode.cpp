@@ -2,14 +2,8 @@
 
 static int32_t reach_shell_detect_game_mode(const reach_shell *shell)
 {
-    if (shell == nullptr || shell->window_manager.manager == nullptr)
-    {
-        return 0;
-    }
-
-    return shell->window_manager.ops.foreground_is_exclusive_fullscreen != nullptr &&
-           shell->window_manager.ops.foreground_is_exclusive_fullscreen(
-               shell->window_manager.manager);
+    (void)shell;
+    return 0;
 }
 
 static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)

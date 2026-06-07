@@ -112,11 +112,9 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
-    src/adapters/windows/window_management/window_filter_win32.cpp
-    src/adapters/windows/window_management/window_display_state_win32.cpp
     src/adapters/windows/window_management/elevation_helper_protocol.cpp
     src/adapters/windows/window_management/elevation_helper_client_win32.cpp
-    src/adapters/windows/window_management/elevation_helper_session_win32.cpp
+    src/adapters/windows/window_management/elevation_helper_shared_state_win32.cpp
     src/adapters/windows/window_management/window_manager_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp
@@ -306,8 +304,10 @@ target_link_libraries(reach-watchdog PRIVATE
 
 add_executable(reach_elevation_helper WIN32
     src/tools/reach_elevation_helper/reach_elevation_helper.cpp
-    src/adapters/windows/window_management/window_actions_win32.cpp
+    src/tools/reach_elevation_helper/window_actions.cpp
     src/adapters/windows/window_management/elevation_helper_protocol.cpp
+    src/adapters/windows/window_management/elevation_helper_shared_state_win32.cpp
+    src/adapters/windows/window_management/window_query_win32.cpp
     src/support/layout.cpp
     src/support/util.cpp
 )
@@ -327,7 +327,11 @@ target_compile_features(reach_elevation_helper PRIVATE
 )
 target_link_libraries(reach_elevation_helper PRIVATE
     user32
+    shell32
     advapi32
+    ole32
+    propsys
+    uuid
 )
 set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
 set(REACH_DIST_DIR "${REACH_DIST_ROOT}/Release")
@@ -463,17 +467,6 @@ target_link_libraries(reach_search_ranking_tests PRIVATE
     reach_support
 )
 
-add_executable(reach_elevation_helper_protocol_tests
-    tests/elevation_helper_protocol_tests.cpp
-    src/adapters/windows/window_management/elevation_helper_protocol.cpp
-)
-
-reach_configure_common(reach_elevation_helper_protocol_tests)
-reach_configure_windows(reach_elevation_helper_protocol_tests)
-target_compile_features(reach_elevation_helper_protocol_tests PRIVATE
-    cxx_std_17
-)
-
 add_executable(reach_system_controls_network_tests
     tests/system_controls_network_tests.cpp
     src/adapters/windows/system_controls_network.cpp
@@ -492,7 +485,6 @@ if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_quick_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_quick_settings_feature_tests.exe)
     add_test(NAME reach_launcher_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_launcher_feature_tests.exe)
     add_test(NAME reach_search_ranking_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_search_ranking_tests.exe)
-    add_test(NAME reach_elevation_helper_protocol_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_elevation_helper_protocol_tests.exe)
     add_test(NAME reach_system_controls_network_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_system_controls_network_tests.exe)
 else()
     add_test(NAME reach_core_tests COMMAND reach_core_tests)
@@ -501,7 +493,6 @@ else()
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
-    add_test(NAME reach_elevation_helper_protocol_tests COMMAND reach_elevation_helper_protocol_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
 endif()
 

@@ -333,7 +333,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 ? shell->window_manager.ops.foreground(shell->window_manager.manager)
                 : 0;
         int32_t foreground_changed = shell->foreground_window != foreground_window;
-        shell->foreground_window = foreground_window;
+        reach_shell_note_foreground_window(shell, foreground_window);
 
         if (open_windows_changed || foreground_changed)
         {

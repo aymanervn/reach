@@ -1,7 +1,8 @@
-#ifndef REACH_WINDOW_ACTIONS_WIN32_H
-#define REACH_WINDOW_ACTIONS_WIN32_H
+#ifndef REACH_WINDOW_ACTIONS_H
+#define REACH_WINDOW_ACTIONS_H
 
-#include "../windows_adapters_internal.h"
+#include "reach/support/layout.h"
+#include "reach/support/util.h"
 
 #include <windows.h>
 

@@ -1,6 +1,6 @@
 #include "windows_adapters_internal.h"
 
-#include "window_management/elevation_helper_session_win32.h"
+#include "window_management/elevation_helper_shared_state_win32.h"
 
 #include "reach/ports/input_source.h"
 
@@ -12,95 +12,150 @@ struct reach_input_source
     reach_input_event_callback callback;
     void *user;
     HWND window;
-    HHOOK keyboard_hook;
     ATOM window_class;
-    int32_t registered_hotkey_count;
-    int32_t windows_key_down;
-    int32_t windows_key_chord;
+    uint64_t last_hotkey_event;
     int32_t alt_down;
     int32_t shift_down;
     int32_t alt_tab_active;
-    LONG helper_hotkeys_enabled;
+    int32_t windows_key_down;
+    int32_t windows_key_chord;
 };
 
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
-static const UINT REACH_INPUT_WM_WINDOWS_KEY = WM_APP + 20;
 static const UINT REACH_INPUT_WM_UI_EVENT = WM_APP + 21;
-static const UINT REACH_INPUT_WM_ENABLE_FALLBACK_HOTKEYS = WM_APP + 22;
-static const UINT REACH_INPUT_WM_HELPER_CONNECTED = WM_APP + 23;
+static const UINT REACH_INPUT_WM_SHARED_HOTKEYS = WM_APP + 23;
 static const UINT REACH_INPUT_WM_HELPER_DISCONNECTED = WM_APP + 24;
-static const UINT_PTR REACH_INPUT_HELPER_RETRY_TIMER = 1;
-static reach_input_source *g_reach_keyboard_source;
 
-enum reach_input_hotkey_id
+static void reach_input_post_ui_event(reach_input_source *source, reach_ui_event_type type,
+                                      uint32_t id)
 {
-    REACH_HOTKEY_WIN_SPACE = 3,
-    REACH_HOTKEY_CTRL_SPACE = 4
-};
-
-static reach_result reach_input_install_fallback_hotkeys(reach_input_source *source);
-static void reach_input_uninstall_fallback_hotkeys(reach_input_source *source);
-static reach_result reach_input_set_helper_hotkey_forwarding(reach_input_source *source,
-                                                             int32_t enabled);
-
-static int32_t reach_input_helper_event_type_valid(uint32_t event_type)
-{
-    switch (event_type)
+    if (source != nullptr && source->window != nullptr)
     {
-    case REACH_UI_EVENT_WINDOWS_KEY:
-    case REACH_UI_EVENT_ALT_TAB_BEGIN:
-    case REACH_UI_EVENT_ALT_TAB_NEXT:
-    case REACH_UI_EVENT_ALT_TAB_PREVIOUS:
-    case REACH_UI_EVENT_ALT_TAB_COMMIT:
-    case REACH_UI_EVENT_ALT_TAB_CANCEL:
-        return 1;
-    default:
-        return 0;
+        PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, type, id);
     }
 }
 
-static int32_t reach_input_helper_hotkeys_enabled(reach_input_source *source)
+static void reach_input_reset_hotkey_state(reach_input_source *source)
 {
     if (source == nullptr)
     {
-        return 0;
+        return;
     }
-    return InterlockedCompareExchange(&source->helper_hotkeys_enabled, 0, 0) != 0;
-}
-
-static void reach_input_set_helper_hotkeys_enabled_local(reach_input_source *source,
-                                                         int32_t enabled)
-{
-    if (source != nullptr)
+    if (source->alt_tab_active)
     {
-        InterlockedExchange(&source->helper_hotkeys_enabled, enabled ? 1 : 0);
+        reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_CANCEL, 0);
     }
+    source->alt_down = 0;
+    source->shift_down = 0;
+    source->alt_tab_active = 0;
+    source->windows_key_down = 0;
+    source->windows_key_chord = 0;
 }
 
-static void reach_input_helper_event_callback(void *user, const reach_elevation_helper_event *event)
+static void reach_input_handle_hotkey_record(reach_input_source *source,
+                                             const reach_elevation_helper_hotkey_record *record)
 {
-    reach_input_source *source = static_cast<reach_input_source *>(user);
-    if (source == nullptr || source->window == nullptr || event == nullptr)
+    if (source == nullptr || record == nullptr)
     {
         return;
     }
 
-    if (event->type != REACH_ELEVATION_HELPER_EVENT_HOTKEY || event->event_count == 0 ||
-        event->event_count > 2)
+    int32_t pressed = record->action == REACH_ELEVATION_HELPER_HOTKEY_PRESSED;
+    switch (record->key)
     {
-        return;
-    }
-
-    for (uint32_t index = 0; index < event->event_count; ++index)
-    {
-        if (reach_input_helper_event_type_valid(event->event_types[index]))
+    case REACH_ELEVATION_HELPER_HOTKEY_ALT:
+        source->alt_down = pressed;
+        if (!pressed && source->alt_tab_active)
         {
-            PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, event->event_types[index], 0);
+            source->alt_tab_active = 0;
+            reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_COMMIT, 0);
         }
+        break;
+    case REACH_ELEVATION_HELPER_HOTKEY_SHIFT:
+        source->shift_down = pressed;
+        break;
+    case REACH_ELEVATION_HELPER_HOTKEY_TAB:
+        if (pressed && source->alt_down)
+        {
+            if (!source->alt_tab_active)
+            {
+                reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_BEGIN, 0);
+                source->alt_tab_active = 1;
+                break;
+            }
+            reach_ui_event_type direction =
+                source->shift_down ? REACH_UI_EVENT_ALT_TAB_PREVIOUS : REACH_UI_EVENT_ALT_TAB_NEXT;
+            reach_input_post_ui_event(source, direction, 0);
+        }
+        break;
+    case REACH_ELEVATION_HELPER_HOTKEY_ESCAPE:
+        if (pressed && source->alt_tab_active)
+        {
+            source->alt_tab_active = 0;
+            reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_CANCEL, 0);
+        }
+        break;
+    case REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN:
+    case REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN:
+        if (pressed)
+        {
+            source->windows_key_down = 1;
+            source->windows_key_chord = 0;
+        }
+        else if (source->windows_key_down)
+        {
+            int32_t chord = source->windows_key_chord ||
+                            ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_CHORD) != 0);
+            source->windows_key_down = 0;
+            source->windows_key_chord = 0;
+            if (!chord)
+            {
+                reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOWS_KEY, 0);
+            }
+        }
+        break;
+    default:
+        if (pressed && source->windows_key_down)
+        {
+            source->windows_key_chord = 1;
+        }
+        break;
     }
 }
 
-static void reach_input_helper_state_callback(void *user, reach_elevation_helper_session_state state)
+static void reach_input_process_shared_hotkeys(reach_input_source *source)
+{
+    if (source == nullptr)
+    {
+        return;
+    }
+
+    reach_elevation_helper_hotkey_record records[REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY] = {};
+    uint32_t record_count = 0;
+    int32_t missed = 0;
+    uint64_t first_available = 0;
+    uint64_t last_available = 0;
+    if (reach_elevation_helper_shared_copy_hotkeys_since(
+            source->last_hotkey_event, records, REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY,
+            &record_count, &missed, &first_available, &last_available) != REACH_OK)
+    {
+        return;
+    }
+
+    if (missed)
+    {
+        reach_input_reset_hotkey_state(source);
+        source->last_hotkey_event = first_available > 0 ? first_available - 1 : 0;
+    }
+
+    for (uint32_t index = 0; index < record_count; ++index)
+    {
+        reach_input_handle_hotkey_record(source, &records[index]);
+        source->last_hotkey_event = records[index].event_number;
+    }
+}
+
+static void reach_input_shared_callback(void *user, reach_elevation_helper_shared_reader_event event)
 {
     reach_input_source *source = static_cast<reach_input_source *>(user);
     if (source == nullptr || source->window == nullptr)
@@ -108,11 +163,15 @@ static void reach_input_helper_state_callback(void *user, reach_elevation_helper
         return;
     }
 
-    if (state == REACH_ELEVATION_HELPER_SESSION_CONNECTED)
+    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_WINDOWS_CHANGED)
     {
-        PostMessageW(source->window, REACH_INPUT_WM_HELPER_CONNECTED, 0, 0);
+        reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOW_STATE_CHANGED, 0);
     }
-    else if (state == REACH_ELEVATION_HELPER_SESSION_DISCONNECTED)
+    else if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_HOTKEYS_CHANGED)
+    {
+        PostMessageW(source->window, REACH_INPUT_WM_SHARED_HOTKEYS, 0, 0);
+    }
+    else if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_DISCONNECTED)
     {
         PostMessageW(source->window, REACH_INPUT_WM_HELPER_DISCONNECTED, 0, 0);
     }
@@ -130,174 +189,26 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
 
     reach_input_source *source =
         reinterpret_cast<reach_input_source *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-    if (message == REACH_INPUT_WM_WINDOWS_KEY && source != nullptr && source->callback != nullptr)
-    {
-        reach_ui_event event = {};
-        event.type = REACH_UI_EVENT_WINDOWS_KEY;
-        source->callback(source->user, &event);
-        return 0;
-    }
     if (message == REACH_INPUT_WM_UI_EVENT && source != nullptr && source->callback != nullptr)
     {
         reach_ui_event event = {};
         event.type = static_cast<reach_ui_event_type>(wparam);
+        event.id = static_cast<uint32_t>(lparam);
         source->callback(source->user, &event);
         return 0;
     }
-    if ((message == REACH_INPUT_WM_ENABLE_FALLBACK_HOTKEYS ||
-         message == REACH_INPUT_WM_HELPER_DISCONNECTED) &&
-        source != nullptr)
+    if (message == REACH_INPUT_WM_HELPER_DISCONNECTED && source != nullptr)
     {
-        reach_input_set_helper_hotkeys_enabled_local(source, 0);
-        (void)reach_input_install_fallback_hotkeys(source);
-        SetTimer(source->window, REACH_INPUT_HELPER_RETRY_TIMER, 2000, nullptr);
+        reach_input_reset_hotkey_state(source);
         return 0;
     }
-    if (message == REACH_INPUT_WM_HELPER_CONNECTED && source != nullptr)
+    if (message == REACH_INPUT_WM_SHARED_HOTKEYS && source != nullptr)
     {
-        if (reach_input_set_helper_hotkey_forwarding(source, 1) == REACH_OK)
-        {
-            reach_input_uninstall_fallback_hotkeys(source);
-            KillTimer(source->window, REACH_INPUT_HELPER_RETRY_TIMER);
-        }
+        reach_input_process_shared_hotkeys(source);
         return 0;
-    }
-    if (message == WM_TIMER && source != nullptr &&
-        wparam == REACH_INPUT_HELPER_RETRY_TIMER &&
-        !reach_input_helper_hotkeys_enabled(source))
-    {
-        if (reach_elevation_helper_session_reconnect() == REACH_OK &&
-            reach_input_set_helper_hotkey_forwarding(source, 1) == REACH_OK)
-        {
-            reach_input_uninstall_fallback_hotkeys(source);
-            KillTimer(source->window, REACH_INPUT_HELPER_RETRY_TIMER);
-        }
-        return 0;
-    }
-
-    if (message == WM_HOTKEY && source != nullptr && source->callback != nullptr)
-    {
-        switch ((int)wparam)
-        {
-        case REACH_HOTKEY_WIN_SPACE:
-        case REACH_HOTKEY_CTRL_SPACE:
-        {
-            reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_WINDOWS_KEY;
-            source->callback(source->user, &event);
-            return 0;
-        }
-        default:
-            break;
-        }
     }
 
     return DefWindowProcW(hwnd, message, wparam, lparam);
-}
-
-static LRESULT CALLBACK reach_input_keyboard_proc(int code, WPARAM wparam, LPARAM lparam)
-{
-    reach_input_source *source = g_reach_keyboard_source;
-    if (code == HC_ACTION && source != nullptr && source->window != nullptr)
-    {
-        const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
-        if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) != 0)
-        {
-            return CallNextHookEx(source->keyboard_hook, code, wparam, lparam);
-        }
-        if (reach_input_helper_hotkeys_enabled(source) && keyboard != nullptr &&
-            (keyboard->vkCode == VK_MENU || keyboard->vkCode == VK_LMENU ||
-             keyboard->vkCode == VK_RMENU || keyboard->vkCode == VK_TAB ||
-             keyboard->vkCode == VK_ESCAPE || keyboard->vkCode == VK_LWIN ||
-             keyboard->vkCode == VK_RWIN))
-        {
-            return CallNextHookEx(source->keyboard_hook, code, wparam, lparam);
-        }
-        if (keyboard != nullptr && (keyboard->vkCode == VK_SHIFT || keyboard->vkCode == VK_LSHIFT ||
-                                    keyboard->vkCode == VK_RSHIFT))
-        {
-            source->shift_down = (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) ? 1 : 0;
-        }
-        if (keyboard != nullptr && (keyboard->vkCode == VK_MENU || keyboard->vkCode == VK_LMENU ||
-                                    keyboard->vkCode == VK_RMENU))
-        {
-            if (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN)
-            {
-                source->alt_down = 1;
-            }
-            else if (wparam == WM_KEYUP || wparam == WM_SYSKEYUP)
-            {
-                source->alt_down = 0;
-                if (source->alt_tab_active)
-                {
-                    source->alt_tab_active = 0;
-                    PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT,
-                                 REACH_UI_EVENT_ALT_TAB_COMMIT, 0);
-                }
-            }
-        }
-        if (keyboard != nullptr && keyboard->vkCode == VK_TAB &&
-            (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN) &&
-            (source->alt_down || (keyboard->flags & LLKHF_ALTDOWN) != 0))
-        {
-            if (!source->alt_tab_active)
-            {
-                source->alt_tab_active = 1;
-                PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, REACH_UI_EVENT_ALT_TAB_BEGIN,
-                             0);
-            }
-            PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT,
-                         source->shift_down ? REACH_UI_EVENT_ALT_TAB_PREVIOUS
-                                            : REACH_UI_EVENT_ALT_TAB_NEXT,
-                         0);
-            return 1;
-        }
-        if (keyboard != nullptr && keyboard->vkCode == VK_ESCAPE && source->alt_tab_active &&
-            (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN))
-        {
-            source->alt_tab_active = 0;
-            PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, REACH_UI_EVENT_ALT_TAB_CANCEL, 0);
-            return 1;
-        }
-        if (keyboard != nullptr && (keyboard->vkCode == VK_LWIN || keyboard->vkCode == VK_RWIN))
-        {
-            if (source->alt_tab_active)
-            {
-                source->windows_key_down = 0;
-                source->windows_key_chord = 0;
-                return 1;
-            }
-            if (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN)
-            {
-                if (!source->windows_key_down)
-                {
-                    source->windows_key_down = 1;
-                    source->windows_key_chord = 0;
-                }
-                return 1;
-            }
-            if (wparam == WM_KEYUP || wparam == WM_SYSKEYUP)
-            {
-                int32_t chord = source->windows_key_chord;
-                source->windows_key_down = 0;
-                source->windows_key_chord = 0;
-                if (chord)
-                {
-                    return 1;
-                }
-                PostMessageW(source->window, REACH_INPUT_WM_WINDOWS_KEY, 0, 0);
-                return 1;
-            }
-        }
-        if (keyboard != nullptr && source->windows_key_down &&
-            (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN))
-        {
-            source->windows_key_chord = 1;
-        }
-    }
-
-    return CallNextHookEx(source != nullptr ? source->keyboard_hook : nullptr, code, wparam,
-                          lparam);
 }
 
 static reach_result reach_input_create_window(reach_input_source *source)
@@ -324,85 +235,6 @@ static reach_result reach_input_create_window(reach_input_source *source)
     return source->window != nullptr ? REACH_OK : REACH_ERROR;
 }
 
-static int32_t reach_input_register_hotkey(reach_input_source *source, int id, UINT modifiers,
-                                           UINT key)
-{
-    REACH_ASSERT(source != nullptr);
-    if (source == nullptr || source->window == nullptr)
-    {
-        return 0;
-    }
-
-    if (RegisterHotKey(source->window, id, modifiers | MOD_NOREPEAT, key))
-    {
-        ++source->registered_hotkey_count;
-        return 1;
-    }
-    return 0;
-}
-
-static void reach_input_unregister_fallback_hotkeys(reach_input_source *source)
-{
-    if (source == nullptr || source->window == nullptr)
-    {
-        return;
-    }
-    UnregisterHotKey(source->window, REACH_HOTKEY_WIN_SPACE);
-    UnregisterHotKey(source->window, REACH_HOTKEY_CTRL_SPACE);
-    source->registered_hotkey_count = 0;
-}
-
-static reach_result reach_input_install_fallback_hotkeys(reach_input_source *source)
-{
-    if (source == nullptr || source->window == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    if (source->keyboard_hook != nullptr || source->registered_hotkey_count != 0)
-    {
-        return REACH_OK;
-    }
-
-    g_reach_keyboard_source = source;
-    source->keyboard_hook =
-        SetWindowsHookExW(WH_KEYBOARD_LL, reach_input_keyboard_proc, GetModuleHandleW(nullptr), 0);
-    if (source->keyboard_hook == nullptr)
-    {
-        (void)reach_input_register_hotkey(source, REACH_HOTKEY_WIN_SPACE, MOD_WIN, VK_SPACE);
-    }
-    if (source->keyboard_hook == nullptr && source->registered_hotkey_count == 0)
-    {
-        (void)reach_input_register_hotkey(source, REACH_HOTKEY_CTRL_SPACE, MOD_CONTROL, VK_SPACE);
-    }
-    return source->keyboard_hook != nullptr || source->registered_hotkey_count != 0 ? REACH_OK
-                                                                                   : REACH_ERROR;
-}
-
-static void reach_input_uninstall_fallback_hotkeys(reach_input_source *source)
-{
-    if (source == nullptr)
-    {
-        return;
-    }
-
-    reach_input_unregister_fallback_hotkeys(source);
-    if (source->keyboard_hook != nullptr)
-    {
-        UnhookWindowsHookEx(source->keyboard_hook);
-        source->keyboard_hook = nullptr;
-    }
-    if (g_reach_keyboard_source == source)
-    {
-        g_reach_keyboard_source = nullptr;
-    }
-
-    source->windows_key_down = 0;
-    source->windows_key_chord = 0;
-    source->alt_down = 0;
-    source->shift_down = 0;
-    source->alt_tab_active = 0;
-}
-
 static reach_result reach_input_start(reach_input_source *source,
                                       reach_input_event_callback callback, void *user)
 {
@@ -420,57 +252,8 @@ static reach_result reach_input_start(reach_input_source *source,
         return REACH_ERROR;
     }
 
-    source->registered_hotkey_count = 0;
-    source->windows_key_down = 0;
-    source->windows_key_chord = 0;
-    source->alt_down = 0;
-    source->shift_down = 0;
-    source->alt_tab_active = 0;
-    reach_input_set_helper_hotkeys_enabled_local(source, 0);
-    if (reach_elevation_helper_session_start(reach_input_helper_event_callback,
-                                             reach_input_helper_state_callback, source) ==
-            REACH_OK &&
-        reach_input_set_helper_hotkey_forwarding(source, 1) == REACH_OK)
-    {
-        reach_input_uninstall_fallback_hotkeys(source);
-        KillTimer(source->window, REACH_INPUT_HELPER_RETRY_TIMER);
-        return REACH_OK;
-    }
-
-    SetTimer(source->window, REACH_INPUT_HELPER_RETRY_TIMER, 2000, nullptr);
-    (void)reach_input_install_fallback_hotkeys(source);
+    (void)reach_elevation_helper_shared_reader_subscribe(reach_input_shared_callback, source);
     return REACH_OK;
-}
-
-static reach_result reach_input_set_helper_hotkey_forwarding(reach_input_source *source,
-                                                             int32_t enabled)
-{
-    if (source == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    int32_t next_enabled = enabled ? 1 : 0;
-    if (reach_input_helper_hotkeys_enabled(source) == next_enabled)
-    {
-        return REACH_OK;
-    }
-
-    uint32_t hotkey_mask =
-        REACH_ELEVATION_HELPER_HOTKEY_ALT_TAB | REACH_ELEVATION_HELPER_HOTKEY_WINDOWS_KEY;
-    reach_result result =
-        reach_elevation_helper_session_set_hotkey_forwarding(next_enabled, hotkey_mask);
-
-    if (result == REACH_OK)
-    {
-        reach_input_set_helper_hotkeys_enabled_local(source, next_enabled);
-    }
-    else
-    {
-        reach_input_set_helper_hotkeys_enabled_local(source, 0);
-    }
-
-    return result;
 }
 
 static reach_result reach_input_stop(reach_input_source *source)
@@ -481,20 +264,8 @@ static reach_result reach_input_stop(reach_input_source *source)
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (source->window != nullptr)
-    {
-        KillTimer(source->window, REACH_INPUT_HELPER_RETRY_TIMER);
-    }
-    (void)reach_input_set_helper_hotkey_forwarding(source, 0);
-    reach_elevation_helper_session_stop();
-    reach_input_uninstall_fallback_hotkeys(source);
-    source->registered_hotkey_count = 0;
-    source->windows_key_down = 0;
-    source->windows_key_chord = 0;
-    source->alt_down = 0;
-    source->shift_down = 0;
-    source->alt_tab_active = 0;
-    reach_input_set_helper_hotkeys_enabled_local(source, 0);
+    reach_elevation_helper_shared_reader_unsubscribe(source);
+    reach_input_reset_hotkey_state(source);
     source->callback = nullptr;
     source->user = nullptr;
     return REACH_OK;

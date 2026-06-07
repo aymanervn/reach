@@ -129,7 +129,9 @@ size_t reach_shell_switcher_visible_count(const reach_shell *shell)
     {
         return 0;
     }
-    return reach_switcher_visible_count(shell->open_window_count);
+    size_t window_count =
+        shell->switcher_state.open ? shell->switcher_state.window_count : shell->open_window_count;
+    return reach_switcher_visible_count(window_count);
 }
 
 void reach_shell_update_switcher_visible_start(reach_shell *shell)
@@ -140,7 +142,8 @@ void reach_shell_update_switcher_visible_start(reach_shell *shell)
     }
 
     reach_switcher_model model = {};
-    model.window_count = shell->open_window_count;
+    model.window_count =
+        shell->switcher_state.open ? shell->switcher_state.window_count : shell->open_window_count;
     model.selected_index = shell->switcher_state.selected_index;
     model.visible_start = shell->switcher_state.visible_start;
     reach_switcher_update_visible_start(&model);
@@ -204,6 +207,28 @@ static void reach_shell_label_from_path(uint16_t *out_label, size_t out_count, c
     }
 }
 
+static int32_t reach_shell_render_open_window_index(const reach_shell *shell, uintptr_t window_id,
+                                                    size_t *out_index)
+{
+    if (shell == nullptr || window_id == 0)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < shell->open_window_count; ++index)
+    {
+        if (shell->open_windows[index].id == window_id)
+        {
+            if (out_index != nullptr)
+            {
+                *out_index = index;
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
 reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds)
 {
     if (shell == nullptr || shell->switcher.renderer.ops.begin_frame == nullptr)
@@ -215,16 +240,23 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
     reach_shell_update_switcher_visible_start(shell);
 
     reach_switcher_model model = {};
-    model.window_count = shell->open_window_count;
+    model.window_count = shell->switcher_state.window_count;
     model.selected_index = shell->switcher_state.selected_index;
     model.visible_start = shell->switcher_state.visible_start;
 
     reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
-    for (size_t index = 0; index < shell->open_window_count && index < REACH_MAX_PINNED_APPS;
+    for (size_t index = 0; index < shell->switcher_state.window_count &&
+                           index < REACH_MAX_PINNED_APPS;
          ++index)
     {
-        items[index].icon = shell->dock_icons.open_window_icons[index];
-        reach_shell_label_from_path(items[index].label, 260, shell->open_windows[index].path);
+        size_t open_index = 0;
+        if (reach_shell_render_open_window_index(shell, shell->switcher_state.windows[index],
+                                                 &open_index))
+        {
+            items[index].icon = shell->dock_icons.open_window_icons[open_index];
+            reach_shell_label_from_path(items[index].label, 260,
+                                        shell->open_windows[open_index].path);
+        }
     }
 
     reach_render_command_buffer commands = {};
@@ -233,7 +265,7 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
     input.bounds = bounds;
     input.model = &model;
     input.items = items;
-    input.item_count = shell->open_window_count;
+    input.item_count = shell->switcher_state.window_count;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     input.text_weight_demi_bold = REACH_TEXT_WEIGHT_DEMIBOLD;
 

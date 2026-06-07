@@ -577,6 +577,35 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         return REACH_OK;
     }
 
+    if (event->type == REACH_UI_EVENT_WINDOW_STATE_CHANGED)
+    {
+        if (shell->window_manager.ops.refresh != nullptr)
+        {
+            (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
+        }
+
+        int32_t open_windows_changed = 0;
+        (void)reach_shell_refresh_open_windows(shell, &open_windows_changed);
+
+        uintptr_t foreground_window =
+            shell->window_manager.ops.foreground != nullptr
+                ? shell->window_manager.ops.foreground(shell->window_manager.manager)
+                : 0;
+        int32_t foreground_changed = shell->foreground_window != foreground_window;
+        reach_shell_note_foreground_window(shell, foreground_window);
+
+        if (open_windows_changed || foreground_changed)
+        {
+            shell->dock.dirty_flags = 1;
+            shell->switcher.dirty_flags = 1;
+        }
+        if (foreground_changed && foreground_window != 0 && shell->ui.launcher.open)
+        {
+            reach_shell_close_launcher(shell);
+        }
+        return REACH_OK;
+    }
+
     if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN || event->type == REACH_UI_EVENT_ALT_TAB_NEXT ||
         event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS ||
         event->type == REACH_UI_EVENT_ALT_TAB_COMMIT ||

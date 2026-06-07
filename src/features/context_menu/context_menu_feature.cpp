@@ -25,7 +25,6 @@ void reach_context_menu_build_dock_item_commands(int32_t pinned, int32_t has_pat
     }
     if (has_window)
     {
-        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_KILL_PROCESS;
         out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_CLOSE;
     }
     *out_count = count;
@@ -76,10 +75,6 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
     if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE)
     {
         return (const uint16_t *)L"Close app";
-    }
-    if (command == REACH_CONTEXT_MENU_COMMAND_KILL_PROCESS)
-    {
-        return (const uint16_t *)L"Kill process";
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_POWER_LOCK)
     {

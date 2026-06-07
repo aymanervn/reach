@@ -1,21 +1,80 @@
 #include "shell_internal.h"
 
-static size_t reach_shell_switcher_foreground_index(const reach_shell *shell)
+static int32_t reach_shell_switcher_open_window_index(const reach_shell *shell, uintptr_t window_id,
+                                                      size_t *out_index)
 {
-    if (shell == nullptr || shell->foreground_window == 0)
+    if (shell == nullptr || window_id == 0)
     {
-        return REACH_MAX_PINNED_APPS;
+        return 0;
     }
 
     for (size_t index = 0; index < shell->open_window_count; ++index)
     {
-        if (shell->open_windows[index].id == shell->foreground_window)
+        if (shell->open_windows[index].id == window_id)
         {
-            return index;
+            if (out_index != nullptr)
+            {
+                *out_index = index;
+            }
+            return 1;
         }
     }
+    return 0;
+}
 
-    return REACH_MAX_PINNED_APPS;
+static int32_t reach_shell_switcher_contains(const reach_shell_switcher_state *state,
+                                             uintptr_t window_id)
+{
+    if (state == nullptr || window_id == 0)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < state->window_count; ++index)
+    {
+        if (state->windows[index] == window_id)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void reach_shell_switcher_append_window(reach_shell *shell, uintptr_t window_id)
+{
+    if (shell == nullptr || window_id == 0 ||
+        shell->switcher_state.window_count >= REACH_MAX_PINNED_APPS ||
+        reach_shell_switcher_contains(&shell->switcher_state, window_id) ||
+        !reach_shell_switcher_open_window_index(shell, window_id, nullptr))
+    {
+        return;
+    }
+
+    shell->switcher_state.windows[shell->switcher_state.window_count++] = window_id;
+}
+
+static void reach_shell_rebuild_switcher_windows(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    shell->switcher_state.window_count = 0;
+    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    {
+        shell->switcher_state.windows[index] = 0;
+    }
+
+    reach_shell_switcher_append_window(shell, shell->foreground_window);
+    for (size_t index = 0; index < shell->focus_history_count; ++index)
+    {
+        reach_shell_switcher_append_window(shell, shell->focus_history[index]);
+    }
+    for (size_t index = 0; index < shell->open_window_count; ++index)
+    {
+        reach_shell_switcher_append_window(shell, shell->open_windows[index].id);
+    }
 }
 
 reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_ui_event *event)
@@ -35,15 +94,14 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
             (void)reach_shell_refresh_open_windows(shell, nullptr);
             if (shell->window_manager.ops.foreground != nullptr)
             {
-                shell->foreground_window =
-                    shell->window_manager.ops.foreground(shell->window_manager.manager);
+                reach_shell_note_foreground_window(
+                    shell, shell->window_manager.ops.foreground(shell->window_manager.manager));
             }
         }
 
-        shell->switcher_state.open = shell->open_window_count > 0 ? 1 : 0;
-        size_t foreground_index = reach_shell_switcher_foreground_index(shell);
-        shell->switcher_state.selected_index =
-            foreground_index < shell->open_window_count ? foreground_index : 0;
+        reach_shell_rebuild_switcher_windows(shell);
+        shell->switcher_state.open = shell->switcher_state.window_count > 0 ? 1 : 0;
+        shell->switcher_state.selected_index = shell->switcher_state.window_count > 1 ? 1 : 0;
         shell->switcher_state.visible_start = 0;
 
         reach_shell_update_switcher_visible_start(shell);
@@ -57,10 +115,10 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
         return REACH_OK;
     }
 
-    if (event->type == REACH_UI_EVENT_ALT_TAB_NEXT && shell->open_window_count > 0)
+    if (event->type == REACH_UI_EVENT_ALT_TAB_NEXT && shell->switcher_state.window_count > 0)
     {
         shell->switcher_state.selected_index =
-            (shell->switcher_state.selected_index + 1) % shell->open_window_count;
+            (shell->switcher_state.selected_index + 1) % shell->switcher_state.window_count;
 
         reach_shell_update_switcher_visible_start(shell);
 
@@ -68,11 +126,12 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
         return REACH_OK;
     }
 
-    if (event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS && shell->open_window_count > 0)
+    if (event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS && shell->switcher_state.window_count > 0)
     {
-        shell->switcher_state.selected_index = shell->switcher_state.selected_index == 0
-                                                   ? shell->open_window_count - 1
-                                                   : shell->switcher_state.selected_index - 1;
+        shell->switcher_state.selected_index =
+            shell->switcher_state.selected_index == 0
+                ? shell->switcher_state.window_count - 1
+                : shell->switcher_state.selected_index - 1;
 
         reach_shell_update_switcher_visible_start(shell);
 
@@ -95,9 +154,14 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_COMMIT)
     {
-        uintptr_t selected = shell->switcher_state.selected_index < shell->open_window_count
-                                 ? shell->open_windows[shell->switcher_state.selected_index].id
-                                 : 0;
+        if (shell->switcher_state.selected_index < shell->switcher_state.window_count)
+        {
+            uintptr_t window = shell->switcher_state.windows[shell->switcher_state.selected_index];
+            if (window != 0 && shell->window_manager.ops.activate != nullptr)
+            {
+                (void)shell->window_manager.ops.activate(shell->window_manager.manager, window);
+            }
+        }
 
         shell->switcher_state.open = 0;
         shell->switcher.dirty_flags = 1;
@@ -105,12 +169,6 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
         if (shell->switcher.window.ops.hide != nullptr)
         {
             (void)shell->switcher.window.ops.hide(shell->switcher.window.window);
-        }
-
-        if (selected != 0)
-        {
-            (void)reach_shell_execute_window_control(
-                shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE, selected);
         }
 
         return REACH_OK;

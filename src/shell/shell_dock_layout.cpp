@@ -28,10 +28,6 @@ int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell)
     {
         return 0;
     }
-    if (shell->window_manager.ops.dock_should_auto_hide != nullptr)
-    {
-        return shell->window_manager.ops.dock_should_auto_hide(shell->window_manager.manager);
-    }
     if (shell->window_manager.ops.foreground_is_maximized != nullptr)
     {
         return shell->window_manager.ops.foreground_is_maximized(shell->window_manager.manager);
