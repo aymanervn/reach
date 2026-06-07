@@ -33,6 +33,27 @@ void reach_shell_close_context_menu(reach_shell *shell)
     reach_shell_sync_popup_mouse_hook(shell);
 }
 
+static reach_result reach_shell_launch_context_menu_item(reach_shell *shell, const uint16_t *path,
+                                                        size_t pinned_index,
+                                                        int32_t run_as_admin)
+{
+    if (shell == nullptr || path == nullptr || path[0] == 0 ||
+        shell->app_launcher.ops.launch == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_app_launch_request request = {};
+    reach_copy_utf16(request.path, 260, path);
+    if (pinned_index < shell->ui.pinned_app_count)
+    {
+        reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[pinned_index].arguments);
+    }
+    request.force_new_instance = 1;
+    request.run_as_admin = run_as_admin ? 1 : 0;
+    return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+}
+
 reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t command)
 {
     if (shell == nullptr)
@@ -95,18 +116,11 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
 
     if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_NEW)
     {
-        if (item_path[0] == 0 || shell->app_launcher.ops.launch == nullptr)
-        {
-            return REACH_INVALID_ARGUMENT;
-        }
-        reach_app_launch_request request = {};
-        reach_copy_utf16(request.path, 260, item_path);
-        if (pinned_index < shell->ui.pinned_app_count)
-        {
-            reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[pinned_index].arguments);
-        }
-        request.force_new_instance = 1;
-        return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+        return reach_shell_launch_context_menu_item(shell, item_path, pinned_index, 0);
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN)
+    {
+        return reach_shell_launch_context_menu_item(shell, item_path, pinned_index, 1);
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_UNPIN)
     {

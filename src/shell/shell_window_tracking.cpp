@@ -245,7 +245,9 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
         reach_window_snapshot snapshot = {};
         if (shell->window_manager.ops.window_at(shell->window_manager.manager, index, &snapshot) !=
                 REACH_OK ||
-            snapshot.path[0] == 0)
+            snapshot.id == 0 ||
+            (snapshot.path[0] == 0 && snapshot.app_user_model_id[0] == 0 &&
+             snapshot.title[0] == 0))
         {
             continue;
         }
