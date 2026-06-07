@@ -392,6 +392,13 @@ static reach_result reach_register_platform_class()
     return REACH_OK;
 }
 
+static int32_t reach_window_no_activate_surface(reach_surface_role role)
+{
+    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU ||
+           role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
+           role == REACH_SURFACE_QUICK_SETTINGS;
+}
+
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = WS_EX_TOOLWINDOW;
@@ -411,9 +418,7 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     {
         style |= WS_EX_TOPMOST;
     }
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU ||
-        role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-        role == REACH_SURFACE_QUICK_SETTINGS)
+    if (reach_window_no_activate_surface(role))
     {
         style |= WS_EX_NOACTIVATE;
     }
@@ -458,17 +463,16 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
-    int show_command = window->role == REACH_SURFACE_DOCK ||
-                               window->role == REACH_SURFACE_TRAY_MENU ||
-                               window->role == REACH_SURFACE_SWITCHER ||
-                               window->role == REACH_SURFACE_CONTEXT_MENU ||
-                               window->role == REACH_SURFACE_QUICK_SETTINGS
-                           ? SW_SHOWNOACTIVATE
-                           : SW_SHOW;
+    int32_t no_activate = reach_window_no_activate_surface(window->role);
+    int show_command = no_activate ? SW_SHOWNOACTIVATE : SW_SHOW;
     ShowWindow(window->hwnd, show_command);
-    if (window->role != REACH_SURFACE_DOCK && window->role != REACH_SURFACE_TRAY_MENU &&
-        window->role != REACH_SURFACE_SWITCHER && window->role != REACH_SURFACE_CONTEXT_MENU &&
-        window->role != REACH_SURFACE_QUICK_SETTINGS)
+    if (no_activate)
+    {
+        SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER |
+                         SWP_SHOWWINDOW);
+    }
+    else
     {
         reach_platform_window_focus(window->hwnd);
     }
