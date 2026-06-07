@@ -1,10 +1,5 @@
 #include "shell_internal.h"
 
-static int32_t reach_shell_rect_contains_point(reach_rect_f32 rect, reach_point_i32 point)
-{
-    return (float)point.x >= rect.x && (float)point.x <= rect.x + rect.width &&
-           (float)point.y >= rect.y && (float)point.y <= rect.y + rect.height;
-}
 static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point_i32 point)
 {
     if (shell == nullptr)
@@ -63,6 +58,7 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
         if (dock_hit.type != REACH_DOCK_HIT_NONE)
         {
             reach_shell_keep_dock_revealed(shell);
+            return;
         }
         reach_shell_close_launcher(shell);
     }

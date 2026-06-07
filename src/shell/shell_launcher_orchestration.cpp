@@ -104,7 +104,7 @@ void reach_shell_restore_launcher_focus(reach_shell *shell)
     }
 }
 
-void reach_shell_close_launcher(reach_shell *shell)
+static void reach_shell_close_launcher_impl(reach_shell *shell, int32_t restore_focus)
 {
     if (shell == nullptr || !shell->ui.launcher.open)
     {
@@ -123,7 +123,24 @@ void reach_shell_close_launcher(reach_shell *shell)
     {
         (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
     }
-    reach_shell_restore_launcher_focus(shell);
+    if (restore_focus)
+    {
+        reach_shell_restore_launcher_focus(shell);
+    }
+    else
+    {
+        reach_shell_clear_launcher_restore_window(shell);
+    }
+}
+
+void reach_shell_close_launcher(reach_shell *shell)
+{
+    reach_shell_close_launcher_impl(shell, 1);
+}
+
+void reach_shell_close_launcher_for_dock_click(reach_shell *shell)
+{
+    reach_shell_close_launcher_impl(shell, 0);
 }
 
 reach_result reach_shell_open_launcher_result(reach_shell *shell)

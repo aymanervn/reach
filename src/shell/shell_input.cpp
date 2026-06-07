@@ -282,7 +282,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
             if (dock_hit.type != REACH_DOCK_HIT_NONE)
             {
                 reach_shell_keep_dock_revealed(shell);
-                reach_shell_close_launcher(shell);
+                reach_shell_close_launcher_for_dock_click(shell);
             }
             else
             {
