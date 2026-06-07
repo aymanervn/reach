@@ -342,6 +342,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
         }
         if (foreground_changed && foreground_window != 0 && shell->ui.launcher.open)
         {
+            reach_shell_clear_launcher_restore_window(shell);
             reach_shell_close_launcher(shell);
         }
     }

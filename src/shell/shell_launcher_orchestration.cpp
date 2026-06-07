@@ -56,6 +56,54 @@ void reach_shell_notify_launcher_search_ready(reach_shell *shell)
                                                 REACH_UI_EVENT_LAUNCHER_SEARCH_READY);
 }
 
+void reach_shell_remember_launcher_restore_window(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    shell->launcher_restore_window = 0;
+    shell->launcher_restore_window_valid = 0;
+    if (shell->window_manager.ops.foreground == nullptr)
+    {
+        return;
+    }
+
+    uintptr_t foreground = shell->window_manager.ops.foreground(shell->window_manager.manager);
+    if (foreground != 0)
+    {
+        shell->launcher_restore_window = foreground;
+        shell->launcher_restore_window_valid = 1;
+    }
+}
+
+void reach_shell_clear_launcher_restore_window(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    shell->launcher_restore_window = 0;
+    shell->launcher_restore_window_valid = 0;
+}
+
+void reach_shell_restore_launcher_focus(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->launcher_restore_window_valid)
+    {
+        return;
+    }
+
+    uintptr_t window = shell->launcher_restore_window;
+    reach_shell_clear_launcher_restore_window(shell);
+    if (window != 0 && shell->window_manager.ops.activate != nullptr)
+    {
+        (void)shell->window_manager.ops.activate(shell->window_manager.manager, window);
+    }
+}
+
 void reach_shell_close_launcher(reach_shell *shell)
 {
     if (shell == nullptr || !shell->ui.launcher.open)
@@ -75,6 +123,7 @@ void reach_shell_close_launcher(reach_shell *shell)
     {
         (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
     }
+    reach_shell_restore_launcher_focus(shell);
 }
 
 reach_result reach_shell_open_launcher_result(reach_shell *shell)

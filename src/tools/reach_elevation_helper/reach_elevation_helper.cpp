@@ -794,6 +794,13 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
                 {
                     reach_helper_reconcile_modifier_state();
                 }
+                if ((key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
+                     key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN) &&
+                    g_hotkeys.alt_tab_active)
+                {
+                    g_hotkeys.windows_key_chord = 0;
+                    return 1;
+                }
                 uint32_t modifiers = reach_helper_hotkey_modifiers();
                 if ((key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
                      key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN) &&

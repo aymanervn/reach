@@ -127,6 +127,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
         if (launcher_action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT && launcher_pressed_match)
         {
+            reach_shell_clear_launcher_restore_window(shell);
             (void)reach_shell_open_launcher_result(shell);
             reach_shell_close_launcher(shell);
             return REACH_OK;
@@ -601,6 +602,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         }
         if (foreground_changed && foreground_window != 0 && shell->ui.launcher.open)
         {
+            reach_shell_clear_launcher_restore_window(shell);
             reach_shell_close_launcher(shell);
         }
         return REACH_OK;
@@ -612,6 +614,11 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         event->type == REACH_UI_EVENT_ALT_TAB_CANCEL)
     {
         return reach_shell_handle_switcher_event(shell, event);
+    }
+
+    if (event->type == REACH_UI_EVENT_WINDOWS_KEY && !shell->ui.launcher.open)
+    {
+        reach_shell_remember_launcher_restore_window(shell);
     }
 
     reach_result result = reach_ui_handle_event(&shell->ui, event, &intent);
@@ -661,6 +668,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
     else if (intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT)
     {
+        reach_shell_clear_launcher_restore_window(shell);
         (void)reach_shell_open_launcher_result(shell);
         reach_shell_close_launcher(shell);
     }
@@ -680,7 +688,9 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
             return show_result;
         }
 
-        return shell->launcher.window.ops.hide(shell->launcher.window.window);
+        reach_result hide_result = shell->launcher.window.ops.hide(shell->launcher.window.window);
+        reach_shell_restore_launcher_focus(shell);
+        return hide_result;
     }
 
     return REACH_OK;

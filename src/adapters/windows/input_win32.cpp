@@ -97,6 +97,12 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         break;
     case REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN:
     case REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN:
+        if (source->alt_tab_active)
+        {
+            source->windows_key_down = 0;
+            source->windows_key_chord = 0;
+            break;
+        }
         if (pressed)
         {
             source->windows_key_down = 1;
