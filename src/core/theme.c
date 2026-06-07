@@ -17,7 +17,7 @@ const reach_theme *reach_theme_default(void)
         .icon_backplate_background = {1.0f, 0.97f, 0.91f, 0.96f},
         .fallback_icon_background = {0.18f, 0.20f, 0.24f, 1.0f},
         .fallback_icon_text = {0.12f, 0.14f, 0.17f, 0.92f},
-        .dock_button_background = {0.36f, 0.43f, 0.49f, 0.46f},
+        .dock_button_background = {0.52f, 0.59f, 0.65f, 0.66f},
         .dock_system_separator = {0.72f, 0.72f, 0.72f, 1.0f},
         .dock_clock_time = {1.0f, 0.97f, 0.91f, 0.96f},
         .dock_clock_date = {1.0f, 0.97f, 0.91f, 0.56f},
