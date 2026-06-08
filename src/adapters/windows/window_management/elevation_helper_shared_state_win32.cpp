@@ -19,10 +19,12 @@ struct reach_shared_reader
     HANDLE stop_event;
     HANDLE mapping;
     HANDLE update_event;
+    HANDLE writer_process;
     const reach_elevation_helper_shared_state *view;
     CRITICAL_SECTION lock;
     int32_t lock_initialized;
     int32_t connected;
+    DWORD writer_pid;
     uint64_t last_publish_sequence;
     uint64_t last_window_sequence;
     uint64_t last_hotkey_sequence;
@@ -96,6 +98,12 @@ static void reach_shared_reader_dispatch(reach_elevation_helper_shared_reader_ev
 
 static void reach_shared_reader_close_mapping(void)
 {
+    if (g_reader.writer_process != nullptr)
+    {
+        CloseHandle(g_reader.writer_process);
+        g_reader.writer_process = nullptr;
+        g_reader.writer_pid = 0;
+    }
     if (g_reader.view != nullptr)
     {
         UnmapViewOfFile(g_reader.view);
@@ -110,6 +118,31 @@ static void reach_shared_reader_close_mapping(void)
     {
         CloseHandle(g_reader.update_event);
         g_reader.update_event = nullptr;
+    }
+}
+
+static void reach_shared_reader_accept_writer_pid(DWORD writer_pid)
+{
+    if (writer_pid == 0 || writer_pid == GetCurrentProcessId())
+    {
+        return;
+    }
+    if (g_reader.writer_process != nullptr && g_reader.writer_pid == writer_pid)
+    {
+        return;
+    }
+    if (g_reader.writer_process != nullptr)
+    {
+        CloseHandle(g_reader.writer_process);
+        g_reader.writer_process = nullptr;
+        g_reader.writer_pid = 0;
+    }
+
+    HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, writer_pid);
+    if (process != nullptr)
+    {
+        g_reader.writer_process = process;
+        g_reader.writer_pid = writer_pid;
     }
 }
 
@@ -205,6 +238,8 @@ static void reach_shared_reader_accept_state(const reach_elevation_helper_shared
         return;
     }
 
+    reach_shared_reader_accept_writer_pid(state->writer_pid);
+
     int32_t became_connected = 0;
     int32_t windows_changed = 0;
     int32_t hotkeys_changed = 0;
@@ -268,11 +303,17 @@ static DWORD WINAPI reach_shared_reader_thread(void *param)
             reach_shared_reader_accept_state(&state);
         }
 
-        HANDLE handles[2] = {g_reader.stop_event, g_reader.update_event};
-        DWORD wait = WaitForMultipleObjects(2, handles, FALSE, 1000);
+        HANDLE handles[3] = {g_reader.stop_event, g_reader.update_event, g_reader.writer_process};
+        DWORD handle_count = g_reader.writer_process != nullptr ? 3u : 2u;
+        DWORD wait = WaitForMultipleObjects(handle_count, handles, FALSE, 1000);
         if (wait == WAIT_OBJECT_0)
         {
             return 0;
+        }
+        if (handle_count == 3u && wait == WAIT_OBJECT_0 + 2)
+        {
+            reach_shared_reader_set_disconnected();
+            continue;
         }
         if (wait != WAIT_OBJECT_0 + 1 && wait != WAIT_TIMEOUT)
         {

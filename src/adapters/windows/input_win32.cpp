@@ -5,6 +5,8 @@
 #include "reach/ports/input_source.h"
 
 #include <windows.h>
+#include <shlwapi.h>
+#include <cwchar>
 #include <new>
 
 struct reach_input_source
@@ -26,6 +28,64 @@ static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
 static const UINT REACH_INPUT_WM_UI_EVENT = WM_APP + 21;
 static const UINT REACH_INPUT_WM_SHARED_HOTKEYS = WM_APP + 23;
 static const UINT REACH_INPUT_WM_HELPER_DISCONNECTED = WM_APP + 24;
+static LONG g_reach_input_helper_restart_prompt_active = 0;
+
+static void reach_input_reset_hotkey_state(reach_input_source *source);
+
+static reach_result reach_input_restart_reach_session(void)
+{
+    wchar_t reachctl_path[MAX_PATH] = {};
+    DWORD length = GetModuleFileNameW(nullptr, reachctl_path, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH)
+    {
+        return REACH_ERROR;
+    }
+
+    if (!PathRemoveFileSpecW(reachctl_path))
+    {
+        return REACH_ERROR;
+    }
+
+    wchar_t working_directory[MAX_PATH] = {};
+    wcscpy_s(working_directory, reachctl_path);
+
+    if (!PathAppendW(reachctl_path, L"reachctl.exe"))
+    {
+        return REACH_ERROR;
+    }
+
+    wchar_t command_line[MAX_PATH + 32] = {};
+    swprintf_s(command_line, L"\"%ls\" --start", reachctl_path);
+
+    STARTUPINFOW startup = {};
+    startup.cb = sizeof(startup);
+
+    PROCESS_INFORMATION process = {};
+    BOOL ok = CreateProcessW(nullptr, command_line, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+                             nullptr, working_directory, &startup, &process);
+    if (!ok)
+    {
+        return REACH_ERROR;
+    }
+
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return REACH_OK;
+}
+
+static void reach_input_handle_helper_disconnected(reach_input_source *source)
+{
+    reach_input_reset_hotkey_state(source);
+    if (InterlockedCompareExchange(&g_reach_input_helper_restart_prompt_active, 1, 0) != 0)
+    {
+        return;
+    }
+
+    MessageBoxW(nullptr, L"Reach encountered a problem and needs to restart.", L"Reach",
+                MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST | MB_TASKMODAL);
+    (void)reach_input_restart_reach_session();
+    InterlockedExchange(&g_reach_input_helper_restart_prompt_active, 0);
+}
 
 static void reach_input_post_ui_event(reach_input_source *source, reach_ui_event_type type,
                                       uint32_t id)
@@ -231,7 +291,7 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
     }
     if (message == REACH_INPUT_WM_HELPER_DISCONNECTED && source != nullptr)
     {
-        reach_input_reset_hotkey_state(source);
+        reach_input_handle_helper_disconnected(source);
         return 0;
     }
     if (message == REACH_INPUT_WM_SHARED_HOTKEYS && source != nullptr)
