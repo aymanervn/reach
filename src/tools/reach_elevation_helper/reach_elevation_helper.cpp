@@ -1137,6 +1137,17 @@ static void reach_helper_reconcile_modifier_state(void)
     }
 }
 
+static int32_t reach_helper_windows_key_down(void)
+{
+    return g_hotkeys.left_win_down || g_hotkeys.right_win_down;
+}
+
+static int32_t reach_helper_hotkey_is_windows_key(uint32_t key)
+{
+    return key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
+           key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN;
+}
+
 static void reach_helper_clear_reach_hotkey_state(void)
 {
     g_hotkeys.alt_down = 0;
@@ -1206,7 +1217,19 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
             }
             if (key != 0 && (key_down || key_up))
             {
+                if (reach_helper_hotkey_is_windows_key(key) && key_down &&
+                    !reach_helper_windows_key_down())
+                {
+                    g_hotkeys.windows_key_chord = 0;
+                }
                 int32_t windows_chord = g_hotkeys.windows_key_chord;
+                if (!reach_helper_hotkey_is_windows_key(key))
+                {
+                    if (reach_helper_windows_key_down() && key_down)
+                    {
+                        g_hotkeys.windows_key_chord = 1;
+                    }
+                }
                 if (reach_helper_hotkey_is_modifier(key))
                 {
                     reach_helper_update_key_state(key, key_down ? 1 : 0);
@@ -1215,17 +1238,13 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
                 {
                     reach_helper_reconcile_modifier_state();
                 }
-                if ((key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
-                     key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN) &&
-                    g_hotkeys.alt_tab_active)
+                if (reach_helper_hotkey_is_windows_key(key) && g_hotkeys.alt_tab_active)
                 {
                     g_hotkeys.windows_key_chord = 0;
-                    return 1;
+                    return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
                 }
                 uint32_t modifiers = reach_helper_hotkey_modifiers();
-                if ((key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
-                     key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN) &&
-                    key_up && windows_chord)
+                if (reach_helper_hotkey_is_windows_key(key) && key_up && windows_chord)
                 {
                     modifiers |= REACH_ELEVATION_HELPER_MODIFIER_CHORD;
                 }
@@ -1248,18 +1267,13 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
                 {
                     g_hotkeys.alt_tab_active = 0;
                 }
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
-                    key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN)
+                if (reach_helper_hotkey_is_windows_key(key))
                 {
                     if (key_up && !g_hotkeys.left_win_down && !g_hotkeys.right_win_down)
                     {
                         g_hotkeys.windows_key_chord = 0;
                     }
-                    return 1;
-                }
-                if ((g_hotkeys.left_win_down || g_hotkeys.right_win_down) && key_down)
-                {
-                    g_hotkeys.windows_key_chord = 1;
+                    return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
                 }
             }
         }
