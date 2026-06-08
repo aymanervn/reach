@@ -136,6 +136,26 @@ static int32_t reach_window_management_closed(HWND hwnd, const RECT *expected)
     return hwnd == nullptr || !IsWindow(hwnd);
 }
 
+void reach_window_management_prepare_minimize(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd))
+    {
+        return;
+    }
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+    if (!GetWindowPlacement(hwnd, &placement))
+    {
+        return;
+    }
+
+    placement.flags |= WPF_SETMINPOSITION;
+    placement.ptMinPosition.x = GetSystemMetrics(SM_XVIRTUALSCREEN) - 32000;
+    placement.ptMinPosition.y = GetSystemMetrics(SM_YVIRTUALSCREEN) - 32000;
+    (void)SetWindowPlacement(hwnd, &placement);
+}
+
 static void reach_window_management_log_failure(const char *action, HWND hwnd,
                                                 const reach_window_action_state *before,
                                                 const reach_window_action_state *after)
@@ -253,6 +273,7 @@ reach_result reach_window_management_minimize(HWND hwnd)
     HWND target = hwnd;
 
     reach_window_action_state before = reach_window_management_capture_state(target);
+    reach_window_management_prepare_minimize(target);
     (void)ShowWindowAsync(target, SW_MINIMIZE);
     (void)PostMessageW(target, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 

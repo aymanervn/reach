@@ -844,6 +844,10 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
         {
             reach_helper_forget_window_metadata(hwnd);
         }
+        if (event == EVENT_SYSTEM_MINIMIZESTART)
+        {
+            reach_window_management_prepare_minimize(hwnd);
+        }
 
         if (event == EVENT_SYSTEM_FOREGROUND && reach_helper_publish_foreground_change())
         {
@@ -1508,6 +1512,25 @@ static void reach_helper_serve_client(HANDLE pipe)
     FlushFileBuffers(pipe);
 }
 
+static void reach_helper_hide_minimized_window_icons(void)
+{
+    MINIMIZEDMETRICS metrics = {};
+    metrics.cbSize = sizeof(metrics);
+    if (!SystemParametersInfoW(SPI_GETMINIMIZEDMETRICS, sizeof(metrics), &metrics, 0))
+    {
+        return;
+    }
+
+    if ((metrics.iArrange & ARW_HIDE) != 0)
+    {
+        return;
+    }
+
+    metrics.iArrange |= ARW_HIDE;
+    (void)SystemParametersInfoW(SPI_SETMINIMIZEDMETRICS, sizeof(metrics), &metrics,
+                                SPIF_SENDCHANGE);
+}
+
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, int show_command)
 {
     (void)instance;
@@ -1524,6 +1547,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
         }
         return 0;
     }
+
+    reach_helper_hide_minimized_window_icons();
 
     if (reach_elevation_helper_shared_writer_start() != REACH_OK)
     {
