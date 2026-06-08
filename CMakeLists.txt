@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 0.5.8 LANGUAGES C CXX)
+project(reach VERSION 0.5.9 LANGUAGES C CXX)
 
 enable_testing()
 set(REACH_CTEST_DEFAULT_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/CTestDefaultConfig.cmake)
