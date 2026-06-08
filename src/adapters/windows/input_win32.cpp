@@ -19,6 +19,7 @@ struct reach_input_source
     int32_t alt_tab_active;
     int32_t windows_key_down;
     int32_t windows_key_chord;
+    int32_t windows_d_down;
 };
 
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
@@ -50,6 +51,7 @@ static void reach_input_reset_hotkey_state(reach_input_source *source)
     source->alt_tab_active = 0;
     source->windows_key_down = 0;
     source->windows_key_chord = 0;
+    source->windows_d_down = 0;
 }
 
 static void reach_input_handle_hotkey_record(reach_input_source *source,
@@ -100,6 +102,23 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
             reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_CANCEL, 0);
         }
         break;
+    case REACH_ELEVATION_HELPER_HOTKEY_D:
+        if (source->windows_key_down ||
+            (record->modifiers & (REACH_ELEVATION_HELPER_MODIFIER_LEFT_WIN |
+                                  REACH_ELEVATION_HELPER_MODIFIER_RIGHT_WIN)) != 0)
+        {
+            source->windows_key_chord = 1;
+            if (pressed && !source->windows_d_down)
+            {
+                source->windows_d_down = 1;
+                reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOWS_D_MINIMIZE_ALL, 0);
+            }
+            else if (!pressed)
+            {
+                source->windows_d_down = 0;
+            }
+        }
+        break;
     case REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN:
     case REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN:
         if (source->alt_tab_active)
@@ -119,6 +138,7 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
                             ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_CHORD) != 0);
             source->windows_key_down = 0;
             source->windows_key_chord = 0;
+            source->windows_d_down = 0;
             if (!chord)
             {
                 reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOWS_KEY, 0);

@@ -84,6 +84,7 @@ enum reach_elevation_helper_hotkey_key : uint32_t
     REACH_ELEVATION_HELPER_HOTKEY_ESCAPE = 4,
     REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN = 5,
     REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN = 6,
+    REACH_ELEVATION_HELPER_HOTKEY_D = 7,
 };
 
 enum reach_elevation_helper_hotkey_action : uint32_t

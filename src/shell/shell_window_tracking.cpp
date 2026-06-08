@@ -392,7 +392,8 @@ static void reach_shell_window_control_thread_main(reach_shell *shell)
     for (;;)
     {
         reach_shell_window_control_action action = REACH_SHELL_WINDOW_CONTROL_ACTIVATE;
-        uintptr_t window_id = 0;
+        uintptr_t windows[REACH_MAX_PINNED_APPS] = {};
+        size_t window_count = 0;
 
         {
             std::unique_lock<std::mutex> lock(shell->window_control.mutex);
@@ -406,11 +407,28 @@ static void reach_shell_window_control_thread_main(reach_shell *shell)
             }
 
             action = shell->window_control.pending_action;
-            window_id = shell->window_control.pending_window;
+            window_count = shell->window_control.pending_window_count;
+            if (window_count > REACH_MAX_PINNED_APPS)
+            {
+                window_count = REACH_MAX_PINNED_APPS;
+            }
+            for (size_t index = 0; index < window_count; ++index)
+            {
+                windows[index] = shell->window_control.pending_windows[index];
+            }
             shell->window_control.pending = 0;
         }
 
-        reach_result result = reach_shell_execute_window_control(shell, action, window_id);
+        reach_result result = window_count > 0 ? REACH_OK : REACH_INVALID_ARGUMENT;
+        for (size_t index = 0; index < window_count; ++index)
+        {
+            reach_result window_result = reach_shell_execute_window_control(shell, action,
+                                                                            windows[index]);
+            if (window_result != REACH_OK && result == REACH_OK)
+            {
+                result = window_result;
+            }
+        }
 
         {
             std::lock_guard<std::mutex> lock(shell->window_control.mutex);
@@ -469,6 +487,48 @@ reach_result reach_shell_schedule_window_control(reach_shell *shell,
         std::lock_guard<std::mutex> lock(shell->window_control.mutex);
         shell->window_control.pending_action = action;
         shell->window_control.pending_window = window_id;
+        shell->window_control.pending_windows[0] = window_id;
+        shell->window_control.pending_window_count = 1;
+        shell->window_control.pending = 1;
+    }
+
+    shell->window_control.cv.notify_one();
+    reach_shell_request_update(shell);
+    return REACH_OK;
+}
+
+reach_result reach_shell_schedule_minimize_windows(reach_shell *shell, const uintptr_t *window_ids,
+                                                   size_t window_count)
+{
+    if (shell == nullptr || window_ids == nullptr || window_count == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (window_count > REACH_MAX_PINNED_APPS)
+    {
+        window_count = REACH_MAX_PINNED_APPS;
+    }
+
+    reach_result result = reach_shell_start_window_control_worker(shell);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(shell->window_control.mutex);
+        shell->window_control.pending_action = REACH_SHELL_WINDOW_CONTROL_MINIMIZE;
+        shell->window_control.pending_window = window_ids[0];
+        shell->window_control.pending_window_count = window_count;
+        for (size_t index = 0; index < window_count; ++index)
+        {
+            shell->window_control.pending_windows[index] = window_ids[index];
+        }
+        for (size_t index = window_count; index < REACH_MAX_PINNED_APPS; ++index)
+        {
+            shell->window_control.pending_windows[index] = 0;
+        }
         shell->window_control.pending = 1;
     }
 
@@ -522,6 +582,7 @@ void reach_shell_stop_window_control_worker(reach_shell *shell)
         std::lock_guard<std::mutex> lock(shell->window_control.mutex);
         shell->window_control.stop = 1;
         shell->window_control.pending = 0;
+        shell->window_control.pending_window_count = 0;
     }
     shell->window_control.cv.notify_one();
 
@@ -535,6 +596,7 @@ void reach_shell_stop_window_control_worker(reach_shell *shell)
     shell->window_control.pending = 0;
     shell->window_control.completed = 0;
     shell->window_control.pending_window = 0;
+    shell->window_control.pending_window_count = 0;
 }
 
 void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)

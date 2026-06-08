@@ -2,7 +2,7 @@
 
 uint32_t reach_elevation_helper_protocol_version(void)
 {
-    return 7;
+    return 8;
 }
 
 int32_t reach_elevation_helper_command_valid(uint32_t command)

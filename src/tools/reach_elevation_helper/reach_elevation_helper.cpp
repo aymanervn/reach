@@ -33,6 +33,7 @@ struct reach_helper_hotkey_state
     int32_t left_win_down;
     int32_t right_win_down;
     int32_t windows_key_chord;
+    int32_t windows_d_down;
 };
 
 struct reach_helper_window_metadata
@@ -1090,6 +1091,8 @@ static uint32_t reach_helper_hotkey_key_from_vk(DWORD vk)
         return REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN;
     case VK_RWIN:
         return REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN;
+    case 'D':
+        return REACH_ELEVATION_HELPER_HOTKEY_D;
     default:
         return 0;
     }
@@ -1156,6 +1159,7 @@ static void reach_helper_clear_reach_hotkey_state(void)
     g_hotkeys.left_win_down = 0;
     g_hotkeys.right_win_down = 0;
     g_hotkeys.windows_key_chord = 0;
+    g_hotkeys.windows_d_down = 0;
 }
 
 static int32_t reach_helper_alt_down(void)
@@ -1217,6 +1221,37 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
             }
             if (key != 0 && (key_down || key_up))
             {
+                if (key == REACH_ELEVATION_HELPER_HOTKEY_D && key_up && g_hotkeys.windows_d_down)
+                {
+                    g_hotkeys.windows_d_down = 0;
+                    uint32_t modifiers = reach_helper_hotkey_modifiers();
+                    (void)reach_elevation_helper_shared_append_hotkey(
+                        key, REACH_ELEVATION_HELPER_HOTKEY_RELEASED, modifiers);
+                    return 1;
+                }
+                if (key == REACH_ELEVATION_HELPER_HOTKEY_D && reach_helper_windows_key_down())
+                {
+                    g_hotkeys.windows_key_chord = 1;
+                    if (key_down)
+                    {
+                        if (!g_hotkeys.windows_d_down)
+                        {
+                            g_hotkeys.windows_d_down = 1;
+                            uint32_t modifiers = reach_helper_hotkey_modifiers();
+                            (void)reach_elevation_helper_shared_append_hotkey(
+                                key, REACH_ELEVATION_HELPER_HOTKEY_PRESSED, modifiers);
+                        }
+                        return 1;
+                    }
+                    if (g_hotkeys.windows_d_down)
+                    {
+                        g_hotkeys.windows_d_down = 0;
+                        uint32_t modifiers = reach_helper_hotkey_modifiers();
+                        (void)reach_elevation_helper_shared_append_hotkey(
+                            key, REACH_ELEVATION_HELPER_HOTKEY_RELEASED, modifiers);
+                        return 1;
+                    }
+                }
                 if (reach_helper_hotkey_is_windows_key(key) && key_down &&
                     !reach_helper_windows_key_down())
                 {

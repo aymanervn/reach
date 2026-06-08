@@ -276,6 +276,8 @@ typedef struct reach_shell_window_control_state
 
     reach_shell_window_control_action pending_action;
     uintptr_t pending_window;
+    uintptr_t pending_windows[REACH_MAX_PINNED_APPS];
+    size_t pending_window_count;
     reach_result completed_result;
 } reach_shell_window_control_state;
 
@@ -584,6 +586,8 @@ reach_result reach_shell_execute_window_control(reach_shell *shell,
 reach_result reach_shell_schedule_window_control(reach_shell *shell,
                                                  reach_shell_window_control_action action,
                                                  uintptr_t window_id);
+reach_result reach_shell_schedule_minimize_windows(reach_shell *shell, const uintptr_t *window_ids,
+                                                   size_t window_count);
 void reach_shell_apply_window_control_result(reach_shell *shell);
 void reach_shell_stop_window_control_worker(reach_shell *shell);
 
