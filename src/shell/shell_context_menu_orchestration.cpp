@@ -181,17 +181,18 @@ reach_result reach_shell_show_power_context_menu(reach_shell *shell)
                                             shell->context_menu_state.item_icon_ids,
                                             &shell->context_menu_state.item_count);
 
-    float popup_width = 176.0f;
-    float item_height = 34.0f;
-    float padding = 8.0f;
-    float notch_height = reach_popup_notch_height();
+    float scale = reach_shell_layout_dpi_scale(shell);
+    float popup_width = 176.0f * scale;
+    float item_height = 34.0f * scale;
+    float padding = 8.0f * scale;
+    float notch_height = reach_popup_notch_height_scaled(scale);
     float popup_body_height =
         padding * 2.0f + item_height * (float)shell->context_menu_state.item_count;
     float popup_height = popup_body_height + notch_height;
     float anchor_x =
         shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
     float popup_x = anchor_x - popup_width * 0.72f;
-    float popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f;
+    float popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f * scale;
 
     reach_rect_f32 monitor = {};
     const reach_monitor_info *primary_monitor =
@@ -209,18 +210,18 @@ reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     {
         monitor = shell->layout.dock.bounds;
     }
-    if (popup_x < monitor.x + 8.0f)
+    if (popup_x < monitor.x + 8.0f * scale)
     {
-        popup_x = monitor.x + 8.0f;
+        popup_x = monitor.x + 8.0f * scale;
     }
-    float max_x = monitor.x + monitor.width - popup_width - 8.0f;
+    float max_x = monitor.x + monitor.width - popup_width - 8.0f * scale;
     if (popup_x > max_x)
     {
         popup_x = max_x;
     }
-    if (popup_y < monitor.y + 8.0f)
+    if (popup_y < monitor.y + 8.0f * scale)
     {
-        popup_y = monitor.y + 8.0f;
+        popup_y = monitor.y + 8.0f * scale;
     }
 
     shell->context_menu_state.bounds = {popup_x, popup_y, popup_width, popup_height};
@@ -266,10 +267,11 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
         shell->context_menu_state.item_icon_ids[index] = 0;
     }
 
-    float popup_width = 208.0f;
-    float item_height = 34.0f;
-    float padding = 8.0f;
-    float notch_height = reach_popup_notch_height();
+    float scale = reach_shell_layout_dpi_scale(shell);
+    float popup_width = 208.0f * scale;
+    float item_height = 34.0f * scale;
+    float padding = 8.0f * scale;
+    float notch_height = reach_popup_notch_height_scaled(scale);
     float anchor_ratio = 0.30f;
     float popup_body_height =
         padding * 2.0f + item_height * (float)shell->context_menu_state.item_count;
@@ -280,7 +282,7 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     {
         reach_rect_f32 slot = shell->layout.dock.app_slots[item_index];
         popup_x = slot.x + slot.width * 0.5f - popup_width * anchor_ratio;
-        popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f;
+        popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f * scale;
         reach_rect_f32 monitor = {};
         const reach_monitor_info *primary_monitor =
             shell->monitors.list != nullptr && shell->monitors.ops.primary != nullptr
@@ -297,18 +299,18 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
         {
             monitor = shell->layout.dock.bounds;
         }
-        if (popup_x < monitor.x + 8.0f)
+        if (popup_x < monitor.x + 8.0f * scale)
         {
-            popup_x = monitor.x + 8.0f;
+            popup_x = monitor.x + 8.0f * scale;
         }
-        float max_x = monitor.x + monitor.width - popup_width - 8.0f;
+        float max_x = monitor.x + monitor.width - popup_width - 8.0f * scale;
         if (popup_x > max_x)
         {
             popup_x = max_x;
         }
-        if (popup_y < monitor.y + 8.0f)
+        if (popup_y < monitor.y + 8.0f * scale)
         {
-            popup_y = monitor.y + 8.0f;
+            popup_y = monitor.y + 8.0f * scale;
         }
     }
 

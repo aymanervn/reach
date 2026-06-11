@@ -55,7 +55,8 @@ void reach_shell_compute_tray_popup_layout(reach_shell *shell, const reach_dock_
 
     (void)out_slots;
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    reach_tray_compute_popup_layout(&shell->tray_state.model, theme, dock_layout, out_bounds);
+    reach_tray_compute_popup_layout(&shell->tray_state.model, theme, dock_layout,
+                                    reach_shell_layout_dpi_scale(shell), out_bounds);
 }
 
 reach_result reach_shell_execute_tray_action(reach_shell *shell, reach_tray_feature_action action)

@@ -27,6 +27,7 @@ extern "C"
         const reach_tray_model *model;
         reach_rect_f32 bounds;
         float dock_height;
+        float dpi_scale;
         size_t click_feedback_index;
         float click_feedback_opacity;
         int32_t text_alignment_center;
@@ -64,7 +65,7 @@ extern "C"
                                           reach_tray_provider_port *provider);
     void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme *theme,
                                          const reach_dock_layout *dock_layout,
-                                         reach_rect_f32 *out_bounds);
+                                         float dpi_scale, reach_rect_f32 *out_bounds);
     reach_result reach_tray_build_render_commands(const reach_tray_render_input *input,
                                                   reach_render_command_buffer *out_commands);
     reach_tray_hit_result reach_tray_hit_test_popup(const reach_tray_model *model,

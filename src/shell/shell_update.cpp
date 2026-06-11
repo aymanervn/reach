@@ -643,7 +643,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         shell->tray.window.ops.apply_rounded_corners != nullptr)
                     {
                         (void)shell->tray.window.ops.apply_rounded_corners(
-                            shell->tray.window.window, reach_popup_radius());
+                            shell->tray.window.window,
+                            reach_popup_radius_scaled(reach_shell_layout_dpi_scale(shell)));
                     }
                     if (shell->tray_state.popup_open)
                     {
@@ -694,7 +695,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         shell->quick_settings.window.ops.apply_rounded_corners != nullptr)
                     {
                         (void)shell->quick_settings.window.ops.apply_rounded_corners(
-                            shell->quick_settings.window.window, reach_popup_radius());
+                            shell->quick_settings.window.window,
+                            reach_popup_radius_scaled(reach_shell_layout_dpi_scale(shell)));
                     }
 
                     if (!game_mode && shell->quick_settings_open)
@@ -719,8 +721,10 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
                 if (shell->switcher.window.ops.set_bounds != nullptr)
                 {
-                    reach_rect_f32 target_switcher_bounds = reach_switcher_bounds_for_count(
-                        bounds, reach_shell_switcher_visible_count(shell));
+                    reach_rect_f32 target_switcher_bounds =
+                        reach_switcher_bounds_for_count_scaled(
+                            bounds, reach_shell_switcher_visible_count(shell),
+                            reach_shell_layout_dpi_scale(shell));
                     reach_rect_f32 switcher_bounds = reach_shell_apply_switcher_bounds_animation(
                         shell, target_switcher_bounds, delta_seconds);
                     int32_t switcher_window_changed = 0;
@@ -739,7 +743,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         shell->switcher.window.ops.apply_rounded_corners != nullptr)
                     {
                         (void)shell->switcher.window.ops.apply_rounded_corners(
-                            shell->switcher.window.window, 16.0f);
+                            shell->switcher.window.window,
+                            16.0f * reach_shell_layout_dpi_scale(shell));
                     }
                     if (!game_mode && shell->switcher_state.open)
                     {
@@ -777,7 +782,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         shell->context_menu.window.ops.apply_rounded_corners != nullptr)
                     {
                         (void)shell->context_menu.window.ops.apply_rounded_corners(
-                            shell->context_menu.window.window, reach_popup_radius());
+                            shell->context_menu.window.window,
+                            reach_popup_radius_scaled(reach_shell_layout_dpi_scale(shell)));
                     }
                     if (!game_mode && shell->context_menu_state.open)
                     {

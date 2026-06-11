@@ -156,4 +156,135 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
 static constexpr reach_quick_settings_metrics reach_quick_settings_metrics_values =
     reach_quick_settings_make_metrics();
 
+static inline float reach_quick_settings_metric_scale_value(float value, float dpi_scale)
+{
+    return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+}
+
+static inline reach_quick_settings_metrics
+reach_quick_settings_metrics_for_scale(float dpi_scale)
+{
+    reach_quick_settings_metrics metrics = reach_quick_settings_metrics_values;
+
+    metrics.content_padding = reach_quick_settings_metric_scale_value(metrics.content_padding,
+                                                                      dpi_scale);
+    metrics.text_padding = reach_quick_settings_metric_scale_value(metrics.text_padding,
+                                                                   dpi_scale);
+    metrics.system_grid_tile_height =
+        reach_quick_settings_metric_scale_value(metrics.system_grid_tile_height, dpi_scale);
+    metrics.system_grid_gap =
+        reach_quick_settings_metric_scale_value(metrics.system_grid_gap, dpi_scale);
+    metrics.system_grid_bottom_gap =
+        reach_quick_settings_metric_scale_value(metrics.system_grid_bottom_gap, dpi_scale);
+    metrics.system_tile_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_size, dpi_scale);
+    metrics.system_tile_icon_gap =
+        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_gap, dpi_scale);
+    metrics.pill_header_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.pill_header_icon_size, dpi_scale);
+    metrics.pill_header_label_gap =
+        reach_quick_settings_metric_scale_value(metrics.pill_header_label_gap, dpi_scale);
+    metrics.pill_header_height =
+        reach_quick_settings_metric_scale_value(metrics.pill_header_height, dpi_scale);
+    metrics.pill_header_gap =
+        reach_quick_settings_metric_scale_value(metrics.pill_header_gap, dpi_scale);
+    metrics.pill_height = reach_quick_settings_metric_scale_value(metrics.pill_height, dpi_scale);
+    metrics.section_header_gap =
+        reach_quick_settings_metric_scale_value(metrics.section_header_gap, dpi_scale);
+    metrics.output_button_gap =
+        reach_quick_settings_metric_scale_value(metrics.output_button_gap, dpi_scale);
+    metrics.output_button_height =
+        reach_quick_settings_metric_scale_value(metrics.output_button_height, dpi_scale);
+    metrics.output_title_height =
+        reach_quick_settings_metric_scale_value(metrics.output_title_height, dpi_scale);
+    metrics.output_panel_gap =
+        reach_quick_settings_metric_scale_value(metrics.output_panel_gap, dpi_scale);
+    metrics.output_device_row_height =
+        reach_quick_settings_metric_scale_value(metrics.output_device_row_height, dpi_scale);
+    metrics.output_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.output_icon_size, dpi_scale);
+    metrics.output_check_size =
+        reach_quick_settings_metric_scale_value(metrics.output_check_size, dpi_scale);
+    metrics.output_row_horizontal_padding =
+        reach_quick_settings_metric_scale_value(metrics.output_row_horizontal_padding, dpi_scale);
+    metrics.output_row_label_gap =
+        reach_quick_settings_metric_scale_value(metrics.output_row_label_gap, dpi_scale);
+    metrics.app_title_height =
+        reach_quick_settings_metric_scale_value(metrics.app_title_height, dpi_scale);
+    metrics.app_title_gap =
+        reach_quick_settings_metric_scale_value(metrics.app_title_gap, dpi_scale);
+    metrics.app_panel_gap =
+        reach_quick_settings_metric_scale_value(metrics.app_panel_gap, dpi_scale);
+    metrics.app_volume_row_height =
+        reach_quick_settings_metric_scale_value(metrics.app_volume_row_height, dpi_scale);
+    metrics.app_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.app_icon_size, dpi_scale);
+    metrics.app_row_horizontal_padding =
+        reach_quick_settings_metric_scale_value(metrics.app_row_horizontal_padding, dpi_scale);
+    metrics.app_row_label_gap =
+        reach_quick_settings_metric_scale_value(metrics.app_row_label_gap, dpi_scale);
+    metrics.app_row_slider_width =
+        reach_quick_settings_metric_scale_value(metrics.app_row_slider_width, dpi_scale);
+    metrics.app_row_slider_gap =
+        reach_quick_settings_metric_scale_value(metrics.app_row_slider_gap, dpi_scale);
+    metrics.app_row_slider_line_height =
+        reach_quick_settings_metric_scale_value(metrics.app_row_slider_line_height, dpi_scale);
+    metrics.app_row_thumb_size =
+        reach_quick_settings_metric_scale_value(metrics.app_row_thumb_size, dpi_scale);
+    metrics.app_row_percent_width =
+        reach_quick_settings_metric_scale_value(metrics.app_row_percent_width, dpi_scale);
+    metrics.app_row_percent_gap =
+        reach_quick_settings_metric_scale_value(metrics.app_row_percent_gap, dpi_scale);
+    metrics.separator_inset =
+        reach_quick_settings_metric_scale_value(metrics.separator_inset, dpi_scale);
+    metrics.separator_thickness =
+        reach_quick_settings_metric_scale_value(metrics.separator_thickness, dpi_scale);
+    metrics.expand_button_gap =
+        reach_quick_settings_metric_scale_value(metrics.expand_button_gap, dpi_scale);
+    metrics.expand_button_height =
+        reach_quick_settings_metric_scale_value(metrics.expand_button_height, dpi_scale);
+    metrics.chevron_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.chevron_icon_size, dpi_scale);
+    metrics.system_tile_text_size =
+        reach_quick_settings_metric_scale_value(metrics.system_tile_text_size, dpi_scale);
+    metrics.default_pill_label_text_size =
+        reach_quick_settings_metric_scale_value(metrics.default_pill_label_text_size, dpi_scale);
+    metrics.master_pill_label_text_size =
+        reach_quick_settings_metric_scale_value(metrics.master_pill_label_text_size, dpi_scale);
+    metrics.output_row_primary_top =
+        reach_quick_settings_metric_scale_value(metrics.output_row_primary_top, dpi_scale);
+    metrics.output_row_primary_height =
+        reach_quick_settings_metric_scale_value(metrics.output_row_primary_height, dpi_scale);
+    metrics.output_row_primary_text_size =
+        reach_quick_settings_metric_scale_value(metrics.output_row_primary_text_size, dpi_scale);
+    metrics.output_row_secondary_top =
+        reach_quick_settings_metric_scale_value(metrics.output_row_secondary_top, dpi_scale);
+    metrics.output_row_secondary_height =
+        reach_quick_settings_metric_scale_value(metrics.output_row_secondary_height, dpi_scale);
+    metrics.output_row_secondary_text_size =
+        reach_quick_settings_metric_scale_value(metrics.output_row_secondary_text_size, dpi_scale);
+    metrics.output_button_title_top =
+        reach_quick_settings_metric_scale_value(metrics.output_button_title_top, dpi_scale);
+    metrics.output_button_title_height =
+        reach_quick_settings_metric_scale_value(metrics.output_button_title_height, dpi_scale);
+    metrics.output_button_title_text_size =
+        reach_quick_settings_metric_scale_value(metrics.output_button_title_text_size, dpi_scale);
+    metrics.output_button_device_top =
+        reach_quick_settings_metric_scale_value(metrics.output_button_device_top, dpi_scale);
+    metrics.output_button_device_height =
+        reach_quick_settings_metric_scale_value(metrics.output_button_device_height, dpi_scale);
+    metrics.output_button_device_text_size =
+        reach_quick_settings_metric_scale_value(metrics.output_button_device_text_size, dpi_scale);
+    metrics.section_title_text_size =
+        reach_quick_settings_metric_scale_value(metrics.section_title_text_size, dpi_scale);
+    metrics.app_row_text_size =
+        reach_quick_settings_metric_scale_value(metrics.app_row_text_size, dpi_scale);
+    metrics.app_row_percent_text_size =
+        reach_quick_settings_metric_scale_value(metrics.app_row_percent_text_size, dpi_scale);
+    metrics.expand_button_text_size =
+        reach_quick_settings_metric_scale_value(metrics.expand_button_text_size, dpi_scale);
+
+    return metrics;
+}
+
 #endif

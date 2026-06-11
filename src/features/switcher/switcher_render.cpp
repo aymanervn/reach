@@ -10,6 +10,12 @@ static reach_color reach_switcher_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
     return color;
 }
 
+static float reach_switcher_input_scale(const reach_switcher_render_input *input, float value)
+{
+    float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
+    return value * scale;
+}
+
 reach_result reach_switcher_build_render_commands(const reach_switcher_render_input *input,
                                                   reach_render_command_buffer *out_commands)
 {
@@ -22,11 +28,16 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     reach_render_command_buffer_clear(out_commands);
 
     reach_render_command command = {};
-    float radius = 20.0f;
-    float padding = 24.0f;
-    float item_size = 112.0f;
-    float icon_box_size = 88.0f;
-    float gap = 14.0f;
+    float radius = reach_switcher_input_scale(input, 20.0f);
+    float padding = reach_switcher_input_scale(input, 24.0f);
+    float item_size = reach_switcher_input_scale(input, 112.0f);
+    float icon_box_size = reach_switcher_input_scale(input, 88.0f);
+    float gap = reach_switcher_input_scale(input, 14.0f);
+    float selected_inset = reach_switcher_input_scale(input, 5.0f);
+    float icon_top_offset = reach_switcher_input_scale(input, 4.0f);
+    float label_top = reach_switcher_input_scale(input, 104.0f);
+    float label_height = reach_switcher_input_scale(input, 20.0f);
+    float label_text_size = reach_switcher_input_scale(input, 13.0f);
     const reach_theme *theme = input->theme;
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
     size_t visible_count = reach_switcher_visible_count(input->model->window_count);
@@ -49,7 +60,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     command.rect.height = input->bounds.height - 1.0f;
     command.color = theme->dark_border;
     command.radius = radius;
-    command.stroke_width = 1.0f;
+    command.stroke_width = reach_switcher_input_scale(input, 1.0f);
     reach_render_command_buffer_push(out_commands, &command);
 
     if (visible_count > 0)
@@ -72,19 +83,19 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
                                    item_size};
             int32_t selected = index == input->model->selected_index;
             float box_x = item.x + (item.width - icon_box_size) * 0.5f;
-            float box_y = item.y + 4.0f;
+            float box_y = item.y + icon_top_offset;
             reach_icon_handle icon = input->items[index].icon;
 
             if (selected)
             {
                 command = {};
                 command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = box_x - 5.0f;
-                command.rect.y = box_y - 5.0f;
-                command.rect.width = icon_box_size + 10.0f;
-                command.rect.height = icon_box_size + 10.0f;
+                command.rect.x = box_x - selected_inset;
+                command.rect.y = box_y - selected_inset;
+                command.rect.width = icon_box_size + selected_inset * 2.0f;
+                command.rect.height = icon_box_size + selected_inset * 2.0f;
                 command.color = reach_switcher_rgb(255, 255, 255, 0.34f);
-                command.radius = icon_box_radius + 5.0f;
+                command.radius = icon_box_radius + selected_inset;
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
@@ -107,13 +118,13 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
                 command = {};
                 command.type = REACH_RENDER_COMMAND_TEXT;
                 command.rect.x = item.x;
-                command.rect.y = item.y + 104.0f;
+                command.rect.y = item.y + label_top;
                 command.rect.width = item.width;
-                command.rect.height = 20.0f;
+                command.rect.height = label_height;
                 command.color = reach_switcher_rgb(242, 240, 236, 0.96f);
                 command.text_weight = input->text_weight_demi_bold;
                 command.text_alignment = input->text_alignment_center;
-                command.text_size = 13.0f;
+                command.text_size = label_text_size;
                 command.text_ellipsis = 1;
                 reach_copy_utf16(command.text, 260,
                                  input->items[index].label[0] != 0 ? input->items[index].label

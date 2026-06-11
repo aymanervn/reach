@@ -13,18 +13,20 @@ static float reach_shell_quick_settings_clamp01(float value)
     return value;
 }
 
-static reach_rect_f32 reach_shell_quick_settings_content_bounds(reach_rect_f32 surface_bounds)
+static reach_rect_f32 reach_shell_quick_settings_content_bounds(reach_rect_f32 surface_bounds,
+                                                                float dpi_scale)
 {
     reach_rect_f32 bounds = surface_bounds;
 
-    const float horizontal_padding = 8.0f;
-    const float top_padding = 8.0f;
-    const float bottom_padding = 12.0f;
+    float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+    const float horizontal_padding = 8.0f * scale;
+    const float top_padding = 8.0f * scale;
+    const float bottom_padding = 12.0f * scale;
 
     bounds.x += horizontal_padding;
     bounds.y += top_padding;
     bounds.width -= horizontal_padding * 2.0f;
-    bounds.height -= top_padding + bottom_padding + reach_popup_notch_height();
+    bounds.height -= top_padding + bottom_padding + reach_popup_notch_height_scaled(scale);
 
     if (bounds.width < 0.0f)
     {
@@ -41,13 +43,15 @@ static reach_rect_f32 reach_shell_quick_settings_content_bounds(reach_rect_f32 s
 static void reach_shell_quick_settings_target_size(reach_shell *shell, float *out_width,
                                                    float *out_height)
 {
-    const float surface_vertical_padding = 8.0f + 12.0f + reach_popup_notch_height();
-    float content_height = reach_quick_settings_content_height_for_model(
-        shell != nullptr ? &shell->quick_settings_model : nullptr);
+    float scale = reach_shell_layout_dpi_scale(shell);
+    const float surface_vertical_padding =
+        8.0f * scale + 12.0f * scale + reach_popup_notch_height_scaled(scale);
+    float content_height = reach_quick_settings_content_height_for_model_scaled(
+        shell != nullptr ? &shell->quick_settings_model : nullptr, scale);
 
     if (out_width != nullptr)
     {
-        *out_width = 280.0f;
+        *out_width = 280.0f * scale;
     }
     if (out_height != nullptr)
     {
@@ -67,7 +71,8 @@ static reach_rect_f32 reach_shell_quick_settings_target_bounds(reach_shell *shel
     float height = 140.0f;
     reach_shell_quick_settings_target_size(shell, &width, &height);
 
-    const float gap = 8.0f;
+    float scale = reach_shell_layout_dpi_scale(shell);
+    const float gap = 8.0f * scale;
     reach_rect_f32 button = shell->layout.dock.quick_settings_button;
     float anchor_x = button.x + button.width * 0.5f;
 
@@ -136,9 +141,10 @@ void reach_shell_refresh_quick_settings_layout(reach_shell *shell)
     surface_bounds.width = shell->quick_settings_bounds.width;
     surface_bounds.height = shell->quick_settings_bounds.height;
     shell->quick_settings_content_bounds =
-        reach_shell_quick_settings_content_bounds(surface_bounds);
-    shell->quick_settings_layout = reach_quick_settings_layout_for_content_bounds(
-        shell->quick_settings_content_bounds, shell->theme, &shell->quick_settings_model);
+        reach_shell_quick_settings_content_bounds(surface_bounds, reach_shell_layout_dpi_scale(shell));
+    shell->quick_settings_layout = reach_quick_settings_layout_for_content_bounds_scaled(
+        shell->quick_settings_content_bounds, shell->theme, &shell->quick_settings_model,
+        reach_shell_layout_dpi_scale(shell));
 }
 
 void reach_shell_update_quick_settings_animation(reach_shell *shell, double delta_seconds)
@@ -150,7 +156,8 @@ void reach_shell_update_quick_settings_animation(reach_shell *shell, double delt
 
     if (reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation))
     {
-        const float gap = 8.0f;
+        float scale = reach_shell_layout_dpi_scale(shell);
+        const float gap = 8.0f * scale;
         float anchor_x = shell->layout.dock.quick_settings_button.x +
                          shell->layout.dock.quick_settings_button.width * 0.5f;
 

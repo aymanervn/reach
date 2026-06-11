@@ -127,6 +127,7 @@ reach_result reach_shell_render_popup_surface(reach_shell *shell, reach_surface_
     popup.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
     popup.bounds = bounds;
     popup.notch_center_x = notch_anchor_x - bounds.x;
+    popup.dpi_scale = reach_shell_layout_dpi_scale(shell);
 
     reach_result result = reach_popup_push_background(&popup, &commands);
     if (result != REACH_OK)

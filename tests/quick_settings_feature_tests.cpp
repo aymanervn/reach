@@ -167,7 +167,68 @@ static reach_quick_settings_layout test_layout(void)
 {
     reach_quick_settings_model model = {};
     reach_quick_settings_model_init(&model);
+    reach_quick_settings_model_set_main_volume(&model, 0.5f, 0);
     return test_layout_for_model(&model);
+}
+
+static void test_scaled_layout_and_render_metrics_follow_dpi_scale(void)
+{
+    reach_theme theme = test_theme();
+    reach_quick_settings_model model = {};
+    reach_quick_settings_model_init(&model);
+
+    const float scale = 1.5f;
+    reach_rect_f32 bounds = {};
+    bounds.width = 224.0f * scale;
+    bounds.height = reach_quick_settings_content_height_for_model_scaled(&model, scale);
+
+    reach_quick_settings_layout layout =
+        reach_quick_settings_layout_for_content_bounds_scaled(bounds, &theme, &model, scale);
+
+    expect_near(layout.system_grid_bounds.y - bounds.y, 8.0f * scale, 0.001f,
+                "scaled layout uses scaled top padding");
+    expect_near(layout.network_tile.icon.width, 20.0f * scale, 0.001f,
+                "scaled layout uses scaled tile icon size");
+    expect_near(layout.main_volume_pill.bounds.height, 24.0f * scale, 0.001f,
+                "scaled layout uses scaled pill height");
+
+    reach_quick_settings_render_input input = {};
+    input.theme = theme;
+    input.model = model;
+    input.layout = layout;
+    input.dpi_scale = scale;
+
+    reach_render_command_buffer commands = {};
+    reach_result result = reach_quick_settings_build_render_commands(&input, &commands);
+    expect_true(result == REACH_OK, "scaled render builds commands");
+
+    const size_t volume_label = 7 + project_tile_command_offset;
+    const size_t slider_track = 8 + project_tile_command_offset;
+    const reach_render_command *output_button = nullptr;
+    for (size_t index = 0; index < commands.count; ++index)
+    {
+        const reach_render_command *command = &commands.commands[index];
+        if (command->type == REACH_RENDER_COMMAND_RECT &&
+            fabsf(command->rect.x - layout.output_device_button.x) <= 0.001f &&
+            fabsf(command->rect.y - layout.output_device_button.y) <= 0.001f &&
+            fabsf(command->rect.width - layout.output_device_button.width) <= 0.001f &&
+            fabsf(command->rect.height - layout.output_device_button.height) <= 0.001f)
+        {
+            output_button = command;
+            break;
+        }
+    }
+
+    expect_near(commands.commands[volume_label].text_size, 14.0f * scale, 0.001f,
+                "scaled render uses scaled master label text size");
+    expect_near(commands.commands[slider_track].radius, reach_popup_radius_scaled(scale), 0.001f,
+                "scaled render uses scaled slider radius");
+    expect_true(output_button != nullptr, "scaled render emits output button background");
+    if (output_button != nullptr)
+    {
+        expect_near(output_button->radius, reach_popup_radius_scaled(scale), 0.001f,
+                    "scaled render uses scaled output button radius");
+    }
 }
 
 static void test_model_clamps_volume(void)
@@ -999,6 +1060,7 @@ static void test_render_emits_volume_pill_and_expand_commands(void)
 
 int main(void)
 {
+    test_scaled_layout_and_render_metrics_follow_dpi_scale();
     test_model_clamps_volume();
     test_layout_places_volume_pill_above_output_device_and_expand();
     test_desktop_system_grid_shows_network_bluetooth_and_project();

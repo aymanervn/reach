@@ -17,6 +17,7 @@ extern "C"
         const reach_theme *theme;
         const reach_ui_state *state;
         const reach_launcher_layout *layout;
+        float dpi_scale;
         int32_t text_alignment_leading;
     } reach_launcher_render_input;
 

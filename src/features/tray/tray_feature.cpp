@@ -9,7 +9,7 @@ static size_t reach_tray_min_size(size_t a, size_t b)
 
 void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme *theme,
                                      const reach_dock_layout *dock_layout,
-                                     reach_rect_f32 *out_bounds)
+                                     float dpi_scale, reach_rect_f32 *out_bounds)
 {
     if (model == nullptr || theme == nullptr || dock_layout == nullptr || out_bounds == nullptr)
     {
@@ -19,7 +19,8 @@ void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme 
     float slot_size = reach_theme_tray_slot_size(theme, dock_layout->bounds.height);
     float gap = slot_size * 0.22f;
     float padding = slot_size * 0.58f;
-    float notch_height = reach_popup_notch_height();
+    float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+    float notch_height = reach_popup_notch_height_scaled(scale);
     size_t visual_count = model->item_count > 0 ? model->item_count : 1;
     size_t columns = reach_tray_min_size(visual_count, 5);
     size_t rows = (visual_count + 4) / 5;
@@ -30,7 +31,7 @@ void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme 
     out_bounds->height = ceilf(content_height + notch_height);
     out_bounds->x = dock_layout->tray_button.x + dock_layout->tray_button.width * 0.5f -
                     out_bounds->width * 0.5f;
-    out_bounds->y = dock_layout->bounds.y - out_bounds->height - 8.0f;
+    out_bounds->y = dock_layout->bounds.y - out_bounds->height - 8.0f * scale;
 
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
     float grid_y = out_bounds->y + (content_height - grid_height) * 0.5f;

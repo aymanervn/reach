@@ -5,9 +5,24 @@ float reach_popup_radius(void)
     return 14.0f;
 }
 
+static float reach_popup_scale(float value, float dpi_scale)
+{
+    return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+}
+
+float reach_popup_radius_scaled(float dpi_scale)
+{
+    return reach_popup_scale(reach_popup_radius(), dpi_scale);
+}
+
 float reach_popup_notch_width(void)
 {
     return 18.0f;
+}
+
+float reach_popup_notch_width_scaled(float dpi_scale)
+{
+    return reach_popup_scale(reach_popup_notch_width(), dpi_scale);
 }
 
 float reach_popup_notch_height(void)
@@ -15,10 +30,20 @@ float reach_popup_notch_height(void)
     return 8.0f;
 }
 
+float reach_popup_notch_height_scaled(float dpi_scale)
+{
+    return reach_popup_scale(reach_popup_notch_height(), dpi_scale);
+}
+
 float reach_popup_clamp_notch_center(float notch_center_x, float width)
 {
-    float radius = reach_popup_radius();
-    float notch_width = reach_popup_notch_width();
+    return reach_popup_clamp_notch_center_scaled(notch_center_x, width, 1.0f);
+}
+
+float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale)
+{
+    float radius = reach_popup_radius_scaled(dpi_scale);
+    float notch_width = reach_popup_notch_width_scaled(dpi_scale);
     float min_center = radius + notch_width;
     float max_center = width - radius - notch_width;
 
@@ -46,10 +71,12 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
         return REACH_INVALID_ARGUMENT;
     }
 
-    float radius = reach_popup_radius();
-    float notch_width = reach_popup_notch_width();
-    float notch_height = reach_popup_notch_height();
-    float notch_center = reach_popup_clamp_notch_center(input->notch_center_x, input->bounds.width);
+    float radius = reach_popup_radius_scaled(input->dpi_scale);
+    float notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
+    float notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
+    float notch_center =
+        reach_popup_clamp_notch_center_scaled(input->notch_center_x, input->bounds.width,
+                                              input->dpi_scale);
     reach_color border = input->theme->dark_border;
     float border_thickness = input->theme->border_thickness;
     reach_render_command command = {};

@@ -80,6 +80,7 @@ reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 
     input.model = &shell->tray_state.model;
     input.bounds = bounds;
     input.dock_height = shell->layout.dock.bounds.height;
+    input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.click_feedback_index = shell->feedback.tray_index;
     input.click_feedback_opacity = shell->feedback.tray_opacity.value;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
@@ -110,6 +111,7 @@ reach_result reach_shell_render_quick_settings_surface(reach_shell *shell)
     input.theme = shell->theme != nullptr ? *shell->theme : *reach_theme_default();
     input.model = shell->quick_settings_model;
     input.layout = shell->quick_settings_layout;
+    input.dpi_scale = reach_shell_layout_dpi_scale(shell);
 
     reach_render_command_buffer commands = {};
     reach_result result = reach_quick_settings_build_render_commands(&input, &commands);
@@ -266,6 +268,7 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
     input.model = &model;
     input.items = items;
     input.item_count = shell->switcher_state.window_count;
+    input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     input.text_weight_demi_bold = REACH_TEXT_WEIGHT_DEMIBOLD;
 
@@ -299,6 +302,7 @@ reach_result reach_shell_render_launcher_surface(reach_shell *shell,
     input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
     input.state = &shell->ui;
     input.layout = layout;
+    input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 
     reach_render_command_buffer commands = {};
@@ -338,6 +342,7 @@ reach_result reach_shell_render_context_menu_surface(reach_shell *shell)
     input.use_anchor_x = shell->context_menu_state.power_open && shell->has_layout;
     input.anchor_x =
         shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
+    input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 
     reach_render_command_buffer commands = {};

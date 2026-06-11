@@ -173,6 +173,7 @@ extern "C"
         reach_quick_settings_model model;
         reach_quick_settings_layout layout;
         reach_theme theme;
+        float dpi_scale;
     } reach_quick_settings_render_input;
 
     void reach_quick_settings_model_init(reach_quick_settings_model *model);
@@ -205,6 +206,10 @@ extern "C"
     reach_quick_settings_volume_pill_layout
     reach_quick_settings_volume_pill_layout_for_bounds(reach_rect_f32 bounds,
                                                        const reach_theme *theme);
+    reach_quick_settings_volume_pill_layout
+    reach_quick_settings_volume_pill_layout_for_bounds_scaled(reach_rect_f32 bounds,
+                                                              const reach_theme *theme,
+                                                              float dpi_scale);
 
     float reach_quick_settings_volume_pill_level_for_x(
         const reach_quick_settings_volume_pill_layout *layout, float x);
@@ -213,8 +218,13 @@ extern "C"
     reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
                                                    const reach_theme *theme,
                                                    const reach_quick_settings_model *model);
+    reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scaled(
+        reach_rect_f32 content_bounds, const reach_theme *theme,
+        const reach_quick_settings_model *model, float dpi_scale);
 
     float reach_quick_settings_content_height_for_model(const reach_quick_settings_model *model);
+    float reach_quick_settings_content_height_for_model_scaled(
+        const reach_quick_settings_model *model, float dpi_scale);
 
     reach_quick_settings_hit_result
     reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,

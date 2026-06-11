@@ -15,6 +15,12 @@ static uint64_t reach_launcher_fallback_icon(int32_t is_directory)
     return is_directory ? REACH_VECTOR_ICON_FOLDER : REACH_VECTOR_ICON_FILE;
 }
 
+static float reach_launcher_scale(const reach_launcher_render_input *input, float value)
+{
+    float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
+    return value * scale;
+}
+
 static void reach_launcher_copy_query_prefix(uint16_t *dst, size_t dst_count,
                                              const reach_ui_state *state)
 {
@@ -49,7 +55,27 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     const reach_ui_state *state = input->state;
     const reach_launcher_layout *layout = input->layout;
     reach_render_command_buffer_clear(out_commands);
-    float launcher_radius = 10.0f;
+    float launcher_radius = reach_launcher_scale(input, 10.0f);
+    float search_padding_x = reach_launcher_scale(input, 18.0f);
+    float search_caret_y = reach_launcher_scale(input, 14.0f);
+    float search_caret_vertical_padding = reach_launcher_scale(input, 28.0f);
+    float search_text_size = reach_launcher_scale(input, 18.0f);
+    float row_selected_inset_x = reach_launcher_scale(input, 6.0f);
+    float row_selected_inset_y = reach_launcher_scale(input, 5.0f);
+    float row_selected_radius = reach_launcher_scale(input, 8.0f);
+    float row_icon_size = reach_launcher_scale(input, 32.0f);
+    float row_icon_x = reach_launcher_scale(input, 16.0f);
+    float row_icon_y = reach_launcher_scale(input, 12.0f);
+    float row_fallback_icon_padding = reach_launcher_scale(input, 2.0f);
+    float row_fallback_icon_radius = reach_launcher_scale(input, 7.0f);
+    float row_text_x = reach_launcher_scale(input, 62.0f);
+    float row_text_right_padding = reach_launcher_scale(input, 16.0f);
+    float row_title_y = reach_launcher_scale(input, 6.0f);
+    float row_title_height = reach_launcher_scale(input, 24.0f);
+    float row_title_size = reach_launcher_scale(input, 15.0f);
+    float row_path_y = reach_launcher_scale(input, 28.0f);
+    float row_path_height = reach_launcher_scale(input, 20.0f);
+    float row_path_size = reach_launcher_scale(input, 12.0f);
 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
@@ -74,15 +100,15 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
     command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
-    command.rect.x = layout->search_box.x - layout->bounds.x + 18.0f;
+    command.rect.x = layout->search_box.x - layout->bounds.x + search_padding_x;
     command.rect.y = layout->search_box.y - layout->bounds.y;
-    command.rect.width = layout->search_box.width - 36.0f;
+    command.rect.width = layout->search_box.width - search_padding_x * 2.0f;
     command.rect.height = layout->search_box.height;
     command.color.r = 1.0f;
     command.color.g = 1.0f;
     command.color.b = 1.0f;
     command.color.a = state->launcher.query_length > 0 ? 0.95f : 0.58f;
-    command.text_size = 18.0f;
+    command.text_size = search_text_size;
     command.text_alignment = input->text_alignment_leading;
     command.text_ellipsis = 1;
     reach_copy_utf16(command.text, 260,
@@ -92,14 +118,14 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
     command = {};
     command.type = REACH_RENDER_COMMAND_TEXT_CARET;
-    command.rect.x = layout->search_box.x - layout->bounds.x + 18.0f;
-    command.rect.y = layout->search_box.y - layout->bounds.y + 14.0f;
-    command.rect.width = layout->search_box.width - 36.0f;
-    command.rect.height = layout->search_box.height - 28.0f;
+    command.rect.x = layout->search_box.x - layout->bounds.x + search_padding_x;
+    command.rect.y = layout->search_box.y - layout->bounds.y + search_caret_y;
+    command.rect.width = layout->search_box.width - search_padding_x * 2.0f;
+    command.rect.height = layout->search_box.height - search_caret_vertical_padding;
     command.color = reach_launcher_rgb(255, 255, 255, 0.90f);
-    command.text_size = 18.0f;
+    command.text_size = search_text_size;
     command.text_alignment = input->text_alignment_leading;
-    command.radius = 1.0f;
+    command.radius = reach_launcher_scale(input, 1.0f);
     reach_launcher_copy_query_prefix(command.text, 260, state);
     reach_render_command_buffer_push(out_commands, &command);
 
@@ -129,18 +155,18 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             {
                 command = {};
                 command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = row_x + 6.0f;
-                command.rect.y = row_y + 5.0f;
-                command.rect.width = row_width - 12.0f;
-                command.rect.height = row_height - 10.0f;
+                command.rect.x = row_x + row_selected_inset_x;
+                command.rect.y = row_y + row_selected_inset_y;
+                command.rect.width = row_width - row_selected_inset_x * 2.0f;
+                command.rect.height = row_height - row_selected_inset_y * 2.0f;
                 command.color = reach_launcher_rgb(255, 255, 255, 0.14f);
-                command.radius = 8.0f;
+                command.radius = row_selected_radius;
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
-            float icon_size = 32.0f;
-            float icon_x = row_x + 16.0f;
-            float icon_y = row_y + 12.0f;
+            float icon_size = row_icon_size;
+            float icon_x = row_x + row_icon_x;
+            float icon_y = row_y + row_icon_y;
             uint64_t icon_id = state->launcher.result_icon_ids[index];
 
             if (icon_id != 0)
@@ -160,12 +186,12 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             {
                 command = {};
                 command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = icon_x - 2.0f;
-                command.rect.y = icon_y - 2.0f;
-                command.rect.width = icon_size + 4.0f;
-                command.rect.height = icon_size + 4.0f;
+                command.rect.x = icon_x - row_fallback_icon_padding;
+                command.rect.y = icon_y - row_fallback_icon_padding;
+                command.rect.width = icon_size + row_fallback_icon_padding * 2.0f;
+                command.rect.height = icon_size + row_fallback_icon_padding * 2.0f;
                 command.color = reach_launcher_rgb(255, 255, 255, 0.10f);
-                command.radius = 7.0f;
+                command.radius = row_fallback_icon_radius;
                 reach_render_command_buffer_push(out_commands, &command);
 
                 command = {};
@@ -182,12 +208,12 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
             command = {};
             command.type = REACH_RENDER_COMMAND_TEXT;
-            command.rect.x = row_x + 62.0f;
-            command.rect.y = row_y + 6.0f;
-            command.rect.width = row_width - 78.0f;
-            command.rect.height = 24.0f;
+            command.rect.x = row_x + row_text_x;
+            command.rect.y = row_y + row_title_y;
+            command.rect.width = row_width - row_text_x - row_text_right_padding;
+            command.rect.height = row_title_height;
             command.color = reach_launcher_rgb(255, 255, 255, selected ? 0.96f : 0.86f);
-            command.text_size = 15.0f;
+            command.text_size = row_title_size;
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
@@ -196,12 +222,12 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
             command = {};
             command.type = REACH_RENDER_COMMAND_TEXT;
-            command.rect.x = row_x + 62.0f;
-            command.rect.y = row_y + 28.0f;
-            command.rect.width = row_width - 78.0f;
-            command.rect.height = 20.0f;
+            command.rect.x = row_x + row_text_x;
+            command.rect.y = row_y + row_path_y;
+            command.rect.width = row_width - row_text_x - row_text_right_padding;
+            command.rect.height = row_path_height;
             command.color = reach_launcher_rgb(255, 255, 255, selected ? 0.62f : 0.44f);
-            command.text_size = 12.0f;
+            command.text_size = row_path_size;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
             reach_copy_utf16(command.text, 260, state->launcher.results[index].path);

@@ -10,6 +10,12 @@ static reach_color reach_context_menu_rgb(uint8_t r, uint8_t g, uint8_t b, float
     return color;
 }
 
+static float reach_context_menu_scale(const reach_context_menu_render_input *input, float value)
+{
+    float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
+    return value * scale;
+}
+
 reach_result reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
                                                       reach_render_command_buffer *out_commands)
 {
@@ -38,6 +44,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     popup.theme = input->theme;
     popup.bounds = input->bounds;
     popup.notch_center_x = notch_center;
+    popup.dpi_scale = input->dpi_scale;
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
     if (popup_result != REACH_OK)
     {
@@ -56,32 +63,35 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
             command.color = reach_context_menu_rgb(255, 255, 255, 0.12f);
-            command.radius = 8.0f;
+            command.radius = reach_context_menu_scale(input, 8.0f);
             reach_render_command_buffer_push(out_commands, &command);
         }
 
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
         float text_left =
-            input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0 ? 40.0f : 14.0f;
+            input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0
+                ? reach_context_menu_scale(input, 40.0f)
+                : reach_context_menu_scale(input, 14.0f);
         if (input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0)
         {
+            float icon_size = reach_context_menu_scale(input, 16.0f);
             reach_render_command icon_command = {};
             icon_command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-            icon_command.rect.x = item.x + 13.0f;
-            icon_command.rect.y = item.y + (item.height - 16.0f) * 0.5f;
-            icon_command.rect.width = 16.0f;
-            icon_command.rect.height = 16.0f;
+            icon_command.rect.x = item.x + reach_context_menu_scale(input, 13.0f);
+            icon_command.rect.y = item.y + (item.height - icon_size) * 0.5f;
+            icon_command.rect.width = icon_size;
+            icon_command.rect.height = icon_size;
             icon_command.color = reach_context_menu_rgb(232, 229, 224, 0.96f);
             icon_command.icon_id = input->item_icon_ids[index];
             reach_render_command_buffer_push(out_commands, &icon_command);
         }
         command.rect.x = item.x + text_left;
         command.rect.y = item.y;
-        command.rect.width = item.width - text_left - 14.0f;
+        command.rect.width = item.width - text_left - reach_context_menu_scale(input, 14.0f);
         command.rect.height = item.height;
         command.color = reach_context_menu_rgb(232, 229, 224, 0.96f);
-        command.text_size = 14.0f;
+        command.text_size = reach_context_menu_scale(input, 14.0f);
         command.text_alignment = input->text_alignment_leading;
         command.text_ellipsis = 1;
         reach_copy_utf16(command.text, 260,

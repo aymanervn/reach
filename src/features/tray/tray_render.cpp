@@ -30,6 +30,7 @@ reach_result reach_tray_build_render_commands(const reach_tray_render_input *inp
     popup.theme = theme;
     popup.bounds = input->bounds;
     popup.notch_center_x = input->bounds.width * 0.5f;
+    popup.dpi_scale = input->dpi_scale;
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
     if (popup_result != REACH_OK)
     {
@@ -42,9 +43,10 @@ reach_result reach_tray_build_render_commands(const reach_tray_render_input *inp
         slot.x -= input->bounds.x;
         slot.y -= input->bounds.y;
         float icon_size = floorf(slot.height * 0.86f);
-        if (icon_size < 16.0f && slot.height >= 16.0f)
+        float min_icon_size = 16.0f * (input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f);
+        if (icon_size < min_icon_size && slot.height >= min_icon_size)
         {
-            icon_size = 16.0f;
+            icon_size = min_icon_size;
         }
         float icon_x = slot.x + (slot.width - icon_size) * 0.5f;
         float icon_y = slot.y + (slot.height - icon_size) * 0.5f;

@@ -14,11 +14,14 @@ static reach_rect_f32 reach_quick_settings_rect(float x, float y, float width, f
 }
 
 static reach_rect_f32 reach_quick_settings_content_line(reach_rect_f32 content_bounds, float y,
-                                                        float height)
+                                                        float height,
+                                                        const reach_quick_settings_metrics *metrics)
 {
+    const reach_quick_settings_metrics *values =
+        metrics != nullptr ? metrics : &reach_quick_settings_metrics_values;
     return reach_quick_settings_rect(
-        content_bounds.x + reach_quick_settings_metrics_values.content_padding, y,
-        content_bounds.width - reach_quick_settings_metrics_values.content_padding * 2.0f, height);
+        content_bounds.x + values->content_padding, y,
+        content_bounds.width - values->content_padding * 2.0f, height);
 }
 
 static size_t reach_quick_settings_two_column_row_count(size_t item_count)
@@ -230,12 +233,20 @@ void reach_quick_settings_volume_pill_model_init(reach_quick_settings_volume_pil
 reach_quick_settings_volume_pill_layout
 reach_quick_settings_volume_pill_layout_for_bounds(reach_rect_f32 bounds, const reach_theme *theme)
 {
+    return reach_quick_settings_volume_pill_layout_for_bounds_scaled(bounds, theme, 1.0f);
+}
+
+reach_quick_settings_volume_pill_layout
+reach_quick_settings_volume_pill_layout_for_bounds_scaled(reach_rect_f32 bounds,
+                                                          const reach_theme *theme,
+                                                          float dpi_scale)
+{
     (void)theme;
 
     reach_quick_settings_volume_pill_layout layout = {};
     layout.bounds = bounds;
 
-    const reach_quick_settings_metrics &metrics = reach_quick_settings_metrics_values;
+    reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
 
     layout.header_icon.x = bounds.x;
     layout.header_icon.y = bounds.y - metrics.pill_header_gap - metrics.pill_header_height +
@@ -258,7 +269,13 @@ reach_quick_settings_volume_pill_layout_for_bounds(reach_rect_f32 bounds, const 
 
 float reach_quick_settings_content_height_for_model(const reach_quick_settings_model *model)
 {
-    const reach_quick_settings_metrics &metrics = reach_quick_settings_metrics_values;
+    return reach_quick_settings_content_height_for_model_scaled(model, 1.0f);
+}
+
+float reach_quick_settings_content_height_for_model_scaled(const reach_quick_settings_model *model,
+                                                           float dpi_scale)
+{
+    reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
 
     size_t visible_sessions = reach_quick_settings_visible_session_count(model);
     size_t visible_output_devices = reach_quick_settings_visible_output_device_count(model);
@@ -315,32 +332,35 @@ float reach_quick_settings_volume_pill_level_for_x(
 
 static void reach_quick_settings_place_system_tile(reach_quick_settings_tile_layout *tile,
                                                    reach_rect_f32 grid_bounds, float tile_width,
-                                                   size_t tile_index)
+                                                   size_t tile_index,
+                                                   const reach_quick_settings_metrics *metrics)
 {
     if (tile == nullptr)
     {
         return;
     }
 
-    const reach_quick_settings_metrics &metrics = reach_quick_settings_metrics_values;
+    const reach_quick_settings_metrics *values =
+        metrics != nullptr ? metrics : &reach_quick_settings_metrics_values;
     size_t tile_row = tile_index / 2;
     size_t tile_column = tile_index % 2;
 
     tile->bounds = reach_quick_settings_rect(
-        grid_bounds.x + (float)tile_column * (tile_width + metrics.system_grid_gap),
+        grid_bounds.x + (float)tile_column * (tile_width + values->system_grid_gap),
         grid_bounds.y +
-            (float)tile_row * (metrics.system_grid_tile_height + metrics.system_grid_gap),
-        tile_width, metrics.system_grid_tile_height);
+            (float)tile_row * (values->system_grid_tile_height + values->system_grid_gap),
+        tile_width, values->system_grid_tile_height);
 
     tile->icon = reach_quick_settings_rect(
-        tile->bounds.x + metrics.text_padding,
-        tile->bounds.y + (tile->bounds.height - metrics.system_tile_icon_size) * 0.5f,
-        metrics.system_tile_icon_size, metrics.system_tile_icon_size);
+        tile->bounds.x + values->text_padding,
+        tile->bounds.y + (tile->bounds.height - values->system_tile_icon_size) * 0.5f,
+        values->system_tile_icon_size, values->system_tile_icon_size);
 
     tile->label = reach_quick_settings_rect(
-        tile->icon.x + metrics.system_tile_icon_size + metrics.system_tile_icon_gap, tile->bounds.y,
-        tile->bounds.x + tile->bounds.width - metrics.content_padding -
-            (tile->icon.x + metrics.system_tile_icon_size + metrics.system_tile_icon_gap),
+        tile->icon.x + values->system_tile_icon_size + values->system_tile_icon_gap,
+        tile->bounds.y,
+        tile->bounds.x + tile->bounds.width - values->content_padding -
+            (tile->icon.x + values->system_tile_icon_size + values->system_tile_icon_gap),
         tile->bounds.height);
 }
 
@@ -349,31 +369,39 @@ reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
                                                const reach_theme *theme,
                                                const reach_quick_settings_model *model)
 {
+    return reach_quick_settings_layout_for_content_bounds_scaled(content_bounds, theme, model,
+                                                                1.0f);
+}
+
+reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scaled(
+    reach_rect_f32 content_bounds, const reach_theme *theme,
+    const reach_quick_settings_model *model, float dpi_scale)
+{
     (void)theme;
 
     reach_quick_settings_layout layout = {};
     layout.content_bounds = content_bounds;
 
-    const reach_quick_settings_metrics &metrics = reach_quick_settings_metrics_values;
+    reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
 
     reach_rect_f32 grid_bounds = reach_quick_settings_content_line(
-        content_bounds, content_bounds.y + metrics.content_padding, 0.0f);
+        content_bounds, content_bounds.y + metrics.content_padding, 0.0f, &metrics);
 
     float tile_width =
         reach_quick_settings_clamp_min0((grid_bounds.width - metrics.system_grid_gap) * 0.5f);
 
     size_t tile_index = 0;
     reach_quick_settings_place_system_tile(&layout.network_tile, grid_bounds, tile_width,
-                                           tile_index++);
+                                           tile_index++, &metrics);
     reach_quick_settings_place_system_tile(&layout.bluetooth_tile, grid_bounds, tile_width,
-                                           tile_index++);
+                                           tile_index++, &metrics);
     if (model != nullptr && model->power.has_battery)
     {
         reach_quick_settings_place_system_tile(&layout.battery_saver_tile, grid_bounds, tile_width,
-                                               tile_index++);
+                                               tile_index++, &metrics);
     }
     reach_quick_settings_place_system_tile(&layout.project_tile, grid_bounds, tile_width,
-                                           tile_index++);
+                                           tile_index++, &metrics);
 
     layout.system_tile_count = tile_index;
     size_t grid_rows = reach_quick_settings_two_column_row_count(tile_index);
@@ -388,9 +416,10 @@ reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
     {
         reach_rect_f32 brightness_bounds = reach_quick_settings_content_line(
             content_bounds, next_y + metrics.pill_header_height + metrics.section_header_gap,
-            metrics.pill_height);
+            metrics.pill_height, &metrics);
         layout.brightness_pill =
-            reach_quick_settings_volume_pill_layout_for_bounds(brightness_bounds, theme);
+            reach_quick_settings_volume_pill_layout_for_bounds_scaled(brightness_bounds, theme,
+                                                                      dpi_scale);
         layout.brightness_slider_track = layout.brightness_pill.slider_track;
         layout.brightness_slider_fill = layout.brightness_pill.slider_fill;
         next_y = brightness_bounds.y + brightness_bounds.height + metrics.system_grid_bottom_gap;
@@ -398,10 +427,10 @@ reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
 
     reach_rect_f32 pill_bounds = reach_quick_settings_content_line(
         content_bounds, next_y + metrics.pill_header_height + metrics.section_header_gap,
-        metrics.pill_height);
+        metrics.pill_height, &metrics);
 
     layout.main_volume_pill =
-        reach_quick_settings_volume_pill_layout_for_bounds(pill_bounds, theme);
+        reach_quick_settings_volume_pill_layout_for_bounds_scaled(pill_bounds, theme, dpi_scale);
     layout.main_slider_track = layout.main_volume_pill.slider_track;
     layout.main_slider_fill = layout.main_volume_pill.slider_fill;
 
@@ -480,7 +509,8 @@ reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
     else
     {
         layout.output_device_button = reach_quick_settings_content_line(
-            content_bounds, next_y + metrics.output_button_gap, metrics.output_button_height);
+            content_bounds, next_y + metrics.output_button_gap, metrics.output_button_height,
+            &metrics);
 
         layout.output_device_button_icon.width = metrics.output_icon_size;
         layout.output_device_button_icon.height = metrics.output_icon_size;
@@ -621,7 +651,8 @@ reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
     else
     {
         layout.expand_button = reach_quick_settings_content_line(
-            content_bounds, next_y + metrics.expand_button_gap, metrics.expand_button_height);
+            content_bounds, next_y + metrics.expand_button_gap, metrics.expand_button_height,
+            &metrics);
     }
 
     if (layout.expand_button.width < 0.0f)

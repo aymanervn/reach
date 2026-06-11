@@ -35,6 +35,7 @@ extern "C"
         const reach_switcher_model *model;
         const reach_switcher_render_item *items;
         size_t item_count;
+        float dpi_scale;
         int32_t text_alignment_center;
         int32_t text_weight_demi_bold;
     } reach_switcher_render_input;
@@ -42,6 +43,9 @@ extern "C"
     size_t reach_switcher_visible_count(size_t window_count);
     reach_rect_f32 reach_switcher_bounds_for_count(reach_rect_f32 monitor_bounds,
                                                    size_t visible_count);
+    reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bounds,
+                                                          size_t visible_count,
+                                                          float dpi_scale);
     void reach_switcher_update_visible_start(reach_switcher_model *model);
     reach_result reach_switcher_build_render_commands(const reach_switcher_render_input *input,
                                                       reach_render_command_buffer *out_commands);

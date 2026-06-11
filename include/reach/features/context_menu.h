@@ -43,6 +43,7 @@ extern "C"
         int32_t has_layout;
         int32_t use_anchor_x;
         float anchor_x;
+        float dpi_scale;
         int32_t text_alignment_leading;
     } reach_context_menu_render_input;
 
