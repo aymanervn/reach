@@ -89,6 +89,16 @@ void reach_shell_clear_launcher_restore_window(reach_shell *shell)
     shell->launcher_restore_window_valid = 0;
 }
 
+static int32_t reach_shell_launcher_can_restore_focus_to(reach_shell *shell, uintptr_t window)
+{
+    if (shell == nullptr || window == 0 || shell->window_manager.ops.activate == nullptr)
+    {
+        return 0;
+    }
+
+    return !reach_shell_window_is_minimized(shell, window);
+}
+
 void reach_shell_restore_launcher_focus(reach_shell *shell)
 {
     if (shell == nullptr || !shell->launcher_restore_window_valid)
@@ -98,7 +108,7 @@ void reach_shell_restore_launcher_focus(reach_shell *shell)
 
     uintptr_t window = shell->launcher_restore_window;
     reach_shell_clear_launcher_restore_window(shell);
-    if (window != 0 && shell->window_manager.ops.activate != nullptr)
+    if (reach_shell_launcher_can_restore_focus_to(shell, window))
     {
         (void)shell->window_manager.ops.activate(shell->window_manager.manager, window);
     }
