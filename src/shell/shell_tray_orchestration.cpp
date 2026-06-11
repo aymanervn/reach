@@ -15,6 +15,10 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
 
     int32_t was_open = shell->tray_state.popup_open;
     shell->tray_state.popup_open = next_open;
+    if (shell->tray.window.ops.set_topmost != nullptr)
+    {
+        (void)shell->tray.window.ops.set_topmost(shell->tray.window.window, 1);
+    }
     if (shell->tray_state.popup_open)
     {
         reach_shell_set_quick_settings_open(shell, 0);
@@ -65,13 +69,17 @@ reach_result reach_shell_execute_tray_action(reach_shell *shell, reach_tray_feat
     {
         return REACH_OK;
     }
+
     if (shell->tray_provider.ops.activate == nullptr)
     {
         return REACH_OK;
     }
 
-    reach_result result = shell->tray_provider.ops.activate(shell->tray_provider.provider,
-                                                            action.item_id, action.provider_action);
+    if (shell->tray.window.ops.set_topmost != nullptr)
+    {
+        (void)shell->tray.window.ops.set_topmost(shell->tray.window.window, 0);
+    }
     reach_shell_release_tray_item(shell);
-    return result;
+    return shell->tray_provider.ops.activate(shell->tray_provider.provider, action.item_id,
+                                             action.provider_action);
 }

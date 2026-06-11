@@ -31,6 +31,7 @@ struct reach_platform_window
     float corner_radius;
     int tracking_mouse_leave;
     int pointer_move_enabled;
+    int topmost_enabled;
 };
 
 static int32_t reach_platform_window_queue_event(reach_platform_window *window,
@@ -399,6 +400,13 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
            role == REACH_SURFACE_QUICK_SETTINGS;
 }
 
+static int32_t reach_window_topmost_surface(reach_surface_role role)
+{
+    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
+           role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
+           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS;
+}
+
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = WS_EX_TOOLWINDOW;
@@ -412,9 +420,7 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     {
         style |= WS_EX_LAYERED;
     }
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
-        role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-        role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS)
+    if (reach_window_topmost_surface(role))
     {
         style |= WS_EX_TOPMOST;
     }
@@ -468,7 +474,8 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     ShowWindow(window->hwnd, show_command);
     if (no_activate)
     {
-        SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+        SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0,
+                     0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER |
                          SWP_SHOWWINDOW);
     }
@@ -502,8 +509,8 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
     int width = (int)bounds.width;
     int height = (int)bounds.height;
 
-    BOOL ok = SetWindowPos(window->hwnd, HWND_TOPMOST, (int)bounds.x, (int)bounds.y, width, height,
-                           SWP_NOACTIVATE);
+    BOOL ok = SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST,
+                           (int)bounds.x, (int)bounds.y, width, height, SWP_NOACTIVATE);
     window->width = width;
     window->height = height;
     return ok ? REACH_OK : REACH_ERROR;
@@ -663,6 +670,20 @@ static reach_result reach_platform_window_set_pointer_move_enabled(reach_platfor
     return REACH_OK;
 }
 
+static reach_result reach_platform_window_set_topmost(reach_platform_window *window,
+                                                      int32_t enabled)
+{
+    if (window == nullptr || window->hwnd == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    window->topmost_enabled = enabled ? 1 : 0;
+    BOOL ok = SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0,
+                           0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    return ok ? REACH_OK : REACH_ERROR;
+}
+
 void *reach_windows_platform_window_native_handle(reach_platform_window *window)
 {
     return window == nullptr ? nullptr : window->hwnd;
@@ -703,6 +724,7 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
 
     ShowWindow(window->hwnd, SW_SHOW);
 
+    window->topmost_enabled = 1;
     SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     BringWindowToTop(window->hwnd);
     reach_platform_window_focus(window->hwnd);
@@ -775,6 +797,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     }
     window->role = role;
     window->pointer_move_enabled = 1;
+    window->topmost_enabled = reach_window_topmost_surface(role);
     window->hwnd =
         CreateWindowExW(reach_window_ex_style(role), reach_window_class_name(), L"Reach", WS_POPUP,
                         0, 0, 1, 1, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
@@ -796,6 +819,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.has_pending_events = reach_platform_window_has_pending_events;
     out_port->ops.dispatch_events = reach_platform_window_dispatch_events;
     out_port->ops.set_pointer_move_enabled = reach_platform_window_set_pointer_move_enabled;
+    out_port->ops.set_topmost = reach_platform_window_set_topmost;
     out_port->ops.raise = reach_platform_window_raise;
     out_port->ops.post_event = reach_platform_window_post_event;
     out_port->ops.destroy = reach_platform_window_destroy;
