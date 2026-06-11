@@ -39,6 +39,7 @@ extern "C"
         int32_t (*has_pending_events)(const reach_platform_window *window);
         reach_result (*dispatch_events)(reach_platform_window *window);
         reach_result (*set_pointer_move_enabled)(reach_platform_window *window, int32_t enabled);
+        reach_result (*set_pointer_capture)(reach_platform_window *window, int32_t enabled);
         reach_result (*set_topmost)(reach_platform_window *window, int32_t enabled);
         reach_result (*raise)(reach_platform_window *window);
         reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);

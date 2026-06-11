@@ -34,6 +34,7 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
     case REACH_UI_EVENT_POINTER_LEAVE:
     case REACH_UI_EVENT_POINTER_MIDDLE:
     case REACH_UI_EVENT_POINTER_DOWN:
+    case REACH_UI_EVENT_POINTER_CANCEL:
         break;
 
     case REACH_UI_EVENT_NONE:
@@ -45,7 +46,8 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
 static int32_t reach_shell_game_mode_allows_event(reach_ui_event_type type)
 {
     return type == REACH_UI_EVENT_CONFIG_CHANGED || type == REACH_UI_EVENT_DISPLAY_CHANGED ||
-           type == REACH_UI_EVENT_WINDOW_STATE_CHANGED || type == REACH_UI_EVENT_WALLPAPER_CHANGED;
+           type == REACH_UI_EVENT_WINDOW_STATE_CHANGED || type == REACH_UI_EVENT_WALLPAPER_CHANGED ||
+           type == REACH_UI_EVENT_POINTER_CANCEL;
 }
 
 static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
@@ -437,6 +439,26 @@ static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
     return REACH_OK;
 }
 
+static reach_result reach_shell_handle_pointer_cancel(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    if (shell->quick_settings_drag.active)
+    {
+        reach_shell_end_quick_settings_drag(shell);
+    }
+
+    if (shell->dock_drag.active)
+    {
+        return reach_shell_end_dock_drag(shell);
+    }
+
+    return REACH_OK;
+}
+
 static reach_result reach_shell_handle_pointer_context(reach_shell *shell,
                                                        const reach_ui_event *event)
 {
@@ -558,6 +580,11 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     if (event->type == REACH_UI_EVENT_POINTER_LEAVE)
     {
         return reach_shell_handle_pointer_leave(shell);
+    }
+
+    if (event->type == REACH_UI_EVENT_POINTER_CANCEL)
+    {
+        return reach_shell_handle_pointer_cancel(shell);
     }
 
     if (event->type == REACH_UI_EVENT_POINTER_CONTEXT)

@@ -291,6 +291,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         if (window != nullptr)
         {
             window->tracking_mouse_leave = 0;
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_POINTER_CANCEL;
+            reach_platform_window_queue_event(window, &event);
         }
         reach_platform_window_release_capture(hwnd);
         return DefWindowProcW(hwnd, message, wparam, lparam);
@@ -298,6 +301,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         if (window != nullptr)
         {
             window->tracking_mouse_leave = 0;
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_POINTER_CANCEL;
+            reach_platform_window_queue_event(window, &event);
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SIZE:
@@ -670,6 +676,24 @@ static reach_result reach_platform_window_set_pointer_move_enabled(reach_platfor
     return REACH_OK;
 }
 
+static reach_result reach_platform_window_set_pointer_capture(reach_platform_window *window,
+                                                              int32_t enabled)
+{
+    if (window == nullptr || window->hwnd == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (enabled)
+    {
+        SetCapture(window->hwnd);
+        return GetCapture() == window->hwnd ? REACH_OK : REACH_ERROR;
+    }
+
+    reach_platform_window_release_capture(window->hwnd);
+    return REACH_OK;
+}
+
 static reach_result reach_platform_window_set_topmost(reach_platform_window *window,
                                                       int32_t enabled)
 {
@@ -819,6 +843,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.has_pending_events = reach_platform_window_has_pending_events;
     out_port->ops.dispatch_events = reach_platform_window_dispatch_events;
     out_port->ops.set_pointer_move_enabled = reach_platform_window_set_pointer_move_enabled;
+    out_port->ops.set_pointer_capture = reach_platform_window_set_pointer_capture;
     out_port->ops.set_topmost = reach_platform_window_set_topmost;
     out_port->ops.raise = reach_platform_window_raise;
     out_port->ops.post_event = reach_platform_window_post_event;

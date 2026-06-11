@@ -28,6 +28,12 @@ void reach_shell_end_quick_settings_drag(reach_shell *shell)
     shell->quick_settings_drag.session_index = 0;
     shell->quick_settings_drag.session_instance_id[0] = 0;
 
+    if (shell->quick_settings.window.ops.set_pointer_capture != nullptr)
+    {
+        (void)shell->quick_settings.window.ops.set_pointer_capture(
+            shell->quick_settings.window.window, 0);
+    }
+
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
     {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
@@ -63,6 +69,12 @@ reach_result reach_shell_begin_quick_settings_drag_if_hit(reach_shell *shell,
         shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
     {
         (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
+            shell->quick_settings.window.window, 1);
+    }
+    if (shell->quick_settings_drag.active &&
+        shell->quick_settings.window.ops.set_pointer_capture != nullptr)
+    {
+        (void)shell->quick_settings.window.ops.set_pointer_capture(
             shell->quick_settings.window.window, 1);
     }
 
