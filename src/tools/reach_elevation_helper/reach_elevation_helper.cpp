@@ -1208,6 +1208,7 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
             key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
             if (game_mode_active)
             {
+                reach_helper_reconcile_modifier_state();
                 if (key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down && reach_helper_alt_down())
                 {
                     HWND game = GetForegroundWindow();
@@ -1218,6 +1219,10 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
                     }
                 }
                 return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
+            }
+            if (!reach_helper_hotkey_is_modifier(key))
+            {
+                reach_helper_reconcile_modifier_state();
             }
             if (key == 0 && key_down && (g_hotkeys.left_win_down || g_hotkeys.right_win_down))
             {
@@ -1272,10 +1277,6 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
                 if (reach_helper_hotkey_is_modifier(key))
                 {
                     reach_helper_update_key_state(key, key_down ? 1 : 0);
-                }
-                else
-                {
-                    reach_helper_reconcile_modifier_state();
                 }
                 if (reach_helper_hotkey_is_windows_key(key) && g_hotkeys.alt_tab_active)
                 {

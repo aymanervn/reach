@@ -163,22 +163,30 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         }
         break;
     case REACH_ELEVATION_HELPER_HOTKEY_D:
-        if (source->windows_key_down ||
+    {
+        int32_t win_modifier =
             (record->modifiers & (REACH_ELEVATION_HELPER_MODIFIER_LEFT_WIN |
-                                  REACH_ELEVATION_HELPER_MODIFIER_RIGHT_WIN)) != 0)
+                                  REACH_ELEVATION_HELPER_MODIFIER_RIGHT_WIN)) != 0;
+        if (!pressed)
+        {
+            source->windows_d_down = 0;
+            if (win_modifier)
+            {
+                source->windows_key_chord = 1;
+            }
+            break;
+        }
+        if (win_modifier)
         {
             source->windows_key_chord = 1;
-            if (pressed && !source->windows_d_down)
+            if (!source->windows_d_down)
             {
                 source->windows_d_down = 1;
                 reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOWS_D_MINIMIZE_ALL, 0);
             }
-            else if (!pressed)
-            {
-                source->windows_d_down = 0;
-            }
         }
         break;
+    }
     case REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN:
     case REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN:
         if (source->alt_tab_active)
