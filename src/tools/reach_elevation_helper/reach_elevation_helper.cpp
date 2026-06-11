@@ -630,6 +630,57 @@ static int32_t reach_helper_window_is_game(HWND hwnd)
     return reach_helper_window_occupies_whole_monitor(hwnd, rect);
 }
 
+static int32_t reach_helper_rect_contains_rect(RECT outer, RECT inner)
+{
+    const LONG tolerance = 2;
+    return inner.left >= outer.left - tolerance && inner.top >= outer.top - tolerance &&
+           inner.right <= outer.right + tolerance && inner.bottom <= outer.bottom + tolerance;
+}
+
+static int32_t reach_helper_rect_is_virtual_screen(RECT rect)
+{
+    RECT virtual_screen = {};
+    virtual_screen.left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    virtual_screen.top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    virtual_screen.right = virtual_screen.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    virtual_screen.bottom = virtual_screen.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    return reach_helper_rect_matches_monitor(rect, virtual_screen);
+}
+
+static void reach_helper_release_game_cursor_clip(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd))
+    {
+        return;
+    }
+
+    RECT clip = {};
+    if (!GetClipCursor(&clip) || reach_helper_rect_is_virtual_screen(clip))
+    {
+        return;
+    }
+
+    RECT window_rect = {};
+    if (!GetWindowRect(hwnd, &window_rect))
+    {
+        return;
+    }
+
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info = {};
+    info.cbSize = sizeof(info);
+    if (monitor == nullptr || !GetMonitorInfoW(monitor, &info))
+    {
+        return;
+    }
+
+    if (reach_helper_rect_contains_rect(window_rect, clip) ||
+        reach_helper_rect_contains_rect(info.rcMonitor, clip))
+    {
+        (void)ClipCursor(nullptr);
+    }
+}
+
 static int32_t reach_helper_detect_game_mode(void)
 {
     return reach_helper_window_is_game(GetForegroundWindow());
@@ -870,7 +921,9 @@ static void reach_helper_minimize_game(HWND hwnd)
         return;
     }
 
+    reach_helper_release_game_cursor_clip(hwnd);
     (void)reach_window_management_minimize(hwnd);
+    reach_helper_release_game_cursor_clip(hwnd);
     reach_helper_publish_window_state();
 }
 
