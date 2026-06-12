@@ -31,6 +31,11 @@ static int32_t reach_windows_paths_equal(const wchar_t *a, const wchar_t *b)
     return a != nullptr && b != nullptr && a[0] != 0 && b[0] != 0 && _wcsicmp(a, b) == 0;
 }
 
+static int32_t reach_windows_startup_is_space(wchar_t value)
+{
+    return value == L' ' || value == L'\t';
+}
+
 struct reach_windows_startup_com_scope
 {
     HRESULT hr;
@@ -133,6 +138,31 @@ static int32_t reach_windows_resolve_executable_path(const wchar_t *path, wchar_
     return SUCCEEDED(StringCchCopyW(out_path, out_path_count, candidate));
 }
 
+static int32_t reach_windows_startup_resolve_executable_candidate(const wchar_t *candidate,
+                                                                  wchar_t *out_path,
+                                                                  DWORD out_path_count)
+{
+    if (candidate == nullptr || candidate[0] == 0 || out_path == nullptr || out_path_count == 0 ||
+        !reach_windows_startup_extension_supported(candidate))
+    {
+        return 0;
+    }
+
+    wchar_t resolved[MAX_PATH] = {};
+    if (!reach_windows_resolve_executable_path(candidate, resolved, MAX_PATH))
+    {
+        return 0;
+    }
+
+    DWORD attributes = GetFileAttributesW(resolved);
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+    {
+        return 0;
+    }
+
+    return SUCCEEDED(StringCchCopyW(out_path, out_path_count, resolved));
+}
+
 static int32_t reach_windows_executable_running(const wchar_t *executable)
 {
     wchar_t target[MAX_PATH] = {};
@@ -194,7 +224,7 @@ static void reach_windows_launch_path(const wchar_t *path)
 
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
+    execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
     execute.lpVerb = L"open";
     execute.lpFile = path;
     execute.nShow = SW_SHOWNORMAL;
@@ -289,19 +319,110 @@ static int32_t reach_windows_startup_value_enabled(HKEY root, const wchar_t *val
     return data[0] != 0x03;
 }
 
-static void reach_windows_launch_run_command(const wchar_t *command)
+static int32_t reach_windows_copy_command_slice(const wchar_t *start, const wchar_t *end,
+                                                wchar_t *out_value, DWORD out_value_count)
 {
-    if (command == nullptr || command[0] == 0)
+    if (start == nullptr || end == nullptr || out_value == nullptr || out_value_count == 0 ||
+        end < start)
     {
-        return;
+        return 0;
     }
 
-    wchar_t executable[4096] = {};
-    wchar_t arguments[4096] = {};
+    while (end > start && reach_windows_startup_is_space(*(end - 1)))
+    {
+        --end;
+    }
+
+    size_t length = (size_t)(end - start);
+    if (length == 0 || length >= out_value_count)
+    {
+        return 0;
+    }
+
+    wcsncpy_s(out_value, out_value_count, start, length);
+    return 1;
+}
+
+static int32_t reach_windows_parse_unquoted_run_command(const wchar_t *command,
+                                                        wchar_t *out_executable,
+                                                        DWORD out_executable_count,
+                                                        wchar_t *out_arguments,
+                                                        DWORD out_arguments_count)
+{
+    if (command == nullptr || out_executable == nullptr || out_arguments == nullptr)
+    {
+        return 0;
+    }
+
+    const wchar_t *end = command + wcslen(command);
+    while (end > command && reach_windows_startup_is_space(*(end - 1)))
+    {
+        --end;
+    }
+
+    wchar_t candidate[4096] = {};
+    if (reach_windows_copy_command_slice(command, end, candidate, _countof(candidate)) &&
+        reach_windows_startup_resolve_executable_candidate(candidate, out_executable,
+                                                          out_executable_count))
+    {
+        out_arguments[0] = 0;
+        return 1;
+    }
+
+    for (const wchar_t *split = end; split > command; --split)
+    {
+        if (!reach_windows_startup_is_space(*(split - 1)))
+        {
+            continue;
+        }
+
+        if (!reach_windows_copy_command_slice(command, split - 1, candidate,
+                                             _countof(candidate)))
+        {
+            continue;
+        }
+
+        if (!reach_windows_startup_resolve_executable_candidate(candidate, out_executable,
+                                                               out_executable_count))
+        {
+            continue;
+        }
+
+        const wchar_t *arguments = split;
+        while (reach_windows_startup_is_space(*arguments))
+        {
+            ++arguments;
+        }
+
+        if (*arguments != 0)
+        {
+            (void)StringCchCopyW(out_arguments, out_arguments_count, arguments);
+        }
+        else
+        {
+            out_arguments[0] = 0;
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
+static int32_t reach_windows_parse_run_command(const wchar_t *command, wchar_t *out_executable,
+                                               DWORD out_executable_count, wchar_t *out_arguments,
+                                               DWORD out_arguments_count)
+{
+    if (command == nullptr || out_executable == nullptr || out_arguments == nullptr ||
+        out_executable_count == 0 || out_arguments_count == 0)
+    {
+        return 0;
+    }
+
+    out_executable[0] = 0;
+    out_arguments[0] = 0;
 
     const wchar_t *cursor = command;
-
-    while (*cursor == L' ' || *cursor == L'\t')
+    while (reach_windows_startup_is_space(*cursor))
     {
         ++cursor;
     }
@@ -313,47 +434,48 @@ static void reach_windows_launch_run_command(const wchar_t *command)
         const wchar_t *end = wcschr(cursor, L'"');
         if (end == nullptr)
         {
-            return;
+            return 0;
         }
 
-        size_t length = (size_t)(end - cursor);
-
-        if (length >= _countof(executable))
+        wchar_t candidate[4096] = {};
+        if (!reach_windows_copy_command_slice(cursor, end, candidate, _countof(candidate)) ||
+            !reach_windows_startup_resolve_executable_candidate(candidate, out_executable,
+                                                               out_executable_count))
         {
-            return;
+            return 0;
         }
 
-        wcsncpy_s(executable, cursor, length);
         cursor = end + 1;
-    }
-    else
-    {
-        const wchar_t *end = cursor;
-
-        while (*end != 0 && *end != L' ' && *end != L'\t')
+        while (reach_windows_startup_is_space(*cursor))
         {
-            ++end;
+            ++cursor;
         }
 
-        size_t length = (size_t)(end - cursor);
-
-        if (length >= _countof(executable))
+        if (*cursor != 0)
         {
-            return;
+            (void)StringCchCopyW(out_arguments, out_arguments_count, cursor);
         }
-
-        wcsncpy_s(executable, cursor, length);
-        cursor = end;
+        return 1;
     }
 
-    while (*cursor == L' ' || *cursor == L'\t')
+    return reach_windows_parse_unquoted_run_command(cursor, out_executable, out_executable_count,
+                                                    out_arguments, out_arguments_count);
+}
+
+static void reach_windows_launch_run_command(const wchar_t *command)
+{
+    if (command == nullptr || command[0] == 0)
     {
-        ++cursor;
+        return;
     }
 
-    if (*cursor != 0)
+    wchar_t executable[4096] = {};
+    wchar_t arguments[4096] = {};
+
+    if (!reach_windows_parse_run_command(command, executable, _countof(executable), arguments,
+                                         _countof(arguments)))
     {
-        StringCchCopyW(arguments, _countof(arguments), cursor);
+        return;
     }
 
     if (reach_windows_executable_running(executable))
@@ -363,7 +485,7 @@ static void reach_windows_launch_run_command(const wchar_t *command)
 
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
+    execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
     execute.lpVerb = L"open";
     execute.lpFile = executable;
     execute.lpParameters = arguments[0] != 0 ? arguments : nullptr;
