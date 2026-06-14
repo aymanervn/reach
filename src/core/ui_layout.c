@@ -26,6 +26,10 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
     out_layout->dock.bounds.width = dock_width;
     out_layout->dock.bounds.height = dock_height;
     out_layout->dock.app_slot_count = state->pinned_app_count;
+    out_layout->dock.music_widget.x = 0.0f;
+    out_layout->dock.music_widget.y = 0.0f;
+    out_layout->dock.music_widget.width = 0.0f;
+    out_layout->dock.music_widget.height = 0.0f;
 
     float icon_size = reach_scale(state->dock.icon_size, scale);
     float gap = reach_scale(state->dock.gap, scale);

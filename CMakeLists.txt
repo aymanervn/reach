@@ -67,6 +67,7 @@ add_library(reach_features STATIC
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
+    src/features/music_widget/music_widget_feature.cpp
     src/features/popup/popup_render.cpp
     src/features/quick_settings/quick_settings_feature.cpp
     src/features/quick_settings/quick_settings_interaction.cpp

@@ -1,5 +1,27 @@
 #include "shell_internal.h"
 
+static reach_rect_f32 reach_shell_rect_to_dock_local(reach_rect_f32 rect,
+                                                     reach_rect_f32 dock_bounds)
+{
+    rect.x -= dock_bounds.x;
+    rect.y -= dock_bounds.y;
+    return rect;
+}
+
+static reach_music_widget_layout
+reach_shell_music_widget_layout_to_dock_local(reach_music_widget_layout layout,
+                                              reach_rect_f32 dock_bounds)
+{
+    layout.bounds = reach_shell_rect_to_dock_local(layout.bounds, dock_bounds);
+    layout.cover = reach_shell_rect_to_dock_local(layout.cover, dock_bounds);
+    layout.title = reach_shell_rect_to_dock_local(layout.title, dock_bounds);
+    layout.previous_button = reach_shell_rect_to_dock_local(layout.previous_button, dock_bounds);
+    layout.play_pause_button =
+        reach_shell_rect_to_dock_local(layout.play_pause_button, dock_bounds);
+    layout.next_button = reach_shell_rect_to_dock_local(layout.next_button, dock_bounds);
+    return layout;
+}
+
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout)
 {
     REACH_ASSERT(shell != nullptr);
@@ -48,6 +70,20 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     reach_result result = reach_dock_build_render_commands(&input, &commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    reach_music_widget_layout music_layout =
+        reach_shell_music_widget_layout_to_dock_local(shell->music_widget_layout, layout->bounds);
+    reach_music_widget_render_input music_input = {};
+    music_input.theme = input.theme;
+    music_input.model = &shell->music_widget_model;
+    music_input.layout = &music_layout;
+    music_input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
+    music_input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+    result = reach_music_widget_build_render_commands(&music_input, &commands);
     if (result != REACH_OK)
     {
         return result;

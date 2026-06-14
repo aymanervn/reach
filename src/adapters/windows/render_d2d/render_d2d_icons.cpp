@@ -23,6 +23,43 @@ static D2D1_RECT_F reach_d2d_snap_bitmap_rect(reach_rect_f32 rect)
     return D2D1::RectF(left, top, left + width, top + height);
 }
 
+static int32_t reach_d2d_center_crop_source_rect(ID2D1Bitmap *bitmap, D2D1_RECT_F dest,
+                                                 D2D1_RECT_F *out_source)
+{
+    if (bitmap == nullptr || out_source == nullptr)
+    {
+        return 0;
+    }
+
+    D2D1_SIZE_F size = bitmap->GetSize();
+    float dest_width = dest.right - dest.left;
+    float dest_height = dest.bottom - dest.top;
+    if (size.width <= 0.0f || size.height <= 0.0f || dest_width <= 0.0f ||
+        dest_height <= 0.0f)
+    {
+        return 0;
+    }
+
+    float source_width = size.width;
+    float source_height = size.height;
+    float source_ratio = source_width / source_height;
+    float dest_ratio = dest_width / dest_height;
+    if (source_ratio > dest_ratio)
+    {
+        source_width = source_height * dest_ratio;
+    }
+    else
+    {
+        source_height = source_width / dest_ratio;
+    }
+
+    out_source->left = (size.width - source_width) * 0.5f;
+    out_source->top = (size.height - source_height) * 0.5f;
+    out_source->right = out_source->left + source_width;
+    out_source->bottom = out_source->top + source_height;
+    return 1;
+}
+
 void reach_d2d_clear_icon_cache(reach_render_backend *backend)
 {
     if (backend == nullptr)
@@ -371,13 +408,20 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
 
         if (SUCCEEDED(hr))
         {
+            D2D1_RECT_F source_rect = {};
+            D2D1_RECT_F *source = nullptr;
+            if (command->icon_crop_to_fill &&
+                reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
+            {
+                source = &source_rect;
+            }
             D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
                 rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(),
                 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
 
             target->PushLayer(layer, clip_layer);
             target->DrawBitmap(bitmap, rect, command->color.a,
-                               D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+                               D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
             target->PopLayer();
         }
 
@@ -397,7 +441,16 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
         return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
     }
 
-    target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    D2D1_RECT_F source_rect = {};
+    D2D1_RECT_F *source = nullptr;
+    if (command->icon_crop_to_fill &&
+        reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
+    {
+        source = &source_rect;
+    }
+
+    target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                       source);
 
     return REACH_OK;
 }

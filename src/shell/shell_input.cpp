@@ -59,13 +59,6 @@ static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
            (float)y <= rect.y + rect.height;
 }
 
-typedef enum reach_shell_media_action
-{
-    REACH_SHELL_MEDIA_ACTION_PREVIOUS = 1,
-    REACH_SHELL_MEDIA_ACTION_PLAY_PAUSE = 2,
-    REACH_SHELL_MEDIA_ACTION_NEXT = 3
-} reach_shell_media_action;
-
 static float reach_shell_clamp01(float value)
 {
     if (value < 0.0f)
@@ -79,31 +72,44 @@ static float reach_shell_clamp01(float value)
     return value;
 }
 
-static reach_result reach_shell_execute_media_action(reach_shell *shell,
-                                                     reach_shell_media_action action)
+typedef enum reach_shell_media_action
+{
+    REACH_SHELL_MEDIA_ACTION_PREVIOUS = 1,
+    REACH_SHELL_MEDIA_ACTION_PLAY_PAUSE = 2,
+    REACH_SHELL_MEDIA_ACTION_NEXT = 3
+} reach_shell_media_action;
+
+static reach_result reach_shell_execute_media_action(reach_shell *shell, reach_shell_media_action action)
 {
     if (shell == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
+    reach_result result = REACH_OK;
     switch (action)
     {
     case REACH_SHELL_MEDIA_ACTION_PREVIOUS:
-        return shell->media_controls.previous_track != nullptr
-                   ? shell->media_controls.previous_track(shell->media_controls.userdata)
-                   : REACH_OK;
+        result = shell->media_controls.previous_track != nullptr
+                     ? shell->media_controls.previous_track(shell->media_controls.userdata)
+                     : REACH_OK;
+        break;
     case REACH_SHELL_MEDIA_ACTION_PLAY_PAUSE:
-        return shell->media_controls.play_pause != nullptr
-                   ? shell->media_controls.play_pause(shell->media_controls.userdata)
-                   : REACH_OK;
+        result = shell->media_controls.play_pause != nullptr
+                     ? shell->media_controls.play_pause(shell->media_controls.userdata)
+                     : REACH_OK;
+        break;
     case REACH_SHELL_MEDIA_ACTION_NEXT:
-        return shell->media_controls.next_track != nullptr
-                   ? shell->media_controls.next_track(shell->media_controls.userdata)
-                   : REACH_OK;
+        result = shell->media_controls.next_track != nullptr
+                     ? shell->media_controls.next_track(shell->media_controls.userdata)
+                     : REACH_OK;
+        break;
     default:
-        return REACH_OK;
+        result = REACH_OK;
+        break;
     }
+
+    return result;
 }
 
 static reach_result reach_shell_step_main_volume(reach_shell *shell, float delta)
@@ -140,6 +146,7 @@ static reach_result reach_shell_toggle_main_volume_mute(reach_shell *shell)
 
     return shell->audio_volume.set_muted(shell->audio_volume.userdata, state.muted ? 0 : 1);
 }
+
 static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reach_ui_event *event)
 {
     if (shell == nullptr || event == nullptr || !shell->has_layout)
@@ -242,6 +249,31 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
     reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
 
+    reach_music_widget_action_type music_action =
+        reach_music_widget_hit_test(&shell->music_widget_layout, event->x, event->y);
+    if (music_action != REACH_MUSIC_WIDGET_ACTION_NONE)
+    {
+        reach_music_widget_action_type pressed_action = shell->pressed_music_widget_action;
+        shell->pressed_music_widget_action = REACH_MUSIC_WIDGET_ACTION_NONE;
+        if (pressed_action == music_action)
+        {
+            if (music_action == REACH_MUSIC_WIDGET_ACTION_PREVIOUS)
+            {
+                return reach_shell_execute_media_action(shell, REACH_SHELL_MEDIA_ACTION_PREVIOUS);
+            }
+            if (music_action == REACH_MUSIC_WIDGET_ACTION_PLAY_PAUSE)
+            {
+                return reach_shell_execute_media_action(shell,
+                                                        REACH_SHELL_MEDIA_ACTION_PLAY_PAUSE);
+            }
+            if (music_action == REACH_MUSIC_WIDGET_ACTION_NEXT)
+            {
+                return reach_shell_execute_media_action(shell, REACH_SHELL_MEDIA_ACTION_NEXT);
+            }
+        }
+        return REACH_OK;
+    }
+
     if (dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON)
     {
         reach_shell_toggle_tray_popup(shell);
@@ -304,6 +336,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     }
 
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
+    shell->pressed_music_widget_action = REACH_MUSIC_WIDGET_ACTION_NONE;
     return REACH_OK;
 }
 
@@ -357,6 +390,14 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     }
 
     reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+
+    reach_music_widget_action_type music_action =
+        reach_music_widget_hit_test(&shell->music_widget_layout, event->x, event->y);
+    if (music_action != REACH_MUSIC_WIDGET_ACTION_NONE)
+    {
+        shell->pressed_music_widget_action = music_action;
+        return REACH_OK;
+    }
 
     if (shell->ui.launcher.open)
     {
@@ -445,6 +486,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
 
     reach_shell_release_tray_item(shell);
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
+    shell->pressed_music_widget_action = REACH_MUSIC_WIDGET_ACTION_NONE;
     return REACH_OK;
 }
 
@@ -798,6 +840,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     {
         return reach_shell_toggle_main_volume_mute(shell);
     }
+
     if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN || event->type == REACH_UI_EVENT_ALT_TAB_NEXT ||
         event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS ||
         event->type == REACH_UI_EVENT_ALT_TAB_COMMIT ||

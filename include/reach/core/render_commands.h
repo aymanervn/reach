@@ -90,6 +90,7 @@ extern "C"
         float clip_radius;
         float stroke_width;
         uint64_t icon_id;
+        int32_t icon_crop_to_fill;
         int32_t text_weight;
         float text_size;
         float notch_center_x;

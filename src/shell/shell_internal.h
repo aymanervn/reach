@@ -11,6 +11,7 @@
 #include "reach/features/context_menu.h"
 #include "reach/features/dock.h"
 #include "reach/features/launcher.h"
+#include "reach/features/music_widget.h"
 #include "reach/features/pin_config.h"
 #include "reach/features/popup.h"
 #include "reach/features/quick_settings.h"
@@ -448,6 +449,10 @@ struct reach_shell
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
     reach_media_controls_port media_controls;
+    reach_music_widget_model music_widget_model;
+    reach_music_widget_layout music_widget_layout;
+    reach_music_widget_action_type pressed_music_widget_action;
+    std::atomic<int32_t> music_widget_refresh_requested;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_shell_quick_settings_audio_refresh_state quick_settings_audio_refresh;
     reach_shell_quick_settings_system_refresh_state quick_settings_system_refresh;
@@ -647,6 +652,8 @@ reach_result reach_shell_launch_dock_item(reach_shell *shell, size_t item_index,
 
 reach_result reach_shell_execute_dock_item_action(reach_shell *shell,
                                                   reach_dock_item_action action);
+
+void reach_shell_refresh_music_widget(reach_shell *shell);
 
 /* Dock drag orchestration */
 
