@@ -167,6 +167,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->system_controls.destroy(shell->system_controls.userdata);
     }
+    if (shell->media_controls.destroy != nullptr)
+    {
+        shell->media_controls.destroy(shell->media_controls.userdata);
+    }
 
     shell->monitors = {};
     shell->popup_capture = {};
@@ -194,6 +198,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->power_session = {};
     shell->audio_volume = {};
     shell->system_controls = {};
+    shell->media_controls = {};
     shell->quick_settings_system_change_flags.store(0);
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
@@ -262,6 +267,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->quick_settings_audio_sessions = {};
     shell->quick_settings_output_devices = {};
     shell->system_controls = {};
+    shell->media_controls = {};
     shell->quick_settings_system_change_flags.store(0);
     shell->quick_settings_notch_anchor_x = 0.0f;
     shell->quick_settings_bounds = {};
@@ -303,6 +309,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->power_session = dependencies->power_session;
     shell->audio_volume = dependencies->audio_volume;
     shell->system_controls = dependencies->system_controls;
+    shell->media_controls = dependencies->media_controls;
     shell->theme = reach_theme_default();
 
     if (shell->monitors.list == nullptr)

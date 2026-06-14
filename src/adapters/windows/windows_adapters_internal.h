@@ -8,6 +8,7 @@
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/input_source.h"
+#include "reach/ports/media_controls.h"
 #include "reach/ports/monitor.h"
 #include "reach/ports/platform_window.h"
 #include "reach/ports/popup_capture.h"
@@ -49,6 +50,7 @@ extern "C"
     reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
     reach_result reach_windows_create_icon_provider(reach_icon_provider_port *out_port);
     reach_result reach_windows_create_input_source(reach_input_source_port *out_port);
+    reach_result reach_windows_create_media_controls(reach_media_controls_port *out_port);
     reach_result reach_windows_create_config_store(const uint16_t *path,
                                                    reach_config_store_port *out_port);
     reach_result reach_windows_create_window_manager(reach_window_manager_port *out_port);

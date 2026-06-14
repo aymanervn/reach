@@ -447,6 +447,7 @@ struct reach_shell
     reach_shell_window_control_state window_control;
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
+    reach_media_controls_port media_controls;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_shell_quick_settings_audio_refresh_state quick_settings_audio_refresh;
     reach_shell_quick_settings_system_refresh_state quick_settings_system_refresh;
