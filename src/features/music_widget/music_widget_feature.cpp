@@ -92,21 +92,26 @@ static reach_color reach_music_widget_background_overlay(const reach_theme *them
     {
         color = theme->music_widget_background;
     }
-    color.r *= 0.22f;
-    color.g *= 0.22f;
-    color.b *= 0.22f;
-    if (color.a < 0.58f)
+    color.r *= 0.34f;
+    color.g *= 0.34f;
+    color.b *= 0.34f;
+    if (color.a < 0.48f)
     {
-        color.a = 0.58f;
+        color.a = 0.48f;
     }
     return color;
 }
 
-static reach_rect_f32 reach_music_widget_centered_square(reach_rect_f32 rect)
+static reach_rect_f32 reach_music_widget_centered_circle_bounds(reach_rect_f32 rect)
 {
-    float size = rect.height < rect.width ? rect.height : rect.width;
+    float size = rect.height * 1.15f;
+    if (size > rect.width)
+    {
+        size = rect.width;
+    }
     return reach_music_widget_rect(rect.x + (rect.width - size) * 0.5f,
-                                   rect.y + (rect.height - size) * 0.5f, size, size);
+                                   rect.y + (rect.height - size) * 0.5f + rect.height * 0.08f,
+                                   size, size);
 }
 
 void reach_music_widget_model_init(reach_music_widget_model *model)
@@ -168,7 +173,7 @@ reach_music_widget_layout reach_music_widget_compute_layout(const reach_music_wi
     {
         title_height = control_height;
     }
-    layout.title = reach_music_widget_rect(content_x, bounds.y + padding, content_width,
+    layout.title = reach_music_widget_rect(content_x, bounds.y + padding * 0.55f, content_width,
                                            title_height);
 
     float controls_y = bounds.y + bounds.height - padding - control_height;
@@ -273,7 +278,8 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
         reach_color background =
             index == 1 ? play_pause_background : theme->music_widget_control_background;
         reach_rect_f32 background_rect =
-            index == 1 ? reach_music_widget_centered_square(controls[index]) : controls[index];
+            index == 1 ? reach_music_widget_centered_circle_bounds(controls[index])
+                       : controls[index];
         reach_music_widget_push_rect(out_commands, background_rect, background,
                                      background_rect.height * (index == 1 ? 0.5f : 0.45f));
         reach_music_widget_push_text(out_commands, controls[index], labels[index],

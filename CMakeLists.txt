@@ -146,6 +146,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     dcomp
     d3d11
     dxgi
+    dxguid
     user32
     shell32
     comctl32
@@ -231,6 +232,7 @@ target_link_libraries(reach PRIVATE
     dcomp
     d3d11
     dxgi
+    dxguid
     user32
     shell32
     comctl32
