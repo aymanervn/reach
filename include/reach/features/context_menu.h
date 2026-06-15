@@ -59,9 +59,6 @@ extern "C"
         uint32_t command;
     } reach_context_menu_action;
 
-    void reach_context_menu_build_dock_item_commands(int32_t pinned, int32_t has_path,
-                                                     int32_t has_window, uint32_t *out_commands,
-                                                     size_t *out_count);
     void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                                  size_t *out_count);
     const uint16_t *reach_context_menu_command_text(uint32_t command);

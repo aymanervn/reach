@@ -1,35 +1,5 @@
 #include "reach/features/context_menu.h"
 
-void reach_context_menu_build_dock_item_commands(int32_t pinned, int32_t has_path,
-                                                 int32_t has_window, uint32_t *out_commands,
-                                                 size_t *out_count)
-{
-    if (out_commands == nullptr || out_count == nullptr)
-    {
-        return;
-    }
-
-    size_t count = 0;
-    out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_OPEN_NEW;
-    if (has_path)
-    {
-        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN;
-    }
-    if (pinned)
-    {
-        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_UNPIN;
-    }
-    else if (has_path)
-    {
-        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_PIN;
-    }
-    if (has_window)
-    {
-        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_CLOSE;
-    }
-    *out_count = count;
-}
-
 void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                              size_t *out_count)
 {

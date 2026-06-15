@@ -329,6 +329,39 @@ int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t wind
     return 0;
 }
 
+void reach_shell_dock_item_menu_capabilities_for_index(
+    const reach_shell *shell, size_t item_index,
+    reach_shell_dock_item_menu_capabilities *out_capabilities)
+{
+    if (out_capabilities == nullptr)
+    {
+        return;
+    }
+
+    *out_capabilities = {};
+    if (shell == nullptr || item_index >= shell->dock_model.item_count)
+    {
+        return;
+    }
+
+    const reach_dock_item_model *item = &shell->dock_model.items[item_index];
+    uintptr_t window_id = item->window;
+    int32_t has_window = window_id != 0;
+    int32_t has_path = reach_shell_dock_item_path(shell, item_index) != nullptr;
+
+    if (reach_shell_window_is_settings_window(shell, window_id))
+    {
+        out_capabilities->close = has_window;
+        return;
+    }
+
+    out_capabilities->open_new = has_path;
+    out_capabilities->open_as_admin = has_path;
+    out_capabilities->pin = !item->pinned && has_path;
+    out_capabilities->unpin = item->pinned;
+    out_capabilities->close = has_window;
+}
+
 static reach_result reach_shell_dispatch_window_control(reach_shell *shell,
                                                         reach_shell_window_control_action action,
                                                         uintptr_t window_id)
