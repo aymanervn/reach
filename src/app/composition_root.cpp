@@ -107,6 +107,16 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result =
+            reach_windows_create_platform_window(REACH_SURFACE_SETTINGS, &dependencies.settings_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.settings_window.window,
+                                                           &dependencies.settings_renderer);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_search_provider(&dependencies.search_provider);
     }
     if (result == REACH_OK)
@@ -183,6 +193,8 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
             dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
+            dependencies.settings_window = {};
+            dependencies.settings_renderer = {};
         }
     }
     if (result != REACH_OK)
@@ -237,6 +249,14 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         {
             dependencies.quick_settings_renderer.ops.destroy(
                 dependencies.quick_settings_renderer.backend);
+        }
+        if (dependencies.settings_window.ops.destroy != nullptr)
+        {
+            dependencies.settings_window.ops.destroy(dependencies.settings_window.window);
+        }
+        if (dependencies.settings_renderer.ops.destroy != nullptr)
+        {
+            dependencies.settings_renderer.ops.destroy(dependencies.settings_renderer.backend);
         }
         if (dependencies.input_source.ops.destroy != nullptr)
         {

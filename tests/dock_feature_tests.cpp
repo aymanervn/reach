@@ -122,14 +122,16 @@ int main(void)
     uint32_t icons[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     size_t count = 0;
     reach_context_menu_build_power_commands(commands, icons, &count);
-    failed += expect(count == 5);
+    failed += expect(count == 6);
     failed += expect(commands[0] == REACH_CONTEXT_MENU_COMMAND_POWER_LOCK);
     failed += expect(commands[1] == REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP);
     failed += expect(commands[2] == REACH_CONTEXT_MENU_COMMAND_POWER_RESTART);
     failed += expect(commands[3] == REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN);
     failed += expect(commands[4] == REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT);
+    failed += expect(commands[5] == REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS);
     failed += expect(icons[0] == REACH_VECTOR_ICON_LOCK);
     failed += expect(icons[4] == REACH_VECTOR_ICON_SIGN_OUT);
+    failed += expect(icons[5] == REACH_VECTOR_ICON_SETTINGS);
 
     reach_rect_f32 slots[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     for (size_t index = 0; index < count; ++index)

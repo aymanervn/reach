@@ -13,7 +13,7 @@ extern "C"
 {
 #endif
 
-#define REACH_CONTEXT_MENU_MAX_ITEMS 5
+#define REACH_CONTEXT_MENU_MAX_ITEMS 6
 
     typedef enum reach_context_menu_command
     {
@@ -26,7 +26,8 @@ extern "C"
         REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP = 201,
         REACH_CONTEXT_MENU_COMMAND_POWER_RESTART = 202,
         REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN = 203,
-        REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT = 204
+        REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT = 204,
+        REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS = 205
     } reach_context_menu_command;
 
     typedef struct reach_context_menu_render_input
