@@ -78,6 +78,12 @@ typedef struct reach_shell_quick_settings_drag_state
     uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
 } reach_shell_quick_settings_drag_state;
 
+typedef struct reach_shell_launcher_scrollbar_drag_state
+{
+    int32_t active;
+    float grab_offset_y;
+} reach_shell_launcher_scrollbar_drag_state;
+
 typedef struct reach_shell_launcher_result_icon_job
 {
     uint32_t generation;
@@ -431,6 +437,7 @@ struct reach_shell
     size_t pressed_dock_index;
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
+    reach_shell_launcher_scrollbar_drag_state launcher_scrollbar_drag;
     reach_shell_launcher_search_state launcher_search;
     reach_shell_open_window_icon_state open_window_icons;
     uintptr_t launcher_restore_window;
@@ -539,6 +546,7 @@ reach_result reach_shell_open_launcher_result(reach_shell *shell);
 void reach_shell_cancel_launcher_search(reach_shell *shell);
 reach_result reach_shell_schedule_launcher_search(reach_shell *shell);
 void reach_shell_apply_launcher_search_results(reach_shell *shell);
+void reach_shell_schedule_launcher_result_icons(reach_shell *shell);
 void reach_shell_stop_launcher_search_worker(reach_shell *shell);
 void reach_shell_stop_launcher_result_icon_worker(reach_shell *shell);
 void reach_shell_release_launcher_result_icons(reach_shell *shell);

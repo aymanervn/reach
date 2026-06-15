@@ -50,7 +50,8 @@ extern "C"
         REACH_UI_EVENT_VOLUME_DOWN = 37,
         REACH_UI_EVENT_VOLUME_MUTE = 38,
         REACH_UI_EVENT_BRIGHTNESS_UP = 39,
-        REACH_UI_EVENT_BRIGHTNESS_DOWN = 40
+        REACH_UI_EVENT_BRIGHTNESS_DOWN = 40,
+        REACH_UI_EVENT_POINTER_WHEEL = 41
     } reach_ui_event_type;
 
 #define REACH_UI_EVENT_MODIFIER_CTRL 0x1u
@@ -62,6 +63,7 @@ extern "C"
         uint32_t modifiers;
         int32_t x;
         int32_t y;
+        int32_t wheel_delta;
         uint16_t text[REACH_MAX_SEARCH_CHARS + 1];
     } reach_ui_event;
 

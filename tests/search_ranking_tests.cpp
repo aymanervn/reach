@@ -59,14 +59,15 @@ int main()
     copy_ascii(path, 260, "C:\\Users\\me\\folder");
     failed += expect(reach_search_classify_result(path, 1) == REACH_SEARCH_RESULT_FOLDER);
 
-    reach_search_candidate many[8] = {};
-    for (size_t index = 0; index < 8; ++index)
+    reach_search_candidate many[REACH_SEARCH_MAX_RESULTS + 1] = {};
+    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS + 1; ++index)
     {
         copy_ascii(many[index].name, REACH_SEARCH_RESULT_NAME_CAPACITY, "brave.exe");
         copy_ascii(many[index].path, REACH_SEARCH_RESULT_PATH_CAPACITY, "C:\\Apps\\brave.exe");
         many[index].kind = REACH_SEARCH_RESULT_APP;
     }
-    failed += expect(reach_search_rank_candidates(query, many, 8, REACH_SEARCH_MAX_RESULTS) ==
+    failed += expect(reach_search_rank_candidates(query, many, REACH_SEARCH_MAX_RESULTS + 1,
+                                                  REACH_SEARCH_MAX_RESULTS) ==
                      REACH_SEARCH_MAX_RESULTS);
 
     return failed == 0 ? 0 : 1;

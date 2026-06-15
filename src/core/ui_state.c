@@ -27,6 +27,69 @@ static void reach_ui_state_clamp_launcher_caret(reach_ui_state *state)
     }
 }
 
+static size_t reach_ui_state_launcher_visible_count(const reach_ui_state *state)
+{
+    if (state == 0)
+    {
+        return 0;
+    }
+    return state->launcher.result_count < REACH_SEARCH_VISIBLE_RESULTS
+               ? state->launcher.result_count
+               : REACH_SEARCH_VISIBLE_RESULTS;
+}
+
+static size_t reach_ui_state_launcher_max_scroll_offset(const reach_ui_state *state)
+{
+    if (state == 0 || state->launcher.result_count <= REACH_SEARCH_VISIBLE_RESULTS)
+    {
+        return 0;
+    }
+    return state->launcher.result_count - REACH_SEARCH_VISIBLE_RESULTS;
+}
+
+static void reach_ui_state_clamp_launcher_result_scroll(reach_ui_state *state)
+{
+    if (state == 0)
+    {
+        return;
+    }
+
+    size_t max_offset = reach_ui_state_launcher_max_scroll_offset(state);
+    if (state->launcher.result_scroll_offset > max_offset)
+    {
+        state->launcher.result_scroll_offset = max_offset;
+    }
+}
+
+static void reach_ui_state_keep_selected_launcher_result_visible(reach_ui_state *state)
+{
+    if (state == 0)
+    {
+        return;
+    }
+
+    reach_ui_state_clamp_launcher_result_scroll(state);
+    size_t visible_count = reach_ui_state_launcher_visible_count(state);
+    if (visible_count == 0)
+    {
+        state->launcher.result_scroll_offset = 0;
+        return;
+    }
+
+    size_t offset = state->launcher.result_scroll_offset;
+    if (state->launcher.selected_result_index < offset)
+    {
+        state->launcher.result_scroll_offset = state->launcher.selected_result_index;
+    }
+    else if (state->launcher.selected_result_index >= offset + visible_count)
+    {
+        state->launcher.result_scroll_offset =
+            state->launcher.selected_result_index - visible_count + 1;
+    }
+
+    reach_ui_state_clamp_launcher_result_scroll(state);
+}
+
 void reach_ui_state_init(reach_ui_state *state)
 {
     if (state == 0)
@@ -46,6 +109,7 @@ void reach_ui_state_init(reach_ui_state *state)
     state->launcher.caret_index = 0;
     state->launcher.result_count = 0;
     state->launcher.selected_result_index = 0;
+    state->launcher.result_scroll_offset = 0;
     state->pinned_app_count = 0;
 }
 
@@ -344,6 +408,7 @@ reach_result reach_ui_state_clear_launcher_results(reach_ui_state *state)
     }
     state->launcher.result_count = 0;
     state->launcher.selected_result_index = 0;
+    state->launcher.result_scroll_offset = 0;
     return REACH_OK;
 }
 
@@ -368,6 +433,7 @@ reach_result reach_ui_state_set_launcher_results(reach_ui_state *state,
     }
     state->launcher.result_count = count;
     state->launcher.selected_result_index = 0;
+    state->launcher.result_scroll_offset = 0;
     return REACH_OK;
 }
 
@@ -398,6 +464,7 @@ reach_result reach_ui_state_select_next_launcher_result(reach_ui_state *state)
     {
         state->launcher.selected_result_index += 1;
     }
+    reach_ui_state_keep_selected_launcher_result_visible(state);
     return REACH_OK;
 }
 
@@ -413,6 +480,61 @@ reach_result reach_ui_state_select_previous_launcher_result(reach_ui_state *stat
         return REACH_OK;
     }
     state->launcher.selected_result_index -= 1;
+    reach_ui_state_keep_selected_launcher_result_visible(state);
+    return REACH_OK;
+}
+
+reach_result reach_ui_state_set_launcher_result_scroll_offset(reach_ui_state *state, size_t offset)
+{
+    if (state == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    state->launcher.result_scroll_offset = offset;
+    reach_ui_state_clamp_launcher_result_scroll(state);
+    return REACH_OK;
+}
+
+reach_result reach_ui_state_scroll_launcher_results(reach_ui_state *state, int32_t delta)
+{
+    if (state == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    size_t offset = state->launcher.result_scroll_offset;
+    if (delta < 0)
+    {
+        size_t amount = (size_t)(-delta);
+        offset = amount > offset ? 0 : offset - amount;
+    }
+    else
+    {
+        offset += (size_t)delta;
+    }
+
+    return reach_ui_state_set_launcher_result_scroll_offset(state, offset);
+}
+
+reach_result reach_ui_state_set_launcher_selected_result(reach_ui_state *state, size_t index)
+{
+    if (state == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (state->launcher.result_count == 0)
+    {
+        state->launcher.selected_result_index = 0;
+        state->launcher.result_scroll_offset = 0;
+        return REACH_OK;
+    }
+    if (index >= state->launcher.result_count)
+    {
+        index = state->launcher.result_count - 1;
+    }
+    state->launcher.selected_result_index = index;
+    reach_ui_state_keep_selected_launcher_result_visible(state);
     return REACH_OK;
 }
 

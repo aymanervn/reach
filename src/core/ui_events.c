@@ -150,6 +150,8 @@ reach_result reach_ui_handle_event(reach_ui_state *state, const reach_ui_event *
             out_intent->type = REACH_UI_INTENT_OPEN_TRAY_MENU;
         }
         return REACH_OK;
+    case REACH_UI_EVENT_POINTER_WHEEL:
+        return REACH_OK;
     case REACH_UI_EVENT_NONE:
     default:
         return REACH_OK;
