@@ -138,6 +138,18 @@ void reach_shell_clear_launcher_restore_window(reach_shell *shell)
     shell->launcher_restore_window_valid = 0;
 }
 
+void reach_shell_defer_launcher_close_until_foreground_change(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    reach_shell_clear_launcher_restore_window(shell);
+    shell->launcher_close_after_foreground_change = 1;
+    reach_shell_request_update(shell);
+}
+
 static int32_t reach_shell_launcher_can_restore_focus_to(reach_shell *shell, uintptr_t window)
 {
     if (shell == nullptr || window == 0 || shell->window_manager.ops.activate == nullptr)
@@ -175,6 +187,7 @@ static void reach_shell_close_launcher_impl(reach_shell *shell, int32_t restore_
     (void)reach_ui_state_close_launcher(&shell->ui);
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
+    shell->launcher_close_after_foreground_change = 0;
     shell->dirty.layout = 1;
     shell->launcher.dirty_flags = 1;
     reach_shell_sync_popup_mouse_hook(shell);

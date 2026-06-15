@@ -442,6 +442,7 @@ struct reach_shell
     reach_shell_open_window_icon_state open_window_icons;
     uintptr_t launcher_restore_window;
     int32_t launcher_restore_window_valid;
+    int32_t launcher_close_after_foreground_change;
     int32_t suppress_power_button_release;
     reach_shell_tray_state tray_state;
     reach_shell_switcher_state switcher_state;
@@ -540,6 +541,7 @@ void reach_shell_close_launcher(reach_shell *shell);
 void reach_shell_close_launcher_without_focus_restore(reach_shell *shell);
 void reach_shell_remember_launcher_restore_window(reach_shell *shell);
 void reach_shell_clear_launcher_restore_window(reach_shell *shell);
+void reach_shell_defer_launcher_close_until_foreground_change(reach_shell *shell);
 void reach_shell_restore_launcher_focus(reach_shell *shell);
 reach_result reach_shell_open_launcher_result(reach_shell *shell);
 reach_result reach_shell_open_launcher_result_path(reach_shell *shell, size_t result_index);

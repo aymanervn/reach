@@ -271,6 +271,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
     shell->launcher_scrollbar_drag.active = 0;
     shell->launcher_scrollbar_drag.grab_offset_y = 0.0f;
+    shell->launcher_close_after_foreground_change = 0;
     shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
 
