@@ -1098,27 +1098,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
     if (event->type == REACH_UI_EVENT_WINDOWS_D_MINIMIZE_ALL)
     {
-        if (shell->window_manager.ops.refresh != nullptr)
-        {
-            (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
-            (void)reach_shell_refresh_open_windows(shell, nullptr);
-        }
-
-        uintptr_t windows[REACH_MAX_PINNED_APPS] = {};
-        size_t window_count = 0;
-        for (size_t index = 0; index < shell->open_window_count && window_count < REACH_MAX_PINNED_APPS;
-             ++index)
-        {
-            if (shell->open_windows[index].id != 0 && !shell->open_windows[index].minimized)
-            {
-                windows[window_count++] = shell->open_windows[index].id;
-            }
-        }
-
-        if (window_count > 0)
-        {
-            (void)reach_shell_schedule_minimize_windows(shell, windows, window_count);
-        }
+        (void)reach_shell_schedule_minimize_open_windows(shell);
         return REACH_OK;
     }
 
