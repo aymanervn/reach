@@ -5,6 +5,17 @@ static float reach_scale(float value, float dpi_scale)
     return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
+static size_t reach_visible_launcher_result_count(const reach_ui_state *state)
+{
+    if (state == 0)
+    {
+        return 0;
+    }
+    return state->launcher.result_count < REACH_SEARCH_VISIBLE_RESULTS
+               ? state->launcher.result_count
+               : REACH_SEARCH_VISIBLE_RESULTS;
+}
+
 reach_result reach_ui_layout_compute(const reach_ui_state *state,
                                      const reach_ui_layout_input *input,
                                      reach_ui_layout *out_layout)
@@ -108,8 +119,63 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
                                             out_layout->launcher.search_box.height +
                                             reach_scale(8.0f, scale);
     out_layout->launcher.search_results.width = out_layout->launcher.search_box.width;
+    size_t visible_result_count = reach_visible_launcher_result_count(state);
     out_layout->launcher.search_results.height =
-        reach_scale(56.0f * (float)state->launcher.result_count, scale);
+        reach_scale(56.0f * (float)visible_result_count, scale);
+    out_layout->launcher.search_result_items = out_layout->launcher.search_results;
+    out_layout->launcher.search_result_scrollbar_track = (reach_rect_f32){0};
+    out_layout->launcher.search_result_scrollbar_thumb = (reach_rect_f32){0};
+
+    if (state->launcher.result_count > REACH_SEARCH_VISIBLE_RESULTS && visible_result_count > 0)
+    {
+        float gutter_width = reach_scale(18.0f, scale);
+        float track_width = reach_scale(4.0f, scale);
+        float track_padding_y = reach_scale(8.0f, scale);
+        out_layout->launcher.search_result_items.width =
+            out_layout->launcher.search_results.width - gutter_width;
+        out_layout->launcher.search_result_scrollbar_track.x =
+            out_layout->launcher.search_results.x + out_layout->launcher.search_results.width -
+            gutter_width * 0.5f - track_width * 0.5f;
+        out_layout->launcher.search_result_scrollbar_track.y =
+            out_layout->launcher.search_results.y + track_padding_y;
+        out_layout->launcher.search_result_scrollbar_track.width = track_width;
+        out_layout->launcher.search_result_scrollbar_track.height =
+            out_layout->launcher.search_results.height - track_padding_y * 2.0f;
+
+        float track_height = out_layout->launcher.search_result_scrollbar_track.height;
+        float thumb_height =
+            track_height * ((float)visible_result_count / (float)state->launcher.result_count);
+        float min_thumb_height = reach_scale(22.0f, scale);
+        if (thumb_height < min_thumb_height)
+        {
+            thumb_height = min_thumb_height;
+        }
+        if (thumb_height > track_height)
+        {
+            thumb_height = track_height;
+        }
+
+        size_t max_offset = state->launcher.result_count - visible_result_count;
+        float progress = max_offset > 0 ? (float)state->launcher.result_scroll_offset /
+                                              (float)max_offset
+                                        : 0.0f;
+        if (progress < 0.0f)
+        {
+            progress = 0.0f;
+        }
+        if (progress > 1.0f)
+        {
+            progress = 1.0f;
+        }
+
+        out_layout->launcher.search_result_scrollbar_thumb.x =
+            out_layout->launcher.search_result_scrollbar_track.x;
+        out_layout->launcher.search_result_scrollbar_thumb.y =
+            out_layout->launcher.search_result_scrollbar_track.y +
+            (track_height - thumb_height) * progress;
+        out_layout->launcher.search_result_scrollbar_thumb.width = track_width;
+        out_layout->launcher.search_result_scrollbar_thumb.height = thumb_height;
+    }
     out_layout->launcher.bounds = out_layout->launcher.search_box;
 
     if (state->launcher.result_count > 0)

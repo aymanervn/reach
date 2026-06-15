@@ -34,6 +34,9 @@ extern "C"
         reach_rect_f32 search_box;
         reach_rect_f32 pinned_app_slots[REACH_MAX_PINNED_APPS];
         reach_rect_f32 search_results;
+        reach_rect_f32 search_result_items;
+        reach_rect_f32 search_result_scrollbar_track;
+        reach_rect_f32 search_result_scrollbar_thumb;
         size_t pinned_app_slot_count;
     } reach_launcher_layout;
 

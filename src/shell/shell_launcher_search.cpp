@@ -130,7 +130,7 @@ void reach_shell_stop_launcher_result_icon_worker(reach_shell *shell)
     shell->launcher_search.icon_result_count = 0;
 }
 
-static void reach_shell_schedule_launcher_result_icons(reach_shell *shell)
+void reach_shell_schedule_launcher_result_icons(reach_shell *shell)
 {
     if (shell == nullptr)
     {
@@ -142,12 +142,27 @@ static void reach_shell_schedule_launcher_result_icons(reach_shell *shell)
         return;
     }
 
-    uint32_t generation = ++shell->launcher_search.icon_generation;
+    uint32_t generation = shell->launcher_search.icon_generation;
     reach_shell_clear_launcher_result_icon_jobs(shell);
 
-    for (size_t index = 0;
-         index < shell->ui.launcher.result_count && index < REACH_SEARCH_MAX_RESULTS; ++index)
+    size_t start = shell->ui.launcher.result_scroll_offset;
+    if (start > shell->ui.launcher.result_count)
     {
+        start = shell->ui.launcher.result_count;
+    }
+    size_t end = start + REACH_SEARCH_VISIBLE_RESULTS;
+    if (end > shell->ui.launcher.result_count)
+    {
+        end = shell->ui.launcher.result_count;
+    }
+
+    for (size_t index = start; index < end && index < REACH_SEARCH_MAX_RESULTS; ++index)
+    {
+        if (shell->ui.launcher.result_icon_ids[index] != 0)
+        {
+            continue;
+        }
+
         const uint16_t *path = shell->ui.launcher.results[index].path;
         if (path[0] == 0)
         {

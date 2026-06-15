@@ -36,6 +36,7 @@ extern "C"
         uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS];
         size_t result_count;
         size_t selected_result_index;
+        size_t result_scroll_offset;
     } reach_launcher_model;
 
     typedef struct reach_ui_state
@@ -66,8 +67,12 @@ extern "C"
                                                      size_t count);
     reach_result reach_ui_state_set_launcher_result_icon(reach_ui_state *state, size_t index,
                                                          uint64_t icon_id);
+    reach_result reach_ui_state_set_launcher_selected_result(reach_ui_state *state, size_t index);
     reach_result reach_ui_state_select_next_launcher_result(reach_ui_state *state);
     reach_result reach_ui_state_select_previous_launcher_result(reach_ui_state *state);
+    reach_result reach_ui_state_scroll_launcher_results(reach_ui_state *state, int32_t delta);
+    reach_result reach_ui_state_set_launcher_result_scroll_offset(reach_ui_state *state,
+                                                                  size_t offset);
     reach_result reach_ui_state_clear_launcher_results(reach_ui_state *state);
     int32_t reach_ui_state_should_show_pinned_apps(const reach_ui_state *state);
     int32_t reach_ui_state_should_show_search_placeholder(const reach_ui_state *state);

@@ -42,6 +42,17 @@ static void reach_launcher_copy_query_prefix(uint16_t *dst, size_t dst_count,
     dst[count] = 0;
 }
 
+static size_t reach_launcher_visible_result_count(const reach_ui_state *state)
+{
+    if (state == nullptr)
+    {
+        return 0;
+    }
+    return state->launcher.result_count < REACH_SEARCH_VISIBLE_RESULTS
+               ? state->launcher.result_count
+               : REACH_SEARCH_VISIBLE_RESULTS;
+}
+
 reach_result reach_launcher_build_render_commands(const reach_launcher_render_input *input,
                                                   reach_render_command_buffer *out_commands)
 {
@@ -131,7 +142,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
     if (state->launcher.result_count > 0)
     {
-        float row_height = layout->search_results.height / (float)state->launcher.result_count;
+        size_t visible_count = reach_launcher_visible_result_count(state);
+        float row_height =
+            visible_count > 0 ? layout->search_results.height / (float)visible_count : 0.0f;
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect.x = layout->search_results.x - layout->bounds.x;
@@ -143,12 +156,47 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.radius = launcher_radius;
         reach_render_command_buffer_push(out_commands, &command);
 
-        for (size_t index = 0;
-             index < state->launcher.result_count && index < REACH_SEARCH_MAX_RESULTS; ++index)
+        if (layout->search_result_scrollbar_track.height > 0.0f)
         {
-            float row_x = layout->search_results.x - layout->bounds.x;
-            float row_y = layout->search_results.y - layout->bounds.y + row_height * (float)index;
-            float row_width = layout->search_results.width;
+            command = {};
+            command.type = REACH_RENDER_COMMAND_RECT;
+            command.rect.x = layout->search_result_scrollbar_track.x - layout->bounds.x;
+            command.rect.y = layout->search_result_scrollbar_track.y - layout->bounds.y;
+            command.rect.width = layout->search_result_scrollbar_track.width;
+            command.rect.height = layout->search_result_scrollbar_track.height;
+            command.color = reach_launcher_rgb(255, 255, 255, 0.16f);
+            command.radius = command.rect.width * 0.5f;
+            reach_render_command_buffer_push(out_commands, &command);
+
+            command = {};
+            command.type = REACH_RENDER_COMMAND_RECT;
+            command.rect.x = layout->search_result_scrollbar_thumb.x - layout->bounds.x;
+            command.rect.y = layout->search_result_scrollbar_thumb.y - layout->bounds.y;
+            command.rect.width = layout->search_result_scrollbar_thumb.width;
+            command.rect.height = layout->search_result_scrollbar_thumb.height;
+            command.color = reach_launcher_rgb(255, 255, 255, 0.72f);
+            command.radius = command.rect.width * 0.5f;
+            reach_render_command_buffer_push(out_commands, &command);
+        }
+
+        size_t start = state->launcher.result_scroll_offset;
+        if (start > state->launcher.result_count)
+        {
+            start = state->launcher.result_count;
+        }
+        size_t end = start + visible_count;
+        if (end > state->launcher.result_count)
+        {
+            end = state->launcher.result_count;
+        }
+
+        for (size_t index = start; index < end && index < REACH_SEARCH_MAX_RESULTS; ++index)
+        {
+            size_t visible_index = index - start;
+            float row_x = layout->search_result_items.x - layout->bounds.x;
+            float row_y =
+                layout->search_result_items.y - layout->bounds.y + row_height * (float)visible_index;
+            float row_width = layout->search_result_items.width;
             int32_t selected = index == state->launcher.selected_result_index;
 
             if (selected)

@@ -25,7 +25,9 @@ extern "C"
     {
         REACH_LAUNCHER_HIT_NONE = 0,
         REACH_LAUNCHER_HIT_PINNED_APP = 1,
-        REACH_LAUNCHER_HIT_SEARCH_RESULT = 2
+        REACH_LAUNCHER_HIT_SEARCH_RESULT = 2,
+        REACH_LAUNCHER_HIT_SCROLLBAR_TRACK = 3,
+        REACH_LAUNCHER_HIT_SCROLLBAR_THUMB = 4
     } reach_launcher_hit_type;
 
     typedef struct reach_launcher_hit_result

@@ -2,8 +2,23 @@
 
 static int32_t reach_launcher_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
+    if (rect.width <= 0.0f || rect.height <= 0.0f)
+    {
+        return 0;
+    }
     return (float)x >= rect.x && (float)x <= rect.x + rect.width && (float)y >= rect.y &&
            (float)y <= rect.y + rect.height;
+}
+
+static size_t reach_launcher_visible_result_count(const reach_ui_state *state)
+{
+    if (state == nullptr)
+    {
+        return 0;
+    }
+    return state->launcher.result_count < REACH_SEARCH_VISIBLE_RESULTS
+               ? state->launcher.result_count
+               : REACH_SEARCH_VISIBLE_RESULTS;
 }
 
 reach_launcher_hit_result reach_launcher_hit_test(const reach_ui_state *state,
@@ -28,14 +43,30 @@ reach_launcher_hit_result reach_launcher_hit_test(const reach_ui_state *state,
         }
     }
 
-    if (reach_launcher_rect_contains(layout->search_results, x, y))
+    if (reach_launcher_rect_contains(layout->search_result_scrollbar_thumb, x, y))
+    {
+        hit.type = REACH_LAUNCHER_HIT_SCROLLBAR_THUMB;
+        hit.index = state->launcher.result_scroll_offset;
+        return hit;
+    }
+
+    if (reach_launcher_rect_contains(layout->search_result_scrollbar_track, x, y))
+    {
+        hit.type = REACH_LAUNCHER_HIT_SCROLLBAR_TRACK;
+        hit.index = state->launcher.result_scroll_offset;
+        return hit;
+    }
+
+    if (reach_launcher_rect_contains(layout->search_result_items, x, y))
     {
         hit.type = REACH_LAUNCHER_HIT_SEARCH_RESULT;
-        float local_y = (float)y - layout->search_results.y;
-        float row_height = state->launcher.result_count > 0
-                               ? layout->search_results.height / (float)state->launcher.result_count
-                               : 0.0f;
-        size_t index = row_height > 0.0f && local_y > 0.0f ? (size_t)(local_y / row_height) : 0;
+        float local_y = (float)y - layout->search_result_items.y;
+        size_t visible_count = reach_launcher_visible_result_count(state);
+        float row_height =
+            visible_count > 0 ? layout->search_result_items.height / (float)visible_count : 0.0f;
+        size_t visible_index =
+            row_height > 0.0f && local_y > 0.0f ? (size_t)(local_y / row_height) : 0;
+        size_t index = state->launcher.result_scroll_offset + visible_index;
         hit.index = index < state->launcher.result_count ? index : REACH_SEARCH_MAX_RESULTS;
     }
     return hit;

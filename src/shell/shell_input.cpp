@@ -35,6 +35,7 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
     case REACH_UI_EVENT_POINTER_MIDDLE:
     case REACH_UI_EVENT_POINTER_DOWN:
     case REACH_UI_EVENT_POINTER_CANCEL:
+    case REACH_UI_EVENT_POINTER_WHEEL:
         break;
 
     case REACH_UI_EVENT_NONE:
@@ -93,6 +94,178 @@ reach_shell_music_widget_hit_test_event(const reach_shell *shell, const reach_ui
     }
     reach_point_i32 point = reach_shell_event_dock_point(shell, event);
     return reach_music_widget_hit_test(&shell->music_widget_layout, point.x, point.y);
+}
+
+static size_t reach_shell_launcher_visible_result_count(const reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return 0;
+    }
+    return shell->ui.launcher.result_count < REACH_SEARCH_VISIBLE_RESULTS
+               ? shell->ui.launcher.result_count
+               : REACH_SEARCH_VISIBLE_RESULTS;
+}
+
+static void reach_shell_note_launcher_viewport_changed(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+    reach_shell_schedule_launcher_result_icons(shell);
+    shell->dirty.layout = 1;
+    shell->launcher.dirty_flags = 1;
+    reach_shell_request_update(shell);
+}
+
+static size_t reach_shell_launcher_scroll_offset_for_y(reach_shell *shell, int32_t y)
+{
+    if (shell == nullptr)
+    {
+        return 0;
+    }
+
+    size_t visible_count = reach_shell_launcher_visible_result_count(shell);
+    if (visible_count == 0 || shell->ui.launcher.result_count <= visible_count)
+    {
+        return 0;
+    }
+
+    size_t max_offset = shell->ui.launcher.result_count - visible_count;
+    reach_rect_f32 track = shell->layout.launcher.search_result_scrollbar_track;
+    reach_rect_f32 thumb = shell->layout.launcher.search_result_scrollbar_thumb;
+    float travel = track.height - thumb.height;
+    if (travel <= 0.0f)
+    {
+        return 0;
+    }
+
+    float thumb_y = (float)y - shell->launcher_scrollbar_drag.grab_offset_y;
+    float progress = (thumb_y - track.y) / travel;
+    if (progress < 0.0f)
+    {
+        progress = 0.0f;
+    }
+    if (progress > 1.0f)
+    {
+        progress = 1.0f;
+    }
+
+    return (size_t)(progress * (float)max_offset + 0.5f);
+}
+
+static reach_result reach_shell_scroll_launcher_results(reach_shell *shell, int32_t delta)
+{
+    if (shell == nullptr || delta == 0)
+    {
+        return REACH_OK;
+    }
+
+    size_t old_offset = shell->ui.launcher.result_scroll_offset;
+    reach_result result = reach_ui_state_scroll_launcher_results(&shell->ui, delta);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    if (old_offset != shell->ui.launcher.result_scroll_offset)
+    {
+        reach_shell_note_launcher_viewport_changed(shell);
+    }
+    return REACH_OK;
+}
+
+static reach_result reach_shell_handle_pointer_wheel(reach_shell *shell,
+                                                     const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr || !shell->has_layout || !shell->ui.launcher.open)
+    {
+        return REACH_OK;
+    }
+
+    if (event->wheel_delta == 0 ||
+        !reach_rect_contains(shell->layout.launcher.search_results, event->x, event->y))
+    {
+        return REACH_OK;
+    }
+
+    int32_t direction = event->wheel_delta > 0 ? -1 : 1;
+    return reach_shell_scroll_launcher_results(shell, direction * REACH_SEARCH_SCROLL_STEP);
+}
+
+static void reach_shell_end_launcher_scrollbar_drag(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+    shell->launcher_scrollbar_drag.active = 0;
+    shell->launcher_scrollbar_drag.grab_offset_y = 0.0f;
+    if (shell->launcher.window.ops.set_pointer_move_enabled != nullptr)
+    {
+        (void)shell->launcher.window.ops.set_pointer_move_enabled(shell->launcher.window.window, 0);
+    }
+    if (shell->launcher.window.ops.set_pointer_capture != nullptr)
+    {
+        (void)shell->launcher.window.ops.set_pointer_capture(shell->launcher.window.window, 0);
+    }
+}
+
+static reach_result reach_shell_begin_launcher_scrollbar_drag(reach_shell *shell,
+                                                              const reach_ui_event *event,
+                                                              reach_launcher_hit_result hit)
+{
+    if (shell == nullptr || event == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_rect_f32 thumb = shell->layout.launcher.search_result_scrollbar_thumb;
+    if (hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_THUMB)
+    {
+        shell->launcher_scrollbar_drag.grab_offset_y = (float)event->y - thumb.y;
+    }
+    else
+    {
+        shell->launcher_scrollbar_drag.grab_offset_y = thumb.height * 0.5f;
+    }
+
+    shell->launcher_scrollbar_drag.active = 1;
+    size_t old_offset = shell->ui.launcher.result_scroll_offset;
+    size_t offset = reach_shell_launcher_scroll_offset_for_y(shell, event->y);
+    (void)reach_ui_state_set_launcher_result_scroll_offset(&shell->ui, offset);
+    if (old_offset != shell->ui.launcher.result_scroll_offset)
+    {
+        reach_shell_note_launcher_viewport_changed(shell);
+    }
+
+    if (shell->launcher.window.ops.set_pointer_move_enabled != nullptr)
+    {
+        (void)shell->launcher.window.ops.set_pointer_move_enabled(shell->launcher.window.window, 1);
+    }
+    if (shell->launcher.window.ops.set_pointer_capture != nullptr)
+    {
+        (void)shell->launcher.window.ops.set_pointer_capture(shell->launcher.window.window, 1);
+    }
+    return REACH_OK;
+}
+
+static reach_result reach_shell_update_launcher_scrollbar_drag(reach_shell *shell,
+                                                               const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr || !shell->launcher_scrollbar_drag.active)
+    {
+        return REACH_OK;
+    }
+
+    size_t old_offset = shell->ui.launcher.result_scroll_offset;
+    size_t offset = reach_shell_launcher_scroll_offset_for_y(shell, event->y);
+    (void)reach_ui_state_set_launcher_result_scroll_offset(&shell->ui, offset);
+    if (old_offset != shell->ui.launcher.result_scroll_offset)
+    {
+        reach_shell_note_launcher_viewport_changed(shell);
+    }
+    return REACH_OK;
 }
 
 static float reach_shell_clamp01(float value)
@@ -281,6 +454,12 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     if (shell->quick_settings_drag.active)
     {
         reach_shell_end_quick_settings_drag(shell);
+        return REACH_OK;
+    }
+
+    if (shell->launcher_scrollbar_drag.active)
+    {
+        reach_shell_end_launcher_scrollbar_drag(shell);
         return REACH_OK;
     }
 
@@ -500,10 +679,16 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         }
         else
         {
+            if (launcher_hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_THUMB ||
+                launcher_hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_TRACK)
+            {
+                return reach_shell_begin_launcher_scrollbar_drag(shell, event, launcher_hit);
+            }
+
             if (launcher_hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
                 launcher_hit.index < shell->ui.launcher.result_count)
             {
-                shell->ui.launcher.selected_result_index = launcher_hit.index;
+                (void)reach_ui_state_set_launcher_selected_result(&shell->ui, launcher_hit.index);
                 shell->launcher.dirty_flags = 1;
             }
 
@@ -599,6 +784,11 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         return reach_shell_update_quick_settings_drag(shell, event);
     }
 
+    if (shell->launcher_scrollbar_drag.active)
+    {
+        return reach_shell_update_launcher_scrollbar_drag(shell, event);
+    }
+
     if (shell->dock_drag.active)
     {
         return reach_shell_update_dock_drag(shell, event);
@@ -655,6 +845,11 @@ static reach_result reach_shell_handle_pointer_cancel(reach_shell *shell)
     if (shell->quick_settings_drag.active)
     {
         reach_shell_end_quick_settings_drag(shell);
+    }
+
+    if (shell->launcher_scrollbar_drag.active)
+    {
+        reach_shell_end_launcher_scrollbar_drag(shell);
     }
 
     if (shell->dock_drag.active)
@@ -776,6 +971,11 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     if (event->type == REACH_UI_EVENT_POINTER_MOVE)
     {
         return reach_shell_handle_pointer_move(shell, event);
+    }
+
+    if (event->type == REACH_UI_EVENT_POINTER_WHEEL)
+    {
+        return reach_shell_handle_pointer_wheel(shell, event);
     }
 
     if (event->type == REACH_UI_EVENT_POINTER_MIDDLE)

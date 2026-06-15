@@ -278,6 +278,18 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
+    case WM_MOUSEWHEEL:
+        if (window != nullptr)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_POINTER_WHEEL;
+            event.x = GET_X_LPARAM(lparam);
+            event.y = GET_Y_LPARAM(lparam);
+            event.wheel_delta = GET_WHEEL_DELTA_WPARAM(wparam);
+            reach_platform_window_queue_event(window, &event);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_MOUSELEAVE:
         if (window != nullptr)
         {
