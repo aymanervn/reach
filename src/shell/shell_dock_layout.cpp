@@ -648,7 +648,8 @@ int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell)
            !shell->dirty.render && !shell->dock.dirty_flags && !shell->launcher.dirty_flags &&
            !shell->tray.dirty_flags && !shell->switcher.dirty_flags &&
            !shell->context_menu.dirty_flags && !shell->quick_settings.dirty_flags &&
-           !shell->dock_width.animating && !shell->dock_drag.active && !shell->dock_drag.snapping &&
+           !shell->settings.dirty_flags && !shell->dock_width.animating &&
+           !shell->dock_drag.active && !shell->dock_drag.snapping &&
            !shell->feedback.dock_animating && !shell->feedback.tray_animating &&
            !reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation);
 }

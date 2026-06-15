@@ -15,6 +15,7 @@
 #include "reach/features/pin_config.h"
 #include "reach/features/popup.h"
 #include "reach/features/quick_settings.h"
+#include "reach/features/settings.h"
 #include "reach/features/switcher.h"
 #include "reach/features/tray.h"
 #include "reach/features/wallpaper.h"
@@ -397,6 +398,7 @@ struct reach_shell
     reach_surface_runtime switcher;
     reach_surface_runtime context_menu;
     reach_surface_runtime quick_settings;
+    reach_surface_runtime settings;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
@@ -482,6 +484,12 @@ struct reach_shell
     reach_rect_f32 quick_settings_content_bounds;
     float quick_settings_notch_anchor_x;
     reach_shell_popup_bounds_animation quick_settings_bounds_animation;
+    int32_t settings_open;
+    int32_t settings_maximized;
+    reach_settings_model settings_model;
+    reach_settings_layout settings_layout;
+    reach_rect_f32 settings_bounds;
+    reach_rect_f32 settings_restored_bounds;
     reach_popup_capture_port popup_capture;
 };
 
@@ -736,6 +744,14 @@ reach_result reach_shell_begin_quick_settings_drag_if_hit(reach_shell *shell,
 reach_result reach_shell_update_quick_settings_drag(reach_shell *shell,
                                                     const reach_ui_event *event);
 
+/* Settings orchestration */
+
+void reach_shell_open_settings(reach_shell *shell);
+void reach_shell_close_settings(reach_shell *shell);
+void reach_shell_toggle_settings_maximized(reach_shell *shell);
+void reach_shell_refresh_settings_layout(reach_shell *shell);
+reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell, const reach_ui_event *event);
+
 /* Switcher orchestration */
 
 size_t reach_shell_switcher_visible_count(const reach_shell *shell);
@@ -769,6 +785,7 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
 reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 bounds);
 
 reach_result reach_shell_render_quick_settings_surface(reach_shell *shell);
+reach_result reach_shell_render_settings_surface(reach_shell *shell);
 
 reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds);
 

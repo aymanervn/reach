@@ -43,6 +43,7 @@ void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *o
     out_commands[2] = REACH_CONTEXT_MENU_COMMAND_POWER_RESTART;
     out_commands[3] = REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN;
     out_commands[4] = REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT;
+    out_commands[5] = REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS;
     if (out_icon_ids != nullptr)
     {
         out_icon_ids[0] = REACH_VECTOR_ICON_LOCK;
@@ -50,8 +51,9 @@ void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *o
         out_icon_ids[2] = REACH_VECTOR_ICON_RESTART;
         out_icon_ids[3] = REACH_VECTOR_ICON_SHUTDOWN;
         out_icon_ids[4] = REACH_VECTOR_ICON_SIGN_OUT;
+        out_icon_ids[5] = REACH_VECTOR_ICON_SETTINGS;
     }
-    *out_count = 5;
+    *out_count = 6;
 }
 
 const uint16_t *reach_context_menu_command_text(uint32_t command)
@@ -95,6 +97,10 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
     if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT)
     {
         return (const uint16_t *)L"Sign out";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS)
+    {
+        return (const uint16_t *)L"Settings";
     }
     return (const uint16_t *)L"";
 }

@@ -52,6 +52,8 @@ extern "C"
         reach_render_backend_port context_menu_renderer;
         reach_platform_window_port quick_settings_window;
         reach_render_backend_port quick_settings_renderer;
+        reach_platform_window_port settings_window;
+        reach_render_backend_port settings_renderer;
         reach_input_source_port input_source;
         reach_monitor_port monitors;
         reach_window_manager_port window_manager;

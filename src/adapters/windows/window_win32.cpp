@@ -84,6 +84,15 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
     switch (message)
     {
+    case WM_CLOSE:
+        if (window != nullptr && window->role == REACH_SURFACE_SETTINGS)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_ESCAPE;
+            reach_platform_window_queue_event(window, &event);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR:
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
         return TRUE;
@@ -214,6 +223,32 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_LBUTTONDOWN:
         if (window != nullptr)
         {
+            if (window->role == REACH_SURFACE_SETTINGS)
+            {
+                POINT client_point = {};
+                client_point.x = GET_X_LPARAM(lparam);
+                client_point.y = GET_Y_LPARAM(lparam);
+                UINT dpi = GetDpiForWindow(hwnd);
+                int topbar_height = MulDiv(44, dpi, 96);
+                int control_size = MulDiv(18, dpi, 96);
+                int control_gap = MulDiv(10, dpi, 96);
+                int close_left = window->width - MulDiv(18, dpi, 96) - control_size;
+                int close_right = close_left + control_size;
+                int max_left = close_left - control_gap - control_size;
+                int max_right = max_left + control_size;
+                int control_top = (topbar_height - control_size) / 2;
+                int control_bottom = control_top + control_size;
+                int on_control =
+                    client_point.y >= control_top && client_point.y <= control_bottom &&
+                    ((client_point.x >= close_left && client_point.x <= close_right) ||
+                     (client_point.x >= max_left && client_point.x <= max_right));
+                if (client_point.y >= 0 && client_point.y <= topbar_height && !on_control)
+                {
+                    ReleaseCapture();
+                    SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+                    return 0;
+                }
+            }
             if (window->pointer_move_enabled)
             {
                 SetCapture(hwnd);
@@ -427,10 +462,11 @@ static int32_t reach_window_topmost_surface(reach_surface_role role)
 
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
-    DWORD style = WS_EX_TOOLWINDOW;
+    DWORD style = role == REACH_SURFACE_SETTINGS ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW;
     if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
         role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-        role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS)
+        role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
+        role == REACH_SURFACE_SETTINGS)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
@@ -551,7 +587,8 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     */
     if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
         window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
-        window->role == REACH_SURFACE_CONTEXT_MENU || window->role == REACH_SURFACE_QUICK_SETTINGS)
+        window->role == REACH_SURFACE_CONTEXT_MENU ||
+        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_SETTINGS)
     {
         return REACH_OK;
     }
@@ -589,7 +626,8 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
     }
     if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
         window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
-        window->role == REACH_SURFACE_CONTEXT_MENU || window->role == REACH_SURFACE_QUICK_SETTINGS)
+        window->role == REACH_SURFACE_CONTEXT_MENU ||
+        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_SETTINGS)
     {
         return REACH_OK;
     }
@@ -834,8 +872,9 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     window->role = role;
     window->pointer_move_enabled = 1;
     window->topmost_enabled = reach_window_topmost_surface(role);
+    const wchar_t *title = role == REACH_SURFACE_SETTINGS ? L"Reach Settings" : L"Reach";
     window->hwnd =
-        CreateWindowExW(reach_window_ex_style(role), reach_window_class_name(), L"Reach", WS_POPUP,
+        CreateWindowExW(reach_window_ex_style(role), reach_window_class_name(), title, WS_POPUP,
                         0, 0, 1, 1, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
     if (window->hwnd == nullptr)
     {

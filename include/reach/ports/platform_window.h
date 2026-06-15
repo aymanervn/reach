@@ -19,7 +19,8 @@ extern "C"
         REACH_SURFACE_TRAY_MENU = 2,
         REACH_SURFACE_SWITCHER = 3,
         REACH_SURFACE_CONTEXT_MENU = 4,
-        REACH_SURFACE_QUICK_SETTINGS = 5
+        REACH_SURFACE_QUICK_SETTINGS = 5,
+        REACH_SURFACE_SETTINGS = 6
     } reach_surface_role;
 
     typedef struct reach_platform_window reach_platform_window;
