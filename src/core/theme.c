@@ -27,11 +27,11 @@ const reach_theme *reach_theme_default(void)
         .quick_settings_slider_fill_color = {1.0f, 0.97f, 0.91f, 0.92f},
         .quick_settings_slider_muted_fill_color = {1.0f, 0.97f, 0.91f, 0.38f},
         .quick_settings_button_color = {0.70f, 0.78f, 0.84f, 0.24f},
-        .music_widget_background = {0.18f, 0.22f, 0.26f, 0.72f},
+        .music_widget_background = {0.52f, 0.59f, 0.65f, 0.66f},
         .music_widget_cover_background = {1.0f, 0.97f, 0.91f, 0.18f},
         .music_widget_title = {1.0f, 0.97f, 0.91f, 0.94f},
         .music_widget_control_text = {1.0f, 0.97f, 0.91f, 0.90f},
-        .music_widget_control_background = {0.70f, 0.78f, 0.84f, 0.18f},
+        .music_widget_control_background = {0.70f, 0.78f, 0.84f, 0.0f},
         .light_text = {1.0f, 0.97f, 0.91f, 0.88f},
         .dark_text = {0.08f, 0.11f, 0.14f, 0.88f},
         .dock_corner_radius_ratio = 0.32f,
@@ -53,11 +53,11 @@ const reach_theme *reach_theme_default(void)
         .music_widget_corner_radius_max = 18.0f,
         .music_widget_padding = 6.0f,
         .music_widget_gap = 8.0f,
-        .music_widget_control_gap = 4.0f,
+        .music_widget_control_gap = 14.0f,
         .music_widget_control_width = 24.0f,
-        .music_widget_control_height = 18.0f,
+        .music_widget_control_height = 16.0f,
         .music_widget_title_text_size = 11.0f,
-        .music_widget_control_text_size = 10.0f,
+        .music_widget_control_text_size = 11.0f,
     };
     return &theme;
 }
