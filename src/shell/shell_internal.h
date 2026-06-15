@@ -609,6 +609,8 @@ reach_result reach_shell_execute_window_control(reach_shell *shell,
 reach_result reach_shell_schedule_window_control(reach_shell *shell,
                                                  reach_shell_window_control_action action,
                                                  uintptr_t window_id);
+reach_result reach_shell_minimize_open_windows(reach_shell *shell);
+reach_result reach_shell_schedule_minimize_open_windows(reach_shell *shell);
 reach_result reach_shell_schedule_minimize_windows(reach_shell *shell, const uintptr_t *window_ids,
                                                    size_t window_count);
 void reach_shell_apply_window_control_result(reach_shell *shell);
