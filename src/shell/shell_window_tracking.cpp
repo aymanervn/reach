@@ -619,6 +619,9 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     float clock_width = theme->dock_clock_width * scale;
     float separator_width = theme->dock_system_separator_width * scale;
     float separator_height = layout->bounds.height * theme->dock_system_separator_height_ratio;
+    float music_widget_width =
+        reach_music_widget_desired_width(&shell->music_widget_model, theme, scale);
+    float music_widget_height = reach_theme_music_widget_height(theme, layout->bounds.height);
 
     float dock_width = ceilf(icon_size * (float)(count + 3) + clock_width + separator_width +
                              gap * (float)(count + 5));
@@ -626,6 +629,10 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     if (count == 0)
     {
         dock_width = ceilf(icon_size * 3.0f + clock_width + separator_width + gap * 4.0f);
+    }
+    if (music_widget_width > 0.0f)
+    {
+        dock_width += ceilf(music_widget_width + gap);
     }
 
     float old_width = layout->bounds.width;
@@ -635,8 +642,20 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         layout->bounds.width = dock_width;
     }
 
-    float left = layout->bounds.x + gap;
-    float top = layout->bounds.y + (layout->bounds.height - icon_size) * 0.5f;
+    float left = gap;
+    float top = (layout->bounds.height - icon_size) * 0.5f;
+    layout->music_widget = {};
+    if (music_widget_width > 0.0f)
+    {
+        layout->music_widget.x = left;
+        layout->music_widget.y = (layout->bounds.height - music_widget_height) * 0.5f;
+        layout->music_widget.width = music_widget_width;
+        layout->music_widget.height = music_widget_height;
+        left += music_widget_width + gap;
+    }
+    shell->music_widget_layout = reach_music_widget_compute_layout(
+        &shell->music_widget_model, theme, layout->music_widget, scale);
+
     for (size_t index = 0; index < layout->app_slot_count; ++index)
     {
         layout->app_slots[index].x = left + (icon_size + gap) * (float)index;
@@ -647,7 +666,7 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
 
     layout->power_button.width = icon_size;
     layout->power_button.height = icon_size;
-    layout->power_button.x = layout->bounds.x + dock_width - icon_size - gap;
+    layout->power_button.x = dock_width - icon_size - gap;
     layout->power_button.y = top;
     layout->clock.width = clock_width;
     layout->clock.height = icon_size;
@@ -656,8 +675,7 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     layout->system_separator.width = separator_width;
     layout->system_separator.height = separator_height;
     layout->system_separator.x = layout->clock.x - gap - separator_width;
-    layout->system_separator.y =
-        layout->bounds.y + (layout->bounds.height - separator_height) * 0.5f;
+    layout->system_separator.y = (layout->bounds.height - separator_height) * 0.5f;
     layout->quick_settings_button.width = icon_size;
     layout->quick_settings_button.height = icon_size;
     layout->quick_settings_button.x = layout->system_separator.x - gap - icon_size;

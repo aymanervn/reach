@@ -97,6 +97,8 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend);
 void reach_d2d_clear_icon_cache(reach_render_backend *backend);
 reach_result reach_d2d_draw_icon(reach_render_backend *backend,
                                  const reach_render_command *command);
+reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
+                                          const reach_render_command *command);
 void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t icon_id);
 reach_result reach_d2d_draw_icon_tint(reach_render_backend *backend,
                                       const reach_render_command *command);

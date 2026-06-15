@@ -28,9 +28,16 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
         (float)point.x <= shell->layout.launcher.bounds.x + shell->layout.launcher.bounds.width &&
         (float)point.y >= shell->layout.launcher.bounds.y &&
         (float)point.y <= shell->layout.launcher.bounds.y + shell->layout.launcher.bounds.height;
-    reach_dock_hit_result dock_hit =
-        shell->has_layout ? reach_dock_hit_test(&shell->layout.dock, point.x, point.y)
-                          : reach_dock_hit_result{};
+    reach_point_i32 dock_point =
+        shell->has_layout ? reach_shell_dock_local_point(&shell->layout.dock, point.x, point.y)
+                          : reach_point_i32{};
+    reach_dock_hit_result dock_hit = {};
+    dock_hit.type = REACH_DOCK_HIT_NONE;
+    dock_hit.index = REACH_MAX_PINNED_APPS;
+    if (shell->has_layout)
+    {
+        dock_hit = reach_dock_hit_test(&shell->layout.dock, dock_point.x, dock_point.y);
+    }
     int32_t on_tray_button =
         shell->tray_state.popup_open && dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON;
     int32_t on_quick_settings_button =

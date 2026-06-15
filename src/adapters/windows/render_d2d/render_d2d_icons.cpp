@@ -1,6 +1,7 @@
 #include "render_d2d_internal.h"
 #include "../windows_icon_handle_internal.h"
 
+#include <d2d1effects.h>
 #include <math.h>
 
 static D2D1_RECT_F reach_d2d_snap_bitmap_rect(reach_rect_f32 rect)
@@ -21,6 +22,169 @@ static D2D1_RECT_F reach_d2d_snap_bitmap_rect(reach_rect_f32 rect)
     }
 
     return D2D1::RectF(left, top, left + width, top + height);
+}
+
+static int32_t reach_d2d_center_crop_source_rect(ID2D1Bitmap *bitmap, D2D1_RECT_F dest,
+                                                 D2D1_RECT_F *out_source)
+{
+    if (bitmap == nullptr || out_source == nullptr)
+    {
+        return 0;
+    }
+
+    D2D1_SIZE_F size = bitmap->GetSize();
+    float dest_width = dest.right - dest.left;
+    float dest_height = dest.bottom - dest.top;
+    if (size.width <= 0.0f || size.height <= 0.0f || dest_width <= 0.0f ||
+        dest_height <= 0.0f)
+    {
+        return 0;
+    }
+
+    float source_width = size.width;
+    float source_height = size.height;
+    float source_ratio = source_width / source_height;
+    float dest_ratio = dest_width / dest_height;
+    if (source_ratio > dest_ratio)
+    {
+        source_width = source_height * dest_ratio;
+    }
+    else
+    {
+        source_height = source_width / dest_ratio;
+    }
+
+    out_source->left = (size.width - source_width) * 0.5f;
+    out_source->top = (size.height - source_height) * 0.5f;
+    out_source->right = out_source->left + source_width;
+    out_source->bottom = out_source->top + source_height;
+    return 1;
+}
+
+static int32_t reach_d2d_corner_mask(const reach_render_command *command)
+{
+    if (command == nullptr || command->corner_mask == 0)
+    {
+        return REACH_RENDER_CORNER_ALL;
+    }
+    return command->corner_mask;
+}
+
+static float reach_d2d_clamp_radius(D2D1_RECT_F rect, float radius)
+{
+    float width = rect.right - rect.left;
+    float height = rect.bottom - rect.top;
+    float max_radius = fminf(width, height) * 0.5f;
+    if (radius < 0.0f)
+    {
+        return 0.0f;
+    }
+    return radius > max_radius ? max_radius : radius;
+}
+
+static reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target,
+                                                     D2D1_RECT_F rect, float radius,
+                                                     int32_t corner_mask,
+                                                     ID2D1Geometry **out_geometry)
+{
+    if (target == nullptr || out_geometry == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_geometry = nullptr;
+    radius = reach_d2d_clamp_radius(rect, radius);
+    if (radius <= 0.0f)
+    {
+        return REACH_OK;
+    }
+
+    ID2D1Factory *factory = nullptr;
+    target->GetFactory(&factory);
+    if (factory == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    if (corner_mask == REACH_RENDER_CORNER_ALL)
+    {
+        ID2D1RoundedRectangleGeometry *rounded = nullptr;
+        HRESULT hr = factory->CreateRoundedRectangleGeometry(
+            D2D1::RoundedRect(rect, radius, radius), &rounded);
+        factory->Release();
+        if (SUCCEEDED(hr))
+        {
+            *out_geometry = rounded;
+        }
+        return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    }
+
+    ID2D1PathGeometry *path = nullptr;
+    ID2D1GeometrySink *sink = nullptr;
+    HRESULT hr = factory->CreatePathGeometry(&path);
+    factory->Release();
+    if (SUCCEEDED(hr))
+    {
+        hr = path->Open(&sink);
+    }
+    if (SUCCEEDED(hr))
+    {
+        float rtl = (corner_mask & REACH_RENDER_CORNER_TOP_LEFT) ? radius : 0.0f;
+        float rtr = (corner_mask & REACH_RENDER_CORNER_TOP_RIGHT) ? radius : 0.0f;
+        float rbr = (corner_mask & REACH_RENDER_CORNER_BOTTOM_RIGHT) ? radius : 0.0f;
+        float rbl = (corner_mask & REACH_RENDER_CORNER_BOTTOM_LEFT) ? radius : 0.0f;
+
+        sink->BeginFigure(D2D1::Point2F(rect.left + rtl, rect.top),
+                          D2D1_FIGURE_BEGIN_FILLED);
+        sink->AddLine(D2D1::Point2F(rect.right - rtr, rect.top));
+        if (rtr > 0.0f)
+        {
+            sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.right, rect.top + rtr),
+                                          D2D1::SizeF(rtr, rtr), 0.0f,
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                                          D2D1_ARC_SIZE_SMALL));
+        }
+        sink->AddLine(D2D1::Point2F(rect.right, rect.bottom - rbr));
+        if (rbr > 0.0f)
+        {
+            sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.right - rbr, rect.bottom),
+                                          D2D1::SizeF(rbr, rbr), 0.0f,
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                                          D2D1_ARC_SIZE_SMALL));
+        }
+        sink->AddLine(D2D1::Point2F(rect.left + rbl, rect.bottom));
+        if (rbl > 0.0f)
+        {
+            sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.left, rect.bottom - rbl),
+                                          D2D1::SizeF(rbl, rbl), 0.0f,
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                                          D2D1_ARC_SIZE_SMALL));
+        }
+        sink->AddLine(D2D1::Point2F(rect.left, rect.top + rtl));
+        if (rtl > 0.0f)
+        {
+            sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.left + rtl, rect.top),
+                                          D2D1::SizeF(rtl, rtl), 0.0f,
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                                          D2D1_ARC_SIZE_SMALL));
+        }
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        hr = sink->Close();
+    }
+
+    if (sink != nullptr)
+    {
+        sink->Release();
+    }
+    if (SUCCEEDED(hr))
+    {
+        *out_geometry = path;
+    }
+    else if (path != nullptr)
+    {
+        path->Release();
+    }
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
 void reach_d2d_clear_icon_cache(reach_render_backend *backend)
@@ -352,17 +516,12 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
 
     if (command->radius > 0.0f)
     {
-        ID2D1Factory *factory = nullptr;
-        ID2D1RoundedRectangleGeometry *clip_geometry = nullptr;
+        ID2D1Geometry *clip_geometry = nullptr;
         ID2D1Layer *clip_layer = nullptr;
 
-        target->GetFactory(&factory);
-
-        HRESULT hr =
-            factory != nullptr
-                ? factory->CreateRoundedRectangleGeometry(
-                      D2D1::RoundedRect(rect, command->radius, command->radius), &clip_geometry)
-                : E_FAIL;
+        reach_result geometry_result = reach_d2d_create_corner_geometry(
+            target, rect, command->radius, reach_d2d_corner_mask(command), &clip_geometry);
+        HRESULT hr = geometry_result == REACH_OK ? S_OK : E_FAIL;
 
         if (SUCCEEDED(hr))
         {
@@ -371,13 +530,20 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
 
         if (SUCCEEDED(hr))
         {
+            D2D1_RECT_F source_rect = {};
+            D2D1_RECT_F *source = nullptr;
+            if (command->icon_crop_to_fill &&
+                reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
+            {
+                source = &source_rect;
+            }
             D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
                 rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(),
                 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
 
             target->PushLayer(layer, clip_layer);
             target->DrawBitmap(bitmap, rect, command->color.a,
-                               D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+                               D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
             target->PopLayer();
         }
 
@@ -389,15 +555,207 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
         {
             clip_geometry->Release();
         }
-        if (factory != nullptr)
-        {
-            factory->Release();
-        }
 
         return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
     }
 
-    target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    D2D1_RECT_F source_rect = {};
+    D2D1_RECT_F *source = nullptr;
+    if (command->icon_crop_to_fill &&
+        reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
+    {
+        source = &source_rect;
+    }
+
+    target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                       source);
+
+    return REACH_OK;
+}
+
+reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
+                                          const reach_render_command *command)
+{
+    REACH_ASSERT(backend != nullptr);
+    REACH_ASSERT(command != nullptr);
+
+    if (backend == nullptr || command == nullptr || command->icon_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    ID2D1Bitmap *bitmap = nullptr;
+    reach_result result = reach_d2d_get_icon_bitmap(backend, command->icon_id, &bitmap);
+    if (result != REACH_OK || bitmap == nullptr)
+    {
+        return result == REACH_OK ? REACH_ERROR : result;
+    }
+
+    ID2D1RenderTarget *target = reach_d2d_target(backend);
+    if (target == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    D2D1_RECT_F rect = reach_d2d_snap_bitmap_rect(command->rect);
+    D2D1_RECT_F source_rect = {};
+    D2D1_RECT_F *source = nullptr;
+    if (command->icon_crop_to_fill &&
+        reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
+    {
+        source = &source_rect;
+    }
+
+    if (backend->d2d_context == nullptr || command->blur_radius <= 0.0f)
+    {
+        if (command->radius > 0.0f)
+        {
+            ID2D1Geometry *clip_geometry = nullptr;
+            ID2D1Layer *clip_layer = nullptr;
+            HRESULT hr = reach_d2d_create_corner_geometry(
+                             target, rect, command->radius, reach_d2d_corner_mask(command),
+                             &clip_geometry) == REACH_OK
+                             ? S_OK
+                             : E_FAIL;
+            if (SUCCEEDED(hr))
+            {
+                hr = target->CreateLayer(nullptr, &clip_layer);
+            }
+            if (SUCCEEDED(hr))
+            {
+                D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
+                    rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                    D2D1::IdentityMatrix(), 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+                target->PushLayer(layer, clip_layer);
+                target->DrawBitmap(bitmap, rect, command->color.a,
+                                   D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
+                target->PopLayer();
+            }
+            if (clip_layer != nullptr)
+            {
+                clip_layer->Release();
+            }
+            if (clip_geometry != nullptr)
+            {
+                clip_geometry->Release();
+            }
+            return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+        }
+        target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                           source);
+        return REACH_OK;
+    }
+
+    ID2D1DeviceContext *context = backend->d2d_context;
+    ID2D1Effect *transform = nullptr;
+    ID2D1Effect *blur = nullptr;
+
+    D2D1_RECT_F mapped_source = source != nullptr ? *source : D2D1::RectF(
+        0.0f, 0.0f, bitmap->GetSize().width, bitmap->GetSize().height);
+    float source_width = mapped_source.right - mapped_source.left;
+    float source_height = mapped_source.bottom - mapped_source.top;
+    float dest_width = rect.right - rect.left;
+    float dest_height = rect.bottom - rect.top;
+    if (source_width <= 0.0f || source_height <= 0.0f || dest_width <= 0.0f ||
+        dest_height <= 0.0f)
+    {
+        return REACH_ERROR;
+    }
+
+    HRESULT hr = context->CreateEffect(CLSID_D2D12DAffineTransform, &transform);
+    if (SUCCEEDED(hr))
+    {
+        D2D1_MATRIX_3X2_F matrix =
+            D2D1::Matrix3x2F::Translation(-mapped_source.left, -mapped_source.top) *
+            D2D1::Matrix3x2F::Scale(dest_width / source_width, dest_height / source_height) *
+            D2D1::Matrix3x2F::Translation(rect.left, rect.top);
+        transform->SetInput(0, bitmap);
+        hr = transform->SetValue(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, matrix);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = context->CreateEffect(CLSID_D2D1GaussianBlur, &blur);
+    }
+    if (SUCCEEDED(hr))
+    {
+        blur->SetInputEffect(0, transform);
+        hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
+                            command->blur_radius);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
+                            D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED);
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        ID2D1Geometry *clip_geometry = nullptr;
+        ID2D1Layer *clip_layer = nullptr;
+        HRESULT clip_hr = S_OK;
+        if (command->radius > 0.0f)
+        {
+            clip_hr = reach_d2d_create_corner_geometry(
+                          target, rect, command->radius, reach_d2d_corner_mask(command),
+                          &clip_geometry) == REACH_OK
+                          ? S_OK
+                          : E_FAIL;
+            if (SUCCEEDED(clip_hr))
+            {
+                clip_hr = target->CreateLayer(nullptr, &clip_layer);
+            }
+        }
+
+        ID2D1Image *blur_output = nullptr;
+        blur->GetOutput(&blur_output);
+        if (command->radius > 0.0f && SUCCEEDED(clip_hr))
+        {
+            D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
+                rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(),
+                1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+            target->PushLayer(layer, clip_layer);
+        }
+        else
+        {
+            context->PushAxisAlignedClip(rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        }
+        context->DrawImage(blur_output, nullptr, nullptr, D2D1_INTERPOLATION_MODE_LINEAR,
+                           D2D1_COMPOSITE_MODE_SOURCE_OVER);
+        if (command->radius > 0.0f && SUCCEEDED(clip_hr))
+        {
+            target->PopLayer();
+        }
+        else
+        {
+            context->PopAxisAlignedClip();
+        }
+        if (blur_output != nullptr)
+        {
+            blur_output->Release();
+        }
+        if (clip_layer != nullptr)
+        {
+            clip_layer->Release();
+        }
+        if (clip_geometry != nullptr)
+        {
+            clip_geometry->Release();
+        }
+    }
+    else
+    {
+        target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                           source);
+    }
+
+    if (blur != nullptr)
+    {
+        blur->Release();
+    }
+    if (transform != nullptr)
+    {
+        transform->Release();
+    }
 
     return REACH_OK;
 }

@@ -73,7 +73,8 @@ static reach_rect_f32 reach_shell_quick_settings_target_bounds(reach_shell *shel
 
     float scale = reach_shell_layout_dpi_scale(shell);
     const float gap = 8.0f * scale;
-    reach_rect_f32 button = shell->layout.dock.quick_settings_button;
+    reach_rect_f32 button = reach_shell_dock_rect_to_screen(
+        &shell->layout.dock, shell->layout.dock.quick_settings_button);
     float anchor_x = button.x + button.width * 0.5f;
 
     bounds.width = width;
@@ -127,7 +128,8 @@ void reach_shell_refresh_quick_settings_layout(reach_shell *shell)
         return;
     }
 
-    reach_rect_f32 button = shell->layout.dock.quick_settings_button;
+    reach_rect_f32 button = reach_shell_dock_rect_to_screen(
+        &shell->layout.dock, shell->layout.dock.quick_settings_button);
     float anchor_x = button.x + button.width * 0.5f;
 
     shell->quick_settings_target_bounds = reach_shell_quick_settings_target_bounds(shell);
@@ -158,8 +160,9 @@ void reach_shell_update_quick_settings_animation(reach_shell *shell, double delt
     {
         float scale = reach_shell_layout_dpi_scale(shell);
         const float gap = 8.0f * scale;
-        float anchor_x = shell->layout.dock.quick_settings_button.x +
-                         shell->layout.dock.quick_settings_button.width * 0.5f;
+        reach_rect_f32 button = reach_shell_dock_rect_to_screen(
+            &shell->layout.dock, shell->layout.dock.quick_settings_button);
+        float anchor_x = button.x + button.width * 0.5f;
 
         reach_rect_f32 animated = reach_shell_apply_popup_bounds_animation(
             &shell->quick_settings_bounds_animation, shell->quick_settings_target_bounds, anchor_x,

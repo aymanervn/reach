@@ -15,6 +15,22 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
     for (size_t index = 0; index < commands->count; ++index)
     {
         const reach_render_command *command = &commands->commands[index];
+        if (command->type == REACH_RENDER_COMMAND_BLURRED_IMAGE)
+        {
+            if (command->icon_id == 0)
+            {
+                continue;
+            }
+
+            reach_result result = reach_d2d_draw_blurred_image(backend, command);
+            if (result != REACH_OK)
+            {
+                continue;
+            }
+
+            continue;
+        }
+
         if (command->type == REACH_RENDER_COMMAND_ICON)
         {
             if (command->icon_id == 0)

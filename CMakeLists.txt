@@ -67,6 +67,7 @@ add_library(reach_features STATIC
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
+    src/features/music_widget/music_widget_feature.cpp
     src/features/popup/popup_render.cpp
     src/features/quick_settings/quick_settings_feature.cpp
     src/features/quick_settings/quick_settings_interaction.cpp
@@ -109,6 +110,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/icon_shell.cpp
     src/adapters/windows/windows_icon_handle.cpp
     src/adapters/windows/input_win32.cpp
+    src/adapters/windows/media_controls_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
@@ -144,6 +146,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     dcomp
     d3d11
     dxgi
+    dxguid
     user32
     shell32
     comctl32
@@ -229,6 +232,7 @@ target_link_libraries(reach PRIVATE
     dcomp
     d3d11
     dxgi
+    dxguid
     user32
     shell32
     comctl32

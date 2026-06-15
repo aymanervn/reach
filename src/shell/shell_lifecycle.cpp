@@ -25,6 +25,18 @@ static void reach_shell_on_dock_reveal_edge(void *user)
     reach_shell_request_update(shell);
 }
 
+static void reach_shell_on_media_controls_changed(void *user)
+{
+    reach_shell *shell = static_cast<reach_shell *>(user);
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    shell->music_widget_refresh_requested = 1;
+    reach_shell_request_update(shell);
+}
+
 static void reach_shell_cleanup(reach_shell *shell)
 {
     if (shell == nullptr)
@@ -43,6 +55,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
     }
+    if (shell->media_controls.stop_watching != nullptr)
+    {
+        shell->media_controls.stop_watching(shell->media_controls.userdata);
+    }
     reach_shell_close_context_menu(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     reach_shell_release_dock_icons(shell);
@@ -51,6 +67,11 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_stop_quick_settings_audio_refresh(shell);
     reach_shell_stop_quick_settings_system_refresh(shell);
     reach_shell_release_quick_settings_audio_render_icons(shell);
+    if (shell->music_widget_model.cover_icon_id != 0)
+    {
+        reach_shell_release_render_icon(shell, shell->music_widget_model.cover_icon_id);
+        shell->music_widget_model.cover_icon_id = 0;
+    }
     if (shell->monitors.ops.destroy != nullptr)
     {
         shell->monitors.ops.destroy(shell->monitors.list);
@@ -167,6 +188,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->system_controls.destroy(shell->system_controls.userdata);
     }
+    if (shell->media_controls.destroy != nullptr)
+    {
+        shell->media_controls.destroy(shell->media_controls.userdata);
+    }
 
     shell->monitors = {};
     shell->popup_capture = {};
@@ -194,12 +219,15 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->power_session = {};
     shell->audio_volume = {};
     shell->system_controls = {};
+    shell->media_controls = {};
+    shell->music_widget_refresh_requested = 0;
     shell->quick_settings_system_change_flags.store(0);
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
     reach_dock_icon_cache_init(&shell->dock_icons);
     reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
+    reach_music_widget_model_init(&shell->music_widget_model);
 }
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
@@ -225,6 +253,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     reach_dock_icon_cache_init(&shell->dock_icons);
     reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
+    reach_music_widget_model_init(&shell->music_widget_model);
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
     reach_surface_runtime_init(&shell->tray);
@@ -269,6 +298,9 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->quick_settings_bounds_animation = {};
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
+    shell->music_widget_layout = {};
+    shell->pressed_music_widget_action = REACH_MUSIC_WIDGET_ACTION_NONE;
+    shell->music_widget_refresh_requested = 1;
     shell->launcher_search.notify = reach_shell_notify_launcher_search_ready;
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
@@ -303,6 +335,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->power_session = dependencies->power_session;
     shell->audio_volume = dependencies->audio_volume;
     shell->system_controls = dependencies->system_controls;
+    shell->media_controls = dependencies->media_controls;
     shell->theme = reach_theme_default();
 
     if (shell->monitors.list == nullptr)
@@ -345,6 +378,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->dirty.layout = 1;
     shell->dirty.render = 1;
     shell->dirty.monitors = 1;
+    shell->music_widget_refresh_requested = 1;
     shell->dock.dirty_flags = 1;
     shell->launcher.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
@@ -501,6 +535,11 @@ reach_result reach_shell_start(reach_shell *shell)
         (void)shell->system_controls.start_watching(shell->system_controls.userdata,
                                                     reach_shell_on_system_controls_changed, shell);
     }
+    if (shell->media_controls.start_watching != nullptr)
+    {
+        (void)shell->media_controls.start_watching(shell->media_controls.userdata,
+                                                   reach_shell_on_media_controls_changed, shell);
+    }
 
     if (shell->dock.window.ops.show != nullptr)
     {
@@ -557,6 +596,10 @@ reach_result reach_shell_stop(reach_shell *shell)
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
+    }
+    if (shell->media_controls.stop_watching != nullptr)
+    {
+        shell->media_controls.stop_watching(shell->media_controls.userdata);
     }
     if (shell->window_manager.ops.stop != nullptr)
     {

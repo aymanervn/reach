@@ -18,6 +18,7 @@ extern "C"
     typedef struct reach_dock_layout
     {
         reach_rect_f32 bounds;
+        reach_rect_f32 music_widget;
         reach_rect_f32 app_slots[REACH_MAX_PINNED_APPS];
         reach_rect_f32 tray_button;
         reach_rect_f32 quick_settings_button;
