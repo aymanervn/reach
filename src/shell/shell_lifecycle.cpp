@@ -34,6 +34,7 @@ static void reach_shell_on_media_controls_changed(void *user)
     }
 
     shell->music_widget_refresh_requested = 1;
+    reach_shell_request_update(shell);
 }
 
 static void reach_shell_cleanup(reach_shell *shell)

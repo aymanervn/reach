@@ -642,14 +642,13 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         layout->bounds.width = dock_width;
     }
 
-    float left = layout->bounds.x + gap;
-    float top = layout->bounds.y + (layout->bounds.height - icon_size) * 0.5f;
+    float left = gap;
+    float top = (layout->bounds.height - icon_size) * 0.5f;
     layout->music_widget = {};
     if (music_widget_width > 0.0f)
     {
         layout->music_widget.x = left;
-        layout->music_widget.y =
-            layout->bounds.y + (layout->bounds.height - music_widget_height) * 0.5f;
+        layout->music_widget.y = (layout->bounds.height - music_widget_height) * 0.5f;
         layout->music_widget.width = music_widget_width;
         layout->music_widget.height = music_widget_height;
         left += music_widget_width + gap;
@@ -667,7 +666,7 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
 
     layout->power_button.width = icon_size;
     layout->power_button.height = icon_size;
-    layout->power_button.x = layout->bounds.x + dock_width - icon_size - gap;
+    layout->power_button.x = dock_width - icon_size - gap;
     layout->power_button.y = top;
     layout->clock.width = clock_width;
     layout->clock.height = icon_size;
@@ -676,8 +675,7 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     layout->system_separator.width = separator_width;
     layout->system_separator.height = separator_height;
     layout->system_separator.x = layout->clock.x - gap - separator_width;
-    layout->system_separator.y =
-        layout->bounds.y + (layout->bounds.height - separator_height) * 0.5f;
+    layout->system_separator.y = (layout->bounds.height - separator_height) * 0.5f;
     layout->quick_settings_button.width = icon_size;
     layout->quick_settings_button.height = icon_size;
     layout->quick_settings_button.x = layout->system_separator.x - gap - icon_size;

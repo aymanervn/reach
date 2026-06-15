@@ -236,6 +236,75 @@ static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b)
     return 1;
 }
 
+static const double REACH_MUSIC_WIDGET_HIDE_GRACE_SECONDS = 4.0;
+static const double REACH_MUSIC_WIDGET_PENDING_COVER_SECONDS = 1.0;
+
+static void reach_shell_clear_music_widget_pending_cover(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+    if (shell->music_widget_pending_cover_icon_id != 0 &&
+        shell->music_widget_pending_cover_icon_id != shell->music_widget_model.cover_icon_id)
+    {
+        reach_shell_release_render_icon(shell, shell->music_widget_pending_cover_icon_id);
+    }
+    shell->music_widget_pending_cover_seconds = 0.0;
+    shell->music_widget_pending_cover_icon_id = 0;
+    shell->music_widget_pending_cover_title[0] = 0;
+}
+
+static void reach_shell_apply_music_widget_cover(reach_shell *shell, uint64_t cover_icon_id)
+{
+    if (shell == nullptr || shell->music_widget_model.cover_icon_id == cover_icon_id)
+    {
+        return;
+    }
+    if (shell->music_widget_model.cover_icon_id != 0)
+    {
+        reach_shell_release_render_icon(shell, shell->music_widget_model.cover_icon_id);
+    }
+    shell->music_widget_model.cover_icon_id = cover_icon_id;
+}
+
+static uint64_t reach_shell_music_widget_effective_cover(reach_shell *shell,
+                                                         const reach_media_controls_state *state,
+                                                         int32_t title_changed)
+{
+    if (shell == nullptr || state == nullptr || !state->has_media)
+    {
+        return 0;
+    }
+
+    if (title_changed)
+    {
+        reach_shell_clear_music_widget_pending_cover(shell);
+        if (state->cover_icon_id != 0)
+        {
+            shell->music_widget_pending_cover_seconds =
+                REACH_MUSIC_WIDGET_PENDING_COVER_SECONDS;
+            shell->music_widget_pending_cover_icon_id = state->cover_icon_id;
+            reach_copy_utf16(shell->music_widget_pending_cover_title, 260, state->title);
+        }
+        return shell->music_widget_model.cover_icon_id;
+    }
+
+    if (shell->music_widget_pending_cover_seconds > 0.0 &&
+        reach_shell_utf16_equal(shell->music_widget_pending_cover_title, state->title))
+    {
+        if (state->cover_icon_id != 0 &&
+            state->cover_icon_id != shell->music_widget_pending_cover_icon_id)
+        {
+            reach_shell_clear_music_widget_pending_cover(shell);
+            return state->cover_icon_id;
+        }
+        return shell->music_widget_model.cover_icon_id;
+    }
+
+    return state->cover_icon_id;
+}
+
 void reach_shell_refresh_music_widget(reach_shell *shell)
 {
     if (shell == nullptr || shell->media_controls.get_state == nullptr)
@@ -249,32 +318,44 @@ void reach_shell_refresh_music_widget(reach_shell *shell)
         return;
     }
 
-    int32_t changed = shell->music_widget_model.visible != state.has_media ||
-                      !reach_shell_utf16_equal(shell->music_widget_model.title, state.title) ||
-                      shell->music_widget_model.cover_icon_id != state.cover_icon_id ||
+    if (!state.has_media && shell->music_widget_model.visible &&
+        shell->music_widget_hide_grace_seconds > 0.0)
+    {
+        return;
+    }
+
+    int32_t title_changed = !reach_shell_utf16_equal(shell->music_widget_model.title, state.title);
+    uint64_t next_cover_icon_id =
+        reach_shell_music_widget_effective_cover(shell, &state, title_changed);
+
+    int32_t visibility_changed = shell->music_widget_model.visible != state.has_media;
+    int32_t changed = visibility_changed ||
+                      title_changed ||
+                      shell->music_widget_model.cover_icon_id != next_cover_icon_id ||
                       shell->music_widget_model.playback != state.playback;
     if (!changed)
     {
         return;
     }
 
-    if (shell->music_widget_model.cover_icon_id != 0 &&
-        shell->music_widget_model.cover_icon_id != state.cover_icon_id)
-    {
-        reach_shell_release_render_icon(shell, shell->music_widget_model.cover_icon_id);
-    }
-
     if (state.has_media)
     {
         shell->music_widget_model.visible = 1;
         reach_copy_utf16(shell->music_widget_model.title, 260, state.title);
-        shell->music_widget_model.cover_icon_id = state.cover_icon_id;
+        reach_shell_apply_music_widget_cover(shell, next_cover_icon_id);
         shell->music_widget_model.playback = state.playback;
     }
     else
     {
+        reach_shell_clear_music_widget_pending_cover(shell);
         reach_music_widget_model_init(&shell->music_widget_model);
     }
+    if (visibility_changed)
+    {
+        reach_shell_clear_dock_item_x_animations(shell);
+        shell->dock_items_changed = 1;
+    }
+    shell->dirty.layout = 1;
     shell->dock.dirty_flags = 1;
 }
 
@@ -286,6 +367,52 @@ static void reach_shell_process_music_widget_refresh(reach_shell *shell)
     }
 
     reach_shell_refresh_music_widget(shell);
+}
+
+void reach_shell_start_music_widget_hide_grace(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+    shell->music_widget_hide_grace_seconds = REACH_MUSIC_WIDGET_HIDE_GRACE_SECONDS;
+    shell->music_widget_refresh_requested = 1;
+    reach_shell_request_update(shell);
+}
+
+static void reach_shell_update_music_widget_hide_grace(reach_shell *shell, double delta_seconds)
+{
+    if (shell == nullptr || shell->music_widget_hide_grace_seconds <= 0.0)
+    {
+        return;
+    }
+
+    shell->music_widget_hide_grace_seconds -= delta_seconds;
+    if (shell->music_widget_hide_grace_seconds <= 0.0)
+    {
+        shell->music_widget_hide_grace_seconds = 0.0;
+        shell->music_widget_refresh_requested = 1;
+    }
+    reach_shell_request_update(shell);
+}
+
+static void reach_shell_update_music_widget_pending_cover(reach_shell *shell, double delta_seconds)
+{
+    if (shell == nullptr || shell->music_widget_pending_cover_seconds <= 0.0)
+    {
+        return;
+    }
+
+    shell->music_widget_pending_cover_seconds -= delta_seconds;
+    if (shell->music_widget_pending_cover_seconds <= 0.0)
+    {
+        shell->music_widget_pending_cover_seconds = 0.0;
+        reach_shell_apply_music_widget_cover(shell, shell->music_widget_pending_cover_icon_id);
+        shell->music_widget_pending_cover_icon_id = 0;
+        shell->music_widget_pending_cover_title[0] = 0;
+        shell->dock.dirty_flags = 1;
+    }
+    reach_shell_request_update(shell);
 }
 
 void reach_shell_request_update(reach_shell *shell)
@@ -383,6 +510,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     reach_shell_apply_quick_settings_audio_refresh_result(shell);
     reach_shell_apply_open_window_icon_results(shell);
     reach_shell_apply_launcher_result_icon_results(shell);
+    reach_shell_update_music_widget_hide_grace(shell, delta_seconds);
+    reach_shell_update_music_widget_pending_cover(shell, delta_seconds);
     reach_shell_process_music_widget_refresh(shell);
 
     reach_shell_update_clock_text(shell);
@@ -559,17 +688,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     shell->dock_reveal.edge_visible = 0;
                 }
 
-                float dock_y_offset = animated_dock_bounds.y - shown_dock_bounds.y;
                 layout.dock.bounds = animated_dock_bounds;
-                for (size_t index = 0; index < layout.dock.app_slot_count; ++index)
-                {
-                    layout.dock.app_slots[index].y += dock_y_offset;
-                }
-                layout.dock.tray_button.y += dock_y_offset;
-                layout.dock.quick_settings_button.y += dock_y_offset;
-                layout.dock.system_separator.y += dock_y_offset;
-                layout.dock.clock.y += dock_y_offset;
-                layout.dock.power_button.y += dock_y_offset;
 
                 float dock_left_offset = bounds.x - layout.dock.bounds.x;
                 float dock_right_offset =
@@ -587,20 +706,11 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 if (dock_x_offset != 0.0f)
                 {
                     layout.dock.bounds.x += dock_x_offset;
-                    layout.dock.music_widget.x += dock_x_offset;
-                    for (size_t index = 0; index < layout.dock.app_slot_count; ++index)
-                    {
-                        layout.dock.app_slots[index].x += dock_x_offset;
-                    }
-                    layout.dock.tray_button.x += dock_x_offset;
-                    layout.dock.quick_settings_button.x += dock_x_offset;
-                    layout.dock.system_separator.x += dock_x_offset;
-                    layout.dock.clock.x += dock_x_offset;
-                    layout.dock.power_button.x += dock_x_offset;
-                    shell->music_widget_layout = reach_music_widget_compute_layout(
-                        &shell->music_widget_model, shell->theme, layout.dock.music_widget,
-                        reach_shell_layout_dpi_scale(shell));
                 }
+
+                shell->music_widget_layout = reach_music_widget_compute_layout(
+                    &shell->music_widget_model, shell->theme, layout.dock.music_widget,
+                    reach_shell_layout_dpi_scale(shell));
 
                 int32_t dock_layout_changed =
                     !shell->has_layout ||
@@ -682,7 +792,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 if (shell->tray.window.ops.set_bounds != nullptr)
                 {
                     reach_rect_f32 tray_bounds = {};
-                    reach_shell_compute_tray_popup_layout(shell, &layout.dock, &tray_bounds,
+                    reach_dock_layout screen_dock = reach_shell_dock_layout_to_screen(layout.dock);
+                    reach_shell_compute_tray_popup_layout(shell, &screen_dock, &tray_bounds,
                                                           shell->tray_state.model.item_slots);
                     int32_t tray_window_changed = 0;
                     result = reach_shell_apply_window_state(
@@ -918,6 +1029,8 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             reach_shell_quick_settings_system_refresh_work_pending(shell) ||
             shell->quick_settings_bluetooth_pending.active ||
             shell->music_widget_refresh_requested.load() ||
+            shell->music_widget_hide_grace_seconds > 0.0 ||
+            shell->music_widget_pending_cover_seconds > 0.0 ||
             reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
             shell->dock_animation.animating || shell->dock_width.animating ||
             reach_shell_switcher_width_animation_active(shell) || shell->dock_drag.active ||

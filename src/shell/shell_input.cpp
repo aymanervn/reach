@@ -59,6 +59,41 @@ static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
            (float)y <= rect.y + rect.height;
 }
 
+static reach_point_i32 reach_shell_event_dock_point(const reach_shell *shell,
+                                                    const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr)
+    {
+        return {};
+    }
+    return reach_shell_dock_local_point(&shell->layout.dock, event->x, event->y);
+}
+
+static reach_dock_hit_result reach_shell_dock_hit_test_event(const reach_shell *shell,
+                                                             const reach_ui_event *event)
+{
+    reach_dock_hit_result result = {};
+    result.type = REACH_DOCK_HIT_NONE;
+    result.index = REACH_MAX_PINNED_APPS;
+    if (shell == nullptr || event == nullptr)
+    {
+        return result;
+    }
+    reach_point_i32 point = reach_shell_event_dock_point(shell, event);
+    return reach_dock_hit_test(&shell->layout.dock, point.x, point.y);
+}
+
+static reach_music_widget_action_type
+reach_shell_music_widget_hit_test_event(const reach_shell *shell, const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr)
+    {
+        return REACH_MUSIC_WIDGET_ACTION_NONE;
+    }
+    reach_point_i32 point = reach_shell_event_dock_point(shell, event);
+    return reach_music_widget_hit_test(&shell->music_widget_layout, point.x, point.y);
+}
+
 static float reach_shell_clamp01(float value)
 {
     if (value < 0.0f)
@@ -79,11 +114,18 @@ typedef enum reach_shell_media_action
     REACH_SHELL_MEDIA_ACTION_NEXT = 3
 } reach_shell_media_action;
 
-static reach_result reach_shell_execute_media_action(reach_shell *shell, reach_shell_media_action action)
+static reach_result reach_shell_execute_media_action(reach_shell *shell,
+                                                    reach_shell_media_action action)
 {
     if (shell == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if ((action == REACH_SHELL_MEDIA_ACTION_PREVIOUS || action == REACH_SHELL_MEDIA_ACTION_NEXT) &&
+        shell->music_widget_model.visible)
+    {
+        reach_shell_start_music_widget_hide_grace(shell);
     }
 
     reach_result result = REACH_OK;
@@ -247,10 +289,10 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         }
     }
 
-    reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+    reach_dock_hit_result dock_hit = reach_shell_dock_hit_test_event(shell, event);
 
     reach_music_widget_action_type music_action =
-        reach_music_widget_hit_test(&shell->music_widget_layout, event->x, event->y);
+        reach_shell_music_widget_hit_test_event(shell, event);
     if (music_action != REACH_MUSIC_WIDGET_ACTION_NONE)
     {
         reach_music_widget_action_type pressed_action = shell->pressed_music_widget_action;
@@ -351,8 +393,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
 
     if (shell->quick_settings_open)
     {
-        reach_dock_hit_result dock_hit =
-            reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+        reach_dock_hit_result dock_hit = reach_shell_dock_hit_test_event(shell, event);
 
         if (dock_hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON)
         {
@@ -371,8 +412,7 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
 
     if (shell->context_menu_state.open)
     {
-        reach_dock_hit_result dock_hit =
-            reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+        reach_dock_hit_result dock_hit = reach_shell_dock_hit_test_event(shell, event);
 
         if (shell->context_menu_state.power_open && dock_hit.type == REACH_DOCK_HIT_POWER_BUTTON)
         {
@@ -389,10 +429,10 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
         return REACH_OK;
     }
 
-    reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+    reach_dock_hit_result dock_hit = reach_shell_dock_hit_test_event(shell, event);
 
     reach_music_widget_action_type music_action =
-        reach_music_widget_hit_test(&shell->music_widget_layout, event->x, event->y);
+        reach_shell_music_widget_hit_test_event(shell, event);
     if (music_action != REACH_MUSIC_WIDGET_ACTION_NONE)
     {
         shell->pressed_music_widget_action = music_action;
@@ -538,7 +578,7 @@ static reach_result reach_shell_handle_pointer_middle(reach_shell *shell,
     reach_shell_release_dock_item(shell);
     reach_shell_release_tray_item(shell);
 
-    reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+    reach_dock_hit_result dock_hit = reach_shell_dock_hit_test_event(shell, event);
 
     if (dock_hit.type == REACH_DOCK_HIT_ITEM)
     {
@@ -620,7 +660,7 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell,
         }
     }
 
-    reach_dock_hit_result dock_hit = reach_dock_hit_test(&shell->layout.dock, event->x, event->y);
+    reach_dock_hit_result dock_hit = reach_shell_dock_hit_test_event(shell, event);
 
     if (dock_hit.type == REACH_DOCK_HIT_ITEM)
     {

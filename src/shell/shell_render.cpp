@@ -1,27 +1,5 @@
 #include "shell_internal.h"
 
-static reach_rect_f32 reach_shell_rect_to_dock_local(reach_rect_f32 rect,
-                                                     reach_rect_f32 dock_bounds)
-{
-    rect.x -= dock_bounds.x;
-    rect.y -= dock_bounds.y;
-    return rect;
-}
-
-static reach_music_widget_layout
-reach_shell_music_widget_layout_to_dock_local(reach_music_widget_layout layout,
-                                              reach_rect_f32 dock_bounds)
-{
-    layout.bounds = reach_shell_rect_to_dock_local(layout.bounds, dock_bounds);
-    layout.cover = reach_shell_rect_to_dock_local(layout.cover, dock_bounds);
-    layout.title = reach_shell_rect_to_dock_local(layout.title, dock_bounds);
-    layout.previous_button = reach_shell_rect_to_dock_local(layout.previous_button, dock_bounds);
-    layout.play_pause_button =
-        reach_shell_rect_to_dock_local(layout.play_pause_button, dock_bounds);
-    layout.next_button = reach_shell_rect_to_dock_local(layout.next_button, dock_bounds);
-    return layout;
-}
-
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout)
 {
     REACH_ASSERT(shell != nullptr);
@@ -75,12 +53,10 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
         return result;
     }
 
-    reach_music_widget_layout music_layout =
-        reach_shell_music_widget_layout_to_dock_local(shell->music_widget_layout, layout->bounds);
     reach_music_widget_render_input music_input = {};
     music_input.theme = input.theme;
     music_input.model = &shell->music_widget_model;
-    music_input.layout = &music_layout;
+    music_input.layout = &shell->music_widget_layout;
     music_input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     music_input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
     result = reach_music_widget_build_render_commands(&music_input, &commands);
@@ -373,11 +349,11 @@ reach_result reach_shell_render_context_menu_surface(reach_shell *shell)
     input.item_count = shell->context_menu_state.item_count;
     input.hovered_index = shell->context_menu_state.hovered_index;
     input.target_index = shell->context_menu_state.target_index;
-    input.dock_layout = &shell->layout.dock;
+    reach_dock_layout screen_dock = reach_shell_dock_layout_to_screen(shell->layout.dock);
+    input.dock_layout = &screen_dock;
     input.has_layout = shell->has_layout;
     input.use_anchor_x = shell->context_menu_state.power_open && shell->has_layout;
-    input.anchor_x =
-        shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
+    input.anchor_x = screen_dock.power_button.x + screen_dock.power_button.width * 0.5f;
     input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 

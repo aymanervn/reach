@@ -93,11 +93,11 @@ float reach_dock_slot_box_x(const reach_theme *theme, const reach_dock_layout *l
     }
 
     float icon_box_size = reach_theme_icon_box_size(theme, layout->bounds.height);
-    return reach_dock_icon_box_for_slot(layout->app_slots[index], layout->bounds, icon_box_size).x;
+    return reach_dock_icon_box_for_slot(layout->app_slots[index], icon_box_size).x;
 }
 
 float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layout *layout,
-                                int32_t cursor_x, float grab_offset_x)
+                                int32_t local_cursor_x, float grab_offset_x)
 {
     if (theme == nullptr || layout == nullptr || layout->app_slot_count == 0)
     {
@@ -106,8 +106,7 @@ float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layou
 
     float min_x = reach_dock_slot_box_x(theme, layout, 0);
     float max_x = reach_dock_slot_box_x(theme, layout, layout->app_slot_count - 1);
-    float wanted_screen_x = (float)cursor_x - grab_offset_x;
-    float wanted_local_x = wanted_screen_x - layout->bounds.x;
+    float wanted_local_x = (float)local_cursor_x - grab_offset_x;
 
     if (wanted_local_x < min_x)
     {

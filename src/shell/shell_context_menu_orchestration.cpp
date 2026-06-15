@@ -189,8 +189,8 @@ reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     float popup_body_height =
         padding * 2.0f + item_height * (float)shell->context_menu_state.item_count;
     float popup_height = popup_body_height + notch_height;
-    float anchor_x =
-        shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
+    float anchor_x = shell->layout.dock.bounds.x + shell->layout.dock.power_button.x +
+                     shell->layout.dock.power_button.width * 0.5f;
     float popup_x = anchor_x - popup_width * 0.72f;
     float popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f * scale;
 
@@ -280,7 +280,9 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     float popup_y = (float)y - popup_height;
     if (shell->has_layout && item_index < shell->layout.dock.app_slot_count)
     {
-        reach_rect_f32 slot = shell->layout.dock.app_slots[item_index];
+        reach_rect_f32 slot =
+            reach_shell_dock_rect_to_screen(&shell->layout.dock,
+                                            shell->layout.dock.app_slots[item_index]);
         popup_x = slot.x + slot.width * 0.5f - popup_width * anchor_ratio;
         popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f * scale;
         reach_rect_f32 monitor = {};

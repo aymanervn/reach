@@ -10,13 +10,6 @@ static reach_color reach_dock_black(float alpha)
     return color;
 }
 
-static reach_rect_f32 reach_dock_local_rect(reach_rect_f32 rect, reach_rect_f32 bounds)
-{
-    rect.x -= bounds.x;
-    rect.y -= bounds.y;
-    return rect;
-}
-
 static reach_rect_f32 reach_dock_center_square(reach_rect_f32 outer, float size)
 {
     return reach_dock_rect(outer.x + (outer.width - size) * 0.5f,
@@ -170,7 +163,7 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     reach_icon_handle icon =
         reach_dock_icon_for_item(input->icons, input->model, index, &fallback_initial);
     reach_rect_f32 icon_box =
-        reach_dock_icon_box_for_slot(layout->app_slots[index], layout->bounds, icon_box_size);
+        reach_dock_icon_box_for_slot(layout->app_slots[index], icon_box_size);
     if (use_override)
     {
         icon_box.x = override_box_x;
@@ -243,9 +236,9 @@ static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
     float system_icon_size = icon_box_size * reach_dock_metrics_values.system_icon_box_scale;
 
     reach_rect_f32 tray_box =
-        reach_dock_icon_box_for_slot(layout->tray_button, layout->bounds, icon_box_size);
+        reach_dock_icon_box_for_slot(layout->tray_button, icon_box_size);
     reach_rect_f32 quick_settings_box =
-        reach_dock_icon_box_for_slot(layout->quick_settings_button, layout->bounds, icon_box_size);
+        reach_dock_icon_box_for_slot(layout->quick_settings_button, icon_box_size);
 
     reach_dock_push_rect(commands, reach_dock_union_rect(tray_box, quick_settings_box),
                          theme->dock_button_background, icon_box_radius);
@@ -271,7 +264,7 @@ static void reach_dock_push_clock(const reach_dock_render_input *input,
                                   reach_render_command_buffer *commands)
 {
     const reach_dock_metrics &metrics = reach_dock_metrics_values;
-    reach_rect_f32 clock = reach_dock_local_rect(input->layout->clock, input->layout->bounds);
+    reach_rect_f32 clock = input->layout->clock;
 
     reach_dock_push_text(commands,
                          reach_dock_rect(clock.x, clock.y + metrics.clock_time_top_offset,
@@ -295,7 +288,7 @@ static void reach_dock_push_power_button(const reach_dock_render_input *input,
     const reach_dock_layout *layout = input->layout;
     float system_icon_size = icon_box_size * reach_dock_metrics_values.system_icon_box_scale;
     reach_rect_f32 power_box =
-        reach_dock_icon_box_for_slot(layout->power_button, layout->bounds, icon_box_size);
+        reach_dock_icon_box_for_slot(layout->power_button, icon_box_size);
 
     reach_dock_push_rect(commands, power_box, theme->dock_button_background,
                          theme->dock_power_button_corner_radius);
@@ -344,7 +337,7 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
 
     reach_dock_push_system_buttons(input, out_commands, icon_box_size, icon_box_radius);
 
-    reach_rect_f32 separator = reach_dock_local_rect(layout->system_separator, layout->bounds);
+    reach_rect_f32 separator = layout->system_separator;
     reach_dock_push_rect(out_commands, separator, theme->dock_system_separator,
                          separator.width * 0.5f);
 
