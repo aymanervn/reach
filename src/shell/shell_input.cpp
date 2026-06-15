@@ -487,9 +487,10 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
         if (launcher_action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT && launcher_pressed_match)
         {
-            reach_shell_clear_launcher_restore_window(shell);
-            (void)reach_shell_open_launcher_result(shell);
-            reach_shell_close_launcher(shell);
+            if (reach_shell_open_launcher_result(shell) == REACH_OK)
+            {
+                reach_shell_defer_launcher_close_until_foreground_change(shell);
+            }
             return REACH_OK;
         }
     }
@@ -892,10 +893,12 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell,
                 &shell->ui.launcher.results[launcher_hit.index];
             if (result->kind == REACH_SEARCH_RESULT_APP)
             {
-                reach_result open_result =
-                    reach_shell_open_launcher_result_path(shell, launcher_hit.index);
-                reach_shell_clear_launcher_restore_window(shell);
-                reach_shell_close_launcher(shell);
+                reach_result open_result = reach_shell_open_launcher_result_path(
+                    shell, launcher_hit.index);
+                if (open_result == REACH_OK)
+                {
+                    reach_shell_defer_launcher_close_until_foreground_change(shell);
+                }
                 return open_result;
             }
 
@@ -1087,7 +1090,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         if (foreground_changed && foreground_window != 0 && shell->ui.launcher.open)
         {
             reach_shell_clear_launcher_restore_window(shell);
-            reach_shell_close_launcher(shell);
+            reach_shell_close_launcher_without_focus_restore(shell);
         }
         (void)reach_shell_update_game_mode(shell);
         return REACH_OK;
@@ -1199,10 +1202,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     else if (intent.type == REACH_UI_INTENT_LAUNCH_APP)
     {
         int32_t launcher_launch = shell->ui.launcher.open;
-        if (launcher_launch)
-        {
-            reach_shell_clear_launcher_restore_window(shell);
-        }
+        int32_t launched = 0;
 
         for (size_t index = 0; index < shell->ui.pinned_app_count; ++index)
         {
@@ -1215,13 +1215,17 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
                 reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[index].arguments);
 
-                (void)shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+                if (shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request) ==
+                    REACH_OK)
+                {
+                    launched = 1;
+                }
             }
         }
 
-        if (launcher_launch)
+        if (launcher_launch && launched)
         {
-            reach_shell_close_launcher_without_focus_restore(shell);
+            reach_shell_defer_launcher_close_until_foreground_change(shell);
         }
     }
     else if (intent.type == REACH_UI_INTENT_RUN_SEARCH)
@@ -1230,15 +1234,21 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
     else if (intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT)
     {
-        reach_shell_clear_launcher_restore_window(shell);
-        (void)reach_shell_open_launcher_result(shell);
-        reach_shell_close_launcher(shell);
+        if (reach_shell_open_launcher_result(shell) == REACH_OK)
+        {
+            reach_shell_defer_launcher_close_until_foreground_change(shell);
+        }
     }
 
     if (shell->launcher.window.ops.show != nullptr && shell->launcher.window.ops.hide != nullptr)
     {
         if (shell->ui.launcher.open)
         {
+            if (shell->launcher_close_after_foreground_change)
+            {
+                return REACH_OK;
+            }
+
             reach_result show_result =
                 shell->launcher.window.ops.show(shell->launcher.window.window);
 
