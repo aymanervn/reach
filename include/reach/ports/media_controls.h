@@ -1,6 +1,7 @@
 #ifndef REACH_PORTS_MEDIA_CONTROLS_H
 #define REACH_PORTS_MEDIA_CONTROLS_H
 
+#include "reach/core/geometry.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -23,6 +24,7 @@ extern "C"
         int32_t has_media;
         uint16_t title[260];
         uint64_t cover_icon_id;
+        reach_color cover_accent;
         reach_media_playback_state playback;
     } reach_media_controls_state;
 

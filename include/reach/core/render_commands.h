@@ -25,8 +25,18 @@ extern "C"
         REACH_RENDER_COMMAND_VECTOR_ICON = 10,
         REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11,
         REACH_RENDER_COMMAND_TEXT_CARET = 12,
-        REACH_RENDER_COMMAND_ICON_TINT = 13
+        REACH_RENDER_COMMAND_ICON_TINT = 13,
+        REACH_RENDER_COMMAND_BLURRED_IMAGE = 14
     } reach_render_command_type;
+
+    typedef enum reach_render_corner_mask
+    {
+        REACH_RENDER_CORNER_TOP_LEFT = 1,
+        REACH_RENDER_CORNER_TOP_RIGHT = 2,
+        REACH_RENDER_CORNER_BOTTOM_RIGHT = 4,
+        REACH_RENDER_CORNER_BOTTOM_LEFT = 8,
+        REACH_RENDER_CORNER_ALL = 15
+    } reach_render_corner_mask;
 
     typedef enum reach_vector_icon_id
     {
@@ -87,10 +97,12 @@ extern "C"
         reach_rect_f32 clip_rect;
         reach_color color;
         float radius;
+        float blur_radius;
         float clip_radius;
         float stroke_width;
         uint64_t icon_id;
         int32_t icon_crop_to_fill;
+        int32_t corner_mask;
         int32_t text_weight;
         float text_size;
         float notch_center_x;

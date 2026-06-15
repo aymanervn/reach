@@ -12,6 +12,7 @@
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/base.h>
 #include <condition_variable>
+#include <math.h>
 #include <mutex>
 #include <new>
 #include <thread>
@@ -24,6 +25,7 @@ struct reach_media_controls_adapter
     std::thread watcher_thread;
     uint16_t cached_title[260];
     uint64_t cached_cover_icon_id;
+    reach_color cached_cover_accent;
     int32_t cached_cover_valid;
     int32_t watcher_started;
     int32_t stop_requested;
@@ -212,6 +214,7 @@ static void reach_media_controls_clear_cached_cover(reach_media_controls_adapter
         std::lock_guard<std::mutex> lock(adapter->mutex);
         cover_icon_id = adapter->cached_cover_icon_id;
         adapter->cached_cover_icon_id = 0;
+        adapter->cached_cover_accent = {};
         adapter->cached_cover_valid = 0;
         adapter->cached_title[0] = 0;
     }
@@ -222,11 +225,96 @@ static void reach_media_controls_clear_cached_cover(reach_media_controls_adapter
     }
 }
 
-static HBITMAP reach_media_controls_hbitmap_from_stream(IStream *stream)
+static reach_color reach_media_controls_cover_accent_from_pixels(const std::vector<BYTE> &pixels,
+                                                                 UINT width, UINT height)
+{
+    reach_color accent = {};
+    size_t pixel_count = (size_t)width * (size_t)height;
+    if (pixels.empty() || pixel_count == 0)
+    {
+        return accent;
+    }
+
+    size_t step = pixel_count / 4096;
+    if (step < 1)
+    {
+        step = 1;
+    }
+
+    double red_sum = 0.0;
+    double green_sum = 0.0;
+    double blue_sum = 0.0;
+    double weight_sum = 0.0;
+
+    for (size_t pixel_index = 0; pixel_index < pixel_count; pixel_index += step)
+    {
+        size_t byte_index = pixel_index * 4;
+        double alpha = (double)pixels[byte_index + 3] / 255.0;
+        if (alpha < 0.12)
+        {
+            continue;
+        }
+
+        double blue = (double)pixels[byte_index] / 255.0;
+        double green = (double)pixels[byte_index + 1] / 255.0;
+        double red = (double)pixels[byte_index + 2] / 255.0;
+        if (alpha > 0.0)
+        {
+            red = fmin(1.0, red / alpha);
+            green = fmin(1.0, green / alpha);
+            blue = fmin(1.0, blue / alpha);
+        }
+
+        double max_channel = fmax(red, fmax(green, blue));
+        double min_channel = fmin(red, fmin(green, blue));
+        double saturation = max_channel - min_channel;
+        double weight = alpha * (0.65 + saturation);
+        red_sum += red * weight;
+        green_sum += green * weight;
+        blue_sum += blue * weight;
+        weight_sum += weight;
+    }
+
+    if (weight_sum <= 0.0)
+    {
+        return accent;
+    }
+
+    double red = red_sum / weight_sum;
+    double green = green_sum / weight_sum;
+    double blue = blue_sum / weight_sum;
+    double luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+    if (luma < 0.32)
+    {
+        double lift = 0.32 - luma;
+        red = fmin(1.0, red + lift);
+        green = fmin(1.0, green + lift);
+        blue = fmin(1.0, blue + lift);
+    }
+    else if (luma > 0.72)
+    {
+        double scale = 0.72 / luma;
+        red *= scale;
+        green *= scale;
+        blue *= scale;
+    }
+
+    accent.r = (float)red;
+    accent.g = (float)green;
+    accent.b = (float)blue;
+    accent.a = 0.92f;
+    return accent;
+}
+
+static HBITMAP reach_media_controls_hbitmap_from_stream(IStream *stream, reach_color *out_accent)
 {
     if (stream == nullptr)
     {
         return nullptr;
+    }
+    if (out_accent != nullptr)
+    {
+        *out_accent = {};
     }
 
     winrt::com_ptr<IWICImagingFactory> factory;
@@ -282,6 +370,10 @@ static HBITMAP reach_media_controls_hbitmap_from_stream(IStream *stream)
     {
         return nullptr;
     }
+    if (out_accent != nullptr)
+    {
+        *out_accent = reach_media_controls_cover_accent_from_pixels(pixels, width, height);
+    }
 
     BITMAPINFO info = {};
     info.bmiHeader.biSize = sizeof(info.bmiHeader);
@@ -303,7 +395,8 @@ static HBITMAP reach_media_controls_hbitmap_from_stream(IStream *stream)
 }
 
 static uint64_t reach_media_controls_cover_icon_from_thumbnail(
-    winrt::Windows::Storage::Streams::IRandomAccessStreamReference const &thumbnail)
+    winrt::Windows::Storage::Streams::IRandomAccessStreamReference const &thumbnail,
+    reach_color *out_accent)
 {
     if (thumbnail == nullptr)
     {
@@ -327,7 +420,7 @@ static uint64_t reach_media_controls_cover_icon_from_thumbnail(
             return 0;
         }
 
-        HBITMAP bitmap = reach_media_controls_hbitmap_from_stream(com_stream.get());
+        HBITMAP bitmap = reach_media_controls_hbitmap_from_stream(com_stream.get(), out_accent);
         return bitmap != nullptr ? reach_windows_icon_id_from_hbitmap(bitmap) : 0;
     }
     catch (winrt::hresult_error const &)
@@ -378,21 +471,25 @@ static reach_result reach_media_controls_read_state(reach_media_controls_adapter
                 reach_media_controls_utf16_equal(adapter->cached_title, state.title))
             {
                 state.cover_icon_id = adapter->cached_cover_icon_id;
+                state.cover_accent = adapter->cached_cover_accent;
                 *out_state = state;
                 return REACH_OK;
             }
         }
 
+        reach_color cover_accent = {};
         uint64_t cover_icon_id =
-            reach_media_controls_cover_icon_from_thumbnail(properties.Thumbnail());
+            reach_media_controls_cover_icon_from_thumbnail(properties.Thumbnail(), &cover_accent);
 
         {
             std::lock_guard<std::mutex> lock(adapter->mutex);
             old_cover_icon_id = adapter->cached_cover_icon_id;
             adapter->cached_cover_icon_id = cover_icon_id;
+            adapter->cached_cover_accent = cover_accent;
             adapter->cached_cover_valid = 1;
             reach_copy_utf16(adapter->cached_title, 260, state.title);
             state.cover_icon_id = adapter->cached_cover_icon_id;
+            state.cover_accent = adapter->cached_cover_accent;
         }
 
         if (old_cover_icon_id != 0 && old_cover_icon_id != cover_icon_id)

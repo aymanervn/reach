@@ -34,6 +34,26 @@ static void reach_music_widget_push_rect(reach_render_command_buffer *commands, 
     reach_render_command_buffer_push(commands, &command);
 }
 
+static void reach_music_widget_push_blurred_image(reach_render_command_buffer *commands,
+                                                  reach_rect_f32 rect, uint64_t icon_id,
+                                                  float radius, float blur_radius)
+{
+    if (icon_id == 0)
+    {
+        return;
+    }
+
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_BLURRED_IMAGE;
+    command.rect = rect;
+    command.icon_id = icon_id;
+    command.icon_crop_to_fill = 1;
+    command.radius = radius;
+    command.blur_radius = blur_radius;
+    command.color.a = 1.0f;
+    reach_render_command_buffer_push(commands, &command);
+}
+
 static void reach_music_widget_push_text(reach_render_command_buffer *commands,
                                          reach_rect_f32 rect, const uint16_t *text,
                                          float text_size, int32_t text_weight,
@@ -49,6 +69,44 @@ static void reach_music_widget_push_text(reach_render_command_buffer *commands,
     command.text_ellipsis = 1;
     reach_copy_utf16(command.text, 260, text != nullptr ? text : REACH_MUSIC_WIDGET_DEFAULT_TITLE);
     reach_render_command_buffer_push(commands, &command);
+}
+
+static reach_color reach_music_widget_play_pause_background(const reach_music_widget_model *model,
+                                                            const reach_theme *theme)
+{
+    if (model != nullptr && model->cover_accent.a > 0.0f)
+    {
+        reach_color color = model->cover_accent;
+        color.a = color.a < 0.78f ? 0.78f : color.a;
+        return color;
+    }
+
+    reach_color fallback = {};
+    return theme != nullptr ? theme->music_widget_control_background : fallback;
+}
+
+static reach_color reach_music_widget_background_overlay(const reach_theme *theme)
+{
+    reach_color color = {};
+    if (theme != nullptr)
+    {
+        color = theme->music_widget_background;
+    }
+    color.r *= 0.22f;
+    color.g *= 0.22f;
+    color.b *= 0.22f;
+    if (color.a < 0.58f)
+    {
+        color.a = 0.58f;
+    }
+    return color;
+}
+
+static reach_rect_f32 reach_music_widget_centered_square(reach_rect_f32 rect)
+{
+    float size = rect.height < rect.width ? rect.height : rect.width;
+    return reach_music_widget_rect(rect.x + (rect.width - size) * 0.5f,
+                                   rect.y + (rect.height - size) * 0.5f, size, size);
 }
 
 void reach_music_widget_model_init(reach_music_widget_model *model)
@@ -167,8 +225,11 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
     float radius =
         reach_theme_music_widget_corner_radius(theme, input->layout->bounds.height);
 
+    reach_music_widget_push_blurred_image(out_commands, input->layout->bounds,
+                                          input->model->cover_icon_id, radius,
+                                          input->layout->bounds.height * 0.28f);
     reach_music_widget_push_rect(out_commands, input->layout->bounds,
-                                 theme->music_widget_background, radius);
+                                 reach_music_widget_background_overlay(theme), radius);
     reach_music_widget_push_rect(out_commands, input->layout->cover,
                                  theme->music_widget_cover_background, radius);
 
@@ -180,6 +241,8 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
         icon.icon_id = input->model->cover_icon_id;
         icon.icon_crop_to_fill = 1;
         icon.radius = radius;
+        icon.corner_mask =
+            REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT;
         icon.color.a = 1.0f;
         reach_render_command_buffer_push(out_commands, &icon);
     }
@@ -203,11 +266,16 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
                                                                : REACH_MUSIC_WIDGET_PLAY;
     const uint16_t *labels[3] = {REACH_MUSIC_WIDGET_PREVIOUS, play_pause_label,
                                  REACH_MUSIC_WIDGET_NEXT};
+    reach_color play_pause_background =
+        reach_music_widget_play_pause_background(input->model, theme);
     for (size_t index = 0; index < 3; ++index)
     {
-        reach_music_widget_push_rect(out_commands, controls[index],
-                                     theme->music_widget_control_background,
-                                     controls[index].height * 0.45f);
+        reach_color background =
+            index == 1 ? play_pause_background : theme->music_widget_control_background;
+        reach_rect_f32 background_rect =
+            index == 1 ? reach_music_widget_centered_square(controls[index]) : controls[index];
+        reach_music_widget_push_rect(out_commands, background_rect, background,
+                                     background_rect.height * (index == 1 ? 0.5f : 0.45f));
         reach_music_widget_push_text(out_commands, controls[index], labels[index],
                                      theme->music_widget_control_text_size,
                                      REACH_TEXT_WEIGHT_DEMIBOLD, input->text_alignment_center,

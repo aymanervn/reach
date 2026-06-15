@@ -456,6 +456,7 @@ struct reach_shell
     double music_widget_pending_cover_seconds;
     uint16_t music_widget_pending_cover_title[260];
     uint64_t music_widget_pending_cover_icon_id;
+    reach_color music_widget_pending_cover_accent;
     std::atomic<int32_t> music_widget_refresh_requested;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_shell_quick_settings_audio_refresh_state quick_settings_audio_refresh;

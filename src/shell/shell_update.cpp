@@ -239,6 +239,12 @@ static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b)
 static const double REACH_MUSIC_WIDGET_HIDE_GRACE_SECONDS = 4.0;
 static const double REACH_MUSIC_WIDGET_PENDING_COVER_SECONDS = 1.0;
 
+static int32_t reach_shell_color_equal(reach_color a, reach_color b)
+{
+    return fabsf(a.r - b.r) < 0.001f && fabsf(a.g - b.g) < 0.001f &&
+           fabsf(a.b - b.b) < 0.001f && fabsf(a.a - b.a) < 0.001f;
+}
+
 static void reach_shell_clear_music_widget_pending_cover(reach_shell *shell)
 {
     if (shell == nullptr)
@@ -252,42 +258,67 @@ static void reach_shell_clear_music_widget_pending_cover(reach_shell *shell)
     }
     shell->music_widget_pending_cover_seconds = 0.0;
     shell->music_widget_pending_cover_icon_id = 0;
+    shell->music_widget_pending_cover_accent = {};
     shell->music_widget_pending_cover_title[0] = 0;
 }
 
-static void reach_shell_apply_music_widget_cover(reach_shell *shell, uint64_t cover_icon_id)
+static void reach_shell_apply_music_widget_cover(reach_shell *shell, uint64_t cover_icon_id,
+                                                 reach_color cover_accent)
 {
-    if (shell == nullptr || shell->music_widget_model.cover_icon_id == cover_icon_id)
+    if (shell == nullptr)
     {
         return;
     }
-    if (shell->music_widget_model.cover_icon_id != 0)
+    if (shell->music_widget_model.cover_icon_id != cover_icon_id)
     {
-        reach_shell_release_render_icon(shell, shell->music_widget_model.cover_icon_id);
+        if (shell->music_widget_model.cover_icon_id != 0)
+        {
+            reach_shell_release_render_icon(shell, shell->music_widget_model.cover_icon_id);
+        }
+        shell->music_widget_model.cover_icon_id = cover_icon_id;
     }
-    shell->music_widget_model.cover_icon_id = cover_icon_id;
+    shell->music_widget_model.cover_accent = cover_accent;
 }
 
-static uint64_t reach_shell_music_widget_effective_cover(reach_shell *shell,
-                                                         const reach_media_controls_state *state,
-                                                         int32_t title_changed)
+static void reach_shell_music_widget_effective_cover(reach_shell *shell,
+                                                     const reach_media_controls_state *state,
+                                                     int32_t title_changed,
+                                                     uint64_t *out_cover_icon_id,
+                                                     reach_color *out_cover_accent)
 {
+    if (out_cover_icon_id != nullptr)
+    {
+        *out_cover_icon_id = 0;
+    }
+    if (out_cover_accent != nullptr)
+    {
+        *out_cover_accent = {};
+    }
     if (shell == nullptr || state == nullptr || !state->has_media)
     {
-        return 0;
+        return;
     }
 
     if (title_changed)
     {
         reach_shell_clear_music_widget_pending_cover(shell);
-        if (state->cover_icon_id != 0)
+        if (state->cover_icon_id != 0 || shell->music_widget_model.cover_icon_id != 0)
         {
             shell->music_widget_pending_cover_seconds =
                 REACH_MUSIC_WIDGET_PENDING_COVER_SECONDS;
             shell->music_widget_pending_cover_icon_id = state->cover_icon_id;
+            shell->music_widget_pending_cover_accent = state->cover_accent;
             reach_copy_utf16(shell->music_widget_pending_cover_title, 260, state->title);
         }
-        return shell->music_widget_model.cover_icon_id;
+        if (out_cover_icon_id != nullptr)
+        {
+            *out_cover_icon_id = shell->music_widget_model.cover_icon_id;
+        }
+        if (out_cover_accent != nullptr)
+        {
+            *out_cover_accent = shell->music_widget_model.cover_accent;
+        }
+        return;
     }
 
     if (shell->music_widget_pending_cover_seconds > 0.0 &&
@@ -297,12 +328,35 @@ static uint64_t reach_shell_music_widget_effective_cover(reach_shell *shell,
             state->cover_icon_id != shell->music_widget_pending_cover_icon_id)
         {
             reach_shell_clear_music_widget_pending_cover(shell);
-            return state->cover_icon_id;
+            if (out_cover_icon_id != nullptr)
+            {
+                *out_cover_icon_id = state->cover_icon_id;
+            }
+            if (out_cover_accent != nullptr)
+            {
+                *out_cover_accent = state->cover_accent;
+            }
+            return;
         }
-        return shell->music_widget_model.cover_icon_id;
+        if (out_cover_icon_id != nullptr)
+        {
+            *out_cover_icon_id = shell->music_widget_model.cover_icon_id;
+        }
+        if (out_cover_accent != nullptr)
+        {
+            *out_cover_accent = shell->music_widget_model.cover_accent;
+        }
+        return;
     }
 
-    return state->cover_icon_id;
+    if (out_cover_icon_id != nullptr)
+    {
+        *out_cover_icon_id = state->cover_icon_id;
+    }
+    if (out_cover_accent != nullptr)
+    {
+        *out_cover_accent = state->cover_accent;
+    }
 }
 
 void reach_shell_refresh_music_widget(reach_shell *shell)
@@ -325,13 +379,17 @@ void reach_shell_refresh_music_widget(reach_shell *shell)
     }
 
     int32_t title_changed = !reach_shell_utf16_equal(shell->music_widget_model.title, state.title);
-    uint64_t next_cover_icon_id =
-        reach_shell_music_widget_effective_cover(shell, &state, title_changed);
+    uint64_t next_cover_icon_id = 0;
+    reach_color next_cover_accent = {};
+    reach_shell_music_widget_effective_cover(shell, &state, title_changed, &next_cover_icon_id,
+                                             &next_cover_accent);
 
     int32_t visibility_changed = shell->music_widget_model.visible != state.has_media;
     int32_t changed = visibility_changed ||
                       title_changed ||
                       shell->music_widget_model.cover_icon_id != next_cover_icon_id ||
+                      !reach_shell_color_equal(shell->music_widget_model.cover_accent,
+                                               next_cover_accent) ||
                       shell->music_widget_model.playback != state.playback;
     if (!changed)
     {
@@ -342,7 +400,7 @@ void reach_shell_refresh_music_widget(reach_shell *shell)
     {
         shell->music_widget_model.visible = 1;
         reach_copy_utf16(shell->music_widget_model.title, 260, state.title);
-        reach_shell_apply_music_widget_cover(shell, next_cover_icon_id);
+        reach_shell_apply_music_widget_cover(shell, next_cover_icon_id, next_cover_accent);
         shell->music_widget_model.playback = state.playback;
     }
     else
@@ -407,8 +465,10 @@ static void reach_shell_update_music_widget_pending_cover(reach_shell *shell, do
     if (shell->music_widget_pending_cover_seconds <= 0.0)
     {
         shell->music_widget_pending_cover_seconds = 0.0;
-        reach_shell_apply_music_widget_cover(shell, shell->music_widget_pending_cover_icon_id);
+        reach_shell_apply_music_widget_cover(shell, shell->music_widget_pending_cover_icon_id,
+                                             shell->music_widget_pending_cover_accent);
         shell->music_widget_pending_cover_icon_id = 0;
+        shell->music_widget_pending_cover_accent = {};
         shell->music_widget_pending_cover_title[0] = 0;
         shell->dock.dirty_flags = 1;
     }
