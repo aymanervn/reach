@@ -35,6 +35,55 @@ static int32_t reach_utf16_starts_with_ascii_case_insensitive(const uint16_t *te
     return 1;
 }
 
+static void reach_shell_copy_parent_path(uint16_t *dst, size_t dst_count, const uint16_t *path)
+{
+    if (dst == nullptr || dst_count == 0)
+    {
+        return;
+    }
+
+    dst[0] = 0;
+    if (path == nullptr || path[0] == 0)
+    {
+        return;
+    }
+
+    size_t length = 0;
+    size_t last_separator = 0;
+    int32_t has_separator = 0;
+    while (path[length] != 0)
+    {
+        if (path[length] == '\\' || path[length] == '/')
+        {
+            last_separator = length;
+            has_separator = 1;
+        }
+        ++length;
+    }
+
+    if (!has_separator)
+    {
+        reach_copy_utf16(dst, dst_count, path);
+        return;
+    }
+
+    size_t copy_length = last_separator;
+    if (last_separator == 2 && path[1] == ':')
+    {
+        copy_length = 3;
+    }
+    if (copy_length + 1 > dst_count)
+    {
+        copy_length = dst_count - 1;
+    }
+
+    for (size_t index = 0; index < copy_length; ++index)
+    {
+        dst[index] = path[index];
+    }
+    dst[copy_length] = 0;
+}
+
 void reach_shell_raise_launcher(reach_shell *shell)
 {
     if (shell == nullptr || shell->launcher.window.ops.raise == nullptr)
@@ -213,4 +262,34 @@ reach_result reach_shell_open_launcher_result(reach_shell *shell)
         return shell->explorer_service.ops.open_default(shell->explorer_service.service);
     }
     return REACH_OK;
+}
+
+reach_result reach_shell_open_launcher_result_path(reach_shell *shell, size_t result_index)
+{
+    REACH_ASSERT(shell != nullptr);
+    if (shell == nullptr || shell->explorer_service.service == nullptr ||
+        shell->explorer_service.ops.open_path == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (result_index >= shell->ui.launcher.result_count)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const reach_search_candidate *result = &shell->ui.launcher.results[result_index];
+    if (result->kind != REACH_SEARCH_RESULT_APP || result->path[0] == 0)
+    {
+        return REACH_OK;
+    }
+
+    uint16_t parent_path[260] = {};
+    reach_shell_copy_parent_path(parent_path, 260, result->path);
+    if (parent_path[0] == 0)
+    {
+        return REACH_OK;
+    }
+
+    return shell->explorer_service.ops.open_path(shell->explorer_service.service, parent_path);
 }

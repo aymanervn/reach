@@ -880,6 +880,34 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell,
         reach_shell_set_quick_settings_open(shell, 0);
     }
 
+    if (shell->ui.launcher.open)
+    {
+        reach_launcher_hit_result launcher_hit =
+            reach_launcher_hit_test(&shell->ui, &shell->layout.launcher, event->x, event->y);
+
+        if (launcher_hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
+            launcher_hit.index < shell->ui.launcher.result_count)
+        {
+            const reach_search_candidate *result =
+                &shell->ui.launcher.results[launcher_hit.index];
+            if (result->kind == REACH_SEARCH_RESULT_APP)
+            {
+                reach_result open_result =
+                    reach_shell_open_launcher_result_path(shell, launcher_hit.index);
+                reach_shell_clear_launcher_restore_window(shell);
+                reach_shell_close_launcher(shell);
+                return open_result;
+            }
+
+            return REACH_OK;
+        }
+
+        if (reach_rect_contains(shell->layout.launcher.bounds, event->x, event->y))
+        {
+            return REACH_OK;
+        }
+    }
+
     if (shell->tray_state.popup_open && shell->tray_provider.ops.activate != nullptr)
     {
         reach_tray_hit_result tray_hit = reach_tray_hit_test_popup(
