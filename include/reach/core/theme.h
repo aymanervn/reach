@@ -28,6 +28,11 @@ extern "C"
         reach_color quick_settings_slider_fill_color;
         reach_color quick_settings_slider_muted_fill_color;
         reach_color quick_settings_button_color;
+        reach_color music_widget_background;
+        reach_color music_widget_cover_background;
+        reach_color music_widget_title;
+        reach_color music_widget_control_text;
+        reach_color music_widget_control_background;
         float dock_corner_radius_ratio;
         reach_color light_text;
         reach_color dark_text;
@@ -43,6 +48,17 @@ extern "C"
         float dock_system_separator_width;
         float dock_system_separator_height_ratio;
         float dock_clock_width;
+        float music_widget_width;
+        float music_widget_height_ratio;
+        float music_widget_corner_radius_ratio;
+        float music_widget_corner_radius_max;
+        float music_widget_padding;
+        float music_widget_gap;
+        float music_widget_control_gap;
+        float music_widget_control_width;
+        float music_widget_control_height;
+        float music_widget_title_text_size;
+        float music_widget_control_text_size;
     } reach_theme;
 
     const reach_theme *reach_theme_default(void);
@@ -51,6 +67,8 @@ extern "C"
     float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);
     float reach_theme_icon_box_corner_radius(const reach_theme *theme, float icon_box_size);
     float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height);
+    float reach_theme_music_widget_height(const reach_theme *theme, float dock_height);
+    float reach_theme_music_widget_corner_radius(const reach_theme *theme, float widget_height);
 
 #ifdef __cplusplus
 }

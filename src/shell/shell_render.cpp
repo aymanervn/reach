@@ -53,6 +53,18 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
         return result;
     }
 
+    reach_music_widget_render_input music_input = {};
+    music_input.theme = input.theme;
+    music_input.model = &shell->music_widget_model;
+    music_input.layout = &shell->music_widget_layout;
+    music_input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
+    music_input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+    result = reach_music_widget_build_render_commands(&music_input, &commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
     if (shell->dock.renderer.ops.begin_frame(shell->dock.renderer.backend) != REACH_OK)
     {
         return REACH_ERROR;
@@ -337,11 +349,11 @@ reach_result reach_shell_render_context_menu_surface(reach_shell *shell)
     input.item_count = shell->context_menu_state.item_count;
     input.hovered_index = shell->context_menu_state.hovered_index;
     input.target_index = shell->context_menu_state.target_index;
-    input.dock_layout = &shell->layout.dock;
+    reach_dock_layout screen_dock = reach_shell_dock_layout_to_screen(shell->layout.dock);
+    input.dock_layout = &screen_dock;
     input.has_layout = shell->has_layout;
     input.use_anchor_x = shell->context_menu_state.power_open && shell->has_layout;
-    input.anchor_x =
-        shell->layout.dock.power_button.x + shell->layout.dock.power_button.width * 0.5f;
+    input.anchor_x = screen_dock.power_button.x + screen_dock.power_button.width * 0.5f;
     input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 

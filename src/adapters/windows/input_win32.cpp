@@ -22,15 +22,130 @@ struct reach_input_source
     int32_t windows_key_down;
     int32_t windows_key_chord;
     int32_t windows_d_down;
+    uint32_t registered_media_hotkeys;
 };
 
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
 static const UINT REACH_INPUT_WM_UI_EVENT = WM_APP + 21;
 static const UINT REACH_INPUT_WM_SHARED_HOTKEYS = WM_APP + 23;
 static const UINT REACH_INPUT_WM_HELPER_DISCONNECTED = WM_APP + 24;
+static const int REACH_INPUT_HOTKEY_MEDIA_PREVIOUS = 1;
+static const int REACH_INPUT_HOTKEY_MEDIA_PLAY_PAUSE = 2;
+static const int REACH_INPUT_HOTKEY_MEDIA_NEXT = 3;
+static const int REACH_INPUT_HOTKEY_VOLUME_UP = 4;
+static const int REACH_INPUT_HOTKEY_VOLUME_DOWN = 5;
+static const int REACH_INPUT_HOTKEY_VOLUME_MUTE = 6;
 static LONG g_reach_input_helper_restart_prompt_active = 0;
 
 static void reach_input_reset_hotkey_state(reach_input_source *source);
+
+static uint32_t reach_input_media_hotkey_mask(int hotkey_id)
+{
+    return 1u << (uint32_t)hotkey_id;
+}
+
+static UINT reach_input_media_hotkey_vk(int hotkey_id)
+{
+    switch (hotkey_id)
+    {
+    case REACH_INPUT_HOTKEY_MEDIA_PREVIOUS:
+        return VK_MEDIA_PREV_TRACK;
+    case REACH_INPUT_HOTKEY_MEDIA_PLAY_PAUSE:
+        return VK_MEDIA_PLAY_PAUSE;
+    case REACH_INPUT_HOTKEY_MEDIA_NEXT:
+        return VK_MEDIA_NEXT_TRACK;
+    case REACH_INPUT_HOTKEY_VOLUME_UP:
+        return VK_VOLUME_UP;
+    case REACH_INPUT_HOTKEY_VOLUME_DOWN:
+        return VK_VOLUME_DOWN;
+    case REACH_INPUT_HOTKEY_VOLUME_MUTE:
+        return VK_VOLUME_MUTE;
+    default:
+        return 0;
+    }
+}
+
+static void reach_input_register_media_hotkey(reach_input_source *source, int hotkey_id)
+{
+    if (source == nullptr || source->window == nullptr)
+    {
+        return;
+    }
+
+    uint32_t mask = reach_input_media_hotkey_mask(hotkey_id);
+    if ((source->registered_media_hotkeys & mask) != 0)
+    {
+        return;
+    }
+
+    UINT vk = reach_input_media_hotkey_vk(hotkey_id);
+    if (vk != 0 && RegisterHotKey(source->window, hotkey_id, 0, vk))
+    {
+        source->registered_media_hotkeys |= mask;
+    }
+}
+
+static void reach_input_register_media_hotkeys(reach_input_source *source)
+{
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_MEDIA_PREVIOUS);
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_MEDIA_PLAY_PAUSE);
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_MEDIA_NEXT);
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_VOLUME_UP);
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_VOLUME_DOWN);
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_VOLUME_MUTE);
+}
+
+static void reach_input_unregister_media_hotkey(reach_input_source *source, int hotkey_id)
+{
+    if (source == nullptr || source->window == nullptr)
+    {
+        return;
+    }
+
+    uint32_t mask = reach_input_media_hotkey_mask(hotkey_id);
+    if ((source->registered_media_hotkeys & mask) == 0)
+    {
+        return;
+    }
+
+    (void)UnregisterHotKey(source->window, hotkey_id);
+    source->registered_media_hotkeys &= ~mask;
+}
+
+static void reach_input_unregister_media_hotkeys(reach_input_source *source)
+{
+    if (source == nullptr || source->window == nullptr)
+    {
+        return;
+    }
+
+    for (int hotkey_id = REACH_INPUT_HOTKEY_MEDIA_PREVIOUS;
+         hotkey_id <= REACH_INPUT_HOTKEY_VOLUME_MUTE; ++hotkey_id)
+    {
+        reach_input_unregister_media_hotkey(source, hotkey_id);
+    }
+}
+
+static reach_ui_event_type reach_input_media_hotkey_event(WPARAM hotkey_id)
+{
+    switch ((int)hotkey_id)
+    {
+    case REACH_INPUT_HOTKEY_MEDIA_PREVIOUS:
+        return REACH_UI_EVENT_MEDIA_PREVIOUS;
+    case REACH_INPUT_HOTKEY_MEDIA_PLAY_PAUSE:
+        return REACH_UI_EVENT_MEDIA_PLAY_PAUSE;
+    case REACH_INPUT_HOTKEY_MEDIA_NEXT:
+        return REACH_UI_EVENT_MEDIA_NEXT;
+    case REACH_INPUT_HOTKEY_VOLUME_UP:
+        return REACH_UI_EVENT_VOLUME_UP;
+    case REACH_INPUT_HOTKEY_VOLUME_DOWN:
+        return REACH_UI_EVENT_VOLUME_DOWN;
+    case REACH_INPUT_HOTKEY_VOLUME_MUTE:
+        return REACH_UI_EVENT_VOLUME_MUTE;
+    default:
+        return REACH_UI_EVENT_NONE;
+    }
+}
 
 static reach_result reach_input_restart_reach_session(void)
 {
@@ -307,6 +422,15 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
         reach_input_process_shared_hotkeys(source);
         return 0;
     }
+    if (message == WM_HOTKEY && source != nullptr)
+    {
+        reach_ui_event_type type = reach_input_media_hotkey_event(wparam);
+        if (type != REACH_UI_EVENT_NONE)
+        {
+            reach_input_post_ui_event(source, type, 0);
+            return 0;
+        }
+    }
 
     return DefWindowProcW(hwnd, message, wparam, lparam);
 }
@@ -353,6 +477,7 @@ static reach_result reach_input_start(reach_input_source *source,
     }
 
     (void)reach_elevation_helper_shared_reader_subscribe(reach_input_shared_callback, source);
+    reach_input_register_media_hotkeys(source);
     return REACH_OK;
 }
 
@@ -365,6 +490,7 @@ static reach_result reach_input_stop(reach_input_source *source)
     }
 
     reach_elevation_helper_shared_reader_unsubscribe(source);
+    reach_input_unregister_media_hotkeys(source);
     reach_input_reset_hotkey_state(source);
     source->callback = nullptr;
     source->user = nullptr;

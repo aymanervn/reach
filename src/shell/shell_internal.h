@@ -11,6 +11,7 @@
 #include "reach/features/context_menu.h"
 #include "reach/features/dock.h"
 #include "reach/features/launcher.h"
+#include "reach/features/music_widget.h"
 #include "reach/features/pin_config.h"
 #include "reach/features/popup.h"
 #include "reach/features/quick_settings.h"
@@ -447,6 +448,16 @@ struct reach_shell
     reach_shell_window_control_state window_control;
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
+    reach_media_controls_port media_controls;
+    reach_music_widget_model music_widget_model;
+    reach_music_widget_layout music_widget_layout;
+    reach_music_widget_action_type pressed_music_widget_action;
+    double music_widget_hide_grace_seconds;
+    double music_widget_pending_cover_seconds;
+    uint16_t music_widget_pending_cover_title[260];
+    uint64_t music_widget_pending_cover_icon_id;
+    reach_color music_widget_pending_cover_accent;
+    std::atomic<int32_t> music_widget_refresh_requested;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_shell_quick_settings_audio_refresh_state quick_settings_audio_refresh;
     reach_shell_quick_settings_system_refresh_state quick_settings_system_refresh;
@@ -488,6 +499,7 @@ reach_result reach_shell_apply_window_state(reach_platform_window_port *window,
                                             int32_t *out_changed);
 
 void reach_shell_request_update(reach_shell *shell);
+void reach_shell_start_music_widget_hide_grace(reach_shell *shell);
 void reach_shell_on_window_event(void *user, const reach_ui_event *event);
 
 /* Popup/window capture helpers */
@@ -621,10 +633,17 @@ float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock
                                       size_t index);
 
 void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_dock_layout *layout);
+void reach_shell_clear_dock_item_x_animations(reach_shell *shell);
 
 int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell);
 void reach_shell_keep_dock_revealed(reach_shell *shell);
 void reach_shell_schedule_dock_reveal_recheck(reach_shell *shell);
+
+reach_point_i32 reach_shell_dock_local_point(const reach_dock_layout *layout, int32_t x,
+                                             int32_t y);
+reach_rect_f32 reach_shell_dock_rect_to_screen(const reach_dock_layout *layout,
+                                               reach_rect_f32 rect);
+reach_dock_layout reach_shell_dock_layout_to_screen(reach_dock_layout layout);
 
 reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds,
                                                 reach_rect_f32 monitor_bounds,
@@ -646,6 +665,8 @@ reach_result reach_shell_launch_dock_item(reach_shell *shell, size_t item_index,
 
 reach_result reach_shell_execute_dock_item_action(reach_shell *shell,
                                                   reach_dock_item_action action);
+
+void reach_shell_refresh_music_widget(reach_shell *shell);
 
 /* Dock drag orchestration */
 

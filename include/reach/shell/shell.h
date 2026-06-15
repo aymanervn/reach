@@ -9,6 +9,7 @@
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/input_source.h"
+#include "reach/ports/media_controls.h"
 #include "reach/ports/monitor.h"
 #include "reach/ports/platform_window.h"
 #include "reach/ports/popup_capture.h"
@@ -66,6 +67,7 @@ extern "C"
         reach_power_session_port power_session;
         reach_audio_volume_port audio_volume;
         reach_system_controls_port system_controls;
+        reach_media_controls_port media_controls;
     } reach_shell_dependencies;
 
     reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,

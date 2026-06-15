@@ -267,6 +267,48 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     return animated;
 }
 
+reach_point_i32 reach_shell_dock_local_point(const reach_dock_layout *layout, int32_t x,
+                                             int32_t y)
+{
+    reach_point_i32 point = {};
+    if (layout == nullptr)
+    {
+        point.x = x;
+        point.y = y;
+        return point;
+    }
+    point.x = static_cast<int32_t>((float)x - layout->bounds.x);
+    point.y = static_cast<int32_t>((float)y - layout->bounds.y);
+    return point;
+}
+
+reach_rect_f32 reach_shell_dock_rect_to_screen(const reach_dock_layout *layout, reach_rect_f32 rect)
+{
+    if (layout == nullptr)
+    {
+        return rect;
+    }
+    rect.x += layout->bounds.x;
+    rect.y += layout->bounds.y;
+    return rect;
+}
+
+reach_dock_layout reach_shell_dock_layout_to_screen(reach_dock_layout layout)
+{
+    layout.music_widget = reach_shell_dock_rect_to_screen(&layout, layout.music_widget);
+    for (size_t index = 0; index < layout.app_slot_count; ++index)
+    {
+        layout.app_slots[index] = reach_shell_dock_rect_to_screen(&layout, layout.app_slots[index]);
+    }
+    layout.tray_button = reach_shell_dock_rect_to_screen(&layout, layout.tray_button);
+    layout.quick_settings_button =
+        reach_shell_dock_rect_to_screen(&layout, layout.quick_settings_button);
+    layout.system_separator = reach_shell_dock_rect_to_screen(&layout, layout.system_separator);
+    layout.clock = reach_shell_dock_rect_to_screen(&layout, layout.clock);
+    layout.power_button = reach_shell_dock_rect_to_screen(&layout, layout.power_button);
+    return layout;
+}
+
 void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout,
                                             double delta_seconds)
 {
@@ -287,8 +329,7 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
         shell->dock_width.animation.value = target_width;
     }
 
-    if (shell->dock_width.item_count != target_count &&
-        fabsf(shell->dock_width.animation.to - target_width) >= 0.5f)
+    if (fabsf(shell->dock_width.animation.to - target_width) >= 0.5f)
     {
         float from = shell->dock_width.animation.value > 0.0f ? shell->dock_width.animation.value
                                                               : target_width;
@@ -324,20 +365,14 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
         animated_width = target_width;
     }
 
-    float target_x = layout->bounds.x;
     float center = layout->bounds.x + layout->bounds.width * 0.5f;
     layout->bounds.x = center - animated_width * 0.5f;
     layout->bounds.width = animated_width;
-    float x_delta = layout->bounds.x - target_x;
-    for (size_t index = 0; index < layout->app_slot_count; ++index)
-    {
-        layout->app_slots[index].x += x_delta;
-    }
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
     float scale = reach_shell_layout_dpi_scale(shell);
     float gap = shell->ui.dock.gap * scale;
     layout->power_button.x =
-        layout->bounds.x + layout->bounds.width - layout->power_button.width - gap;
+        layout->bounds.width - layout->power_button.width - gap;
     layout->clock.x = layout->power_button.x - gap - theme->dock_clock_width * scale;
     layout->system_separator.x =
         layout->clock.x - gap - theme->dock_system_separator_width * scale;
@@ -431,7 +466,9 @@ float reach_shell_dock_drag_clamped_x(const reach_shell *shell, const reach_dock
 {
     const reach_theme *theme =
         shell != nullptr && shell->theme != nullptr ? shell->theme : reach_theme_default();
-    return reach_dock_drag_clamped_x(theme, layout, cursor_x,
+    int32_t local_cursor_x =
+        layout != nullptr ? static_cast<int32_t>((float)cursor_x - layout->bounds.x) : cursor_x;
+    return reach_dock_drag_clamped_x(theme, layout, local_cursor_x,
                                      shell != nullptr ? shell->dock_drag.grab_offset_x : 0.0f);
 }
 
@@ -514,6 +551,23 @@ static void reach_shell_start_dock_item_x_animation(reach_shell *shell, size_t i
     reach_float_animation_start(&shell->dock_item_x_animations[index], from, to, 0.12);
     shell->dock_item_x_valid[index] = 1;
     shell->dock_item_x_animating[index] = 1;
+}
+
+void reach_shell_clear_dock_item_x_animations(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    {
+        shell->dock_item_x_animations[index] = {};
+        shell->dock_item_x_valid[index] = 0;
+        shell->dock_item_x_animating[index] = 0;
+        shell->dock_item_x_pinned[index] = 0;
+        shell->dock_item_x_pin_ids[index] = 0;
+        shell->dock_item_x_windows[index] = 0;
+    }
 }
 
 void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_dock_layout *layout)

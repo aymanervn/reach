@@ -84,7 +84,7 @@ reach_result reach_shell_update_dock_drag(reach_shell *shell, const reach_ui_eve
         shell->dock.dirty_flags = 1;
     }
 
-    float dragged_box_x = shell->layout.dock.bounds.x + shell->dock_drag.x;
+    float dragged_box_x = shell->dock_drag.x;
 
     size_t current = reach_shell_find_dock_order_key(
         shell, shell->dock_drag.pinned, shell->dock_drag.pin_id, shell->dock_drag.window);

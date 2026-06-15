@@ -26,14 +26,18 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
     out_layout->dock.bounds.width = dock_width;
     out_layout->dock.bounds.height = dock_height;
     out_layout->dock.app_slot_count = state->pinned_app_count;
+    out_layout->dock.music_widget.x = 0.0f;
+    out_layout->dock.music_widget.y = 0.0f;
+    out_layout->dock.music_widget.width = 0.0f;
+    out_layout->dock.music_widget.height = 0.0f;
 
     float icon_size = reach_scale(state->dock.icon_size, scale);
     float gap = reach_scale(state->dock.gap, scale);
     float clock_width = reach_scale(92.0f, scale);
     float separator_width = reach_scale(1.0f, scale);
     float separator_height = dock_height * 0.56f;
-    float left = dock_x + gap;
-    float top = dock_y + (dock_height - icon_size) * 0.5f;
+    float left = gap;
+    float top = (dock_height - icon_size) * 0.5f;
 
     for (size_t index = 0; index < state->pinned_app_count; ++index)
     {
@@ -51,7 +55,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
 
     out_layout->dock.power_button.width = icon_size;
     out_layout->dock.power_button.height = icon_size;
-    out_layout->dock.power_button.x = dock_x + dock_width - icon_size - gap;
+    out_layout->dock.power_button.x = dock_width - icon_size - gap;
     out_layout->dock.power_button.y = top;
 
     out_layout->dock.clock.width = clock_width;
@@ -62,7 +66,7 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
     out_layout->dock.system_separator.width = separator_width;
     out_layout->dock.system_separator.height = separator_height;
     out_layout->dock.system_separator.x = out_layout->dock.clock.x - gap - separator_width;
-    out_layout->dock.system_separator.y = dock_y + (dock_height - separator_height) * 0.5f;
+    out_layout->dock.system_separator.y = (dock_height - separator_height) * 0.5f;
 
     out_layout->dock.quick_settings_button.x =
         out_layout->dock.system_separator.x - gap - icon_size;

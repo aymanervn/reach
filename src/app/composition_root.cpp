@@ -169,6 +169,10 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_media_controls(&dependencies.media_controls);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
         if (result == REACH_OK)
         {
@@ -176,6 +180,7 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
             dependencies.power_session = {};
             dependencies.audio_volume = {};
             dependencies.system_controls = {};
+            dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
         }
@@ -292,6 +297,10 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         if (dependencies.system_controls.destroy != nullptr)
         {
             dependencies.system_controls.destroy(dependencies.system_controls.userdata);
+        }
+        if (dependencies.media_controls.destroy != nullptr)
+        {
+            dependencies.media_controls.destroy(dependencies.media_controls.userdata);
         }
         reach_windows_destroy_explorer_desktop_compat_host();
         delete app;

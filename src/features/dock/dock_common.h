@@ -14,11 +14,11 @@ static inline reach_rect_f32 reach_dock_rect(float x, float y, float width, floa
 }
 
 static inline reach_rect_f32
-reach_dock_icon_box_for_slot(reach_rect_f32 slot, reach_rect_f32 dock_bounds, float icon_box_size)
+reach_dock_icon_box_for_slot(reach_rect_f32 slot, float icon_box_size)
 {
-    return reach_dock_rect(slot.x - dock_bounds.x + (slot.width - icon_box_size) * 0.5f,
-                           slot.y - dock_bounds.y + (slot.height - icon_box_size) * 0.5f,
-                           icon_box_size, icon_box_size);
+    return reach_dock_rect(slot.x + (slot.width - icon_box_size) * 0.5f,
+                           slot.y + (slot.height - icon_box_size) * 0.5f, icon_box_size,
+                           icon_box_size);
 }
 
 #endif
