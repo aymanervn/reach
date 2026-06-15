@@ -24,6 +24,33 @@ struct reach_window_manager
 
 static const DWORD REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS = 10000;
 static const DWORD REACH_HELPER_RESTART_FAILED_COOLDOWN_MS = 5000;
+static const int REACH_SETTINGS_ICON_RESOURCE_ID = 102;
+
+static void reach_window_manager_icon_ref_for_helper(
+    const reach_elevation_helper_window_snapshot &helper, uint16_t *out_icon_ref,
+    size_t out_icon_ref_count)
+{
+    if (out_icon_ref == nullptr || out_icon_ref_count == 0)
+    {
+        return;
+    }
+
+    out_icon_ref[0] = 0;
+    if (helper.process_path[0] == 0)
+    {
+        return;
+    }
+
+    if (lstrcmpiW(helper.class_name, L"ReachSettingsWindow") == 0)
+    {
+        swprintf_s(reinterpret_cast<wchar_t *>(out_icon_ref), out_icon_ref_count, L"%ls,-%d",
+                   helper.process_path, REACH_SETTINGS_ICON_RESOURCE_ID);
+        return;
+    }
+
+    (void)reach_copy_utf16(out_icon_ref, out_icon_ref_count,
+                           reinterpret_cast<const uint16_t *>(helper.process_path));
+}
 
 static const reach_elevation_helper_window_snapshot *
 reach_window_manager_find_helper_window(const reach_window_manager *manager, uintptr_t window_id)
@@ -487,6 +514,7 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
                            reinterpret_cast<const uint16_t *>(helper.title));
     (void)reach_copy_utf16(snapshot.path, 260,
                            reinterpret_cast<const uint16_t *>(helper.process_path));
+    reach_window_manager_icon_ref_for_helper(helper, snapshot.icon_ref, 260);
     snapshot.visible = helper.visible;
     snapshot.maximized = helper.maximized;
     snapshot.minimized = helper.iconic;
@@ -522,7 +550,7 @@ static reach_result reach_window_manager_pin_app_for_window(reach_window_manager
                            reinterpret_cast<const uint16_t *>(helper->process_path));
     (void)reach_copy_utf16(out_app->title, 128,
                            reinterpret_cast<const uint16_t *>(helper->title));
-    (void)reach_copy_utf16(out_app->icon_ref, 260, out_app->path);
+    reach_window_manager_icon_ref_for_helper(*helper, out_app->icon_ref, 260);
     (void)reach_copy_utf16(out_app->app_user_model_id, 260,
                            reinterpret_cast<const uint16_t *>(helper->app_user_model_id));
     reach_window_manager_unlock(manager);

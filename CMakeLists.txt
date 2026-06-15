@@ -79,6 +79,7 @@ add_library(reach_features STATIC
     src/features/settings/settings_power_sleep.cpp
     src/features/settings/settings_render.cpp
     src/features/settings/settings_startup_apps.cpp
+    src/features/settings/settings_update.cpp
     src/features/settings/settings_wifi.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
@@ -455,18 +456,6 @@ target_link_libraries(reach_quick_settings_feature_tests PRIVATE
     reach_features
 )
 
-add_executable(reach_settings_feature_tests
-    tests/settings_feature_tests.cpp
-)
-
-reach_configure_common(reach_settings_feature_tests)
-target_compile_features(reach_settings_feature_tests PRIVATE
-    cxx_std_17
-)
-target_link_libraries(reach_settings_feature_tests PRIVATE
-    reach_features
-)
-
 add_executable(reach_launcher_feature_tests
     tests/launcher_feature_tests.cpp
 )
@@ -508,7 +497,6 @@ if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_dock_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_dock_feature_tests.exe)
     add_test(NAME reach_pin_config_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_pin_config_tests.exe)
     add_test(NAME reach_quick_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_quick_settings_feature_tests.exe)
-    add_test(NAME reach_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_settings_feature_tests.exe)
     add_test(NAME reach_launcher_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_launcher_feature_tests.exe)
     add_test(NAME reach_search_ranking_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_search_ranking_tests.exe)
     add_test(NAME reach_system_controls_network_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_system_controls_network_tests.exe)
@@ -517,7 +505,6 @@ else()
     add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
-    add_test(NAME reach_settings_feature_tests COMMAND reach_settings_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)

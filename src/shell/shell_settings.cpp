@@ -42,28 +42,6 @@ static reach_rect_f32 reach_shell_settings_default_bounds(reach_shell *shell)
             monitor.y + (monitor.height - height) * 0.5f, width, height};
 }
 
-static reach_rect_f32 reach_shell_settings_maximized_bounds(reach_shell *shell)
-{
-    reach_rect_f32 monitor = {};
-    const reach_monitor_info *primary_monitor =
-        shell != nullptr && shell->monitors.list != nullptr && shell->monitors.ops.primary != nullptr
-            ? shell->monitors.ops.primary(shell->monitors.list)
-            : nullptr;
-    if (primary_monitor != nullptr)
-    {
-        monitor.x = (float)primary_monitor->work_area.left;
-        monitor.y = (float)primary_monitor->work_area.top;
-        monitor.width = (float)(primary_monitor->work_area.right - primary_monitor->work_area.left);
-        monitor.height =
-            (float)(primary_monitor->work_area.bottom - primary_monitor->work_area.top);
-    }
-    else
-    {
-        monitor = reach_shell_settings_default_bounds(shell);
-    }
-    return monitor;
-}
-
 void reach_shell_refresh_settings_layout(reach_shell *shell)
 {
     if (shell == nullptr)
@@ -78,6 +56,137 @@ void reach_shell_refresh_settings_layout(reach_shell *shell)
         reach_settings_layout_for_bounds(local, shell->theme, reach_shell_layout_dpi_scale(shell));
 }
 
+int32_t reach_shell_settings_window_minimized(const reach_shell *shell)
+{
+    if (shell == nullptr || !shell->settings_open)
+    {
+        return 0;
+    }
+    return shell->settings.window.ops.is_minimized != nullptr &&
+           shell->settings.window.ops.is_minimized(shell->settings.window.window);
+}
+
+int32_t reach_shell_window_is_settings_window(const reach_shell *shell, uintptr_t window_id)
+{
+    if (shell == nullptr || window_id == 0 || shell->settings.window.ops.native_id == nullptr)
+    {
+        return 0;
+    }
+
+    return shell->settings.window.ops.native_id(shell->settings.window.window) == window_id;
+}
+
+static void reach_shell_prepare_settings_window(reach_shell *shell)
+{
+    if (shell == nullptr || shell->settings.window.ops.set_bounds == nullptr)
+    {
+        return;
+    }
+
+    int32_t settings_window_changed = 0;
+    if (reach_shell_apply_window_state(
+            &shell->settings.window, shell->settings_bounds, 1.0f, &shell->settings.last_bounds,
+            &shell->settings.last_opacity, &shell->settings.bounds_valid,
+            &shell->settings.opacity_valid, &settings_window_changed) != REACH_OK)
+    {
+        return;
+    }
+
+    if (settings_window_changed && shell->settings.window.ops.apply_rounded_corners != nullptr)
+    {
+        (void)shell->settings.window.ops.apply_rounded_corners(
+            shell->settings.window.window, 18.0f * reach_shell_layout_dpi_scale(shell));
+    }
+
+    if (shell->settings.renderer.ops.begin_frame != nullptr)
+    {
+        (void)reach_shell_render_settings_surface(shell);
+    }
+}
+
+static void reach_shell_ensure_settings_open(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    if (!shell->settings_open)
+    {
+        if (shell->settings_restored_bounds.width <= 0.0f ||
+            shell->settings_restored_bounds.height <= 0.0f)
+        {
+            shell->settings_restored_bounds = reach_shell_settings_default_bounds(shell);
+        }
+        shell->settings_bounds = shell->settings_restored_bounds;
+        shell->settings_open = 1;
+    }
+    reach_shell_refresh_settings_layout(shell);
+    shell->settings.dirty_flags = 1;
+    shell->dirty.render = 1;
+}
+
+reach_result reach_shell_execute_settings_window_control(reach_shell *shell,
+                                                         reach_shell_window_control_action action)
+{
+    if (shell == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (action == REACH_SHELL_WINDOW_CONTROL_CLOSE)
+    {
+        reach_shell_close_settings(shell);
+        return REACH_OK;
+    }
+    if (action == REACH_SHELL_WINDOW_CONTROL_MINIMIZE)
+    {
+        reach_shell_minimize_settings(shell);
+        return REACH_OK;
+    }
+    if (action == REACH_SHELL_WINDOW_CONTROL_ACTIVATE)
+    {
+        reach_shell_ensure_settings_open(shell);
+        reach_shell_prepare_settings_window(shell);
+        if (shell->settings.window.ops.raise != nullptr)
+        {
+            (void)shell->settings.window.ops.raise(shell->settings.window.window);
+        }
+        else if (shell->settings.window.ops.show != nullptr)
+        {
+            (void)shell->settings.window.ops.show(shell->settings.window.window);
+        }
+        reach_shell_request_update(shell);
+        return REACH_OK;
+    }
+
+    return REACH_INVALID_ARGUMENT;
+}
+
+void reach_shell_sync_settings_bounds_from_window(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->settings_open || reach_shell_settings_window_minimized(shell) ||
+        shell->settings.window.ops.get_bounds == nullptr)
+    {
+        return;
+    }
+
+    reach_rect_f32 actual = {};
+    if (shell->settings.window.ops.get_bounds(shell->settings.window.window, &actual) != REACH_OK ||
+        actual.width <= 0.0f || actual.height <= 0.0f)
+    {
+        return;
+    }
+
+    if (!reach_shell_rect_equal(shell->settings_bounds, actual))
+    {
+        shell->settings_bounds = actual;
+        shell->settings_restored_bounds = actual;
+        reach_shell_refresh_settings_layout(shell);
+        shell->settings.dirty_flags = 1;
+    }
+}
+
 void reach_shell_open_settings(reach_shell *shell)
 {
     if (shell == nullptr)
@@ -89,27 +198,7 @@ void reach_shell_open_settings(reach_shell *shell)
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_close_context_menu(shell);
 
-    if (!shell->settings_open)
-    {
-        if (shell->settings_restored_bounds.width <= 0.0f ||
-            shell->settings_restored_bounds.height <= 0.0f)
-        {
-            shell->settings_restored_bounds = reach_shell_settings_default_bounds(shell);
-        }
-        shell->settings_bounds = shell->settings_maximized
-                                     ? reach_shell_settings_maximized_bounds(shell)
-                                     : shell->settings_restored_bounds;
-        shell->settings_open = 1;
-    }
-
-    reach_shell_refresh_settings_layout(shell);
-    shell->settings.dirty_flags = 1;
-    shell->dirty.render = 1;
-    if (shell->settings.window.ops.show != nullptr)
-    {
-        (void)shell->settings.window.ops.show(shell->settings.window.window);
-    }
-    reach_shell_request_update(shell);
+    (void)reach_shell_execute_settings_window_control(shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE);
 }
 
 void reach_shell_close_settings(reach_shell *shell)
@@ -118,6 +207,7 @@ void reach_shell_close_settings(reach_shell *shell)
     {
         return;
     }
+    reach_shell_sync_settings_bounds_from_window(shell);
     shell->settings_open = 0;
     shell->settings.dirty_flags = 1;
     if (shell->settings.window.ops.hide != nullptr)
@@ -127,31 +217,18 @@ void reach_shell_close_settings(reach_shell *shell)
     reach_shell_request_update(shell);
 }
 
-void reach_shell_toggle_settings_maximized(reach_shell *shell)
+void reach_shell_minimize_settings(reach_shell *shell)
 {
     if (shell == nullptr)
     {
         return;
     }
-    if (!shell->settings_maximized)
+
+    reach_shell_sync_settings_bounds_from_window(shell);
+    if (shell->settings.window.ops.minimize != nullptr)
     {
-        if (shell->settings_bounds.width > 0.0f && shell->settings_bounds.height > 0.0f)
-        {
-            shell->settings_restored_bounds = shell->settings_bounds;
-        }
-        shell->settings_maximized = 1;
-        shell->settings_bounds = reach_shell_settings_maximized_bounds(shell);
+        (void)shell->settings.window.ops.minimize(shell->settings.window.window);
     }
-    else
-    {
-        shell->settings_maximized = 0;
-        shell->settings_bounds = shell->settings_restored_bounds.width > 0.0f
-                                     ? shell->settings_restored_bounds
-                                     : reach_shell_settings_default_bounds(shell);
-    }
-    reach_shell_refresh_settings_layout(shell);
-    shell->settings.dirty_flags = 1;
-    shell->dirty.render = 1;
     reach_shell_request_update(shell);
 }
 
@@ -163,6 +240,8 @@ reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
         return REACH_OK;
     }
 
+    reach_shell_sync_settings_bounds_from_window(shell);
+
     float local_x = (float)event->x - shell->settings_bounds.x;
     float local_y = (float)event->y - shell->settings_bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&shell->settings_layout, local_x, local_y);
@@ -171,9 +250,9 @@ reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
         reach_shell_close_settings(shell);
         return REACH_OK;
     }
-    if (hit.type == REACH_SETTINGS_HIT_MAXIMIZE)
+    if (hit.type == REACH_SETTINGS_HIT_MINIMIZE)
     {
-        reach_shell_toggle_settings_maximized(shell);
+        reach_shell_minimize_settings(shell);
         return REACH_OK;
     }
     if (hit.type == REACH_SETTINGS_HIT_NAV_ITEM)

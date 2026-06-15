@@ -409,10 +409,13 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         return REACH_OK;
     }
 
-    if (shell->settings_open &&
-        reach_rect_contains(shell->settings_bounds, event->x, event->y))
+    if (shell->settings_open)
     {
-        return reach_shell_handle_settings_pointer_up(shell, event);
+        reach_shell_sync_settings_bounds_from_window(shell);
+        if (reach_rect_contains(shell->settings_bounds, event->x, event->y))
+        {
+            return reach_shell_handle_settings_pointer_up(shell, event);
+        }
     }
 
     if (shell->context_menu_state.open)
@@ -617,10 +620,13 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
 
     reach_shell_clear_sticky_dock_feedback(shell);
 
-    if (shell->settings_open &&
-        reach_rect_contains(shell->settings_bounds, event->x, event->y))
+    if (shell->settings_open)
     {
-        return REACH_OK;
+        reach_shell_sync_settings_bounds_from_window(shell);
+        if (reach_rect_contains(shell->settings_bounds, event->x, event->y))
+        {
+            return REACH_OK;
+        }
     }
 
     if (shell->quick_settings_open)

@@ -211,6 +211,7 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
     int32_t old_maximized[REACH_MAX_PINNED_APPS] = {};
     int32_t old_visible[REACH_MAX_PINNED_APPS] = {};
     uint16_t old_paths[REACH_MAX_PINNED_APPS][260] = {};
+    uint16_t old_icon_refs[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_app_user_model_ids[REACH_MAX_PINNED_APPS][260] = {};
     reach_icon_handle old_icons[REACH_MAX_PINNED_APPS] = {};
@@ -228,6 +229,10 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
         old_maximized[index] = shell->open_windows[index].maximized;
         old_visible[index] = shell->open_windows[index].visible;
         reach_copy_utf16(old_paths[index], 260, shell->open_windows[index].path);
+        reach_copy_utf16(old_icon_refs[index], 260,
+                         shell->open_windows[index].icon_ref[0] != 0
+                             ? shell->open_windows[index].icon_ref
+                             : shell->open_windows[index].path);
         reach_copy_utf16(old_titles[index], 260, shell->open_windows[index].title);
         reach_copy_utf16(old_app_user_model_ids[index], 260,
                          shell->open_windows[index].app_user_model_id);
@@ -270,11 +275,19 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
                 !reach_shell_utf16_equal(old_paths[index], shell->open_windows[index].path) ||
                 !reach_shell_utf16_equal(old_app_user_model_ids[index],
                                          shell->open_windows[index].app_user_model_id);
+            const uint16_t *icon_ref = shell->open_windows[index].icon_ref[0] != 0
+                                           ? shell->open_windows[index].icon_ref
+                                           : shell->open_windows[index].path;
+            int32_t icon_ref_changed = !reach_shell_utf16_equal(old_icon_refs[index], icon_ref);
 
             if (dock_item_changed)
             {
                 icon_identity_changed = 1;
                 shell->dock_items_changed = 1;
+            }
+            if (icon_ref_changed)
+            {
+                icon_identity_changed = 1;
             }
 
             if (dock_item_changed || old_minimized[index] != shell->open_windows[index].minimized ||
@@ -289,8 +302,8 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
 
     if (icon_identity_changed)
     {
-        reach_shell_sync_open_window_icons(shell, old_windows, old_paths, old_icons, old_initials,
-                                           old_count);
+        reach_shell_sync_open_window_icons(shell, old_windows, old_icon_refs, old_icons,
+                                           old_initials, old_count);
     }
     reach_shell_prune_focus_history(shell);
     if (out_changed != nullptr)
@@ -351,6 +364,11 @@ reach_result reach_shell_execute_window_control(reach_shell *shell,
     if (shell == nullptr || window_id == 0)
     {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if (reach_shell_window_is_settings_window(shell, window_id))
+    {
+        return reach_shell_execute_settings_window_control(shell, action);
     }
 
     if (shell->window_manager.ops.privileged_control_available != nullptr &&
@@ -475,6 +493,11 @@ reach_result reach_shell_schedule_window_control(reach_shell *shell,
     if (shell == nullptr || window_id == 0)
     {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if (reach_shell_window_is_settings_window(shell, window_id))
+    {
+        return reach_shell_execute_settings_window_control(shell, action);
     }
 
     reach_result result = reach_shell_start_window_control_worker(shell);
