@@ -150,7 +150,6 @@ reach_result reach_shell_render_settings_surface(reach_shell *shell)
     input.layout = &shell->settings_layout;
     input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
-    input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     reach_render_command_buffer commands = {};
     reach_result build_result = reach_settings_build_render_commands(&input, &commands);

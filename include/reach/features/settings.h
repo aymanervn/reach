@@ -21,7 +21,8 @@ extern "C"
         REACH_SETTINGS_PAGE_ACCOUNT = 2,
         REACH_SETTINGS_PAGE_STARTUP_APPS = 3,
         REACH_SETTINGS_PAGE_POWER_SLEEP = 4,
-        REACH_SETTINGS_PAGE_MONITORS_SCALING = 5
+        REACH_SETTINGS_PAGE_MONITORS_SCALING = 5,
+        REACH_SETTINGS_PAGE_UPDATE = 6
     } reach_settings_page;
 
     typedef enum reach_settings_hit_type
@@ -29,8 +30,7 @@ extern "C"
         REACH_SETTINGS_HIT_NONE = 0,
         REACH_SETTINGS_HIT_NAV_ITEM,
         REACH_SETTINGS_HIT_CLOSE,
-        REACH_SETTINGS_HIT_MAXIMIZE,
-        REACH_SETTINGS_HIT_TOPBAR_DRAG
+        REACH_SETTINGS_HIT_MINIMIZE
     } reach_settings_hit_type;
 
     typedef struct reach_settings_model
@@ -58,9 +58,8 @@ extern "C"
     typedef struct reach_settings_layout
     {
         reach_rect_f32 bounds;
-        reach_rect_f32 topbar;
         reach_rect_f32 close_button;
-        reach_rect_f32 maximize_button;
+        reach_rect_f32 minimize_button;
         reach_rect_f32 nav;
         reach_rect_f32 content;
         reach_rect_f32 content_title;
@@ -82,7 +81,6 @@ extern "C"
         const reach_settings_layout *layout;
         float dpi_scale;
         int32_t text_alignment_leading;
-        int32_t text_alignment_center;
     } reach_settings_render_input;
 
     void reach_settings_model_init(reach_settings_model *model);

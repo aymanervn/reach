@@ -54,6 +54,22 @@ static reach_result reach_shell_launch_context_menu_item(reach_shell *shell, con
     return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
 }
 
+static int32_t reach_shell_dock_item_is_settings_window(const reach_shell *shell, size_t item_index)
+{
+    if (shell == nullptr || item_index >= shell->dock_model.item_count)
+    {
+        return 0;
+    }
+
+    size_t open_index = shell->dock_model.items[item_index].open_index;
+    if (open_index >= shell->open_window_count)
+    {
+        return 0;
+    }
+
+    return reach_shell_window_is_settings_window(shell, shell->open_windows[open_index].id);
+}
+
 reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t command)
 {
     if (shell == nullptr)
@@ -118,7 +134,13 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
     uint32_t pin_id =
         pinned_index < shell->ui.pinned_app_count ? shell->ui.pinned_apps[pinned_index].id : 0;
     uintptr_t window_id = shell->dock_model.items[item_index].window;
+    int32_t settings_window = reach_shell_dock_item_is_settings_window(shell, item_index);
     reach_shell_close_context_menu(shell);
+
+    if (settings_window && command != REACH_CONTEXT_MENU_COMMAND_CLOSE)
+    {
+        return REACH_OK;
+    }
 
     if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_NEW)
     {
@@ -153,7 +175,8 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
                     (void)reach_copy_utf16(app.title, 128, window->title);
                 }
                 (void)reach_copy_utf16(app.path, 260, window->path);
-                (void)reach_copy_utf16(app.icon_ref, 260, window->path);
+                (void)reach_copy_utf16(app.icon_ref, 260,
+                                       window->icon_ref[0] != 0 ? window->icon_ref : window->path);
                 (void)reach_copy_utf16(app.app_user_model_id, 260, window->app_user_model_id);
             }
         }
@@ -263,11 +286,19 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     reach_shell_set_quick_settings_open(shell, 0);
     reach_shell_set_tray_popup_open(shell, 0);
 
-    reach_context_menu_build_dock_item_commands(
-        shell->dock_model.items[item_index].pinned,
-        reach_shell_dock_item_path(shell, item_index) != nullptr,
-        shell->dock_model.items[item_index].window != 0, shell->context_menu_state.item_commands,
-        &shell->context_menu_state.item_count);
+    if (reach_shell_dock_item_is_settings_window(shell, item_index))
+    {
+        shell->context_menu_state.item_commands[0] = REACH_CONTEXT_MENU_COMMAND_CLOSE;
+        shell->context_menu_state.item_count = 1;
+    }
+    else
+    {
+        reach_context_menu_build_dock_item_commands(
+            shell->dock_model.items[item_index].pinned,
+            reach_shell_dock_item_path(shell, item_index) != nullptr,
+            shell->dock_model.items[item_index].window != 0, shell->context_menu_state.item_commands,
+            &shell->context_menu_state.item_count);
+    }
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
     {
         shell->context_menu_state.item_icon_ids[index] = 0;

@@ -225,13 +225,10 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_COMMIT)
     {
+        uintptr_t window = 0;
         if (shell->switcher_state.selected_index < shell->switcher_state.window_count)
         {
-            uintptr_t window = shell->switcher_state.windows[shell->switcher_state.selected_index];
-            if (window != 0 && shell->window_manager.ops.activate != nullptr)
-            {
-                (void)shell->window_manager.ops.activate(shell->window_manager.manager, window);
-            }
+            window = shell->switcher_state.windows[shell->switcher_state.selected_index];
         }
 
         shell->switcher_state.open = 0;
@@ -242,6 +239,20 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
         if (shell->switcher.window.ops.hide != nullptr)
         {
             (void)shell->switcher.window.ops.hide(shell->switcher.window.window);
+        }
+
+        if (window != 0)
+        {
+            if (reach_shell_window_is_settings_window(shell, window))
+            {
+                (void)reach_shell_execute_settings_window_control(
+                    shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE);
+            }
+            else
+            {
+                (void)reach_shell_schedule_window_control(shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE,
+                                                          window);
+            }
         }
 
         return REACH_OK;

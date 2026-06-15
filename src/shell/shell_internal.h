@@ -485,7 +485,6 @@ struct reach_shell
     float quick_settings_notch_anchor_x;
     reach_shell_popup_bounds_animation quick_settings_bounds_animation;
     int32_t settings_open;
-    int32_t settings_maximized;
     reach_settings_model settings_model;
     reach_settings_layout settings_layout;
     reach_rect_f32 settings_bounds;
@@ -602,7 +601,7 @@ void reach_shell_stop_open_window_icon_worker(reach_shell *shell);
 void reach_shell_apply_open_window_icon_results(reach_shell *shell);
 int32_t reach_shell_open_window_icon_work_pending(const reach_shell *shell);
 void reach_shell_sync_open_window_icons(reach_shell *shell, const uintptr_t *old_windows,
-                                        const uint16_t old_paths[][260],
+                                        const uint16_t old_icon_refs[][260],
                                         const reach_icon_handle *old_icons,
                                         const uint16_t *old_initials, size_t old_count);
 void reach_shell_load_open_window_icons(reach_shell *shell);
@@ -611,6 +610,9 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
 void reach_shell_note_foreground_window(reach_shell *shell, uintptr_t foreground_window);
 
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
+int32_t reach_shell_window_is_settings_window(const reach_shell *shell, uintptr_t window_id);
+reach_result reach_shell_execute_settings_window_control(reach_shell *shell,
+                                                         reach_shell_window_control_action action);
 reach_result reach_shell_execute_window_control(reach_shell *shell,
                                                 reach_shell_window_control_action action,
                                                 uintptr_t window_id);
@@ -748,7 +750,9 @@ reach_result reach_shell_update_quick_settings_drag(reach_shell *shell,
 
 void reach_shell_open_settings(reach_shell *shell);
 void reach_shell_close_settings(reach_shell *shell);
-void reach_shell_toggle_settings_maximized(reach_shell *shell);
+void reach_shell_minimize_settings(reach_shell *shell);
+int32_t reach_shell_settings_window_minimized(const reach_shell *shell);
+void reach_shell_sync_settings_bounds_from_window(reach_shell *shell);
 void reach_shell_refresh_settings_layout(reach_shell *shell);
 reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell, const reach_ui_event *event);
 

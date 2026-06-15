@@ -315,7 +315,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
     shell->settings_open = 0;
-    shell->settings_maximized = 0;
     shell->settings_bounds = {};
     shell->settings_restored_bounds = {};
     shell->settings_layout = {};

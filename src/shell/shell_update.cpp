@@ -950,20 +950,20 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 if (shell->settings.window.ops.set_bounds != nullptr)
                 {
                     int32_t settings_window_changed = 0;
-                    if (!game_mode && shell->settings_open)
+                    int32_t settings_minimized = reach_shell_settings_window_minimized(shell);
+                    if (!game_mode && shell->settings_open && !settings_minimized)
                     {
                         reach_shell_refresh_settings_layout(shell);
-                    }
 
-                    result = reach_shell_apply_window_state(
-                        &shell->settings.window, shell->settings_bounds,
-                        (!game_mode && shell->settings_open) ? 1.0f : 0.0f,
-                        &shell->settings.last_bounds, &shell->settings.last_opacity,
-                        &shell->settings.bounds_valid, &shell->settings.opacity_valid,
-                        &settings_window_changed);
-                    if (result != REACH_OK)
-                    {
-                        return result;
+                        result = reach_shell_apply_window_state(
+                            &shell->settings.window, shell->settings_bounds, 1.0f,
+                            &shell->settings.last_bounds, &shell->settings.last_opacity,
+                            &shell->settings.bounds_valid, &shell->settings.opacity_valid,
+                            &settings_window_changed);
+                        if (result != REACH_OK)
+                        {
+                            return result;
+                        }
                     }
 
                     if (settings_window_changed &&
@@ -974,19 +974,15 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                             18.0f * reach_shell_layout_dpi_scale(shell));
                     }
 
-                    if (!game_mode && shell->settings_open)
+                    if (!game_mode && shell->settings_open && !settings_minimized)
                     {
-                        if (shell->settings.window.ops.show != nullptr)
-                        {
-                            (void)shell->settings.window.ops.show(shell->settings.window.window);
-                        }
                         if (shell->dirty.render || shell->settings.dirty_flags ||
                             settings_window_changed)
                         {
                             (void)reach_shell_render_settings_surface(shell);
                         }
                     }
-                    else if (shell->settings.window.ops.hide != nullptr)
+                    else if (!shell->settings_open && shell->settings.window.ops.hide != nullptr)
                     {
                         (void)shell->settings.window.ops.hide(shell->settings.window.window);
                     }
