@@ -22,6 +22,10 @@ static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *
 static void reach_quick_settings_push_text(reach_render_command_buffer *commands,
                                            reach_rect_f32 rect, const uint16_t *text, float size,
                                            int32_t weight, int32_t alignment, reach_color color);
+static void reach_quick_settings_push_ellipsized_text(reach_render_command_buffer *commands,
+                                                      reach_rect_f32 rect, const uint16_t *text,
+                                                      float size, int32_t weight,
+                                                      int32_t alignment, reach_color color);
 
 static size_t reach_quick_settings_utf16_length(const uint16_t *text)
 {
@@ -313,6 +317,23 @@ static void reach_quick_settings_push_text(reach_render_command_buffer *commands
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
+static void reach_quick_settings_push_ellipsized_text(reach_render_command_buffer *commands,
+                                                      reach_rect_f32 rect, const uint16_t *text,
+                                                      float size, int32_t weight,
+                                                      int32_t alignment, reach_color color)
+{
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_TEXT;
+    command.rect = rect;
+    command.text_size = size;
+    command.text_weight = weight;
+    command.text_alignment = alignment;
+    command.text_ellipsis = 1;
+    command.color = color;
+    reach_quick_settings_copy_utf16(command.text, 260, text);
+    (void)reach_render_command_buffer_push(commands, &command);
+}
+
 static const reach_audio_output_device *
 reach_quick_settings_current_output_device(const reach_quick_settings_model *model)
 {
@@ -523,9 +544,9 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
         display_label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, session->label);
     reach_quick_settings_capitalize_first_utf16(display_label);
 
-    reach_quick_settings_push_text(commands, layout->app_label, display_label,
-                                   values->app_row_text_size,
-                                   REACH_TEXT_WEIGHT_NORMAL, 0, theme->light_text);
+    reach_quick_settings_push_ellipsized_text(commands, layout->app_label, display_label,
+                                              values->app_row_text_size,
+                                              REACH_TEXT_WEIGHT_NORMAL, 0, theme->light_text);
 
     reach_color line_color = reach_quick_settings_color_alpha(theme->light_text, 0.32f);
     reach_color level_color =
