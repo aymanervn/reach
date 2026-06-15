@@ -248,6 +248,15 @@ enum reach_shell_window_control_action
     REACH_SHELL_WINDOW_CONTROL_CLOSE,
 };
 
+typedef struct reach_shell_dock_item_menu_capabilities
+{
+    int32_t open_new;
+    int32_t open_as_admin;
+    int32_t pin;
+    int32_t unpin;
+    int32_t close;
+} reach_shell_dock_item_menu_capabilities;
+
 typedef struct reach_shell_config_reload_state
 {
     std::thread thread;
@@ -611,6 +620,9 @@ void reach_shell_note_foreground_window(reach_shell *shell, uintptr_t foreground
 
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
 int32_t reach_shell_window_is_settings_window(const reach_shell *shell, uintptr_t window_id);
+void reach_shell_dock_item_menu_capabilities_for_index(
+    const reach_shell *shell, size_t item_index,
+    reach_shell_dock_item_menu_capabilities *out_capabilities);
 reach_result reach_shell_execute_settings_window_control(reach_shell *shell,
                                                          reach_shell_window_control_action action);
 reach_result reach_shell_execute_window_control(reach_shell *shell,

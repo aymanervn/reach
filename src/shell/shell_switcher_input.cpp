@@ -243,16 +243,8 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
 
         if (window != 0)
         {
-            if (reach_shell_window_is_settings_window(shell, window))
-            {
-                (void)reach_shell_execute_settings_window_control(
-                    shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE);
-            }
-            else
-            {
-                (void)reach_shell_schedule_window_control(shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE,
-                                                          window);
-            }
+            (void)reach_shell_schedule_window_control(shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE,
+                                                      window);
         }
 
         return REACH_OK;
