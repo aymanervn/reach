@@ -16,6 +16,64 @@ static float reach_context_menu_scale(const reach_context_menu_render_input *inp
     return value * scale;
 }
 
+typedef struct reach_context_menu_item_style
+{
+    reach_color foreground;
+    reach_color hover_background;
+    reach_color hover_foreground;
+    int32_t use_hover_foreground;
+} reach_context_menu_item_style;
+
+static reach_context_menu_item_style reach_context_menu_style_for_command(uint32_t command)
+{
+    reach_context_menu_item_style style = {};
+    style.foreground = reach_context_menu_rgb(232, 229, 224, 0.96f);
+    style.hover_background = reach_context_menu_rgb(255, 255, 255, 0.12f);
+    style.hover_foreground = style.foreground;
+    style.use_hover_foreground = 0;
+
+    uint8_t r = 0;
+    uint8_t g = 0;
+    uint8_t b = 0;
+    int32_t power_color = 1;
+    switch (command)
+    {
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN:
+        r = 236;
+        g = 92;
+        b = 92;
+        break;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP:
+        r = 176;
+        g = 132;
+        b = 232;
+        break;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_RESTART:
+        r = 98;
+        g = 210;
+        b = 132;
+        break;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_LOCK:
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT:
+        r = 236;
+        g = 202;
+        b = 92;
+        break;
+    default:
+        power_color = 0;
+        break;
+    }
+
+    if (power_color)
+    {
+        style.hover_background = reach_context_menu_rgb(r, g, b, 0.12f);
+        style.hover_foreground = reach_context_menu_rgb(r, g, b, 1.0f);
+        style.use_hover_foreground = 1;
+    }
+
+    return style;
+}
+
 reach_result reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
                                                       reach_render_command_buffer *out_commands)
 {
@@ -56,15 +114,22 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         reach_rect_f32 item = input->item_slots[index];
         item.x -= input->bounds.x;
         item.y -= input->bounds.y;
+        reach_context_menu_item_style style =
+            reach_context_menu_style_for_command(input->item_commands[index]);
+        reach_color foreground = style.foreground;
 
         if (input->hovered_index == index)
         {
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
-            command.color = reach_context_menu_rgb(255, 255, 255, 0.12f);
+            command.color = style.hover_background;
             command.radius = reach_context_menu_scale(input, 8.0f);
             reach_render_command_buffer_push(out_commands, &command);
+            if (style.use_hover_foreground)
+            {
+                foreground = style.hover_foreground;
+            }
         }
 
         command = {};
@@ -82,7 +147,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             icon_command.rect.y = item.y + (item.height - icon_size) * 0.5f;
             icon_command.rect.width = icon_size;
             icon_command.rect.height = icon_size;
-            icon_command.color = reach_context_menu_rgb(232, 229, 224, 0.96f);
+            icon_command.color = foreground;
             icon_command.icon_id = input->item_icon_ids[index];
             reach_render_command_buffer_push(out_commands, &icon_command);
         }
@@ -90,7 +155,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         command.rect.y = item.y;
         command.rect.width = item.width - text_left - reach_context_menu_scale(input, 14.0f);
         command.rect.height = item.height;
-        command.color = reach_context_menu_rgb(232, 229, 224, 0.96f);
+        command.color = foreground;
         command.text_size = reach_context_menu_scale(input, 14.0f);
         command.text_alignment = input->text_alignment_leading;
         command.text_ellipsis = 1;
