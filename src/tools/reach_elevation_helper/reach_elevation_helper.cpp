@@ -506,11 +506,14 @@ static void reach_helper_classify_window(reach_elevation_helper_window_snapshot 
         return;
     }
 
-    if (reach_helper_string_in_list(snapshot->class_name, helper_classes,
+    int32_t app_window = (ex_style & WS_EX_APPWINDOW) != 0;
+    int32_t helper_class =
+        reach_helper_string_in_list(snapshot->class_name, helper_classes,
                                     sizeof(helper_classes) / sizeof(helper_classes[0])) ||
         reach_helper_string_has_prefix(snapshot->class_name, helper_class_prefixes,
                                        sizeof(helper_class_prefixes) /
-                                           sizeof(helper_class_prefixes[0])))
+                                           sizeof(helper_class_prefixes[0]));
+    if (helper_class && !app_window)
     {
         snapshot->kind = REACH_ELEVATION_HELPER_WINDOW_HELPER;
         reach_helper_copy_wide(snapshot->classification_reason, 160, L"known helper class");
