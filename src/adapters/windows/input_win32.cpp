@@ -35,6 +35,8 @@ static const int REACH_INPUT_HOTKEY_MEDIA_NEXT = 3;
 static const int REACH_INPUT_HOTKEY_VOLUME_UP = 4;
 static const int REACH_INPUT_HOTKEY_VOLUME_DOWN = 5;
 static const int REACH_INPUT_HOTKEY_VOLUME_MUTE = 6;
+static const int REACH_INPUT_HOTKEY_BRIGHTNESS_UP = 7;
+static const int REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN = 8;
 static LONG g_reach_input_helper_restart_prompt_active = 0;
 
 static void reach_input_reset_hotkey_state(reach_input_source *source);
@@ -60,6 +62,18 @@ static UINT reach_input_media_hotkey_vk(int hotkey_id)
         return VK_VOLUME_DOWN;
     case REACH_INPUT_HOTKEY_VOLUME_MUTE:
         return VK_VOLUME_MUTE;
+    case REACH_INPUT_HOTKEY_BRIGHTNESS_UP:
+#ifdef VK_BRIGHTNESS_UP
+        return VK_BRIGHTNESS_UP;
+#else
+        return 0;
+#endif
+    case REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN:
+#ifdef VK_BRIGHTNESS_DOWN
+        return VK_BRIGHTNESS_DOWN;
+#else
+        return 0;
+#endif
     default:
         return 0;
     }
@@ -93,6 +107,8 @@ static void reach_input_register_media_hotkeys(reach_input_source *source)
     reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_VOLUME_UP);
     reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_VOLUME_DOWN);
     reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_VOLUME_MUTE);
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_BRIGHTNESS_UP);
+    reach_input_register_media_hotkey(source, REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN);
 }
 
 static void reach_input_unregister_media_hotkey(reach_input_source *source, int hotkey_id)
@@ -120,7 +136,7 @@ static void reach_input_unregister_media_hotkeys(reach_input_source *source)
     }
 
     for (int hotkey_id = REACH_INPUT_HOTKEY_MEDIA_PREVIOUS;
-         hotkey_id <= REACH_INPUT_HOTKEY_VOLUME_MUTE; ++hotkey_id)
+         hotkey_id <= REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN; ++hotkey_id)
     {
         reach_input_unregister_media_hotkey(source, hotkey_id);
     }
@@ -142,6 +158,10 @@ static reach_ui_event_type reach_input_media_hotkey_event(WPARAM hotkey_id)
         return REACH_UI_EVENT_VOLUME_DOWN;
     case REACH_INPUT_HOTKEY_VOLUME_MUTE:
         return REACH_UI_EVENT_VOLUME_MUTE;
+    case REACH_INPUT_HOTKEY_BRIGHTNESS_UP:
+        return REACH_UI_EVENT_BRIGHTNESS_UP;
+    case REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN:
+        return REACH_UI_EVENT_BRIGHTNESS_DOWN;
     default:
         return REACH_UI_EVENT_NONE;
     }

@@ -50,7 +50,8 @@ static int32_t reach_shell_game_mode_allows_event(reach_ui_event_type type)
            type == REACH_UI_EVENT_POINTER_CANCEL || type == REACH_UI_EVENT_MEDIA_PREVIOUS ||
            type == REACH_UI_EVENT_MEDIA_PLAY_PAUSE || type == REACH_UI_EVENT_MEDIA_NEXT ||
            type == REACH_UI_EVENT_VOLUME_UP || type == REACH_UI_EVENT_VOLUME_DOWN ||
-           type == REACH_UI_EVENT_VOLUME_MUTE;
+           type == REACH_UI_EVENT_VOLUME_MUTE || type == REACH_UI_EVENT_BRIGHTNESS_UP ||
+           type == REACH_UI_EVENT_BRIGHTNESS_DOWN;
 }
 
 static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
@@ -187,6 +188,45 @@ static reach_result reach_shell_toggle_main_volume_mute(reach_shell *shell)
     }
 
     return shell->audio_volume.set_muted(shell->audio_volume.userdata, state.muted ? 0 : 1);
+}
+
+static reach_result reach_shell_step_brightness(reach_shell *shell, float delta)
+{
+    if (shell == nullptr || shell->system_controls.get_brightness_state == nullptr ||
+        shell->system_controls.set_brightness_level == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    reach_brightness_state state = {};
+    if (shell->system_controls.get_brightness_state(shell->system_controls.userdata, &state) !=
+        REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+    if (!state.available)
+    {
+        return REACH_OK;
+    }
+
+    float level = reach_shell_clamp01(state.level + delta);
+    reach_result result =
+        shell->system_controls.set_brightness_level(shell->system_controls.userdata, level);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    if (shell->quick_settings_open)
+    {
+        reach_shell_start_quick_settings_system_refresh(
+            shell, REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS);
+        shell->quick_settings.dirty_flags = 1;
+        shell->dirty.render = 1;
+        reach_shell_request_update(shell);
+    }
+
+    return REACH_OK;
 }
 
 static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reach_ui_event *event)
@@ -879,6 +919,16 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     if (event->type == REACH_UI_EVENT_VOLUME_MUTE)
     {
         return reach_shell_toggle_main_volume_mute(shell);
+    }
+
+    if (event->type == REACH_UI_EVENT_BRIGHTNESS_UP)
+    {
+        return reach_shell_step_brightness(shell, 0.02f);
+    }
+
+    if (event->type == REACH_UI_EVENT_BRIGHTNESS_DOWN)
+    {
+        return reach_shell_step_brightness(shell, -0.02f);
     }
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN || event->type == REACH_UI_EVENT_ALT_TAB_NEXT ||
