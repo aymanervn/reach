@@ -437,6 +437,7 @@ reach_result reach_shell_start(reach_shell *shell)
     {
         return result;
     }
+    (void)reach_shell_minimize_open_windows(shell);
 
     if (shell->dock.window.ops.set_event_callback != nullptr)
     {

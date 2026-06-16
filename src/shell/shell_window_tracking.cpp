@@ -553,6 +553,87 @@ reach_result reach_shell_schedule_window_control(reach_shell *shell,
     return REACH_OK;
 }
 
+static size_t reach_shell_collect_unminimized_windows(const reach_shell *shell,
+                                                      uintptr_t *out_windows,
+                                                      size_t out_window_count)
+{
+    if (shell == nullptr || out_windows == nullptr || out_window_count == 0)
+    {
+        return 0;
+    }
+
+    size_t window_count = 0;
+    for (size_t index = 0; index < shell->open_window_count && window_count < out_window_count;
+         ++index)
+    {
+        if (shell->open_windows[index].id != 0 && !shell->open_windows[index].minimized)
+        {
+            out_windows[window_count++] = shell->open_windows[index].id;
+        }
+    }
+    return window_count;
+}
+
+reach_result reach_shell_minimize_open_windows(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (shell->window_manager.ops.refresh != nullptr)
+    {
+        (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
+    }
+    (void)reach_shell_refresh_open_windows(shell, nullptr);
+
+    uintptr_t windows[REACH_MAX_PINNED_APPS] = {};
+    size_t window_count =
+        reach_shell_collect_unminimized_windows(shell, windows, REACH_MAX_PINNED_APPS);
+    reach_result result = REACH_OK;
+    for (size_t index = 0; index < window_count; ++index)
+    {
+        reach_result window_result =
+            reach_shell_execute_window_control(shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE,
+                                               windows[index]);
+        if (window_result != REACH_OK && result == REACH_OK)
+        {
+            result = window_result;
+        }
+    }
+
+    if (shell->window_manager.ops.refresh != nullptr)
+    {
+        (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
+    }
+    (void)reach_shell_refresh_open_windows(shell, nullptr);
+    if (window_count > 0)
+    {
+        shell->dock.dirty_flags = 1;
+    }
+    return result;
+}
+
+reach_result reach_shell_schedule_minimize_open_windows(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (shell->window_manager.ops.refresh != nullptr)
+    {
+        (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
+    }
+    (void)reach_shell_refresh_open_windows(shell, nullptr);
+
+    uintptr_t windows[REACH_MAX_PINNED_APPS] = {};
+    size_t window_count =
+        reach_shell_collect_unminimized_windows(shell, windows, REACH_MAX_PINNED_APPS);
+    return window_count > 0 ? reach_shell_schedule_minimize_windows(shell, windows, window_count)
+                            : REACH_OK;
+}
+
 reach_result reach_shell_schedule_minimize_windows(reach_shell *shell, const uintptr_t *window_ids,
                                                    size_t window_count)
 {
