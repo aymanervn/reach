@@ -11,16 +11,20 @@
 
 ## Important notice
 
-Reach replaces Windows Explorer as the shell, which means that Explorer does not run in the background. This breaks a few apps that rely on it, most importantly Settings. I haven't tested other Windows Store apps as I don't use them.
+Reach replaces Windows Explorer, which will not be running in the background. This breaks a few apps that rely on it, most importantly Windows settings. I haven't tested other Windows Store apps as I don't use them.
 
 ## Important hotkeys
 
 In case of an emergency, you can always open Task manager (CTRL + SHIFT + ESC), click on run, type powershell, then press CTRL + SHIFT + ENTER. This will open an elevated powershell session, and you can follow the instructions below to restore explorer.
 
+## Reach app launcher
+
+Press the windows key to open app launcher, it uses voidtools' Everything SDK and can search any file on the NTFS disks.
+
 ## Requirements
 
-Microsoft Visual C++ Redistributable for Visual Studio 2015–2022 (x64)
-[Everything by voidtools](https://www.voidtools.com/) to be installed and running.
+- Microsoft Visual C++ Redistributable for Visual Studio 2015–2022 (x64)
+- [Everything by voidtools](https://www.voidtools.com/) neeed to be installed and running.
 
 ## Build
 
@@ -38,14 +42,14 @@ This produces a zip file with the distributables.
 Run as admin:
 
 ```powershell
-reachctl --install
+./reachctl --install
 ```
 
 This configures Windows to launch Reach instead of Explorer, effective starting from the next Windows session.
 Then, to start Reach immediately for your current session, run:
 
 ```powershell
-reachctl --start
+./reachctl --start
 ```
 
 You also need Voidtools' Everything installed and running to use the launcher feature.
@@ -53,7 +57,7 @@ You also need Voidtools' Everything installed and running to use the launcher fe
 In case of a problem, you can reset Windows Explorer as the shell by running this as admin:
 
 ```powershell
-reachctl --reset
+./reachctl --reset
 ```
 
 ## License

@@ -572,3 +572,13 @@ reach_result reach_windows_launch_startup_apps(void)
 
     return REACH_OK;
 }
+
+uintptr_t reach_windows_get_current_foreground(void)
+{
+    HWND foreground = GetForegroundWindow();
+    if (foreground != nullptr && IsWindow(foreground))
+    {
+        return reinterpret_cast<uintptr_t>(foreground);
+    }
+    return 0;
+}
