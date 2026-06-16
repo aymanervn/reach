@@ -56,6 +56,7 @@ extern "C"
     void reach_windows_request_desktop_environment_sync(void);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
     reach_result reach_windows_launch_startup_apps(void);
+    uintptr_t reach_windows_get_current_foreground(void);
 
 #ifdef __cplusplus
 }

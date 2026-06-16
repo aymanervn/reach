@@ -498,7 +498,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         {
             if (reach_shell_open_launcher_result(shell) == REACH_OK)
             {
-                reach_shell_defer_launcher_close_until_foreground_change(shell);
+                reach_shell_close_launcher(shell);
             }
             return REACH_OK;
         }
@@ -1241,7 +1241,7 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     {
         if (reach_shell_open_launcher_result(shell) == REACH_OK)
         {
-            reach_shell_defer_launcher_close_until_foreground_change(shell);
+            reach_shell_close_launcher(shell);
         }
     }
 

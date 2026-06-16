@@ -421,6 +421,16 @@ void reach_shell_destroy(reach_shell *shell)
     delete shell;
 }
 
+void reach_shell_set_initial_foreground(reach_shell *shell, uintptr_t window)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    shell->foreground_window = window;
+}
+
 reach_result reach_shell_start(reach_shell *shell)
 {
     if (shell == nullptr)
@@ -437,7 +447,6 @@ reach_result reach_shell_start(reach_shell *shell)
     {
         return result;
     }
-    (void)reach_shell_minimize_open_windows(shell);
 
     if (shell->dock.window.ops.set_event_callback != nullptr)
     {
@@ -597,6 +606,16 @@ reach_result reach_shell_start(reach_shell *shell)
         if (result != REACH_OK)
         {
             return result;
+        }
+    }
+
+    if (shell->foreground_window != 0 &&
+        !reach_shell_window_is_minimized(shell, shell->foreground_window))
+    {
+        if (shell->window_manager.ops.activate != nullptr)
+        {
+            (void)shell->window_manager.ops.activate(shell->window_manager.manager,
+                                                     shell->foreground_window);
         }
     }
 
