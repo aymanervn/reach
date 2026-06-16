@@ -70,6 +70,7 @@ extern "C"
     reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
     reach_result reach_windows_launch_startup_apps(void);
+    extern "C" uintptr_t reach_windows_get_current_foreground(void);
     reach_result reach_windows_shell_install_current_user(const uint16_t *exe_path);
     reach_result reach_windows_shell_install_command_current_user(const uint16_t *identity_exe_path,
                                                                   const uint16_t *shell_command);
