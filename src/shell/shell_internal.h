@@ -652,8 +652,7 @@ int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell);
 void reach_shell_keep_dock_revealed(reach_shell *shell);
 void reach_shell_schedule_dock_reveal_recheck(reach_shell *shell);
 
-reach_point_i32 reach_shell_dock_local_point(const reach_dock_layout *layout, int32_t x,
-                                             int32_t y);
+reach_point_i32 reach_shell_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y);
 reach_rect_f32 reach_shell_dock_rect_to_screen(const reach_dock_layout *layout,
                                                reach_rect_f32 rect);
 reach_dock_layout reach_shell_dock_layout_to_screen(reach_dock_layout layout);

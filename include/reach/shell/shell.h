@@ -73,6 +73,7 @@ extern "C"
     reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
                                                       const reach_shell_dependencies *dependencies,
                                                       reach_shell **out_shell);
+    void reach_shell_set_initial_foreground(reach_shell *shell, uintptr_t window);
     void reach_shell_destroy(reach_shell *shell);
     reach_result reach_shell_start(reach_shell *shell);
     reach_result reach_shell_stop(reach_shell *shell);
