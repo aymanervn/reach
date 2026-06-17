@@ -4,7 +4,8 @@ static reach_rect_f32 reach_shell_settings_default_bounds(reach_shell *shell)
 {
     reach_rect_f32 monitor = {};
     const reach_monitor_info *primary_monitor =
-        shell != nullptr && shell->monitors.list != nullptr && shell->monitors.ops.primary != nullptr
+        shell != nullptr && shell->monitors.list != nullptr &&
+                shell->monitors.ops.primary != nullptr
             ? shell->monitors.ops.primary(shell->monitors.list)
             : nullptr;
     if (primary_monitor != nullptr)
@@ -74,6 +75,17 @@ int32_t reach_shell_window_is_settings_window(const reach_shell *shell, uintptr_
     }
 
     return shell->settings.window.ops.native_id(shell->settings.window.window) == window_id;
+}
+
+int32_t reach_shell_foreground_is_settings_window(const reach_shell *shell, uintptr_t window_id)
+{
+    if (shell == nullptr || window_id == 0)
+    {
+        return 0;
+    }
+    // to be implmented, currently might require double clicking on icon if focus is lost but not
+    // minimized
+    return 1;
 }
 
 static void reach_shell_prepare_settings_window(reach_shell *shell)
@@ -232,8 +244,7 @@ void reach_shell_minimize_settings(reach_shell *shell)
     reach_shell_request_update(shell);
 }
 
-reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
-                                                    const reach_ui_event *event)
+reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell, const reach_ui_event *event)
 {
     if (shell == nullptr || event == nullptr || !shell->settings_open)
     {
@@ -244,7 +255,8 @@ reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
 
     float local_x = (float)event->x - shell->settings_bounds.x;
     float local_y = (float)event->y - shell->settings_bounds.y;
-    reach_settings_hit_result hit = reach_settings_hit_test(&shell->settings_layout, local_x, local_y);
+    reach_settings_hit_result hit =
+        reach_settings_hit_test(&shell->settings_layout, local_x, local_y);
     if (hit.type == REACH_SETTINGS_HIT_CLOSE)
     {
         reach_shell_close_settings(shell);

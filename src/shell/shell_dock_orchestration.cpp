@@ -63,21 +63,31 @@ reach_result reach_shell_execute_dock_item_action(reach_shell *shell, reach_dock
             (void)shell->window_manager.ops.refresh(shell->window_manager.manager);
             (void)reach_shell_refresh_open_windows(shell, nullptr);
         }
-        uintptr_t foreground =
-            shell->window_manager.ops.foreground != nullptr
-                ? shell->window_manager.ops.foreground(shell->window_manager.manager)
-                : 0;
-        int32_t minimized = reach_shell_window_is_minimized(shell, window_id);
+        uintptr_t foreground;
+        int32_t minimized;
         reach_result result = REACH_OK;
-        if (foreground == window_id && !minimized)
+        if (reach_shell_window_is_settings_window(shell, window_id))
         {
-            result = reach_shell_schedule_window_control(
-                shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE, window_id);
+            foreground =
+                reach_shell_foreground_is_settings_window(shell, window_id) ? window_id : 0;
+            minimized = reach_shell_settings_window_minimized(shell);
         }
         else
         {
-            result = reach_shell_schedule_window_control(
-                shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE, window_id);
+            foreground = shell->window_manager.ops.foreground != nullptr
+                             ? shell->window_manager.ops.foreground(shell->window_manager.manager)
+                             : 0;
+            minimized = reach_shell_window_is_minimized(shell, window_id);
+        }
+        if (foreground == window_id && !minimized)
+        {
+            result = reach_shell_schedule_window_control(shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE,
+                                                         window_id);
+        }
+        else
+        {
+            result = reach_shell_schedule_window_control(shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE,
+                                                         window_id);
         }
         shell->dock.dirty_flags = 1;
         return result;
