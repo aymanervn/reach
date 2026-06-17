@@ -60,7 +60,6 @@ void reach_shell_stick_dock_item(reach_shell *shell)
     if (shell->feedback.dock_sticky)
     {
         reach_shell_set_dock_click_feedback_immediate(shell, shell->feedback.dock_index, 0.50f);
-
     }
 }
 

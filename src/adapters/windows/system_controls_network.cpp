@@ -5,8 +5,9 @@ static int32_t reach_windows_network_adapter_connected(const reach_windows_netwo
     return adapter != nullptr && adapter->oper_up && adapter->has_unicast;
 }
 
-reach_network_kind reach_windows_network_kind_from_adapters(
-    const reach_windows_network_adapter *adapters, size_t adapter_count)
+reach_network_kind
+reach_windows_network_kind_from_adapters(const reach_windows_network_adapter *adapters,
+                                         size_t adapter_count)
 {
     if (adapters == nullptr)
     {

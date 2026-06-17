@@ -176,8 +176,7 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
         if (result == REACH_OK)
         {
-            reach_shell_set_initial_foreground(app->shell,
-                                               reach_windows_get_current_foreground());
+            reach_shell_set_initial_foreground(app->shell, reach_windows_get_current_foreground());
             dependencies.popup_capture = {};
             dependencies.power_session = {};
             dependencies.audio_volume = {};

@@ -81,8 +81,7 @@ extern "C"
 
     int32_t reach_music_widget_bg_animation_update(reach_music_widget_bg_animation *animation,
                                                    const reach_music_widget_model *model,
-                                                   reach_rect_f32 bounds,
-                                                   double delta_seconds);
+                                                   reach_rect_f32 bounds, double delta_seconds);
 
 #ifdef __cplusplus
 }

@@ -47,12 +47,12 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
 static int32_t reach_shell_game_mode_allows_event(reach_ui_event_type type)
 {
     return type == REACH_UI_EVENT_CONFIG_CHANGED || type == REACH_UI_EVENT_DISPLAY_CHANGED ||
-           type == REACH_UI_EVENT_WINDOW_STATE_CHANGED || type == REACH_UI_EVENT_WALLPAPER_CHANGED ||
-           type == REACH_UI_EVENT_POINTER_CANCEL || type == REACH_UI_EVENT_MEDIA_PREVIOUS ||
-           type == REACH_UI_EVENT_MEDIA_PLAY_PAUSE || type == REACH_UI_EVENT_MEDIA_NEXT ||
-           type == REACH_UI_EVENT_VOLUME_UP || type == REACH_UI_EVENT_VOLUME_DOWN ||
-           type == REACH_UI_EVENT_VOLUME_MUTE || type == REACH_UI_EVENT_BRIGHTNESS_UP ||
-           type == REACH_UI_EVENT_BRIGHTNESS_DOWN;
+           type == REACH_UI_EVENT_WINDOW_STATE_CHANGED ||
+           type == REACH_UI_EVENT_WALLPAPER_CHANGED || type == REACH_UI_EVENT_POINTER_CANCEL ||
+           type == REACH_UI_EVENT_MEDIA_PREVIOUS || type == REACH_UI_EVENT_MEDIA_PLAY_PAUSE ||
+           type == REACH_UI_EVENT_MEDIA_NEXT || type == REACH_UI_EVENT_VOLUME_UP ||
+           type == REACH_UI_EVENT_VOLUME_DOWN || type == REACH_UI_EVENT_VOLUME_MUTE ||
+           type == REACH_UI_EVENT_BRIGHTNESS_UP || type == REACH_UI_EVENT_BRIGHTNESS_DOWN;
 }
 
 static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
@@ -93,7 +93,8 @@ reach_shell_music_widget_hit_test_event(const reach_shell *shell, const reach_ui
         return REACH_MUSIC_WIDGET_ACTION_NONE;
     }
     reach_point_i32 point = reach_shell_event_dock_point(shell, event);
-    return reach_music_widget_hit_test(&shell->music_widget_model, &shell->music_widget_layout, point.x, point.y);
+    return reach_music_widget_hit_test(&shell->music_widget_model, &shell->music_widget_layout,
+                                       point.x, point.y);
 }
 
 static size_t reach_shell_launcher_visible_result_count(const reach_shell *shell)
@@ -289,7 +290,7 @@ typedef enum reach_shell_media_action
 } reach_shell_media_action;
 
 static reach_result reach_shell_execute_media_action(reach_shell *shell,
-                                                    reach_shell_media_action action)
+                                                     reach_shell_media_action action)
 {
     if (shell == nullptr)
     {
@@ -392,8 +393,8 @@ static reach_result reach_shell_step_brightness(reach_shell *shell, float delta)
 
     if (shell->quick_settings_open)
     {
-        reach_shell_start_quick_settings_system_refresh(
-            shell, REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS);
+        reach_shell_start_quick_settings_system_refresh(shell,
+                                                        REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS);
         shell->quick_settings.dirty_flags = 1;
         shell->dirty.render = 1;
         reach_shell_request_update(shell);
@@ -525,8 +526,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
             }
             if (music_action == REACH_MUSIC_WIDGET_ACTION_PLAY_PAUSE)
             {
-                return reach_shell_execute_media_action(shell,
-                                                        REACH_SHELL_MEDIA_ACTION_PLAY_PAUSE);
+                return reach_shell_execute_media_action(shell, REACH_SHELL_MEDIA_ACTION_PLAY_PAUSE);
             }
             if (music_action == REACH_MUSIC_WIDGET_ACTION_NEXT)
             {
@@ -889,12 +889,11 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell,
         if (launcher_hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
             launcher_hit.index < shell->ui.launcher.result_count)
         {
-            const reach_search_candidate *result =
-                &shell->ui.launcher.results[launcher_hit.index];
+            const reach_search_candidate *result = &shell->ui.launcher.results[launcher_hit.index];
             if (result->kind == REACH_SEARCH_RESULT_APP)
             {
-                reach_result open_result = reach_shell_open_launcher_result_path(
-                    shell, launcher_hit.index);
+                reach_result open_result =
+                    reach_shell_open_launcher_result_path(shell, launcher_hit.index);
                 if (open_result == REACH_OK)
                 {
                     reach_shell_defer_launcher_close_until_foreground_change(shell);

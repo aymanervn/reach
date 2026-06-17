@@ -44,8 +44,7 @@ extern "C"
     reach_rect_f32 reach_switcher_bounds_for_count(reach_rect_f32 monitor_bounds,
                                                    size_t visible_count);
     reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bounds,
-                                                          size_t visible_count,
-                                                          float dpi_scale);
+                                                          size_t visible_count, float dpi_scale);
     void reach_switcher_update_visible_start(reach_switcher_model *model);
     reach_result reach_switcher_build_render_commands(const reach_switcher_render_input *input,
                                                       reach_render_command_buffer *out_commands);

@@ -492,10 +492,9 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     ShowWindow(window->hwnd, show_command);
     if (no_activate)
     {
-        SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0,
-                     0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER |
-                         SWP_SHOWWINDOW);
+        SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0,
+                     0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
     }
     else
     {

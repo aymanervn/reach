@@ -59,9 +59,9 @@ static void reach_window_manager_unlock(const reach_window_manager *manager)
     }
 }
 
-static void reach_window_manager_fill_request_identity(
-    const reach_window_manager *manager, uintptr_t window_id,
-    reach_elevation_helper_request *request)
+static void reach_window_manager_fill_request_identity(const reach_window_manager *manager,
+                                                       uintptr_t window_id,
+                                                       reach_elevation_helper_request *request)
 {
     if (request == nullptr)
     {
@@ -83,8 +83,7 @@ static void reach_window_manager_fill_request_identity(
 
 static reach_result reach_window_manager_send_helper(reach_window_manager *manager,
                                                      reach_elevation_helper_command command,
-                                                     uintptr_t window_id,
-                                                     reach_split_mode mode)
+                                                     uintptr_t window_id, reach_split_mode mode)
 {
     if (!reach_elevation_helper_shared_reader_connected())
     {
@@ -100,8 +99,8 @@ static reach_result reach_window_manager_send_helper(reach_window_manager *manag
     return reach_elevation_helper_send_request(&request, nullptr);
 }
 
-static int32_t reach_window_manager_privileged_control_available(
-    const reach_window_manager *manager)
+static int32_t
+reach_window_manager_privileged_control_available(const reach_window_manager *manager)
 {
     if (manager != nullptr && reach_elevation_helper_shared_reader_connected())
     {
@@ -131,8 +130,8 @@ static void reach_window_manager_suppress_helper_retry(reach_window_manager *man
     }
 }
 
-static int32_t reach_window_manager_confirm_privileged_control_restart(
-    reach_window_manager *manager)
+static int32_t
+reach_window_manager_confirm_privileged_control_restart(reach_window_manager *manager)
 {
     if (manager == nullptr)
     {
@@ -155,16 +154,15 @@ static int32_t reach_window_manager_confirm_privileged_control_restart(
         return 0;
     }
 
-    int response = MessageBoxW(nullptr, L"Reach elevation helper is not running. Restart it?",
-                               L"Reach",
-                               MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON1 | MB_SETFOREGROUND |
-                                   MB_TOPMOST | MB_TASKMODAL);
+    int response = MessageBoxW(
+        nullptr, L"Reach elevation helper is not running. Restart it?", L"Reach",
+        MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON1 | MB_SETFOREGROUND | MB_TOPMOST | MB_TASKMODAL);
     InterlockedExchange(&manager->helper_prompt_active, 0);
 
     if (response != IDYES)
     {
-        reach_window_manager_suppress_helper_retry(
-            manager, REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS);
+        reach_window_manager_suppress_helper_retry(manager,
+                                                   REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS);
         return 0;
     }
 
@@ -384,9 +382,8 @@ static reach_result reach_window_manager_refresh(reach_window_manager *manager)
 static reach_result reach_window_manager_snap(reach_window_manager *manager, uintptr_t window_id,
                                               reach_split_mode mode)
 {
-    reach_result result =
-        reach_window_manager_send_helper(manager, REACH_ELEVATION_HELPER_COMMAND_SNAP, window_id,
-                                         mode);
+    reach_result result = reach_window_manager_send_helper(
+        manager, REACH_ELEVATION_HELPER_COMMAND_SNAP, window_id, mode);
     return result;
 }
 
@@ -483,8 +480,7 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
     const reach_elevation_helper_window_snapshot &helper = manager->helper_windows[index];
     reach_window_snapshot snapshot = {};
     snapshot.id = static_cast<uintptr_t>(helper.window);
-    (void)reach_copy_utf16(snapshot.title, 260,
-                           reinterpret_cast<const uint16_t *>(helper.title));
+    (void)reach_copy_utf16(snapshot.title, 260, reinterpret_cast<const uint16_t *>(helper.title));
     (void)reach_copy_utf16(snapshot.path, 260,
                            reinterpret_cast<const uint16_t *>(helper.process_path));
     snapshot.visible = helper.visible;
@@ -520,8 +516,7 @@ static reach_result reach_window_manager_pin_app_for_window(reach_window_manager
     *out_app = {};
     (void)reach_copy_utf16(out_app->path, 260,
                            reinterpret_cast<const uint16_t *>(helper->process_path));
-    (void)reach_copy_utf16(out_app->title, 128,
-                           reinterpret_cast<const uint16_t *>(helper->title));
+    (void)reach_copy_utf16(out_app->title, 128, reinterpret_cast<const uint16_t *>(helper->title));
     (void)reach_copy_utf16(out_app->icon_ref, 260, out_app->path);
     (void)reach_copy_utf16(out_app->app_user_model_id, 260,
                            reinterpret_cast<const uint16_t *>(helper->app_user_model_id));
@@ -595,8 +590,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;
     out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
-    out_port->ops.privileged_control_available =
-        reach_window_manager_privileged_control_available;
+    out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.confirm_privileged_control_restart =
         reach_window_manager_confirm_privileged_control_restart;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;

@@ -71,13 +71,13 @@ reach_result reach_shell_execute_dock_item_action(reach_shell *shell, reach_dock
         reach_result result = REACH_OK;
         if (foreground == window_id && !minimized)
         {
-            result = reach_shell_schedule_window_control(
-                shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE, window_id);
+            result = reach_shell_schedule_window_control(shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE,
+                                                         window_id);
         }
         else
         {
-            result = reach_shell_schedule_window_control(
-                shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE, window_id);
+            result = reach_shell_schedule_window_control(shell, REACH_SHELL_WINDOW_CONTROL_ACTIVATE,
+                                                         window_id);
         }
         shell->dock.dirty_flags = 1;
         return result;

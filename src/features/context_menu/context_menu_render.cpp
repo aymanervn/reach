@@ -134,10 +134,9 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
 
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
-        float text_left =
-            input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0
-                ? reach_context_menu_scale(input, 40.0f)
-                : reach_context_menu_scale(input, 14.0f);
+        float text_left = input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0
+                              ? reach_context_menu_scale(input, 40.0f)
+                              : reach_context_menu_scale(input, 14.0f);
         if (input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0)
         {
             float icon_size = reach_context_menu_scale(input, 16.0f);

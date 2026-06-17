@@ -129,8 +129,7 @@ struct reach_elevation_helper_shared_state
     uint64_t first_hotkey_event_number;
     uint64_t last_hotkey_event_number;
     reach_elevation_helper_window_snapshot windows[REACH_ELEVATION_HELPER_MAX_WINDOWS];
-    reach_elevation_helper_hotkey_record
-        hotkeys[REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY];
+    reach_elevation_helper_hotkey_record hotkeys[REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY];
 };
 
 struct reach_elevation_helper_response

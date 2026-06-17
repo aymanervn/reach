@@ -161,15 +161,13 @@ static inline float reach_quick_settings_metric_scale_value(float value, float d
     return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
-static inline reach_quick_settings_metrics
-reach_quick_settings_metrics_for_scale(float dpi_scale)
+static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scale(float dpi_scale)
 {
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_values;
 
-    metrics.content_padding = reach_quick_settings_metric_scale_value(metrics.content_padding,
-                                                                      dpi_scale);
-    metrics.text_padding = reach_quick_settings_metric_scale_value(metrics.text_padding,
-                                                                   dpi_scale);
+    metrics.content_padding =
+        reach_quick_settings_metric_scale_value(metrics.content_padding, dpi_scale);
+    metrics.text_padding = reach_quick_settings_metric_scale_value(metrics.text_padding, dpi_scale);
     metrics.system_grid_tile_height =
         reach_quick_settings_metric_scale_value(metrics.system_grid_tile_height, dpi_scale);
     metrics.system_grid_gap =

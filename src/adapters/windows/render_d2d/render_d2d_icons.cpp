@@ -36,8 +36,7 @@ static int32_t reach_d2d_center_crop_source_rect(ID2D1Bitmap *bitmap, D2D1_RECT_
     D2D1_SIZE_F size = bitmap->GetSize();
     float dest_width = dest.right - dest.left;
     float dest_height = dest.bottom - dest.top;
-    if (size.width <= 0.0f || size.height <= 0.0f || dest_width <= 0.0f ||
-        dest_height <= 0.0f)
+    if (size.width <= 0.0f || size.height <= 0.0f || dest_width <= 0.0f || dest_height <= 0.0f)
     {
         return 0;
     }
@@ -83,9 +82,8 @@ static float reach_d2d_clamp_radius(D2D1_RECT_F rect, float radius)
     return radius > max_radius ? max_radius : radius;
 }
 
-static reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target,
-                                                     D2D1_RECT_F rect, float radius,
-                                                     int32_t corner_mask,
+static reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RECT_F rect,
+                                                     float radius, int32_t corner_mask,
                                                      ID2D1Geometry **out_geometry)
 {
     if (target == nullptr || out_geometry == nullptr)
@@ -135,39 +133,34 @@ static reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target,
         float rbr = (corner_mask & REACH_RENDER_CORNER_BOTTOM_RIGHT) ? radius : 0.0f;
         float rbl = (corner_mask & REACH_RENDER_CORNER_BOTTOM_LEFT) ? radius : 0.0f;
 
-        sink->BeginFigure(D2D1::Point2F(rect.left + rtl, rect.top),
-                          D2D1_FIGURE_BEGIN_FILLED);
+        sink->BeginFigure(D2D1::Point2F(rect.left + rtl, rect.top), D2D1_FIGURE_BEGIN_FILLED);
         sink->AddLine(D2D1::Point2F(rect.right - rtr, rect.top));
         if (rtr > 0.0f)
         {
             sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.right, rect.top + rtr),
                                           D2D1::SizeF(rtr, rtr), 0.0f,
-                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
-                                          D2D1_ARC_SIZE_SMALL));
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
         }
         sink->AddLine(D2D1::Point2F(rect.right, rect.bottom - rbr));
         if (rbr > 0.0f)
         {
             sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.right - rbr, rect.bottom),
                                           D2D1::SizeF(rbr, rbr), 0.0f,
-                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
-                                          D2D1_ARC_SIZE_SMALL));
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
         }
         sink->AddLine(D2D1::Point2F(rect.left + rbl, rect.bottom));
         if (rbl > 0.0f)
         {
             sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.left, rect.bottom - rbl),
                                           D2D1::SizeF(rbl, rbl), 0.0f,
-                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
-                                          D2D1_ARC_SIZE_SMALL));
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
         }
         sink->AddLine(D2D1::Point2F(rect.left, rect.top + rtl));
         if (rtl > 0.0f)
         {
             sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(rect.left + rtl, rect.top),
                                           D2D1::SizeF(rtl, rtl), 0.0f,
-                                          D2D1_SWEEP_DIRECTION_CLOCKWISE,
-                                          D2D1_ARC_SIZE_SMALL));
+                                          D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
         }
         sink->EndFigure(D2D1_FIGURE_END_CLOSED);
         hr = sink->Close();
@@ -562,8 +555,7 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
 
     D2D1_RECT_F source_rect = {};
     D2D1_RECT_F *source = nullptr;
-    if (command->icon_crop_to_fill &&
-        reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
+    if (command->icon_crop_to_fill && reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
     {
         source = &source_rect;
     }
@@ -601,8 +593,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     D2D1_RECT_F rect = reach_d2d_snap_bitmap_rect(command->rect);
     D2D1_RECT_F source_rect = {};
     D2D1_RECT_F *source = nullptr;
-    if (command->icon_crop_to_fill &&
-        reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
+    if (command->icon_crop_to_fill && reach_d2d_center_crop_source_rect(bitmap, rect, &source_rect))
     {
         source = &source_rect;
     }
@@ -615,9 +606,9 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             ID2D1Geometry *clip_geometry = nullptr;
             ID2D1Layer *clip_layer = nullptr;
             D2D1_RECT_F clip_snap = reach_d2d_snap_bitmap_rect(command->clip_rect);
-            HRESULT hr = reach_d2d_create_corner_geometry(
-                             target, clip_snap, command->clip_radius, REACH_RENDER_CORNER_ALL,
-                             &clip_geometry) == REACH_OK
+            HRESULT hr = reach_d2d_create_corner_geometry(target, clip_snap, command->clip_radius,
+                                                          REACH_RENDER_CORNER_ALL,
+                                                          &clip_geometry) == REACH_OK
                              ? S_OK
                              : E_FAIL;
             if (SUCCEEDED(hr))
@@ -648,7 +639,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         {
             ID2D1RenderTarget *clip_target = target;
             clip_target->PushAxisAlignedClip(reach_d2d_snap_bitmap_rect(command->clip_rect),
-                                              D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+                                             D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
             target->DrawBitmap(bitmap, rect, command->color.a,
                                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
             clip_target->PopAxisAlignedClip();
@@ -658,9 +649,9 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         {
             ID2D1Geometry *clip_geometry = nullptr;
             ID2D1Layer *clip_layer = nullptr;
-            HRESULT hr = reach_d2d_create_corner_geometry(
-                             target, rect, command->radius, reach_d2d_corner_mask(command),
-                             &clip_geometry) == REACH_OK
+            HRESULT hr = reach_d2d_create_corner_geometry(target, rect, command->radius,
+                                                          reach_d2d_corner_mask(command),
+                                                          &clip_geometry) == REACH_OK
                              ? S_OK
                              : E_FAIL;
             if (SUCCEEDED(hr))
@@ -670,8 +661,8 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             if (SUCCEEDED(hr))
             {
                 D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
-                    rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
-                    D2D1::IdentityMatrix(), 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+                    rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(),
+                    1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
                 target->PushLayer(layer, clip_layer);
                 target->DrawBitmap(bitmap, rect, command->color.a,
                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
@@ -696,8 +687,9 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
 
     float actual_contrast = command->image_contrast > 0.0f ? command->image_contrast : 1.0f;
 
-    D2D1_RECT_F mapped_source = source != nullptr ? *source : D2D1::RectF(
-        0.0f, 0.0f, bitmap->GetSize().width, bitmap->GetSize().height);
+    D2D1_RECT_F mapped_source = source != nullptr ? *source
+                                                  : D2D1::RectF(0.0f, 0.0f, bitmap->GetSize().width,
+                                                                bitmap->GetSize().height);
     float source_width = mapped_source.right - mapped_source.left;
     float source_height = mapped_source.bottom - mapped_source.top;
 
@@ -724,12 +716,9 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             color_mat->SetInput(0, bitmap);
             float scale = actual_contrast;
             float offset = 0.5f - 0.5f * scale;
-            D2D1_MATRIX_5X4_F matrix = D2D1::Matrix5x4F(
-                scale, 0.0f, 0.0f, 0.0f,
-                0.0f, scale, 0.0f, 0.0f,
-                0.0f, 0.0f, scale, 0.0f,
-                0.0f, 0.0f, 0.0f, 1.0f,
-                offset, offset, offset, 0.0f);
+            D2D1_MATRIX_5X4_F matrix =
+                D2D1::Matrix5x4F(scale, 0.0f, 0.0f, 0.0f, 0.0f, scale, 0.0f, 0.0f, 0.0f, 0.0f,
+                                 scale, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, offset, offset, offset, 0.0f);
             color_mat->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, matrix);
         }
     }
@@ -779,8 +768,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         {
             blur->SetInputEffect(0, blur_input);
         }
-        hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
-                            command->blur_radius);
+        hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, command->blur_radius);
     }
     if (SUCCEEDED(hr))
     {
@@ -800,10 +788,10 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         {
             D2D1_RECT_F clip_snap = reach_d2d_snap_bitmap_rect(command->clip_rect);
             HRESULT clip_hr = reach_d2d_create_corner_geometry(
-                                   target, clip_snap, command->clip_radius, REACH_RENDER_CORNER_ALL,
-                                   &clip_geometry) == REACH_OK
-                                   ? S_OK
-                                   : E_FAIL;
+                                  target, clip_snap, command->clip_radius, REACH_RENDER_CORNER_ALL,
+                                  &clip_geometry) == REACH_OK
+                                  ? S_OK
+                                  : E_FAIL;
             if (SUCCEEDED(clip_hr))
             {
                 clip_hr = target->CreateLayer(nullptr, &clip_layer);
@@ -827,18 +815,17 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         }
         else if (command->has_clip_rect)
         {
-            context->PushAxisAlignedClip(
-                reach_d2d_snap_bitmap_rect(command->clip_rect),
-                D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            context->PushAxisAlignedClip(reach_d2d_snap_bitmap_rect(command->clip_rect),
+                                         D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
             pushed_axis_clip = 1;
         }
         else if (command->radius > 0.0f)
         {
-            HRESULT clip_hr = reach_d2d_create_corner_geometry(
-                                   target, rect, command->radius, reach_d2d_corner_mask(command),
-                                   &clip_geometry) == REACH_OK
-                                   ? S_OK
-                                   : E_FAIL;
+            HRESULT clip_hr = reach_d2d_create_corner_geometry(target, rect, command->radius,
+                                                               reach_d2d_corner_mask(command),
+                                                               &clip_geometry) == REACH_OK
+                                  ? S_OK
+                                  : E_FAIL;
             if (SUCCEEDED(clip_hr))
             {
                 clip_hr = target->CreateLayer(nullptr, &clip_layer);
@@ -846,8 +833,8 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             if (SUCCEEDED(clip_hr))
             {
                 D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
-                    rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
-                    D2D1::IdentityMatrix(), 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+                    rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(),
+                    1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
                 target->PushLayer(layer, clip_layer);
                 pushed_layer = 1;
             }
@@ -867,8 +854,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             blur->GetOutput(&blur_output);
             if (blur_output != nullptr)
             {
-                context->DrawImage(blur_output, nullptr, nullptr,
-                                   D2D1_INTERPOLATION_MODE_LINEAR,
+                context->DrawImage(blur_output, nullptr, nullptr, D2D1_INTERPOLATION_MODE_LINEAR,
                                    D2D1_COMPOSITE_MODE_SOURCE_OVER);
                 blur_output->Release();
             }
@@ -893,8 +879,8 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     }
     else
     {
-        target->DrawBitmap(bitmap, rect, command->color.a,
-                           D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
+        target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+                           source);
     }
 
     if (blur != nullptr)
