@@ -60,7 +60,7 @@ extern "C"
         float music_widget_gap;
         float music_widget_control_gap;
         float music_widget_play_button_width;
-        float music_widget_prev_next_hit_target;
+        float music_widget_prev_next_button_width;
         float music_widget_title_text_size;
     } reach_theme;
 
