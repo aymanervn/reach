@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format-build-test:
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check clang-format version
+        run: clang-format --version
+
+      - name: Check formatting
+        run: |
+          Get-ChildItem -Recurse -Include *.c,*.h,*.cpp,*.hpp src,include,tests,tools |
+            ForEach-Object {
+              clang-format --dry-run --Werror $_.FullName
+            }
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Debug
+        run: cmake --build build --config Debug
+
+      - name: Test
+        run: ctest --test-dir build -C Debug --output-on-failure
