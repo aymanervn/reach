@@ -102,6 +102,8 @@ extern "C"
         reach_color color;
         float radius;
         float blur_radius;
+        float image_contrast;
+        int32_t has_clip_rect;
         float clip_radius;
         float stroke_width;
         uint64_t icon_id;

@@ -1,6 +1,7 @@
 #include "render_d2d_internal.h"
 #include "../windows_icon_handle_internal.h"
 
+#include <dcommon.h>
 #include <d2d1effects.h>
 #include <math.h>
 
@@ -608,7 +609,52 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
 
     if (backend->d2d_context == nullptr || command->blur_radius <= 0.0f)
     {
-        if (command->radius > 0.0f)
+        if (command->has_clip_rect && command->clip_radius > 0.0f &&
+            command->clip_rect.width > 0.0f && command->clip_rect.height > 0.0f)
+        {
+            ID2D1Geometry *clip_geometry = nullptr;
+            ID2D1Layer *clip_layer = nullptr;
+            D2D1_RECT_F clip_snap = reach_d2d_snap_bitmap_rect(command->clip_rect);
+            HRESULT hr = reach_d2d_create_corner_geometry(
+                             target, clip_snap, command->clip_radius, REACH_RENDER_CORNER_ALL,
+                             &clip_geometry) == REACH_OK
+                             ? S_OK
+                             : E_FAIL;
+            if (SUCCEEDED(hr))
+            {
+                hr = target->CreateLayer(nullptr, &clip_layer);
+            }
+            if (SUCCEEDED(hr))
+            {
+                D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
+                    clip_snap, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                    D2D1::IdentityMatrix(), 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+                target->PushLayer(layer, clip_layer);
+                target->DrawBitmap(bitmap, rect, command->color.a,
+                                   D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
+                target->PopLayer();
+            }
+            if (clip_layer != nullptr)
+            {
+                clip_layer->Release();
+            }
+            if (clip_geometry != nullptr)
+            {
+                clip_geometry->Release();
+            }
+            return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+        }
+        else if (command->has_clip_rect)
+        {
+            ID2D1RenderTarget *clip_target = target;
+            clip_target->PushAxisAlignedClip(reach_d2d_snap_bitmap_rect(command->clip_rect),
+                                              D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            target->DrawBitmap(bitmap, rect, command->color.a,
+                               D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
+            clip_target->PopAxisAlignedClip();
+            return REACH_OK;
+        }
+        else if (command->radius > 0.0f)
         {
             ID2D1Geometry *clip_geometry = nullptr;
             ID2D1Layer *clip_layer = nullptr;
@@ -647,38 +693,92 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     }
 
     ID2D1DeviceContext *context = backend->d2d_context;
-    ID2D1Effect *transform = nullptr;
-    ID2D1Effect *blur = nullptr;
+
+    float actual_contrast = command->image_contrast > 0.0f ? command->image_contrast : 1.0f;
 
     D2D1_RECT_F mapped_source = source != nullptr ? *source : D2D1::RectF(
         0.0f, 0.0f, bitmap->GetSize().width, bitmap->GetSize().height);
     float source_width = mapped_source.right - mapped_source.left;
     float source_height = mapped_source.bottom - mapped_source.top;
-    float dest_width = rect.right - rect.left;
-    float dest_height = rect.bottom - rect.top;
-    if (source_width <= 0.0f || source_height <= 0.0f || dest_width <= 0.0f ||
-        dest_height <= 0.0f)
+
+    D2D1_RECT_F image_rect = reach_d2d_snap_bitmap_rect(command->rect);
+    float image_width = image_rect.right - image_rect.left;
+    float image_height = image_rect.bottom - image_rect.top;
+
+    if (source_width <= 0.0f || source_height <= 0.0f || image_width <= 0.0f ||
+        image_height <= 0.0f)
     {
         return REACH_ERROR;
     }
 
-    HRESULT hr = context->CreateEffect(CLSID_D2D12DAffineTransform, &transform);
+    HRESULT hr = S_OK;
+    ID2D1Effect *color_mat = nullptr;
+    ID2D1Effect *transform = nullptr;
+    ID2D1Effect *blur = nullptr;
+
+    if (actual_contrast != 1.0f)
+    {
+        hr = context->CreateEffect(CLSID_D2D1ColorMatrix, &color_mat);
+        if (SUCCEEDED(hr))
+        {
+            color_mat->SetInput(0, bitmap);
+            float scale = actual_contrast;
+            float offset = 0.5f - 0.5f * scale;
+            D2D1_MATRIX_5X4_F matrix = D2D1::Matrix5x4F(
+                scale, 0.0f, 0.0f, 0.0f,
+                0.0f, scale, 0.0f, 0.0f,
+                0.0f, 0.0f, scale, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f,
+                offset, offset, offset, 0.0f);
+            color_mat->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, matrix);
+        }
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        hr = context->CreateEffect(CLSID_D2D12DAffineTransform, &transform);
+    }
     if (SUCCEEDED(hr))
     {
         D2D1_MATRIX_3X2_F matrix =
             D2D1::Matrix3x2F::Translation(-mapped_source.left, -mapped_source.top) *
-            D2D1::Matrix3x2F::Scale(dest_width / source_width, dest_height / source_height) *
-            D2D1::Matrix3x2F::Translation(rect.left, rect.top);
-        transform->SetInput(0, bitmap);
+            D2D1::Matrix3x2F::Scale(image_width / source_width, image_height / source_height) *
+            D2D1::Matrix3x2F::Translation(image_rect.left, image_rect.top);
+        if (color_mat != nullptr)
+        {
+            transform->SetInputEffect(0, color_mat);
+        }
+        else
+        {
+            transform->SetInput(0, bitmap);
+        }
         hr = transform->SetValue(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, matrix);
     }
+
     if (SUCCEEDED(hr))
     {
         hr = context->CreateEffect(CLSID_D2D1GaussianBlur, &blur);
     }
     if (SUCCEEDED(hr))
     {
-        blur->SetInputEffect(0, transform);
+        ID2D1Effect *blur_input = nullptr;
+        if (transform != nullptr)
+        {
+            blur_input = transform;
+        }
+        else if (color_mat != nullptr)
+        {
+            blur_input = color_mat;
+        }
+        else
+        {
+            blur->SetInput(0, bitmap);
+        }
+
+        if (blur_input != nullptr)
+        {
+            blur->SetInputEffect(0, blur_input);
+        }
         hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION,
                             command->blur_radius);
     }
@@ -692,46 +792,95 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     {
         ID2D1Geometry *clip_geometry = nullptr;
         ID2D1Layer *clip_layer = nullptr;
-        HRESULT clip_hr = S_OK;
-        if (command->radius > 0.0f)
+        int32_t pushed_layer = 0;
+        int32_t pushed_axis_clip = 0;
+
+        if (command->has_clip_rect && command->clip_radius > 0.0f &&
+            command->clip_rect.width > 0.0f && command->clip_rect.height > 0.0f)
         {
-            clip_hr = reach_d2d_create_corner_geometry(
-                          target, rect, command->radius, reach_d2d_corner_mask(command),
-                          &clip_geometry) == REACH_OK
-                          ? S_OK
-                          : E_FAIL;
+            D2D1_RECT_F clip_snap = reach_d2d_snap_bitmap_rect(command->clip_rect);
+            HRESULT clip_hr = reach_d2d_create_corner_geometry(
+                                   target, clip_snap, command->clip_radius, REACH_RENDER_CORNER_ALL,
+                                   &clip_geometry) == REACH_OK
+                                   ? S_OK
+                                   : E_FAIL;
             if (SUCCEEDED(clip_hr))
             {
                 clip_hr = target->CreateLayer(nullptr, &clip_layer);
             }
+            if (SUCCEEDED(clip_hr))
+            {
+                D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
+                    clip_snap, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                    D2D1::IdentityMatrix(), 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+                target->PushLayer(layer, clip_layer);
+                pushed_layer = 1;
+            }
+            else
+            {
+                if (clip_geometry != nullptr)
+                {
+                    clip_geometry->Release();
+                }
+                hr = E_FAIL;
+            }
+        }
+        else if (command->has_clip_rect)
+        {
+            context->PushAxisAlignedClip(
+                reach_d2d_snap_bitmap_rect(command->clip_rect),
+                D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            pushed_axis_clip = 1;
+        }
+        else if (command->radius > 0.0f)
+        {
+            HRESULT clip_hr = reach_d2d_create_corner_geometry(
+                                   target, rect, command->radius, reach_d2d_corner_mask(command),
+                                   &clip_geometry) == REACH_OK
+                                   ? S_OK
+                                   : E_FAIL;
+            if (SUCCEEDED(clip_hr))
+            {
+                clip_hr = target->CreateLayer(nullptr, &clip_layer);
+            }
+            if (SUCCEEDED(clip_hr))
+            {
+                D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
+                    rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                    D2D1::IdentityMatrix(), 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
+                target->PushLayer(layer, clip_layer);
+                pushed_layer = 1;
+            }
+            else
+            {
+                if (clip_geometry != nullptr)
+                {
+                    clip_geometry->Release();
+                }
+                hr = E_FAIL;
+            }
         }
 
-        ID2D1Image *blur_output = nullptr;
-        blur->GetOutput(&blur_output);
-        if (command->radius > 0.0f && SUCCEEDED(clip_hr))
+        if (SUCCEEDED(hr))
         {
-            D2D1_LAYER_PARAMETERS layer = D2D1::LayerParameters(
-                rect, clip_geometry, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(),
-                1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
-            target->PushLayer(layer, clip_layer);
+            ID2D1Image *blur_output = nullptr;
+            blur->GetOutput(&blur_output);
+            if (blur_output != nullptr)
+            {
+                context->DrawImage(blur_output, nullptr, nullptr,
+                                   D2D1_INTERPOLATION_MODE_LINEAR,
+                                   D2D1_COMPOSITE_MODE_SOURCE_OVER);
+                blur_output->Release();
+            }
         }
-        else
-        {
-            context->PushAxisAlignedClip(rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-        }
-        context->DrawImage(blur_output, nullptr, nullptr, D2D1_INTERPOLATION_MODE_LINEAR,
-                           D2D1_COMPOSITE_MODE_SOURCE_OVER);
-        if (command->radius > 0.0f && SUCCEEDED(clip_hr))
+
+        if (pushed_layer)
         {
             target->PopLayer();
         }
-        else
+        if (pushed_axis_clip)
         {
             context->PopAxisAlignedClip();
-        }
-        if (blur_output != nullptr)
-        {
-            blur_output->Release();
         }
         if (clip_layer != nullptr)
         {
@@ -744,8 +893,8 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     }
     else
     {
-        target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                           source);
+        target->DrawBitmap(bitmap, rect, command->color.a,
+                           D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
     }
 
     if (blur != nullptr)
@@ -756,6 +905,10 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     {
         transform->Release();
     }
+    if (color_mat != nullptr)
+    {
+        color_mat->Release();
+    }
 
-    return REACH_OK;
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
