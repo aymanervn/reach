@@ -620,6 +620,7 @@ void reach_shell_note_foreground_window(reach_shell *shell, uintptr_t foreground
 
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
 int32_t reach_shell_window_is_settings_window(const reach_shell *shell, uintptr_t window_id);
+int32_t reach_shell_foreground_is_settings_window(const reach_shell *shell, uintptr_t window_id);
 void reach_shell_dock_item_menu_capabilities_for_index(
     const reach_shell *shell, size_t item_index,
     reach_shell_dock_item_menu_capabilities *out_capabilities);
@@ -767,7 +768,8 @@ void reach_shell_minimize_settings(reach_shell *shell);
 int32_t reach_shell_settings_window_minimized(const reach_shell *shell);
 void reach_shell_sync_settings_bounds_from_window(reach_shell *shell);
 void reach_shell_refresh_settings_layout(reach_shell *shell);
-reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell, const reach_ui_event *event);
+reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
+                                                    const reach_ui_event *event);
 
 /* Switcher orchestration */
 
