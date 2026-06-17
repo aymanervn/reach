@@ -6,6 +6,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/ports/media_controls.h"
+#include "reach/support/animation.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -43,6 +44,17 @@ extern "C"
         reach_rect_f32 next_button;
     } reach_music_widget_layout;
 
+    typedef struct reach_music_widget_bg_animation
+    {
+        int32_t active;
+        uint64_t current_cover_id;
+        reach_vec2_animation offset;
+        float widget_width;
+        float widget_height;
+        int32_t segment_index;
+        int32_t initialized;
+    } reach_music_widget_bg_animation;
+
     typedef struct reach_music_widget_render_input
     {
         const reach_theme *theme;
@@ -50,6 +62,7 @@ extern "C"
         const reach_music_widget_layout *layout;
         int32_t text_alignment_center;
         int32_t text_alignment_leading;
+        const reach_music_widget_bg_animation *animation;
     } reach_music_widget_render_input;
 
     void reach_music_widget_model_init(reach_music_widget_model *model);
@@ -65,6 +78,11 @@ extern "C"
     reach_result
     reach_music_widget_build_render_commands(const reach_music_widget_render_input *input,
                                              reach_render_command_buffer *out_commands);
+
+    int32_t reach_music_widget_bg_animation_update(reach_music_widget_bg_animation *animation,
+                                                   const reach_music_widget_model *model,
+                                                   reach_rect_f32 bounds,
+                                                   double delta_seconds);
 
 #ifdef __cplusplus
 }

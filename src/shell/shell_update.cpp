@@ -280,10 +280,10 @@ static void reach_shell_apply_music_widget_cover(reach_shell *shell, uint64_t co
 }
 
 static void reach_shell_music_widget_effective_cover(reach_shell *shell,
-                                                      const reach_media_controls_state *state,
-                                                      int32_t metadata_changed,
-                                                      uint64_t *out_cover_icon_id,
-                                                      reach_color *out_cover_accent)
+                                                     const reach_media_controls_state *state,
+                                                     int32_t metadata_changed,
+                                                     uint64_t *out_cover_icon_id,
+                                                     reach_color *out_cover_accent)
 {
     if (out_cover_icon_id != nullptr)
     {
@@ -479,6 +479,23 @@ static void reach_shell_update_music_widget_pending_cover(reach_shell *shell, do
     reach_shell_request_update(shell);
 }
 
+static void reach_shell_update_music_widget_bg_animation(reach_shell *shell, double delta_seconds)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    int32_t render_changed = reach_music_widget_bg_animation_update(
+        &shell->music_widget_bg_animation, &shell->music_widget_model,
+        shell->music_widget_layout.bounds, delta_seconds);
+
+    if (render_changed)
+    {
+        shell->dirty.render = 1;
+    }
+}
+
 void reach_shell_request_update(reach_shell *shell)
 {
     if (shell != nullptr)
@@ -577,6 +594,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     reach_shell_update_music_widget_hide_grace(shell, delta_seconds);
     reach_shell_update_music_widget_pending_cover(shell, delta_seconds);
     reach_shell_process_music_widget_refresh(shell);
+    reach_shell_update_music_widget_bg_animation(shell, delta_seconds);
 
     reach_shell_update_clock_text(shell);
     if (shell->feedback.dock_animating)
@@ -1094,6 +1112,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             shell->music_widget_refresh_requested.load() ||
             shell->music_widget_hide_grace_seconds > 0.0 ||
             shell->music_widget_pending_cover_seconds > 0.0 ||
+            (!reach_shell_game_mode_enabled(shell) && shell->music_widget_bg_animation.active) ||
             reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
             shell->dock_animation.animating || shell->dock_width.animating ||
             reach_shell_switcher_width_animation_active(shell) || shell->dock_drag.active ||
