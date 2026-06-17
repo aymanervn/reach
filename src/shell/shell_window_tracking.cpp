@@ -723,16 +723,17 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         layout->bounds.width = dock_width;
     }
 
-    float left = gap;
+    float music_widget_left = theme->music_widget_left_margin * scale;
     float top = (layout->bounds.height - icon_size) * 0.5f;
+    float left = gap;
     layout->music_widget = {};
     if (music_widget_width > 0.0f)
     {
-        layout->music_widget.x = left;
+        layout->music_widget.x = music_widget_left;
         layout->music_widget.y = (layout->bounds.height - music_widget_height) * 0.5f;
         layout->music_widget.width = music_widget_width;
         layout->music_widget.height = music_widget_height;
-        left += music_widget_width + gap;
+        left = music_widget_left + music_widget_width + gap;
     }
     shell->music_widget_layout = reach_music_widget_compute_layout(
         &shell->music_widget_model, theme, layout->music_widget, scale);

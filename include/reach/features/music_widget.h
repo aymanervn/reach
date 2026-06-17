@@ -24,9 +24,12 @@ extern "C"
     {
         int32_t visible;
         uint16_t title[260];
+        uint16_t artist[260];
         uint64_t cover_icon_id;
         reach_color cover_accent;
         reach_media_playback_state playback;
+        int32_t previous_enabled;
+        int32_t next_enabled;
     } reach_music_widget_model;
 
     typedef struct reach_music_widget_layout
@@ -34,6 +37,7 @@ extern "C"
         reach_rect_f32 bounds;
         reach_rect_f32 cover;
         reach_rect_f32 title;
+        reach_rect_f32 artist;
         reach_rect_f32 previous_button;
         reach_rect_f32 play_pause_button;
         reach_rect_f32 next_button;
@@ -51,11 +55,13 @@ extern "C"
     void reach_music_widget_model_init(reach_music_widget_model *model);
     float reach_music_widget_desired_width(const reach_music_widget_model *model,
                                            const reach_theme *theme, float dpi_scale);
-    reach_music_widget_layout reach_music_widget_compute_layout(
-        const reach_music_widget_model *model, const reach_theme *theme, reach_rect_f32 bounds,
-        float dpi_scale);
-    reach_music_widget_action_type reach_music_widget_hit_test(
-        const reach_music_widget_layout *layout, int32_t x, int32_t y);
+    reach_music_widget_layout
+    reach_music_widget_compute_layout(const reach_music_widget_model *model,
+                                      const reach_theme *theme, reach_rect_f32 bounds,
+                                      float dpi_scale);
+    reach_music_widget_action_type
+    reach_music_widget_hit_test(const reach_music_widget_model *model,
+                                const reach_music_widget_layout *layout, int32_t x, int32_t y);
     reach_result
     reach_music_widget_build_render_commands(const reach_music_widget_render_input *input,
                                              reach_render_command_buffer *out_commands);
