@@ -151,7 +151,7 @@ reach_music_widget_layout reach_music_widget_compute_layout(const reach_music_wi
     float text_gap = actual->music_widget_text_gap * dpi_scale;
     float button_gap = actual->music_widget_control_gap * dpi_scale;
     float play_button_size = actual->music_widget_play_button_width * dpi_scale;
-    float prev_next_hit_size = actual->music_widget_prev_next_hit_target * dpi_scale;
+    float prev_next_size = actual->music_widget_prev_next_button_width * dpi_scale;
 
     layout.bounds = bounds;
     float cover_size = bounds.height;
@@ -162,7 +162,7 @@ reach_music_widget_layout reach_music_widget_compute_layout(const reach_music_wi
     layout.cover = reach_music_widget_rect(bounds.x, bounds.y, cover_size, cover_size);
 
     float total_button_row_width =
-        prev_next_hit_size + button_gap + play_button_size + button_gap + prev_next_hit_size;
+        prev_next_size + button_gap + play_button_size + button_gap + prev_next_size;
     float min_required_width =
         cover_size + cover_gap + total_button_row_width + padding;
     if (bounds.width < min_required_width)
@@ -199,14 +199,14 @@ reach_music_widget_layout reach_music_widget_compute_layout(const reach_music_wi
                                             artist_height);
 
     layout.previous_button =
-        reach_music_widget_rect(button_start_x, bounds.y + (bounds.height - prev_next_hit_size) * 0.5f,
-                                prev_next_hit_size, prev_next_hit_size);
+        reach_music_widget_rect(button_start_x, bounds.y + (bounds.height - prev_next_size) * 0.5f,
+                                prev_next_size, prev_next_size);
     layout.play_pause_button = reach_music_widget_rect(
-        layout.previous_button.x + prev_next_hit_size + button_gap,
+        layout.previous_button.x + prev_next_size + button_gap,
         bounds.y + (bounds.height - play_button_size) * 0.5f, play_button_size, play_button_size);
     layout.next_button = reach_music_widget_rect(
         layout.play_pause_button.x + play_button_size + button_gap,
-        bounds.y + (bounds.height - prev_next_hit_size) * 0.5f, prev_next_hit_size, prev_next_hit_size);
+        bounds.y + (bounds.height - prev_next_size) * 0.5f, prev_next_size, prev_next_size);
 
     return layout;
 }
