@@ -223,8 +223,9 @@ extern "C"
         const reach_quick_settings_model *model, float dpi_scale);
 
     float reach_quick_settings_content_height_for_model(const reach_quick_settings_model *model);
-    float reach_quick_settings_content_height_for_model_scaled(
-        const reach_quick_settings_model *model, float dpi_scale);
+    float
+    reach_quick_settings_content_height_for_model_scaled(const reach_quick_settings_model *model,
+                                                         float dpi_scale);
 
     reach_quick_settings_hit_result
     reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,

@@ -273,8 +273,7 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         break;
     case REACH_ELEVATION_HELPER_HOTKEY_TAB:
         if (pressed &&
-            (source->alt_down ||
-             (record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_ALT) != 0))
+            (source->alt_down || (record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_ALT) != 0))
         {
             if (!source->alt_tab_active)
             {
@@ -282,9 +281,8 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
                 source->alt_tab_active = 1;
                 break;
             }
-            int32_t shift_down =
-                source->shift_down ||
-                ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_SHIFT) != 0);
+            int32_t shift_down = source->shift_down ||
+                                 ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_SHIFT) != 0);
             reach_ui_event_type direction =
                 shift_down ? REACH_UI_EVENT_ALT_TAB_PREVIOUS : REACH_UI_EVENT_ALT_TAB_NEXT;
             reach_input_post_ui_event(source, direction, 0);
@@ -389,7 +387,8 @@ static void reach_input_process_shared_hotkeys(reach_input_source *source)
     }
 }
 
-static void reach_input_shared_callback(void *user, reach_elevation_helper_shared_reader_event event)
+static void reach_input_shared_callback(void *user,
+                                        reach_elevation_helper_shared_reader_event event)
 {
     reach_input_source *source = static_cast<reach_input_source *>(user);
     if (source == nullptr || source->window == nullptr)

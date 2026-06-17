@@ -538,12 +538,11 @@ static void reach_system_controls_set_ethernet_network(reach_network_state *stat
     state->kind = REACH_NETWORK_KIND_ETHERNET;
     state->connected = 1;
     state->signal_strength = 100;
-    reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY,
-                                     "Ethernet");
+    reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "Ethernet");
 }
 
-static void reach_system_controls_set_wifi_network(reach_network_state *state, int32_t signal_strength,
-                                                   const DOT11_SSID *ssid)
+static void reach_system_controls_set_wifi_network(reach_network_state *state,
+                                                   int32_t signal_strength, const DOT11_SSID *ssid)
 {
     if (state == nullptr)
     {
@@ -659,8 +658,7 @@ static int32_t reach_system_controls_get_wlan_network_state(reach_network_state 
             if (query_result == ERROR_SUCCESS && attributes != nullptr)
             {
                 reach_system_controls_set_wifi_network(
-                    out_state,
-                    (int32_t)attributes->wlanAssociationAttributes.wlanSignalQuality,
+                    out_state, (int32_t)attributes->wlanAssociationAttributes.wlanSignalQuality,
                     &attributes->wlanAssociationAttributes.dot11Ssid);
                 connected = 1;
                 WlanFreeMemory(attributes);

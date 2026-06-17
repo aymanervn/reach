@@ -244,8 +244,7 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
         if (shell->window_manager.ops.window_at(shell->window_manager.manager, index, &snapshot) !=
                 REACH_OK ||
             snapshot.id == 0 ||
-            (snapshot.path[0] == 0 && snapshot.app_user_model_id[0] == 0 &&
-             snapshot.title[0] == 0))
+            (snapshot.path[0] == 0 && snapshot.app_user_model_id[0] == 0 && snapshot.title[0] == 0))
         {
             continue;
         }
@@ -397,9 +396,9 @@ static void reach_shell_window_control_thread_main(reach_shell *shell)
 
         {
             std::unique_lock<std::mutex> lock(shell->window_control.mutex);
-            shell->window_control.cv.wait(lock, [shell]() {
-                return shell->window_control.stop || shell->window_control.pending;
-            });
+            shell->window_control.cv.wait(
+                lock,
+                [shell]() { return shell->window_control.stop || shell->window_control.pending; });
 
             if (shell->window_control.stop)
             {
@@ -422,8 +421,8 @@ static void reach_shell_window_control_thread_main(reach_shell *shell)
         reach_result result = window_count > 0 ? REACH_OK : REACH_INVALID_ARGUMENT;
         for (size_t index = 0; index < window_count; ++index)
         {
-            reach_result window_result = reach_shell_execute_window_control(shell, action,
-                                                                            windows[index]);
+            reach_result window_result =
+                reach_shell_execute_window_control(shell, action, windows[index]);
             if (window_result != REACH_OK && result == REACH_OK)
             {
                 result = window_result;
@@ -537,9 +536,8 @@ reach_result reach_shell_minimize_open_windows(reach_shell *shell)
     reach_result result = REACH_OK;
     for (size_t index = 0; index < window_count; ++index)
     {
-        reach_result window_result =
-            reach_shell_execute_window_control(shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE,
-                                               windows[index]);
+        reach_result window_result = reach_shell_execute_window_control(
+            shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE, windows[index]);
         if (window_result != REACH_OK && result == REACH_OK)
         {
             result = window_result;

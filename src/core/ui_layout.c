@@ -156,9 +156,8 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
         }
 
         size_t max_offset = state->launcher.result_count - visible_result_count;
-        float progress = max_offset > 0 ? (float)state->launcher.result_scroll_offset /
-                                              (float)max_offset
-                                        : 0.0f;
+        float progress =
+            max_offset > 0 ? (float)state->launcher.result_scroll_offset / (float)max_offset : 0.0f;
         if (progress < 0.0f)
         {
             progress = 0.0f;

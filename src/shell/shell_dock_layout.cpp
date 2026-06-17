@@ -267,8 +267,7 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     return animated;
 }
 
-reach_point_i32 reach_shell_dock_local_point(const reach_dock_layout *layout, int32_t x,
-                                             int32_t y)
+reach_point_i32 reach_shell_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y)
 {
     reach_point_i32 point = {};
     if (layout == nullptr)
@@ -371,11 +370,9 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
     float scale = reach_shell_layout_dpi_scale(shell);
     float gap = shell->ui.dock.gap * scale;
-    layout->power_button.x =
-        layout->bounds.width - layout->power_button.width - gap;
+    layout->power_button.x = layout->bounds.width - layout->power_button.width - gap;
     layout->clock.x = layout->power_button.x - gap - theme->dock_clock_width * scale;
-    layout->system_separator.x =
-        layout->clock.x - gap - theme->dock_system_separator_width * scale;
+    layout->system_separator.x = layout->clock.x - gap - theme->dock_system_separator_width * scale;
     layout->quick_settings_button.x =
         layout->system_separator.x - gap - layout->quick_settings_button.width;
     layout->tray_button.x = layout->quick_settings_button.x - layout->tray_button.width;

@@ -66,9 +66,9 @@ int main()
         copy_ascii(many[index].path, REACH_SEARCH_RESULT_PATH_CAPACITY, "C:\\Apps\\brave.exe");
         many[index].kind = REACH_SEARCH_RESULT_APP;
     }
-    failed += expect(reach_search_rank_candidates(query, many, REACH_SEARCH_MAX_RESULTS + 1,
-                                                  REACH_SEARCH_MAX_RESULTS) ==
-                     REACH_SEARCH_MAX_RESULTS);
+    failed +=
+        expect(reach_search_rank_candidates(query, many, REACH_SEARCH_MAX_RESULTS + 1,
+                                            REACH_SEARCH_MAX_RESULTS) == REACH_SEARCH_MAX_RESULTS);
 
     return failed == 0 ? 0 : 1;
 }

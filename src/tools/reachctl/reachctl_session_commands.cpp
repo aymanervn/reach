@@ -27,8 +27,8 @@ static reach_result reachctl_first_start_repair_marker_path(wchar_t *path, DWORD
 
     path[0] = 0;
     PWSTR local_app_data = nullptr;
-    HRESULT hr = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr,
-                                      &local_app_data);
+    HRESULT hr =
+        SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &local_app_data);
     if (FAILED(hr) || local_app_data == nullptr)
     {
         return REACH_ERROR;

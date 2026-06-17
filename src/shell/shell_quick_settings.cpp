@@ -142,8 +142,8 @@ void reach_shell_refresh_quick_settings_layout(reach_shell *shell)
     reach_rect_f32 surface_bounds = {};
     surface_bounds.width = shell->quick_settings_bounds.width;
     surface_bounds.height = shell->quick_settings_bounds.height;
-    shell->quick_settings_content_bounds =
-        reach_shell_quick_settings_content_bounds(surface_bounds, reach_shell_layout_dpi_scale(shell));
+    shell->quick_settings_content_bounds = reach_shell_quick_settings_content_bounds(
+        surface_bounds, reach_shell_layout_dpi_scale(shell));
     shell->quick_settings_layout = reach_quick_settings_layout_for_content_bounds_scaled(
         shell->quick_settings_content_bounds, shell->theme, &shell->quick_settings_model,
         reach_shell_layout_dpi_scale(shell));

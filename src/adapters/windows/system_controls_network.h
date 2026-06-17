@@ -16,7 +16,8 @@ typedef struct reach_windows_network_adapter
     int32_t has_unicast;
 } reach_windows_network_adapter;
 
-reach_network_kind reach_windows_network_kind_from_adapters(
-    const reach_windows_network_adapter *adapters, size_t adapter_count);
+reach_network_kind
+reach_windows_network_kind_from_adapters(const reach_windows_network_adapter *adapters,
+                                         size_t adapter_count);
 
 #endif

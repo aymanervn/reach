@@ -260,9 +260,8 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
     model.visible_start = shell->switcher_state.visible_start;
 
     reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
-    for (size_t index = 0; index < shell->switcher_state.window_count &&
-                           index < REACH_MAX_PINNED_APPS;
-         ++index)
+    for (size_t index = 0;
+         index < shell->switcher_state.window_count && index < REACH_MAX_PINNED_APPS; ++index)
     {
         size_t open_index = 0;
         if (reach_shell_render_open_window_index(shell, shell->switcher_state.windows[index],
