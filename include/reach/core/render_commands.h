@@ -69,7 +69,11 @@ extern "C"
         REACH_VECTOR_ICON_VIDEO = 26,
         REACH_VECTOR_ICON_MUSIC = 27,
         REACH_VECTOR_ICON_DOCUMENT = 28,
-        REACH_VECTOR_ICON_FILE = 29
+        REACH_VECTOR_ICON_FILE = 29,
+        REACH_VECTOR_ICON_PLAY = 30,
+        REACH_VECTOR_ICON_PAUSE = 31,
+        REACH_VECTOR_ICON_PREVIOUS = 32,
+        REACH_VECTOR_ICON_NEXT = 33
     } reach_vector_icon_id;
 
     typedef enum reach_text_weight

@@ -30,6 +30,10 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 227 RCDATA "launcher/music.svg"
 228 RCDATA "launcher/document.svg"
 229 RCDATA "launcher/file.svg"
+230 RCDATA "music_player/play.svg"
+231 RCDATA "music_player/pause.svg"
+232 RCDATA "music_player/previous.svg"
+233 RCDATA "music_player/next.svg"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0

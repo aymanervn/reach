@@ -33,6 +33,9 @@ extern "C"
         reach_color music_widget_title;
         reach_color music_widget_control_text;
         reach_color music_widget_control_background;
+        reach_color music_widget_artist_text;
+        float music_widget_artist_text_size;
+        float music_widget_text_gap;
         float dock_corner_radius_ratio;
         reach_color light_text;
         reach_color dark_text;
@@ -49,16 +52,16 @@ extern "C"
         float dock_system_separator_height_ratio;
         float dock_clock_width;
         float music_widget_width;
+        float music_widget_left_margin;
         float music_widget_height_ratio;
         float music_widget_corner_radius_ratio;
         float music_widget_corner_radius_max;
         float music_widget_padding;
         float music_widget_gap;
         float music_widget_control_gap;
-        float music_widget_control_width;
-        float music_widget_control_height;
+        float music_widget_play_button_width;
+        float music_widget_prev_next_hit_target;
         float music_widget_title_text_size;
-        float music_widget_control_text_size;
     } reach_theme;
 
     const reach_theme *reach_theme_default(void);

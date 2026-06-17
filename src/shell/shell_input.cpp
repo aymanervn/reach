@@ -93,7 +93,7 @@ reach_shell_music_widget_hit_test_event(const reach_shell *shell, const reach_ui
         return REACH_MUSIC_WIDGET_ACTION_NONE;
     }
     reach_point_i32 point = reach_shell_event_dock_point(shell, event);
-    return reach_music_widget_hit_test(&shell->music_widget_layout, point.x, point.y);
+    return reach_music_widget_hit_test(&shell->music_widget_model, &shell->music_widget_layout, point.x, point.y);
 }
 
 static size_t reach_shell_launcher_visible_result_count(const reach_shell *shell)
