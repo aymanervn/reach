@@ -62,14 +62,12 @@ static reach_window_action_state reach_window_management_capture_state(HWND hwnd
 static int32_t reach_window_management_rect_equalish(RECT a, RECT b)
 {
     const LONG tolerance = 2;
-    auto abs_long = [](LONG value) -> LONG
-    { return value < 0 ? -value : value; };
+    auto abs_long = [](LONG value) -> LONG { return value < 0 ? -value : value; };
     return abs_long(a.left - b.left) <= tolerance && abs_long(a.top - b.top) <= tolerance &&
            abs_long(a.right - b.right) <= tolerance && abs_long(a.bottom - b.bottom) <= tolerance;
 }
 
-static int32_t reach_window_management_wait_for(HWND hwnd,
-                                                int32_t (*predicate)(HWND, const RECT *),
+static int32_t reach_window_management_wait_for(HWND hwnd, int32_t (*predicate)(HWND, const RECT *),
                                                 const RECT *expected, DWORD timeout_ms)
 {
     DWORD start = GetTickCount();

@@ -13,8 +13,7 @@ static void expect_true(int condition, const char *message)
     }
 }
 
-static reach_windows_network_adapter adapter(uint32_t if_type, int32_t oper_up,
-                                             int32_t has_unicast)
+static reach_windows_network_adapter adapter(uint32_t if_type, int32_t oper_up, int32_t has_unicast)
 {
     reach_windows_network_adapter result = {};
     result.if_type = if_type;

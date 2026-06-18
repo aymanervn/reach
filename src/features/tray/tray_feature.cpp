@@ -8,8 +8,8 @@ static size_t reach_tray_min_size(size_t a, size_t b)
 }
 
 void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme *theme,
-                                     const reach_dock_layout *dock_layout,
-                                     float dpi_scale, reach_rect_f32 *out_bounds)
+                                     const reach_dock_layout *dock_layout, float dpi_scale,
+                                     reach_rect_f32 *out_bounds)
 {
     if (model == nullptr || theme == nullptr || dock_layout == nullptr || out_bounds == nullptr)
     {

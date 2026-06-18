@@ -34,8 +34,7 @@ void reach_shell_close_context_menu(reach_shell *shell)
 }
 
 static reach_result reach_shell_launch_context_menu_item(reach_shell *shell, const uint16_t *path,
-                                                        size_t pinned_index,
-                                                        int32_t run_as_admin)
+                                                         size_t pinned_index, int32_t run_as_admin)
 {
     if (shell == nullptr || path == nullptr || path[0] == 0 ||
         shell->app_launcher.ops.launch == nullptr)
@@ -353,9 +352,8 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     float popup_y = (float)y - popup_height;
     if (shell->has_layout && item_index < shell->layout.dock.app_slot_count)
     {
-        reach_rect_f32 slot =
-            reach_shell_dock_rect_to_screen(&shell->layout.dock,
-                                            shell->layout.dock.app_slots[item_index]);
+        reach_rect_f32 slot = reach_shell_dock_rect_to_screen(
+            &shell->layout.dock, shell->layout.dock.app_slots[item_index]);
         popup_x = slot.x + slot.width * 0.5f - popup_width * anchor_ratio;
         popup_y = shell->layout.dock.bounds.y - popup_height - 8.0f * scale;
         reach_rect_f32 monitor = {};

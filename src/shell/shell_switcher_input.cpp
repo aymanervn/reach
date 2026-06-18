@@ -126,8 +126,7 @@ void reach_shell_refresh_switcher_windows(reach_shell *shell)
     }
 
     size_t selected_index = 0;
-    if (reach_shell_switcher_window_index(&shell->switcher_state, selected_window,
-                                          &selected_index))
+    if (reach_shell_switcher_window_index(&shell->switcher_state, selected_window, &selected_index))
     {
         shell->switcher_state.selected_index = selected_index;
     }
@@ -197,10 +196,9 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS && shell->switcher_state.window_count > 0)
     {
-        shell->switcher_state.selected_index =
-            shell->switcher_state.selected_index == 0
-                ? shell->switcher_state.window_count - 1
-                : shell->switcher_state.selected_index - 1;
+        shell->switcher_state.selected_index = shell->switcher_state.selected_index == 0
+                                                   ? shell->switcher_state.window_count - 1
+                                                   : shell->switcher_state.selected_index - 1;
 
         reach_shell_update_switcher_visible_start(shell);
 

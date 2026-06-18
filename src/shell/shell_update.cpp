@@ -115,8 +115,7 @@ static reach_rect_f32 reach_shell_apply_switcher_bounds_animation(reach_shell *s
     {
         reach_float_animation_update(animation, delta_seconds);
         width = animation->value;
-        shell->switcher_state.width_animating =
-            reach_shell_switcher_width_animation_active(shell);
+        shell->switcher_state.width_animating = reach_shell_switcher_width_animation_active(shell);
         shell->switcher.dirty_flags = 1;
     }
     else if (animation->to > 0.0f)
@@ -241,8 +240,8 @@ static const double REACH_MUSIC_WIDGET_PENDING_COVER_SECONDS = 1.0;
 
 static int32_t reach_shell_color_equal(reach_color a, reach_color b)
 {
-    return fabsf(a.r - b.r) < 0.001f && fabsf(a.g - b.g) < 0.001f &&
-           fabsf(a.b - b.b) < 0.001f && fabsf(a.a - b.a) < 0.001f;
+    return fabsf(a.r - b.r) < 0.001f && fabsf(a.g - b.g) < 0.001f && fabsf(a.b - b.b) < 0.001f &&
+           fabsf(a.a - b.a) < 0.001f;
 }
 
 static void reach_shell_clear_music_widget_pending_cover(reach_shell *shell)
@@ -282,7 +281,7 @@ static void reach_shell_apply_music_widget_cover(reach_shell *shell, uint64_t co
 
 static void reach_shell_music_widget_effective_cover(reach_shell *shell,
                                                      const reach_media_controls_state *state,
-                                                     int32_t title_changed,
+                                                     int32_t metadata_changed,
                                                      uint64_t *out_cover_icon_id,
                                                      reach_color *out_cover_accent)
 {
@@ -299,13 +298,12 @@ static void reach_shell_music_widget_effective_cover(reach_shell *shell,
         return;
     }
 
-    if (title_changed)
+    if (metadata_changed)
     {
         reach_shell_clear_music_widget_pending_cover(shell);
         if (state->cover_icon_id != 0 || shell->music_widget_model.cover_icon_id != 0)
         {
-            shell->music_widget_pending_cover_seconds =
-                REACH_MUSIC_WIDGET_PENDING_COVER_SECONDS;
+            shell->music_widget_pending_cover_seconds = REACH_MUSIC_WIDGET_PENDING_COVER_SECONDS;
             shell->music_widget_pending_cover_icon_id = state->cover_icon_id;
             shell->music_widget_pending_cover_accent = state->cover_accent;
             reach_copy_utf16(shell->music_widget_pending_cover_title, 260, state->title);
@@ -378,19 +376,22 @@ void reach_shell_refresh_music_widget(reach_shell *shell)
         return;
     }
 
-    int32_t title_changed = !reach_shell_utf16_equal(shell->music_widget_model.title, state.title);
+    int32_t metadata_changed =
+        !reach_shell_utf16_equal(shell->music_widget_model.title, state.title) ||
+        !reach_shell_utf16_equal(shell->music_widget_model.artist, state.artist);
     uint64_t next_cover_icon_id = 0;
     reach_color next_cover_accent = {};
-    reach_shell_music_widget_effective_cover(shell, &state, title_changed, &next_cover_icon_id,
+    reach_shell_music_widget_effective_cover(shell, &state, metadata_changed, &next_cover_icon_id,
                                              &next_cover_accent);
 
     int32_t visibility_changed = shell->music_widget_model.visible != state.has_media;
-    int32_t changed = visibility_changed ||
-                      title_changed ||
-                      shell->music_widget_model.cover_icon_id != next_cover_icon_id ||
-                      !reach_shell_color_equal(shell->music_widget_model.cover_accent,
-                                               next_cover_accent) ||
-                      shell->music_widget_model.playback != state.playback;
+    int32_t changed =
+        visibility_changed || metadata_changed ||
+        shell->music_widget_model.cover_icon_id != next_cover_icon_id ||
+        !reach_shell_color_equal(shell->music_widget_model.cover_accent, next_cover_accent) ||
+        shell->music_widget_model.playback != state.playback ||
+        shell->music_widget_model.previous_enabled != state.previous_enabled ||
+        shell->music_widget_model.next_enabled != state.next_enabled;
     if (!changed)
     {
         return;
@@ -400,8 +401,11 @@ void reach_shell_refresh_music_widget(reach_shell *shell)
     {
         shell->music_widget_model.visible = 1;
         reach_copy_utf16(shell->music_widget_model.title, 260, state.title);
+        reach_copy_utf16(shell->music_widget_model.artist, 260, state.artist);
         reach_shell_apply_music_widget_cover(shell, next_cover_icon_id, next_cover_accent);
         shell->music_widget_model.playback = state.playback;
+        shell->music_widget_model.previous_enabled = state.previous_enabled;
+        shell->music_widget_model.next_enabled = state.next_enabled;
     }
     else
     {
@@ -473,6 +477,23 @@ static void reach_shell_update_music_widget_pending_cover(reach_shell *shell, do
         shell->dock.dirty_flags = 1;
     }
     reach_shell_request_update(shell);
+}
+
+static void reach_shell_update_music_widget_bg_animation(reach_shell *shell, double delta_seconds)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    int32_t render_changed = reach_music_widget_bg_animation_update(
+        &shell->music_widget_bg_animation, &shell->music_widget_model,
+        shell->music_widget_layout.bounds, delta_seconds);
+
+    if (render_changed)
+    {
+        shell->dirty.render = 1;
+    }
 }
 
 void reach_shell_request_update(reach_shell *shell)
@@ -575,6 +596,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     reach_shell_update_music_widget_hide_grace(shell, delta_seconds);
     reach_shell_update_music_widget_pending_cover(shell, delta_seconds);
     reach_shell_process_music_widget_refresh(shell);
+    reach_shell_update_music_widget_bg_animation(shell, delta_seconds);
 
     reach_shell_update_clock_text(shell);
     if (shell->feedback.dock_animating)
@@ -823,9 +845,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         reach_theme_dock_corner_radius(shell->theme, layout.dock.bounds.height);
                     result = reach_shell_apply_window_state(
                         &shell->dock.window, layout.dock.bounds, 1.0f, &shell->dock.last_bounds,
-                        &shell->dock.last_opacity,
-                        &shell->dock.bounds_valid, &shell->dock.opacity_valid,
-                        &dock_window_changed);
+                        &shell->dock.last_opacity, &shell->dock.bounds_valid,
+                        &shell->dock.opacity_valid, &dock_window_changed);
                     if (result != REACH_OK)
                     {
                         return result;
@@ -845,7 +866,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         !shell->feedback.dock_animating;
 
                     if (shell->dirty.render || shell->dock.dirty_flags ||
-                        (!dock_reveal_position_only && (dock_window_changed || dock_layout_changed)))
+                        (!dock_reveal_position_only &&
+                         (dock_window_changed || dock_layout_changed)))
                     {
                         (void)reach_shell_render_dock_surface(shell, &layout.dock);
                     }
@@ -992,10 +1014,9 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
                 if (shell->switcher.window.ops.set_bounds != nullptr)
                 {
-                    reach_rect_f32 target_switcher_bounds =
-                        reach_switcher_bounds_for_count_scaled(
-                            bounds, reach_shell_switcher_visible_count(shell),
-                            reach_shell_layout_dpi_scale(shell));
+                    reach_rect_f32 target_switcher_bounds = reach_switcher_bounds_for_count_scaled(
+                        bounds, reach_shell_switcher_visible_count(shell),
+                        reach_shell_layout_dpi_scale(shell));
                     reach_rect_f32 switcher_bounds = reach_shell_apply_switcher_bounds_animation(
                         shell, target_switcher_bounds, delta_seconds);
                     int32_t switcher_window_changed = 0;
@@ -1137,6 +1158,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             shell->music_widget_refresh_requested.load() ||
             shell->music_widget_hide_grace_seconds > 0.0 ||
             shell->music_widget_pending_cover_seconds > 0.0 ||
+            (!reach_shell_game_mode_enabled(shell) && shell->music_widget_bg_animation.active) ||
             reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation) ||
             shell->dock_animation.animating || shell->dock_width.animating ||
             reach_shell_switcher_width_animation_active(shell) || shell->dock_drag.active ||

@@ -249,8 +249,7 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
         if (shell->window_manager.ops.window_at(shell->window_manager.manager, index, &snapshot) !=
                 REACH_OK ||
             snapshot.id == 0 ||
-            (snapshot.path[0] == 0 && snapshot.app_user_model_id[0] == 0 &&
-             snapshot.title[0] == 0))
+            (snapshot.path[0] == 0 && snapshot.app_user_model_id[0] == 0 && snapshot.title[0] == 0))
         {
             continue;
         }
@@ -448,9 +447,9 @@ static void reach_shell_window_control_thread_main(reach_shell *shell)
 
         {
             std::unique_lock<std::mutex> lock(shell->window_control.mutex);
-            shell->window_control.cv.wait(lock, [shell]() {
-                return shell->window_control.stop || shell->window_control.pending;
-            });
+            shell->window_control.cv.wait(
+                lock,
+                [shell]() { return shell->window_control.stop || shell->window_control.pending; });
 
             if (shell->window_control.stop)
             {
@@ -473,8 +472,8 @@ static void reach_shell_window_control_thread_main(reach_shell *shell)
         reach_result result = window_count > 0 ? REACH_OK : REACH_INVALID_ARGUMENT;
         for (size_t index = 0; index < window_count; ++index)
         {
-            reach_result window_result = reach_shell_execute_window_control(shell, action,
-                                                                            windows[index]);
+            reach_result window_result =
+                reach_shell_execute_window_control(shell, action, windows[index]);
             if (window_result != REACH_OK && result == REACH_OK)
             {
                 result = window_result;
@@ -593,9 +592,8 @@ reach_result reach_shell_minimize_open_windows(reach_shell *shell)
     reach_result result = REACH_OK;
     for (size_t index = 0; index < window_count; ++index)
     {
-        reach_result window_result =
-            reach_shell_execute_window_control(shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE,
-                                               windows[index]);
+        reach_result window_result = reach_shell_execute_window_control(
+            shell, REACH_SHELL_WINDOW_CONTROL_MINIMIZE, windows[index]);
         if (window_result != REACH_OK && result == REACH_OK)
         {
             result = window_result;
@@ -779,16 +777,17 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         layout->bounds.width = dock_width;
     }
 
-    float left = gap;
+    float music_widget_left = theme->music_widget_left_margin * scale;
     float top = (layout->bounds.height - icon_size) * 0.5f;
+    float left = gap;
     layout->music_widget = {};
     if (music_widget_width > 0.0f)
     {
-        layout->music_widget.x = left;
+        layout->music_widget.x = music_widget_left;
         layout->music_widget.y = (layout->bounds.height - music_widget_height) * 0.5f;
         layout->music_widget.width = music_widget_width;
         layout->music_widget.height = music_widget_height;
-        left += music_widget_width + gap;
+        left = music_widget_left + music_widget_width + gap;
     }
     shell->music_widget_layout = reach_music_widget_compute_layout(
         &shell->music_widget_model, theme, layout->music_widget, scale);

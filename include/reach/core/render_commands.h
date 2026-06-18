@@ -70,9 +70,13 @@ extern "C"
         REACH_VECTOR_ICON_MUSIC = 27,
         REACH_VECTOR_ICON_DOCUMENT = 28,
         REACH_VECTOR_ICON_FILE = 29,
-        REACH_VECTOR_ICON_MINIMIZE = 30,
-        REACH_VECTOR_ICON_CLOSE = 31,
-        REACH_VECTOR_ICON_RESIZE = 32
+        REACH_VECTOR_ICON_PLAY = 30,
+        REACH_VECTOR_ICON_PAUSE = 31,
+        REACH_VECTOR_ICON_PREVIOUS = 32,
+        REACH_VECTOR_ICON_NEXT = 33,
+        REACH_VECTOR_ICON_MINIMIZE = 34,
+        REACH_VECTOR_ICON_CLOSE = 35,
+        REACH_VECTOR_ICON_RESIZE = 36
     } reach_vector_icon_id;
 
     typedef enum reach_text_weight
@@ -101,6 +105,8 @@ extern "C"
         reach_color color;
         float radius;
         float blur_radius;
+        float image_contrast;
+        int32_t has_clip_rect;
         float clip_radius;
         float stroke_width;
         uint64_t icon_id;
