@@ -52,6 +52,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_stop_launcher_search_worker(shell);
     reach_shell_stop_open_window_icon_worker(shell);
     reach_shell_stop_window_control_worker(shell);
+    reach_shell_stop_windows_update_worker(shell);
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
@@ -201,6 +202,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->media_controls.destroy(shell->media_controls.userdata);
     }
+    if (shell->windows_update.destroy != nullptr)
+    {
+        shell->windows_update.destroy(shell->windows_update.userdata);
+    }
 
     shell->monitors = {};
     shell->popup_capture = {};
@@ -230,10 +235,13 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->audio_volume = {};
     shell->system_controls = {};
     shell->media_controls = {};
+    shell->windows_update = {};
     shell->music_widget_refresh_requested = 0;
     shell->quick_settings_system_change_flags.store(0);
+    shell->windows_update_worker.progress_state.store(0);
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
+    shell->windows_update_worker.notify = reach_shell_request_update;
     reach_dock_icon_cache_init(&shell->dock_icons);
     reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
@@ -308,6 +316,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->quick_settings_output_devices = {};
     shell->system_controls = {};
     shell->quick_settings_system_change_flags.store(0);
+    shell->windows_update_worker.progress_state.store(0);
     shell->quick_settings_notch_anchor_x = 0.0f;
     shell->quick_settings_bounds = {};
     shell->quick_settings_target_bounds = {};
@@ -324,6 +333,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->launcher_search.notify = reach_shell_notify_launcher_search_ready;
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
+    shell->windows_update_worker.notify = reach_shell_request_update;
 
     reach_result result = REACH_OK;
 
@@ -358,6 +368,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->audio_volume = dependencies->audio_volume;
     shell->system_controls = dependencies->system_controls;
     shell->media_controls = dependencies->media_controls;
+    shell->windows_update = dependencies->windows_update;
     shell->theme = reach_theme_default();
 
     if (shell->monitors.list == nullptr)
@@ -635,6 +646,7 @@ reach_result reach_shell_start(reach_shell *shell)
     shell->settings_open = 0;
     shell->quick_settings_drag.active = 0;
     shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
+    reach_shell_schedule_windows_update_resume_verification(shell);
     return REACH_OK;
 }
 
@@ -657,6 +669,7 @@ reach_result reach_shell_stop(reach_shell *shell)
     reach_shell_stop_launcher_result_icon_worker(shell);
     reach_shell_stop_launcher_search_worker(shell);
     reach_shell_stop_open_window_icon_worker(shell);
+    reach_shell_stop_windows_update_worker(shell);
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);

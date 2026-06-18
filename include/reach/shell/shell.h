@@ -21,6 +21,7 @@
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
+#include "reach/ports/windows_update.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/dock_reveal_edge.h"
 #include "reach/support/util.h"
@@ -70,6 +71,7 @@ extern "C"
         reach_audio_volume_port audio_volume;
         reach_system_controls_port system_controls;
         reach_media_controls_port media_controls;
+        reach_windows_update_port windows_update;
     } reach_shell_dependencies;
 
     reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,

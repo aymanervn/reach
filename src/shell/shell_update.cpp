@@ -559,6 +559,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
 
     reach_shell_apply_window_control_result(shell);
+    reach_shell_apply_windows_update_progress(shell);
+    reach_shell_apply_windows_update_result(shell);
 
     if (reach_shell_can_move_dock_without_redraw(shell))
     {
@@ -1130,6 +1132,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             reach_shell_config_reload_work_pending(shell) ||
             reach_shell_quick_settings_audio_refresh_work_pending(shell) ||
             reach_shell_quick_settings_system_refresh_work_pending(shell) ||
+            reach_shell_windows_update_work_pending(shell) ||
             shell->quick_settings_bluetooth_pending.active ||
             shell->music_widget_refresh_requested.load() ||
             shell->music_widget_hide_grace_seconds > 0.0 ||

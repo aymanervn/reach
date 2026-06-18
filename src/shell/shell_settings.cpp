@@ -275,5 +275,48 @@ reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell, const re
         reach_shell_request_update(shell);
         return REACH_OK;
     }
+    if (shell->settings_model.selected_page != REACH_SETTINGS_PAGE_UPDATE)
+        return REACH_OK;
+    if (hit.type == REACH_SETTINGS_HIT_UPDATE_SEARCH)
+    {
+        reach_shell_schedule_windows_update_scan(shell);
+        return REACH_OK;
+    }
+    if (hit.type == REACH_SETTINGS_HIT_UPDATE_INSTALL)
+    {
+        reach_shell_schedule_windows_update_install(shell);
+        return REACH_OK;
+    }
+    if (hit.type == REACH_SETTINGS_HIT_UPDATE_CHECKBOX)
+    {
+        reach_settings_model_toggle_update(
+            &shell->settings_model, shell->settings_model.update_scroll_offset + hit.update_index);
+        shell->settings.dirty_flags = 1;
+        shell->dirty.render = 1;
+        reach_shell_request_update(shell);
+    }
+    return REACH_OK;
+}
+
+reach_result reach_shell_handle_settings_pointer_wheel(reach_shell *shell,
+                                                        const reach_ui_event *event)
+{
+    if (shell == nullptr || event == nullptr || !shell->settings_open ||
+        shell->settings_model.selected_page != REACH_SETTINGS_PAGE_UPDATE ||
+        event->wheel_delta == 0) return REACH_OK;
+    if ((float)event->x < shell->settings_bounds.x ||
+        (float)event->x > shell->settings_bounds.x + shell->settings_bounds.width ||
+        (float)event->y < shell->settings_bounds.y ||
+        (float)event->y > shell->settings_bounds.y + shell->settings_bounds.height) return REACH_OK;
+    size_t previous = shell->settings_model.update_scroll_offset;
+    reach_settings_model_scroll_updates(&shell->settings_model,
+                                        event->wheel_delta > 0 ? -1 : 1,
+                                        shell->settings_layout.update_row_count);
+    if (previous != shell->settings_model.update_scroll_offset)
+    {
+        shell->settings.dirty_flags = 1;
+        shell->dirty.render = 1;
+        reach_shell_request_update(shell);
+    }
     return REACH_OK;
 }
