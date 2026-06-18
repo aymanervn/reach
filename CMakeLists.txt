@@ -80,6 +80,7 @@ add_library(reach_features STATIC
     src/features/settings/settings_render.cpp
     src/features/settings/settings_startup_apps.cpp
     src/features/settings/settings_update.cpp
+    src/features/settings/windows_update_policy.cpp
     src/features/settings/settings_wifi.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
@@ -139,6 +140,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/dock_reveal_edge_win32.cpp
     src/adapters/windows/monitor_win32.cpp
     src/adapters/windows/startup_apps_win32.cpp
+    src/adapters/windows/windows_update_wua.cpp
 )
 
 reach_configure_common(reach_windows_adapters)
@@ -163,6 +165,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     shcore
     advapi32
     ole32
+    oleaut32
     runtimeobject
     uuid
     windowscodecs
@@ -171,6 +174,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     wlanapi
     iphlpapi
     wbemuuid
+    Wuguid
 )
 
 add_library(reach_shell STATIC
@@ -199,6 +203,7 @@ add_library(reach_shell STATIC
     src/shell/shell_tray_orchestration.cpp
     src/shell/shell_update.cpp
     src/shell/shell_window_tracking.cpp
+    src/shell/shell_windows_updates.cpp
     src/shell/surface_runtime.cpp
 )
 
@@ -250,6 +255,7 @@ target_link_libraries(reach PRIVATE
     shcore
     advapi32
     ole32
+    oleaut32
     runtimeobject
     uuid
     windowscodecs
@@ -258,6 +264,7 @@ target_link_libraries(reach PRIVATE
     wlanapi
     iphlpapi
     wbemuuid
+    Wuguid
 )
 
 set(EVERYTHING_DLL "${CMAKE_CURRENT_SOURCE_DIR}/third_party/everything/dll/Everything64.dll")
@@ -347,6 +354,29 @@ target_link_libraries(reach_elevation_helper PRIVATE
     propsys
     uuid
 )
+add_executable(reach_update_helper WIN32
+    src/tools/reach_update_helper.cpp
+)
+
+if (MSVC)
+    target_link_options(reach_update_helper PRIVATE
+        "/MANIFEST:EMBED"
+        "/MANIFESTUAC:NO"
+        "/MANIFESTINPUT:${CMAKE_SOURCE_DIR}/resources/elevation_helper.manifest"
+    )
+endif()
+
+reach_configure_common(reach_update_helper)
+reach_configure_windows(reach_update_helper)
+target_compile_features(reach_update_helper PRIVATE cxx_std_17)
+target_link_libraries(reach_update_helper PRIVATE
+    reach_windows_adapters
+    shell32
+    ole32
+    oleaut32
+    Wuguid
+)
+
 set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
 set(REACH_DIST_DIR "${REACH_DIST_ROOT}/Release")
 set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-alpha.zip")
@@ -372,6 +402,10 @@ add_custom_target(reach_release_zip
         "${REACH_DIST_DIR}/reach_elevation_helper.exe"
 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:reach_update_helper>"
+        "${REACH_DIST_DIR}/reach_update_helper.exe"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${EVERYTHING_DLL}"
         "${REACH_DIST_DIR}/Everything64.dll"
 
@@ -385,10 +419,11 @@ add_custom_target(reach_release_zip
         reachctl.exe
         reach-watchdog.exe
         reach_elevation_helper.exe
+        reach_update_helper.exe
         Everything64.dll
         reach.jpg
 
-    DEPENDS reach reachctl reach-watchdog reach_elevation_helper
+    DEPENDS reach reachctl reach-watchdog reach_elevation_helper reach_update_helper
 
     COMMENT "Creating Reach Release ZIP"
 )
@@ -456,6 +491,14 @@ target_link_libraries(reach_quick_settings_feature_tests PRIVATE
     reach_features
 )
 
+add_executable(reach_windows_update_feature_tests
+    tests/windows_update_feature_tests.cpp
+)
+
+reach_configure_common(reach_windows_update_feature_tests)
+target_compile_features(reach_windows_update_feature_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_windows_update_feature_tests PRIVATE reach_features)
+
 add_executable(reach_launcher_feature_tests
     tests/launcher_feature_tests.cpp
 )
@@ -497,6 +540,7 @@ if(CMAKE_CONFIGURATION_TYPES)
     add_test(NAME reach_dock_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_dock_feature_tests.exe)
     add_test(NAME reach_pin_config_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_pin_config_tests.exe)
     add_test(NAME reach_quick_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_quick_settings_feature_tests.exe)
+    add_test(NAME reach_windows_update_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_windows_update_feature_tests.exe)
     add_test(NAME reach_launcher_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_launcher_feature_tests.exe)
     add_test(NAME reach_search_ranking_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_search_ranking_tests.exe)
     add_test(NAME reach_system_controls_network_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_system_controls_network_tests.exe)
@@ -505,6 +549,7 @@ else()
     add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
+    add_test(NAME reach_windows_update_feature_tests COMMAND reach_windows_update_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)

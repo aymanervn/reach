@@ -389,6 +389,36 @@ typedef struct reach_shell_quick_settings_system_refresh_state
     void (*notify)(reach_shell *shell);
 } reach_shell_quick_settings_system_refresh_state;
 
+typedef enum reach_shell_windows_update_work_type
+{
+    REACH_SHELL_WINDOWS_UPDATE_WORK_NONE = 0,
+    REACH_SHELL_WINDOWS_UPDATE_WORK_SCAN,
+    REACH_SHELL_WINDOWS_UPDATE_WORK_INSTALL,
+    REACH_SHELL_WINDOWS_UPDATE_WORK_VERIFY
+} reach_shell_windows_update_work_type;
+
+typedef struct reach_shell_windows_update_worker_state
+{
+    std::thread thread;
+    std::mutex mutex;
+    std::condition_variable cv;
+    int32_t thread_started;
+    int32_t stop;
+    int32_t pending;
+    int32_t in_flight;
+    int32_t completed;
+    reach_shell_windows_update_work_type pending_work;
+    reach_shell_windows_update_work_type completed_work;
+    reach_windows_update_identity selected[REACH_WINDOWS_UPDATE_MAX_UPDATES];
+    size_t selected_count;
+    reach_windows_update_list scan_result;
+    reach_windows_update_operation_result operation_result;
+    int32_t scan_hresult;
+    reach_result work_result;
+    std::atomic<int32_t> progress_state;
+    void (*notify)(reach_shell *shell);
+} reach_shell_windows_update_worker_state;
+
 typedef struct reach_shell_quick_settings_bluetooth_pending_state
 {
     int32_t active;
@@ -468,6 +498,8 @@ struct reach_shell
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
     reach_media_controls_port media_controls;
+    reach_windows_update_port windows_update;
+    reach_shell_windows_update_worker_state windows_update_worker;
     reach_music_widget_model music_widget_model;
     reach_music_widget_layout music_widget_layout;
     reach_music_widget_action_type pressed_music_widget_action;
@@ -752,6 +784,14 @@ void reach_shell_execute_quick_settings_action(reach_shell *shell,
 
 void reach_shell_on_system_controls_changed(void *user, uint32_t change_flags);
 
+void reach_shell_schedule_windows_update_scan(reach_shell *shell);
+void reach_shell_schedule_windows_update_install(reach_shell *shell);
+void reach_shell_schedule_windows_update_resume_verification(reach_shell *shell);
+void reach_shell_apply_windows_update_result(reach_shell *shell);
+void reach_shell_apply_windows_update_progress(reach_shell *shell);
+void reach_shell_stop_windows_update_worker(reach_shell *shell);
+int32_t reach_shell_windows_update_work_pending(const reach_shell *shell);
+
 void reach_shell_end_quick_settings_drag(reach_shell *shell);
 
 reach_result reach_shell_begin_quick_settings_drag_if_hit(reach_shell *shell,
@@ -768,6 +808,8 @@ void reach_shell_minimize_settings(reach_shell *shell);
 int32_t reach_shell_settings_window_minimized(const reach_shell *shell);
 void reach_shell_sync_settings_bounds_from_window(reach_shell *shell);
 void reach_shell_refresh_settings_layout(reach_shell *shell);
+reach_result reach_shell_handle_settings_pointer_wheel(reach_shell *shell,
+                                                        const reach_ui_event *event);
 reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
                                                     const reach_ui_event *event);
 

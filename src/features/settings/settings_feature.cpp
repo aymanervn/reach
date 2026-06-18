@@ -9,7 +9,11 @@ void reach_settings_model_init(reach_settings_model *model)
     {
         return;
     }
+    *model = {};
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
+    model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
+    reach_copy_utf16(model->update_status, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
+                     (const uint16_t *)u"No scan has been run yet.");
 }
 
 void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page)
@@ -18,7 +22,7 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
     {
         return;
     }
-    if (page < REACH_SETTINGS_PAGE_WIFI || page > REACH_SETTINGS_PAGE_MONITORS_SCALING)
+    if (page < REACH_SETTINGS_PAGE_WIFI || page > REACH_SETTINGS_PAGE_UPDATE)
     {
         return;
     }
@@ -58,6 +62,11 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
          (const uint16_t *)L"Monitors and Scaling",
          {0.97f, 0.75f, 0.22f, 1.0f},
          {0.97f, 0.75f, 0.22f, 0.20f}},
+        {REACH_SETTINGS_PAGE_UPDATE,
+         REACH_VECTOR_ICON_RESTART,
+         (const uint16_t *)L"Windows Updates",
+         {0.20f, 0.72f, 0.96f, 1.0f},
+         {0.20f, 0.72f, 0.96f, 0.20f}},
     };
 
     if (out_count != nullptr)
@@ -183,6 +192,37 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
     layout.content_placeholder =
         reach_settings_rect(layout.content_title.x, layout.content_title.y + 56.0f * scale,
                             layout.content_title.width, 34.0f * scale);
+
+    float button_y = layout.content_title.y + 54.0f * scale;
+    float button_height = 34.0f * scale;
+    float button_width = 154.0f * scale;
+    layout.update_search_button =
+        reach_settings_rect(layout.content_title.x, button_y, button_width, button_height);
+    layout.update_install_button = reach_settings_rect(
+        layout.content.x + layout.content.width - 28.0f * scale - button_width, button_y,
+        button_width, button_height);
+
+    float status_height = 28.0f * scale;
+    layout.update_status = reach_settings_rect(
+        layout.content_title.x, layout.content.y + layout.content.height - 42.0f * scale,
+        layout.content.width - 56.0f * scale, status_height);
+    float row_y = button_y + button_height + 12.0f * scale;
+    float row_height = 68.0f * scale;
+    float row_gap = 7.0f * scale;
+    float row_bottom = layout.update_status.y - 8.0f * scale;
+    while (layout.update_row_count < REACH_WINDOWS_UPDATE_MAX_UPDATES &&
+           row_y + row_height <= row_bottom)
+    {
+        size_t index = layout.update_row_count++;
+        layout.update_rows[index] = reach_settings_rect(
+            layout.content_title.x, row_y, layout.content.width - 56.0f * scale, row_height);
+        float checkbox_size = 18.0f * scale;
+        layout.update_checkboxes[index] = reach_settings_rect(
+            layout.update_rows[index].x + 12.0f * scale,
+            layout.update_rows[index].y + (row_height - checkbox_size) * 0.5f,
+            checkbox_size, checkbox_size);
+        row_y += row_height + row_gap;
+    }
     return layout;
 }
 
@@ -211,6 +251,26 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
     {
         result.type = REACH_SETTINGS_HIT_MINIMIZE;
         return result;
+    }
+    if (reach_settings_rect_contains(layout->update_search_button, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_UPDATE_SEARCH;
+        return result;
+    }
+    if (reach_settings_rect_contains(layout->update_install_button, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_UPDATE_INSTALL;
+        return result;
+    }
+    for (size_t index = 0; index < layout->update_row_count; ++index)
+    {
+        if (reach_settings_rect_contains(layout->update_checkboxes[index], x, y) ||
+            reach_settings_rect_contains(layout->update_rows[index], x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_UPDATE_CHECKBOX;
+            result.update_index = index;
+            return result;
+        }
     }
     for (size_t index = 0; index < layout->nav_item_count && index < REACH_SETTINGS_NAV_ITEM_COUNT;
          ++index)
