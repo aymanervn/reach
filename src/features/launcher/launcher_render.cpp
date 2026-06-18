@@ -194,8 +194,8 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         {
             size_t visible_index = index - start;
             float row_x = layout->search_result_items.x - layout->bounds.x;
-            float row_y =
-                layout->search_result_items.y - layout->bounds.y + row_height * (float)visible_index;
+            float row_y = layout->search_result_items.y - layout->bounds.y +
+                          row_height * (float)visible_index;
             float row_width = layout->search_result_items.width;
             int32_t selected = index == state->launcher.selected_result_index;
 

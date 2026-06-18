@@ -290,8 +290,8 @@ static void reach_helper_process_integrity_text(DWORD process_id, wchar_t *text,
     }
 }
 
-static void reach_helper_copy_metadata_to_snapshot(
-    const reach_helper_window_metadata *metadata, reach_elevation_helper_window_snapshot *snapshot)
+static void reach_helper_copy_metadata_to_snapshot(const reach_helper_window_metadata *metadata,
+                                                   reach_elevation_helper_window_snapshot *snapshot)
 {
     if (metadata == nullptr || snapshot == nullptr)
     {
@@ -304,8 +304,8 @@ static void reach_helper_copy_metadata_to_snapshot(
 }
 
 static int32_t reach_helper_cached_window_metadata(HWND hwnd, DWORD process_id,
-                                                  uint64_t seen_generation,
-                                                  reach_elevation_helper_window_snapshot *snapshot)
+                                                   uint64_t seen_generation,
+                                                   reach_elevation_helper_window_snapshot *snapshot)
 {
     if (hwnd == nullptr || snapshot == nullptr)
     {
@@ -371,8 +371,7 @@ static void reach_helper_query_window_metadata(HWND hwnd, DWORD process_id,
     reach_helper_copy_metadata_to_snapshot(&metadata, snapshot);
 }
 
-static void reach_helper_load_window_metadata(HWND hwnd, DWORD process_id,
-                                              uint64_t seen_generation,
+static void reach_helper_load_window_metadata(HWND hwnd, DWORD process_id, uint64_t seen_generation,
                                               reach_elevation_helper_window_snapshot *snapshot)
 {
     if (!reach_helper_cached_window_metadata(hwnd, process_id, seen_generation, snapshot))

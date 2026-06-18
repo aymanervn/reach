@@ -154,16 +154,14 @@ static int32_t reach_shared_reader_open_mapping(void)
     }
 
     reach_shared_reader_close_mapping();
-    g_reader.mapping =
-        OpenFileMappingW(FILE_MAP_READ, FALSE, REACH_ELEVATION_HELPER_STATE_NAME);
+    g_reader.mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, REACH_ELEVATION_HELPER_STATE_NAME);
     if (g_reader.mapping == nullptr)
     {
         return 0;
     }
 
-    g_reader.view = static_cast<const reach_elevation_helper_shared_state *>(
-        MapViewOfFile(g_reader.mapping, FILE_MAP_READ, 0, 0,
-                      sizeof(reach_elevation_helper_shared_state)));
+    g_reader.view = static_cast<const reach_elevation_helper_shared_state *>(MapViewOfFile(
+        g_reader.mapping, FILE_MAP_READ, 0, 0, sizeof(reach_elevation_helper_shared_state)));
     if (g_reader.view == nullptr)
     {
         reach_shared_reader_close_mapping();
@@ -460,9 +458,9 @@ int32_t reach_elevation_helper_shared_reader_connected(void)
     return connected;
 }
 
-reach_result reach_elevation_helper_shared_copy_windows(
-    reach_elevation_helper_window_snapshot *windows, uint32_t max_windows,
-    uint32_t *out_window_count)
+reach_result
+reach_elevation_helper_shared_copy_windows(reach_elevation_helper_window_snapshot *windows,
+                                           uint32_t max_windows, uint32_t *out_window_count)
 {
     if (out_window_count == nullptr || (max_windows > 0 && windows == nullptr))
     {
@@ -508,8 +506,7 @@ reach_result reach_elevation_helper_shared_copy_hotkeys_since(
     }
     uint64_t first = g_reader.cache.first_hotkey_event_number;
     uint64_t last = g_reader.cache.last_hotkey_event_number;
-    int32_t missed = queue_count > 0 && last_consumed_event != 0 &&
-                     last_consumed_event + 1 < first;
+    int32_t missed = queue_count > 0 && last_consumed_event != 0 && last_consumed_event + 1 < first;
     uint64_t next = missed ? first : last_consumed_event + 1;
     uint32_t out_count = 0;
 
@@ -573,9 +570,8 @@ reach_result reach_elevation_helper_shared_writer_start(void)
         return REACH_ERROR;
     }
 
-    g_writer.view = static_cast<reach_elevation_helper_shared_state *>(
-        MapViewOfFile(g_writer.mapping, FILE_MAP_WRITE, 0, 0,
-                      sizeof(reach_elevation_helper_shared_state)));
+    g_writer.view = static_cast<reach_elevation_helper_shared_state *>(MapViewOfFile(
+        g_writer.mapping, FILE_MAP_WRITE, 0, 0, sizeof(reach_elevation_helper_shared_state)));
     if (g_writer.view == nullptr)
     {
         reach_elevation_helper_shared_writer_stop();
@@ -647,9 +643,8 @@ static void reach_shared_writer_end_publish(void)
     }
 }
 
-static int32_t reach_shared_window_snapshot_equal(
-    const reach_elevation_helper_window_snapshot *a,
-    const reach_elevation_helper_window_snapshot *b)
+static int32_t reach_shared_window_snapshot_equal(const reach_elevation_helper_window_snapshot *a,
+                                                  const reach_elevation_helper_window_snapshot *b)
 {
     if (a == nullptr || b == nullptr)
     {
@@ -686,8 +681,9 @@ static int32_t reach_shared_windows_equal(const reach_elevation_helper_window_sn
     return 1;
 }
 
-reach_result reach_elevation_helper_shared_publish_windows(
-    const reach_elevation_helper_window_snapshot *windows, uint32_t window_count)
+reach_result
+reach_elevation_helper_shared_publish_windows(const reach_elevation_helper_window_snapshot *windows,
+                                              uint32_t window_count)
 {
     if (g_writer.view == nullptr)
     {
@@ -774,8 +770,7 @@ reach_result reach_elevation_helper_shared_append_hotkey(uint32_t key, uint32_t 
     {
         index = g_writer.view->hotkey_queue_start;
         g_writer.view->hotkey_queue_start =
-            (g_writer.view->hotkey_queue_start + 1) %
-            REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY;
+            (g_writer.view->hotkey_queue_start + 1) % REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY;
     }
 
     reach_elevation_helper_hotkey_record record = {};
@@ -793,8 +788,7 @@ reach_result reach_elevation_helper_shared_append_hotkey(uint32_t key, uint32_t 
     else
     {
         uint32_t first_index = g_writer.view->hotkey_queue_start;
-        g_writer.view->first_hotkey_event_number =
-            g_writer.view->hotkeys[first_index].event_number;
+        g_writer.view->first_hotkey_event_number = g_writer.view->hotkeys[first_index].event_number;
     }
     g_writer.view->last_hotkey_event_number = record.event_number;
     ++g_writer.view->hotkey_sequence;

@@ -59,6 +59,7 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     music_input.layout = &shell->music_widget_layout;
     music_input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     music_input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+    music_input.animation = &shell->music_widget_bg_animation;
     result = reach_music_widget_build_render_commands(&music_input, &commands);
     if (result != REACH_OK)
     {
@@ -294,9 +295,8 @@ reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_
     model.visible_start = shell->switcher_state.visible_start;
 
     reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
-    for (size_t index = 0; index < shell->switcher_state.window_count &&
-                           index < REACH_MAX_PINNED_APPS;
-         ++index)
+    for (size_t index = 0;
+         index < shell->switcher_state.window_count && index < REACH_MAX_PINNED_APPS; ++index)
     {
         size_t open_index = 0;
         if (reach_shell_render_open_window_index(shell, shell->switcher_state.windows[index],

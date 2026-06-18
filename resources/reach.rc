@@ -34,9 +34,13 @@ IDI_SETTINGS_ICON ICON DISCARDABLE "settings.ico"
 227 RCDATA "launcher/music.svg"
 228 RCDATA "launcher/document.svg"
 229 RCDATA "launcher/file.svg"
-230 RCDATA "extra/minimize.svg"
-231 RCDATA "extra/close.svg"
-232 RCDATA "extra/resize.svg"
+230 RCDATA "music_player/play.svg"
+231 RCDATA "music_player/pause.svg"
+232 RCDATA "music_player/previous.svg"
+233 RCDATA "music_player/next.svg"
+234 RCDATA "extra/minimize.svg"
+235 RCDATA "extra/close.svg"
+236 RCDATA "extra/resize.svg"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0

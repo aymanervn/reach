@@ -162,8 +162,7 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     uint16_t fallback_initial = '?';
     reach_icon_handle icon =
         reach_dock_icon_for_item(input->icons, input->model, index, &fallback_initial);
-    reach_rect_f32 icon_box =
-        reach_dock_icon_box_for_slot(layout->app_slots[index], icon_box_size);
+    reach_rect_f32 icon_box = reach_dock_icon_box_for_slot(layout->app_slots[index], icon_box_size);
     if (use_override)
     {
         icon_box.x = override_box_x;
@@ -235,8 +234,7 @@ static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
     const reach_dock_layout *layout = input->layout;
     float system_icon_size = icon_box_size * reach_dock_metrics_values.system_icon_box_scale;
 
-    reach_rect_f32 tray_box =
-        reach_dock_icon_box_for_slot(layout->tray_button, icon_box_size);
+    reach_rect_f32 tray_box = reach_dock_icon_box_for_slot(layout->tray_button, icon_box_size);
     reach_rect_f32 quick_settings_box =
         reach_dock_icon_box_for_slot(layout->quick_settings_button, icon_box_size);
 
@@ -287,8 +285,7 @@ static void reach_dock_push_power_button(const reach_dock_render_input *input,
     const reach_theme *theme = input->theme;
     const reach_dock_layout *layout = input->layout;
     float system_icon_size = icon_box_size * reach_dock_metrics_values.system_icon_box_scale;
-    reach_rect_f32 power_box =
-        reach_dock_icon_box_for_slot(layout->power_button, icon_box_size);
+    reach_rect_f32 power_box = reach_dock_icon_box_for_slot(layout->power_button, icon_box_size);
 
     reach_dock_push_rect(commands, power_box, theme->dock_button_background,
                          theme->dock_power_button_corner_radius);

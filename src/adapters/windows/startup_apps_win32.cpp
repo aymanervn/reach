@@ -363,7 +363,7 @@ static int32_t reach_windows_parse_unquoted_run_command(const wchar_t *command,
     wchar_t candidate[4096] = {};
     if (reach_windows_copy_command_slice(command, end, candidate, _countof(candidate)) &&
         reach_windows_startup_resolve_executable_candidate(candidate, out_executable,
-                                                          out_executable_count))
+                                                           out_executable_count))
     {
         out_arguments[0] = 0;
         return 1;
@@ -376,14 +376,13 @@ static int32_t reach_windows_parse_unquoted_run_command(const wchar_t *command,
             continue;
         }
 
-        if (!reach_windows_copy_command_slice(command, split - 1, candidate,
-                                             _countof(candidate)))
+        if (!reach_windows_copy_command_slice(command, split - 1, candidate, _countof(candidate)))
         {
             continue;
         }
 
         if (!reach_windows_startup_resolve_executable_candidate(candidate, out_executable,
-                                                               out_executable_count))
+                                                                out_executable_count))
         {
             continue;
         }
@@ -440,7 +439,7 @@ static int32_t reach_windows_parse_run_command(const wchar_t *command, wchar_t *
         wchar_t candidate[4096] = {};
         if (!reach_windows_copy_command_slice(cursor, end, candidate, _countof(candidate)) ||
             !reach_windows_startup_resolve_executable_candidate(candidate, out_executable,
-                                                               out_executable_count))
+                                                                out_executable_count))
         {
             return 0;
         }

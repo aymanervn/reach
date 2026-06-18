@@ -19,9 +19,8 @@ static reach_rect_f32 reach_quick_settings_content_line(reach_rect_f32 content_b
 {
     const reach_quick_settings_metrics *values =
         metrics != nullptr ? metrics : &reach_quick_settings_metrics_values;
-    return reach_quick_settings_rect(
-        content_bounds.x + values->content_padding, y,
-        content_bounds.width - values->content_padding * 2.0f, height);
+    return reach_quick_settings_rect(content_bounds.x + values->content_padding, y,
+                                     content_bounds.width - values->content_padding * 2.0f, height);
 }
 
 static size_t reach_quick_settings_two_column_row_count(size_t item_count)
@@ -238,8 +237,7 @@ reach_quick_settings_volume_pill_layout_for_bounds(reach_rect_f32 bounds, const 
 
 reach_quick_settings_volume_pill_layout
 reach_quick_settings_volume_pill_layout_for_bounds_scaled(reach_rect_f32 bounds,
-                                                          const reach_theme *theme,
-                                                          float dpi_scale)
+                                                          const reach_theme *theme, float dpi_scale)
 {
     (void)theme;
 
@@ -357,8 +355,7 @@ static void reach_quick_settings_place_system_tile(reach_quick_settings_tile_lay
         values->system_tile_icon_size, values->system_tile_icon_size);
 
     tile->label = reach_quick_settings_rect(
-        tile->icon.x + values->system_tile_icon_size + values->system_tile_icon_gap,
-        tile->bounds.y,
+        tile->icon.x + values->system_tile_icon_size + values->system_tile_icon_gap, tile->bounds.y,
         tile->bounds.x + tile->bounds.width - values->content_padding -
             (tile->icon.x + values->system_tile_icon_size + values->system_tile_icon_gap),
         tile->bounds.height);
@@ -370,7 +367,7 @@ reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
                                                const reach_quick_settings_model *model)
 {
     return reach_quick_settings_layout_for_content_bounds_scaled(content_bounds, theme, model,
-                                                                1.0f);
+                                                                 1.0f);
 }
 
 reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scaled(
@@ -417,9 +414,8 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
         reach_rect_f32 brightness_bounds = reach_quick_settings_content_line(
             content_bounds, next_y + metrics.pill_header_height + metrics.section_header_gap,
             metrics.pill_height, &metrics);
-        layout.brightness_pill =
-            reach_quick_settings_volume_pill_layout_for_bounds_scaled(brightness_bounds, theme,
-                                                                      dpi_scale);
+        layout.brightness_pill = reach_quick_settings_volume_pill_layout_for_bounds_scaled(
+            brightness_bounds, theme, dpi_scale);
         layout.brightness_slider_track = layout.brightness_pill.slider_track;
         layout.brightness_slider_fill = layout.brightness_pill.slider_fill;
         next_y = brightness_bounds.y + brightness_bounds.height + metrics.system_grid_bottom_gap;
@@ -508,9 +504,9 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
     }
     else
     {
-        layout.output_device_button = reach_quick_settings_content_line(
-            content_bounds, next_y + metrics.output_button_gap, metrics.output_button_height,
-            &metrics);
+        layout.output_device_button =
+            reach_quick_settings_content_line(content_bounds, next_y + metrics.output_button_gap,
+                                              metrics.output_button_height, &metrics);
 
         layout.output_device_button_icon.width = metrics.output_icon_size;
         layout.output_device_button_icon.height = metrics.output_icon_size;
@@ -650,9 +646,9 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
     }
     else
     {
-        layout.expand_button = reach_quick_settings_content_line(
-            content_bounds, next_y + metrics.expand_button_gap, metrics.expand_button_height,
-            &metrics);
+        layout.expand_button =
+            reach_quick_settings_content_line(content_bounds, next_y + metrics.expand_button_gap,
+                                              metrics.expand_button_height, &metrics);
     }
 
     if (layout.expand_button.width < 0.0f)

@@ -509,6 +509,7 @@ struct reach_shell
     uint64_t music_widget_pending_cover_icon_id;
     reach_color music_widget_pending_cover_accent;
     std::atomic<int32_t> music_widget_refresh_requested;
+    reach_music_widget_bg_animation music_widget_bg_animation;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_shell_quick_settings_audio_refresh_state quick_settings_audio_refresh;
     reach_shell_quick_settings_system_refresh_state quick_settings_system_refresh;
