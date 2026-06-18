@@ -20,8 +20,7 @@ static void reach_shell_launcher_result_icon_thread_main(reach_shell *shell)
             std::unique_lock<std::mutex> lock(shell->launcher_search.mutex);
             shell->launcher_search.icon_cv.wait(
                 lock,
-                [shell]()
-                {
+                [shell]() {
                     return shell->launcher_search.stop || shell->launcher_search.icon_job_count > 0;
                 });
 

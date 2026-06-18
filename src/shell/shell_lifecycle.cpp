@@ -516,8 +516,8 @@ reach_result reach_shell_start(reach_shell *shell)
     }
     if (shell->settings.window.ops.set_event_callback != nullptr)
     {
-        result = shell->settings.window.ops.set_event_callback(
-            shell->settings.window.window, reach_shell_on_window_event, shell);
+        result = shell->settings.window.ops.set_event_callback(shell->settings.window.window,
+                                                               reach_shell_on_window_event, shell);
         if (result != REACH_OK)
         {
             return result;

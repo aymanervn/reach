@@ -107,8 +107,8 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result =
-            reach_windows_create_platform_window(REACH_SURFACE_SETTINGS, &dependencies.settings_window);
+        result = reach_windows_create_platform_window(REACH_SURFACE_SETTINGS,
+                                                      &dependencies.settings_window);
     }
     if (result == REACH_OK)
     {

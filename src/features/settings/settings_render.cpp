@@ -58,8 +58,8 @@ static void push_text(reach_render_command_buffer *commands, reach_rect_f32 rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static void push_icon(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                      reach_color color, reach_vector_icon_id icon_id, float inset_ratio)
+static void push_icon(reach_render_command_buffer *commands, reach_rect_f32 rect, reach_color color,
+                      reach_vector_icon_id icon_id, float inset_ratio)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
@@ -74,11 +74,13 @@ static void push_icon(reach_render_command_buffer *commands, reach_rect_f32 rect
 static void append_text(uint16_t *destination, size_t capacity, const uint16_t *source)
 {
     size_t length = 0;
-    while (length < capacity && destination[length] != 0) ++length;
+    while (length < capacity && destination[length] != 0)
+        ++length;
     size_t index = 0;
     while (source != nullptr && source[index] != 0 && length + 1 < capacity)
         destination[length++] = source[index++];
-    if (length < capacity) destination[length] = 0;
+    if (length < capacity)
+        destination[length] = 0;
 }
 
 static void build_metadata_text(const reach_windows_update_item *update, uint16_t *text,
@@ -86,13 +88,12 @@ static void build_metadata_text(const reach_windows_update_item *update, uint16_
 {
     text[0] = 0;
     append_text(text, capacity, (const uint16_t *)u"KB: ");
-    append_text(text, capacity, update->identity.kb_article_ids[0] != 0
-                                    ? update->identity.kb_article_ids
-                                    : (const uint16_t *)u"N/A");
+    append_text(text, capacity,
+                update->identity.kb_article_ids[0] != 0 ? update->identity.kb_article_ids
+                                                        : (const uint16_t *)u"N/A");
     append_text(text, capacity, (const uint16_t *)u"   Category: ");
-    append_text(text, capacity, update->categories[0] != 0
-                                    ? update->categories
-                                    : (const uint16_t *)u"N/A");
+    append_text(text, capacity,
+                update->categories[0] != 0 ? update->categories : (const uint16_t *)u"N/A");
 }
 
 static void append_integer(uint16_t *destination, size_t capacity, int32_t value)
@@ -100,10 +101,16 @@ static void append_integer(uint16_t *destination, size_t capacity, int32_t value
     uint16_t digits[16] = {};
     size_t count = 0;
     uint32_t remaining = value < 0 ? (uint32_t)(-(int64_t)value) : (uint32_t)value;
-    do { digits[count++] = (uint16_t)(u'0' + remaining % 10); remaining /= 10; } while (remaining && count < 15);
-    if (value < 0 && count < 15) digits[count++] = u'-';
+    do
+    {
+        digits[count++] = (uint16_t)(u'0' + remaining % 10);
+        remaining /= 10;
+    } while (remaining && count < 15);
+    if (value < 0 && count < 15)
+        digits[count++] = u'-';
     uint16_t forward[16] = {};
-    for (size_t index = 0; index < count; ++index) forward[index] = digits[count - index - 1];
+    for (size_t index = 0; index < count; ++index)
+        forward[index] = digits[count - index - 1];
     append_text(destination, capacity, forward);
 }
 
@@ -114,10 +121,13 @@ static void build_status_text(const reach_windows_update_item *update, uint16_t 
     append_text(text, capacity, (const uint16_t *)u"Status: ");
     append_text(text, capacity, reach_windows_update_state_label(update->state));
     append_text(text, capacity, (const uint16_t *)u"   Downloaded: ");
-    append_text(text, capacity, update->downloaded ? (const uint16_t *)u"Yes" : (const uint16_t *)u"No");
+    append_text(text, capacity,
+                update->downloaded ? (const uint16_t *)u"Yes" : (const uint16_t *)u"No");
     append_text(text, capacity, (const uint16_t *)u"   Restart: ");
-    append_text(text, capacity, !update->reboot_required_known ? (const uint16_t *)u"Unknown" :
-                                update->reboot_required ? (const uint16_t *)u"Required" : (const uint16_t *)u"No");
+    append_text(text, capacity,
+                !update->reboot_required_known ? (const uint16_t *)u"Unknown"
+                : update->reboot_required      ? (const uint16_t *)u"Required"
+                                               : (const uint16_t *)u"No");
 }
 
 static void build_identity_text(const reach_windows_update_item *update, uint16_t *text,
@@ -129,10 +139,11 @@ static void build_identity_text(const reach_windows_update_item *update, uint16_
     append_text(text, capacity, (const uint16_t *)u"   Revision: ");
     append_integer(text, capacity, update->identity.revision_number);
     append_text(text, capacity, (const uint16_t *)u"   Reason: ");
-    append_text(text, capacity, update->selected_reason[0]
-                                    ? update->selected_reason
-                                    : (update->selected ? (const uint16_t *)u"Manual"
-                                                        : (const uint16_t *)u"Not selected"));
+    append_text(
+        text, capacity,
+        update->selected_reason[0]
+            ? update->selected_reason
+            : (update->selected ? (const uint16_t *)u"Manual" : (const uint16_t *)u"Not selected"));
 }
 
 static void render_update_page(const reach_settings_render_input *input,
@@ -152,13 +163,12 @@ static void render_update_page(const reach_settings_render_input *input,
               busy && model->update_page_state == REACH_SETTINGS_UPDATE_SCANNING
                   ? (const uint16_t *)u"Scanning..."
                   : (const uint16_t *)u"Search for updates",
-              scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD,
-              REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_text, 1);
+              scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
+              input->theme->settings_text, 1);
     push_rect(commands, layout->update_install_button, scale_value(input, 8.0f),
               install_enabled ? enabled_button : disabled_button);
     push_text(commands, layout->update_install_button, (const uint16_t *)u"Install selected",
-              scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD,
-              REACH_TEXT_ALIGNMENT_CENTER,
+              scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
               install_enabled ? input->theme->settings_text : input->theme->settings_secondary_text,
               1);
 
@@ -168,7 +178,8 @@ static void render_update_page(const reach_settings_render_input *input,
     for (size_t index = 0; index < visible_count; ++index)
     {
         size_t update_index = model->update_scroll_offset + index;
-        if (update_index >= model->update_list.count) break;
+        if (update_index >= model->update_list.count)
+            break;
         const reach_windows_update_item *update = &model->update_list.updates[update_index];
         const reach_rect_f32 row = layout->update_rows[index];
         const reach_rect_f32 checkbox = layout->update_checkboxes[index];
@@ -184,26 +195,26 @@ static void render_update_page(const reach_settings_render_input *input,
 
         float left = checkbox.x + checkbox.width + scale_value(input, 10.0f);
         float width = row.x + row.width - left - scale_value(input, 10.0f);
-        push_text(commands, {left, row.y + scale_value(input, 5.0f), width,
-                             scale_value(input, 18.0f)},
+        push_text(commands,
+                  {left, row.y + scale_value(input, 5.0f), width, scale_value(input, 18.0f)},
                   update->identity.title, scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD,
                   input->text_alignment_leading, input->theme->settings_text, 1);
         uint16_t metadata[260] = {};
         build_metadata_text(update, metadata, 260);
-        push_text(commands, {left, row.y + scale_value(input, 21.0f), width,
-                             scale_value(input, 14.0f)},
+        push_text(commands,
+                  {left, row.y + scale_value(input, 21.0f), width, scale_value(input, 14.0f)},
                   metadata, scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
         uint16_t status[260] = {};
         build_status_text(update, status, 260);
-        push_text(commands, {left, row.y + scale_value(input, 36.0f), width,
-                             scale_value(input, 14.0f)},
+        push_text(commands,
+                  {left, row.y + scale_value(input, 36.0f), width, scale_value(input, 14.0f)},
                   status, scale_value(input, 10.0f), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
         uint16_t identity[260] = {};
         build_identity_text(update, identity, 260);
-        push_text(commands, {left, row.y + scale_value(input, 51.0f), width,
-                             scale_value(input, 13.0f)},
+        push_text(commands,
+                  {left, row.y + scale_value(input, 51.0f), width, scale_value(input, 13.0f)},
                   identity, scale_value(input, 9.5f), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     }
@@ -211,8 +222,7 @@ static void render_update_page(const reach_settings_render_input *input,
     push_text(commands, layout->update_status,
               model->update_status[0] != 0 ? model->update_status
                                            : (const uint16_t *)u"No scan has been run yet.",
-              scale_value(input, 12.0f), REACH_TEXT_WEIGHT_NORMAL,
-              input->text_alignment_leading,
+              scale_value(input, 12.0f), REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
               model->update_page_state == REACH_SETTINGS_UPDATE_ERROR
                   ? reach_color{0.96f, 0.38f, 0.34f, 1.0f}
                   : input->theme->settings_secondary_text,
@@ -223,7 +233,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
                                                   reach_render_command_buffer *commands)
 {
     if (input == nullptr || input->theme == nullptr || input->model == nullptr ||
-        input->layout == nullptr || commands == nullptr) return REACH_INVALID_ARGUMENT;
+        input->layout == nullptr || commands == nullptr)
+        return REACH_INVALID_ARGUMENT;
     reach_render_command_buffer_clear(commands);
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     reach_color background = input->theme->dark_background;
@@ -232,10 +243,10 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
     push_masked_rect(commands, input->layout->nav, 18.0f * scale,
                      REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT,
                      {0.08f, 0.11f, 0.14f, 0.64f});
-    push_rect(commands, input->layout->close_button,
-              input->layout->close_button.width * 0.5f, {0.92f, 0.28f, 0.28f, 1.0f});
-    push_rect(commands, input->layout->minimize_button,
-              input->layout->minimize_button.width * 0.5f, {0.94f, 0.72f, 0.20f, 1.0f});
+    push_rect(commands, input->layout->close_button, input->layout->close_button.width * 0.5f,
+              {0.92f, 0.28f, 0.28f, 1.0f});
+    push_rect(commands, input->layout->minimize_button, input->layout->minimize_button.width * 0.5f,
+              {0.94f, 0.72f, 0.20f, 1.0f});
     push_icon(commands, input->layout->close_button, input->theme->dark_text,
               REACH_VECTOR_ICON_CLOSE, 0.24f);
     push_icon(commands, input->layout->minimize_button, input->theme->dark_text,
@@ -252,8 +263,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
                       item->accent_background);
         push_rect(commands, item_layout->icon_background, scale_value(input, 9.0f),
                   item->accent_background);
-        push_icon(commands, item_layout->icon, item->accent,
-                  (reach_vector_icon_id)item->icon_id, 0.0f);
+        push_icon(commands, item_layout->icon, item->accent, (reach_vector_icon_id)item->icon_id,
+                  0.0f);
         push_text(commands, item_layout->label, item->label, scale_value(input, 13.0f),
                   REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
                   input->theme->settings_text, 1);

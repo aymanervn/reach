@@ -18,11 +18,14 @@ static const HRESULT REACH_WU_E_PER_MACHINE_UPDATE_ACCESS_DENIED = (HRESULT)0x80
 static const HRESULT REACH_WU_E_ALL_UPDATES_FAILED = (HRESULT)0x80240022L;
 static const HRESULT REACH_WU_E_UH_POSTREBOOTSTILLPENDING = (HRESULT)0x80242014L;
 
-struct reach_windows_update_adapter {};
+struct reach_windows_update_adapter
+{
+};
 
 static void copy_wide(uint16_t *destination, size_t capacity, const wchar_t *source)
 {
-    if (destination == nullptr || capacity == 0) return;
+    if (destination == nullptr || capacity == 0)
+        return;
     size_t index = 0;
     while (source != nullptr && source[index] != 0 && index + 1 < capacity)
     {
@@ -35,16 +38,19 @@ static void copy_wide(uint16_t *destination, size_t capacity, const wchar_t *sou
 static void append_wide(uint16_t *destination, size_t capacity, const wchar_t *source)
 {
     size_t length = 0;
-    while (length < capacity && destination[length] != 0) ++length;
+    while (length < capacity && destination[length] != 0)
+        ++length;
     size_t index = 0;
     while (source != nullptr && source[index] != 0 && length + 1 < capacity)
         destination[length++] = (uint16_t)source[index++];
-    if (length < capacity) destination[length] = 0;
+    if (length < capacity)
+        destination[length] = 0;
 }
 
 static void append_separator(uint16_t *destination, size_t capacity)
 {
-    if (destination[0] != 0) append_wide(destination, capacity, L", ");
+    if (destination[0] != 0)
+        append_wide(destination, capacity, L", ");
 }
 
 static void set_utc_now(uint16_t *destination, size_t capacity)
@@ -52,8 +58,8 @@ static void set_utc_now(uint16_t *destination, size_t capacity)
     SYSTEMTIME time = {};
     GetSystemTime(&time);
     wchar_t text[32] = {};
-    swprintf_s(text, L"%04u-%02u-%02uT%02u:%02u:%02uZ", time.wYear, time.wMonth,
-               time.wDay, time.wHour, time.wMinute, time.wSecond);
+    swprintf_s(text, L"%04u-%02u-%02uT%02u:%02u:%02uZ", time.wYear, time.wMonth, time.wDay,
+               time.wHour, time.wMinute, time.wSecond);
     copy_wide(destination, capacity, text);
 }
 
@@ -63,16 +69,23 @@ struct com_scope
     int32_t uninitialize;
     com_scope() : result(CoInitializeEx(nullptr, COINIT_MULTITHREADED)), uninitialize(0)
     {
-        if (result == S_OK || result == S_FALSE) uninitialize = 1;
-        else if (result == RPC_E_CHANGED_MODE) result = S_OK;
+        if (result == S_OK || result == S_FALSE)
+            uninitialize = 1;
+        else if (result == RPC_E_CHANGED_MODE)
+            result = S_OK;
     }
-    ~com_scope() { if (uninitialize) CoUninitialize(); }
+    ~com_scope()
+    {
+        if (uninitialize)
+            CoUninitialize();
+    }
 };
 
 static int32_t is_elevated(void)
 {
     HANDLE token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return 0;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+        return 0;
     TOKEN_ELEVATION elevation = {};
     DWORD size = 0;
     BOOL ok = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size);
@@ -103,16 +116,19 @@ static HRESULT create_session_and_searcher(ComPtr<IUpdateSession> *session,
 {
     HRESULT hr = CoCreateInstance(CLSID_UpdateSession, nullptr, CLSCTX_INPROC_SERVER,
                                   IID_PPV_ARGS(session->ReleaseAndGetAddressOf()));
-    if (FAILED(hr)) return hr;
+    if (FAILED(hr))
+        return hr;
     return (*session)->CreateUpdateSearcher(searcher->ReleaseAndGetAddressOf());
 }
 
 static void read_string_collection(IStringCollection *collection, uint16_t *destination,
                                    size_t capacity)
 {
-    if (collection == nullptr) return;
+    if (collection == nullptr)
+        return;
     LONG count = 0;
-    if (FAILED(collection->get_Count(&count))) return;
+    if (FAILED(collection->get_Count(&count)))
+        return;
     for (LONG index = 0; index < count; ++index)
     {
         BSTR value = nullptr;
@@ -125,12 +141,13 @@ static void read_string_collection(IStringCollection *collection, uint16_t *dest
     }
 }
 
-static void read_categories(ICategoryCollection *categories, uint16_t *destination,
-                            size_t capacity)
+static void read_categories(ICategoryCollection *categories, uint16_t *destination, size_t capacity)
 {
-    if (categories == nullptr) return;
+    if (categories == nullptr)
+        return;
     LONG count = 0;
-    if (FAILED(categories->get_Count(&count))) return;
+    if (FAILED(categories->get_Count(&count)))
+        return;
     for (LONG index = 0; index < count; ++index)
     {
         ComPtr<ICategory> category;
@@ -149,7 +166,8 @@ static void read_categories(ICategoryCollection *categories, uint16_t *destinati
 
 static HRESULT read_update(IUpdate *update, reach_windows_update_item *item)
 {
-    if (update == nullptr || item == nullptr) return E_INVALIDARG;
+    if (update == nullptr || item == nullptr)
+        return E_INVALIDARG;
     *item = {};
     BSTR title = nullptr;
     if (SUCCEEDED(update->get_Title(&title)) && title != nullptr)
@@ -159,7 +177,8 @@ static HRESULT read_update(IUpdate *update, reach_windows_update_item *item)
     }
     ComPtr<IUpdateIdentity> identity;
     HRESULT hr = update->get_Identity(identity.GetAddressOf());
-    if (FAILED(hr)) return hr;
+    if (FAILED(hr))
+        return hr;
     BSTR update_id = nullptr;
     if (SUCCEEDED(identity->get_UpdateID(&update_id)) && update_id != nullptr)
     {
@@ -177,7 +196,8 @@ static HRESULT read_update(IUpdate *update, reach_windows_update_item *item)
     if (SUCCEEDED(update->get_Categories(categories.GetAddressOf())))
         read_categories(categories.Get(), item->categories, REACH_WINDOWS_UPDATE_METADATA_CAPACITY);
     VARIANT_BOOL value = VARIANT_FALSE;
-    if (SUCCEEDED(update->get_IsDownloaded(&value))) item->downloaded = value == VARIANT_TRUE;
+    if (SUCCEEDED(update->get_IsDownloaded(&value)))
+        item->downloaded = value == VARIANT_TRUE;
     ComPtr<IInstallationBehavior> behavior;
     if (SUCCEEDED(update->get_InstallationBehavior(behavior.GetAddressOf())))
     {
@@ -197,30 +217,46 @@ static HRESULT read_update(IUpdate *update, reach_windows_update_item *item)
 static HRESULT search_pending(IUpdateSearcher *searcher, ComPtr<IUpdateCollection> *updates)
 {
     BSTR criteria = SysAllocString(L"IsInstalled=0 and IsHidden=0 and Type='Software'");
-    if (criteria == nullptr) return E_OUTOFMEMORY;
+    if (criteria == nullptr)
+        return E_OUTOFMEMORY;
     ComPtr<ISearchResult> search_result;
     HRESULT hr = searcher->Search(criteria, search_result.GetAddressOf());
     SysFreeString(criteria);
-    if (FAILED(hr)) return hr;
+    if (FAILED(hr))
+        return hr;
     return search_result->get_Updates(updates->ReleaseAndGetAddressOf());
 }
 
 static reach_result scan(void *, reach_windows_update_list *out_updates, int32_t *out_hresult)
 {
-    if (out_updates == nullptr || out_hresult == nullptr) return REACH_INVALID_ARGUMENT;
+    if (out_updates == nullptr || out_hresult == nullptr)
+        return REACH_INVALID_ARGUMENT;
     *out_updates = {};
     *out_hresult = 0;
     com_scope com;
-    if (FAILED(com.result)) { *out_hresult = (int32_t)com.result; return REACH_ERROR; }
+    if (FAILED(com.result))
+    {
+        *out_hresult = (int32_t)com.result;
+        return REACH_ERROR;
+    }
     ComPtr<IUpdateSession> session;
     ComPtr<IUpdateSearcher> searcher;
     HRESULT hr = create_session_and_searcher(&session, &searcher);
     ComPtr<IUpdateCollection> updates;
-    if (SUCCEEDED(hr)) hr = search_pending(searcher.Get(), &updates);
-    if (FAILED(hr)) { *out_hresult = (int32_t)hr; return REACH_ERROR; }
+    if (SUCCEEDED(hr))
+        hr = search_pending(searcher.Get(), &updates);
+    if (FAILED(hr))
+    {
+        *out_hresult = (int32_t)hr;
+        return REACH_ERROR;
+    }
     LONG count = 0;
     hr = updates->get_Count(&count);
-    if (FAILED(hr)) { *out_hresult = (int32_t)hr; return REACH_ERROR; }
+    if (FAILED(hr))
+    {
+        *out_hresult = (int32_t)hr;
+        return REACH_ERROR;
+    }
     for (LONG index = 0; index < count && out_updates->count < REACH_WINDOWS_UPDATE_MAX_UPDATES;
          ++index)
     {
@@ -235,11 +271,13 @@ static reach_result scan(void *, reach_windows_update_list *out_updates, int32_t
 static int32_t identity_equals(IUpdate *update, const reach_windows_update_identity *selected)
 {
     ComPtr<IUpdateIdentity> identity;
-    if (FAILED(update->get_Identity(identity.GetAddressOf()))) return 0;
+    if (FAILED(update->get_Identity(identity.GetAddressOf())))
+        return 0;
     LONG revision = 0;
     BSTR id = nullptr;
-    if (FAILED(identity->get_RevisionNumber(&revision)) ||
-        FAILED(identity->get_UpdateID(&id)) || id == nullptr) return 0;
+    if (FAILED(identity->get_RevisionNumber(&revision)) || FAILED(identity->get_UpdateID(&id)) ||
+        id == nullptr)
+        return 0;
     int32_t equal = revision == selected->revision_number &&
                     wcscmp(id, reinterpret_cast<const wchar_t *>(selected->update_id)) == 0;
     SysFreeString(id);
@@ -250,12 +288,14 @@ static int32_t pending_contains(IUpdateCollection *pending,
                                 const reach_windows_update_identity *identity)
 {
     LONG count = 0;
-    if (pending == nullptr || FAILED(pending->get_Count(&count))) return 0;
+    if (pending == nullptr || FAILED(pending->get_Count(&count)))
+        return 0;
     for (LONG index = 0; index < count; ++index)
     {
         ComPtr<IUpdate> update;
         if (SUCCEEDED(pending->get_Item(index, update.GetAddressOf())) &&
-            identity_equals(update.Get(), identity)) return 1;
+            identity_equals(update.Get(), identity))
+            return 1;
     }
     return 0;
 }
@@ -266,34 +306,45 @@ static int32_t history_contains_success(IUpdateSearcher *searcher,
                                         DATE *out_date)
 {
     LONG total = 0;
-    if (FAILED(searcher->GetTotalHistoryCount(&total))) return 0;
+    if (FAILED(searcher->GetTotalHistoryCount(&total)))
+        return 0;
     LONG count = total < 256 ? total : 256;
     ComPtr<IUpdateHistoryEntryCollection> history;
-    if (FAILED(searcher->QueryHistory(0, count, history.GetAddressOf()))) return 0;
+    if (FAILED(searcher->QueryHistory(0, count, history.GetAddressOf())))
+        return 0;
     LONG history_count = 0;
-    if (FAILED(history->get_Count(&history_count))) return 0;
+    if (FAILED(history->get_Count(&history_count)))
+        return 0;
     for (LONG index = 0; index < history_count; ++index)
     {
         ComPtr<IUpdateHistoryEntry> entry;
-        if (FAILED(history->get_Item(index, entry.GetAddressOf()))) continue;
+        if (FAILED(history->get_Item(index, entry.GetAddressOf())))
+            continue;
         ComPtr<IUpdateIdentity> entry_identity;
-        if (FAILED(entry->get_UpdateIdentity(entry_identity.GetAddressOf()))) continue;
+        if (FAILED(entry->get_UpdateIdentity(entry_identity.GetAddressOf())))
+            continue;
         BSTR id = nullptr;
         LONG revision = 0;
-        if (FAILED(entry_identity->get_UpdateID(&id)) || id == nullptr) continue;
+        if (FAILED(entry_identity->get_UpdateID(&id)) || id == nullptr)
+            continue;
         (void)entry_identity->get_RevisionNumber(&revision);
         int32_t match = revision == identity->revision_number &&
                         wcscmp(id, reinterpret_cast<const wchar_t *>(identity->update_id)) == 0;
         SysFreeString(id);
-        if (!match) continue;
+        if (!match)
+            continue;
         LONG hr = 0;
         OperationResultCode code = orcNotStarted;
         (void)entry->get_HResult(&hr);
         (void)entry->get_ResultCode(&code);
-        if (out_hresult != nullptr) *out_hresult = hr;
-        if (out_result_code != nullptr) *out_result_code = (int32_t)code;
-        if (out_date != nullptr) (void)entry->get_Date(out_date);
-        if (operation_succeeded(code)) return 1;
+        if (out_hresult != nullptr)
+            *out_hresult = hr;
+        if (out_result_code != nullptr)
+            *out_result_code = (int32_t)code;
+        if (out_date != nullptr)
+            (void)entry->get_Date(out_date);
+        if (operation_succeeded(code))
+            return 1;
     }
     return 0;
 }
@@ -306,7 +357,8 @@ static DATE current_boot_date(void)
     now.LowPart = file_time.dwLowDateTime;
     now.HighPart = file_time.dwHighDateTime;
     uint64_t uptime_100ns = GetTickCount64() * 10000ULL;
-    if (now.QuadPart > uptime_100ns) now.QuadPart -= uptime_100ns;
+    if (now.QuadPart > uptime_100ns)
+        now.QuadPart -= uptime_100ns;
     file_time.dwLowDateTime = now.LowPart;
     file_time.dwHighDateTime = now.HighPart;
     SYSTEMTIME boot_time = {};
@@ -323,7 +375,8 @@ static void verify_results(IUpdateSearcher *searcher, IUpdateCollection *pending
     for (size_t index = 0; index < result->per_update_result_count; ++index)
     {
         reach_windows_update_item *item = &result->per_update_results[index];
-        if (item->state == REACH_WINDOWS_UPDATE_FAILED) continue;
+        if (item->state == REACH_WINDOWS_UPDATE_FAILED)
+            continue;
         int32_t history_hresult = 0;
         int32_t history_result_code = 0;
         DATE history_date = 0.0;
@@ -338,7 +391,8 @@ static void verify_results(IUpdateSearcher *searcher, IUpdateCollection *pending
         if (item->reboot_required)
         {
             int32_t reboot_observed = history_date > 0.0 && boot_date > history_date;
-            if (!reboot_observed || history_hresult == (int32_t)REACH_WU_E_UH_POSTREBOOTSTILLPENDING)
+            if (!reboot_observed ||
+                history_hresult == (int32_t)REACH_WU_E_UH_POSTREBOOTSTILLPENDING)
             {
                 item->state = REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED;
                 item->verification_status = REACH_WINDOWS_UPDATE_VERIFICATION_STATUS_PENDING_REBOOT;
@@ -382,10 +436,12 @@ static int32_t pending_verification_path(wchar_t *path, size_t capacity)
 {
     wchar_t local_app_data[MAX_PATH] = {};
     DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", local_app_data, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH) return 0;
+    if (length == 0 || length >= MAX_PATH)
+        return 0;
     wchar_t directory[MAX_PATH] = {};
     swprintf_s(directory, L"%s\\Reach", local_app_data);
-    if (!CreateDirectoryW(directory, nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) return 0;
+    if (!CreateDirectoryW(directory, nullptr) && GetLastError() != ERROR_ALREADY_EXISTS)
+        return 0;
     swprintf_s(path, capacity, L"%s\\pending-windows-updates.bin", directory);
     return 1;
 }
@@ -393,14 +449,16 @@ static int32_t pending_verification_path(wchar_t *path, size_t capacity)
 static void save_pending_verification(const reach_windows_update_operation_result *result)
 {
     wchar_t path[MAX_PATH] = {};
-    if (!pending_verification_path(path, MAX_PATH)) return;
+    if (!pending_verification_path(path, MAX_PATH))
+        return;
     pending_verification_file file = {};
     file.magic = pending_verification_magic;
     for (size_t index = 0; index < result->per_update_result_count; ++index)
     {
         const reach_windows_update_item *item = &result->per_update_results[index];
         if ((item->state == REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED ||
-             item->verification_status == REACH_WINDOWS_UPDATE_VERIFICATION_STATUS_PENDING_REBOOT) &&
+             item->verification_status ==
+                 REACH_WINDOWS_UPDATE_VERIFICATION_STATUS_PENDING_REBOOT) &&
             file.count < REACH_WINDOWS_UPDATE_MAX_UPDATES)
             file.updates[file.count++] = item->identity;
     }
@@ -409,22 +467,24 @@ static void save_pending_verification(const reach_windows_update_operation_resul
         DeleteFileW(path);
         return;
     }
-    HANDLE output = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-                                FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (output == INVALID_HANDLE_VALUE) return;
+    HANDLE output =
+        CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (output == INVALID_HANDLE_VALUE)
+        return;
     DWORD written = 0;
     (void)WriteFile(output, &file, sizeof(file), &written, nullptr);
     CloseHandle(output);
 }
 
-static reach_result load_pending_verification(
-    void *, reach_windows_update_identity *out_updates, size_t update_capacity,
-    size_t *out_update_count)
+static reach_result load_pending_verification(void *, reach_windows_update_identity *out_updates,
+                                              size_t update_capacity, size_t *out_update_count)
 {
-    if (out_updates == nullptr || out_update_count == nullptr) return REACH_INVALID_ARGUMENT;
+    if (out_updates == nullptr || out_update_count == nullptr)
+        return REACH_INVALID_ARGUMENT;
     *out_update_count = 0;
     wchar_t path[MAX_PATH] = {};
-    if (!pending_verification_path(path, MAX_PATH)) return REACH_ERROR;
+    if (!pending_verification_path(path, MAX_PATH))
+        return REACH_ERROR;
     HANDLE input = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                                FILE_ATTRIBUTE_NORMAL, nullptr);
     if (input == INVALID_HANDLE_VALUE)
@@ -437,7 +497,8 @@ static reach_result load_pending_verification(
         file.count > REACH_WINDOWS_UPDATE_MAX_UPDATES)
         return REACH_ERROR;
     size_t count = file.count < update_capacity ? file.count : update_capacity;
-    for (size_t index = 0; index < count; ++index) out_updates[index] = file.updates[index];
+    for (size_t index = 0; index < count; ++index)
+        out_updates[index] = file.updates[index];
     *out_update_count = count;
     return REACH_OK;
 }
@@ -449,11 +510,14 @@ static void mark_active_failed(reach_windows_update_operation_result *result,
     for (size_t index = 0; index < result->per_update_result_count; ++index)
     {
         reach_windows_update_item *item = &result->per_update_results[index];
-        if (item->state == REACH_WINDOWS_UPDATE_FAILED) continue;
+        if (item->state == REACH_WINDOWS_UPDATE_FAILED)
+            continue;
         item->state = REACH_WINDOWS_UPDATE_FAILED;
         item->failure_class = failure;
-        if (download_phase) item->download_hresult = hresult;
-        else item->install_hresult = hresult;
+        if (download_phase)
+            item->download_hresult = hresult;
+        else
+            item->install_hresult = hresult;
     }
 }
 
@@ -506,7 +570,8 @@ static reach_result install_elevated(const reach_windows_update_identity *select
     ComPtr<IUpdateSearcher> searcher;
     HRESULT hr = create_session_and_searcher(&session, &searcher);
     ComPtr<IUpdateCollection> pending;
-    if (SUCCEEDED(hr)) hr = search_pending(searcher.Get(), &pending);
+    if (SUCCEEDED(hr))
+        hr = search_pending(searcher.Get(), &pending);
     if (FAILED(hr))
     {
         result->overall_download_hresult = (int32_t)hr;
@@ -518,7 +583,8 @@ static reach_result install_elevated(const reach_windows_update_identity *select
 
     ComPtr<IUpdateCollection> download_updates;
     hr = pending->Copy(download_updates.GetAddressOf());
-    if (SUCCEEDED(hr)) hr = download_updates->Clear();
+    if (SUCCEEDED(hr))
+        hr = download_updates->Clear();
     if (FAILED(hr))
     {
         result->overall_download_hresult = (int32_t)hr;
@@ -564,12 +630,15 @@ static reach_result install_elevated(const reach_windows_update_identity *select
         set_utc_now(result->completed_utc, 32);
         return REACH_ERROR;
     }
-    if (progress != nullptr) progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_DOWNLOADING);
+    if (progress != nullptr)
+        progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_DOWNLOADING);
     ComPtr<IUpdateDownloader> downloader;
     hr = session->CreateUpdateDownloader(downloader.GetAddressOf());
-    if (SUCCEEDED(hr)) hr = downloader->put_Updates(download_updates.Get());
+    if (SUCCEEDED(hr))
+        hr = downloader->put_Updates(download_updates.Get());
     ComPtr<IDownloadResult> download_result;
-    if (SUCCEEDED(hr)) hr = downloader->Download(download_result.GetAddressOf());
+    if (SUCCEEDED(hr))
+        hr = downloader->Download(download_result.GetAddressOf());
     if (FAILED(hr))
     {
         result->overall_download_hresult = (int32_t)hr;
@@ -589,7 +658,8 @@ static reach_result install_elevated(const reach_windows_update_identity *select
 
     ComPtr<IUpdateCollection> install_updates;
     hr = download_updates->Copy(install_updates.GetAddressOf());
-    if (SUCCEEDED(hr)) hr = install_updates->Clear();
+    if (SUCCEEDED(hr))
+        hr = install_updates->Clear();
     if (FAILED(hr))
     {
         result->overall_install_hresult = (int32_t)hr;
@@ -638,14 +708,16 @@ static reach_result install_elevated(const reach_windows_update_identity *select
         set_utc_now(result->completed_utc, 32);
         return REACH_ERROR;
     }
-    if (progress != nullptr) progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_INSTALLING);
+    if (progress != nullptr)
+        progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_INSTALLING);
     for (size_t index = 0; index < install_count; ++index)
         result->per_update_results[install_map[index]].state = REACH_WINDOWS_UPDATE_INSTALLING;
     ComPtr<IUpdateInstaller> installer;
     hr = session->CreateUpdateInstaller(installer.GetAddressOf());
     VARIANT_BOOL installer_busy = VARIANT_FALSE;
     VARIANT_BOOL reboot_before_install = VARIANT_FALSE;
-    if (SUCCEEDED(hr)) (void)installer->get_IsBusy(&installer_busy);
+    if (SUCCEEDED(hr))
+        (void)installer->get_IsBusy(&installer_busy);
     if (SUCCEEDED(hr))
         (void)installer->get_RebootRequiredBeforeInstallation(&reboot_before_install);
     if (installer_busy == VARIANT_TRUE || reboot_before_install == VARIANT_TRUE)
@@ -662,9 +734,11 @@ static reach_result install_elevated(const reach_windows_update_identity *select
         set_utc_now(result->completed_utc, 32);
         return REACH_ERROR;
     }
-    if (SUCCEEDED(hr)) hr = installer->put_Updates(install_updates.Get());
+    if (SUCCEEDED(hr))
+        hr = installer->put_Updates(install_updates.Get());
     ComPtr<IInstallationResult> installation_result;
-    if (SUCCEEDED(hr)) hr = installer->Install(installation_result.GetAddressOf());
+    if (SUCCEEDED(hr))
+        hr = installer->Install(installation_result.GetAddressOf());
     if (FAILED(hr))
     {
         result->overall_install_hresult = (int32_t)hr;
@@ -688,8 +762,8 @@ static reach_result install_elevated(const reach_windows_update_identity *select
         LONG per_hresult = 0;
         OperationResultCode per_code = orcNotStarted;
         VARIANT_BOOL per_reboot = VARIANT_FALSE;
-        if (SUCCEEDED(installation_result->GetUpdateResult((LONG)index,
-                                                           per_install.GetAddressOf())))
+        if (SUCCEEDED(
+                installation_result->GetUpdateResult((LONG)index, per_install.GetAddressOf())))
         {
             (void)per_install->get_HResult(&per_hresult);
             (void)per_install->get_ResultCode(&per_code);
@@ -710,7 +784,8 @@ static reach_result install_elevated(const reach_windows_update_identity *select
         }
     }
 
-    if (progress != nullptr) progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_VERIFYING);
+    if (progress != nullptr)
+        progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_VERIFYING);
     ComPtr<IUpdateCollection> pending_after;
     if (SUCCEEDED(search_pending(searcher.Get(), &pending_after)))
         verify_results(searcher.Get(), pending_after.Get(), result);
@@ -742,7 +817,8 @@ static int32_t write_all(const wchar_t *path, const void *data, DWORD size)
 {
     HANDLE file = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                               FILE_ATTRIBUTE_TEMPORARY, nullptr);
-    if (file == INVALID_HANDLE_VALUE) return 0;
+    if (file == INVALID_HANDLE_VALUE)
+        return 0;
     DWORD written = 0;
     BOOL ok = WriteFile(file, data, size, &written, nullptr);
     CloseHandle(file);
@@ -752,16 +828,18 @@ static int32_t read_all(const wchar_t *path, void *data, DWORD size)
 {
     HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                               FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE) return 0;
+    if (file == INVALID_HANDLE_VALUE)
+        return 0;
     DWORD read = 0;
     BOOL ok = ReadFile(file, data, size, &read, nullptr);
     CloseHandle(file);
     return ok && read == size;
 }
 
-static reach_result set_install_transport_failure(
-    const reach_windows_update_identity *selected, size_t selected_count,
-    reach_windows_update_operation_result *result, HRESULT hresult)
+static reach_result set_install_transport_failure(const reach_windows_update_identity *selected,
+                                                  size_t selected_count,
+                                                  reach_windows_update_operation_result *result,
+                                                  HRESULT hresult)
 {
     *result = {};
     copy_wide(result->operation, 32, L"Install");
@@ -803,7 +881,8 @@ static reach_result request_elevated_install(const reach_windows_update_identity
         return set_install_transport_failure(selected, selected_count, result, E_OUTOFMEMORY);
     request->magic = helper_request_magic;
     request->count = (uint32_t)selected_count;
-    for (size_t index = 0; index < selected_count; ++index) request->selected[index] = selected[index];
+    for (size_t index = 0; index < selected_count; ++index)
+        request->selected[index] = selected[index];
     if (!write_all(request_path, request.get(), sizeof(*request)))
         return set_install_transport_failure(selected, selected_count, result,
                                              HRESULT_FROM_WIN32(GetLastError()));
@@ -816,11 +895,11 @@ static reach_result request_elevated_install(const reach_windows_update_identity
         DeleteFileW(request_path);
         return set_install_transport_failure(selected, selected_count, result, E_FAIL);
     }
-    wcscpy_s(slash + 1, MAX_PATH - (size_t)(slash + 1 - helper_path),
-             L"reach_update_helper.exe");
+    wcscpy_s(slash + 1, MAX_PATH - (size_t)(slash + 1 - helper_path), L"reach_update_helper.exe");
     wchar_t parameters[MAX_PATH * 2 + 16] = {};
     swprintf_s(parameters, L"\"%s\" \"%s\"", request_path, response_path);
-    if (progress != nullptr) progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_DOWNLOADING);
+    if (progress != nullptr)
+        progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_DOWNLOADING);
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
     execute.fMask = SEE_MASK_NOCLOSEPROCESS;
@@ -852,7 +931,8 @@ static reach_result request_elevated_install(const reach_windows_update_identity
         }
         return REACH_ERROR;
     }
-    if (progress != nullptr) progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_INSTALLING);
+    if (progress != nullptr)
+        progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_INSTALLING);
     WaitForSingleObject(execute.hProcess, INFINITE);
     CloseHandle(execute.hProcess);
     std::unique_ptr<helper_response> response(new (std::nothrow) helper_response());
@@ -864,15 +944,14 @@ static reach_result request_elevated_install(const reach_windows_update_identity
     if (!valid)
         return set_install_transport_failure(selected, selected_count, result, E_FAIL);
     *result = response->operation;
-    if (progress != nullptr) progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_VERIFYING);
+    if (progress != nullptr)
+        progress(progress_user, REACH_WINDOWS_UPDATE_PROGRESS_VERIFYING);
     return response->result == REACH_OK ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result install(void *, const reach_windows_update_identity *selected,
-                            size_t selected_count,
-                            reach_windows_update_progress_callback progress,
-                            void *progress_user,
-                            reach_windows_update_operation_result *result)
+                            size_t selected_count, reach_windows_update_progress_callback progress,
+                            void *progress_user, reach_windows_update_operation_result *result)
 {
     if (selected == nullptr || selected_count == 0 ||
         selected_count > REACH_WINDOWS_UPDATE_MAX_UPDATES || result == nullptr)
@@ -880,12 +959,11 @@ static reach_result install(void *, const reach_windows_update_identity *selecte
     return is_elevated()
                ? install_elevated(selected, selected_count, progress, progress_user, result)
                : request_elevated_install(selected, selected_count, progress, progress_user,
-                                           result);
+                                          result);
 }
 
 static reach_result verify(void *, const reach_windows_update_identity *installed,
-                           size_t installed_count,
-                           reach_windows_update_operation_result *result)
+                           size_t installed_count, reach_windows_update_operation_result *result)
 {
     if (installed == nullptr || installed_count == 0 || result == nullptr)
         return REACH_INVALID_ARGUMENT;
@@ -907,7 +985,8 @@ static reach_result verify(void *, const reach_windows_update_identity *installe
     ComPtr<IUpdateSearcher> searcher;
     HRESULT hr = FAILED(com.result) ? com.result : create_session_and_searcher(&session, &searcher);
     ComPtr<IUpdateCollection> pending;
-    if (SUCCEEDED(hr)) hr = search_pending(searcher.Get(), &pending);
+    if (SUCCEEDED(hr))
+        hr = search_pending(searcher.Get(), &pending);
     if (FAILED(hr))
     {
         result->overall_install_hresult = (int32_t)hr;
@@ -919,8 +998,7 @@ static reach_result verify(void *, const reach_windows_update_identity *installe
     verify_results(searcher.Get(), pending.Get(), result);
     if (result->per_update_result_count > 0)
     {
-        result->overall_install_result_code =
-            result->per_update_results[0].install_result_code;
+        result->overall_install_result_code = result->per_update_results[0].install_result_code;
         result->overall_install_hresult = result->per_update_results[0].install_hresult;
     }
     result->overall_reboot_required = 0;
@@ -944,10 +1022,12 @@ static void destroy(void *userdata)
 
 extern "C" reach_result reach_windows_create_windows_update(reach_windows_update_port *out_port)
 {
-    if (out_port == nullptr) return REACH_INVALID_ARGUMENT;
+    if (out_port == nullptr)
+        return REACH_INVALID_ARGUMENT;
     *out_port = {};
     reach_windows_update_adapter *adapter = new (std::nothrow) reach_windows_update_adapter();
-    if (adapter == nullptr) return REACH_ERROR;
+    if (adapter == nullptr)
+        return REACH_ERROR;
     out_port->userdata = adapter;
     out_port->scan = scan;
     out_port->install = install;
@@ -958,18 +1038,20 @@ extern "C" reach_result reach_windows_create_windows_update(reach_windows_update
 }
 
 extern "C" int reach_windows_update_helper_run(const wchar_t *request_path,
-                                                const wchar_t *response_path)
+                                               const wchar_t *response_path)
 {
     std::unique_ptr<helper_request> request(new (std::nothrow) helper_request());
     std::unique_ptr<helper_response> response(new (std::nothrow) helper_response());
-    if (request == nullptr || response == nullptr) return 2;
+    if (request == nullptr || response == nullptr)
+        return 2;
     response->magic = helper_response_magic;
     if (!read_all(request_path, request.get(), sizeof(*request)) ||
         request->magic != helper_request_magic || request->count == 0 ||
         request->count > REACH_WINDOWS_UPDATE_MAX_UPDATES)
         return 2;
-    response->result = install_elevated(request->selected, request->count, nullptr, nullptr,
-                                        &response->operation);
-    if (!write_all(response_path, response.get(), sizeof(*response))) return 3;
+    response->result =
+        install_elevated(request->selected, request->count, nullptr, nullptr, &response->operation);
+    if (!write_all(response_path, response.get(), sizeof(*response)))
+        return 3;
     return response->result == REACH_OK ? 0 : 1;
 }

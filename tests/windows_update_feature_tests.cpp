@@ -6,7 +6,11 @@
 static int failures = 0;
 static void expect_true(int value, const char *message)
 {
-    if (!value) { ++failures; printf("FAIL: %s\n", message); }
+    if (!value)
+    {
+        ++failures;
+        printf("FAIL: %s\n", message);
+    }
 }
 static void copy_ascii(uint16_t *destination, size_t capacity, const char *source)
 {
@@ -21,7 +25,8 @@ static void copy_ascii(uint16_t *destination, size_t capacity, const char *sourc
 static int equals_ascii(const uint16_t *value, const char *expected)
 {
     size_t index = 0;
-    while (expected[index] != 0 && value[index] == (uint16_t)(unsigned char)expected[index]) ++index;
+    while (expected[index] != 0 && value[index] == (uint16_t)(unsigned char)expected[index])
+        ++index;
     return expected[index] == 0 && value[index] == 0;
 }
 static reach_windows_update_list sample_updates(size_t count)
@@ -67,8 +72,7 @@ static void test_model_and_interaction(void)
                 "initial state is not scanned");
     expect_true(equals_ascii(model.update_status, "No scan has been run yet."),
                 "initial idle status is neutral");
-    expect_true(reach_settings_model_selected_update_count(&model) == 0,
-                "install starts disabled");
+    expect_true(reach_settings_model_selected_update_count(&model) == 0, "install starts disabled");
 
     reach_settings_model_begin_update_scan(&model);
     expect_true(model.update_page_state == REACH_SETTINGS_UPDATE_SCANNING,
@@ -173,11 +177,15 @@ static void test_update_page_rendering(void)
     for (size_t index = 0; index < commands.count; ++index)
     {
         const reach_render_command *command = &commands.commands[index];
-        if (equals_ascii(command->text, "Search for updates")) found_search = 1;
-        if (equals_ascii(command->text, "Install selected")) found_install = 1;
-        if (equals_ascii(command->text, "2026-06 Cumulative Update for Windows 11")) found_title = 1;
+        if (equals_ascii(command->text, "Search for updates"))
+            found_search = 1;
+        if (equals_ascii(command->text, "Install selected"))
+            found_install = 1;
+        if (equals_ascii(command->text, "2026-06 Cumulative Update for Windows 11"))
+            found_title = 1;
         if (command->text[0] == (uint16_t)'K' && command->text[1] == (uint16_t)'B' &&
-            command->text[2] == (uint16_t)':') found_metadata = 1;
+            command->text[2] == (uint16_t)':')
+            found_metadata = 1;
     }
     expect_true(found_search && found_install, "top-bar actions are rendered");
     expect_true(found_title && found_metadata, "update title and metadata are rendered");
