@@ -1147,8 +1147,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             shell->dock.dirty_flags || shell->launcher.dirty_flags || shell->tray.dirty_flags ||
             shell->switcher.dirty_flags || shell->context_menu.dirty_flags ||
             shell->quick_settings.dirty_flags || shell->settings.dirty_flags ||
-            shell->dock_reveal.check_dirty ||
-            reach_shell_open_window_icon_work_pending(shell) ||
+            shell->dock_reveal.check_dirty || reach_shell_open_window_icon_work_pending(shell) ||
             reach_shell_launcher_result_icon_work_pending(shell) ||
             reach_shell_config_reload_work_pending(shell) ||
             reach_shell_quick_settings_audio_refresh_work_pending(shell) ||

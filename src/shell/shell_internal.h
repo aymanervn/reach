@@ -810,7 +810,7 @@ int32_t reach_shell_settings_window_minimized(const reach_shell *shell);
 void reach_shell_sync_settings_bounds_from_window(reach_shell *shell);
 void reach_shell_refresh_settings_layout(reach_shell *shell);
 reach_result reach_shell_handle_settings_pointer_wheel(reach_shell *shell,
-                                                        const reach_ui_event *event);
+                                                       const reach_ui_event *event);
 reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
                                                     const reach_ui_event *event);
 

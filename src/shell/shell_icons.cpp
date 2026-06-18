@@ -271,8 +271,7 @@ static void reach_shell_schedule_open_window_icon_load(reach_shell *shell, size_
 
     if (reach_shell_start_open_window_icon_worker(shell) != REACH_OK)
     {
-        (void)reach_shell_load_icon_handle(shell, icon_path,
-                                           reach_shell_dock_icon_size_px(shell),
+        (void)reach_shell_load_icon_handle(shell, icon_path, reach_shell_dock_icon_size_px(shell),
                                            &shell->dock_icons.open_window_icons[index]);
         return;
     }

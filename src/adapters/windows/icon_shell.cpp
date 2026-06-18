@@ -244,9 +244,8 @@ static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px, 
     HICON icon = nullptr;
     UINT icon_id = 0;
 
-    UINT count =
-        PrivateExtractIconsW(path, icon_index, requested_size, requested_size, &icon, &icon_id, 1,
-                             0);
+    UINT count = PrivateExtractIconsW(path, icon_index, requested_size, requested_size, &icon,
+                                      &icon_id, 1, 0);
 
     return count > 0 && icon != nullptr ? icon : nullptr;
 }
@@ -271,8 +270,8 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
     wchar_t shortcut_target[260] = {};
     const wchar_t *icon_path = requested_path;
     int icon_index = 0;
-    int32_t resource_ref = reach_icon_split_resource_ref(requested_path, resource_ref_path, 260,
-                                                        &icon_index);
+    int32_t resource_ref =
+        reach_icon_split_resource_ref(requested_path, resource_ref_path, 260, &icon_index);
     if (resource_ref)
     {
         icon_path = resource_ref_path;

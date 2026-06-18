@@ -61,11 +61,11 @@ static HICON reach_load_window_icon(reach_surface_role role, int width, int heig
     HINSTANCE instance = GetModuleHandleW(nullptr);
     int resource_id = reach_window_icon_resource_id(role);
     HICON icon = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(resource_id), IMAGE_ICON, width,
-                                  height, LR_DEFAULTCOLOR | LR_SHARED);
+                                   height, LR_DEFAULTCOLOR | LR_SHARED);
     if (icon == nullptr && resource_id != IDI_ICON1)
     {
         icon = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(IDI_ICON1), IMAGE_ICON, width, height,
-                                LR_DEFAULTCOLOR | LR_SHARED);
+                                 LR_DEFAULTCOLOR | LR_SHARED);
     }
     return icon;
 }

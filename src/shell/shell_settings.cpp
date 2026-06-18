@@ -299,18 +299,19 @@ reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell, const re
 }
 
 reach_result reach_shell_handle_settings_pointer_wheel(reach_shell *shell,
-                                                        const reach_ui_event *event)
+                                                       const reach_ui_event *event)
 {
     if (shell == nullptr || event == nullptr || !shell->settings_open ||
         shell->settings_model.selected_page != REACH_SETTINGS_PAGE_UPDATE ||
-        event->wheel_delta == 0) return REACH_OK;
+        event->wheel_delta == 0)
+        return REACH_OK;
     if ((float)event->x < shell->settings_bounds.x ||
         (float)event->x > shell->settings_bounds.x + shell->settings_bounds.width ||
         (float)event->y < shell->settings_bounds.y ||
-        (float)event->y > shell->settings_bounds.y + shell->settings_bounds.height) return REACH_OK;
+        (float)event->y > shell->settings_bounds.y + shell->settings_bounds.height)
+        return REACH_OK;
     size_t previous = shell->settings_model.update_scroll_offset;
-    reach_settings_model_scroll_updates(&shell->settings_model,
-                                        event->wheel_delta > 0 ? -1 : 1,
+    reach_settings_model_scroll_updates(&shell->settings_model, event->wheel_delta > 0 ? -1 : 1,
                                         shell->settings_layout.update_row_count);
     if (previous != shell->settings_model.update_scroll_offset)
     {

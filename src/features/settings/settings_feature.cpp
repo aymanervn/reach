@@ -198,9 +198,9 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
     float button_width = 154.0f * scale;
     layout.update_search_button =
         reach_settings_rect(layout.content_title.x, button_y, button_width, button_height);
-    layout.update_install_button = reach_settings_rect(
-        layout.content.x + layout.content.width - 28.0f * scale - button_width, button_y,
-        button_width, button_height);
+    layout.update_install_button =
+        reach_settings_rect(layout.content.x + layout.content.width - 28.0f * scale - button_width,
+                            button_y, button_width, button_height);
 
     float status_height = 28.0f * scale;
     layout.update_status = reach_settings_rect(
@@ -217,10 +217,10 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.update_rows[index] = reach_settings_rect(
             layout.content_title.x, row_y, layout.content.width - 56.0f * scale, row_height);
         float checkbox_size = 18.0f * scale;
-        layout.update_checkboxes[index] = reach_settings_rect(
-            layout.update_rows[index].x + 12.0f * scale,
-            layout.update_rows[index].y + (row_height - checkbox_size) * 0.5f,
-            checkbox_size, checkbox_size);
+        layout.update_checkboxes[index] =
+            reach_settings_rect(layout.update_rows[index].x + 12.0f * scale,
+                                layout.update_rows[index].y + (row_height - checkbox_size) * 0.5f,
+                                checkbox_size, checkbox_size);
         row_y += row_height + row_gap;
     }
     return layout;
