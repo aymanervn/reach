@@ -58,6 +58,8 @@ int main()
     failed += expect(reach_search_classify_result(path, 0) == REACH_SEARCH_RESULT_DOCUMENT);
     copy_ascii(path, 260, "C:\\Users\\me\\folder");
     failed += expect(reach_search_classify_result(path, 1) == REACH_SEARCH_RESULT_FOLDER);
+    copy_ascii(path, 260, "C:\\Users\\me\\shortcut.lnk");
+    failed += expect(reach_search_classify_result(path, 0) == REACH_SEARCH_RESULT_FILE);
 
     reach_search_candidate many[REACH_SEARCH_MAX_RESULTS + 1] = {};
     for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS + 1; ++index)

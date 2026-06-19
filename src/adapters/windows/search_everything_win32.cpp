@@ -103,6 +103,40 @@ static int32_t reach_search_path_equals_ci(const uint16_t *a, const uint16_t *b)
     return a[index] == 0 && b[index] == 0;
 }
 
+static int32_t reach_search_path_has_extension_ci(const uint16_t *path, const char *extension)
+{
+    const uint16_t *name = reach_search_file_name(path);
+    if (name == nullptr || extension == nullptr)
+    {
+        return 0;
+    }
+
+    const uint16_t *candidate_extension = nullptr;
+    for (const uint16_t *scan = name; *scan != 0; ++scan)
+    {
+        if (*scan == '.')
+        {
+            candidate_extension = scan;
+        }
+    }
+    if (candidate_extension == nullptr)
+    {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (candidate_extension[index] != 0 && extension[index] != 0)
+    {
+        if (reach_search_lower(candidate_extension[index]) !=
+            reach_search_lower((uint16_t)extension[index]))
+        {
+            return 0;
+        }
+        ++index;
+    }
+    return candidate_extension[index] == 0 && extension[index] == 0;
+}
+
 static int32_t reach_search_query_is_regex_like(const uint16_t *query)
 {
     if (query == nullptr)
@@ -154,7 +188,7 @@ static void reach_search_build_app_query(uint16_t *dst, size_t dst_count, const 
         dst[write++] = query[read];
     }
 
-    const wchar_t *suffix = L" ext:exe;lnk";
+    const wchar_t *suffix = L" ext:exe";
     for (size_t read = 0; suffix[read] != 0 && write + 1 < dst_count; ++read)
     {
         dst[write++] = (uint16_t)suffix[read];
@@ -233,6 +267,10 @@ static void reach_search_add_candidate(std::vector<reach_search_candidate> *cand
                                        const uint16_t *path, int32_t is_directory)
 {
     if (candidates == nullptr || path == nullptr || path[0] == 0)
+    {
+        return;
+    }
+    if (!is_directory && reach_search_path_has_extension_ci(path, ".lnk"))
     {
         return;
     }
