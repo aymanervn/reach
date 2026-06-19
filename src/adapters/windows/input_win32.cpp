@@ -5,8 +5,6 @@
 #include "reach/ports/input_source.h"
 
 #include <windows.h>
-#include <shlwapi.h>
-#include <cwchar>
 #include <new>
 
 struct reach_input_source
@@ -28,7 +26,7 @@ struct reach_input_source
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
 static const UINT REACH_INPUT_WM_UI_EVENT = WM_APP + 21;
 static const UINT REACH_INPUT_WM_SHARED_HOTKEYS = WM_APP + 23;
-static const UINT REACH_INPUT_WM_HELPER_DISCONNECTED = WM_APP + 24;
+static const UINT REACH_INPUT_WM_HELPER_CONNECTED = WM_APP + 24;
 static const int REACH_INPUT_HOTKEY_MEDIA_PREVIOUS = 1;
 static const int REACH_INPUT_HOTKEY_MEDIA_PLAY_PAUSE = 2;
 static const int REACH_INPUT_HOTKEY_MEDIA_NEXT = 3;
@@ -37,13 +35,23 @@ static const int REACH_INPUT_HOTKEY_VOLUME_DOWN = 5;
 static const int REACH_INPUT_HOTKEY_VOLUME_MUTE = 6;
 static const int REACH_INPUT_HOTKEY_BRIGHTNESS_UP = 7;
 static const int REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN = 8;
-static LONG g_reach_input_helper_restart_prompt_active = 0;
 
 static void reach_input_reset_hotkey_state(reach_input_source *source);
 
 static uint32_t reach_input_media_hotkey_mask(int hotkey_id)
 {
     return 1u << (uint32_t)hotkey_id;
+}
+
+static void reach_input_reset_helper_hotkey_state(reach_input_source *source)
+{
+    if (source == nullptr)
+    {
+        return;
+    }
+
+    reach_input_reset_hotkey_state(source);
+    source->last_hotkey_event = 0;
 }
 
 static UINT reach_input_media_hotkey_vk(int hotkey_id)
@@ -165,61 +173,6 @@ static reach_ui_event_type reach_input_media_hotkey_event(WPARAM hotkey_id)
     default:
         return REACH_UI_EVENT_NONE;
     }
-}
-
-static reach_result reach_input_restart_reach_session(void)
-{
-    wchar_t reachctl_path[MAX_PATH] = {};
-    DWORD length = GetModuleFileNameW(nullptr, reachctl_path, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH)
-    {
-        return REACH_ERROR;
-    }
-
-    if (!PathRemoveFileSpecW(reachctl_path))
-    {
-        return REACH_ERROR;
-    }
-
-    wchar_t working_directory[MAX_PATH] = {};
-    wcscpy_s(working_directory, reachctl_path);
-
-    if (!PathAppendW(reachctl_path, L"reachctl.exe"))
-    {
-        return REACH_ERROR;
-    }
-
-    wchar_t command_line[MAX_PATH + 32] = {};
-    swprintf_s(command_line, L"\"%ls\" --start", reachctl_path);
-
-    STARTUPINFOW startup = {};
-    startup.cb = sizeof(startup);
-
-    PROCESS_INFORMATION process = {};
-    BOOL ok = CreateProcessW(nullptr, command_line, nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
-                             nullptr, working_directory, &startup, &process);
-    if (!ok)
-    {
-        return REACH_ERROR;
-    }
-
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
-    return REACH_OK;
-}
-
-static void reach_input_handle_helper_disconnected(reach_input_source *source)
-{
-    reach_input_reset_hotkey_state(source);
-    if (InterlockedCompareExchange(&g_reach_input_helper_restart_prompt_active, 1, 0) != 0)
-    {
-        return;
-    }
-
-    MessageBoxW(nullptr, L"Reach encountered a problem and needs to restart.", L"Reach",
-                MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST | MB_TASKMODAL);
-    (void)reach_input_restart_reach_session();
-    InterlockedExchange(&g_reach_input_helper_restart_prompt_active, 0);
 }
 
 static void reach_input_post_ui_event(reach_input_source *source, reach_ui_event_type type,
@@ -396,18 +349,23 @@ static void reach_input_shared_callback(void *user,
         return;
     }
 
+    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_CONNECTED)
+    {
+        PostMessageW(source->window, REACH_INPUT_WM_HELPER_CONNECTED, 0, 0);
+        return;
+    }
+
     if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_WINDOWS_CHANGED ||
         event == REACH_ELEVATION_HELPER_SHARED_EVENT_GAME_MODE_CHANGED)
     {
         reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOW_STATE_CHANGED, 0);
+        return;
     }
-    else if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_HOTKEYS_CHANGED)
+
+    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_HOTKEYS_CHANGED)
     {
         PostMessageW(source->window, REACH_INPUT_WM_SHARED_HOTKEYS, 0, 0);
-    }
-    else if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_DISCONNECTED)
-    {
-        PostMessageW(source->window, REACH_INPUT_WM_HELPER_DISCONNECTED, 0, 0);
+        return;
     }
 }
 
@@ -431,9 +389,9 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
         source->callback(source->user, &event);
         return 0;
     }
-    if (message == REACH_INPUT_WM_HELPER_DISCONNECTED && source != nullptr)
+    if (message == REACH_INPUT_WM_HELPER_CONNECTED && source != nullptr)
     {
-        reach_input_handle_helper_disconnected(source);
+        reach_input_reset_helper_hotkey_state(source);
         return 0;
     }
     if (message == REACH_INPUT_WM_SHARED_HOTKEYS && source != nullptr)

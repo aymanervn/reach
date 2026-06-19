@@ -24,7 +24,6 @@ struct reach_window_manager
     LONG helper_prompt_active;
     LONG helper_start_active;
     LONG helper_retry_suppressed_until;
-    HANDLE helper_connected_event;
     std::thread helper_start_thread;
     std::mutex helper_start_mutex;
     std::condition_variable helper_start_cv;
@@ -33,7 +32,6 @@ struct reach_window_manager
 };
 
 static const DWORD REACH_HELPER_RESTART_FAILED_COOLDOWN_MS = 5000;
-static const DWORD REACH_HELPER_START_TIMEOUT_MS = 10000;
 static void
 reach_window_manager_icon_ref_for_helper(const reach_elevation_helper_window_snapshot &helper,
                                          uint16_t *out_icon_ref, size_t out_icon_ref_count)
@@ -186,30 +184,6 @@ static reach_result reach_window_manager_sibling_path(const wchar_t *filename, w
     return REACH_OK;
 }
 
-static reach_result reach_window_manager_wait_for_privileged_control(reach_window_manager *manager)
-{
-    if (manager == nullptr || manager->helper_connected_event == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    if (reach_window_manager_privileged_control_available(manager))
-    {
-        return REACH_OK;
-    }
-
-    ResetEvent(manager->helper_connected_event);
-    if (reach_elevation_helper_task_run() != REACH_OK)
-    {
-        return REACH_ERROR;
-    }
-
-    DWORD wait =
-        WaitForSingleObject(manager->helper_connected_event, REACH_HELPER_START_TIMEOUT_MS);
-    return wait == WAIT_OBJECT_0 && reach_window_manager_privileged_control_available(manager)
-               ? REACH_OK
-               : REACH_ERROR;
-}
-
 static reach_result reach_window_manager_repair_privileged_control(void)
 {
     wchar_t reachctl_path[MAX_PATH] = {};
@@ -330,8 +304,8 @@ static int32_t reach_window_manager_confirm_privileged_control_repair(reach_wind
     reach_window_manager_prepare_prompt_owner(owner);
     int response = MessageBoxW(
         owner,
-        L"Reach's privileged helper is not installed or could not start. Repairing it requires "
-        L"administrator approval.",
+        L"Reach's privileged helper task is missing or points to a different installation. "
+        L"Repairing it requires administrator approval.",
         L"Reach",
         MB_ICONWARNING | MB_OKCANCEL | MB_DEFBUTTON1 | MB_SETFOREGROUND | MB_TOPMOST |
             MB_TASKMODAL);
@@ -345,6 +319,7 @@ static reach_result reach_window_manager_start_privileged_control(reach_window_m
     {
         return REACH_INVALID_ARGUMENT;
     }
+
     if (reach_window_manager_retry_suppressed(manager) ||
         InterlockedCompareExchange(&manager->helper_start_active, 1, 0) != 0)
     {
@@ -352,34 +327,36 @@ static reach_result reach_window_manager_start_privileged_control(reach_window_m
     }
 
     wchar_t helper_path[MAX_PATH] = {};
-    int32_t task_valid = reach_window_manager_sibling_path(L"reach_elevation_helper.exe",
-                                                           helper_path, MAX_PATH) == REACH_OK &&
-                         reach_elevation_helper_task_valid(helper_path);
-    int32_t helper_available = reach_window_manager_privileged_control_available(manager);
     reach_result result = REACH_ERROR;
+
+    int32_t helper_path_ok = reach_window_manager_sibling_path(L"reach_elevation_helper.exe",
+                                                               helper_path, MAX_PATH) == REACH_OK;
+
+    int32_t task_valid = helper_path_ok && reach_elevation_helper_task_valid(helper_path);
+
+    if (!task_valid)
+    {
+        if (helper_path_ok && reach_window_manager_confirm_privileged_control_repair(manager))
+        {
+            result = reach_window_manager_repair_privileged_control();
+
+            task_valid = result == REACH_OK && reach_elevation_helper_task_valid(helper_path);
+        }
+    }
+
     if (task_valid)
     {
-        result =
-            helper_available ? REACH_OK : reach_window_manager_wait_for_privileged_control(manager);
+        result = reach_elevation_helper_task_run();
     }
-    if (result != REACH_OK && reach_window_manager_confirm_privileged_control_repair(manager))
-    {
-        result = reach_window_manager_repair_privileged_control();
-        if (result == REACH_OK && reach_elevation_helper_task_valid(helper_path))
-        {
-            result = reach_window_manager_wait_for_privileged_control(manager);
-        }
-        else
-        {
-            result = REACH_ERROR;
-        }
-    }
+
     InterlockedExchange(&manager->helper_start_active, 0);
+
     if (result != REACH_OK)
     {
         reach_window_manager_suppress_helper_retry(manager,
                                                    REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
     }
+
     return result;
 }
 
@@ -480,7 +457,6 @@ static void reach_window_manager_shared_callback(void *user,
 
     if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_CONNECTED)
     {
-        SetEvent(manager->helper_connected_event);
         reach_window_manager_copy_shared_windows(manager);
         reach_window_manager_copy_shared_game_mode(manager);
         return;
@@ -500,7 +476,6 @@ static void reach_window_manager_shared_callback(void *user,
 
     if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_DISCONNECTED)
     {
-        ResetEvent(manager->helper_connected_event);
         reach_window_manager_lock(manager);
         manager->helper_windows.clear();
         manager->game_mode_active = 0;
@@ -520,10 +495,6 @@ static reach_result reach_window_manager_start(reach_window_manager *manager)
     manager->dirty = 1;
     (void)reach_elevation_helper_shared_reader_subscribe(reach_window_manager_shared_callback,
                                                          manager);
-    if (reach_elevation_helper_shared_reader_connected())
-    {
-        SetEvent(manager->helper_connected_event);
-    }
     reach_window_manager_copy_shared_windows(manager);
     reach_window_manager_copy_shared_game_mode(manager);
     try
@@ -759,11 +730,6 @@ static void reach_window_manager_destroy(reach_window_manager *manager)
             DeleteCriticalSection(&manager->lock);
             manager->lock_initialized = 0;
         }
-        if (manager->helper_connected_event != nullptr)
-        {
-            CloseHandle(manager->helper_connected_event);
-            manager->helper_connected_event = nullptr;
-        }
     }
     delete manager;
 }
@@ -784,13 +750,6 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
 
     InitializeCriticalSection(&manager->lock);
     manager->lock_initialized = 1;
-    manager->helper_connected_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    if (manager->helper_connected_event == nullptr)
-    {
-        DeleteCriticalSection(&manager->lock);
-        delete manager;
-        return REACH_ERROR;
-    }
     manager->dirty = 1;
     out_port->manager = manager;
     out_port->ops.start = reach_window_manager_start;
