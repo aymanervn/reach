@@ -48,6 +48,11 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_textbox(dependencies.launcher_window.window,
+                                              &dependencies.launcher_textbox);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_dcomp_render_backend(dependencies.launcher_window.window,
                                                            &dependencies.launcher_renderer);
     }
@@ -188,10 +193,15 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
             dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
+            dependencies.launcher_textbox = {};
         }
     }
     if (result != REACH_OK)
     {
+        if (dependencies.launcher_textbox.ops.destroy != nullptr)
+        {
+            dependencies.launcher_textbox.ops.destroy(dependencies.launcher_textbox.textbox);
+        }
         if (dependencies.launcher_window.ops.destroy != nullptr)
         {
             dependencies.launcher_window.ops.destroy(dependencies.launcher_window.window);

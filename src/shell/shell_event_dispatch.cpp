@@ -23,6 +23,9 @@ static int32_t reach_shell_surface_has_pending_events(const reach_surface_runtim
 int32_t reach_shell_has_pending_events(const reach_shell *shell)
 {
     return shell != nullptr && (reach_shell_surface_has_pending_events(&shell->launcher) ||
+                                (shell->launcher_textbox.ops.has_pending_events != nullptr &&
+                                 shell->launcher_textbox.ops.has_pending_events(
+                                     shell->launcher_textbox.textbox)) ||
                                 reach_shell_surface_has_pending_events(&shell->dock) ||
                                 reach_shell_surface_has_pending_events(&shell->tray) ||
                                 reach_shell_surface_has_pending_events(&shell->switcher) ||
@@ -38,6 +41,12 @@ reach_result reach_shell_dispatch_events(reach_shell *shell)
     }
 
     reach_shell_dispatch_surface_events(&shell->launcher);
+    if (shell->launcher_textbox.ops.dispatch_events != nullptr &&
+        (shell->launcher_textbox.ops.has_pending_events == nullptr ||
+         shell->launcher_textbox.ops.has_pending_events(shell->launcher_textbox.textbox)))
+    {
+        (void)shell->launcher_textbox.ops.dispatch_events(shell->launcher_textbox.textbox);
+    }
     reach_shell_dispatch_surface_events(&shell->dock);
     reach_shell_dispatch_surface_events(&shell->tray);
     reach_shell_dispatch_surface_events(&shell->switcher);

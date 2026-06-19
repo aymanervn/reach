@@ -94,6 +94,18 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
     out_layout->launcher.search_box.y =
         input->monitor_bounds.y +
         (input->monitor_bounds.height - out_layout->launcher.search_box.height) * 0.5f;
+
+    float search_text_padding_x = reach_scale(18.0f, scale);
+    float search_text_padding_y = reach_scale(8.0f, scale);
+    out_layout->launcher.search_text_input.x =
+        out_layout->launcher.search_box.x + search_text_padding_x;
+    out_layout->launcher.search_text_input.y =
+        out_layout->launcher.search_box.y + search_text_padding_y;
+    out_layout->launcher.search_text_input.width =
+        out_layout->launcher.search_box.width - search_text_padding_x * 2.0f;
+    out_layout->launcher.search_text_input.height =
+        out_layout->launcher.search_box.height - search_text_padding_y * 2.0f;
+
     out_layout->launcher.pinned_app_slot_count = 0;
 
     float launcher_icon = reach_scale(56.0f, scale);

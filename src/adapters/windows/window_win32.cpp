@@ -182,14 +182,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             {
                 event.type = REACH_UI_EVENT_ESCAPE;
             }
-            else if (wparam == VK_BACK)
-            {
-                event.type = REACH_UI_EVENT_BACKSPACE;
-            }
-            else if (wparam == VK_DELETE)
-            {
-                event.type = REACH_UI_EVENT_DELETE;
-            }
             else if (wparam == VK_RETURN)
             {
                 event.type = REACH_UI_EVENT_ENTER;
@@ -202,22 +194,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             {
                 event.type = REACH_UI_EVENT_ARROW_DOWN;
             }
-            else if (wparam == VK_LEFT)
-            {
-                event.type = REACH_UI_EVENT_ARROW_LEFT;
-            }
-            else if (wparam == VK_RIGHT)
-            {
-                event.type = REACH_UI_EVENT_ARROW_RIGHT;
-            }
-            else if (wparam == VK_HOME)
-            {
-                event.type = REACH_UI_EVENT_HOME;
-            }
-            else if (wparam == VK_END)
-            {
-                event.type = REACH_UI_EVENT_END;
-            }
             if (event.type != REACH_UI_EVENT_NONE)
             {
                 reach_platform_window_queue_event(window, &event);
@@ -226,19 +202,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_CHAR:
-        if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
-        {
-            return 0;
-        }
-        if (window != nullptr && wparam >= 0x20)
-        {
-            reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_TEXT;
-            event.text[0] = static_cast<uint16_t>(wparam);
-            event.text[1] = 0;
-            reach_platform_window_queue_event(window, &event);
-            return 0;
-        }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONDOWN:
         if (window != nullptr)

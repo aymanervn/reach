@@ -628,6 +628,14 @@ int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell)
     {
         return 0;
     }
+    if (reach_shell_surface_transition_active(shell, &shell->launcher_transition) ||
+        reach_shell_surface_transition_active(shell, &shell->tray_transition) ||
+        reach_shell_surface_transition_active(shell, &shell->quick_settings_transition) ||
+        reach_shell_surface_transition_active(shell, &shell->switcher_transition) ||
+        reach_shell_surface_transition_active(shell, &shell->context_menu_transition))
+    {
+        return 0;
+    }
 
     return reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y) &&
            shell->has_layout && !shell->dirty.layout &&

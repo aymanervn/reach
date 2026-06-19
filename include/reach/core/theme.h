@@ -29,6 +29,9 @@ extern "C"
         reach_color quick_settings_slider_muted_fill_color;
         reach_color quick_settings_button_color;
         reach_color music_widget_background;
+        reach_color launcher_search_background;
+        reach_color launcher_search_border;
+        reach_color launcher_search_text;
         reach_color music_widget_cover_background;
         reach_color music_widget_title;
         reach_color music_widget_control_text;

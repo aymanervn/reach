@@ -75,16 +75,6 @@ reach_result reach_ui_build_render_commands(const reach_ui_state *state,
         command.radius = 10.0f;
         reach_render_command_buffer_push(buffer, &command);
 
-        command.type = REACH_RENDER_COMMAND_TEXT;
-        command.rect = layout->launcher.search_box;
-        command.color.r = 1.0f;
-        command.color.g = 1.0f;
-        command.color.b = 1.0f;
-        command.color.a = state->launcher.query_length > 0 ? 0.95f : 0.60f;
-        reach_copy_text(command.text, 260,
-                        state->launcher.query_length > 0 ? state->launcher.query
-                                                         : (const uint16_t *)L"Search");
-        reach_render_command_buffer_push(buffer, &command);
     }
 
     if (state->dock.visible)

@@ -1,5 +1,7 @@
 #include "shell_internal.h"
 
+#include <math.h>
+
 static int32_t reach_utf16_starts_with_ascii_case_insensitive(const uint16_t *text,
                                                               const char *prefix)
 {
@@ -35,14 +37,134 @@ static int32_t reach_utf16_starts_with_ascii_case_insensitive(const uint16_t *te
     return 1;
 }
 
-void reach_shell_raise_launcher(reach_shell *shell)
+static reach_color reach_shell_opaque_color(reach_color color)
 {
-    if (shell == nullptr || shell->launcher.window.ops.raise == nullptr)
+    color.a = 1.0f;
+    return color;
+}
+
+static int32_t reach_shell_textbox_color_equal(reach_color a, reach_color b)
+{
+    return fabsf(a.r - b.r) < 0.001f && fabsf(a.g - b.g) < 0.001f &&
+           fabsf(a.b - b.b) < 0.001f && fabsf(a.a - b.a) < 0.001f;
+}
+
+static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b)
+{
+    size_t index = 0;
+    if (a == nullptr || b == nullptr)
+    {
+        return a == b;
+    }
+    while (a[index] != 0 || b[index] != 0)
+    {
+        if (a[index] != b[index])
+        {
+            return 0;
+        }
+        ++index;
+    }
+    return 1;
+}
+
+static int32_t reach_shell_textbox_style_equal(const reach_textbox_style *a,
+                                               const reach_textbox_style *b)
+{
+    return a != nullptr && b != nullptr && fabsf(a->font_size - b->font_size) < 0.001f &&
+           a->font_weight == b->font_weight &&
+           reach_shell_textbox_color_equal(a->text_color, b->text_color) &&
+           reach_shell_textbox_color_equal(a->background_color, b->background_color) &&
+           a->max_length == b->max_length &&
+           reach_shell_utf16_equal(a->placeholder, b->placeholder);
+}
+
+static reach_textbox_style reach_shell_launcher_textbox_style(const reach_shell *shell)
+{
+    const reach_theme *theme = shell != nullptr && shell->theme != nullptr ? shell->theme
+                                                                           : reach_theme_default();
+    float scale = reach_shell_layout_dpi_scale(shell);
+
+    reach_textbox_style style = {};
+    style.font_size = 18.0f * scale;
+    style.font_weight = REACH_TEXT_WEIGHT_NORMAL;
+    style.text_color = theme->launcher_search_text;
+    style.background_color = reach_shell_opaque_color(theme->launcher_search_background);
+    style.max_length = REACH_MAX_SEARCH_CHARS;
+    (void)reach_copy_utf16(style.placeholder, REACH_TEXTBOX_PLACEHOLDER_CAPACITY,
+                           (const uint16_t *)L"Search");
+    return style;
+}
+
+reach_result reach_shell_configure_launcher_textbox(reach_shell *shell)
+{
+    if (shell == nullptr || shell->launcher_textbox.ops.set_style == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_textbox_style style = reach_shell_launcher_textbox_style(shell);
+    if (shell->launcher_textbox_style_valid &&
+        reach_shell_textbox_style_equal(&shell->launcher_textbox_style, &style))
+    {
+        return REACH_OK;
+    }
+
+    reach_result result =
+        shell->launcher_textbox.ops.set_style(shell->launcher_textbox.textbox, &style);
+    if (result == REACH_OK)
+    {
+        shell->launcher_textbox_style = style;
+        shell->launcher_textbox_style_valid = 1;
+    }
+    return result;
+}
+
+void reach_shell_show_launcher_textbox(reach_shell *shell)
+{
+    if (shell == nullptr || shell->launcher_textbox_active)
     {
         return;
     }
+    if (shell->launcher_textbox.ops.show != nullptr)
+    {
+        (void)shell->launcher_textbox.ops.show(shell->launcher_textbox.textbox);
+    }
+    if (shell->launcher_textbox.ops.set_focused != nullptr)
+    {
+        (void)shell->launcher_textbox.ops.set_focused(shell->launcher_textbox.textbox, 1);
+    }
+    shell->launcher_textbox_active = 1;
+}
 
-    (void)shell->launcher.window.ops.raise(shell->launcher.window.window);
+void reach_shell_hide_launcher_textbox(reach_shell *shell)
+{
+    if (shell == nullptr || !shell->launcher_textbox_active)
+    {
+        return;
+    }
+    if (shell->launcher_textbox.ops.set_focused != nullptr)
+    {
+        (void)shell->launcher_textbox.ops.set_focused(shell->launcher_textbox.textbox, 0);
+    }
+    if (shell->launcher_textbox.ops.hide != nullptr)
+    {
+        (void)shell->launcher_textbox.ops.hide(shell->launcher_textbox.textbox);
+    }
+    shell->launcher_textbox_active = 0;
+}
+
+void reach_shell_reset_launcher_textbox(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+    reach_shell_hide_launcher_textbox(shell);
+    if (shell->launcher_textbox.ops.set_text != nullptr)
+    {
+        const uint16_t empty[] = {0};
+        (void)shell->launcher_textbox.ops.set_text(shell->launcher_textbox.textbox, empty);
+    }
 }
 
 void reach_shell_notify_launcher_search_ready(reach_shell *shell)
@@ -54,6 +176,48 @@ void reach_shell_notify_launcher_search_ready(reach_shell *shell)
 
     (void)shell->launcher.window.ops.post_event(shell->launcher.window.window,
                                                 REACH_UI_EVENT_LAUNCHER_SEARCH_READY);
+}
+
+void reach_shell_on_launcher_textbox_event(void *user, const reach_textbox_event *event)
+{
+    reach_shell *shell = static_cast<reach_shell *>(user);
+    if (shell == nullptr || event == nullptr || !shell->ui.launcher.open)
+    {
+        return;
+    }
+
+    if (event->type == REACH_TEXTBOX_EVENT_TEXT_CHANGED)
+    {
+        (void)reach_ui_state_set_query(&shell->ui, event->text);
+        (void)reach_shell_schedule_launcher_search(shell);
+        shell->dirty.layout = 1;
+        shell->launcher.dirty_flags = 1;
+        reach_shell_request_update(shell);
+    }
+    else if (event->type == REACH_TEXTBOX_EVENT_SUBMIT)
+    {
+        reach_ui_event ui_event = {};
+        ui_event.type = REACH_UI_EVENT_ENTER;
+        (void)reach_shell_handle_event(shell, &ui_event);
+    }
+    else if (event->type == REACH_TEXTBOX_EVENT_CANCEL)
+    {
+        reach_ui_event ui_event = {};
+        ui_event.type = REACH_UI_EVENT_ESCAPE;
+        (void)reach_shell_handle_event(shell, &ui_event);
+    }
+    else if (event->type == REACH_TEXTBOX_EVENT_NAVIGATE_UP)
+    {
+        reach_ui_event ui_event = {};
+        ui_event.type = REACH_UI_EVENT_ARROW_UP;
+        (void)reach_shell_handle_event(shell, &ui_event);
+    }
+    else if (event->type == REACH_TEXTBOX_EVENT_NAVIGATE_DOWN)
+    {
+        reach_ui_event ui_event = {};
+        ui_event.type = REACH_UI_EVENT_ARROW_DOWN;
+        (void)reach_shell_handle_event(shell, &ui_event);
+    }
 }
 
 void reach_shell_remember_launcher_restore_window(reach_shell *shell)
@@ -87,18 +251,6 @@ void reach_shell_clear_launcher_restore_window(reach_shell *shell)
 
     shell->launcher_restore_window = 0;
     shell->launcher_restore_window_valid = 0;
-}
-
-void reach_shell_defer_launcher_close_until_foreground_change(reach_shell *shell)
-{
-    if (shell == nullptr)
-    {
-        return;
-    }
-
-    reach_shell_clear_launcher_restore_window(shell);
-    shell->launcher_close_after_foreground_change = 1;
-    reach_shell_request_update(shell);
 }
 
 static int32_t reach_shell_launcher_can_restore_focus_to(reach_shell *shell, uintptr_t window)
@@ -138,10 +290,10 @@ static void reach_shell_close_launcher_impl(reach_shell *shell, int32_t restore_
     (void)reach_ui_state_close_launcher(&shell->ui);
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
-    shell->launcher_close_after_foreground_change = 0;
     shell->dirty.layout = 1;
     shell->launcher.dirty_flags = 1;
     reach_shell_surface_transition_set(shell, &shell->launcher_transition, 0);
+    reach_shell_reset_launcher_textbox(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     if (restore_focus)
     {
@@ -184,7 +336,9 @@ reach_result reach_shell_open_launcher_result(reach_shell *shell)
         {
             reach_app_launch_request request = {};
             reach_copy_utf16(request.path, 260, result->path);
-            return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+            return shell->ui.launcher.open
+                       ? reach_shell_defer_app_launch_until_launcher_closed(shell, &request)
+                       : reach_shell_schedule_app_launch(shell, &request);
         }
         if (shell->explorer_service.ops.open_path != nullptr)
         {

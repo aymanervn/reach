@@ -18,6 +18,7 @@
 #include "reach/ports/search_provider.h"
 #include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
+#include "reach/ports/textbox.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
@@ -42,6 +43,7 @@ extern "C"
     {
         reach_platform_window_port launcher_window;
         reach_render_backend_port launcher_renderer;
+        reach_textbox_port launcher_textbox;
         reach_platform_window_port dock_window;
         reach_render_backend_port dock_renderer;
         reach_dock_reveal_edge_port dock_reveal_edge;

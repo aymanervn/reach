@@ -17,6 +17,7 @@
 #include "reach/ports/search_provider.h"
 #include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
+#include "reach/ports/textbox.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
@@ -42,6 +43,8 @@ extern "C"
 
     reach_result reach_windows_create_platform_window(reach_surface_role role,
                                                       reach_platform_window_port *out_port);
+    reach_result reach_windows_create_textbox(reach_platform_window *parent,
+                                              reach_textbox_port *out_port);
     void *reach_windows_platform_window_native_handle(reach_platform_window *window);
     reach_result reach_windows_create_d2d_render_backend(reach_platform_window *window,
                                                          reach_render_backend_port *out_port);

@@ -13,16 +13,9 @@ static void reach_shell_mark_dirty_for_event(reach_shell *shell, const reach_ui_
     {
     case REACH_UI_EVENT_WINDOWS_KEY:
     case REACH_UI_EVENT_ESCAPE:
-    case REACH_UI_EVENT_TEXT:
-    case REACH_UI_EVENT_BACKSPACE:
-    case REACH_UI_EVENT_DELETE:
     case REACH_UI_EVENT_ENTER:
     case REACH_UI_EVENT_ARROW_UP:
     case REACH_UI_EVENT_ARROW_DOWN:
-    case REACH_UI_EVENT_ARROW_LEFT:
-    case REACH_UI_EVENT_ARROW_RIGHT:
-    case REACH_UI_EVENT_HOME:
-    case REACH_UI_EVENT_END:
         shell->dirty.layout = 1;
         shell->launcher.dirty_flags = 1;
         break;
@@ -492,11 +485,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
         if (launcher_action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT && launcher_pressed_match)
         {
-            if (reach_shell_open_launcher_result(shell) == REACH_OK)
-            {
-                reach_shell_close_launcher(shell);
-            }
-            return REACH_OK;
+            return reach_shell_open_launcher_result(shell);
         }
     }
 
@@ -1176,9 +1165,6 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
     }
     else if (intent.type == REACH_UI_INTENT_LAUNCH_APP)
     {
-        int32_t launcher_launch = shell->ui.launcher.open;
-        int32_t launched = 0;
-
         for (size_t index = 0; index < shell->ui.pinned_app_count; ++index)
         {
             if (shell->ui.pinned_apps[index].id == intent.id &&
@@ -1190,34 +1176,17 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
                 reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[index].arguments);
 
-                if (shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request) ==
-                    REACH_OK)
+                if (shell->ui.launcher.open)
                 {
-                    launched = 1;
+                    return reach_shell_defer_app_launch_until_launcher_closed(shell, &request);
                 }
+                return reach_shell_schedule_app_launch(shell, &request);
             }
         }
-
-        if (launcher_launch && launched)
-        {
-            reach_shell_defer_launcher_close_until_foreground_change(shell);
-        }
-    }
-    else if (intent.type == REACH_UI_INTENT_RUN_SEARCH)
-    {
-        (void)reach_shell_schedule_launcher_search(shell);
     }
     else if (intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT)
     {
-        if (reach_shell_open_launcher_result(shell) == REACH_OK)
-        {
-            reach_shell_close_launcher(shell);
-        }
-    }
-
-    if (shell->ui.launcher.open && shell->launcher_close_after_foreground_change)
-    {
-        return REACH_OK;
+        return reach_shell_open_launcher_result(shell);
     }
 
     return REACH_OK;

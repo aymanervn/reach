@@ -3,6 +3,7 @@
 #include "reach/ports/app_launcher.h"
 
 #include <windows.h>
+#include <objbase.h>
 #include <shellapi.h>
 #include <shlwapi.h>
 
@@ -39,7 +40,14 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
         execute.lpDirectory = working_directory;
     }
 
-    if (!ShellExecuteExW(&execute))
+    HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    BOOL launched = ShellExecuteExW(&execute);
+    if (SUCCEEDED(com_result))
+    {
+        CoUninitialize();
+    }
+
+    if (!launched)
     {
         return REACH_ERROR;
     }
