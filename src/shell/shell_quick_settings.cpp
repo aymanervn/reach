@@ -207,11 +207,7 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
     shell->quick_settings_drag.active = 0;
     shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     shell->quick_settings_drag.level_valid = 0;
-    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
-            shell->quick_settings.window.window, 0);
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
 
     if (next_open)
     {
@@ -229,7 +225,7 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
         shell->quick_settings_bluetooth_pending = {};
         if (was_open)
         {
-            reach_shell_schedule_dock_reveal_recheck(shell);
+            reach_shell_request_dock_visibility_update(shell);
         }
     }
 

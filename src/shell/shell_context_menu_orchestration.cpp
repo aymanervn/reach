@@ -18,14 +18,10 @@ void reach_shell_close_context_menu(reach_shell *shell)
         shell->context_menu_state.item_icon_ids[index] = 0;
     }
     shell->context_menu.dirty_flags = 1;
-    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->context_menu.window.ops.set_pointer_move_enabled(
-            shell->context_menu.window.window, 0);
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
     if (was_open)
     {
-        reach_shell_schedule_dock_reveal_recheck(shell);
+        reach_shell_request_dock_visibility_update(shell);
     }
     reach_shell_sync_popup_mouse_hook(shell);
 }
@@ -307,11 +303,7 @@ reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     shell->context_menu_state.open = 1;
     reach_shell_surface_transition_set(shell, &shell->context_menu_transition, 1);
     shell->context_menu.dirty_flags = 1;
-    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->context_menu.window.ops.set_pointer_move_enabled(
-            shell->context_menu.window.window, 1);
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     return REACH_OK;
 }
@@ -399,11 +391,7 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     shell->context_menu_state.open = 1;
     reach_shell_surface_transition_set(shell, &shell->context_menu_transition, 1);
     shell->context_menu.dirty_flags = 1;
-    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->context_menu.window.ops.set_pointer_move_enabled(
-            shell->context_menu.window.window, 1);
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     return REACH_OK;
 }

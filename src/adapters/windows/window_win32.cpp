@@ -33,6 +33,7 @@ struct reach_platform_window
     int tracking_mouse_leave;
     int pointer_move_enabled;
     int topmost_enabled;
+    int suppress_capture_changed;
 };
 
 static int32_t reach_platform_window_queue_event(reach_platform_window *window,
@@ -235,10 +236,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                     return 0;
                 }
             }
-            if (window->pointer_move_enabled)
-            {
-                SetCapture(hwnd);
-            }
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
             point.y = GET_Y_LPARAM(lparam);
@@ -258,7 +255,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_RBUTTONUP:
         if (window != nullptr)
         {
-            reach_platform_window_release_capture(hwnd);
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
             point.y = GET_Y_LPARAM(lparam);
@@ -276,6 +272,10 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_MOUSEMOVE:
         if (window != nullptr)
         {
+            if (!window->pointer_move_enabled)
+            {
+                return 0;
+            }
             if (!window->tracking_mouse_leave)
             {
                 TRACKMOUSEEVENT track = {};
@@ -283,10 +283,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 track.dwFlags = TME_LEAVE;
                 track.hwndTrack = hwnd;
                 window->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
-            }
-            if (!window->pointer_move_enabled)
-            {
-                return 0;
             }
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
@@ -333,6 +329,11 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_CAPTURECHANGED:
         if (window != nullptr)
         {
+            if (window->suppress_capture_changed)
+            {
+                window->suppress_capture_changed = 0;
+                return DefWindowProcW(hwnd, message, wparam, lparam);
+            }
             window->tracking_mouse_leave = 0;
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_POINTER_CANCEL;
@@ -757,8 +758,15 @@ static reach_result reach_platform_window_set_pointer_move_enabled(reach_platfor
 
     if (!window->pointer_move_enabled)
     {
+        if (window->tracking_mouse_leave)
+        {
+            TRACKMOUSEEVENT track = {};
+            track.cbSize = sizeof(track);
+            track.dwFlags = TME_LEAVE | TME_CANCEL;
+            track.hwndTrack = window->hwnd;
+            (void)TrackMouseEvent(&track);
+        }
         window->tracking_mouse_leave = 0;
-        reach_platform_window_release_capture(window->hwnd);
     }
 
     return REACH_OK;
@@ -778,7 +786,11 @@ static reach_result reach_platform_window_set_pointer_capture(reach_platform_win
         return GetCapture() == window->hwnd ? REACH_OK : REACH_ERROR;
     }
 
-    reach_platform_window_release_capture(window->hwnd);
+    if (GetCapture() == window->hwnd)
+    {
+        window->suppress_capture_changed = 1;
+        ReleaseCapture();
+    }
     return REACH_OK;
 }
 

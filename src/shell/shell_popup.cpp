@@ -69,7 +69,6 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
     {
         if (dock_hit.type != REACH_DOCK_HIT_NONE)
         {
-            reach_shell_keep_dock_revealed(shell);
             return;
         }
         reach_shell_close_launcher(shell);
