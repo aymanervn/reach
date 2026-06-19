@@ -152,7 +152,9 @@ size_t reach_shell_switcher_visible_count(const reach_shell *shell)
         return 0;
     }
     size_t window_count =
-        shell->switcher_state.open ? shell->switcher_state.window_count : shell->open_window_count;
+        reach_shell_surface_transition_visible(&shell->switcher_transition)
+            ? shell->switcher_state.window_count
+            : shell->open_window_count;
     return reach_switcher_visible_count(window_count);
 }
 
@@ -165,7 +167,9 @@ void reach_shell_update_switcher_visible_start(reach_shell *shell)
 
     reach_switcher_model model = {};
     model.window_count =
-        shell->switcher_state.open ? shell->switcher_state.window_count : shell->open_window_count;
+        reach_shell_surface_transition_visible(&shell->switcher_transition)
+            ? shell->switcher_state.window_count
+            : shell->open_window_count;
     model.selected_index = shell->switcher_state.selected_index;
     model.visible_start = shell->switcher_state.visible_start;
     reach_switcher_update_visible_start(&model);

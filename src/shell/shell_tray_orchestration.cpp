@@ -15,6 +15,7 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
 
     int32_t was_open = shell->tray_state.popup_open;
     shell->tray_state.popup_open = next_open;
+    reach_shell_surface_transition_set(shell, &shell->tray_transition, next_open);
     if (shell->tray.window.ops.set_topmost != nullptr)
     {
         (void)shell->tray.window.ops.set_topmost(shell->tray.window.window, 1);
