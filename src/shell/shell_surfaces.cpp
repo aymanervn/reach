@@ -198,4 +198,5 @@ void reach_shell_surface_transition_finish(reach_shell *shell,
     reach_animation_manager_set(&shell->animations, transition->y_track,
                                 REACH_SHELL_TRANSITION_OFFSET);
     reach_animation_manager_set(&shell->animations, transition->opacity_track, 0.0f);
+    reach_shell_request_update(shell);
 }

@@ -638,7 +638,7 @@ int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell)
     }
 
     return reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y) &&
-           shell->has_layout && !shell->dirty.layout &&
+           shell->has_layout && !shell->dirty.update_requested && !shell->dirty.layout &&
            !shell->dirty.render && !shell->dock.dirty_flags && !shell->launcher.dirty_flags &&
            !shell->tray.dirty_flags && !shell->switcher.dirty_flags &&
            !shell->context_menu.dirty_flags && !shell->quick_settings.dirty_flags &&
