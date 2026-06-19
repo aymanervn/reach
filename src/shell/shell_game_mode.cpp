@@ -21,9 +21,11 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
     shell->switcher_state.open = 0;
     shell->switcher_state.selected_index = 0;
     shell->switcher_state.visible_start = 0;
-    shell->switcher_state.width_animation = {};
-    shell->switcher_state.width_animating = 0;
-    shell->dock_animation.animating = 0;
+    reach_animation_manager_init(&shell->animations, shell->animation_tracks,
+                                 REACH_SHELL_ANIMATION_COUNT);
+    reach_shell_clear_dock_item_x_animations(shell);
+    shell->dock_animation.initialized = 0;
+    shell->dock_width.initialized = 0;
     shell->dock_reveal.requested = 0;
     shell->dock_reveal.check_dirty = 0;
     shell->dock_reveal.active = 0;
