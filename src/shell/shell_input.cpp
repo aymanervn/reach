@@ -830,8 +830,9 @@ static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
         return REACH_OK;
     }
 
-    if (shell->ui.dock.auto_hide && (!shell->dock_reveal.target_hidden ||
-                                     shell->dock_reveal.active || shell->dock_animation.animating))
+    if (shell->ui.dock.auto_hide &&
+        (!shell->dock_reveal.target_hidden || shell->dock_reveal.active ||
+         reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y)))
     {
         shell->dock_reveal.check_dirty = 1;
         reach_shell_request_update(shell);

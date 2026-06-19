@@ -46,7 +46,7 @@ void reach_shell_begin_dock_drag(reach_shell *shell, size_t index, const reach_u
     shell->dock_drag.grab_offset_x = (float)event->x - (shell->layout.dock.bounds.x + box_x);
 
     shell->dock_drag.x = box_x;
-    shell->dock_drag.snapping = 0;
+    reach_animation_manager_reset(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP);
 }
 
 reach_result reach_shell_update_dock_drag(reach_shell *shell, const reach_ui_event *event)
@@ -156,10 +156,9 @@ reach_result reach_shell_end_dock_drag(reach_shell *shell)
     {
         float target_x = reach_shell_dock_slot_box_x(shell, &shell->layout.dock, target_index);
 
-        reach_float_animation_start(&shell->dock_drag.snap_animation, shell->dock_drag.x, target_x,
-                                    0.12);
-
-        shell->dock_drag.snapping = 1;
+        reach_animation_manager_start(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP,
+                                      shell->dock_drag.x, target_x, 0.12,
+                                      REACH_EASING_EASE_IN_OUT);
     }
     else
     {
@@ -168,7 +167,8 @@ reach_result reach_shell_end_dock_drag(reach_shell *shell)
         shell->dock_drag.pinned = 0;
         shell->dock_drag.pin_id = 0;
         shell->dock_drag.window = 0;
-        shell->dock_drag.snapping = 0;
+        reach_animation_manager_reset(&shell->animations,
+                                      REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP);
     }
 
     if (moved && dragged_pinned && target_pinned_index != REACH_MAX_PINNED_APPS)

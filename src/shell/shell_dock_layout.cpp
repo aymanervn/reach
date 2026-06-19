@@ -2,11 +2,6 @@
 
 #include <math.h>
 
-static int32_t reach_shell_float_animation_active(const reach_float_animation *animation)
-{
-    return animation != nullptr && animation->elapsed_seconds < animation->duration_seconds;
-}
-
 static int32_t reach_shell_dock_key_equal(int32_t a_pinned, uint32_t a_pin_id, uintptr_t a_window,
                                           int32_t b_pinned, uint32_t b_pin_id, uintptr_t b_window)
 {
@@ -131,7 +126,8 @@ void reach_shell_sync_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_
     int32_t popup_blocks = reach_shell_popup_blocks_dock_reveal_edge(shell);
     int32_t should_show = should_auto_hide && !popup_blocks &&
                           (shell->dock_reveal.target_hidden || shell->dock_reveal.active) &&
-                          !shell->dock_animation.animating;
+                          !reach_animation_manager_active(&shell->animations,
+                                                          REACH_SHELL_ANIMATION_DOCK_Y);
 
     float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
 
@@ -172,7 +168,7 @@ void reach_shell_sync_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_
 }
 
 reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds,
-                                                reach_rect_f32 monitor_bounds, double delta_seconds)
+                                                reach_rect_f32 monitor_bounds)
 {
     REACH_ASSERT(shell != nullptr);
     float hidden_y = monitor_bounds.y + monitor_bounds.height + 4.0f;
@@ -228,10 +224,7 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     {
         shell->dock_animation.initialized = 1;
         shell->dock_reveal.target_hidden = target_hidden;
-        shell->dock_animation.y = {};
-        shell->dock_animation.y.from = target_y;
-        shell->dock_animation.y.to = target_y;
-        shell->dock_animation.y.value = target_y;
+        reach_animation_manager_set(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y, target_y);
         shell->ui.dock.visible = target_hidden ? 0 : 1;
     }
 
@@ -239,31 +232,24 @@ reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f
     {
         shell->dock_reveal.target_hidden = target_hidden;
         shell->ui.dock.visible = target_hidden ? 0 : 1;
-        reach_float_animation_start(&shell->dock_animation.y, shell->dock_animation.y.value,
-                                    target_y, 0.18);
-        shell->dock_animation.animating = 1;
+        reach_animation_manager_animate_to(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y,
+                                           target_y, 0.18, REACH_EASING_EASE_IN_OUT);
     }
 
-    int32_t was_animating = shell->dock_animation.animating;
-    if (shell->dock_animation.animating)
-    {
-        reach_float_animation_update(&shell->dock_animation.y, delta_seconds);
-        shell->dock_animation.animating =
-            reach_shell_float_animation_active(&shell->dock_animation.y);
-    }
-    if (was_animating && !shell->dock_animation.animating && !target_hidden && should_auto_hide &&
+    if (!reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y) &&
+        !target_hidden && should_auto_hide &&
         !popup_blocks_autohide && shell->dock_reveal.active &&
         !reach_shell_cursor_in_dock_reveal_bounds(shell, shown_bounds, monitor_bounds))
     {
         shell->dock_reveal.active = 0;
         shell->dock_reveal.target_hidden = 1;
         shell->ui.dock.visible = 0;
-        reach_float_animation_start(&shell->dock_animation.y, shell->dock_animation.y.value,
-                                    hidden_y, 0.18);
-        shell->dock_animation.animating = 1;
+        reach_animation_manager_animate_to(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y,
+                                           hidden_y, 0.18, REACH_EASING_EASE_IN_OUT);
     }
     reach_rect_f32 animated = shown_bounds;
-    animated.y = shell->dock_animation.y.value;
+    animated.y =
+        reach_animation_manager_value(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y);
     return animated;
 }
 
@@ -308,8 +294,7 @@ reach_dock_layout reach_shell_dock_layout_to_screen(reach_dock_layout layout)
     return layout;
 }
 
-void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout,
-                                            double delta_seconds)
+void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout)
 {
     if (shell == nullptr || layout == nullptr)
     {
@@ -317,44 +302,41 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
     }
 
     float target_width = layout->bounds.width;
-    size_t target_count = layout->app_slot_count;
     if (!shell->dock_width.initialized)
     {
         shell->dock_width.initialized = 1;
-        shell->dock_width.item_count = target_count;
-        shell->dock_width.animation = {};
-        shell->dock_width.animation.from = target_width;
-        shell->dock_width.animation.to = target_width;
-        shell->dock_width.animation.value = target_width;
+        reach_animation_manager_set(&shell->animations, REACH_SHELL_ANIMATION_DOCK_WIDTH,
+                                    target_width);
     }
 
-    if (fabsf(shell->dock_width.animation.to - target_width) >= 0.5f)
+    if (fabsf(reach_animation_manager_target(&shell->animations,
+                                             REACH_SHELL_ANIMATION_DOCK_WIDTH) -
+              target_width) >= 0.5f)
     {
-        float from = shell->dock_width.animation.value > 0.0f ? shell->dock_width.animation.value
-                                                              : target_width;
-        reach_float_animation_start(&shell->dock_width.animation, from, target_width, 0.18);
-        shell->dock_width.animating = 1;
-        shell->dock_width.item_count = target_count;
+        float current = reach_animation_manager_value(&shell->animations,
+                                                      REACH_SHELL_ANIMATION_DOCK_WIDTH);
+        float from = current > 0.0f ? current : target_width;
+        reach_animation_manager_start(&shell->animations, REACH_SHELL_ANIMATION_DOCK_WIDTH, from,
+                                      target_width, 0.18, REACH_EASING_EASE_IN_OUT);
         shell->dock.dirty_flags = 1;
     }
-    else if (!shell->dock_width.animating &&
-             fabsf(shell->dock_width.animation.value - target_width) >= 0.5f)
+    else if (!reach_animation_manager_active(&shell->animations,
+                                             REACH_SHELL_ANIMATION_DOCK_WIDTH) &&
+             fabsf(reach_animation_manager_value(&shell->animations,
+                                                  REACH_SHELL_ANIMATION_DOCK_WIDTH) -
+                   target_width) >= 0.5f)
     {
-        shell->dock_width.animation.from = target_width;
-        shell->dock_width.animation.to = target_width;
-        shell->dock_width.animation.value = target_width;
-        shell->dock_width.item_count = target_count;
+        reach_animation_manager_set(&shell->animations, REACH_SHELL_ANIMATION_DOCK_WIDTH,
+                                    target_width);
     }
 
-    if (shell->dock_width.animating)
+    if (reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_WIDTH))
     {
-        reach_float_animation_update(&shell->dock_width.animation, delta_seconds);
-        shell->dock_width.animating =
-            reach_shell_float_animation_active(&shell->dock_width.animation);
         shell->dock.dirty_flags = 1;
     }
 
-    float animated_width = shell->dock_width.animation.value;
+    float animated_width =
+        reach_animation_manager_value(&shell->animations, REACH_SHELL_ANIMATION_DOCK_WIDTH);
     if (animated_width <= 0.0f)
     {
         animated_width = target_width;
@@ -510,20 +492,26 @@ float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock
     {
         return 0.0f;
     }
-    if ((shell->dock_drag.active || shell->dock_drag.snapping) &&
+    if ((shell->dock_drag.active ||
+         reach_animation_manager_active(&shell->animations,
+                                        REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)) &&
         reach_shell_dock_item_matches_key(shell, index, shell->dock_drag.pinned,
                                           shell->dock_drag.pin_id, shell->dock_drag.window))
     {
-        return shell->dock_drag.snapping ? shell->dock_drag.snap_animation.value
-                                         : shell->dock_drag.x;
+        return reach_animation_manager_active(&shell->animations,
+                                              REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)
+                   ? reach_animation_manager_value(&shell->animations,
+                                                   REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)
+                   : shell->dock_drag.x;
     }
-    if ((shell->dock_item_x_animating[index] || shell->dock_item_x_valid[index]) &&
+    if (shell->dock_item_x_valid[index] &&
         reach_shell_dock_key_equal(
             shell->dock_item_x_pinned[index], shell->dock_item_x_pin_ids[index],
             shell->dock_item_x_windows[index], shell->dock_model.items[index].pinned,
             reach_shell_dock_item_pin_id(shell, index), shell->dock_model.items[index].window))
     {
-        return shell->dock_item_x_animations[index].value;
+        return reach_animation_manager_value(&shell->animations,
+                                             reach_shell_dock_item_animation_id(index));
     }
     return reach_shell_dock_slot_box_x(shell, layout, index);
 }
@@ -537,17 +525,14 @@ static void reach_shell_start_dock_item_x_animation(reach_shell *shell, size_t i
     }
     if (fabsf(from - to) < 0.5f)
     {
-        shell->dock_item_x_animations[index] = {};
-        shell->dock_item_x_animations[index].from = to;
-        shell->dock_item_x_animations[index].to = to;
-        shell->dock_item_x_animations[index].value = to;
+        reach_animation_manager_set(&shell->animations, reach_shell_dock_item_animation_id(index),
+                                    to);
         shell->dock_item_x_valid[index] = 1;
-        shell->dock_item_x_animating[index] = 0;
         return;
     }
-    reach_float_animation_start(&shell->dock_item_x_animations[index], from, to, 0.12);
+    reach_animation_manager_start(&shell->animations, reach_shell_dock_item_animation_id(index),
+                                  from, to, 0.12, REACH_EASING_EASE_IN_OUT);
     shell->dock_item_x_valid[index] = 1;
-    shell->dock_item_x_animating[index] = 1;
 }
 
 void reach_shell_clear_dock_item_x_animations(reach_shell *shell)
@@ -558,9 +543,9 @@ void reach_shell_clear_dock_item_x_animations(reach_shell *shell)
     }
     for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
     {
-        shell->dock_item_x_animations[index] = {};
+        reach_animation_manager_reset(&shell->animations,
+                                      reach_shell_dock_item_animation_id(index));
         shell->dock_item_x_valid[index] = 0;
-        shell->dock_item_x_animating[index] = 0;
         shell->dock_item_x_pinned[index] = 0;
         shell->dock_item_x_pin_ids[index] = 0;
         shell->dock_item_x_windows[index] = 0;
@@ -611,7 +596,9 @@ void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_do
         shell->dock_item_x_windows[index] = shell->dock_model.items[index].window;
         if (reach_shell_dock_item_matches_key(shell, index, shell->dock_drag.pinned,
                                               shell->dock_drag.pin_id, shell->dock_drag.window) &&
-            (shell->dock_drag.active || shell->dock_drag.snapping))
+            (shell->dock_drag.active ||
+             reach_animation_manager_active(&shell->animations,
+                                            REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)))
         {
             reach_shell_start_dock_item_x_animation(shell, index, target_x, target_x);
         }
@@ -623,7 +610,8 @@ void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_do
     for (size_t index = shell->dock_model.item_count; index < REACH_MAX_PINNED_APPS; ++index)
     {
         shell->dock_item_x_valid[index] = 0;
-        shell->dock_item_x_animating[index] = 0;
+        reach_animation_manager_reset(&shell->animations,
+                                      reach_shell_dock_item_animation_id(index));
         shell->dock_item_x_pinned[index] = 0;
         shell->dock_item_x_pin_ids[index] = 0;
         shell->dock_item_x_windows[index] = 0;
@@ -641,27 +629,34 @@ int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell)
         return 0;
     }
 
-    return shell->dock_animation.animating && shell->has_layout && !shell->dirty.layout &&
+    return reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y) &&
+           shell->has_layout && !shell->dirty.layout &&
            !shell->dirty.render && !shell->dock.dirty_flags && !shell->launcher.dirty_flags &&
            !shell->tray.dirty_flags && !shell->switcher.dirty_flags &&
            !shell->context_menu.dirty_flags && !shell->quick_settings.dirty_flags &&
-           !shell->dock_width.animating && !shell->dock_drag.active && !shell->dock_drag.snapping &&
-           !shell->feedback.dock_animating && !shell->feedback.tray_animating &&
-           !reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation);
+           !reach_animation_manager_active(&shell->animations,
+                                           REACH_SHELL_ANIMATION_DOCK_WIDTH) &&
+           !shell->dock_drag.active &&
+           !reach_animation_manager_active(&shell->animations,
+                                           REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP) &&
+           !reach_animation_manager_active(&shell->animations,
+                                           REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY) &&
+           !reach_animation_manager_active(&shell->animations,
+                                           REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY) &&
+           !reach_animation_manager_active(&shell->animations,
+                                           REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT);
 }
 
-reach_result reach_shell_move_dock_animation_frame(reach_shell *shell, double delta_seconds)
+reach_result reach_shell_move_dock_animation_frame(reach_shell *shell)
 {
     if (shell == nullptr || !shell->has_layout)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_float_animation_update(&shell->dock_animation.y, delta_seconds);
-    shell->dock_animation.animating = reach_shell_float_animation_active(&shell->dock_animation.y);
-
     reach_rect_f32 dock_bounds = shell->layout.dock.bounds;
-    dock_bounds.y = shell->dock_animation.y.value;
+    dock_bounds.y =
+        reach_animation_manager_value(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y);
 
     int32_t dock_window_changed = 0;
     reach_result result = reach_shell_apply_window_state(
@@ -674,7 +669,7 @@ reach_result reach_shell_move_dock_animation_frame(reach_shell *shell, double de
 
     shell->layout.dock.bounds = dock_bounds;
 
-    if (!shell->dock_animation.animating)
+    if (!reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y))
     {
         shell->dock_reveal.check_dirty = 1;
     }

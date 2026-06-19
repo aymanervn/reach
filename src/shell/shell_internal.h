@@ -28,14 +28,24 @@
 #include <mutex>
 #include <thread>
 
-typedef struct reach_shell_popup_bounds_animation
+typedef enum reach_shell_animation_id
 {
-    reach_float_animation width;
-    reach_float_animation height;
-    int32_t animate_width;
-    int32_t animate_height;
-    int32_t active;
-} reach_shell_popup_bounds_animation;
+    REACH_SHELL_ANIMATION_DOCK_Y = 0,
+    REACH_SHELL_ANIMATION_DOCK_WIDTH,
+    REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP,
+    REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY,
+    REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY,
+    REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT,
+    REACH_SHELL_ANIMATION_SWITCHER_WIDTH,
+    REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE,
+    REACH_SHELL_ANIMATION_COUNT =
+        REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + REACH_MAX_PINNED_APPS
+} reach_shell_animation_id;
+
+static inline size_t reach_shell_dock_item_animation_id(size_t index)
+{
+    return REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + index;
+}
 
 typedef struct reach_shell_dock_drag_state
 {
@@ -50,8 +60,6 @@ typedef struct reach_shell_dock_drag_state
     int32_t start_y;
     float grab_offset_x;
     float x;
-    int32_t snapping;
-    reach_float_animation snap_animation;
 } reach_shell_dock_drag_state;
 
 typedef struct reach_shell_feedback_state
@@ -59,13 +67,9 @@ typedef struct reach_shell_feedback_state
     size_t dock_index;
     int32_t dock_pressed;
     int32_t dock_sticky;
-    int32_t dock_animating;
-    reach_float_animation dock_opacity;
 
     size_t tray_index;
     int32_t tray_pressed;
-    int32_t tray_animating;
-    reach_float_animation tray_opacity;
 } reach_shell_feedback_state;
 
 typedef struct reach_shell_quick_settings_drag_state
@@ -220,8 +224,6 @@ typedef struct reach_shell_switcher_state
     size_t visible_start;
     uintptr_t windows[REACH_MAX_PINNED_APPS];
     size_t window_count;
-    reach_float_animation width_animation;
-    int32_t width_animating;
 } reach_shell_switcher_state;
 
 typedef struct reach_shell_wallpaper_state
@@ -300,8 +302,6 @@ typedef struct reach_shell_window_control_state
 typedef struct reach_shell_dock_animation_state
 {
     int32_t initialized;
-    int32_t animating;
-    reach_float_animation y;
 } reach_shell_dock_animation_state;
 typedef struct reach_shell_dock_reveal_state
 {
@@ -317,9 +317,6 @@ typedef struct reach_shell_dock_reveal_state
 typedef struct reach_shell_dock_width_state
 {
     int32_t initialized;
-    int32_t animating;
-    size_t item_count;
-    reach_float_animation animation;
 } reach_shell_dock_width_state;
 
 typedef struct reach_shell_quick_settings_audio_result
@@ -427,8 +424,8 @@ struct reach_shell
     reach_dock_feature_model dock_model;
     reach_dock_icon_cache dock_icons;
     float layout_dpi_scale;
-    reach_float_animation dock_item_x_animations[REACH_MAX_PINNED_APPS];
-    int32_t dock_item_x_animating[REACH_MAX_PINNED_APPS];
+    reach_animation_manager animations;
+    reach_animation_track animation_tracks[REACH_SHELL_ANIMATION_COUNT];
     int32_t dock_item_x_valid[REACH_MAX_PINNED_APPS];
     int32_t dock_item_x_pinned[REACH_MAX_PINNED_APPS];
     uint32_t dock_item_x_pin_ids[REACH_MAX_PINNED_APPS];
@@ -476,7 +473,6 @@ struct reach_shell
     uint64_t music_widget_pending_cover_icon_id;
     reach_color music_widget_pending_cover_accent;
     std::atomic<int32_t> music_widget_refresh_requested;
-    reach_music_widget_background_state music_widget_background;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_shell_quick_settings_audio_refresh_state quick_settings_audio_refresh;
     reach_shell_quick_settings_system_refresh_state quick_settings_system_refresh;
@@ -492,7 +488,6 @@ struct reach_shell
     reach_rect_f32 quick_settings_target_bounds;
     reach_rect_f32 quick_settings_content_bounds;
     float quick_settings_notch_anchor_x;
-    reach_shell_popup_bounds_animation quick_settings_bounds_animation;
     reach_popup_capture_port popup_capture;
 };
 
@@ -537,19 +532,6 @@ void reach_shell_on_window_event(void *user, const reach_ui_event *event);
 reach_result reach_shell_render_popup_surface(reach_shell *shell, reach_surface_runtime *surface,
                                               reach_rect_f32 bounds, float notch_anchor_x,
                                               const reach_render_command_buffer *content_commands);
-
-void reach_shell_start_popup_bounds_animation(reach_shell_popup_bounds_animation *animation,
-                                              reach_rect_f32 current_bounds,
-                                              reach_rect_f32 target_bounds, int32_t animate_width,
-                                              int32_t animate_height, double duration_seconds);
-
-reach_rect_f32
-reach_shell_apply_popup_bounds_animation(reach_shell_popup_bounds_animation *animation,
-                                         reach_rect_f32 target_bounds, float anchor_x,
-                                         float reference_y, float gap, double delta_seconds);
-
-int32_t
-reach_shell_popup_bounds_animation_active(const reach_shell_popup_bounds_animation *animation);
 
 void reach_shell_sync_popup_mouse_hook(reach_shell *shell);
 void reach_shell_close_transient_surfaces(reach_shell *shell);
@@ -683,17 +665,15 @@ reach_rect_f32 reach_shell_dock_rect_to_screen(const reach_dock_layout *layout,
 reach_dock_layout reach_shell_dock_layout_to_screen(reach_dock_layout layout);
 
 reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds,
-                                                reach_rect_f32 monitor_bounds,
-                                                double delta_seconds);
+                                                reach_rect_f32 monitor_bounds);
 
-void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout,
-                                            double delta_seconds);
+void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout);
 
 void reach_shell_sync_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_dock_bounds,
                                        reach_rect_f32 monitor_bounds);
 reach_result reach_shell_refresh_monitor_layout(reach_shell *shell);
 int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell);
-reach_result reach_shell_move_dock_animation_frame(reach_shell *shell, double delta_seconds);
+reach_result reach_shell_move_dock_animation_frame(reach_shell *shell);
 
 const uint16_t *reach_shell_dock_item_path(const reach_shell *shell, size_t item_index);
 
@@ -747,7 +727,7 @@ void reach_shell_process_quick_settings_system_changes(reach_shell *shell, doubl
 void reach_shell_refresh_quick_settings_layout(reach_shell *shell);
 void reach_shell_relayout_quick_settings(reach_shell *shell, int32_t animate_height);
 
-void reach_shell_update_quick_settings_animation(reach_shell *shell, double delta_seconds);
+void reach_shell_update_quick_settings_animation(reach_shell *shell);
 
 void reach_shell_execute_quick_settings_action(reach_shell *shell,
                                                reach_quick_settings_action action);

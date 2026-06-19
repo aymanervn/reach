@@ -1,5 +1,4 @@
 #include "reach/features/music_widget.h"
-#include "reach/support/animation.h"
 
 static const uint16_t REACH_MUSIC_WIDGET_DEFAULT_TITLE[] = {'M', 'e', 'd', 'i', 'a', 0};
 static const uint16_t REACH_MUSIC_WIDGET_COVER[] = {'M', 0};
@@ -265,8 +264,7 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
     const reach_theme *theme = input->theme;
     float radius = reach_theme_music_widget_corner_radius(theme, input->layout->bounds.height);
 
-    const reach_music_widget_background_state *background = input->background;
-    if (background != nullptr && background->active)
+    if (input->model->cover_icon_id != 0)
     {
         float bg_width = input->layout->bounds.width * 1.5f;
         float bg_height = input->layout->bounds.height * 1.5f;
@@ -274,8 +272,8 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
         float offset_y = (bg_height - input->layout->bounds.height) * 0.5f;
 
         reach_rect_f32 inflated_bg = {};
-        inflated_bg.x = input->layout->bounds.x - offset_x + background->offset.value.x;
-        inflated_bg.y = input->layout->bounds.y - offset_y + background->offset.value.y;
+        inflated_bg.x = input->layout->bounds.x - offset_x;
+        inflated_bg.y = input->layout->bounds.y - offset_y;
         inflated_bg.width = bg_width;
         inflated_bg.height = bg_height;
 
@@ -365,150 +363,4 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
     }
 
     return REACH_OK;
-}
-
-static int32_t reach_music_widget_vec2_animation_active(const reach_vec2_animation *animation)
-{
-    return animation != nullptr && animation->elapsed_seconds < animation->duration_seconds;
-}
-
-static const int32_t REACH_MUSIC_WIDGET_BG_SEGMENT_COUNT = 6;
-
-static const reach_vec2 REACH_MUSIC_WIDGET_BG_TARGETS[REACH_MUSIC_WIDGET_BG_SEGMENT_COUNT] = {
-    {-0.80f, -0.30f}, {0.40f, -0.70f}, {0.90f, 0.15f},
-    {-0.20f, 0.75f},  {-0.95f, 0.25f}, {0.35f, 0.90f},
-};
-
-static void reach_music_widget_clamp_offset(reach_vec2 *out, float max_x, float max_y)
-{
-    if (out->x > max_x)
-        out->x = max_x;
-    else if (out->x < -max_x)
-        out->x = -max_x;
-    if (out->y > max_y)
-        out->y = max_y;
-    else if (out->y < -max_y)
-        out->y = -max_y;
-}
-
-static void reach_music_widget_compute_segment_target(reach_vec2 *out, int32_t segment_index,
-                                                      float max_offset_x, float max_offset_y)
-{
-    reach_vec2 target = REACH_MUSIC_WIDGET_BG_TARGETS[segment_index];
-    out->x = target.x * max_offset_x;
-    out->y = target.y * max_offset_y;
-    reach_music_widget_clamp_offset(out, max_offset_x, max_offset_y);
-}
-
-int32_t reach_music_widget_background_update(reach_music_widget_background_state *background,
-                                             const reach_music_widget_model *model,
-                                             reach_rect_f32 bounds, double delta_seconds,
-                                             int32_t advance_time)
-{
-    if (background == nullptr || model == nullptr)
-    {
-        return 0;
-    }
-
-    if (!model->visible || bounds.width <= 0.0f || bounds.height <= 0.0f ||
-        model->cover_icon_id == 0)
-    {
-        int32_t was_active = background->active;
-        background->active = 0;
-        return was_active;
-    }
-
-    background->active = 1;
-
-    static const double REACH_MUSIC_WIDGET_BG_PLAYING_SECONDS = 3.0;
-    static const double REACH_MUSIC_WIDGET_BG_PAUSED_SECONDS =
-        REACH_MUSIC_WIDGET_BG_PLAYING_SECONDS * 1.5;
-
-    double duration = model->playback == REACH_MEDIA_PLAYBACK_PLAYING
-                          ? REACH_MUSIC_WIDGET_BG_PLAYING_SECONDS
-                          : REACH_MUSIC_WIDGET_BG_PAUSED_SECONDS;
-
-    int32_t cover_changed =
-        !background->initialized || background->current_cover_id != model->cover_icon_id;
-
-    float bg_width = bounds.width * 1.5f;
-    float bg_height = bounds.height * 1.5f;
-    float max_offset_x = (bg_width - bounds.width) * 0.5f;
-    float max_offset_y = (bg_height - bounds.height) * 0.5f;
-
-    if (cover_changed)
-    {
-        background->current_cover_id = model->cover_icon_id;
-        background->segment_index = 0;
-        background->initialized = 1;
-        background->widget_width = bounds.width;
-        background->widget_height = bounds.height;
-
-        reach_vec2_animation *anim = &background->offset;
-        reach_vec2 start = {0.0f, 0.0f};
-        reach_vec2 end = {};
-        reach_music_widget_compute_segment_target(&end, 0, max_offset_x, max_offset_y);
-
-        reach_vec2_animation_start(anim, start, end, duration);
-
-        return 1;
-    }
-
-    float old_width = background->widget_width;
-    float old_height = background->widget_height;
-
-    int32_t bounds_changed =
-        background->initialized && (old_width != bounds.width || old_height != bounds.height);
-
-    if (bounds_changed)
-    {
-        reach_vec2_animation *anim = &background->offset;
-        float current_x = anim->value.x;
-        float current_y = anim->value.y;
-
-        float prev_max_x = (old_width * 1.5f - old_width) * 0.5f;
-        float prev_max_y = (old_height * 1.5f - old_height) * 0.5f;
-
-        float normalized_x = prev_max_x > 0.0f ? current_x / prev_max_x : 0.0f;
-        float normalized_y = prev_max_y > 0.0f ? current_y / prev_max_y : 0.0f;
-
-        reach_vec2 new_from = {normalized_x * max_offset_x, normalized_y * max_offset_y};
-        reach_music_widget_clamp_offset(&new_from, max_offset_x, max_offset_y);
-
-        reach_vec2_animation_start(anim, new_from, new_from, duration);
-    }
-
-    background->widget_width = bounds.width;
-    background->widget_height = bounds.height;
-
-    if (!advance_time)
-    {
-        return bounds_changed;
-    }
-
-    reach_vec2_animation *anim = &background->offset;
-
-    reach_vec2_animation_update(anim, delta_seconds);
-
-    if (reach_music_widget_vec2_animation_active(anim))
-    {
-        return 1;
-    }
-
-    background->segment_index =
-        (background->segment_index + 1) % REACH_MUSIC_WIDGET_BG_SEGMENT_COUNT;
-
-    reach_vec2 new_target = {};
-    reach_music_widget_compute_segment_target(&new_target, background->segment_index, max_offset_x,
-                                              max_offset_y);
-
-    reach_vec2_animation_start(anim, anim->value, new_target, duration);
-
-    return 1;
-}
-
-int32_t
-reach_music_widget_background_needs_frame(const reach_music_widget_background_state *background)
-{
-    return background != nullptr && background->active;
 }
