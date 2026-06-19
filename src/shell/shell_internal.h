@@ -613,6 +613,7 @@ reach_result reach_shell_configure_launcher_textbox(reach_shell *shell);
 void reach_shell_show_launcher_textbox(reach_shell *shell);
 void reach_shell_hide_launcher_textbox(reach_shell *shell);
 void reach_shell_reset_launcher_textbox(reach_shell *shell);
+void reach_shell_cleanup_closed_launcher(reach_shell *shell);
 
 void reach_shell_close_launcher(reach_shell *shell);
 void reach_shell_close_launcher_without_focus_restore(reach_shell *shell);

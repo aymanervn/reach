@@ -167,6 +167,20 @@ void reach_shell_reset_launcher_textbox(reach_shell *shell)
     }
 }
 
+void reach_shell_cleanup_closed_launcher(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    reach_shell_cancel_launcher_search(shell);
+    reach_shell_release_launcher_result_icons(shell);
+    shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
+    shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
+    reach_shell_reset_launcher_textbox(shell);
+}
+
 void reach_shell_notify_launcher_search_ready(reach_shell *shell)
 {
     if (shell == nullptr || shell->launcher.window.ops.post_event == nullptr)
@@ -285,15 +299,11 @@ static void reach_shell_close_launcher_impl(reach_shell *shell, int32_t restore_
         return;
     }
 
-    reach_shell_cancel_launcher_search(shell);
-    reach_shell_release_launcher_result_icons(shell);
     (void)reach_ui_state_close_launcher(&shell->ui);
-    shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
-    shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
+    reach_shell_cleanup_closed_launcher(shell);
     shell->dirty.layout = 1;
     shell->launcher.dirty_flags = 1;
     reach_shell_surface_transition_set(shell, &shell->launcher_transition, 0);
-    reach_shell_reset_launcher_textbox(shell);
     reach_shell_sync_popup_mouse_hook(shell);
     if (restore_focus)
     {

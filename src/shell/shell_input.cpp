@@ -1207,9 +1207,7 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
                                            shell->ui.launcher.open);
         if (!shell->ui.launcher.open)
         {
-            reach_shell_cancel_launcher_search(shell);
-            reach_shell_release_launcher_result_icons(shell);
-            (void)reach_ui_state_clear_launcher_results(&shell->ui);
+            reach_shell_cleanup_closed_launcher(shell);
         }
 
         reach_shell_sync_popup_mouse_hook(shell);
