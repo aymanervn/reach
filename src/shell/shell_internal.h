@@ -157,6 +157,22 @@ typedef struct reach_shell_launcher_search_state
     void (*notify)(reach_shell *shell);
 } reach_shell_launcher_search_state;
 
+typedef struct reach_shell_app_launch_state
+{
+    std::thread thread;
+    std::mutex mutex;
+    std::condition_variable cv;
+
+    int32_t thread_started;
+    int32_t stop;
+    int32_t pending;
+
+    reach_app_launch_request pending_request;
+
+    int32_t launch_after_launcher_close;
+    reach_app_launch_request deferred_launcher_request;
+} reach_shell_app_launch_state;
+
 typedef struct reach_shell_open_window_icon_job
 {
     uint32_t generation;
@@ -415,6 +431,10 @@ struct reach_shell
     reach_monitor_port monitors;
     reach_ui_state ui;
     reach_surface_runtime launcher;
+    reach_textbox_port launcher_textbox;
+    reach_textbox_style launcher_textbox_style;
+    int32_t launcher_textbox_style_valid;
+    int32_t launcher_textbox_active;
     reach_surface_runtime dock;
     reach_dock_reveal_edge_port dock_reveal_edge;
     reach_surface_runtime tray;
@@ -469,10 +489,10 @@ struct reach_shell
     size_t pressed_launcher_index;
     reach_shell_launcher_scrollbar_drag_state launcher_scrollbar_drag;
     reach_shell_launcher_search_state launcher_search;
+    reach_shell_app_launch_state app_launch;
     reach_shell_open_window_icon_state open_window_icons;
     uintptr_t launcher_restore_window;
     int32_t launcher_restore_window_valid;
-    int32_t launcher_close_after_foreground_change;
     int32_t suppress_power_button_release;
     reach_shell_tray_state tray_state;
     reach_shell_switcher_state switcher_state;
@@ -578,17 +598,26 @@ void reach_shell_close_transient_surfaces(reach_shell *shell);
 
 /* Launcher orchestration */
 
-void reach_shell_raise_launcher(reach_shell *shell);
 void reach_shell_notify_launcher_search_ready(reach_shell *shell);
+void reach_shell_on_launcher_textbox_event(void *user, const reach_textbox_event *event);
+reach_result reach_shell_configure_launcher_textbox(reach_shell *shell);
+void reach_shell_show_launcher_textbox(reach_shell *shell);
+void reach_shell_hide_launcher_textbox(reach_shell *shell);
+void reach_shell_reset_launcher_textbox(reach_shell *shell);
 
 void reach_shell_close_launcher(reach_shell *shell);
 void reach_shell_close_launcher_without_focus_restore(reach_shell *shell);
 void reach_shell_remember_launcher_restore_window(reach_shell *shell);
 void reach_shell_clear_launcher_restore_window(reach_shell *shell);
-void reach_shell_defer_launcher_close_until_foreground_change(reach_shell *shell);
 void reach_shell_restore_launcher_focus(reach_shell *shell);
 reach_result reach_shell_open_launcher_result(reach_shell *shell);
 reach_result reach_shell_reveal_launcher_result(reach_shell *shell, size_t result_index);
+reach_result reach_shell_schedule_app_launch(reach_shell *shell,
+                                            const reach_app_launch_request *request);
+void reach_shell_stop_app_launch_worker(reach_shell *shell);
+void reach_shell_process_deferred_launcher_app_launch(reach_shell *shell);
+reach_result reach_shell_defer_app_launch_until_launcher_closed(
+    reach_shell *shell, const reach_app_launch_request *request);
 
 void reach_shell_cancel_launcher_search(reach_shell *shell);
 reach_result reach_shell_schedule_launcher_search(reach_shell *shell);

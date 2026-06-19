@@ -42,7 +42,7 @@ reach_result reach_shell_launch_dock_item(reach_shell *shell, size_t item_index,
             shell->ui.pinned_apps[shell->dock_model.items[item_index].pinned_index].arguments);
     }
     request.force_new_instance = force_new_instance;
-    return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+    return reach_shell_schedule_app_launch(shell, &request);
 }
 
 reach_result reach_shell_execute_dock_item_action(reach_shell *shell, reach_dock_item_action action)

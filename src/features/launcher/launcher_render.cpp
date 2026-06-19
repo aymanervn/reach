@@ -10,6 +10,12 @@ static reach_color reach_launcher_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
     return color;
 }
 
+static reach_color reach_launcher_opaque(reach_color color)
+{
+    color.a = 1.0f;
+    return color;
+}
+
 static uint64_t reach_launcher_fallback_icon(int32_t is_directory)
 {
     return is_directory ? REACH_VECTOR_ICON_FOLDER : REACH_VECTOR_ICON_FILE;
@@ -19,27 +25,6 @@ static float reach_launcher_scale(const reach_launcher_render_input *input, floa
 {
     float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     return value * scale;
-}
-
-static void reach_launcher_copy_query_prefix(uint16_t *dst, size_t dst_count,
-                                             const reach_ui_state *state)
-{
-    if (dst == nullptr || dst_count == 0 || state == nullptr)
-    {
-        return;
-    }
-    size_t count = state->launcher.caret_index < state->launcher.query_length
-                       ? state->launcher.caret_index
-                       : state->launcher.query_length;
-    if (count + 1 > dst_count)
-    {
-        count = dst_count - 1;
-    }
-    for (size_t index = 0; index < count; ++index)
-    {
-        dst[index] = state->launcher.query[index];
-    }
-    dst[count] = 0;
 }
 
 static size_t reach_launcher_visible_result_count(const reach_ui_state *state)
@@ -67,10 +52,6 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     const reach_launcher_layout *layout = input->layout;
     reach_render_command_buffer_clear(out_commands);
     float launcher_radius = reach_launcher_scale(input, 10.0f);
-    float search_padding_x = reach_launcher_scale(input, 18.0f);
-    float search_caret_y = reach_launcher_scale(input, 14.0f);
-    float search_caret_vertical_padding = reach_launcher_scale(input, 28.0f);
-    float search_text_size = reach_launcher_scale(input, 18.0f);
     float row_selected_inset_x = reach_launcher_scale(input, 6.0f);
     float row_selected_inset_y = reach_launcher_scale(input, 5.0f);
     float row_selected_radius = reach_launcher_scale(input, 8.0f);
@@ -94,7 +75,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     command.rect.y = layout->search_box.y - layout->bounds.y;
     command.rect.width = layout->search_box.width;
     command.rect.height = layout->search_box.height;
-    command.color = theme->dark_background;
+    command.color = reach_launcher_opaque(theme->launcher_search_background);
     command.radius = launcher_radius;
     reach_render_command_buffer_push(out_commands, &command);
 
@@ -104,40 +85,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     command.rect.y = layout->search_box.y - layout->bounds.y + 0.5f;
     command.rect.width = layout->search_box.width - 1.0f;
     command.rect.height = layout->search_box.height - 1.0f;
-    command.color = theme->dark_border;
+    command.color = theme->launcher_search_border;
     command.radius = launcher_radius;
     command.stroke_width = theme->border_thickness;
-    reach_render_command_buffer_push(out_commands, &command);
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_TEXT;
-    command.rect.x = layout->search_box.x - layout->bounds.x + search_padding_x;
-    command.rect.y = layout->search_box.y - layout->bounds.y;
-    command.rect.width = layout->search_box.width - search_padding_x * 2.0f;
-    command.rect.height = layout->search_box.height;
-    command.color.r = 1.0f;
-    command.color.g = 1.0f;
-    command.color.b = 1.0f;
-    command.color.a = state->launcher.query_length > 0 ? 0.95f : 0.58f;
-    command.text_size = search_text_size;
-    command.text_alignment = input->text_alignment_leading;
-    command.text_ellipsis = 1;
-    reach_copy_utf16(command.text, 260,
-                     state->launcher.query_length > 0 ? state->launcher.query
-                                                      : (const uint16_t *)L"Search");
-    reach_render_command_buffer_push(out_commands, &command);
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_TEXT_CARET;
-    command.rect.x = layout->search_box.x - layout->bounds.x + search_padding_x;
-    command.rect.y = layout->search_box.y - layout->bounds.y + search_caret_y;
-    command.rect.width = layout->search_box.width - search_padding_x * 2.0f;
-    command.rect.height = layout->search_box.height - search_caret_vertical_padding;
-    command.color = reach_launcher_rgb(255, 255, 255, 0.90f);
-    command.text_size = search_text_size;
-    command.text_alignment = input->text_alignment_leading;
-    command.radius = reach_launcher_scale(input, 1.0f);
-    reach_launcher_copy_query_prefix(command.text, 260, state);
     reach_render_command_buffer_push(out_commands, &command);
 
     if (state->launcher.result_count > 0)

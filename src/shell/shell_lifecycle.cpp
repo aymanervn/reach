@@ -51,6 +51,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_stop_launcher_search_worker(shell);
     reach_shell_stop_open_window_icon_worker(shell);
     reach_shell_stop_window_control_worker(shell);
+    reach_shell_stop_app_launch_worker(shell);
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
@@ -75,6 +76,11 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->monitors.ops.destroy != nullptr)
     {
         shell->monitors.ops.destroy(shell->monitors.list);
+    }
+    if (shell->launcher_textbox.ops.destroy != nullptr)
+    {
+        shell->launcher_textbox.ops.destroy(shell->launcher_textbox.textbox);
+        shell->launcher_textbox = {};
     }
     if (shell->launcher.window.ops.destroy != nullptr)
     {
@@ -277,7 +283,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
     shell->launcher_scrollbar_drag.active = 0;
     shell->launcher_scrollbar_drag.grab_offset_y = 0.0f;
-    shell->launcher_close_after_foreground_change = 0;
     shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
 
@@ -308,6 +313,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
 
     shell->launcher.window = dependencies->launcher_window;
     shell->launcher.renderer = dependencies->launcher_renderer;
+    shell->launcher_textbox = dependencies->launcher_textbox;
     shell->dock.window = dependencies->dock_window;
     shell->dock.renderer = dependencies->dock_renderer;
     shell->dock_reveal_edge = dependencies->dock_reveal_edge;
@@ -338,7 +344,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->media_controls = dependencies->media_controls;
     shell->theme = reach_theme_default();
 
-    if (shell->monitors.list == nullptr)
+    if (shell->monitors.list == nullptr || shell->launcher_textbox.textbox == nullptr)
     {
         result = REACH_INVALID_ARGUMENT;
     }
@@ -416,7 +422,20 @@ reach_result reach_shell_start(reach_shell *shell)
     }
 
     reach_result result = REACH_OK;
-    if (shell->window_manager.ops.start != nullptr)
+    if (shell->launcher_textbox.ops.set_event_callback != nullptr)
+    {
+        result = shell->launcher_textbox.ops.set_event_callback(
+            shell->launcher_textbox.textbox, reach_shell_on_launcher_textbox_event, shell);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_shell_configure_launcher_textbox(shell);
+    }
+    if (result == REACH_OK && shell->launcher_textbox.ops.hide != nullptr)
+    {
+        result = shell->launcher_textbox.ops.hide(shell->launcher_textbox.textbox);
+    }
+    if (result == REACH_OK && shell->window_manager.ops.start != nullptr)
     {
         result = shell->window_manager.ops.start(shell->window_manager.manager);
     }
@@ -613,6 +632,7 @@ reach_result reach_shell_stop(reach_shell *shell)
     reach_shell_stop_launcher_result_icon_worker(shell);
     reach_shell_stop_launcher_search_worker(shell);
     reach_shell_stop_open_window_icon_worker(shell);
+    reach_shell_stop_app_launch_worker(shell);
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
@@ -632,6 +652,10 @@ reach_result reach_shell_stop(reach_shell *shell)
     if (shell->launcher.window.ops.hide != nullptr)
     {
         (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
+    }
+    if (shell->launcher_textbox.ops.hide != nullptr)
+    {
+        (void)shell->launcher_textbox.ops.hide(shell->launcher_textbox.textbox);
     }
     if (shell->tray.window.ops.hide != nullptr)
     {

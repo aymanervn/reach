@@ -121,8 +121,6 @@ reach_result reach_d2d_draw_clipped_rounded_rect(ID2D1RenderTarget *target,
 /* Text drawing */
 reach_result reach_d2d_draw_text(reach_render_backend *backend,
                                  const reach_render_command *command);
-reach_result reach_d2d_draw_text_caret(reach_render_backend *backend,
-                                       const reach_render_command *command);
 
 /* Command execution */
 reach_result reach_d2d_execute(reach_render_backend *backend,

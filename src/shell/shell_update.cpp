@@ -659,6 +659,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
     reach_shell_apply_window_control_result(shell);
     reach_shell_tick_animations(shell, delta_seconds);
+    reach_shell_process_deferred_launcher_app_launch(shell);
 
     if (reach_shell_can_move_dock_without_redraw(shell))
     {
@@ -822,6 +823,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 shell->layout = layout;
                 shell->has_layout = 1;
 
+                (void)reach_shell_configure_launcher_textbox(shell);
+
                 reach_rect_f32 launcher_bounds = reach_shell_surface_transition_bounds(
                     shell, &shell->launcher_transition, layout.launcher.bounds);
                 float launcher_opacity =
@@ -845,14 +848,35 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 if (!game_mode &&
                     reach_shell_surface_transition_visible(&shell->launcher_transition))
                 {
-                    if (shell->launcher.window.ops.show != nullptr)
+                    if (shell->ui.launcher.open && !shell->launcher_textbox_active &&
+                        shell->launcher.window.ops.show != nullptr)
                     {
                         (void)shell->launcher.window.ops.show(shell->launcher.window.window);
                     }
+                    if (shell->ui.launcher.open)
+                    {
+                        if (shell->launcher_textbox.ops.set_bounds != nullptr)
+                        {
+                            reach_rect_f32 textbox_bounds = layout.launcher.search_text_input;
+                            textbox_bounds.x -= layout.launcher.bounds.x;
+                            textbox_bounds.y -= layout.launcher.bounds.y;
+                            (void)shell->launcher_textbox.ops.set_bounds(
+                                shell->launcher_textbox.textbox, textbox_bounds);
+                        }
+                        reach_shell_show_launcher_textbox(shell);
+                    }
+                    else
+                    {
+                        reach_shell_hide_launcher_textbox(shell);
+                    }
                 }
-                else if (shell->launcher.window.ops.hide != nullptr)
+                else
                 {
-                    (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
+                    if (shell->launcher.window.ops.hide != nullptr)
+                    {
+                        (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
+                    }
+                    reach_shell_hide_launcher_textbox(shell);
                 }
                 if (game_mode)
                 {
@@ -1103,10 +1127,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     }
                 }
 
-                if (!game_mode && shell->ui.launcher.open)
-                {
-                    reach_shell_raise_launcher(shell);
-                }
             }
         }
     }

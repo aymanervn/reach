@@ -47,7 +47,7 @@ static reach_result reach_shell_launch_context_menu_item(reach_shell *shell, con
     }
     request.force_new_instance = 1;
     request.run_as_admin = run_as_admin ? 1 : 0;
-    return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
+    return reach_shell_schedule_app_launch(shell, &request);
 }
 
 static int32_t reach_shell_dock_item_menu_command_allowed(

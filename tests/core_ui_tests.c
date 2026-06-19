@@ -26,46 +26,8 @@ int main(void)
     failed += expect(state.launcher.open == 1);
     failed += expect(!reach_ui_state_should_show_pinned_apps(&state));
 
-    event.type = REACH_UI_EVENT_TEXT;
-    event.text[0] = 'a';
-    event.text[1] = 0;
-    failed += expect(reach_ui_handle_event(&state, &event, 0) == REACH_OK);
-    failed += expect(reach_ui_state_should_show_search_placeholder(&state));
-    failed += expect(state.launcher.caret_index == 1);
-
-    event.type = REACH_UI_EVENT_ARROW_LEFT;
-    event.modifiers = 0;
-    event.text[0] = 0;
-    failed += expect(reach_ui_handle_event(&state, &event, 0) == REACH_OK);
-    failed += expect(state.launcher.caret_index == 0);
-    event.type = REACH_UI_EVENT_TEXT;
-    event.text[0] = 'b';
-    event.text[1] = 0;
-    failed += expect(reach_ui_handle_event(&state, &event, 0) == REACH_OK);
-    failed += expect(state.launcher.query[0] == 'b');
-    failed += expect(state.launcher.query[1] == 'a');
-    failed += expect(state.launcher.caret_index == 1);
-    event.type = REACH_UI_EVENT_ARROW_LEFT;
-    event.text[0] = 0;
-    failed += expect(reach_ui_handle_event(&state, &event, 0) == REACH_OK);
-    failed += expect(state.launcher.caret_index == 0);
-    failed += expect(reach_ui_handle_event(&state, &event, 0) == REACH_OK);
-    failed += expect(state.launcher.caret_index == 0);
-    event.type = REACH_UI_EVENT_ARROW_RIGHT;
-    failed += expect(reach_ui_handle_event(&state, &event, 0) == REACH_OK);
-    failed += expect(state.launcher.caret_index == 1);
-
-    uint16_t hello_world[] = {'h', 'e', 'l', 'l', 'o', ' ', ' ', ' ', 'w', 'o', 'r', 'l', 'd', 0};
-    failed += expect(reach_ui_state_set_query(&state, hello_world) == REACH_OK);
-    event.type = REACH_UI_EVENT_BACKSPACE;
-    event.modifiers = REACH_UI_EVENT_MODIFIER_CTRL;
-    reach_ui_intent word_delete_intent = {0};
-    failed += expect(reach_ui_handle_event(&state, &event, &word_delete_intent) == REACH_OK);
-    failed += expect(word_delete_intent.type == REACH_UI_INTENT_RUN_SEARCH);
-    failed += expect(state.launcher.query_length == 6);
-    failed += expect(state.launcher.query[0] == 'h');
-    failed += expect(state.launcher.query[5] == ' ');
-    failed += expect(state.launcher.caret_index == 6);
+    uint16_t query[] = {'a', 0};
+    failed += expect(reach_ui_state_set_query(&state, query) == REACH_OK);
 
     reach_ui_layout_input input = {0};
     input.monitor_bounds.x = 0.0f;
@@ -108,11 +70,6 @@ int main(void)
     event.type = REACH_UI_EVENT_ARROW_UP;
     failed += expect(reach_ui_handle_event(&state, &event, 0) == REACH_OK);
     failed += expect(state.launcher.selected_result_index == 0);
-    event.type = REACH_UI_EVENT_BACKSPACE;
-    event.text[0] = 0;
-    reach_ui_intent intent = {0};
-    failed += expect(reach_ui_handle_event(&state, &event, &intent) == REACH_OK);
-    failed += expect(intent.type == REACH_UI_INTENT_RUN_SEARCH);
     failed += expect(reach_ui_state_clear_launcher_results(&state) == REACH_OK);
     failed += expect(state.launcher.result_count == 0);
     failed += expect(layout.dock.tray_button.x + layout.dock.tray_button.width <
