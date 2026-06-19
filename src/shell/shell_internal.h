@@ -566,7 +566,7 @@ void reach_shell_clear_launcher_restore_window(reach_shell *shell);
 void reach_shell_defer_launcher_close_until_foreground_change(reach_shell *shell);
 void reach_shell_restore_launcher_focus(reach_shell *shell);
 reach_result reach_shell_open_launcher_result(reach_shell *shell);
-reach_result reach_shell_open_launcher_result_path(reach_shell *shell, size_t result_index);
+reach_result reach_shell_reveal_launcher_result(reach_shell *shell, size_t result_index);
 
 void reach_shell_cancel_launcher_search(reach_shell *shell);
 reach_result reach_shell_schedule_launcher_search(reach_shell *shell);

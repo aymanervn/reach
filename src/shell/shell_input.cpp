@@ -897,10 +897,10 @@ static reach_result reach_shell_handle_pointer_context(reach_shell *shell,
             if (result->kind == REACH_SEARCH_RESULT_APP)
             {
                 reach_result open_result =
-                    reach_shell_open_launcher_result_path(shell, launcher_hit.index);
+                    reach_shell_reveal_launcher_result(shell, launcher_hit.index);
                 if (open_result == REACH_OK)
                 {
-                    reach_shell_defer_launcher_close_until_foreground_change(shell);
+                    reach_shell_close_launcher(shell);
                 }
                 return open_result;
             }
