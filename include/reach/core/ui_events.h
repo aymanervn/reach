@@ -65,8 +65,8 @@ extern "C"
     {
         REACH_UI_INTENT_NONE = 0,
         REACH_UI_INTENT_LAUNCH_APP = 1,
-        REACH_UI_INTENT_OPEN_TRAY_MENU = 2,
-        REACH_UI_INTENT_CLOSE_LAUNCHER = 3,
+        REACH_UI_INTENT_RESERVED_2 = 2,
+        REACH_UI_INTENT_RESERVED_3 = 3,
         REACH_UI_INTENT_OPEN_LAUNCHER_RESULT = 4
     } reach_ui_intent_type;
 

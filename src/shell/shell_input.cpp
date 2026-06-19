@@ -957,18 +957,6 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         return REACH_OK;
     }
 
-    if (event->type == REACH_UI_EVENT_ESCAPE && shell->quick_settings_open)
-    {
-        reach_shell_set_quick_settings_open(shell, 0);
-        return REACH_OK;
-    }
-
-    if (event->type == REACH_UI_EVENT_ESCAPE && shell->context_menu_state.open)
-    {
-        reach_shell_close_context_menu(shell);
-        return REACH_OK;
-    }
-
     int32_t launcher_was_open = shell->ui.launcher.open;
 
     if (event->type == REACH_UI_EVENT_POINTER_UP)
@@ -1159,10 +1147,6 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         reach_shell_sync_popup_mouse_hook(shell);
     }
 
-    if (intent.type == REACH_UI_INTENT_OPEN_TRAY_MENU)
-    {
-        reach_shell_toggle_tray_popup(shell);
-    }
     else if (intent.type == REACH_UI_INTENT_LAUNCH_APP)
     {
         for (size_t index = 0; index < shell->ui.pinned_app_count; ++index)

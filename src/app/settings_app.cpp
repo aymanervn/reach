@@ -390,9 +390,8 @@ static void reach_settings_schedule_install(reach_settings_app *app)
     {
         std::lock_guard<std::mutex> lock(app->update_worker.mutex);
         app->update_worker.selected_count = 0;
-        for (size_t index = 0;
-             index < app->model.update_list.count &&
-             app->update_worker.selected_count < REACH_WINDOWS_UPDATE_MAX_UPDATES;
+        for (size_t index = 0; index < app->model.update_list.count &&
+                               app->update_worker.selected_count < REACH_WINDOWS_UPDATE_MAX_UPDATES;
              ++index)
         {
             if (app->model.update_list.updates[index].selected &&
@@ -496,8 +495,7 @@ static void reach_settings_apply_result(reach_settings_app *app)
 {
     reach_settings_update_worker *worker = &app->update_worker;
     reach_settings_update_work_type work = REACH_SETTINGS_UPDATE_WORK_NONE;
-    std::unique_ptr<reach_windows_update_list> scan(
-        new (std::nothrow) reach_windows_update_list());
+    std::unique_ptr<reach_windows_update_list> scan(new (std::nothrow) reach_windows_update_list());
     std::unique_ptr<reach_windows_update_operation_result> operation(
         new (std::nothrow) reach_windows_update_operation_result());
     if (scan == nullptr || operation == nullptr)
@@ -648,10 +646,6 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     if (app == nullptr || event == nullptr)
     {
         return;
-    }
-    if (event->type == REACH_UI_EVENT_ESCAPE)
-    {
-        app->running = 0;
     }
     else if (event->type == REACH_UI_EVENT_POINTER_UP)
     {

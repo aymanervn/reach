@@ -17,13 +17,8 @@ reach_result reach_ui_handle_event(reach_ui_state *state, const reach_ui_event *
     switch (event->type)
     {
     case REACH_UI_EVENT_WINDOWS_KEY:
-        return reach_ui_state_toggle_launcher(state);
     case REACH_UI_EVENT_ESCAPE:
-        if (out_intent != 0 && state->launcher.open)
-        {
-            out_intent->type = REACH_UI_INTENT_CLOSE_LAUNCHER;
-        }
-        return reach_ui_state_close_launcher(state);
+        return reach_ui_state_toggle_launcher(state);
     case REACH_UI_EVENT_ENTER:
         if (out_intent != 0 && state->launcher.open)
         {
@@ -40,12 +35,6 @@ reach_result reach_ui_handle_event(reach_ui_state *state, const reach_ui_event *
         {
             out_intent->type = REACH_UI_INTENT_LAUNCH_APP;
             out_intent->id = event->id;
-        }
-        return REACH_OK;
-    case REACH_UI_EVENT_TRAY_BUTTON_CLICK:
-        if (out_intent != 0)
-        {
-            out_intent->type = REACH_UI_INTENT_OPEN_TRAY_MENU;
         }
         return REACH_OK;
     case REACH_UI_EVENT_POINTER_WHEEL:

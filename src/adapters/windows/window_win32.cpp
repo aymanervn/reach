@@ -104,15 +104,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
     switch (message)
     {
-    case WM_CLOSE:
-        if (window != nullptr && window->role == REACH_SURFACE_SETTINGS)
-        {
-            reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_ESCAPE;
-            reach_platform_window_queue_event(window, &event);
-            return 0;
-        }
-        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR:
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
         return TRUE;
