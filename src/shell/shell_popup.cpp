@@ -103,14 +103,21 @@ void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
     }
 }
 
-void reach_shell_close_transient_surfaces(reach_shell *shell)
+void reach_shell_close_transient_surfaces(reach_shell *shell, int32_t restore_launcher_focus)
 {
     if (shell == nullptr)
     {
         return;
     }
 
-    reach_shell_close_launcher(shell);
+    if (restore_launcher_focus)
+    {
+        reach_shell_close_launcher(shell);
+    }
+    else
+    {
+        reach_shell_close_launcher_without_focus_restore(shell);
+    }
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
     reach_shell_close_context_menu(shell);

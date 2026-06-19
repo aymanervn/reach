@@ -594,7 +594,7 @@ reach_result reach_shell_render_popup_surface(reach_shell *shell, reach_surface_
                                               const reach_render_command_buffer *content_commands);
 
 void reach_shell_sync_popup_mouse_hook(reach_shell *shell);
-void reach_shell_close_transient_surfaces(reach_shell *shell);
+void reach_shell_close_transient_surfaces(reach_shell *shell, int32_t restore_launcher_focus);
 
 /* Launcher orchestration */
 

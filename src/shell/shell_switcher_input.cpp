@@ -152,7 +152,7 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
 
     if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN)
     {
-        reach_shell_close_transient_surfaces(shell);
+        reach_shell_close_transient_surfaces(shell, 0);
 
         if (shell->window_manager.ops.refresh != nullptr)
         {
