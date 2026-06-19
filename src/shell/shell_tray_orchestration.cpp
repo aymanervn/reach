@@ -28,7 +28,7 @@ void reach_shell_set_tray_popup_open(reach_shell *shell, int32_t open)
     }
     else if (was_open)
     {
-        reach_shell_schedule_dock_reveal_recheck(shell);
+        reach_shell_request_dock_visibility_update(shell);
     }
     reach_shell_sync_popup_mouse_hook(shell);
     shell->dock.dirty_flags = 1;

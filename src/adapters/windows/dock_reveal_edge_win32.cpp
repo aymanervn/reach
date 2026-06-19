@@ -4,6 +4,8 @@
 
 #include <new>
 
+#define REACH_DOCK_REVEAL_EDGE_MAX_PENDING_EVENTS 8
+
 struct reach_dock_reveal_edge
 {
     HWND hwnd;
@@ -13,6 +15,8 @@ struct reach_dock_reveal_edge
     int bounds_valid;
     int tracking_mouse_leave;
     reach_rect_f32 bounds;
+    reach_dock_reveal_edge_event pending_events[REACH_DOCK_REVEAL_EDGE_MAX_PENDING_EVENTS];
+    size_t pending_event_count;
 };
 
 static const wchar_t *reach_dock_reveal_edge_class_name()
@@ -20,11 +24,25 @@ static const wchar_t *reach_dock_reveal_edge_class_name()
     return L"ReachDockRevealEdgeWindow";
 }
 
-static void reach_dock_reveal_edge_notify(reach_dock_reveal_edge *edge)
+static void reach_dock_reveal_edge_queue_event(reach_dock_reveal_edge *edge,
+                                               reach_dock_reveal_edge_event event)
 {
-    if (edge != nullptr && edge->callback != nullptr)
+    if (edge == nullptr)
     {
-        edge->callback(edge->callback_user);
+        return;
+    }
+    if (edge->pending_event_count > 0 &&
+        edge->pending_events[edge->pending_event_count - 1] == event)
+    {
+        return;
+    }
+    if (edge->pending_event_count < REACH_DOCK_REVEAL_EDGE_MAX_PENDING_EVENTS)
+    {
+        edge->pending_events[edge->pending_event_count++] = event;
+    }
+    else
+    {
+        edge->pending_events[REACH_DOCK_REVEAL_EDGE_MAX_PENDING_EVENTS - 1] = event;
     }
 }
 
@@ -54,7 +72,7 @@ static LRESULT CALLBACK reach_dock_reveal_edge_proc(HWND hwnd, UINT message, WPA
             track.dwFlags = TME_LEAVE;
             track.hwndTrack = hwnd;
             edge->tracking_mouse_leave = TrackMouseEvent(&track) ? 1 : 0;
-            reach_dock_reveal_edge_notify(edge);
+            reach_dock_reveal_edge_queue_event(edge, REACH_DOCK_REVEAL_EDGE_ENTER);
         }
         return 0;
     case WM_MOUSELEAVE:
@@ -62,12 +80,7 @@ static LRESULT CALLBACK reach_dock_reveal_edge_proc(HWND hwnd, UINT message, WPA
         {
             edge->tracking_mouse_leave = 0;
         }
-        reach_dock_reveal_edge_notify(edge);
-        return 0;
-    case WM_LBUTTONDOWN:
-    case WM_MBUTTONDOWN:
-    case WM_RBUTTONDOWN:
-        reach_dock_reveal_edge_notify(edge);
+        reach_dock_reveal_edge_queue_event(edge, REACH_DOCK_REVEAL_EDGE_LEAVE);
         return 0;
     case WM_SETCURSOR:
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
@@ -116,8 +129,8 @@ static reach_result reach_dock_reveal_edge_set_bounds(reach_dock_reveal_edge *ed
         height = 1;
     }
 
-    BOOL ok = SetWindowPos(edge->hwnd, HWND_TOPMOST, (int)bounds.x, (int)bounds.y, width, height,
-                           SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    BOOL ok = SetWindowPos(edge->hwnd, nullptr, (int)bounds.x, (int)bounds.y, width, height,
+                           SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER);
 
     if (!ok)
     {
@@ -137,8 +150,6 @@ static reach_result reach_dock_reveal_edge_show(reach_dock_reveal_edge *edge)
     }
 
     ShowWindow(edge->hwnd, SW_SHOWNOACTIVATE);
-    SetWindowPos(edge->hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
     edge->visible = 1;
     return REACH_OK;
 }
@@ -156,6 +167,20 @@ static reach_result reach_dock_reveal_edge_hide(reach_dock_reveal_edge *edge)
     return REACH_OK;
 }
 
+static reach_result reach_dock_reveal_edge_place_behind(reach_dock_reveal_edge *edge,
+                                                        reach_window_id window)
+{
+    if (edge == nullptr || edge->hwnd == nullptr || window == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND target = reinterpret_cast<HWND>(window);
+    BOOL ok = SetWindowPos(edge->hwnd, target, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    return ok ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_dock_reveal_edge_set_callback(reach_dock_reveal_edge *edge,
                                                         reach_dock_reveal_edge_callback callback,
                                                         void *user)
@@ -167,6 +192,36 @@ static reach_result reach_dock_reveal_edge_set_callback(reach_dock_reveal_edge *
 
     edge->callback = callback;
     edge->callback_user = user;
+    return REACH_OK;
+}
+
+static int32_t reach_dock_reveal_edge_has_pending_events(const reach_dock_reveal_edge *edge)
+{
+    return edge != nullptr && edge->pending_event_count > 0;
+}
+
+static reach_result reach_dock_reveal_edge_dispatch_events(reach_dock_reveal_edge *edge)
+{
+    if (edge == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (edge->callback == nullptr || edge->pending_event_count == 0)
+    {
+        return REACH_OK;
+    }
+
+    reach_dock_reveal_edge_event events[REACH_DOCK_REVEAL_EDGE_MAX_PENDING_EVENTS] = {};
+    size_t event_count = edge->pending_event_count;
+    for (size_t index = 0; index < event_count; ++index)
+    {
+        events[index] = edge->pending_events[index];
+    }
+    edge->pending_event_count = 0;
+    for (size_t index = 0; index < event_count; ++index)
+    {
+        edge->callback(edge->callback_user, events[index]);
+    }
     return REACH_OK;
 }
 
@@ -229,7 +284,10 @@ reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *
     out_port->ops.set_bounds = reach_dock_reveal_edge_set_bounds;
     out_port->ops.show = reach_dock_reveal_edge_show;
     out_port->ops.hide = reach_dock_reveal_edge_hide;
+    out_port->ops.place_behind = reach_dock_reveal_edge_place_behind;
     out_port->ops.set_callback = reach_dock_reveal_edge_set_callback;
+    out_port->ops.has_pending_events = reach_dock_reveal_edge_has_pending_events;
+    out_port->ops.dispatch_events = reach_dock_reveal_edge_dispatch_events;
     out_port->ops.destroy = reach_dock_reveal_edge_destroy;
     return REACH_OK;
 }

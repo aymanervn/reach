@@ -34,11 +34,7 @@ void reach_shell_end_quick_settings_drag(reach_shell *shell)
             shell->quick_settings.window.window, 0);
     }
 
-    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
-            shell->quick_settings.window.window, 0);
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
 }
 
 reach_result reach_shell_begin_quick_settings_drag_if_hit(reach_shell *shell,
@@ -65,12 +61,7 @@ reach_result reach_shell_begin_quick_settings_drag_if_hit(reach_shell *shell,
         action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME ||
         action.type == REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
 
-    if (shell->quick_settings_drag.active &&
-        shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
-            shell->quick_settings.window.window, 1);
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
     if (shell->quick_settings_drag.active &&
         shell->quick_settings.window.ops.set_pointer_capture != nullptr)
     {

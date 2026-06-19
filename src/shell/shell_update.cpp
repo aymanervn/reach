@@ -533,8 +533,6 @@ static void reach_shell_update_clock_text(reach_shell *shell)
 
 static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds)
 {
-    int32_t dock_y_was_active =
-        reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y);
     int32_t dock_feedback_was_active = reach_animation_manager_active(
         &shell->animations, REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY);
     int32_t tray_feedback_was_active = reach_animation_manager_active(
@@ -554,12 +552,6 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
     reach_shell_surface_transition_finish(shell, &shell->quick_settings_transition);
     reach_shell_surface_transition_finish(shell, &shell->switcher_transition);
     reach_shell_surface_transition_finish(shell, &shell->context_menu_transition);
-
-    if (dock_y_was_active &&
-        !reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y))
-    {
-        shell->dock_reveal.check_dirty = 1;
-    }
 
     if (dock_feedback_was_active ||
         reach_animation_manager_active(&shell->animations,
@@ -706,7 +698,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
     (void)reach_shell_update_game_mode(shell);
     int32_t game_mode = reach_shell_game_mode_enabled(shell);
-
     if (!game_mode && shell->tray_state.popup_open &&
         shell->tray_provider.ops.needs_refresh != nullptr &&
         shell->tray_provider.ops.needs_refresh(shell->tray_provider.provider))
@@ -769,19 +760,10 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
                 reach_rect_f32 animated_dock_bounds =
                     game_mode ? shown_dock_bounds
-                              : reach_shell_apply_dock_animation(shell, shown_dock_bounds, bounds);
-                if (!game_mode)
+                              : reach_shell_reconcile_dock_visibility(shell, shown_dock_bounds,
+                                                                     bounds);
+                if (game_mode)
                 {
-                    reach_shell_sync_dock_reveal_edge(shell, shown_dock_bounds, bounds);
-                    if (shell->dock_reveal.check_dirty)
-                    {
-                        shell->dock_reveal.check_dirty = 0;
-                    }
-                }
-                else
-                {
-                    shell->dock_reveal.requested = 0;
-                    shell->dock_reveal.check_dirty = 0;
                     if (shell->dock_reveal_edge.ops.hide != nullptr)
                     {
                         (void)shell->dock_reveal_edge.ops.hide(shell->dock_reveal_edge.edge);
@@ -1161,7 +1143,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
            (shell->dirty.update_requested || window_manager_needs_refresh || shell->dirty.render ||
             shell->dock.dirty_flags || shell->launcher.dirty_flags || shell->tray.dirty_flags ||
             shell->switcher.dirty_flags || shell->context_menu.dirty_flags ||
-            shell->quick_settings.dirty_flags || shell->dock_reveal.check_dirty ||
+            shell->quick_settings.dirty_flags ||
             reach_shell_open_window_icon_work_pending(shell) ||
             reach_shell_launcher_result_icon_work_pending(shell) ||
             reach_shell_config_reload_work_pending(shell) ||

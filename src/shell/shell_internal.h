@@ -340,11 +340,15 @@ typedef struct reach_shell_dock_animation_state
 typedef struct reach_shell_dock_reveal_state
 {
     int32_t target_hidden;
-    int32_t active;
-    int32_t requested;
-    int32_t check_dirty;
+    int32_t reveal_session_active;
+    int32_t pointer_sequence_active;
     int32_t edge_visible;
     int32_t edge_bounds_valid;
+    int32_t subscriptions_initialized;
+    int32_t dock_move_enabled;
+    int32_t launcher_move_enabled;
+    int32_t context_menu_move_enabled;
+    int32_t quick_settings_move_enabled;
     reach_rect_f32 edge_bounds;
 } reach_shell_dock_reveal_state;
 
@@ -585,7 +589,12 @@ void reach_shell_surface_transition_finish(reach_shell *shell,
 
 void reach_shell_request_update(reach_shell *shell);
 void reach_shell_start_music_widget_hide_grace(reach_shell *shell);
-void reach_shell_on_window_event(void *user, const reach_ui_event *event);
+void reach_shell_on_launcher_window_event(void *user, const reach_ui_event *event);
+void reach_shell_on_dock_window_event(void *user, const reach_ui_event *event);
+void reach_shell_on_tray_window_event(void *user, const reach_ui_event *event);
+void reach_shell_on_switcher_window_event(void *user, const reach_ui_event *event);
+void reach_shell_on_context_menu_window_event(void *user, const reach_ui_event *event);
+void reach_shell_on_quick_settings_window_event(void *user, const reach_ui_event *event);
 
 /* Popup/window capture helpers */
 
@@ -724,22 +733,21 @@ float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock
 void reach_shell_rebuild_dock_items_with_animations(reach_shell *shell, reach_dock_layout *layout);
 void reach_shell_clear_dock_item_x_animations(reach_shell *shell);
 
-int32_t reach_shell_should_auto_hide_dock(const reach_shell *shell);
-void reach_shell_keep_dock_revealed(reach_shell *shell);
-void reach_shell_schedule_dock_reveal_recheck(reach_shell *shell);
+int32_t reach_shell_dock_can_hide(const reach_shell *shell);
+void reach_shell_sync_pointer_move_subscriptions(reach_shell *shell);
+void reach_shell_request_dock_visibility_update(reach_shell *shell);
 
 reach_point_i32 reach_shell_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y);
 reach_rect_f32 reach_shell_dock_rect_to_screen(const reach_dock_layout *layout,
                                                reach_rect_f32 rect);
 reach_dock_layout reach_shell_dock_layout_to_screen(reach_dock_layout layout);
 
-reach_rect_f32 reach_shell_apply_dock_animation(reach_shell *shell, reach_rect_f32 shown_bounds,
-                                                reach_rect_f32 monitor_bounds);
+reach_rect_f32 reach_shell_reconcile_dock_visibility(reach_shell *shell,
+                                                     reach_rect_f32 shown_bounds,
+                                                     reach_rect_f32 monitor_bounds);
 
 void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layout *layout);
 
-void reach_shell_sync_dock_reveal_edge(reach_shell *shell, reach_rect_f32 shown_dock_bounds,
-                                       reach_rect_f32 monitor_bounds);
 reach_result reach_shell_refresh_monitor_layout(reach_shell *shell);
 int32_t reach_shell_can_move_dock_without_redraw(const reach_shell *shell);
 reach_result reach_shell_move_dock_animation_frame(reach_shell *shell);

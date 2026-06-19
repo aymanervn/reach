@@ -16,6 +16,9 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
         return;
     }
 
+    reach_ui_event cancel = {};
+    cancel.type = REACH_UI_EVENT_POINTER_CANCEL;
+    (void)reach_shell_handle_event(shell, &cancel);
     reach_shell_close_transient_surfaces(shell, 1);
 
     shell->switcher_state.open = 0;
@@ -27,9 +30,8 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
     reach_shell_clear_dock_item_x_animations(shell);
     shell->dock_animation.initialized = 0;
     shell->dock_width.initialized = 0;
-    shell->dock_reveal.requested = 0;
-    shell->dock_reveal.check_dirty = 0;
-    shell->dock_reveal.active = 0;
+    shell->dock_reveal.reveal_session_active = 0;
+    shell->dock_reveal.pointer_sequence_active = 0;
     shell->dock_reveal.edge_visible = 0;
     shell->dock_reveal.edge_bounds_valid = 0;
     if (shell->dock_reveal_edge.ops.hide != nullptr)
@@ -83,6 +85,7 @@ reach_result reach_shell_update_game_mode(reach_shell *shell)
         shell->context_menu.dirty_flags = 1;
         shell->quick_settings.dirty_flags = 1;
     }
+    reach_shell_sync_pointer_move_subscriptions(shell);
 
     return REACH_OK;
 }

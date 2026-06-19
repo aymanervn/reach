@@ -2,7 +2,7 @@
 
 #include <new>
 
-static void reach_shell_on_dock_reveal_edge(void *user)
+static void reach_shell_on_dock_reveal_edge(void *user, reach_dock_reveal_edge_event event)
 {
     reach_shell *shell = static_cast<reach_shell *>(user);
     if (shell == nullptr)
@@ -14,15 +14,11 @@ static void reach_shell_on_dock_reveal_edge(void *user)
         return;
     }
 
-    if (shell->dock_reveal.active || !shell->dock_reveal.target_hidden)
+    if (event == REACH_DOCK_REVEAL_EDGE_ENTER)
     {
-        shell->dock_reveal.check_dirty = 1;
+        shell->dock_reveal.reveal_session_active = 1;
     }
-    else
-    {
-        shell->dock_reveal.requested = 1;
-    }
-    reach_shell_request_update(shell);
+    reach_shell_request_dock_visibility_update(shell);
 }
 
 static void reach_shell_on_media_controls_changed(void *user)
@@ -212,10 +208,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
     shell->dock_reveal_edge = {};
-    shell->dock_reveal.edge_visible = 0;
-    shell->dock_reveal.edge_bounds_valid = 0;
-    shell->dock_reveal.requested = 0;
-    shell->dock_reveal.edge_bounds = {};
+    shell->dock_reveal = {};
     shell->input_source = {};
     shell->window_manager = {};
     shell->config_store = {};
@@ -378,9 +371,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
         *out_shell = nullptr;
         return result;
     }
-    shell->dock_reveal.edge_visible = 0;
-    shell->dock_reveal.edge_bounds_valid = 0;
-    shell->dock_reveal.edge_bounds = {};
+    shell->dock_reveal = {};
     shell->dirty.layout = 1;
     shell->dirty.render = 1;
     shell->dirty.monitors = 1;
@@ -447,7 +438,7 @@ reach_result reach_shell_start(reach_shell *shell)
     if (shell->dock.window.ops.set_event_callback != nullptr)
     {
         result = shell->dock.window.ops.set_event_callback(shell->dock.window.window,
-                                                           reach_shell_on_window_event, shell);
+                                                           reach_shell_on_dock_window_event, shell);
         if (result != REACH_OK)
         {
             return result;
@@ -456,7 +447,8 @@ reach_result reach_shell_start(reach_shell *shell)
     if (shell->launcher.window.ops.set_event_callback != nullptr)
     {
         result = shell->launcher.window.ops.set_event_callback(shell->launcher.window.window,
-                                                               reach_shell_on_window_event, shell);
+                                                               reach_shell_on_launcher_window_event,
+                                                               shell);
         if (result != REACH_OK)
         {
             return result;
@@ -465,7 +457,7 @@ reach_result reach_shell_start(reach_shell *shell)
     if (shell->tray.window.ops.set_event_callback != nullptr)
     {
         result = shell->tray.window.ops.set_event_callback(shell->tray.window.window,
-                                                           reach_shell_on_window_event, shell);
+                                                           reach_shell_on_tray_window_event, shell);
         if (result != REACH_OK)
         {
             return result;
@@ -474,7 +466,8 @@ reach_result reach_shell_start(reach_shell *shell)
     if (shell->switcher.window.ops.set_event_callback != nullptr)
     {
         result = shell->switcher.window.ops.set_event_callback(shell->switcher.window.window,
-                                                               reach_shell_on_window_event, shell);
+                                                               reach_shell_on_switcher_window_event,
+                                                               shell);
         if (result != REACH_OK)
         {
             return result;
@@ -483,7 +476,7 @@ reach_result reach_shell_start(reach_shell *shell)
     if (shell->context_menu.window.ops.set_event_callback != nullptr)
     {
         result = shell->context_menu.window.ops.set_event_callback(
-            shell->context_menu.window.window, reach_shell_on_window_event, shell);
+            shell->context_menu.window.window, reach_shell_on_context_menu_window_event, shell);
         if (result != REACH_OK)
         {
             return result;
@@ -492,64 +485,13 @@ reach_result reach_shell_start(reach_shell *shell)
     if (shell->quick_settings.window.ops.set_event_callback != nullptr)
     {
         result = shell->quick_settings.window.ops.set_event_callback(
-            shell->quick_settings.window.window, reach_shell_on_window_event, shell);
+            shell->quick_settings.window.window, reach_shell_on_quick_settings_window_event, shell);
         if (result != REACH_OK)
         {
             return result;
         }
     }
-    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        result = shell->quick_settings.window.ops.set_pointer_move_enabled(
-            shell->quick_settings.window.window, 0);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (shell->launcher.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        result =
-            shell->launcher.window.ops.set_pointer_move_enabled(shell->launcher.window.window, 0);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (shell->dock.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        result = shell->dock.window.ops.set_pointer_move_enabled(shell->dock.window.window, 0);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (shell->tray.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        result = shell->tray.window.ops.set_pointer_move_enabled(shell->tray.window.window, 0);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (shell->switcher.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        result =
-            shell->switcher.window.ops.set_pointer_move_enabled(shell->switcher.window.window, 0);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        result = shell->context_menu.window.ops.set_pointer_move_enabled(
-            shell->context_menu.window.window, 0);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
     if (shell->dock_reveal_edge.ops.set_callback != nullptr)
     {
         result = shell->dock_reveal_edge.ops.set_callback(shell->dock_reveal_edge.edge,
@@ -672,11 +614,6 @@ reach_result reach_shell_stop(reach_shell *shell)
     if (shell->quick_settings.window.ops.hide != nullptr)
     {
         (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
-    }
-    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
-            shell->quick_settings.window.window, 0);
     }
     if (shell->wallpaper_surface.ops.hide != nullptr)
     {

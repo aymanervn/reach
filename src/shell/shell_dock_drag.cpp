@@ -15,15 +15,7 @@ void reach_shell_begin_dock_drag(reach_shell *shell, size_t index, const reach_u
     }
 
     shell->dock_drag.active = 1;
-
-    if (shell->dock.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->dock.window.ops.set_pointer_move_enabled(shell->dock.window.window, 1);
-    }
-    if (shell->dock.window.ops.set_pointer_capture != nullptr)
-    {
-        (void)shell->dock.window.ops.set_pointer_capture(shell->dock.window.window, 1);
-    }
+    reach_shell_sync_pointer_move_subscriptions(shell);
 
     shell->dock_drag.moved = 0;
     shell->dock_drag.source_index = index;
@@ -144,11 +136,6 @@ reach_result reach_shell_end_dock_drag(reach_shell *shell)
     shell->dock_drag.moved = 0;
     shell->pressed_dock_index = moved ? REACH_MAX_PINNED_APPS : previous_pressed_dock_index;
     shell->dock.dirty_flags = 1;
-
-    if (shell->dock.window.ops.set_pointer_capture != nullptr)
-    {
-        (void)shell->dock.window.ops.set_pointer_capture(shell->dock.window.window, 0);
-    }
 
     reach_shell_release_dock_item(shell);
 
