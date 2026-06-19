@@ -265,10 +265,11 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
+    reach_animation_manager_init(&shell->animations, shell->animation_tracks,
+                                 REACH_SHELL_ANIMATION_COUNT);
+    reach_shell_surface_transitions_init(shell);
     shell->feedback.dock_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
-    shell->feedback.dock_opacity = {};
     shell->feedback.tray_index = REACH_MAX_TRAY_ITEMS;
-    shell->feedback.tray_opacity = {};
     shell->dock_drag.source_index = REACH_MAX_PINNED_APPS;
     shell->dock_drag.target_index = REACH_MAX_PINNED_APPS;
     shell->pressed_dock_index = REACH_MAX_PINNED_APPS;
@@ -281,19 +282,10 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
 
     shell->quick_settings_open = 0;
-    if (shell->quick_settings.window.ops.hide != nullptr)
-    {
-        (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
-    }
     shell->quick_settings_drag.active = 0;
     shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     shell->quick_settings_drag.session_index = 0;
     shell->quick_settings_drag.session_instance_id[0] = 0;
-    if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        (void)shell->quick_settings.window.ops.set_pointer_move_enabled(
-            shell->quick_settings.window.window, 0);
-    }
     shell->quick_settings_audio_state.level = 0.0f;
     shell->quick_settings_audio_state.muted = 0;
     shell->quick_settings_audio_sessions = {};
@@ -303,13 +295,11 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->quick_settings_notch_anchor_x = 0.0f;
     shell->quick_settings_bounds = {};
     shell->quick_settings_target_bounds = {};
-    shell->quick_settings_bounds_animation = {};
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
     shell->music_widget_layout = {};
     shell->pressed_music_widget_action = REACH_MUSIC_WIDGET_ACTION_NONE;
     shell->music_widget_refresh_requested = 1;
-    shell->music_widget_background = {};
     shell->launcher_search.notify = reach_shell_notify_launcher_search_ready;
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;

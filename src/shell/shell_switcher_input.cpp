@@ -117,10 +117,10 @@ void reach_shell_refresh_switcher_windows(reach_shell *shell)
     if (shell->switcher_state.window_count == 0)
     {
         shell->switcher_state.open = 0;
+        reach_shell_surface_transition_set(shell, &shell->switcher_transition, 0);
         shell->switcher_state.selected_index = 0;
         shell->switcher_state.visible_start = 0;
-        shell->switcher_state.width_animation = {};
-        shell->switcher_state.width_animating = 0;
+        reach_animation_manager_reset(&shell->animations, REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
         shell->switcher.dirty_flags = 1;
         return;
     }
@@ -167,10 +167,11 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
 
         reach_shell_rebuild_switcher_windows(shell);
         shell->switcher_state.open = shell->switcher_state.window_count > 0 ? 1 : 0;
+        reach_shell_surface_transition_set(shell, &shell->switcher_transition,
+                                           shell->switcher_state.open);
         shell->switcher_state.selected_index = shell->switcher_state.window_count > 1 ? 1 : 0;
         shell->switcher_state.visible_start = 0;
-        shell->switcher_state.width_animation = {};
-        shell->switcher_state.width_animating = 0;
+        reach_animation_manager_reset(&shell->animations, REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
 
         reach_shell_update_switcher_visible_start(shell);
 
@@ -209,14 +210,8 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
     if (event->type == REACH_UI_EVENT_ALT_TAB_CANCEL)
     {
         shell->switcher_state.open = 0;
-        shell->switcher_state.width_animation = {};
-        shell->switcher_state.width_animating = 0;
+        reach_shell_surface_transition_set(shell, &shell->switcher_transition, 0);
         shell->switcher.dirty_flags = 1;
-
-        if (shell->switcher.window.ops.hide != nullptr)
-        {
-            (void)shell->switcher.window.ops.hide(shell->switcher.window.window);
-        }
 
         return REACH_OK;
     }
@@ -230,14 +225,8 @@ reach_result reach_shell_handle_switcher_event(reach_shell *shell, const reach_u
         }
 
         shell->switcher_state.open = 0;
-        shell->switcher_state.width_animation = {};
-        shell->switcher_state.width_animating = 0;
+        reach_shell_surface_transition_set(shell, &shell->switcher_transition, 0);
         shell->switcher.dirty_flags = 1;
-
-        if (shell->switcher.window.ops.hide != nullptr)
-        {
-            (void)shell->switcher.window.ops.hide(shell->switcher.window.window);
-        }
 
         if (window != 0)
         {

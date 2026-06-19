@@ -543,12 +543,6 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
     if (dock_hit.type == REACH_DOCK_HIT_TRAY_BUTTON)
     {
         reach_shell_toggle_tray_popup(shell);
-
-        if (!shell->tray_state.popup_open && shell->tray.window.ops.hide != nullptr)
-        {
-            return shell->tray.window.ops.hide(shell->tray.window.window);
-        }
-
         return REACH_OK;
     }
 
@@ -579,11 +573,6 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         !reach_rect_contains(shell->tray.last_bounds, event->x, event->y))
     {
         reach_shell_set_tray_popup_open(shell, 0);
-
-        if (shell->tray.window.ops.hide != nullptr)
-        {
-            (void)shell->tray.window.ops.hide(shell->tray.window.window);
-        }
     }
 
     if (dock_hit.type == REACH_DOCK_HIT_ITEM && shell->pressed_dock_index == dock_hit.index)
@@ -830,8 +819,9 @@ static reach_result reach_shell_handle_pointer_leave(reach_shell *shell)
         return REACH_OK;
     }
 
-    if (shell->ui.dock.auto_hide && (!shell->dock_reveal.target_hidden ||
-                                     shell->dock_reveal.active || shell->dock_animation.animating))
+    if (shell->ui.dock.auto_hide &&
+        (!shell->dock_reveal.target_hidden || shell->dock_reveal.active ||
+         reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_Y)))
     {
         shell->dock_reveal.check_dirty = 1;
         reach_shell_request_update(shell);
@@ -1168,6 +1158,8 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
 
     if (launcher_was_open != shell->ui.launcher.open)
     {
+        reach_shell_surface_transition_set(shell, &shell->launcher_transition,
+                                           shell->ui.launcher.open);
         if (!shell->ui.launcher.open)
         {
             reach_shell_cancel_launcher_search(shell);
@@ -1223,29 +1215,9 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         }
     }
 
-    if (shell->launcher.window.ops.show != nullptr && shell->launcher.window.ops.hide != nullptr)
+    if (shell->ui.launcher.open && shell->launcher_close_after_foreground_change)
     {
-        if (shell->ui.launcher.open)
-        {
-            if (shell->launcher_close_after_foreground_change)
-            {
-                return REACH_OK;
-            }
-
-            reach_result show_result =
-                shell->launcher.window.ops.show(shell->launcher.window.window);
-
-            if (show_result == REACH_OK)
-            {
-                reach_shell_raise_launcher(shell);
-            }
-
-            return show_result;
-        }
-
-        reach_result hide_result = shell->launcher.window.ops.hide(shell->launcher.window.window);
-        reach_shell_restore_launcher_focus(shell);
-        return hide_result;
+        return REACH_OK;
     }
 
     return REACH_OK;

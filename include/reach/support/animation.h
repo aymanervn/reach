@@ -1,6 +1,9 @@
 #ifndef REACH_ANIMATION_H
 #define REACH_ANIMATION_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -10,11 +13,12 @@ extern "C"
 
     typedef enum reach_easing
     {
-        REACH_EASING_LINEAR = 0,
-        REACH_EASING_EASE_IN_OUT = 1
+        REACH_EASING_EASE_IN = 0,
+        REACH_EASING_EASE_OUT = 1,
+        REACH_EASING_EASE_IN_OUT = 2
     } reach_easing;
 
-    typedef struct reach_float_animation
+    typedef struct reach_animation_track
     {
         float from;
         float to;
@@ -22,27 +26,31 @@ extern "C"
         double elapsed_seconds;
         double duration_seconds;
         reach_easing easing;
-    } reach_float_animation;
+        int32_t active;
+    } reach_animation_track;
 
-    typedef struct reach_vec2_animation
+    typedef struct reach_animation_manager
     {
-        reach_vec2 from;
-        reach_vec2 to;
-        reach_vec2 value;
-        double elapsed_seconds;
-        double duration_seconds;
-        reach_easing easing;
-    } reach_vec2_animation;
+        reach_animation_track *tracks;
+        size_t track_count;
+    } reach_animation_manager;
 
-    float reach_lerp_float(float a, float b, float t);
-    reach_vec2 reach_lerp_vec2(reach_vec2 a, reach_vec2 b, float t);
-    float reach_ease_in_out(float t);
-    void reach_float_animation_start(reach_float_animation *animation, float from, float to,
-                                     double duration_seconds);
-    void reach_vec2_animation_start(reach_vec2_animation *animation, reach_vec2 from, reach_vec2 to,
-                                    double duration_seconds);
-    void reach_float_animation_update(reach_float_animation *animation, double delta_seconds);
-    void reach_vec2_animation_update(reach_vec2_animation *animation, double delta_seconds);
+    void reach_animation_manager_init(reach_animation_manager *manager,
+                                      reach_animation_track *tracks, size_t track_count);
+    void reach_animation_manager_tick(reach_animation_manager *manager, double delta_seconds);
+    void reach_animation_manager_set(reach_animation_manager *manager, size_t track_id,
+                                     float value);
+    void reach_animation_manager_start(reach_animation_manager *manager, size_t track_id,
+                                       float from, float to, double duration_seconds,
+                                       reach_easing easing);
+    void reach_animation_manager_animate_to(reach_animation_manager *manager, size_t track_id,
+                                            float to, double duration_seconds,
+                                            reach_easing easing);
+    void reach_animation_manager_reset(reach_animation_manager *manager, size_t track_id);
+    float reach_animation_manager_value(const reach_animation_manager *manager, size_t track_id);
+    float reach_animation_manager_target(const reach_animation_manager *manager, size_t track_id);
+    int32_t reach_animation_manager_active(const reach_animation_manager *manager, size_t track_id);
+    int32_t reach_animation_manager_any_active(const reach_animation_manager *manager);
 
 #ifdef __cplusplus
 }
