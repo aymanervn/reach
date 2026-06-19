@@ -37,6 +37,7 @@ extern "C"
         reach_result (*load_pending_verification)(void *userdata,
                                                   reach_windows_update_identity *out_updates,
                                                   size_t update_capacity, size_t *out_update_count);
+        void (*cancel)(void *userdata);
         void (*destroy)(void *userdata);
     } reach_windows_update_port;
 

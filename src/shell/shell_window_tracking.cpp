@@ -348,12 +348,6 @@ void reach_shell_dock_item_menu_capabilities_for_index(
     int32_t has_window = window_id != 0;
     int32_t has_path = reach_shell_dock_item_path(shell, item_index) != nullptr;
 
-    if (reach_shell_window_is_settings_window(shell, window_id))
-    {
-        out_capabilities->close = has_window;
-        return;
-    }
-
     out_capabilities->open_new = has_path;
     out_capabilities->open_as_admin = has_path;
     out_capabilities->pin = !item->pinned && has_path;
@@ -396,11 +390,6 @@ reach_result reach_shell_execute_window_control(reach_shell *shell,
     if (shell == nullptr || window_id == 0)
     {
         return REACH_INVALID_ARGUMENT;
-    }
-
-    if (reach_shell_window_is_settings_window(shell, window_id))
-    {
-        return reach_shell_execute_settings_window_control(shell, action);
     }
 
     if (shell->window_manager.ops.privileged_control_available != nullptr &&
@@ -525,11 +514,6 @@ reach_result reach_shell_schedule_window_control(reach_shell *shell,
     if (shell == nullptr || window_id == 0)
     {
         return REACH_INVALID_ARGUMENT;
-    }
-
-    if (reach_shell_window_is_settings_window(shell, window_id))
-    {
-        return reach_shell_execute_settings_window_control(shell, action);
     }
 
     reach_result result = reach_shell_start_window_control_worker(shell);

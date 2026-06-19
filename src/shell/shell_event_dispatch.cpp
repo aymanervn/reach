@@ -27,8 +27,7 @@ int32_t reach_shell_has_pending_events(const reach_shell *shell)
                                 reach_shell_surface_has_pending_events(&shell->tray) ||
                                 reach_shell_surface_has_pending_events(&shell->switcher) ||
                                 reach_shell_surface_has_pending_events(&shell->context_menu) ||
-                                reach_shell_surface_has_pending_events(&shell->quick_settings) ||
-                                reach_shell_surface_has_pending_events(&shell->settings));
+                                reach_shell_surface_has_pending_events(&shell->quick_settings));
 }
 
 reach_result reach_shell_dispatch_events(reach_shell *shell)
@@ -44,7 +43,6 @@ reach_result reach_shell_dispatch_events(reach_shell *shell)
     reach_shell_dispatch_surface_events(&shell->switcher);
     reach_shell_dispatch_surface_events(&shell->context_menu);
     reach_shell_dispatch_surface_events(&shell->quick_settings);
-    reach_shell_dispatch_surface_events(&shell->settings);
     shell->dirty.events_dispatched_this_cycle = 1;
     return REACH_OK;
 }

@@ -386,6 +386,13 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SIZE:
+    case WM_MOVE:
+        if (window != nullptr && window->role == REACH_SURFACE_SETTINGS)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_WINDOW_BOUNDS_CHANGED;
+            reach_platform_window_queue_event(window, &event);
+        }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_MEASUREITEM:
     {
@@ -591,10 +598,7 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     }
     else
     {
-        if (window->role != REACH_SURFACE_SETTINGS)
-        {
-            reach_platform_window_focus(window->hwnd);
-        }
+        reach_platform_window_focus(window->hwnd);
     }
     return REACH_OK;
 }
@@ -876,15 +880,10 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (window->role == REACH_SURFACE_SETTINGS)
+    if (!reach_window_topmost_surface(window->role))
     {
         int show_command = IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW;
         ShowWindow(window->hwnd, show_command);
-        window->topmost_enabled = 0;
-        SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-        SetWindowPos(window->hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
         BringWindowToTop(window->hwnd);
         reach_platform_window_focus(window->hwnd);
         return REACH_OK;

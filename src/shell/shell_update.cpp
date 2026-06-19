@@ -66,17 +66,6 @@ int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
     return requested;
 }
 
-static float reach_shell_monitor_dpi_scale(const reach_monitor_info *monitor)
-{
-    if (monitor == nullptr)
-    {
-        return 1.0f;
-    }
-
-    int32_t dpi = monitor->dpi_y > 0 ? monitor->dpi_y : monitor->dpi_x;
-    return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
-}
-
 static int32_t reach_shell_switcher_width_animation_active(const reach_shell *shell)
 {
     return shell != nullptr && shell->switcher_state.width_animating &&
@@ -580,8 +569,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     }
 
     reach_shell_apply_window_control_result(shell);
-    reach_shell_apply_windows_update_progress(shell);
-    reach_shell_apply_windows_update_result(shell);
 
     if (reach_shell_can_move_dock_without_redraw(shell))
     {
@@ -971,47 +958,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                     }
                 }
 
-                if (shell->settings.window.ops.set_bounds != nullptr)
-                {
-                    int32_t settings_window_changed = 0;
-                    int32_t settings_minimized = reach_shell_settings_window_minimized(shell);
-                    if (!game_mode && shell->settings_open && !settings_minimized)
-                    {
-                        reach_shell_refresh_settings_layout(shell);
-
-                        result = reach_shell_apply_window_state(
-                            &shell->settings.window, shell->settings_bounds, 1.0f,
-                            &shell->settings.last_bounds, &shell->settings.last_opacity,
-                            &shell->settings.bounds_valid, &shell->settings.opacity_valid,
-                            &settings_window_changed);
-                        if (result != REACH_OK)
-                        {
-                            return result;
-                        }
-                    }
-
-                    if (settings_window_changed &&
-                        shell->settings.window.ops.apply_rounded_corners != nullptr)
-                    {
-                        (void)shell->settings.window.ops.apply_rounded_corners(
-                            shell->settings.window.window,
-                            18.0f * reach_shell_layout_dpi_scale(shell));
-                    }
-
-                    if (!game_mode && shell->settings_open && !settings_minimized)
-                    {
-                        if (shell->dirty.render || shell->settings.dirty_flags ||
-                            settings_window_changed)
-                        {
-                            (void)reach_shell_render_settings_surface(shell);
-                        }
-                    }
-                    else if (!shell->settings_open && shell->settings.window.ops.hide != nullptr)
-                    {
-                        (void)shell->settings.window.ops.hide(shell->settings.window.window);
-                    }
-                }
-
                 if (shell->switcher.window.ops.set_bounds != nullptr)
                 {
                     reach_rect_f32 target_switcher_bounds = reach_switcher_bounds_for_count_scaled(
@@ -1113,7 +1059,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     shell->switcher.dirty_flags = 0;
     shell->context_menu.dirty_flags = 0;
     shell->quick_settings.dirty_flags = 0;
-    shell->settings.dirty_flags = 0;
 
     return REACH_OK;
 }
@@ -1146,13 +1091,12 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
            (shell->dirty.update_requested || window_manager_needs_refresh || shell->dirty.render ||
             shell->dock.dirty_flags || shell->launcher.dirty_flags || shell->tray.dirty_flags ||
             shell->switcher.dirty_flags || shell->context_menu.dirty_flags ||
-            shell->quick_settings.dirty_flags || shell->settings.dirty_flags ||
-            shell->dock_reveal.check_dirty || reach_shell_open_window_icon_work_pending(shell) ||
+            shell->quick_settings.dirty_flags || shell->dock_reveal.check_dirty ||
+            reach_shell_open_window_icon_work_pending(shell) ||
             reach_shell_launcher_result_icon_work_pending(shell) ||
             reach_shell_config_reload_work_pending(shell) ||
             reach_shell_quick_settings_audio_refresh_work_pending(shell) ||
             reach_shell_quick_settings_system_refresh_work_pending(shell) ||
-            reach_shell_windows_update_work_pending(shell) ||
             shell->quick_settings_bluetooth_pending.active ||
             shell->music_widget_refresh_requested.load() ||
             shell->music_widget_hide_grace_seconds > 0.0 ||

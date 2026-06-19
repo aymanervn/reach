@@ -15,6 +15,7 @@
 #include "reach/ports/power_session.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
+#include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
@@ -48,6 +49,7 @@ extern "C"
                                                            reach_render_backend_port *out_port);
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
     reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
+    reach_result reach_windows_create_settings_launcher(reach_settings_launcher_port *out_port);
     reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
     reach_result reach_windows_create_icon_provider(reach_icon_provider_port *out_port);
     reach_result reach_windows_create_input_source(reach_input_source_port *out_port);

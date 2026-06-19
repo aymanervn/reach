@@ -24,8 +24,6 @@ struct reach_window_manager
 
 static const DWORD REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS = 10000;
 static const DWORD REACH_HELPER_RESTART_FAILED_COOLDOWN_MS = 5000;
-static const int REACH_SETTINGS_ICON_RESOURCE_ID = 102;
-
 static void
 reach_window_manager_icon_ref_for_helper(const reach_elevation_helper_window_snapshot &helper,
                                          uint16_t *out_icon_ref, size_t out_icon_ref_count)
@@ -38,13 +36,6 @@ reach_window_manager_icon_ref_for_helper(const reach_elevation_helper_window_sna
     out_icon_ref[0] = 0;
     if (helper.process_path[0] == 0)
     {
-        return;
-    }
-
-    if (lstrcmpiW(helper.class_name, L"ReachSettingsWindow") == 0)
-    {
-        swprintf_s(reinterpret_cast<wchar_t *>(out_icon_ref), out_icon_ref_count, L"%ls,-%d",
-                   helper.process_path, REACH_SETTINGS_ICON_RESOURCE_ID);
         return;
     }
 

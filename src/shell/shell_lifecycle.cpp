@@ -46,13 +46,11 @@ static void reach_shell_cleanup(reach_shell *shell)
 
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
-    reach_shell_close_settings(shell);
     reach_shell_stop_config_reload_worker(shell);
     reach_shell_stop_launcher_result_icon_worker(shell);
     reach_shell_stop_launcher_search_worker(shell);
     reach_shell_stop_open_window_icon_worker(shell);
     reach_shell_stop_window_control_worker(shell);
-    reach_shell_stop_windows_update_worker(shell);
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
@@ -126,14 +124,6 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->quick_settings.renderer.ops.destroy(shell->quick_settings.renderer.backend);
     }
-    if (shell->settings.window.ops.destroy != nullptr)
-    {
-        shell->settings.window.ops.destroy(shell->settings.window.window);
-    }
-    if (shell->settings.renderer.ops.destroy != nullptr)
-    {
-        shell->settings.renderer.ops.destroy(shell->settings.renderer.backend);
-    }
     if (shell->dock_reveal_edge.ops.hide != nullptr)
     {
         shell->dock_reveal_edge.ops.hide(shell->dock_reveal_edge.edge);
@@ -165,6 +155,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->app_launcher.ops.destroy != nullptr)
     {
         shell->app_launcher.ops.destroy(shell->app_launcher.launcher);
+    }
+    if (shell->settings_launcher.ops.destroy != nullptr)
+    {
+        shell->settings_launcher.ops.destroy(shell->settings_launcher.launcher);
     }
     if (shell->icon_provider.ops.destroy != nullptr)
     {
@@ -202,10 +196,6 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->media_controls.destroy(shell->media_controls.userdata);
     }
-    if (shell->windows_update.destroy != nullptr)
-    {
-        shell->windows_update.destroy(shell->windows_update.userdata);
-    }
 
     shell->monitors = {};
     shell->popup_capture = {};
@@ -215,7 +205,6 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
-    reach_surface_runtime_init(&shell->settings);
     shell->dock_reveal_edge = {};
     shell->dock_reveal.edge_visible = 0;
     shell->dock_reveal.edge_bounds_valid = 0;
@@ -227,6 +216,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->tray_provider = {};
     shell->search_provider = {};
     shell->app_launcher = {};
+    shell->settings_launcher = {};
     shell->icon_provider = {};
     shell->explorer_service = {};
     shell->wallpaper_service = {};
@@ -235,17 +225,13 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->audio_volume = {};
     shell->system_controls = {};
     shell->media_controls = {};
-    shell->windows_update = {};
     shell->music_widget_refresh_requested = 0;
     shell->quick_settings_system_change_flags.store(0);
-    shell->windows_update_worker.progress_state.store(0);
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
-    shell->windows_update_worker.notify = reach_shell_request_update;
     reach_dock_icon_cache_init(&shell->dock_icons);
     reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
-    reach_settings_model_init(&shell->settings_model);
     reach_music_widget_model_init(&shell->music_widget_model);
 }
 
@@ -279,8 +265,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
-    reach_surface_runtime_init(&shell->settings);
-    reach_settings_model_init(&shell->settings_model);
     shell->feedback.dock_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
     shell->feedback.dock_opacity = {};
     shell->feedback.tray_index = REACH_MAX_TRAY_ITEMS;
@@ -316,17 +300,12 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->quick_settings_output_devices = {};
     shell->system_controls = {};
     shell->quick_settings_system_change_flags.store(0);
-    shell->windows_update_worker.progress_state.store(0);
     shell->quick_settings_notch_anchor_x = 0.0f;
     shell->quick_settings_bounds = {};
     shell->quick_settings_target_bounds = {};
     shell->quick_settings_bounds_animation = {};
     shell->quick_settings_content_bounds = {};
     shell->quick_settings_layout = {};
-    shell->settings_open = 0;
-    shell->settings_bounds = {};
-    shell->settings_restored_bounds = {};
-    shell->settings_layout = {};
     shell->music_widget_layout = {};
     shell->pressed_music_widget_action = REACH_MUSIC_WIDGET_ACTION_NONE;
     shell->music_widget_refresh_requested = 1;
@@ -334,7 +313,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->launcher_search.notify = reach_shell_notify_launcher_search_ready;
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
-    shell->windows_update_worker.notify = reach_shell_request_update;
 
     reach_result result = REACH_OK;
 
@@ -351,8 +329,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->context_menu.renderer = dependencies->context_menu_renderer;
     shell->quick_settings.window = dependencies->quick_settings_window;
     shell->quick_settings.renderer = dependencies->quick_settings_renderer;
-    shell->settings.window = dependencies->settings_window;
-    shell->settings.renderer = dependencies->settings_renderer;
     shell->input_source = dependencies->input_source;
     shell->monitors = dependencies->monitors;
     shell->window_manager = dependencies->window_manager;
@@ -360,6 +336,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->tray_provider = dependencies->tray_provider;
     shell->search_provider = dependencies->search_provider;
     shell->app_launcher = dependencies->app_launcher;
+    shell->settings_launcher = dependencies->settings_launcher;
     shell->icon_provider = dependencies->icon_provider;
     shell->explorer_service = dependencies->explorer_service;
     shell->wallpaper_service = dependencies->wallpaper_service;
@@ -369,7 +346,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->audio_volume = dependencies->audio_volume;
     shell->system_controls = dependencies->system_controls;
     shell->media_controls = dependencies->media_controls;
-    shell->windows_update = dependencies->windows_update;
     shell->theme = reach_theme_default();
 
     if (shell->monitors.list == nullptr)
@@ -417,7 +393,6 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->launcher.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
     shell->quick_settings.dirty_flags = 1;
-    shell->settings.dirty_flags = 1;
     *out_shell = shell;
     return REACH_OK;
 }
@@ -514,15 +489,6 @@ reach_result reach_shell_start(reach_shell *shell)
             return result;
         }
     }
-    if (shell->settings.window.ops.set_event_callback != nullptr)
-    {
-        result = shell->settings.window.ops.set_event_callback(shell->settings.window.window,
-                                                               reach_shell_on_window_event, shell);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
     {
         result = shell->quick_settings.window.ops.set_pointer_move_enabled(
@@ -570,15 +536,6 @@ reach_result reach_shell_start(reach_shell *shell)
     {
         result = shell->context_menu.window.ops.set_pointer_move_enabled(
             shell->context_menu.window.window, 0);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (shell->settings.window.ops.set_pointer_move_enabled != nullptr)
-    {
-        result =
-            shell->settings.window.ops.set_pointer_move_enabled(shell->settings.window.window, 1);
         if (result != REACH_OK)
         {
             return result;
@@ -641,13 +598,10 @@ reach_result reach_shell_start(reach_shell *shell)
     shell->tray.dirty_flags = 1;
     shell->switcher.dirty_flags = 1;
     shell->quick_settings.dirty_flags = 1;
-    shell->settings.dirty_flags = 1;
     shell->context_menu_state.open = 0;
     shell->quick_settings_open = 0;
-    shell->settings_open = 0;
     shell->quick_settings_drag.active = 0;
     shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
-    reach_shell_schedule_windows_update_resume_verification(shell);
     return REACH_OK;
 }
 
@@ -664,13 +618,11 @@ reach_result reach_shell_stop(reach_shell *shell)
     shell->context_menu_state.open = 0;
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
-    reach_shell_close_settings(shell);
     reach_shell_cancel_launcher_search(shell);
     reach_shell_stop_config_reload_worker(shell);
     reach_shell_stop_launcher_result_icon_worker(shell);
     reach_shell_stop_launcher_search_worker(shell);
     reach_shell_stop_open_window_icon_worker(shell);
-    reach_shell_stop_windows_update_worker(shell);
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
@@ -706,10 +658,6 @@ reach_result reach_shell_stop(reach_shell *shell)
     if (shell->quick_settings.window.ops.hide != nullptr)
     {
         (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
-    }
-    if (shell->settings.window.ops.hide != nullptr)
-    {
-        (void)shell->settings.window.ops.hide(shell->settings.window.window);
     }
     if (shell->quick_settings.window.ops.set_pointer_move_enabled != nullptr)
     {

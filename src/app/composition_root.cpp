@@ -107,21 +107,15 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_platform_window(REACH_SURFACE_SETTINGS,
-                                                      &dependencies.settings_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(dependencies.settings_window.window,
-                                                           &dependencies.settings_renderer);
-    }
-    if (result == REACH_OK)
-    {
         result = reach_windows_create_search_provider(&dependencies.search_provider);
     }
     if (result == REACH_OK)
     {
         result = reach_windows_create_app_launcher(&dependencies.app_launcher);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_settings_launcher(&dependencies.settings_launcher);
     }
     if (result == REACH_OK)
     {
@@ -183,10 +177,6 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_windows_update(&dependencies.windows_update);
-    }
-    if (result == REACH_OK)
-    {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
         if (result == REACH_OK)
         {
@@ -196,11 +186,8 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
             dependencies.audio_volume = {};
             dependencies.system_controls = {};
             dependencies.media_controls = {};
-            dependencies.windows_update = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
-            dependencies.settings_window = {};
-            dependencies.settings_renderer = {};
         }
     }
     if (result != REACH_OK)
@@ -256,14 +243,6 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
             dependencies.quick_settings_renderer.ops.destroy(
                 dependencies.quick_settings_renderer.backend);
         }
-        if (dependencies.settings_window.ops.destroy != nullptr)
-        {
-            dependencies.settings_window.ops.destroy(dependencies.settings_window.window);
-        }
-        if (dependencies.settings_renderer.ops.destroy != nullptr)
-        {
-            dependencies.settings_renderer.ops.destroy(dependencies.settings_renderer.backend);
-        }
         if (dependencies.input_source.ops.destroy != nullptr)
         {
             dependencies.input_source.ops.destroy(dependencies.input_source.source);
@@ -291,6 +270,10 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         if (dependencies.app_launcher.ops.destroy != nullptr)
         {
             dependencies.app_launcher.ops.destroy(dependencies.app_launcher.launcher);
+        }
+        if (dependencies.settings_launcher.ops.destroy != nullptr)
+        {
+            dependencies.settings_launcher.ops.destroy(dependencies.settings_launcher.launcher);
         }
         if (dependencies.icon_provider.ops.destroy != nullptr)
         {
@@ -327,10 +310,6 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         if (dependencies.media_controls.destroy != nullptr)
         {
             dependencies.media_controls.destroy(dependencies.media_controls.userdata);
-        }
-        if (dependencies.windows_update.destroy != nullptr)
-        {
-            dependencies.windows_update.destroy(dependencies.windows_update.userdata);
         }
         reach_windows_destroy_explorer_desktop_compat_host();
         delete app;

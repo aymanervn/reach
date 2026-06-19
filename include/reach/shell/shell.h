@@ -16,12 +16,12 @@
 #include "reach/ports/power_session.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
+#include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
-#include "reach/ports/windows_update.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/dock_reveal_edge.h"
 #include "reach/support/util.h"
@@ -53,8 +53,6 @@ extern "C"
         reach_render_backend_port context_menu_renderer;
         reach_platform_window_port quick_settings_window;
         reach_render_backend_port quick_settings_renderer;
-        reach_platform_window_port settings_window;
-        reach_render_backend_port settings_renderer;
         reach_input_source_port input_source;
         reach_monitor_port monitors;
         reach_window_manager_port window_manager;
@@ -62,6 +60,7 @@ extern "C"
         reach_tray_provider_port tray_provider;
         reach_search_provider_port search_provider;
         reach_app_launcher_port app_launcher;
+        reach_settings_launcher_port settings_launcher;
         reach_icon_provider_port icon_provider;
         reach_explorer_service_port explorer_service;
         reach_wallpaper_service_port wallpaper_service;
@@ -71,7 +70,6 @@ extern "C"
         reach_audio_volume_port audio_volume;
         reach_system_controls_port system_controls;
         reach_media_controls_port media_controls;
-        reach_windows_update_port windows_update;
     } reach_shell_dependencies;
 
     reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,

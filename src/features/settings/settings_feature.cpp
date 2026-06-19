@@ -1,6 +1,8 @@
 #include "reach/core/render_commands.h"
 #include "reach/features/settings.h"
 
+#include <string.h>
+
 #include "settings_pages_internal.h"
 
 void reach_settings_model_init(reach_settings_model *model)
@@ -9,11 +11,9 @@ void reach_settings_model_init(reach_settings_model *model)
     {
         return;
     }
-    *model = {};
+    memset(model, 0, sizeof(*model));
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
-    reach_copy_utf16(model->update_status, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
-                     (const uint16_t *)u"No scan has been run yet.");
 }
 
 void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page)
@@ -116,7 +116,7 @@ const uint16_t *reach_settings_page_placeholder(reach_settings_page page)
     case REACH_SETTINGS_PAGE_MONITORS_SCALING:
         return reach_settings_monitors_scaling_page_placeholder();
     case REACH_SETTINGS_PAGE_UPDATE:
-        return reach_settings_update_page_placeholder();
+        return (const uint16_t *)L"";
     default:
         return (const uint16_t *)L"Settings page";
     }
@@ -132,8 +132,28 @@ static reach_rect_f32 reach_settings_rect(float x, float y, float width, float h
     return rect;
 }
 
+static int32_t reach_settings_update_in_select_section(reach_windows_update_state state)
+{
+    return state == REACH_WINDOWS_UPDATE_DISCOVERED || state == REACH_WINDOWS_UPDATE_SELECTED ||
+           state == REACH_WINDOWS_UPDATE_DOWNLOADING || state == REACH_WINDOWS_UPDATE_DOWNLOADED ||
+           state == REACH_WINDOWS_UPDATE_INSTALLING ||
+           state == REACH_WINDOWS_UPDATE_INSTALLED_NO_REBOOT_REQUIRED ||
+           state == REACH_WINDOWS_UPDATE_REBOOT_OBSERVED;
+}
+
+static int32_t reach_settings_update_in_restart_section(reach_windows_update_state state)
+{
+    return state == REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED;
+}
+
+static int32_t reach_settings_update_in_failed_section(reach_windows_update_state state)
+{
+    return state == REACH_WINDOWS_UPDATE_FAILED;
+}
+
 reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
-                                                       const reach_theme *theme, float dpi_scale)
+                                                       const reach_theme *theme, float dpi_scale,
+                                                       reach_settings_model *model)
 {
     (void)theme;
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
@@ -195,33 +215,101 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
 
     float button_y = layout.content_title.y + 54.0f * scale;
     float button_height = 34.0f * scale;
-    float button_width = 154.0f * scale;
-    layout.update_search_button =
-        reach_settings_rect(layout.content_title.x, button_y, button_width, button_height);
+    float button_gap = 10.0f * scale;
+    float refresh_width = 92.0f * scale;
+    float install_width = 154.0f * scale;
+    float restart_width = 122.0f * scale;
+    layout.update_refresh_button =
+        reach_settings_rect(layout.content_title.x, button_y, refresh_width, button_height);
+    layout.update_restart_button =
+        reach_settings_rect(layout.content.x + layout.content.width - 28.0f * scale - restart_width,
+                            button_y, restart_width, button_height);
     layout.update_install_button =
-        reach_settings_rect(layout.content.x + layout.content.width - 28.0f * scale - button_width,
-                            button_y, button_width, button_height);
+        reach_settings_rect(layout.update_restart_button.x - button_gap - install_width, button_y,
+                            install_width, button_height);
 
-    float status_height = 28.0f * scale;
-    layout.update_status = reach_settings_rect(
-        layout.content_title.x, layout.content.y + layout.content.height - 42.0f * scale,
-        layout.content.width - 56.0f * scale, status_height);
-    float row_y = button_y + button_height + 12.0f * scale;
+    float viewport_y = button_y + button_height + 14.0f * scale;
+    float scrollbar_width = 5.0f * scale;
+    float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
+    layout.update_viewport = reach_settings_rect(
+        layout.content_title.x, viewport_y, layout.content.width - 64.0f * scale - scrollbar_width,
+        viewport_bottom - viewport_y);
+    layout.update_scrollbar_track = reach_settings_rect(
+        layout.update_viewport.x + layout.update_viewport.width + 11.0f * scale,
+        layout.update_viewport.y, scrollbar_width, layout.update_viewport.height);
+
     float row_height = 68.0f * scale;
     float row_gap = 7.0f * scale;
-    float row_bottom = layout.update_status.y - 8.0f * scale;
-    while (layout.update_row_count < REACH_WINDOWS_UPDATE_MAX_UPDATES &&
-           row_y + row_height <= row_bottom)
+    float section_title_height = 22.0f * scale;
+    float section_gap = 14.0f * scale;
+    float content_y = 0.0f;
+    typedef int32_t (*section_matcher)(reach_windows_update_state);
+    const section_matcher matchers[3] = {reach_settings_update_in_select_section,
+                                         reach_settings_update_in_restart_section,
+                                         reach_settings_update_in_failed_section};
+    for (size_t section = 0; section < 3; ++section)
     {
-        size_t index = layout.update_row_count++;
-        layout.update_rows[index] = reach_settings_rect(
-            layout.content_title.x, row_y, layout.content.width - 56.0f * scale, row_height);
-        float checkbox_size = 18.0f * scale;
-        layout.update_checkboxes[index] =
-            reach_settings_rect(layout.update_rows[index].x + 12.0f * scale,
-                                layout.update_rows[index].y + (row_height - checkbox_size) * 0.5f,
-                                checkbox_size, checkbox_size);
-        row_y += row_height + row_gap;
+        size_t section_count = 0;
+        if (model != nullptr)
+            for (size_t index = 0; index < model->update_list.count; ++index)
+                if (matchers[section](model->update_list.updates[index].state))
+                    ++section_count;
+        if (section_count == 0)
+            continue;
+
+        if (layout.update_section_count > 0)
+            content_y += section_gap;
+        size_t section_index = layout.update_section_count++;
+        layout.update_section_ids[section_index] = section;
+        layout.update_section_titles[section_index] =
+            reach_settings_rect(layout.update_viewport.x,
+                                layout.update_viewport.y + content_y -
+                                    (model != nullptr ? model->update_scroll_offset : 0.0f),
+                                layout.update_viewport.width, section_title_height);
+        content_y += section_title_height + 5.0f * scale;
+
+        for (size_t update_index = 0; model != nullptr && update_index < model->update_list.count;
+             ++update_index)
+        {
+            if (!matchers[section](model->update_list.updates[update_index].state))
+                continue;
+            size_t row_index = layout.update_row_count++;
+            layout.update_indices[row_index] = update_index;
+            layout.update_rows[row_index] = reach_settings_rect(
+                layout.update_viewport.x,
+                layout.update_viewport.y + content_y - model->update_scroll_offset,
+                layout.update_viewport.width, row_height);
+            float checkbox_size = 18.0f * scale;
+            layout.update_checkboxes[row_index] = reach_settings_rect(
+                layout.update_rows[row_index].x + 12.0f * scale,
+                layout.update_rows[row_index].y + (row_height - checkbox_size) * 0.5f,
+                checkbox_size, checkbox_size);
+            content_y += row_height + row_gap;
+        }
+    }
+    layout.update_content_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
+    float scroll_max = layout.update_content_height > layout.update_viewport.height
+                           ? layout.update_content_height - layout.update_viewport.height
+                           : 0.0f;
+    if (model != nullptr)
+    {
+        model->update_scroll_max = scroll_max;
+        if (model->update_scroll_target > scroll_max)
+            model->update_scroll_target = scroll_max;
+        if (model->update_scroll_offset > scroll_max)
+            model->update_scroll_offset = scroll_max;
+    }
+    if (scroll_max > 0.0f)
+    {
+        float thumb_height = layout.update_scrollbar_track.height * layout.update_viewport.height /
+                             layout.update_content_height;
+        if (thumb_height < 34.0f * scale)
+            thumb_height = 34.0f * scale;
+        float travel = layout.update_scrollbar_track.height - thumb_height;
+        float progress = model != nullptr ? model->update_scroll_offset / scroll_max : 0.0f;
+        layout.update_scrollbar_thumb = reach_settings_rect(
+            layout.update_scrollbar_track.x, layout.update_scrollbar_track.y + travel * progress,
+            layout.update_scrollbar_track.width, thumb_height);
     }
     return layout;
 }
@@ -252,9 +340,9 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         result.type = REACH_SETTINGS_HIT_MINIMIZE;
         return result;
     }
-    if (reach_settings_rect_contains(layout->update_search_button, x, y))
+    if (reach_settings_rect_contains(layout->update_refresh_button, x, y))
     {
-        result.type = REACH_SETTINGS_HIT_UPDATE_SEARCH;
+        result.type = REACH_SETTINGS_HIT_UPDATE_REFRESH;
         return result;
     }
     if (reach_settings_rect_contains(layout->update_install_button, x, y))
@@ -262,23 +350,46 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         result.type = REACH_SETTINGS_HIT_UPDATE_INSTALL;
         return result;
     }
+    if (reach_settings_rect_contains(layout->update_restart_button, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_UPDATE_RESTART;
+        return result;
+    }
+    if (reach_settings_rect_contains(layout->update_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (reach_settings_rect_contains(layout->update_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK;
+        return result;
+    }
     for (size_t index = 0; index < layout->update_row_count; ++index)
     {
+        if (layout->update_rows[index].y < layout->update_viewport.y ||
+            layout->update_rows[index].y + layout->update_rows[index].height >
+                layout->update_viewport.y + layout->update_viewport.height)
+            continue;
         if (reach_settings_rect_contains(layout->update_checkboxes[index], x, y) ||
             reach_settings_rect_contains(layout->update_rows[index], x, y))
         {
             result.type = REACH_SETTINGS_HIT_UPDATE_CHECKBOX;
-            result.update_index = index;
+            result.update_index = layout->update_indices[index];
             return result;
         }
     }
-    for (size_t index = 0; index < layout->nav_item_count && index < REACH_SETTINGS_NAV_ITEM_COUNT;
+    size_t nav_count = 0;
+    const reach_settings_nav_item *items = reach_settings_nav_items(&nav_count);
+
+    for (size_t index = 0; index < layout->nav_item_count &&
+                           index < REACH_SETTINGS_NAV_ITEM_COUNT && index < nav_count;
          ++index)
     {
         if (reach_settings_rect_contains(layout->nav_items[index].bounds, x, y))
         {
             result.type = REACH_SETTINGS_HIT_NAV_ITEM;
-            result.page = (reach_settings_page)index;
+            result.page = items[index].page;
             return result;
         }
     }

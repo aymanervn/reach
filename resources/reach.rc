@@ -1,10 +1,8 @@
 #include <windows.h>
 
 #define IDI_ICON1 101
-#define IDI_SETTINGS_ICON 102
 
 IDI_ICON1 ICON DISCARDABLE "favicon.ico"
-IDI_SETTINGS_ICON ICON DISCARDABLE "settings.ico"
 
 201 RCDATA "power/lock.svg"
 202 RCDATA "power/sleep.svg"
