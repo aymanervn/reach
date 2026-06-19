@@ -156,6 +156,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->app_launcher.ops.destroy(shell->app_launcher.launcher);
     }
+    if (shell->settings_launcher.ops.destroy != nullptr)
+    {
+        shell->settings_launcher.ops.destroy(shell->settings_launcher.launcher);
+    }
     if (shell->icon_provider.ops.destroy != nullptr)
     {
         shell->icon_provider.ops.destroy(shell->icon_provider.provider);
@@ -212,6 +216,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->tray_provider = {};
     shell->search_provider = {};
     shell->app_launcher = {};
+    shell->settings_launcher = {};
     shell->icon_provider = {};
     shell->explorer_service = {};
     shell->wallpaper_service = {};
@@ -331,6 +336,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->tray_provider = dependencies->tray_provider;
     shell->search_provider = dependencies->search_provider;
     shell->app_launcher = dependencies->app_launcher;
+    shell->settings_launcher = dependencies->settings_launcher;
     shell->icon_provider = dependencies->icon_provider;
     shell->explorer_service = dependencies->explorer_service;
     shell->wallpaper_service = dependencies->wallpaper_service;

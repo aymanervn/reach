@@ -73,7 +73,10 @@ extern "C"
         REACH_VECTOR_ICON_PLAY = 30,
         REACH_VECTOR_ICON_PAUSE = 31,
         REACH_VECTOR_ICON_PREVIOUS = 32,
-        REACH_VECTOR_ICON_NEXT = 33
+        REACH_VECTOR_ICON_NEXT = 33,
+        REACH_VECTOR_ICON_MINIMIZE = 34,
+        REACH_VECTOR_ICON_CLOSE = 35,
+        REACH_VECTOR_ICON_RESIZE = 36
     } reach_vector_icon_id;
 
     typedef enum reach_text_weight

@@ -36,6 +36,9 @@ extern "C"
         reach_color music_widget_artist_text;
         float music_widget_artist_text_size;
         float music_widget_text_gap;
+        reach_color settings_selected_nav_background;
+        reach_color settings_text;
+        reach_color settings_secondary_text;
         float dock_corner_radius_ratio;
         reach_color light_text;
         reach_color dark_text;

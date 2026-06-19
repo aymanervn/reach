@@ -179,7 +179,11 @@ static reach_result reach_shell_scroll_launcher_results(reach_shell *shell, int3
 static reach_result reach_shell_handle_pointer_wheel(reach_shell *shell,
                                                      const reach_ui_event *event)
 {
-    if (shell == nullptr || event == nullptr || !shell->has_layout || !shell->ui.launcher.open)
+    if (shell == nullptr || event == nullptr)
+    {
+        return REACH_OK;
+    }
+    if (!shell->has_layout || !shell->ui.launcher.open)
     {
         return REACH_OK;
     }

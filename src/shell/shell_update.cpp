@@ -66,17 +66,6 @@ int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
     return requested;
 }
 
-static float reach_shell_monitor_dpi_scale(const reach_monitor_info *monitor)
-{
-    if (monitor == nullptr)
-    {
-        return 1.0f;
-    }
-
-    int32_t dpi = monitor->dpi_y > 0 ? monitor->dpi_y : monitor->dpi_x;
-    return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
-}
-
 static int32_t reach_shell_switcher_width_animation_active(const reach_shell *shell)
 {
     return shell != nullptr && shell->switcher_state.width_animating &&

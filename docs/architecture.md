@@ -81,6 +81,7 @@ Rules:
 - May depend on shell, ports, features, core, support, platform factory headers,
   and adapters through composition.
 - Owns application startup, composition, and outer process lifecycle.
+- Owns executable-specific runtimes, including the Settings process.
 - May contain deliberate executable-bound platform integration.
 - Must not become a second shell implementation.
 - Must not move feature policy or adapter implementation details into app code.

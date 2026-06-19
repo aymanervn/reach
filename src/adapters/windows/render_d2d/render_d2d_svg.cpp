@@ -75,6 +75,12 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
         return 232;
     case REACH_VECTOR_ICON_NEXT:
         return 233;
+    case REACH_VECTOR_ICON_MINIMIZE:
+        return 234;
+    case REACH_VECTOR_ICON_CLOSE:
+        return 235;
+    case REACH_VECTOR_ICON_RESIZE:
+        return 236;
     default:
         return 0;
     }

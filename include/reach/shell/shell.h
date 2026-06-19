@@ -16,6 +16,7 @@
 #include "reach/ports/power_session.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
+#include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
@@ -59,6 +60,7 @@ extern "C"
         reach_tray_provider_port tray_provider;
         reach_search_provider_port search_provider;
         reach_app_launcher_port app_launcher;
+        reach_settings_launcher_port settings_launcher;
         reach_icon_provider_port icon_provider;
         reach_explorer_service_port explorer_service;
         reach_wallpaper_service_port wallpaper_service;

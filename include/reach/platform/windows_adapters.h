@@ -15,11 +15,13 @@
 #include "reach/ports/power_session.h"
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
+#include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
+#include "reach/ports/windows_update.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -33,11 +35,13 @@ extern "C"
     reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
                                                            reach_render_backend_port *out_port);
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
+    reach_result reach_windows_create_settings_launcher(reach_settings_launcher_port *out_port);
     reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
     reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
     reach_result reach_windows_create_icon_provider(reach_icon_provider_port *out_port);
     reach_result reach_windows_create_input_source(reach_input_source_port *out_port);
     reach_result reach_windows_create_media_controls(reach_media_controls_port *out_port);
+    reach_result reach_windows_create_windows_update(reach_windows_update_port *out_port);
     reach_result reach_windows_create_config_store(const uint16_t *path,
                                                    reach_config_store_port *out_port);
     reach_result reach_windows_create_window_manager(reach_window_manager_port *out_port);
