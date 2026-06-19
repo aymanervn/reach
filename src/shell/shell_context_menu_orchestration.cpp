@@ -8,6 +8,7 @@ void reach_shell_close_context_menu(reach_shell *shell)
     }
     int32_t was_open = shell->context_menu_state.open;
     shell->context_menu_state.open = 0;
+    reach_shell_surface_transition_set(shell, &shell->context_menu_transition, 0);
     shell->context_menu_state.power_open = 0;
     shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
@@ -21,10 +22,6 @@ void reach_shell_close_context_menu(reach_shell *shell)
     {
         (void)shell->context_menu.window.ops.set_pointer_move_enabled(
             shell->context_menu.window.window, 0);
-    }
-    if (shell->context_menu.window.ops.hide != nullptr)
-    {
-        (void)shell->context_menu.window.ops.hide(shell->context_menu.window.window);
     }
     if (was_open)
     {
@@ -308,6 +305,7 @@ reach_result reach_shell_show_power_context_menu(reach_shell *shell)
     shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_state.power_open = 1;
     shell->context_menu_state.open = 1;
+    reach_shell_surface_transition_set(shell, &shell->context_menu_transition, 1);
     shell->context_menu.dirty_flags = 1;
     if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr)
     {
@@ -399,6 +397,7 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_state.power_open = 0;
     shell->context_menu_state.open = 1;
+    reach_shell_surface_transition_set(shell, &shell->context_menu_transition, 1);
     shell->context_menu.dirty_flags = 1;
     if (shell->context_menu.window.ops.set_pointer_move_enabled != nullptr)
     {

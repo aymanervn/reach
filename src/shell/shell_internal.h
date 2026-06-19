@@ -37,10 +37,28 @@ typedef enum reach_shell_animation_id
     REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY,
     REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT,
     REACH_SHELL_ANIMATION_SWITCHER_WIDTH,
+    REACH_SHELL_ANIMATION_LAUNCHER_TRANSITION_Y,
+    REACH_SHELL_ANIMATION_LAUNCHER_TRANSITION_OPACITY,
+    REACH_SHELL_ANIMATION_TRAY_TRANSITION_Y,
+    REACH_SHELL_ANIMATION_TRAY_TRANSITION_OPACITY,
+    REACH_SHELL_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
+    REACH_SHELL_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY,
+    REACH_SHELL_ANIMATION_SWITCHER_TRANSITION_Y,
+    REACH_SHELL_ANIMATION_SWITCHER_TRANSITION_OPACITY,
+    REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
+    REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY,
     REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE,
     REACH_SHELL_ANIMATION_COUNT =
         REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + REACH_MAX_PINNED_APPS
 } reach_shell_animation_id;
+
+typedef struct reach_shell_surface_transition
+{
+    int32_t visible;
+    int32_t target_open;
+    size_t y_track;
+    size_t opacity_track;
+} reach_shell_surface_transition;
 
 static inline size_t reach_shell_dock_item_animation_id(size_t index)
 {
@@ -403,6 +421,11 @@ struct reach_shell
     reach_surface_runtime switcher;
     reach_surface_runtime context_menu;
     reach_surface_runtime quick_settings;
+    reach_shell_surface_transition launcher_transition;
+    reach_shell_surface_transition tray_transition;
+    reach_shell_surface_transition switcher_transition;
+    reach_shell_surface_transition context_menu_transition;
+    reach_shell_surface_transition quick_settings_transition;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
@@ -522,6 +545,23 @@ reach_result reach_shell_apply_window_state(reach_platform_window_port *window,
                                             reach_rect_f32 *last_bounds, float *last_opacity,
                                             int32_t *bounds_valid, int32_t *opacity_valid,
                                             int32_t *out_changed);
+void reach_shell_surface_transition_init(reach_shell *shell,
+                                         reach_shell_surface_transition *transition,
+                                         size_t y_track, size_t opacity_track);
+void reach_shell_surface_transitions_init(reach_shell *shell);
+void reach_shell_surface_transition_set(reach_shell *shell,
+                                        reach_shell_surface_transition *transition, int32_t open);
+reach_rect_f32 reach_shell_surface_transition_bounds(
+    const reach_shell *shell, const reach_shell_surface_transition *transition,
+    reach_rect_f32 target_bounds);
+float reach_shell_surface_transition_opacity(
+    const reach_shell *shell, const reach_shell_surface_transition *transition);
+int32_t reach_shell_surface_transition_visible(
+    const reach_shell_surface_transition *transition);
+int32_t reach_shell_surface_transition_active(
+    const reach_shell *shell, const reach_shell_surface_transition *transition);
+void reach_shell_surface_transition_finish(reach_shell *shell,
+                                           reach_shell_surface_transition *transition);
 
 void reach_shell_request_update(reach_shell *shell);
 void reach_shell_start_music_widget_hide_grace(reach_shell *shell);

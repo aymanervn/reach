@@ -11,23 +11,28 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
                       (float)point.x <= shell->tray.last_bounds.x + shell->tray.last_bounds.width &&
                       (float)point.y >= shell->tray.last_bounds.y &&
                       (float)point.y <= shell->tray.last_bounds.y + shell->tray.last_bounds.height;
+    reach_rect_f32 context_bounds = shell->context_menu.bounds_valid
+                                        ? shell->context_menu.last_bounds
+                                        : shell->context_menu_state.bounds;
     int32_t on_context = shell->context_menu_state.open &&
-                         (float)point.x >= shell->context_menu_state.bounds.x &&
-                         (float)point.x <= shell->context_menu_state.bounds.x +
-                                               shell->context_menu_state.bounds.width &&
-                         (float)point.y >= shell->context_menu_state.bounds.y &&
-                         (float)point.y <= shell->context_menu_state.bounds.y +
-                                               shell->context_menu_state.bounds.height;
+                         (float)point.x >= context_bounds.x &&
+                         (float)point.x <= context_bounds.x + context_bounds.width &&
+                         (float)point.y >= context_bounds.y &&
+                         (float)point.y <= context_bounds.y + context_bounds.height;
+    reach_rect_f32 quick_settings_bounds = shell->quick_settings.bounds_valid
+                                               ? shell->quick_settings.last_bounds
+                                               : shell->quick_settings_bounds;
     int32_t on_quick_settings =
-        shell->quick_settings_open && (float)point.x >= shell->quick_settings_bounds.x &&
-        (float)point.x <= shell->quick_settings_bounds.x + shell->quick_settings_bounds.width &&
-        (float)point.y >= shell->quick_settings_bounds.y &&
-        (float)point.y <= shell->quick_settings_bounds.y + shell->quick_settings_bounds.height;
-    int32_t on_launcher =
-        shell->ui.launcher.open && (float)point.x >= shell->layout.launcher.bounds.x &&
-        (float)point.x <= shell->layout.launcher.bounds.x + shell->layout.launcher.bounds.width &&
-        (float)point.y >= shell->layout.launcher.bounds.y &&
-        (float)point.y <= shell->layout.launcher.bounds.y + shell->layout.launcher.bounds.height;
+        shell->quick_settings_open && (float)point.x >= quick_settings_bounds.x &&
+        (float)point.x <= quick_settings_bounds.x + quick_settings_bounds.width &&
+        (float)point.y >= quick_settings_bounds.y &&
+        (float)point.y <= quick_settings_bounds.y + quick_settings_bounds.height;
+    reach_rect_f32 launcher_bounds =
+        shell->launcher.bounds_valid ? shell->launcher.last_bounds : shell->layout.launcher.bounds;
+    int32_t on_launcher = shell->ui.launcher.open && (float)point.x >= launcher_bounds.x &&
+                          (float)point.x <= launcher_bounds.x + launcher_bounds.width &&
+                          (float)point.y >= launcher_bounds.y &&
+                          (float)point.y <= launcher_bounds.y + launcher_bounds.height;
     reach_point_i32 dock_point =
         shell->has_layout ? reach_shell_dock_local_point(&shell->layout.dock, point.x, point.y)
                           : reach_point_i32{};
