@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <sddl.h>
 #include <taskschd.h>
+#include <shlwapi.h>
 
 #include <vector>
 
@@ -131,54 +132,43 @@ reach_result reach_elevation_helper_current_user_id(wchar_t *user_id, size_t use
     return REACH_OK;
 }
 
-static int32_t reach_elevation_helper_registered_task_valid(IRegisteredTask *task,
-                                                            const wchar_t *helper_path,
-                                                            const wchar_t *user_id)
+static int32_t reach_same_directory(const wchar_t *a, const wchar_t *b)
 {
-    if (task == nullptr || helper_path == nullptr || helper_path[0] == 0 || user_id == nullptr ||
-        user_id[0] == 0)
+    if (a == nullptr || b == nullptr || a[0] == 0 || b[0] == 0)
+    {
+        return 0;
+    }
+
+    wchar_t a_dir[MAX_PATH] = {};
+    wchar_t b_dir[MAX_PATH] = {};
+
+    wcscpy_s(a_dir, MAX_PATH, a);
+    wcscpy_s(b_dir, MAX_PATH, b);
+
+    if (!PathRemoveFileSpecW(a_dir) || !PathRemoveFileSpecW(b_dir))
+    {
+        return 0;
+    }
+
+    return _wcsicmp(a_dir, b_dir) == 0;
+}
+
+static int32_t reach_elevation_helper_registered_task_valid(IRegisteredTask *task,
+                                                            const wchar_t *helper_path)
+{
+    if (task == nullptr || helper_path == nullptr || helper_path[0] == 0)
     {
         return 0;
     }
 
     ITaskDefinition *definition = nullptr;
-    IPrincipal *principal = nullptr;
-    ITriggerCollection *triggers = nullptr;
     IActionCollection *actions = nullptr;
     IAction *action = nullptr;
     IExecAction *exec = nullptr;
     BSTR action_path = nullptr;
-    BSTR principal_user_id = nullptr;
-    TASK_RUNLEVEL_TYPE run_level = TASK_RUNLEVEL_LUA;
-    TASK_LOGON_TYPE logon_type = TASK_LOGON_NONE;
-    LONG trigger_count = 0;
     LONG action_count = 0;
 
     HRESULT hr = task->get_Definition(&definition);
-    if (SUCCEEDED(hr))
-    {
-        hr = definition->get_Principal(&principal);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = principal->get_RunLevel(&run_level);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = principal->get_UserId(&principal_user_id);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = principal->get_LogonType(&logon_type);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = definition->get_Triggers(&triggers);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = triggers->get_Count(&trigger_count);
-    }
     if (SUCCEEDED(hr))
     {
         hr = definition->get_Actions(&actions);
@@ -187,7 +177,7 @@ static int32_t reach_elevation_helper_registered_task_valid(IRegisteredTask *tas
     {
         hr = actions->get_Count(&action_count);
     }
-    if (SUCCEEDED(hr) && action_count == 1)
+    if (SUCCEEDED(hr) && action_count >= 1)
     {
         hr = actions->get_Item(1, &action);
     }
@@ -204,13 +194,10 @@ static int32_t reach_elevation_helper_registered_task_valid(IRegisteredTask *tas
         hr = exec->get_Path(&action_path);
     }
 
-    int32_t valid = SUCCEEDED(hr) && trigger_count == 0 && run_level == TASK_RUNLEVEL_HIGHEST &&
-                    logon_type == TASK_LOGON_INTERACTIVE_TOKEN && principal_user_id != nullptr &&
-                    _wcsicmp(principal_user_id, user_id) == 0 && action_path != nullptr &&
-                    _wcsicmp(action_path, helper_path) == 0;
+    int32_t valid =
+        SUCCEEDED(hr) && action_path != nullptr && reach_same_directory(action_path, helper_path);
 
     SysFreeString(action_path);
-    SysFreeString(principal_user_id);
     if (exec != nullptr)
     {
         exec->Release();
@@ -223,18 +210,11 @@ static int32_t reach_elevation_helper_registered_task_valid(IRegisteredTask *tas
     {
         actions->Release();
     }
-    if (triggers != nullptr)
-    {
-        triggers->Release();
-    }
-    if (principal != nullptr)
-    {
-        principal->Release();
-    }
     if (definition != nullptr)
     {
         definition->Release();
     }
+
     return valid;
 }
 
@@ -323,7 +303,7 @@ reach_result reach_elevation_helper_task_register(const wchar_t *helper_path,
     }
     if (SUCCEEDED(hr))
     {
-        hr = settings->put_MultipleInstances(TASK_INSTANCES_IGNORE_NEW);
+        hr = settings->put_MultipleInstances(TASK_INSTANCES_STOP_EXISTING);
     }
     if (SUCCEEDED(hr))
     {
@@ -360,7 +340,20 @@ reach_result reach_elevation_helper_task_register(const wchar_t *helper_path,
         else
         {
             hr = exec->put_Path(path);
-            SysFreeString(path);
+            wchar_t working_directory[MAX_PATH] = {};
+            wcscpy_s(working_directory, helper_path);
+            PathRemoveFileSpecW(working_directory);
+
+            BSTR workdir = SysAllocString(working_directory);
+            if (workdir == nullptr)
+            {
+                hr = E_OUTOFMEMORY;
+            }
+            else
+            {
+                hr = exec->put_WorkingDirectory(workdir);
+                SysFreeString(workdir);
+            }
         }
     }
     if (SUCCEEDED(hr))
@@ -466,10 +459,8 @@ int32_t reach_elevation_helper_task_valid(const wchar_t *helper_path)
     IRegisteredTask *task = nullptr;
     HRESULT hr = task_name != nullptr ? session.root->GetTask(task_name, &task) : E_OUTOFMEMORY;
     SysFreeString(task_name);
-    wchar_t user_id[192] = {};
-    int32_t valid = SUCCEEDED(hr) &&
-                    reach_elevation_helper_current_user_id(user_id, 192) == REACH_OK &&
-                    reach_elevation_helper_registered_task_valid(task, helper_path, user_id);
+    int32_t valid =
+        SUCCEEDED(hr) && reach_elevation_helper_registered_task_valid(task, helper_path);
     if (task != nullptr)
     {
         task->Release();
