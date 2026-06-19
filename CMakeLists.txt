@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 0.6.1  LANGUAGES C CXX)
+project(reach VERSION 0.7.0  LANGUAGES C CXX)
 
-enable_testing()
-set(REACH_CTEST_DEFAULT_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/CTestDefaultConfig.cmake)
-file(WRITE ${REACH_CTEST_DEFAULT_CONFIG} "if(NOT CTEST_CONFIGURATION_TYPE)\n    set(CTEST_CONFIGURATION_TYPE Debug)\nendif()\n")
-set_property(DIRECTORY PROPERTY TEST_INCLUDE_FILE ${REACH_CTEST_DEFAULT_CONFIG})
+option(REACH_BUILD_TESTS "Build Reach test executables and register CTest tests" ON)
+option(REACH_RUN_ARCHITECTURE_CHECK "Run architecture boundary checks as part of the default build" ON)
+
+if(REACH_BUILD_TESTS)
+    enable_testing()
+endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
@@ -424,62 +426,53 @@ target_link_libraries(reach_update_helper PRIVATE
 )
 
 set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
-set(REACH_DIST_DIR "${REACH_DIST_ROOT}/Release")
-set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-alpha.zip")
+set(REACH_DIST_DIR "${REACH_DIST_ROOT}/$<CONFIG>")
+set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-alpha-$<CONFIG>.zip")
+
+set(REACH_RELEASE_TARGETS
+    reach
+    reach_settings
+    reachctl
+    reach-watchdog
+    reach_elevation_helper
+    reach_update_helper
+)
 
 add_custom_target(reach_release_zip
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${REACH_DIST_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${REACH_DIST_DIR}"
 
+    # Preserve the executable names produced by each target. This avoids
+    # release bundles silently drifting away from target OUTPUT_NAME settings.
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reach>"
-        "${REACH_DIST_DIR}/reach.exe"
-
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reach_settings>"
-        "${REACH_DIST_DIR}/reach-settings.exe"
-
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reachctl>"
-        "${REACH_DIST_DIR}/reachctl.exe"
-
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reach-watchdog>"
-        "${REACH_DIST_DIR}/reach-watchdog.exe"
-
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reach_elevation_helper>"
-        "${REACH_DIST_DIR}/reach_elevation_helper.exe"
-
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reach_update_helper>"
-        "${REACH_DIST_DIR}/reach_update_helper.exe"
-
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${EVERYTHING_DLL}"
-        "${REACH_DIST_DIR}/Everything64.dll"
-
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${REACH_RELEASE_IMAGE}"
-        "${REACH_DIST_DIR}/reach.jpg"
+        "${REACH_DIST_DIR}"
 
     COMMAND ${CMAKE_COMMAND} -E chdir "${REACH_DIST_DIR}"
         ${CMAKE_COMMAND} -E tar "cfv" "${REACH_ZIP_PATH}" --format=zip
-        reach.exe
-        reach-settings.exe
-        reachctl.exe
-        reach-watchdog.exe
-        reach_elevation_helper.exe
-        reach_update_helper.exe
-        Everything64.dll
-        reach.jpg
+        "$<TARGET_FILE_NAME:reach>"
+        "$<TARGET_FILE_NAME:reach_settings>"
+        "$<TARGET_FILE_NAME:reachctl>"
+        "$<TARGET_FILE_NAME:reach-watchdog>"
+        "$<TARGET_FILE_NAME:reach_elevation_helper>"
+        "$<TARGET_FILE_NAME:reach_update_helper>"
+        "Everything64.dll"
+        "reach.jpg"
 
-    DEPENDS reach reach_settings reachctl reach-watchdog reach_elevation_helper reach_update_helper
-
+    DEPENDS ${REACH_RELEASE_TARGETS}
+    BYPRODUCTS "${REACH_ZIP_PATH}"
     COMMENT "Creating Reach Release ZIP"
+    VERBATIM
 )
 
-add_executable(reach_tray_probe
+add_executable(reach_tray_probe EXCLUDE_FROM_ALL
     src/tools/tray_probe.cpp
 )
 
@@ -493,6 +486,7 @@ target_link_libraries(reach_tray_probe PRIVATE
     user32
 )
 
+if(REACH_BUILD_TESTS)
 add_executable(reach_core_tests
     tests/core_ui_tests.c
 )
@@ -586,16 +580,6 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     cxx_std_17
 )
 
-if(CMAKE_CONFIGURATION_TYPES)
-    add_test(NAME reach_core_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_core_tests.exe)
-    add_test(NAME reach_dock_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_dock_feature_tests.exe)
-    add_test(NAME reach_pin_config_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_pin_config_tests.exe)
-    add_test(NAME reach_quick_settings_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_quick_settings_feature_tests.exe)
-    add_test(NAME reach_windows_update_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_windows_update_feature_tests.exe)
-    add_test(NAME reach_launcher_feature_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_launcher_feature_tests.exe)
-    add_test(NAME reach_search_ranking_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_search_ranking_tests.exe)
-    add_test(NAME reach_system_controls_network_tests COMMAND ${CMAKE_BINARY_DIR}/Debug/reach_system_controls_network_tests.exe)
-else()
     add_test(NAME reach_core_tests COMMAND reach_core_tests)
     add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
@@ -606,8 +590,18 @@ else()
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
 endif()
 
-add_custom_target(check_architecture ALL
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Checking Reach architecture boundaries"
-)
+if(REACH_RUN_ARCHITECTURE_CHECK)
+    add_custom_target(check_architecture ALL
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Checking Reach architecture boundaries"
+        VERBATIM
+    )
+else()
+    add_custom_target(check_architecture
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_architecture.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Checking Reach architecture boundaries"
+        VERBATIM
+    )
+endif()
