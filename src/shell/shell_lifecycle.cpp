@@ -309,7 +309,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->music_widget_layout = {};
     shell->pressed_music_widget_action = REACH_MUSIC_WIDGET_ACTION_NONE;
     shell->music_widget_refresh_requested = 1;
-    shell->music_widget_bg_animation = {};
+    shell->music_widget_background = {};
     shell->launcher_search.notify = reach_shell_notify_launcher_search_ready;
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
     shell->quick_settings_system_refresh.notify = reach_shell_request_update;
