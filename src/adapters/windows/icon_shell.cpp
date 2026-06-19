@@ -9,6 +9,8 @@
 #include <shlwapi.h>
 #include <shobjidl.h>
 
+#include <climits>
+#include <cstdlib>
 #include <mutex>
 #include <new>
 
@@ -56,6 +58,42 @@ static int32_t reach_icon_resolve_search_path(const wchar_t *path, wchar_t *reso
 
     DWORD length = SearchPathW(nullptr, path, nullptr, resolved_count, resolved, nullptr);
     return length > 0 && length < resolved_count;
+}
+
+static int32_t reach_icon_split_resource_ref(const wchar_t *path, wchar_t *out_path,
+                                             DWORD out_path_count, int *out_icon_index)
+{
+    if (path == nullptr || out_path == nullptr || out_path_count == 0 || out_icon_index == nullptr)
+    {
+        return 0;
+    }
+
+    *out_icon_index = 0;
+    out_path[0] = 0;
+
+    const wchar_t *comma = wcsrchr(path, L',');
+    if (comma == nullptr || comma == path || comma[1] == 0)
+    {
+        return 0;
+    }
+
+    wchar_t *end = nullptr;
+    long icon_index = wcstol(comma + 1, &end, 10);
+    if (end == comma + 1 || *end != 0 || icon_index < INT_MIN || icon_index > INT_MAX)
+    {
+        return 0;
+    }
+
+    size_t path_count = (size_t)(comma - path);
+    if (path_count == 0 || path_count >= out_path_count)
+    {
+        return 0;
+    }
+
+    wmemcpy(out_path, path, path_count);
+    out_path[path_count] = 0;
+    *out_icon_index = (int)icon_index;
+    return 1;
 }
 
 static int32_t reach_icon_resolve_shortcut(const wchar_t *path, wchar_t *resolved,
@@ -186,7 +224,7 @@ static HICON reach_icon_from_system_image_list(const wchar_t *path, int32_t size
     return reach_icon_from_system_image_list_size(path, SHIL_EXTRALARGE);
 }
 
-static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px)
+static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px, int icon_index)
 {
     if (path == nullptr || path[0] == 0)
     {
@@ -206,8 +244,8 @@ static HICON reach_icon_from_extract_icon(const wchar_t *path, int32_t size_px)
     HICON icon = nullptr;
     UINT icon_id = 0;
 
-    UINT count =
-        PrivateExtractIconsW(path, 0, requested_size, requested_size, &icon, &icon_id, 1, 0);
+    UINT count = PrivateExtractIconsW(path, icon_index, requested_size, requested_size, &icon,
+                                      &icon_id, 1, 0);
 
     return count > 0 && icon != nullptr ? icon : nullptr;
 }
@@ -227,10 +265,18 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
     std::lock_guard<std::mutex> lock(provider->mutex);
 
     const wchar_t *requested_path = reinterpret_cast<const wchar_t *>(request->path);
+    wchar_t resource_ref_path[260] = {};
     wchar_t resolved[260] = {};
     wchar_t shortcut_target[260] = {};
     const wchar_t *icon_path = requested_path;
-    if (reach_icon_resolve_shortcut(requested_path, shortcut_target, 260))
+    int icon_index = 0;
+    int32_t resource_ref =
+        reach_icon_split_resource_ref(requested_path, resource_ref_path, 260, &icon_index);
+    if (resource_ref)
+    {
+        icon_path = resource_ref_path;
+    }
+    else if (reach_icon_resolve_shortcut(requested_path, shortcut_target, 260))
     {
         icon_path = shortcut_target;
     }
@@ -250,7 +296,7 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
     int32_t is_exe = lstrcmpiW(extension, L".exe") == 0;
     if (is_exe)
     {
-        hicon = reach_icon_from_extract_icon(icon_path, request->size_px);
+        hicon = reach_icon_from_extract_icon(icon_path, request->size_px, icon_index);
         icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
 
@@ -276,7 +322,7 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
     }
     if (icon_id == 0 && !is_exe)
     {
-        hicon = reach_icon_from_extract_icon(icon_path, request->size_px);
+        hicon = reach_icon_from_extract_icon(icon_path, request->size_px, icon_index);
         icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
     if (icon_id == 0 && icon_path != requested_path)

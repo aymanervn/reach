@@ -247,6 +247,15 @@ enum reach_shell_window_control_action
     REACH_SHELL_WINDOW_CONTROL_CLOSE,
 };
 
+typedef struct reach_shell_dock_item_menu_capabilities
+{
+    int32_t open_new;
+    int32_t open_as_admin;
+    int32_t pin;
+    int32_t unpin;
+    int32_t close;
+} reach_shell_dock_item_menu_capabilities;
+
 typedef struct reach_shell_config_reload_state
 {
     std::thread thread;
@@ -403,6 +412,7 @@ struct reach_shell
     reach_tray_provider_port tray_provider;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
+    reach_settings_launcher_port settings_launcher;
     reach_icon_provider_port icon_provider;
     reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
@@ -494,6 +504,17 @@ static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 3;
 static inline float reach_shell_layout_dpi_scale(const reach_shell *shell)
 {
     return shell != nullptr && shell->layout_dpi_scale > 0.0f ? shell->layout_dpi_scale : 1.0f;
+}
+
+static inline float reach_shell_monitor_dpi_scale(const reach_monitor_info *monitor)
+{
+    if (monitor == nullptr)
+    {
+        return 1.0f;
+    }
+
+    int32_t dpi = monitor->dpi_y > 0 ? monitor->dpi_y : monitor->dpi_x;
+    return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
 }
 
 /* Generic shell/window helpers */
@@ -595,7 +616,7 @@ void reach_shell_stop_open_window_icon_worker(reach_shell *shell);
 void reach_shell_apply_open_window_icon_results(reach_shell *shell);
 int32_t reach_shell_open_window_icon_work_pending(const reach_shell *shell);
 void reach_shell_sync_open_window_icons(reach_shell *shell, const uintptr_t *old_windows,
-                                        const uint16_t old_paths[][260],
+                                        const uint16_t old_icon_refs[][260],
                                         const reach_icon_handle *old_icons,
                                         const uint16_t *old_initials, size_t old_count);
 void reach_shell_load_open_window_icons(reach_shell *shell);
@@ -604,6 +625,9 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
 void reach_shell_note_foreground_window(reach_shell *shell, uintptr_t foreground_window);
 
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
+void reach_shell_dock_item_menu_capabilities_for_index(
+    const reach_shell *shell, size_t item_index,
+    reach_shell_dock_item_menu_capabilities *out_capabilities);
 reach_result reach_shell_execute_window_control(reach_shell *shell,
                                                 reach_shell_window_control_action action,
                                                 uintptr_t window_id);

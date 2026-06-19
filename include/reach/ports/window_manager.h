@@ -20,6 +20,7 @@ extern "C"
         reach_window_id id;
         uint16_t title[260];
         uint16_t path[260];
+        uint16_t icon_ref[260];
         uint16_t app_user_model_id[260];
         int32_t visible;
         int32_t maximized;

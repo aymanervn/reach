@@ -59,6 +59,11 @@ static reach_context_menu_item_style reach_context_menu_style_for_command(uint32
         g = 202;
         b = 92;
         break;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS:
+        r = 80;
+        g = 158;
+        b = 255;
+        break;
     default:
         power_color = 0;
         break;

@@ -260,15 +260,18 @@ void reach_shell_stop_open_window_icon_worker(reach_shell *shell)
 static void reach_shell_schedule_open_window_icon_load(reach_shell *shell, size_t index)
 {
     if (shell == nullptr || index >= shell->open_window_count || index >= REACH_MAX_PINNED_APPS ||
-        shell->open_windows[index].path[0] == 0)
+        (shell->open_windows[index].path[0] == 0 && shell->open_windows[index].icon_ref[0] == 0))
     {
         return;
     }
 
+    const uint16_t *icon_path = shell->open_windows[index].icon_ref[0] != 0
+                                    ? shell->open_windows[index].icon_ref
+                                    : shell->open_windows[index].path;
+
     if (reach_shell_start_open_window_icon_worker(shell) != REACH_OK)
     {
-        (void)reach_shell_load_icon_handle(shell, shell->open_windows[index].path,
-                                           reach_shell_dock_icon_size_px(shell),
+        (void)reach_shell_load_icon_handle(shell, icon_path, reach_shell_dock_icon_size_px(shell),
                                            &shell->dock_icons.open_window_icons[index]);
         return;
     }
@@ -278,7 +281,7 @@ static void reach_shell_schedule_open_window_icon_load(reach_shell *shell, size_
     job.window = shell->open_windows[index].id;
     job.initial = shell->dock_icons.open_window_initials[index];
     job.size_px = reach_shell_dock_icon_size_px(shell);
-    reach_copy_utf16(job.path, 260, shell->open_windows[index].path);
+    reach_copy_utf16(job.path, 260, icon_path);
 
     {
         std::lock_guard<std::mutex> lock(shell->open_window_icons.mutex);
@@ -434,10 +437,12 @@ reach_shell_open_window_icon_result_matches(const reach_window_snapshot *window,
         return 0;
     }
 
+    const uint16_t *icon_path = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
+
     size_t index = 0;
-    while (window->path[index] != 0 || result->path[index] != 0)
+    while (icon_path[index] != 0 || result->path[index] != 0)
     {
-        if (window->path[index] != result->path[index])
+        if (icon_path[index] != result->path[index])
         {
             return 0;
         }
@@ -581,9 +586,10 @@ static void reach_shell_load_open_window_icon(reach_shell *shell, size_t index)
 }
 
 static int32_t reach_shell_open_window_icon_match(const reach_window_snapshot *window,
-                                                  uintptr_t old_window, const uint16_t *old_path)
+                                                  uintptr_t old_window,
+                                                  const uint16_t *old_icon_ref)
 {
-    if (window == nullptr || old_window == 0 || old_path == nullptr)
+    if (window == nullptr || old_window == 0 || old_icon_ref == nullptr)
     {
         return 0;
     }
@@ -593,10 +599,12 @@ static int32_t reach_shell_open_window_icon_match(const reach_window_snapshot *w
         return 0;
     }
 
+    const uint16_t *icon_ref = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
+
     size_t index = 0;
-    while (window->path[index] != 0 || old_path[index] != 0)
+    while (icon_ref[index] != 0 || old_icon_ref[index] != 0)
     {
-        if (window->path[index] != old_path[index])
+        if (icon_ref[index] != old_icon_ref[index])
         {
             return 0;
         }
@@ -607,7 +615,7 @@ static int32_t reach_shell_open_window_icon_match(const reach_window_snapshot *w
 }
 
 void reach_shell_sync_open_window_icons(reach_shell *shell, const uintptr_t *old_windows,
-                                        const uint16_t old_paths[][260],
+                                        const uint16_t old_icon_refs[][260],
                                         const reach_icon_handle *old_icons,
                                         const uint16_t *old_initials, size_t old_count)
 {
@@ -644,7 +652,8 @@ void reach_shell_sync_open_window_icons(reach_shell *shell, const uintptr_t *old
                 continue;
             }
             if (!reach_shell_open_window_icon_match(&shell->open_windows[new_index],
-                                                    old_windows[old_index], old_paths[old_index]))
+                                                    old_windows[old_index],
+                                                    old_icon_refs[old_index]))
             {
                 continue;
             }

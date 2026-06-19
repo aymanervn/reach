@@ -1,5 +1,7 @@
 #include <windows.h>
 
+#define IDI_ICON1 101
+
 IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 
 201 RCDATA "power/lock.svg"
@@ -34,6 +36,9 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 231 RCDATA "music_player/pause.svg"
 232 RCDATA "music_player/previous.svg"
 233 RCDATA "music_player/next.svg"
+234 RCDATA "extra/minimize.svg"
+235 RCDATA "extra/close.svg"
+236 RCDATA "extra/resize.svg"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0

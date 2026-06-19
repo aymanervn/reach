@@ -53,6 +53,65 @@ static reach_result reach_shell_launch_context_menu_item(reach_shell *shell, con
     return shell->app_launcher.ops.launch(shell->app_launcher.launcher, &request);
 }
 
+static int32_t reach_shell_dock_item_menu_command_allowed(
+    const reach_shell_dock_item_menu_capabilities *capabilities, uint32_t command)
+{
+    if (capabilities == nullptr)
+    {
+        return 0;
+    }
+
+    switch (command)
+    {
+    case REACH_CONTEXT_MENU_COMMAND_OPEN_NEW:
+        return capabilities->open_new;
+    case REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN:
+        return capabilities->open_as_admin;
+    case REACH_CONTEXT_MENU_COMMAND_UNPIN:
+        return capabilities->unpin;
+    case REACH_CONTEXT_MENU_COMMAND_PIN:
+        return capabilities->pin;
+    case REACH_CONTEXT_MENU_COMMAND_CLOSE:
+        return capabilities->close;
+    default:
+        return 0;
+    }
+}
+
+static void reach_shell_build_dock_item_context_commands(
+    const reach_shell_dock_item_menu_capabilities *capabilities, uint32_t *out_commands,
+    size_t *out_count)
+{
+    size_t count = 0;
+    if (capabilities != nullptr && out_commands != nullptr)
+    {
+        if (capabilities->open_new && count < REACH_CONTEXT_MENU_MAX_ITEMS)
+        {
+            out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_OPEN_NEW;
+        }
+        if (capabilities->open_as_admin && count < REACH_CONTEXT_MENU_MAX_ITEMS)
+        {
+            out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN;
+        }
+        if (capabilities->unpin && count < REACH_CONTEXT_MENU_MAX_ITEMS)
+        {
+            out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_UNPIN;
+        }
+        if (capabilities->pin && count < REACH_CONTEXT_MENU_MAX_ITEMS)
+        {
+            out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_PIN;
+        }
+        if (capabilities->close && count < REACH_CONTEXT_MENU_MAX_ITEMS)
+        {
+            out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_CLOSE;
+        }
+    }
+    if (out_count != nullptr)
+    {
+        *out_count = count;
+    }
+}
+
 reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t command)
 {
     if (shell == nullptr)
@@ -95,6 +154,13 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
                    ? shell->power_session.ops.sign_out(shell->power_session.session)
                    : REACH_ERROR;
     }
+    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS)
+    {
+        reach_shell_close_context_menu(shell);
+        return shell->settings_launcher.ops.open != nullptr
+                   ? shell->settings_launcher.ops.open(shell->settings_launcher.launcher)
+                   : REACH_ERROR;
+    }
 
     if (shell->context_menu_state.target_index >= shell->dock_model.item_count)
     {
@@ -111,7 +177,14 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
     uint32_t pin_id =
         pinned_index < shell->ui.pinned_app_count ? shell->ui.pinned_apps[pinned_index].id : 0;
     uintptr_t window_id = shell->dock_model.items[item_index].window;
+    reach_shell_dock_item_menu_capabilities capabilities = {};
+    reach_shell_dock_item_menu_capabilities_for_index(shell, item_index, &capabilities);
     reach_shell_close_context_menu(shell);
+
+    if (!reach_shell_dock_item_menu_command_allowed(&capabilities, command))
+    {
+        return REACH_OK;
+    }
 
     if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_NEW)
     {
@@ -146,7 +219,8 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
                     (void)reach_copy_utf16(app.title, 128, window->title);
                 }
                 (void)reach_copy_utf16(app.path, 260, window->path);
-                (void)reach_copy_utf16(app.icon_ref, 260, window->path);
+                (void)reach_copy_utf16(app.icon_ref, 260,
+                                       window->icon_ref[0] != 0 ? window->icon_ref : window->path);
                 (void)reach_copy_utf16(app.app_user_model_id, 260, window->app_user_model_id);
             }
         }
@@ -256,11 +330,11 @@ reach_result reach_shell_show_dock_app_context_menu(reach_shell *shell, size_t i
     reach_shell_set_quick_settings_open(shell, 0);
     reach_shell_set_tray_popup_open(shell, 0);
 
-    reach_context_menu_build_dock_item_commands(
-        shell->dock_model.items[item_index].pinned,
-        reach_shell_dock_item_path(shell, item_index) != nullptr,
-        shell->dock_model.items[item_index].window != 0, shell->context_menu_state.item_commands,
-        &shell->context_menu_state.item_count);
+    reach_shell_dock_item_menu_capabilities capabilities = {};
+    reach_shell_dock_item_menu_capabilities_for_index(shell, item_index, &capabilities);
+    reach_shell_build_dock_item_context_commands(&capabilities,
+                                                 shell->context_menu_state.item_commands,
+                                                 &shell->context_menu_state.item_count);
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
     {
         shell->context_menu_state.item_icon_ids[index] = 0;

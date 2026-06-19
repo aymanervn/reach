@@ -87,6 +87,7 @@ EXACT_TARGET_LAYERS = {
     "reach_shell": "shell",
     "reach_windows_adapters": "adapters",
     "reach": "app",
+    "reach_settings": "app",
     "reachctl": "tools",
     "reach_elevation_helper": "tools",
     "reach_tray_probe": "tools",

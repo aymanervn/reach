@@ -5,6 +5,7 @@
 
 #include "reach/core/geometry.h"
 #include "reach/core/ui_events.h"
+#include "reach/core/window_id.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -19,7 +20,8 @@ extern "C"
         REACH_SURFACE_TRAY_MENU = 2,
         REACH_SURFACE_SWITCHER = 3,
         REACH_SURFACE_CONTEXT_MENU = 4,
-        REACH_SURFACE_QUICK_SETTINGS = 5
+        REACH_SURFACE_QUICK_SETTINGS = 5,
+        REACH_SURFACE_SETTINGS = 6
     } reach_surface_role;
 
     typedef struct reach_platform_window reach_platform_window;
@@ -30,6 +32,7 @@ extern "C"
         reach_result (*show)(reach_platform_window *window);
         reach_result (*hide)(reach_platform_window *window);
         reach_result (*set_bounds)(reach_platform_window *window, reach_rect_f32 bounds);
+        reach_result (*get_bounds)(const reach_platform_window *window, reach_rect_f32 *out_bounds);
         reach_result (*set_opacity)(reach_platform_window *window, float opacity);
         reach_result (*set_blur_enabled)(reach_platform_window *window, int32_t enabled);
         reach_result (*apply_rounded_corners)(reach_platform_window *window, float radius);
@@ -42,6 +45,9 @@ extern "C"
         reach_result (*set_pointer_capture)(reach_platform_window *window, int32_t enabled);
         reach_result (*set_topmost)(reach_platform_window *window, int32_t enabled);
         reach_result (*raise)(reach_platform_window *window);
+        reach_result (*minimize)(reach_platform_window *window);
+        int32_t (*is_minimized)(const reach_platform_window *window);
+        reach_window_id (*native_id)(const reach_platform_window *window);
         reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);
         void (*destroy)(reach_platform_window *window);
     } reach_platform_window_ops;
