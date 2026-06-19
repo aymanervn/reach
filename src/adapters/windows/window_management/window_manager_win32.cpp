@@ -20,10 +20,12 @@ struct reach_window_manager
     LONG helper_prompt_active;
     LONG helper_start_active;
     DWORD helper_retry_suppressed_until;
+    HANDLE helper_connected_event;
 };
 
 static const DWORD REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS = 10000;
 static const DWORD REACH_HELPER_RESTART_FAILED_COOLDOWN_MS = 5000;
+static const DWORD REACH_HELPER_START_TIMEOUT_MS = 10000;
 static void
 reach_window_manager_icon_ref_for_helper(const reach_elevation_helper_window_snapshot &helper,
                                          uint16_t *out_icon_ref, size_t out_icon_ref_count)
@@ -250,19 +252,19 @@ static reach_result reach_window_manager_start_privileged_control(reach_window_m
                                                    REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
         return REACH_ERROR;
     }
+
+    HANDLE waits[2] = {manager->helper_connected_event, execute.hProcess};
+    DWORD wait_count = execute.hProcess != nullptr ? 2u : 1u;
+    DWORD wait = WaitForMultipleObjects(wait_count, waits, FALSE, REACH_HELPER_START_TIMEOUT_MS);
     if (execute.hProcess != nullptr)
     {
         CloseHandle(execute.hProcess);
     }
 
-    for (int attempt = 0; attempt < 40; ++attempt)
+    if (wait == WAIT_OBJECT_0 && reach_window_manager_privileged_control_available(manager))
     {
-        if (reach_elevation_helper_shared_reader_connected())
-        {
-            InterlockedExchange(&manager->helper_start_active, 0);
-            return REACH_OK;
-        }
-        Sleep(50);
+        InterlockedExchange(&manager->helper_start_active, 0);
+        return REACH_OK;
     }
 
     InterlockedExchange(&manager->helper_start_active, 0);
@@ -325,6 +327,7 @@ static void reach_window_manager_shared_callback(void *user,
 
     if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_CONNECTED)
     {
+        SetEvent(manager->helper_connected_event);
         reach_window_manager_copy_shared_windows(manager);
         reach_window_manager_copy_shared_game_mode(manager);
         return;
@@ -344,6 +347,7 @@ static void reach_window_manager_shared_callback(void *user,
 
     if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_DISCONNECTED)
     {
+        ResetEvent(manager->helper_connected_event);
         reach_window_manager_lock(manager);
         manager->helper_windows.clear();
         manager->game_mode_active = 0;
@@ -362,6 +366,10 @@ static reach_result reach_window_manager_start(reach_window_manager *manager)
     manager->dirty = 1;
     (void)reach_elevation_helper_shared_reader_subscribe(reach_window_manager_shared_callback,
                                                          manager);
+    if (reach_elevation_helper_shared_reader_connected())
+    {
+        SetEvent(manager->helper_connected_event);
+    }
     reach_window_manager_copy_shared_windows(manager);
     reach_window_manager_copy_shared_game_mode(manager);
     (void)reach_window_manager_start_privileged_control(manager);
@@ -576,6 +584,11 @@ static void reach_window_manager_destroy(reach_window_manager *manager)
             DeleteCriticalSection(&manager->lock);
             manager->lock_initialized = 0;
         }
+        if (manager->helper_connected_event != nullptr)
+        {
+            CloseHandle(manager->helper_connected_event);
+            manager->helper_connected_event = nullptr;
+        }
     }
     delete manager;
 }
@@ -596,6 +609,13 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
 
     InitializeCriticalSection(&manager->lock);
     manager->lock_initialized = 1;
+    manager->helper_connected_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (manager->helper_connected_event == nullptr)
+    {
+        DeleteCriticalSection(&manager->lock);
+        delete manager;
+        return REACH_ERROR;
+    }
     manager->dirty = 1;
     out_port->manager = manager;
     out_port->ops.start = reach_window_manager_start;
