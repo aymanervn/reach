@@ -8,6 +8,7 @@
 #include <shlwapi.h>
 
 #include <new>
+#include <thread>
 #include <vector>
 
 struct reach_window_manager
@@ -21,6 +22,7 @@ struct reach_window_manager
     LONG helper_start_active;
     DWORD helper_retry_suppressed_until;
     HANDLE helper_connected_event;
+    std::thread helper_start_thread;
 };
 
 static const DWORD REACH_HELPER_RESTART_DECLINED_COOLDOWN_MS = 10000;
@@ -372,7 +374,16 @@ static reach_result reach_window_manager_start(reach_window_manager *manager)
     }
     reach_window_manager_copy_shared_windows(manager);
     reach_window_manager_copy_shared_game_mode(manager);
-    (void)reach_window_manager_start_privileged_control(manager);
+    try
+    {
+        manager->helper_start_thread = std::thread(
+            [manager]() { (void)reach_window_manager_start_privileged_control(manager); });
+    }
+    catch (...)
+    {
+        reach_window_manager_suppress_helper_retry(manager,
+                                                   REACH_HELPER_RESTART_FAILED_COOLDOWN_MS);
+    }
     return REACH_OK;
 }
 
@@ -381,6 +392,11 @@ static reach_result reach_window_manager_stop(reach_window_manager *manager)
     if (manager == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if (manager->helper_start_thread.joinable())
+    {
+        manager->helper_start_thread.join();
     }
 
     reach_window_manager_lock(manager);
