@@ -45,7 +45,6 @@ extern "C"
                                            const reach_window_snapshot *snapshot,
                                            reach_pinned_app_model *out_app);
         int32_t (*privileged_control_available)(const reach_window_manager *manager);
-        int32_t (*confirm_privileged_control_restart)(reach_window_manager *manager);
         reach_result (*start_privileged_control)(reach_window_manager *manager);
         reach_result (*activate)(reach_window_manager *manager, reach_window_id window_id);
         reach_result (*minimize)(reach_window_manager *manager, reach_window_id window_id);

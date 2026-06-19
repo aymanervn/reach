@@ -394,12 +394,6 @@ reach_result reachctl_start_reach_session(const uint16_t *reach_exe)
 {
     (void)reach_exe;
 
-    reach_result helper_result = reachctl_start_elevation_helper();
-    if (helper_result != REACH_OK)
-    {
-        return helper_result;
-    }
-
     reach_result kill_reach_result = reachctl_terminate_processes_by_name(L"reach.exe");
 
     reach_result kill_explorer_result = reachctl_terminate_processes_by_name(L"explorer.exe");

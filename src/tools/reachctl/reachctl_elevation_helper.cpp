@@ -1,13 +1,9 @@
 #include "reachctl_elevation_helper.h"
 
-#include "reachctl_common.h"
+#include "../../adapters/windows/window_management/elevation_helper_task_win32.h"
 
 #include <windows.h>
-#include <shellapi.h>
 #include <shlwapi.h>
-#include <cwchar>
-
-static const wchar_t *REACHCTL_HELPER_TASK_NAME = L"reach-helper";
 
 static reach_result reachctl_elevation_helper_exe(uint16_t *path, DWORD path_count)
 {
@@ -36,7 +32,7 @@ static reach_result reachctl_elevation_helper_exe(uint16_t *path, DWORD path_cou
     return REACH_OK;
 }
 
-reach_result reachctl_install_elevation_helper(void)
+reach_result reachctl_install_elevation_helper(const wchar_t *user_id)
 {
     uint16_t helper_path_u16[260] = {};
     reach_result path_result = reachctl_elevation_helper_exe(helper_path_u16, 260);
@@ -53,36 +49,10 @@ reach_result reachctl_install_elevation_helper(void)
         return REACH_ERROR;
     }
 
-    wchar_t arguments[1024] = {};
-    swprintf_s(arguments, L"/Create /F /SC ONLOGON /TN \"%ls\" /TR \"\\\"%ls\\\"\" /RL HIGHEST",
-               REACHCTL_HELPER_TASK_NAME, helper_path);
-
-    return reachctl_run_process_wait(L"C:\\Windows\\System32\\schtasks.exe", arguments, nullptr);
+    return reach_elevation_helper_task_register(helper_path, user_id);
 }
 
 reach_result reachctl_unregister_elevation_helper(void)
 {
-    wchar_t arguments[256] = {};
-    swprintf_s(arguments, L"/Delete /F /TN \"%ls\"", REACHCTL_HELPER_TASK_NAME);
-
-    return reachctl_run_process_wait(L"C:\\Windows\\System32\\schtasks.exe", arguments, nullptr);
-}
-
-reach_result reachctl_start_elevation_helper(void)
-{
-    wchar_t arguments[256] = {};
-    swprintf_s(arguments, L"/Run /TN \"%ls\"", REACHCTL_HELPER_TASK_NAME);
-
-    HINSTANCE result = ShellExecuteW(nullptr, L"open", L"C:\\Windows\\System32\\schtasks.exe",
-                                     arguments, nullptr, SW_HIDE);
-    return reinterpret_cast<intptr_t>(result) > 32 ? REACH_OK : REACH_ERROR;
-}
-
-int32_t reachctl_elevation_helper_is_installed(void)
-{
-    wchar_t arguments[256] = {};
-    swprintf_s(arguments, L"/Query /TN \"%ls\"", REACHCTL_HELPER_TASK_NAME);
-
-    return reachctl_run_process_wait(L"C:\\Windows\\System32\\schtasks.exe", arguments, nullptr) ==
-           REACH_OK;
+    return reach_elevation_helper_task_unregister();
 }
