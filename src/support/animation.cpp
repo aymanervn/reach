@@ -1,6 +1,6 @@
 #include "reach/support/animation.h"
 
-static float reach_clamp01(float value)
+static float reach_animation_clamp01(float value)
 {
     if (value < 0.0f)
     {
@@ -13,98 +13,177 @@ static float reach_clamp01(float value)
     return value;
 }
 
-float reach_lerp_float(float a, float b, float t)
+static float reach_animation_ease(float value, reach_easing easing)
 {
-    t = reach_clamp01(t);
-    return a + (b - a) * t;
-}
-
-reach_vec2 reach_lerp_vec2(reach_vec2 a, reach_vec2 b, float t)
-{
-    reach_vec2 value = {reach_lerp_float(a.x, b.x, t), reach_lerp_float(a.y, b.y, t)};
-    return value;
-}
-
-float reach_ease_in_out(float t)
-{
-    t = reach_clamp01(t);
-    return t * t * (3.0f - 2.0f * t);
-}
-
-void reach_float_animation_start(reach_float_animation *animation, float from, float to,
-                                 double duration_seconds)
-{
-    REACH_ASSERT(animation != nullptr);
-    if (animation != nullptr)
+    float t = reach_animation_clamp01(value);
+    switch (easing)
     {
-        if (duration_seconds < 0.0)
-        {
-            duration_seconds = 0.0;
-        }
-        *animation = {from, to, from, 0.0, duration_seconds, REACH_EASING_EASE_IN_OUT};
+    case REACH_EASING_EASE_IN:
+        return t * t * t;
+    case REACH_EASING_EASE_OUT:
+    {
+        float inverse = 1.0f - t;
+        return 1.0f - inverse * inverse * inverse;
+    }
+    case REACH_EASING_EASE_IN_OUT:
+    default:
+        return t < 0.5f ? 4.0f * t * t * t
+                        : 1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f) *
+                                  (-2.0f * t + 2.0f)) /
+                                     2.0f;
     }
 }
 
-void reach_vec2_animation_start(reach_vec2_animation *animation, reach_vec2 from, reach_vec2 to,
-                                double duration_seconds)
+static reach_animation_track *reach_animation_manager_track(reach_animation_manager *manager,
+                                                            size_t track_id)
 {
-    REACH_ASSERT(animation != nullptr);
-    if (animation != nullptr)
+    REACH_ASSERT(manager != nullptr);
+    REACH_ASSERT(manager == nullptr || track_id < manager->track_count);
+    return manager != nullptr && manager->tracks != nullptr && track_id < manager->track_count
+               ? &manager->tracks[track_id]
+               : nullptr;
+}
+
+static const reach_animation_track *
+reach_animation_manager_const_track(const reach_animation_manager *manager, size_t track_id)
+{
+    REACH_ASSERT(manager != nullptr);
+    REACH_ASSERT(manager == nullptr || track_id < manager->track_count);
+    return manager != nullptr && manager->tracks != nullptr && track_id < manager->track_count
+               ? &manager->tracks[track_id]
+               : nullptr;
+}
+
+void reach_animation_manager_init(reach_animation_manager *manager,
+                                  reach_animation_track *tracks, size_t track_count)
+{
+    REACH_ASSERT(manager != nullptr);
+    REACH_ASSERT(track_count == 0 || tracks != nullptr);
+    if (manager == nullptr)
     {
-        if (duration_seconds < 0.0)
-        {
-            duration_seconds = 0.0;
-        }
-        *animation = {from, to, from, 0.0, duration_seconds, REACH_EASING_EASE_IN_OUT};
+        return;
+    }
+
+    manager->tracks = tracks;
+    manager->track_count = tracks != nullptr ? track_count : 0;
+    for (size_t index = 0; index < manager->track_count; ++index)
+    {
+        manager->tracks[index] = {};
     }
 }
 
-void reach_float_animation_update(reach_float_animation *animation, double delta_seconds)
+void reach_animation_manager_tick(reach_animation_manager *manager, double delta_seconds)
 {
-    REACH_ASSERT(animation != nullptr);
-    if (animation == nullptr || animation->duration_seconds <= 0.0)
+    if (manager == nullptr || manager->tracks == nullptr)
     {
-        if (animation != nullptr)
-        {
-            animation->value = animation->to;
-        }
         return;
     }
     if (delta_seconds < 0.0)
     {
         delta_seconds = 0.0;
     }
-    animation->elapsed_seconds += delta_seconds;
-    float t = (float)(animation->elapsed_seconds / animation->duration_seconds);
-    if (t > 1.0f)
+
+    for (size_t index = 0; index < manager->track_count; ++index)
     {
-        t = 1.0f;
+        reach_animation_track *track = &manager->tracks[index];
+        if (!track->active)
+        {
+            continue;
+        }
+
+        track->elapsed_seconds += delta_seconds;
+        float progress =
+            track->duration_seconds > 0.0
+                ? (float)(track->elapsed_seconds / track->duration_seconds)
+                : 1.0f;
+        if (progress >= 1.0f)
+        {
+            track->value = track->to;
+            track->active = 0;
+            continue;
+        }
+
+        float eased = reach_animation_ease(progress, track->easing);
+        track->value = track->from + (track->to - track->from) * eased;
     }
-    float eased = animation->easing == REACH_EASING_LINEAR ? t : reach_ease_in_out(t);
-    animation->value = reach_lerp_float(animation->from, animation->to, eased);
 }
 
-void reach_vec2_animation_update(reach_vec2_animation *animation, double delta_seconds)
+void reach_animation_manager_set(reach_animation_manager *manager, size_t track_id, float value)
 {
-    REACH_ASSERT(animation != nullptr);
-    if (animation == nullptr || animation->duration_seconds <= 0.0)
+    reach_animation_track *track = reach_animation_manager_track(manager, track_id);
+    if (track != nullptr)
     {
-        if (animation != nullptr)
-        {
-            animation->value = animation->to;
-        }
+        *track = {value, value, value, 0.0, 0.0, REACH_EASING_EASE_IN_OUT, 0};
+    }
+}
+
+void reach_animation_manager_start(reach_animation_manager *manager, size_t track_id, float from,
+                                   float to, double duration_seconds, reach_easing easing)
+{
+    reach_animation_track *track = reach_animation_manager_track(manager, track_id);
+    if (track == nullptr)
+    {
         return;
     }
-    if (delta_seconds < 0.0)
+
+    if (duration_seconds <= 0.0 || from == to)
     {
-        delta_seconds = 0.0;
+        reach_animation_manager_set(manager, track_id, to);
+        return;
     }
-    animation->elapsed_seconds += delta_seconds;
-    float t = (float)(animation->elapsed_seconds / animation->duration_seconds);
-    if (t > 1.0f)
+
+    *track = {from, to, from, 0.0, duration_seconds, easing, 1};
+}
+
+void reach_animation_manager_animate_to(reach_animation_manager *manager, size_t track_id, float to,
+                                        double duration_seconds, reach_easing easing)
+{
+    reach_animation_track *track = reach_animation_manager_track(manager, track_id);
+    if (track != nullptr)
     {
-        t = 1.0f;
+        reach_animation_manager_start(manager, track_id, track->value, to, duration_seconds, easing);
     }
-    float eased = animation->easing == REACH_EASING_LINEAR ? t : reach_ease_in_out(t);
-    animation->value = reach_lerp_vec2(animation->from, animation->to, eased);
+}
+
+void reach_animation_manager_reset(reach_animation_manager *manager, size_t track_id)
+{
+    reach_animation_track *track = reach_animation_manager_track(manager, track_id);
+    if (track != nullptr)
+    {
+        *track = {};
+    }
+}
+
+float reach_animation_manager_value(const reach_animation_manager *manager, size_t track_id)
+{
+    const reach_animation_track *track = reach_animation_manager_const_track(manager, track_id);
+    return track != nullptr ? track->value : 0.0f;
+}
+
+float reach_animation_manager_target(const reach_animation_manager *manager, size_t track_id)
+{
+    const reach_animation_track *track = reach_animation_manager_const_track(manager, track_id);
+    return track != nullptr ? track->to : 0.0f;
+}
+
+int32_t reach_animation_manager_active(const reach_animation_manager *manager, size_t track_id)
+{
+    const reach_animation_track *track = reach_animation_manager_const_track(manager, track_id);
+    return track != nullptr && track->active;
+}
+
+int32_t reach_animation_manager_any_active(const reach_animation_manager *manager)
+{
+    if (manager == nullptr || manager->tracks == nullptr)
+    {
+        return 0;
+    }
+    for (size_t index = 0; index < manager->track_count; ++index)
+    {
+        if (manager->tracks[index].active)
+        {
+            return 1;
+        }
+    }
+    return 0;
 }

@@ -16,12 +16,18 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     }
 
     size_t dragged_render_index =
-        (shell->dock_drag.active || shell->dock_drag.snapping)
+        (shell->dock_drag.active ||
+         reach_animation_manager_active(&shell->animations,
+                                        REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP))
             ? reach_shell_find_dock_item_key(shell, shell->dock_drag.pinned,
                                              shell->dock_drag.pin_id, shell->dock_drag.window)
             : REACH_MAX_PINNED_APPS;
     float dragged_x =
-        shell->dock_drag.snapping ? shell->dock_drag.snap_animation.value : shell->dock_drag.x;
+        reach_animation_manager_active(&shell->animations,
+                                       REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)
+            ? reach_animation_manager_value(&shell->animations,
+                                            REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)
+            : shell->dock_drag.x;
     uintptr_t focused_window =
         shell->window_manager.ops.foreground != nullptr
             ? shell->window_manager.ops.foreground(shell->window_manager.manager)
@@ -39,7 +45,8 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     input.dragged_render_index = dragged_render_index;
     input.dragged_box_x = dragged_x;
     input.click_feedback_index = shell->feedback.dock_index;
-    input.click_feedback_opacity = shell->feedback.dock_opacity.value;
+    input.click_feedback_opacity = reach_animation_manager_value(
+        &shell->animations, REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY);
     input.tray_feedback_index = REACH_SHELL_DOCK_FEEDBACK_TRAY_BUTTON;
     input.quick_settings_feedback_index = REACH_SHELL_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON;
     input.power_feedback_index = REACH_SHELL_DOCK_FEEDBACK_POWER_BUTTON;
@@ -59,7 +66,6 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     music_input.layout = &shell->music_widget_layout;
     music_input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     music_input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
-    music_input.background = &shell->music_widget_background;
     result = reach_music_widget_build_render_commands(&music_input, &commands);
     if (result != REACH_OK)
     {
@@ -95,7 +101,8 @@ reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 
     input.dock_height = shell->layout.dock.bounds.height;
     input.dpi_scale = reach_shell_layout_dpi_scale(shell);
     input.click_feedback_index = shell->feedback.tray_index;
-    input.click_feedback_opacity = shell->feedback.tray_opacity.value;
+    input.click_feedback_opacity = reach_animation_manager_value(
+        &shell->animations, REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY);
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     reach_result result = reach_tray_build_render_commands(&input, &commands);
@@ -145,7 +152,9 @@ size_t reach_shell_switcher_visible_count(const reach_shell *shell)
         return 0;
     }
     size_t window_count =
-        shell->switcher_state.open ? shell->switcher_state.window_count : shell->open_window_count;
+        reach_shell_surface_transition_visible(&shell->switcher_transition)
+            ? shell->switcher_state.window_count
+            : shell->open_window_count;
     return reach_switcher_visible_count(window_count);
 }
 
@@ -158,7 +167,9 @@ void reach_shell_update_switcher_visible_start(reach_shell *shell)
 
     reach_switcher_model model = {};
     model.window_count =
-        shell->switcher_state.open ? shell->switcher_state.window_count : shell->open_window_count;
+        reach_shell_surface_transition_visible(&shell->switcher_transition)
+            ? shell->switcher_state.window_count
+            : shell->open_window_count;
     model.selected_index = shell->switcher_state.selected_index;
     model.visible_start = shell->switcher_state.visible_start;
     reach_switcher_update_visible_start(&model);

@@ -1,5 +1,7 @@
 #include "shell_internal.h"
 
+#include <math.h>
+
 static float reach_shell_quick_settings_clamp01(float value)
 {
     if (value < 0.0f)
@@ -110,10 +112,13 @@ void reach_shell_relayout_quick_settings(reach_shell *shell, int32_t animate_hei
     if (animate_height &&
         reach_shell_quick_settings_height_changed(old_target.height, new_target.height))
     {
-        reach_shell_start_popup_bounds_animation(&shell->quick_settings_bounds_animation,
-                                                 current_bounds, new_target, 0, 1, 0.16);
+        reach_animation_manager_start(&shell->animations,
+                                      REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT,
+                                      current_bounds.height, new_target.height, 0.16,
+                                      REACH_EASING_EASE_IN_OUT);
     }
-    else if (!reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation))
+    else if (!reach_animation_manager_active(
+                 &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT))
     {
         shell->quick_settings_bounds = new_target;
     }
@@ -133,7 +138,8 @@ void reach_shell_refresh_quick_settings_layout(reach_shell *shell)
     float anchor_x = button.x + button.width * 0.5f;
 
     shell->quick_settings_target_bounds = reach_shell_quick_settings_target_bounds(shell);
-    if (!reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation))
+    if (!reach_animation_manager_active(
+            &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT))
     {
         shell->quick_settings_bounds = shell->quick_settings_target_bounds;
     }
@@ -149,27 +155,24 @@ void reach_shell_refresh_quick_settings_layout(reach_shell *shell)
         reach_shell_layout_dpi_scale(shell));
 }
 
-void reach_shell_update_quick_settings_animation(reach_shell *shell, double delta_seconds)
+void reach_shell_update_quick_settings_animation(reach_shell *shell)
 {
     if (shell == nullptr || !shell->quick_settings_open || !shell->has_layout)
     {
         return;
     }
 
-    if (reach_shell_popup_bounds_animation_active(&shell->quick_settings_bounds_animation))
+    if (reach_animation_manager_active(
+            &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT) ||
+        reach_shell_quick_settings_height_changed(shell->quick_settings_bounds.height,
+                                                  shell->quick_settings_target_bounds.height))
     {
         float scale = reach_shell_layout_dpi_scale(shell);
         const float gap = 8.0f * scale;
-        reach_rect_f32 button = reach_shell_dock_rect_to_screen(
-            &shell->layout.dock, shell->layout.dock.quick_settings_button);
-        float anchor_x = button.x + button.width * 0.5f;
-
-        reach_rect_f32 animated = reach_shell_apply_popup_bounds_animation(
-            &shell->quick_settings_bounds_animation, shell->quick_settings_target_bounds, anchor_x,
-            shell->layout.dock.bounds.y, gap, delta_seconds);
-
-        animated.x = shell->quick_settings_target_bounds.x;
-        animated.width = shell->quick_settings_target_bounds.width;
+        reach_rect_f32 animated = shell->quick_settings_target_bounds;
+        animated.height = reach_animation_manager_value(
+            &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT);
+        animated.y = floorf(shell->layout.dock.bounds.y - animated.height - gap + 0.5f);
 
         shell->quick_settings_bounds = animated;
 
@@ -200,6 +203,7 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
     }
 
     shell->quick_settings_open = next_open;
+    reach_shell_surface_transition_set(shell, &shell->quick_settings_transition, next_open);
     shell->quick_settings_drag.active = 0;
     shell->quick_settings_drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     shell->quick_settings_drag.level_valid = 0;
@@ -215,21 +219,14 @@ void reach_shell_set_quick_settings_open(reach_shell *shell, int32_t open)
         shell->quick_settings_bluetooth_pending = {};
         reach_shell_start_quick_settings_system_refresh(shell, 0);
         reach_shell_start_quick_settings_audio_refresh(shell);
-        shell->quick_settings_bounds_animation = {};
+        reach_animation_manager_reset(&shell->animations,
+                                      REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT);
         reach_shell_relayout_quick_settings(shell, 0);
-        if (shell->quick_settings.window.ops.show != nullptr)
-        {
-            (void)shell->quick_settings.window.ops.show(shell->quick_settings.window.window);
-        }
     }
     else
     {
         reach_quick_settings_model_set_bluetooth_pending(&shell->quick_settings_model, 0, 0);
         shell->quick_settings_bluetooth_pending = {};
-        if (shell->quick_settings.window.ops.hide != nullptr)
-        {
-            (void)shell->quick_settings.window.ops.hide(shell->quick_settings.window.window);
-        }
         if (was_open)
         {
             reach_shell_schedule_dock_reveal_recheck(shell);

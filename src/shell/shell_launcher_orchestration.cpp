@@ -141,11 +141,8 @@ static void reach_shell_close_launcher_impl(reach_shell *shell, int32_t restore_
     shell->launcher_close_after_foreground_change = 0;
     shell->dirty.layout = 1;
     shell->launcher.dirty_flags = 1;
+    reach_shell_surface_transition_set(shell, &shell->launcher_transition, 0);
     reach_shell_sync_popup_mouse_hook(shell);
-    if (shell->launcher.window.ops.hide != nullptr)
-    {
-        (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
-    }
     if (restore_focus)
     {
         reach_shell_restore_launcher_focus(shell);
