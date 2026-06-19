@@ -324,9 +324,8 @@ static reach_result reach_textbox_set_style(reach_textbox *textbox,
     textbox->text_color =
         reach_textbox_rgb(style->text_color.r, style->text_color.g, style->text_color.b);
 
-    textbox->background_color = reach_textbox_rgb(style->background_color.r,
-                                                  style->background_color.g,
-                                                  style->background_color.b);
+    textbox->background_color = reach_textbox_rgb(
+        style->background_color.r, style->background_color.g, style->background_color.b);
 
     if (textbox->background_brush != nullptr)
         DeleteObject(textbox->background_brush);
@@ -339,7 +338,7 @@ static reach_result reach_textbox_set_style(reach_textbox *textbox,
                  style->max_length > 0 ? static_cast<WPARAM>(style->max_length)
                                        : REACH_TEXTBOX_TEXT_CAPACITY - 1,
                  0);
-    SendMessageW(textbox->edit_hwnd, EM_SETCUEBANNER, FALSE,
+    SendMessageW(textbox->edit_hwnd, EM_SETCUEBANNER, TRUE,
                  reinterpret_cast<LPARAM>(style->placeholder));
 
     InvalidateRect(textbox->host_hwnd, nullptr, TRUE);

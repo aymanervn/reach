@@ -45,8 +45,8 @@ static reach_color reach_shell_opaque_color(reach_color color)
 
 static int32_t reach_shell_textbox_color_equal(reach_color a, reach_color b)
 {
-    return fabsf(a.r - b.r) < 0.001f && fabsf(a.g - b.g) < 0.001f &&
-           fabsf(a.b - b.b) < 0.001f && fabsf(a.a - b.a) < 0.001f;
+    return fabsf(a.r - b.r) < 0.001f && fabsf(a.g - b.g) < 0.001f && fabsf(a.b - b.b) < 0.001f &&
+           fabsf(a.a - b.a) < 0.001f;
 }
 
 static int32_t reach_shell_utf16_equal(const uint16_t *a, const uint16_t *b)
@@ -80,8 +80,8 @@ static int32_t reach_shell_textbox_style_equal(const reach_textbox_style *a,
 
 static reach_textbox_style reach_shell_launcher_textbox_style(const reach_shell *shell)
 {
-    const reach_theme *theme = shell != nullptr && shell->theme != nullptr ? shell->theme
-                                                                           : reach_theme_default();
+    const reach_theme *theme =
+        shell != nullptr && shell->theme != nullptr ? shell->theme : reach_theme_default();
     float scale = reach_shell_layout_dpi_scale(shell);
 
     reach_textbox_style style = {};
@@ -91,7 +91,7 @@ static reach_textbox_style reach_shell_launcher_textbox_style(const reach_shell 
     style.background_color = reach_shell_opaque_color(theme->launcher_search_background);
     style.max_length = REACH_MAX_SEARCH_CHARS;
     (void)reach_copy_utf16(style.placeholder, REACH_TEXTBOX_PLACEHOLDER_CAPACITY,
-                           (const uint16_t *)L"Search");
+                           (const uint16_t *)L"Search for anything");
     return style;
 }
 
