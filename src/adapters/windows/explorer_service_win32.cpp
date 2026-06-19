@@ -5,14 +5,14 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include <cwchar>
 #include <new>
 
 struct reach_explorer_service
 {
-    int unused;
 };
 
-static reach_result reach_explorer_execute(const wchar_t *target)
+static reach_result reach_explorer_execute(const wchar_t *target, const wchar_t *arguments = nullptr)
 {
     if (target == nullptr || target[0] == 0)
     {
@@ -23,6 +23,7 @@ static reach_result reach_explorer_execute(const wchar_t *target)
     info.cbSize = sizeof(info);
     info.fMask = SEE_MASK_NOASYNC;
     info.lpFile = target;
+    info.lpParameters = arguments;
     info.nShow = SW_SHOWNORMAL;
     return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
 }
@@ -48,6 +49,25 @@ static reach_result reach_explorer_open_path(reach_explorer_service *service, co
     }
 
     return reach_explorer_execute(reinterpret_cast<const wchar_t *>(path));
+}
+
+static reach_result reach_explorer_reveal_path(reach_explorer_service *service,
+                                               const uint16_t *path)
+{
+    REACH_ASSERT(service != nullptr);
+    REACH_ASSERT(path != nullptr);
+    if (service == nullptr || path == nullptr || path[0] == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    wchar_t arguments[MAX_PATH + 16] = {};
+    if (swprintf_s(arguments, L"/select,\"%ls\"", reinterpret_cast<const wchar_t *>(path)) < 0)
+    {
+        return REACH_ERROR;
+    }
+
+    return reach_explorer_execute(L"explorer.exe", arguments);
 }
 
 static reach_result reach_explorer_open_shell_location(reach_explorer_service *service,
@@ -97,6 +117,7 @@ reach_result reach_windows_create_explorer_service(reach_explorer_service_port *
     out_port->service = service;
     out_port->ops.open_default = reach_explorer_open_default;
     out_port->ops.open_path = reach_explorer_open_path;
+    out_port->ops.reveal_path = reach_explorer_reveal_path;
     out_port->ops.open_shell_location = reach_explorer_open_shell_location;
     out_port->ops.path_exists = reach_explorer_path_exists;
     out_port->ops.destroy = reach_explorer_destroy;
