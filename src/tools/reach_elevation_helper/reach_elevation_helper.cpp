@@ -63,6 +63,7 @@ static INIT_ONCE g_window_state_once = INIT_ONCE_STATIC_INIT;
 static CRITICAL_SECTION g_window_state_lock;
 static reach_helper_window_state g_window_state;
 static LONG g_game_mode_active;
+static const wchar_t *REACH_SHELL_INSTANCE_MUTEX = L"Local\\Reach.Shell.Instance";
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachElevationHelperInstance";
 static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
 
@@ -1520,7 +1521,7 @@ static HANDLE reach_helper_create_pipe(void)
     PSECURITY_DESCRIPTOR descriptor = nullptr;
     SECURITY_ATTRIBUTES security = reach_helper_pipe_security(&descriptor);
     HANDLE pipe = CreateNamedPipeW(
-        REACH_ELEVATION_HELPER_PIPE_NAME, PIPE_ACCESS_DUPLEX,
+        REACH_ELEVATION_HELPER_PIPE_NAME, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES,
         sizeof(reach_elevation_helper_response), sizeof(reach_elevation_helper_request), 1000,
         security.lpSecurityDescriptor != nullptr ? &security : nullptr);
@@ -1533,39 +1534,107 @@ static HANDLE reach_helper_create_pipe(void)
     return pipe;
 }
 
-static void reach_helper_serve_client(HANDLE pipe)
+enum reach_helper_pipe_wait_result
+{
+    REACH_HELPER_PIPE_WAIT_COMPLETED,
+    REACH_HELPER_PIPE_WAIT_SHELL_EXITED,
+    REACH_HELPER_PIPE_WAIT_FAILED,
+};
+
+static reach_helper_pipe_wait_result
+reach_helper_wait_for_pipe_io(HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
+                              DWORD *out_transferred)
+{
+    HANDLE waits[] = {shell_mutex, overlapped->hEvent};
+    DWORD wait = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+    if (wait == WAIT_OBJECT_0 || wait == WAIT_ABANDONED_0)
+    {
+        (void)CancelIoEx(pipe, overlapped);
+        DWORD transferred = 0;
+        (void)GetOverlappedResult(pipe, overlapped, &transferred, TRUE);
+        return REACH_HELPER_PIPE_WAIT_SHELL_EXITED;
+    }
+    if (wait != WAIT_OBJECT_0 + 1)
+    {
+        (void)CancelIoEx(pipe, overlapped);
+        return REACH_HELPER_PIPE_WAIT_FAILED;
+    }
+
+    DWORD transferred = 0;
+    if (!GetOverlappedResult(pipe, overlapped, &transferred, FALSE))
+    {
+        return REACH_HELPER_PIPE_WAIT_FAILED;
+    }
+    *out_transferred = transferred;
+    return REACH_HELPER_PIPE_WAIT_COMPLETED;
+}
+
+static reach_helper_pipe_wait_result reach_helper_read_request(
+    HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
+    reach_elevation_helper_request *request)
+{
+    ResetEvent(overlapped->hEvent);
+    DWORD read = 0;
+    if (ReadFile(pipe, request, sizeof(*request), &read, overlapped))
+    {
+        return read == sizeof(*request) ? REACH_HELPER_PIPE_WAIT_COMPLETED
+                                        : REACH_HELPER_PIPE_WAIT_FAILED;
+    }
+    if (GetLastError() != ERROR_IO_PENDING)
+    {
+        return REACH_HELPER_PIPE_WAIT_FAILED;
+    }
+
+    reach_helper_pipe_wait_result wait =
+        reach_helper_wait_for_pipe_io(shell_mutex, pipe, overlapped, &read);
+    return wait == REACH_HELPER_PIPE_WAIT_COMPLETED && read != sizeof(*request)
+               ? REACH_HELPER_PIPE_WAIT_FAILED
+               : wait;
+}
+
+static reach_helper_pipe_wait_result reach_helper_write_response(
+    HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
+    const reach_elevation_helper_response *response)
+{
+    ResetEvent(overlapped->hEvent);
+    DWORD written = 0;
+    if (WriteFile(pipe, response, sizeof(*response), &written, overlapped))
+    {
+        return written == sizeof(*response) ? REACH_HELPER_PIPE_WAIT_COMPLETED
+                                            : REACH_HELPER_PIPE_WAIT_FAILED;
+    }
+    if (GetLastError() != ERROR_IO_PENDING)
+    {
+        return REACH_HELPER_PIPE_WAIT_FAILED;
+    }
+
+    reach_helper_pipe_wait_result wait =
+        reach_helper_wait_for_pipe_io(shell_mutex, pipe, overlapped, &written);
+    return wait == REACH_HELPER_PIPE_WAIT_COMPLETED && written != sizeof(*response)
+               ? REACH_HELPER_PIPE_WAIT_FAILED
+               : wait;
+}
+
+static reach_helper_pipe_wait_result reach_helper_serve_client(HANDLE shell_mutex, HANDLE pipe,
+                                                               OVERLAPPED *overlapped)
 {
     reach_elevation_helper_request request = {};
-    DWORD read = 0;
-    reach_result result = REACH_ERROR;
-
-    if (ReadFile(pipe, &request, sizeof(request), &read, nullptr) && read == sizeof(request))
+    reach_helper_pipe_wait_result read =
+        reach_helper_read_request(shell_mutex, pipe, overlapped, &request);
+    if (read != REACH_HELPER_PIPE_WAIT_COMPLETED)
     {
-        if (reach_helper_same_user_client(pipe))
-        {
-            reach_elevation_helper_response response = {};
-            response.version = reach_elevation_helper_protocol_version();
-            result = reach_helper_execute(&request, &response);
-            response.result = static_cast<int32_t>(result);
-
-            DWORD written = 0;
-            (void)WriteFile(pipe, &response, sizeof(response), &written, nullptr);
-            FlushFileBuffers(pipe);
-            return;
-        }
-        else
-        {
-            result = REACH_ERROR;
-        }
+        return read;
     }
 
     reach_elevation_helper_response response = {};
     response.version = reach_elevation_helper_protocol_version();
+    reach_result result = REACH_ERROR;
+    if (reach_helper_same_user_client(pipe))
+    {
+        result = reach_helper_execute(&request, &response);
+    }
     response.result = static_cast<int32_t>(result);
-
-    DWORD written = 0;
-    (void)WriteFile(pipe, &response, sizeof(response), &written, nullptr);
-    FlushFileBuffers(pipe);
+    return reach_helper_write_response(shell_mutex, pipe, overlapped, &response);
 }
 
 static void reach_helper_hide_minimized_window_icons(void)
@@ -1587,12 +1656,84 @@ static void reach_helper_hide_minimized_window_icons(void)
                                 SPIF_SENDCHANGE);
 }
 
+static int reach_helper_run_pipe_server(HANDLE shell_mutex)
+{
+    HANDLE pipe_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (pipe_event == nullptr)
+    {
+        return 1;
+    }
+
+    for (;;)
+    {
+        DWORD shell_wait = WaitForSingleObject(shell_mutex, 0);
+        if (shell_wait == WAIT_OBJECT_0 || shell_wait == WAIT_ABANDONED)
+        {
+            CloseHandle(pipe_event);
+            return 0;
+        }
+
+        HANDLE pipe = reach_helper_create_pipe();
+        if (pipe == INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(pipe_event);
+            return 1;
+        }
+
+        OVERLAPPED overlapped = {};
+        overlapped.hEvent = pipe_event;
+        ResetEvent(pipe_event);
+
+        reach_helper_pipe_wait_result connection = REACH_HELPER_PIPE_WAIT_FAILED;
+        if (ConnectNamedPipe(pipe, &overlapped))
+        {
+            connection = REACH_HELPER_PIPE_WAIT_COMPLETED;
+        }
+        else if (GetLastError() == ERROR_IO_PENDING)
+        {
+            DWORD transferred = 0;
+            connection =
+                reach_helper_wait_for_pipe_io(shell_mutex, pipe, &overlapped, &transferred);
+        }
+        else if (GetLastError() == ERROR_PIPE_CONNECTED)
+        {
+            connection = REACH_HELPER_PIPE_WAIT_COMPLETED;
+        }
+
+        reach_helper_pipe_wait_result served = connection;
+        if (connection == REACH_HELPER_PIPE_WAIT_COMPLETED)
+        {
+            served = reach_helper_serve_client(shell_mutex, pipe, &overlapped);
+            (void)DisconnectNamedPipe(pipe);
+        }
+        CloseHandle(pipe);
+
+        if (connection == REACH_HELPER_PIPE_WAIT_SHELL_EXITED ||
+            served == REACH_HELPER_PIPE_WAIT_SHELL_EXITED)
+        {
+            CloseHandle(pipe_event);
+            return 0;
+        }
+        if (connection == REACH_HELPER_PIPE_WAIT_FAILED)
+        {
+            CloseHandle(pipe_event);
+            return 1;
+        }
+    }
+}
+
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, int show_command)
 {
     (void)instance;
     (void)previous;
     (void)command_line;
     (void)show_command;
+
+    HANDLE shell_mutex = OpenMutexW(SYNCHRONIZE, FALSE, REACH_SHELL_INSTANCE_MUTEX);
+    if (shell_mutex == nullptr)
+    {
+        return 0;
+    }
 
     HANDLE instance_mutex = CreateMutexW(nullptr, TRUE, REACH_HELPER_INSTANCE_MUTEX);
     if (instance_mutex == nullptr || GetLastError() == ERROR_ALREADY_EXISTS)
@@ -1601,6 +1742,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
         {
             CloseHandle(instance_mutex);
         }
+        CloseHandle(shell_mutex);
         return 0;
     }
 
@@ -1609,29 +1751,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     if (reach_elevation_helper_shared_writer_start() != REACH_OK)
     {
         CloseHandle(instance_mutex);
+        CloseHandle(shell_mutex);
         return 1;
     }
     reach_helper_publish_window_state();
     reach_helper_start_window_events();
     (void)reach_helper_start_hotkeys();
 
-    for (;;)
-    {
-        HANDLE pipe = reach_helper_create_pipe();
-        if (pipe == INVALID_HANDLE_VALUE)
-        {
-            Sleep(1000);
-            continue;
-        }
-
-        BOOL connected =
-            ConnectNamedPipe(pipe, nullptr) ? TRUE : GetLastError() == ERROR_PIPE_CONNECTED;
-        if (connected)
-        {
-            reach_helper_serve_client(pipe);
-            DisconnectNamedPipe(pipe);
-        }
-
-        CloseHandle(pipe);
-    }
+    int exit_code = reach_helper_run_pipe_server(shell_mutex);
+    reach_helper_stop_hotkeys();
+    reach_helper_stop_window_events();
+    reach_elevation_helper_shared_writer_stop();
+    CloseHandle(instance_mutex);
+    CloseHandle(shell_mutex);
+    return exit_code;
 }
