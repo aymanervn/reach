@@ -19,6 +19,7 @@ struct reach_helper_session_state
     HWINEVENTHOOK minimize_start_hook;
     HWINEVENTHOOK minimize_end_hook;
     HWINEVENTHOOK foreground_hook;
+    HWINEVENTHOOK location_hook;
     HWINEVENTHOOK name_hook;
 };
 
@@ -827,6 +828,35 @@ static int32_t reach_helper_publish_foreground_change(void)
     return 1;
 }
 
+static int32_t reach_helper_publish_foreground_placement_change(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd) || !reach_helper_window_has_foreground(hwnd))
+    {
+        return 1;
+    }
+
+    reach_helper_window_state state = reach_helper_current_window_state();
+    uint64_t window_id = reinterpret_cast<uint64_t>(hwnd);
+    for (uint32_t index = 0; index < state.window_count; ++index)
+    {
+        if (state.windows[index].window != window_id)
+        {
+            continue;
+        }
+
+        int32_t maximized = IsZoomed(hwnd) ? 1 : 0;
+        if (state.windows[index].maximized != maximized)
+        {
+            state.windows[index].maximized = maximized;
+            reach_helper_publish_cached_window_state(&state);
+            reach_helper_publish_game_mode();
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
 static int32_t reach_helper_publish_name_change(HWND hwnd)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
@@ -868,7 +898,7 @@ static void reach_helper_close_window_event_hooks(void)
     HWINEVENTHOOK *hooks[] = {
         &g_session.create_hook,     &g_session.destroy_hook,        &g_session.show_hook,
         &g_session.hide_hook,       &g_session.minimize_start_hook, &g_session.minimize_end_hook,
-        &g_session.foreground_hook, &g_session.name_hook,
+        &g_session.foreground_hook, &g_session.location_hook,       &g_session.name_hook,
     };
     for (HWINEVENTHOOK *hook : hooks)
     {
@@ -885,10 +915,6 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
                                                     DWORD event_thread, DWORD event_time)
 {
     (void)hook;
-    (void)event;
-    (void)hwnd;
-    (void)object_id;
-    (void)child_id;
     (void)event_thread;
     (void)event_time;
 
@@ -904,6 +930,11 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
         }
 
         if (event == EVENT_SYSTEM_FOREGROUND && reach_helper_publish_foreground_change())
+        {
+            return;
+        }
+        if (event == EVENT_OBJECT_LOCATIONCHANGE &&
+            reach_helper_publish_foreground_placement_change(hwnd))
         {
             return;
         }
@@ -954,6 +985,9 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
                         reach_helper_window_event_proc, 0, 0, flags);
     g_session.foreground_hook =
         SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+                        reach_helper_window_event_proc, 0, 0, flags);
+    g_session.location_hook =
+        SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, nullptr,
                         reach_helper_window_event_proc, 0, 0, flags);
     g_session.name_hook = SetWinEventHook(EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_NAMECHANGE, nullptr,
                                           reach_helper_window_event_proc, 0, 0, flags);

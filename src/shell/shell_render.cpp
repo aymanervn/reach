@@ -59,7 +59,7 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
     music_input.layout = &shell->music_widget_layout;
     music_input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     music_input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
-    music_input.animation = &shell->music_widget_bg_animation;
+    music_input.background = &shell->music_widget_background;
     result = reach_music_widget_build_render_commands(&music_input, &commands);
     if (result != REACH_OK)
     {
