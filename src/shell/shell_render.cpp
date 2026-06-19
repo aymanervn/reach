@@ -138,41 +138,6 @@ reach_result reach_shell_render_quick_settings_surface(reach_shell *shell)
                                             shell->quick_settings_notch_anchor_x, &commands);
 }
 
-reach_result reach_shell_render_settings_surface(reach_shell *shell)
-{
-    if (shell == nullptr || shell->settings.renderer.ops.begin_frame == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_settings_render_input input = {};
-    input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    input.model = &shell->settings_model;
-    input.layout = &shell->settings_layout;
-    input.dpi_scale = reach_shell_layout_dpi_scale(shell);
-    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
-
-    reach_render_command_buffer commands = {};
-    reach_result build_result = reach_settings_build_render_commands(&input, &commands);
-    if (build_result != REACH_OK)
-    {
-        return build_result;
-    }
-
-    if (shell->settings.renderer.ops.begin_frame(shell->settings.renderer.backend) != REACH_OK)
-    {
-        return REACH_ERROR;
-    }
-
-    reach_result result =
-        shell->settings.renderer.ops.execute(shell->settings.renderer.backend, &commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    return shell->settings.renderer.ops.end_frame(shell->settings.renderer.backend);
-}
-
 size_t reach_shell_switcher_visible_count(const reach_shell *shell)
 {
     if (shell == nullptr)

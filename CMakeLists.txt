@@ -116,6 +116,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/search_everything_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp
+    src/adapters/windows/settings_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
     src/adapters/windows/windows_icon_handle.cpp
@@ -197,13 +198,11 @@ add_library(reach_shell STATIC
     src/shell/shell_quick_settings_input.cpp
     src/shell/shell_quick_settings_refresh.cpp
     src/shell/shell_render.cpp
-    src/shell/shell_settings.cpp
     src/shell/shell_surfaces.cpp
     src/shell/shell_switcher_input.cpp
     src/shell/shell_tray_orchestration.cpp
     src/shell/shell_update.cpp
     src/shell/shell_window_tracking.cpp
-    src/shell/shell_windows_updates.cpp
     src/shell/surface_runtime.cpp
 )
 
@@ -238,6 +237,53 @@ target_compile_features(reach PRIVATE
 )
 target_link_libraries(reach PRIVATE
     reach_shell
+    reach_core
+    reach_features
+    reach_support
+    reach_windows_adapters
+    d2d1
+    dwrite
+    dcomp
+    d3d11
+    dxgi
+    dxguid
+    user32
+    shell32
+    comctl32
+    shlwapi
+    shcore
+    advapi32
+    ole32
+    oleaut32
+    runtimeobject
+    uuid
+    windowscodecs
+    dwmapi
+    powrprof
+    wlanapi
+    iphlpapi
+    wbemuuid
+    Wuguid
+)
+
+add_executable(reach_settings WIN32
+    src/app/settings_main.cpp
+    src/app/settings_app.cpp
+    resources/settings.rc
+)
+set_target_properties(reach_settings PROPERTIES OUTPUT_NAME "reach-settings")
+
+if (MSVC)
+    target_link_options(reach_settings PRIVATE
+        "/MANIFEST:EMBED"
+        "/MANIFESTINPUT:${CMAKE_SOURCE_DIR}/resources/settings.manifest"
+    )
+endif()
+
+reach_configure_common(reach_settings)
+reach_configure_windows(reach_settings)
+target_compile_features(reach_settings PRIVATE cxx_std_17)
+target_link_libraries(reach_settings PRIVATE
     reach_core
     reach_features
     reach_support
@@ -390,6 +436,10 @@ add_custom_target(reach_release_zip
         "${REACH_DIST_DIR}/reach.exe"
 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:reach_settings>"
+        "${REACH_DIST_DIR}/reach-settings.exe"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reachctl>"
         "${REACH_DIST_DIR}/reachctl.exe"
 
@@ -416,6 +466,7 @@ add_custom_target(reach_release_zip
     COMMAND ${CMAKE_COMMAND} -E chdir "${REACH_DIST_DIR}"
         ${CMAKE_COMMAND} -E tar "cfv" "${REACH_ZIP_PATH}" --format=zip
         reach.exe
+        reach-settings.exe
         reachctl.exe
         reach-watchdog.exe
         reach_elevation_helper.exe
@@ -423,7 +474,7 @@ add_custom_target(reach_release_zip
         Everything64.dll
         reach.jpg
 
-    DEPENDS reach reachctl reach-watchdog reach_elevation_helper reach_update_helper
+    DEPENDS reach reach_settings reachctl reach-watchdog reach_elevation_helper reach_update_helper
 
     COMMENT "Creating Reach Release ZIP"
 )

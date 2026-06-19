@@ -3,30 +3,25 @@
 #include "reach/features/windows_update.h"
 #include "reach/support/util.h"
 
+#include <memory>
+#include <new>
+
 const uint16_t *reach_settings_update_page_title(void)
 {
     return (const uint16_t *)u"Windows Updates";
 }
 
-const uint16_t *reach_settings_update_page_placeholder(void)
-{
-    return (const uint16_t *)u"No scan has been run yet.";
-}
-
-static void set_status(reach_settings_model *model, const uint16_t *status)
-{
-    reach_copy_utf16(model->update_status, REACH_WINDOWS_UPDATE_TEXT_CAPACITY, status);
-}
+static int identity_equal(const reach_windows_update_identity *left,
+                          const reach_windows_update_identity *right);
 
 void reach_settings_model_begin_update_scan(reach_settings_model *model)
 {
     if (model == nullptr || reach_settings_model_update_busy(model))
         return;
     model->update_page_state = REACH_SETTINGS_UPDATE_SCANNING;
-    model->update_list = {};
     model->update_scroll_offset = 0;
-    model->update_operation_hresult = 0;
-    set_status(model, (const uint16_t *)u"Scanning for available software updates...");
+    model->update_scroll_target = 0;
+    model->update_scroll_max = 0;
 }
 
 void reach_settings_model_apply_update_scan(reach_settings_model *model,
@@ -35,21 +30,60 @@ void reach_settings_model_apply_update_scan(reach_settings_model *model,
 {
     if (model == nullptr)
         return;
-    model->update_operation_hresult = hresult;
     if (updates == nullptr || hresult < 0)
     {
         model->update_page_state = REACH_SETTINGS_UPDATE_ERROR;
-        set_status(model, (const uint16_t *)u"Windows Update scan failed.");
         return;
     }
+    model->update_scan_completed = 1;
+    std::unique_ptr<reach_windows_update_list> previous(
+        new (std::nothrow) reach_windows_update_list(model->update_list));
     model->update_list = *updates;
     if (model->update_list.count > REACH_WINDOWS_UPDATE_MAX_UPDATES)
         model->update_list.count = REACH_WINDOWS_UPDATE_MAX_UPDATES;
     reach_windows_update_apply_default_selection(&model->update_list);
+    if (previous != nullptr)
+    {
+        for (size_t index = 0; index < model->update_list.count; ++index)
+        {
+            reach_windows_update_item *current = &model->update_list.updates[index];
+            for (size_t previous_index = 0; previous_index < previous->count; ++previous_index)
+            {
+                const reach_windows_update_item *old = &previous->updates[previous_index];
+                if (!identity_equal(&current->identity, &old->identity) ||
+                    (old->state != REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED &&
+                     old->state != REACH_WINDOWS_UPDATE_FAILED))
+                    continue;
+                reach_windows_update_identity identity = current->identity;
+                uint16_t categories[REACH_WINDOWS_UPDATE_METADATA_CAPACITY] = {};
+                reach_copy_utf16(categories, REACH_WINDOWS_UPDATE_METADATA_CAPACITY,
+                                 current->categories);
+                *current = *old;
+                current->identity = identity;
+                reach_copy_utf16(current->categories, REACH_WINDOWS_UPDATE_METADATA_CAPACITY,
+                                 categories);
+                break;
+            }
+        }
+        for (size_t previous_index = 0; previous_index < previous->count &&
+                                        model->update_list.count < REACH_WINDOWS_UPDATE_MAX_UPDATES;
+             ++previous_index)
+        {
+            const reach_windows_update_item *old = &previous->updates[previous_index];
+            if (old->state != REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED)
+                continue;
+            int32_t found = 0;
+            for (size_t index = 0; index < model->update_list.count; ++index)
+                if (identity_equal(&model->update_list.updates[index].identity, &old->identity))
+                {
+                    found = 1;
+                    break;
+                }
+            if (!found)
+                model->update_list.updates[model->update_list.count++] = *old;
+        }
+    }
     model->update_page_state = REACH_SETTINGS_UPDATE_AVAILABLE;
-    set_status(model, model->update_list.count == 0
-                          ? (const uint16_t *)u"No available software updates were found."
-                          : (const uint16_t *)u"Available updates");
 }
 
 void reach_settings_model_begin_update_install(reach_settings_model *model)
@@ -58,7 +92,6 @@ void reach_settings_model_begin_update_install(reach_settings_model *model)
         reach_settings_model_selected_update_count(model) == 0)
         return;
     model->update_page_state = REACH_SETTINGS_UPDATE_PREPARING;
-    set_status(model, (const uint16_t *)u"Re-scanning selected updates...");
 }
 
 static int identity_equal(const reach_windows_update_identity *left,
@@ -81,7 +114,6 @@ void reach_settings_model_apply_update_operation(
 {
     if (model == nullptr || result == nullptr)
         return;
-    model->update_operation_hresult = result->overall_install_hresult;
     if (model->update_list.count == 0)
     {
         model->update_list.count = result->per_update_result_count;
@@ -107,20 +139,9 @@ void reach_settings_model_apply_update_operation(
             }
     }
     if (result->failure_class != REACH_WINDOWS_UPDATE_FAILURE_NONE)
-    {
         model->update_page_state = REACH_SETTINGS_UPDATE_ERROR;
-        set_status(model, reach_windows_update_failure_label(result->failure_class));
-    }
-    else if (result->overall_reboot_required)
-    {
-        model->update_page_state = REACH_SETTINGS_UPDATE_COMPLETE;
-        set_status(model, (const uint16_t *)u"Installed - restart required");
-    }
     else
-    {
         model->update_page_state = REACH_SETTINGS_UPDATE_COMPLETE;
-        set_status(model, (const uint16_t *)u"Verified installed");
-    }
 }
 
 void reach_settings_model_toggle_update(reach_settings_model *model, size_t index)
@@ -130,8 +151,7 @@ void reach_settings_model_toggle_update(reach_settings_model *model, size_t inde
         return;
     reach_windows_update_item *update = &model->update_list.updates[index];
     if (update->state != REACH_WINDOWS_UPDATE_DISCOVERED &&
-        update->state != REACH_WINDOWS_UPDATE_SELECTED &&
-        update->state != REACH_WINDOWS_UPDATE_FAILED)
+        update->state != REACH_WINDOWS_UPDATE_SELECTED)
         return;
     update->selected = !update->selected;
     update->state =
@@ -150,8 +170,19 @@ size_t reach_settings_model_selected_update_count(const reach_settings_model *mo
     size_t count = 0;
     for (size_t index = 0; index < model->update_list.count; ++index)
         if (model->update_list.updates[index].selected &&
-            (model->update_list.updates[index].state == REACH_WINDOWS_UPDATE_SELECTED ||
-             model->update_list.updates[index].state == REACH_WINDOWS_UPDATE_FAILED))
+            model->update_list.updates[index].state == REACH_WINDOWS_UPDATE_SELECTED)
+            ++count;
+    return count;
+}
+
+size_t reach_settings_model_restart_required_count(const reach_settings_model *model)
+{
+    if (model == nullptr)
+        return 0;
+    size_t count = 0;
+    for (size_t index = 0; index < model->update_list.count; ++index)
+        if (model->update_list.updates[index].state ==
+            REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED)
             ++count;
     return count;
 }
@@ -165,21 +196,30 @@ int32_t reach_settings_model_update_busy(const reach_settings_model *model)
                                 model->update_page_state == REACH_SETTINGS_UPDATE_VERIFYING);
 }
 
-void reach_settings_model_scroll_updates(reach_settings_model *model, int32_t delta,
-                                         size_t visible_count)
+void reach_settings_model_scroll_updates(reach_settings_model *model, float delta)
 {
-    if (model == nullptr || visible_count == 0 || model->update_list.count <= visible_count)
+    if (model == nullptr || delta == 0.0f)
         return;
-    size_t maximum = model->update_list.count - visible_count;
-    if (delta < 0)
+    model->update_scroll_target += delta;
+    if (model->update_scroll_target < 0.0f)
+        model->update_scroll_target = 0.0f;
+    if (model->update_scroll_target > model->update_scroll_max)
+        model->update_scroll_target = model->update_scroll_max;
+}
+
+int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds)
+{
+    if (model == nullptr)
+        return 0;
+    float difference = model->update_scroll_target - model->update_scroll_offset;
+    if (difference > -0.1f && difference < 0.1f)
     {
-        size_t amount = (size_t)(-delta);
-        model->update_scroll_offset =
-            amount > model->update_scroll_offset ? 0 : model->update_scroll_offset - amount;
+        model->update_scroll_offset = model->update_scroll_target;
+        return 0;
     }
-    else
-    {
-        size_t next = model->update_scroll_offset + (size_t)delta;
-        model->update_scroll_offset = next > maximum ? maximum : next;
-    }
+    float blend = (float)(delta_seconds * 18.0);
+    if (blend > 1.0f)
+        blend = 1.0f;
+    model->update_scroll_offset += difference * blend;
+    return 1;
 }

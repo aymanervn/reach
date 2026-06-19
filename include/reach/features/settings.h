@@ -32,9 +32,12 @@ extern "C"
         REACH_SETTINGS_HIT_NAV_ITEM,
         REACH_SETTINGS_HIT_CLOSE,
         REACH_SETTINGS_HIT_MINIMIZE,
-        REACH_SETTINGS_HIT_UPDATE_SEARCH,
+        REACH_SETTINGS_HIT_UPDATE_REFRESH,
         REACH_SETTINGS_HIT_UPDATE_INSTALL,
-        REACH_SETTINGS_HIT_UPDATE_CHECKBOX
+        REACH_SETTINGS_HIT_UPDATE_RESTART,
+        REACH_SETTINGS_HIT_UPDATE_CHECKBOX,
+        REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK,
+        REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB
     } reach_settings_hit_type;
 
     typedef enum reach_settings_update_page_state
@@ -54,10 +57,11 @@ extern "C"
     {
         reach_settings_page selected_page;
         reach_settings_update_page_state update_page_state;
+        int32_t update_scan_completed;
         reach_windows_update_list update_list;
-        uint16_t update_status[REACH_WINDOWS_UPDATE_TEXT_CAPACITY];
-        int32_t update_operation_hresult;
-        size_t update_scroll_offset;
+        float update_scroll_offset;
+        float update_scroll_target;
+        float update_scroll_max;
     } reach_settings_model;
 
     typedef struct reach_settings_nav_item
@@ -86,12 +90,20 @@ extern "C"
         reach_rect_f32 content;
         reach_rect_f32 content_title;
         reach_rect_f32 content_placeholder;
-        reach_rect_f32 update_search_button;
+        reach_rect_f32 update_refresh_button;
         reach_rect_f32 update_install_button;
-        reach_rect_f32 update_status;
+        reach_rect_f32 update_restart_button;
+        reach_rect_f32 update_viewport;
+        reach_rect_f32 update_scrollbar_track;
+        reach_rect_f32 update_scrollbar_thumb;
+        reach_rect_f32 update_section_titles[3];
+        size_t update_section_ids[3];
+        size_t update_section_count;
         reach_rect_f32 update_rows[REACH_WINDOWS_UPDATE_MAX_UPDATES];
         reach_rect_f32 update_checkboxes[REACH_WINDOWS_UPDATE_MAX_UPDATES];
+        size_t update_indices[REACH_WINDOWS_UPDATE_MAX_UPDATES];
         size_t update_row_count;
+        float update_content_height;
         reach_settings_nav_item_layout nav_items[REACH_SETTINGS_NAV_ITEM_COUNT];
         size_t nav_item_count;
     } reach_settings_layout;
@@ -123,16 +135,18 @@ extern "C"
         reach_settings_model *model, const reach_windows_update_operation_result *result);
     void reach_settings_model_toggle_update(reach_settings_model *model, size_t index);
     size_t reach_settings_model_selected_update_count(const reach_settings_model *model);
+    size_t reach_settings_model_restart_required_count(const reach_settings_model *model);
     int32_t reach_settings_model_update_busy(const reach_settings_model *model);
-    void reach_settings_model_scroll_updates(reach_settings_model *model, int32_t delta,
-                                             size_t visible_count);
+    void reach_settings_model_scroll_updates(reach_settings_model *model, float delta);
+    int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds);
 
     const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count);
     const uint16_t *reach_settings_page_title(reach_settings_page page);
     const uint16_t *reach_settings_page_placeholder(reach_settings_page page);
     reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                                            const reach_theme *theme,
-                                                           float dpi_scale);
+                                                           float dpi_scale,
+                                                           reach_settings_model *model);
     reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *layout, float x,
                                                       float y);
     reach_result reach_settings_build_render_commands(const reach_settings_render_input *input,

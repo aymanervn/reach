@@ -15,7 +15,6 @@
 #include "reach/features/pin_config.h"
 #include "reach/features/popup.h"
 #include "reach/features/quick_settings.h"
-#include "reach/features/settings.h"
 #include "reach/features/switcher.h"
 #include "reach/features/tray.h"
 #include "reach/features/wallpaper.h"
@@ -389,36 +388,6 @@ typedef struct reach_shell_quick_settings_system_refresh_state
     void (*notify)(reach_shell *shell);
 } reach_shell_quick_settings_system_refresh_state;
 
-typedef enum reach_shell_windows_update_work_type
-{
-    REACH_SHELL_WINDOWS_UPDATE_WORK_NONE = 0,
-    REACH_SHELL_WINDOWS_UPDATE_WORK_SCAN,
-    REACH_SHELL_WINDOWS_UPDATE_WORK_INSTALL,
-    REACH_SHELL_WINDOWS_UPDATE_WORK_VERIFY
-} reach_shell_windows_update_work_type;
-
-typedef struct reach_shell_windows_update_worker_state
-{
-    std::thread thread;
-    std::mutex mutex;
-    std::condition_variable cv;
-    int32_t thread_started;
-    int32_t stop;
-    int32_t pending;
-    int32_t in_flight;
-    int32_t completed;
-    reach_shell_windows_update_work_type pending_work;
-    reach_shell_windows_update_work_type completed_work;
-    reach_windows_update_identity selected[REACH_WINDOWS_UPDATE_MAX_UPDATES];
-    size_t selected_count;
-    reach_windows_update_list scan_result;
-    reach_windows_update_operation_result operation_result;
-    int32_t scan_hresult;
-    reach_result work_result;
-    std::atomic<int32_t> progress_state;
-    void (*notify)(reach_shell *shell);
-} reach_shell_windows_update_worker_state;
-
 typedef struct reach_shell_quick_settings_bluetooth_pending_state
 {
     int32_t active;
@@ -437,13 +406,13 @@ struct reach_shell
     reach_surface_runtime switcher;
     reach_surface_runtime context_menu;
     reach_surface_runtime quick_settings;
-    reach_surface_runtime settings;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
     reach_tray_provider_port tray_provider;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
+    reach_settings_launcher_port settings_launcher;
     reach_icon_provider_port icon_provider;
     reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
@@ -498,8 +467,6 @@ struct reach_shell
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
     reach_media_controls_port media_controls;
-    reach_windows_update_port windows_update;
-    reach_shell_windows_update_worker_state windows_update_worker;
     reach_music_widget_model music_widget_model;
     reach_music_widget_layout music_widget_layout;
     reach_music_widget_action_type pressed_music_widget_action;
@@ -526,11 +493,6 @@ struct reach_shell
     reach_rect_f32 quick_settings_content_bounds;
     float quick_settings_notch_anchor_x;
     reach_shell_popup_bounds_animation quick_settings_bounds_animation;
-    int32_t settings_open;
-    reach_settings_model settings_model;
-    reach_settings_layout settings_layout;
-    reach_rect_f32 settings_bounds;
-    reach_rect_f32 settings_restored_bounds;
     reach_popup_capture_port popup_capture;
 };
 
@@ -542,6 +504,17 @@ static const size_t REACH_SHELL_DOCK_FEEDBACK_NONE = REACH_MAX_PINNED_APPS + 3;
 static inline float reach_shell_layout_dpi_scale(const reach_shell *shell)
 {
     return shell != nullptr && shell->layout_dpi_scale > 0.0f ? shell->layout_dpi_scale : 1.0f;
+}
+
+static inline float reach_shell_monitor_dpi_scale(const reach_monitor_info *monitor)
+{
+    if (monitor == nullptr)
+    {
+        return 1.0f;
+    }
+
+    int32_t dpi = monitor->dpi_y > 0 ? monitor->dpi_y : monitor->dpi_x;
+    return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
 }
 
 /* Generic shell/window helpers */
@@ -652,13 +625,9 @@ reach_result reach_shell_refresh_open_windows(reach_shell *shell, int32_t *out_c
 void reach_shell_note_foreground_window(reach_shell *shell, uintptr_t foreground_window);
 
 int32_t reach_shell_window_is_minimized(const reach_shell *shell, uintptr_t window_id);
-int32_t reach_shell_window_is_settings_window(const reach_shell *shell, uintptr_t window_id);
-int32_t reach_shell_foreground_is_settings_window(const reach_shell *shell, uintptr_t window_id);
 void reach_shell_dock_item_menu_capabilities_for_index(
     const reach_shell *shell, size_t item_index,
     reach_shell_dock_item_menu_capabilities *out_capabilities);
-reach_result reach_shell_execute_settings_window_control(reach_shell *shell,
-                                                         reach_shell_window_control_action action);
 reach_result reach_shell_execute_window_control(reach_shell *shell,
                                                 reach_shell_window_control_action action,
                                                 uintptr_t window_id);
@@ -785,33 +754,12 @@ void reach_shell_execute_quick_settings_action(reach_shell *shell,
 
 void reach_shell_on_system_controls_changed(void *user, uint32_t change_flags);
 
-void reach_shell_schedule_windows_update_scan(reach_shell *shell);
-void reach_shell_schedule_windows_update_install(reach_shell *shell);
-void reach_shell_schedule_windows_update_resume_verification(reach_shell *shell);
-void reach_shell_apply_windows_update_result(reach_shell *shell);
-void reach_shell_apply_windows_update_progress(reach_shell *shell);
-void reach_shell_stop_windows_update_worker(reach_shell *shell);
-int32_t reach_shell_windows_update_work_pending(const reach_shell *shell);
-
 void reach_shell_end_quick_settings_drag(reach_shell *shell);
 
 reach_result reach_shell_begin_quick_settings_drag_if_hit(reach_shell *shell,
                                                           const reach_ui_event *event);
 
 reach_result reach_shell_update_quick_settings_drag(reach_shell *shell,
-                                                    const reach_ui_event *event);
-
-/* Settings orchestration */
-
-void reach_shell_open_settings(reach_shell *shell);
-void reach_shell_close_settings(reach_shell *shell);
-void reach_shell_minimize_settings(reach_shell *shell);
-int32_t reach_shell_settings_window_minimized(const reach_shell *shell);
-void reach_shell_sync_settings_bounds_from_window(reach_shell *shell);
-void reach_shell_refresh_settings_layout(reach_shell *shell);
-reach_result reach_shell_handle_settings_pointer_wheel(reach_shell *shell,
-                                                       const reach_ui_event *event);
-reach_result reach_shell_handle_settings_pointer_up(reach_shell *shell,
                                                     const reach_ui_event *event);
 
 /* Switcher orchestration */
@@ -847,7 +795,6 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
 reach_result reach_shell_render_tray_surface(reach_shell *shell, reach_rect_f32 bounds);
 
 reach_result reach_shell_render_quick_settings_surface(reach_shell *shell);
-reach_result reach_shell_render_settings_surface(reach_shell *shell);
 
 reach_result reach_shell_render_switcher_surface(reach_shell *shell, reach_rect_f32 bounds);
 

@@ -17,6 +17,4 @@ const uint16_t *reach_settings_account_page_placeholder(void);
 const uint16_t *reach_settings_startup_apps_page_placeholder(void);
 const uint16_t *reach_settings_power_sleep_page_placeholder(void);
 const uint16_t *reach_settings_monitors_scaling_page_placeholder(void);
-const uint16_t *reach_settings_update_page_placeholder(void);
-
 #endif

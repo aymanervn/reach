@@ -13,6 +13,8 @@ extern "C"
 #define REACH_WINDOWS_UPDATE_TEXT_CAPACITY 260
 #define REACH_WINDOWS_UPDATE_METADATA_CAPACITY 512
 #define REACH_WINDOWS_UPDATE_ID_CAPACITY 64
+#define REACH_WINDOWS_UPDATE_SEVERITY_CAPACITY 64
+#define REACH_WINDOWS_UPDATE_BULLETIN_CAPACITY 256
 
     typedef enum reach_windows_update_state
     {
@@ -61,8 +63,13 @@ extern "C"
     {
         reach_windows_update_identity identity;
         uint16_t categories[REACH_WINDOWS_UPDATE_METADATA_CAPACITY];
+        uint16_t msrc_severity[REACH_WINDOWS_UPDATE_SEVERITY_CAPACITY];
+        uint16_t security_bulletin_ids[REACH_WINDOWS_UPDATE_BULLETIN_CAPACITY];
         uint16_t selected_reason[REACH_WINDOWS_UPDATE_TEXT_CAPACITY];
         int32_t downloaded;
+        int32_t eula_accepted;
+        int32_t can_request_user_input;
+        int32_t requires_network_connectivity;
         int32_t reboot_required_known;
         int32_t reboot_required;
         int32_t selected;

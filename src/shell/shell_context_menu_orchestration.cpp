@@ -157,8 +157,9 @@ reach_result reach_shell_execute_context_command(reach_shell *shell, uint32_t co
     if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS)
     {
         reach_shell_close_context_menu(shell);
-        reach_shell_open_settings(shell);
-        return REACH_OK;
+        return shell->settings_launcher.ops.open != nullptr
+                   ? shell->settings_launcher.ops.open(shell->settings_launcher.launcher)
+                   : REACH_ERROR;
     }
 
     if (shell->context_menu_state.target_index >= shell->dock_model.item_count)

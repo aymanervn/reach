@@ -30,6 +30,33 @@ static int32_t contains_case_insensitive(const uint16_t *text, const char *needl
     return 0;
 }
 
+static int32_t is_ascii_digit(uint16_t value)
+{
+    return value >= (uint16_t)'0' && value <= (uint16_t)'9';
+}
+
+static int32_t contains_kb_id(const uint16_t *kb_ids, const char *expected)
+{
+    if (kb_ids == nullptr || expected == nullptr || expected[0] == 0)
+        return 0;
+    for (size_t start = 0; kb_ids[start] != 0; ++start)
+    {
+        size_t text_index = start;
+        if ((kb_ids[text_index] == (uint16_t)'K' || kb_ids[text_index] == (uint16_t)'k') &&
+            (kb_ids[text_index + 1] == (uint16_t)'B' || kb_ids[text_index + 1] == (uint16_t)'b'))
+            text_index += 2;
+        size_t expected_index = 0;
+        while (expected[expected_index] != 0 &&
+               kb_ids[text_index + expected_index] ==
+                   (uint16_t)(unsigned char)expected[expected_index])
+            ++expected_index;
+        if (expected[expected_index] == 0 && !is_ascii_digit(kb_ids[text_index + expected_index]) &&
+            (start == 0 || !is_ascii_digit(kb_ids[start - 1])))
+            return 1;
+    }
+    return 0;
+}
+
 static void copy_ascii(uint16_t *destination, size_t capacity, const char *source)
 {
     if (destination == nullptr || capacity == 0)
@@ -69,6 +96,12 @@ reach_windows_update_matches_security_maintenance(const reach_windows_update_ite
         if (contains_case_insensitive(update->identity.title, term))
             return 1;
     }
+    static const char *kb_ids[] = {"890830", "5007651", "2267602"};
+    for (const char *kb_id : kb_ids)
+    {
+        if (contains_kb_id(update->identity.kb_article_ids, kb_id))
+            return 1;
+    }
     return 0;
 }
 
@@ -86,6 +119,8 @@ extern "C" void reach_windows_update_apply_default_selection(reach_windows_updat
         if (update->selected)
             copy_ascii(update->selected_reason, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
                        "SecurityMaintenance");
+        else
+            update->selected_reason[0] = 0;
     }
 }
 
@@ -115,32 +150,5 @@ extern "C" const uint16_t *reach_windows_update_state_label(reach_windows_update
         return (const uint16_t *)u"Failed";
     default:
         return (const uint16_t *)u"Available";
-    }
-}
-
-extern "C" const uint16_t *
-reach_windows_update_failure_label(reach_windows_update_failure_class failure)
-{
-    switch (failure)
-    {
-    case REACH_WINDOWS_UPDATE_NOT_ELEVATED:
-        return (
-            const uint16_t *)u"Administrator permission is required to install Windows updates.";
-    case REACH_WINDOWS_UPDATE_DOWNLOAD_FAILED:
-        return (const uint16_t *)u"Download failed";
-    case REACH_WINDOWS_UPDATE_INSTALL_FAILED:
-        return (const uint16_t *)u"Install failed";
-    case REACH_WINDOWS_UPDATE_VERIFICATION_FAILED:
-        return (const uint16_t *)u"Verification failed";
-    case REACH_WINDOWS_UPDATE_REBOOT_REQUIRED_BEFORE_INSTALL:
-        return (const uint16_t *)u"Restart required before installation";
-    case REACH_WINDOWS_UPDATE_SUPERSEDED_OR_NO_LONGER_APPLICABLE:
-        return (const uint16_t *)u"Superseded or no longer applicable";
-    case REACH_WINDOWS_UPDATE_POLICY_BLOCKED:
-        return (const uint16_t *)u"Blocked by update policy";
-    case REACH_WINDOWS_UPDATE_ANOTHER_OPERATION_IN_PROGRESS:
-        return (const uint16_t *)u"Another update operation is in progress";
-    default:
-        return (const uint16_t *)u"";
     }
 }

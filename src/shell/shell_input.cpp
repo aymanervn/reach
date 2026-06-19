@@ -183,15 +183,6 @@ static reach_result reach_shell_handle_pointer_wheel(reach_shell *shell,
     {
         return REACH_OK;
     }
-    if (shell->settings_open)
-    {
-        (void)reach_shell_handle_settings_pointer_wheel(shell, event);
-        if ((float)event->x >= shell->settings_bounds.x &&
-            (float)event->x <= shell->settings_bounds.x + shell->settings_bounds.width &&
-            (float)event->y >= shell->settings_bounds.y &&
-            (float)event->y <= shell->settings_bounds.y + shell->settings_bounds.height)
-            return REACH_OK;
-    }
     if (!shell->has_layout || !shell->ui.launcher.open)
     {
         return REACH_OK;
@@ -423,15 +414,6 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         return REACH_OK;
     }
 
-    if (shell->settings_open)
-    {
-        reach_shell_sync_settings_bounds_from_window(shell);
-        if (reach_rect_contains(shell->settings_bounds, event->x, event->y))
-        {
-            return reach_shell_handle_settings_pointer_up(shell, event);
-        }
-    }
-
     if (shell->context_menu_state.open)
     {
         reach_context_menu_hit_result context_hit = reach_context_menu_hit_test_items(
@@ -632,15 +614,6 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     }
 
     reach_shell_clear_sticky_dock_feedback(shell);
-
-    if (shell->settings_open)
-    {
-        reach_shell_sync_settings_bounds_from_window(shell);
-        if (reach_rect_contains(shell->settings_bounds, event->x, event->y))
-        {
-            return REACH_OK;
-        }
-    }
 
     if (shell->quick_settings_open)
     {
@@ -1011,12 +984,6 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         return REACH_OK;
     }
 
-    if (event->type == REACH_UI_EVENT_ESCAPE && shell->settings_open)
-    {
-        reach_shell_close_settings(shell);
-        return REACH_OK;
-    }
-
     if (event->type == REACH_UI_EVENT_ESCAPE && shell->context_menu_state.open)
     {
         reach_shell_close_context_menu(shell);
@@ -1097,7 +1064,6 @@ reach_result reach_shell_handle_event(reach_shell *shell, const reach_ui_event *
         shell->switcher.dirty_flags = 1;
         shell->context_menu.dirty_flags = 1;
         shell->quick_settings.dirty_flags = 1;
-        shell->settings.dirty_flags = 1;
         return REACH_OK;
     }
 
