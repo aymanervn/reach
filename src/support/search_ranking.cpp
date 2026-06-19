@@ -171,7 +171,7 @@ reach_search_result_kind reach_search_classify_result(const uint16_t *path, int3
         return REACH_SEARCH_RESULT_FOLDER;
     }
 
-    static const char *const app_extensions[] = {".exe", ".lnk"};
+    static const char *const app_extensions[] = {".exe"};
     static const char *const photo_extensions[] = {".png", ".jpg", ".jpeg", ".webp",
                                                    ".gif", ".bmp", ".tif",  ".tiff"};
     static const char *const video_extensions[] = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".wmv"};
