@@ -28,7 +28,7 @@ int wmain(int argc, wchar_t **argv)
             }
 
             reach_result shell_result = reachctl_install_reach_shell_and_watchdog(reach_exe);
-            reach_result helper_result = reachctl_install_elevation_helper();
+            reach_result helper_result = reachctl_install_elevation_helper(nullptr);
             int ok = shell_result == REACH_OK && helper_result == REACH_OK;
             reachctl_print(ok ? L"Reach installed. Shell registry, watchdog task, "
                                 L"elevation helper task, and Explorer context menus "
@@ -46,15 +46,27 @@ int wmain(int argc, wchar_t **argv)
                 return 1;
             }
 
-            if (!reachctl_elevation_helper_is_installed())
+            int ok = reachctl_start_reach_session(reach_exe) == REACH_OK;
+            reachctl_print(ok ? L"Reach started for current session." : L"Reach start failed.");
+            return ok ? 0 : 1;
+        }
+
+        if (lstrcmpiW(argv[index], L"--install-elevation-helper") == 0)
+        {
+            if (!reachctl_is_process_elevated())
             {
-                reachctl_print(L"Reach elevation helper task is not installed. Run reachctl "
-                               L"--install from an elevated PowerShell first.");
+                reachctl_print(L"Elevation helper repair requires Administrator privileges.");
                 return 1;
             }
 
-            int ok = reachctl_start_reach_session(reach_exe) == REACH_OK;
-            reachctl_print(ok ? L"Reach started for current session." : L"Reach start failed.");
+            const wchar_t *user_id = nullptr;
+            if (index + 2 < argc && lstrcmpiW(argv[index + 1], L"--user-id") == 0)
+            {
+                user_id = argv[index + 2];
+            }
+            int ok = reachctl_install_elevation_helper(user_id) == REACH_OK;
+            reachctl_print(ok ? L"Reach elevation helper repaired."
+                              : L"Reach elevation helper repair failed.");
             return ok ? 0 : 1;
         }
 
@@ -110,6 +122,7 @@ int wmain(int argc, wchar_t **argv)
 
     reachctl_print(L"Usage: reachctl.exe\n"
                    L"  --install\n"
+                   L"  --install-elevation-helper\n"
                    L"  --start\n"
                    L"  --reset\n"
                    L"  --list-monitors\n"

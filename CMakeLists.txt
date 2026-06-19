@@ -131,6 +131,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/window_management/elevation_helper_protocol.cpp
     src/adapters/windows/window_management/elevation_helper_client_win32.cpp
     src/adapters/windows/window_management/elevation_helper_shared_state_win32.cpp
+    src/adapters/windows/window_management/elevation_helper_task_win32.cpp
     src/adapters/windows/window_management/window_manager_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp
@@ -170,6 +171,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     advapi32
     ole32
     oleaut32
+    taskschd
     runtimeobject
     uuid
     windowscodecs
@@ -335,6 +337,7 @@ add_executable(reachctl
     src/tools/reachctl/reachctl_config_commands.cpp
     src/tools/reachctl/reachctl_context_menu.cpp
     src/tools/reachctl/reachctl_elevation_helper.cpp
+    src/adapters/windows/window_management/elevation_helper_task_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
@@ -354,6 +357,8 @@ target_link_libraries(reachctl PRIVATE
     user32
     advapi32
     ole32
+    oleaut32
+    taskschd
     uuid
 )
 

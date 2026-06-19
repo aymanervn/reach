@@ -398,13 +398,6 @@ reach_result reach_shell_execute_window_control(reach_shell *shell,
         return reach_shell_dispatch_window_control(shell, action, window_id);
     }
 
-    if (shell->window_manager.ops.confirm_privileged_control_restart == nullptr ||
-        !shell->window_manager.ops.confirm_privileged_control_restart(
-            shell->window_manager.manager))
-    {
-        return REACH_ERROR;
-    }
-
     if (shell->window_manager.ops.start_privileged_control == nullptr ||
         shell->window_manager.ops.start_privileged_control(shell->window_manager.manager) !=
             REACH_OK)
