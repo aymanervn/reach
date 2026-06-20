@@ -126,6 +126,7 @@ void reach_shell_close_transient_surfaces(reach_shell *shell, int32_t restore_la
     }
     reach_shell_set_tray_popup_open(shell, 0);
     reach_shell_set_quick_settings_open(shell, 0);
+    reach_shell_set_clipboard_open(shell, 0);
     reach_shell_close_context_menu(shell);
     reach_shell_clear_sticky_dock_feedback(shell);
 }

@@ -362,6 +362,16 @@ static reach_result reach_shell_step_brightness(reach_shell *shell, float delta)
     return REACH_OK;
 }
 
+static reach_result reach_shell_open_launcher_result_and_close_transients(reach_shell *shell)
+{
+    reach_result activation_result = reach_shell_open_launcher_result(shell);
+    if (activation_result == REACH_OK)
+    {
+        reach_shell_close_transient_surfaces(shell, 0);
+    }
+    return activation_result;
+}
+
 static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reach_ui_event *event)
 {
     if (shell == nullptr || event == nullptr || !shell->has_layout)
@@ -497,7 +507,7 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
 
         if (launcher_action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT && launcher_pressed_match)
         {
-            return reach_shell_open_launcher_result(shell);
+            return reach_shell_open_launcher_result_and_close_transients(shell);
         }
     }
 
@@ -1375,7 +1385,7 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
     }
     else if (intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT)
     {
-        return reach_shell_open_launcher_result(shell);
+        return reach_shell_open_launcher_result_and_close_transients(shell);
     }
 
     return REACH_OK;
