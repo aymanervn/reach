@@ -40,8 +40,8 @@ static void reach_shell_on_clipboard_changed(void *user)
     {
         return;
     }
-    (void)shell->clipboard_surface.window.ops.post_event(
-        shell->clipboard_surface.window.window, REACH_UI_EVENT_CLIPBOARD_CHANGED);
+    (void)shell->clipboard_surface.window.ops.post_event(shell->clipboard_surface.window.window,
+                                                         REACH_UI_EVENT_CLIPBOARD_CHANGED);
 }
 
 static void reach_shell_cleanup(reach_shell *shell)
@@ -484,9 +484,8 @@ reach_result reach_shell_start(reach_shell *shell)
     }
     if (shell->launcher.window.ops.set_event_callback != nullptr)
     {
-        result = shell->launcher.window.ops.set_event_callback(shell->launcher.window.window,
-                                                               reach_shell_on_launcher_window_event,
-                                                               shell);
+        result = shell->launcher.window.ops.set_event_callback(
+            shell->launcher.window.window, reach_shell_on_launcher_window_event, shell);
         if (result != REACH_OK)
         {
             return result;
@@ -503,9 +502,8 @@ reach_result reach_shell_start(reach_shell *shell)
     }
     if (shell->switcher.window.ops.set_event_callback != nullptr)
     {
-        result = shell->switcher.window.ops.set_event_callback(shell->switcher.window.window,
-                                                               reach_shell_on_switcher_window_event,
-                                                               shell);
+        result = shell->switcher.window.ops.set_event_callback(
+            shell->switcher.window.window, reach_shell_on_switcher_window_event, shell);
         if (result != REACH_OK)
         {
             return result;

@@ -88,13 +88,12 @@ static void reach_ui_state_keep_selected_launcher_result_visible(reach_ui_state 
     size_t offset = reach_ui_state_launcher_scroll_offset(state);
     if (state->launcher.selected_result_index < offset)
     {
-        reach_ui_state_set_launcher_scroll_immediate(state,
-                                                     state->launcher.selected_result_index);
+        reach_ui_state_set_launcher_scroll_immediate(state, state->launcher.selected_result_index);
     }
     else if (state->launcher.selected_result_index >= offset + visible_count)
     {
-        reach_ui_state_set_launcher_scroll_immediate(
-            state, state->launcher.selected_result_index - visible_count + 1);
+        reach_ui_state_set_launcher_scroll_immediate(state, state->launcher.selected_result_index -
+                                                                visible_count + 1);
     }
 
     reach_ui_state_clamp_launcher_result_scroll(state);
@@ -118,8 +117,8 @@ void reach_ui_state_init(reach_ui_state *state)
     state->launcher.query_length = 0;
     state->launcher.result_count = 0;
     state->launcher.selected_result_index = 0;
-    reach_scrollbar_model_init(&state->launcher.result_scrollbar,
-                               REACH_SCROLLBAR_DRAG_STEPPED, 1.0f);
+    reach_scrollbar_model_init(&state->launcher.result_scrollbar, REACH_SCROLLBAR_DRAG_STEPPED,
+                               1.0f);
     state->pinned_app_count = 0;
 }
 

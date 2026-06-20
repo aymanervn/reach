@@ -13,16 +13,15 @@ static float reach_scrollbar_clamp(float value, float minimum, float maximum)
 
 static float reach_scrollbar_quantize(const reach_scrollbar_model *model, float value)
 {
-    if (model == nullptr || model->drag_mode != REACH_SCROLLBAR_DRAG_STEPPED ||
-        model->step <= 0.0f)
+    if (model == nullptr || model->drag_mode != REACH_SCROLLBAR_DRAG_STEPPED || model->step <= 0.0f)
     {
         return value;
     }
     return floorf(value / model->step + 0.5f) * model->step;
 }
 
-void reach_scrollbar_model_init(reach_scrollbar_model *model,
-                                reach_scrollbar_drag_mode drag_mode, float step)
+void reach_scrollbar_model_init(reach_scrollbar_model *model, reach_scrollbar_drag_mode drag_mode,
+                                float step)
 {
     if (model == nullptr)
     {
@@ -85,8 +84,7 @@ int32_t reach_scrollbar_update(reach_scrollbar_model *model, double delta_second
 }
 
 reach_scrollbar_layout reach_scrollbar_compute_layout(const reach_scrollbar_model *model,
-                                                      reach_rect_f32 track,
-                                                      float viewport_extent,
+                                                      reach_rect_f32 track, float viewport_extent,
                                                       float content_extent,
                                                       float minimum_thumb_extent)
 {
@@ -118,14 +116,12 @@ void reach_scrollbar_begin_drag(reach_scrollbar_model *model, reach_scrollbar_dr
                                 const reach_scrollbar_layout *layout, float pointer_position,
                                 int32_t on_thumb)
 {
-    if (model == nullptr || drag == nullptr || layout == nullptr ||
-        layout->thumb.height <= 0.0f)
+    if (model == nullptr || drag == nullptr || layout == nullptr || layout->thumb.height <= 0.0f)
     {
         return;
     }
     drag->active = 1;
-    drag->grab_offset =
-        on_thumb ? pointer_position - layout->thumb.y : layout->thumb.height * 0.5f;
+    drag->grab_offset = on_thumb ? pointer_position - layout->thumb.y : layout->thumb.height * 0.5f;
     reach_scrollbar_update_drag(model, drag, layout, pointer_position);
 }
 
@@ -144,8 +140,7 @@ void reach_scrollbar_update_drag(reach_scrollbar_model *model, const reach_scrol
         return;
     }
     float progress = (pointer_position - drag->grab_offset - layout->track.y) / travel;
-    reach_scrollbar_set_target(model, reach_scrollbar_clamp(progress, 0.0f, 1.0f) *
-                                         model->maximum);
+    reach_scrollbar_set_target(model, reach_scrollbar_clamp(progress, 0.0f, 1.0f) * model->maximum);
     model->offset = model->target;
 }
 

@@ -632,8 +632,7 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     }
 }
 
-static void reach_settings_handle_pointer_down(reach_settings_app *app,
-                                               const reach_ui_event *event)
+static void reach_settings_handle_pointer_down(reach_settings_app *app, const reach_ui_event *event)
 {
     if (app == nullptr || event == nullptr ||
         app->model.selected_page != REACH_SETTINGS_PAGE_UPDATE)
@@ -660,8 +659,7 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app,
     app->dirty = 1;
 }
 
-static void reach_settings_handle_pointer_move(reach_settings_app *app,
-                                               const reach_ui_event *event)
+static void reach_settings_handle_pointer_move(reach_settings_app *app, const reach_ui_event *event)
 {
     if (app == nullptr || event == nullptr || !app->update_scrollbar_drag.active)
     {

@@ -38,7 +38,8 @@ struct reach_clipboard_metrics
     float thumbnail_padding;
     float thumbnail_height;
     float thumbnail_text_gap;
-    float thumbnail_max_width_ratio;};
+    float thumbnail_max_width_ratio;
+};
 
 static constexpr reach_clipboard_metrics reach_clipboard_make_metrics()
 {
@@ -75,7 +76,8 @@ static constexpr reach_clipboard_metrics reach_clipboard_make_metrics()
     metrics.thumbnail_padding = 12.0f;
     metrics.thumbnail_height = 72.0f;
     metrics.thumbnail_text_gap = 12.0f;
-    metrics.thumbnail_max_width_ratio = 0.50f;return metrics;
+    metrics.thumbnail_max_width_ratio = 0.50f;
+    return metrics;
 }
 
 static constexpr reach_clipboard_metrics reach_clipboard_metrics_values =
@@ -96,8 +98,7 @@ static inline reach_clipboard_metrics reach_clipboard_metrics_for_scale(float dp
     reach_clipboard_metrics metrics = reach_clipboard_metrics_values;
 
     metrics.panel_width = reach_clipboard_scale_value(metrics.panel_width, dpi_scale);
-    metrics.screen_edge_margin =
-        reach_clipboard_scale_value(metrics.screen_edge_margin, dpi_scale);
+    metrics.screen_edge_margin = reach_clipboard_scale_value(metrics.screen_edge_margin, dpi_scale);
     metrics.launcher_gap = reach_clipboard_scale_value(metrics.launcher_gap, dpi_scale);
 
     metrics.title_height = reach_clipboard_scale_value(metrics.title_height, dpi_scale);
@@ -124,7 +125,8 @@ static inline reach_clipboard_metrics reach_clipboard_metrics_for_scale(float dp
     metrics.item_radius = reach_clipboard_scale_value(metrics.item_radius, dpi_scale);
     metrics.thumbnail_padding = reach_clipboard_scale_value(metrics.thumbnail_padding, dpi_scale);
     metrics.thumbnail_height = reach_clipboard_scale_value(metrics.thumbnail_height, dpi_scale);
-    metrics.thumbnail_text_gap = reach_clipboard_scale_value(metrics.thumbnail_text_gap, dpi_scale);return metrics;
+    metrics.thumbnail_text_gap = reach_clipboard_scale_value(metrics.thumbnail_text_gap, dpi_scale);
+    return metrics;
 }
 
 #endif

@@ -300,8 +300,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
     if (scroll_max > 0.0f && model != nullptr)
     {
         reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-            &model->update_scrollbar, layout.update_scrollbar_track,
-            layout.update_viewport.height, layout.update_content_height, 34.0f * scale);
+            &model->update_scrollbar, layout.update_scrollbar_track, layout.update_viewport.height,
+            layout.update_content_height, 34.0f * scale);
         layout.update_scrollbar_track = scrollbar.track;
         layout.update_scrollbar_thumb = scrollbar.thumb;
     }

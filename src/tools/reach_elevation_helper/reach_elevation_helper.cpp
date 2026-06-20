@@ -1575,9 +1575,9 @@ enum reach_helper_pipe_wait_result
     REACH_HELPER_PIPE_WAIT_FAILED,
 };
 
-static reach_helper_pipe_wait_result
-reach_helper_wait_for_pipe_io(HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
-                              DWORD *out_transferred)
+static reach_helper_pipe_wait_result reach_helper_wait_for_pipe_io(HANDLE shell_mutex, HANDLE pipe,
+                                                                   OVERLAPPED *overlapped,
+                                                                   DWORD *out_transferred)
 {
     HANDLE waits[] = {shell_mutex, overlapped->hEvent};
     DWORD wait = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
@@ -1603,9 +1603,9 @@ reach_helper_wait_for_pipe_io(HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overl
     return REACH_HELPER_PIPE_WAIT_COMPLETED;
 }
 
-static reach_helper_pipe_wait_result reach_helper_read_request(
-    HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
-    reach_elevation_helper_request *request)
+static reach_helper_pipe_wait_result
+reach_helper_read_request(HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
+                          reach_elevation_helper_request *request)
 {
     ResetEvent(overlapped->hEvent);
     DWORD read = 0;
@@ -1626,9 +1626,9 @@ static reach_helper_pipe_wait_result reach_helper_read_request(
                : wait;
 }
 
-static reach_helper_pipe_wait_result reach_helper_write_response(
-    HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
-    const reach_elevation_helper_response *response)
+static reach_helper_pipe_wait_result
+reach_helper_write_response(HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
+                            const reach_elevation_helper_response *response)
 {
     ResetEvent(overlapped->hEvent);
     DWORD written = 0;

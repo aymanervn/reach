@@ -11,8 +11,8 @@ static void reach_shell_start_dock_click_feedback(reach_shell *shell, size_t ind
     shell->feedback.dock_index = index;
 
     reach_animation_manager_animate_to(&shell->animations,
-                                       REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY,
-                                       target_opacity, 0.055, REACH_EASING_EASE_IN_OUT);
+                                       REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY, target_opacity,
+                                       0.055, REACH_EASING_EASE_IN_OUT);
 
     shell->dock.dirty_flags = 1;
 }
@@ -38,8 +38,8 @@ void reach_shell_set_dock_click_feedback_immediate(reach_shell *shell, size_t in
     }
 
     shell->feedback.dock_index = index;
-    reach_animation_manager_set(&shell->animations,
-                                REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY, opacity);
+    reach_animation_manager_set(&shell->animations, REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY,
+                                opacity);
     shell->dock.dirty_flags = 1;
 }
 
@@ -136,8 +136,8 @@ static void reach_shell_start_tray_click_feedback(reach_shell *shell, size_t ind
     shell->feedback.tray_index = index;
 
     reach_animation_manager_animate_to(&shell->animations,
-                                       REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY,
-                                       target_opacity, 0.055, REACH_EASING_EASE_IN_OUT);
+                                       REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY, target_opacity,
+                                       0.055, REACH_EASING_EASE_IN_OUT);
 
     shell->tray.dirty_flags = 1;
 }

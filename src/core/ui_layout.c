@@ -156,9 +156,8 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
 
         float min_thumb_height = reach_scale(22.0f, scale);
         reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-            &state->launcher.result_scrollbar,
-            out_layout->launcher.search_result_scrollbar_track, (float)visible_result_count,
-            (float)state->launcher.result_count, min_thumb_height);
+            &state->launcher.result_scrollbar, out_layout->launcher.search_result_scrollbar_track,
+            (float)visible_result_count, (float)state->launcher.result_count, min_thumb_height);
         out_layout->launcher.search_result_scrollbar_track = scrollbar.track;
         out_layout->launcher.search_result_scrollbar_thumb = scrollbar.thumb;
     }

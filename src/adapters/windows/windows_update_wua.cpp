@@ -123,9 +123,8 @@ class search_completed_callback final : public ISearchCompletedCallback
 
     HRESULT STDMETHODCALLTYPE Invoke(ISearchJob *, ISearchCompletedCallbackArgs *) override
     {
-        return completed_ != nullptr && SetEvent(completed_)
-                   ? S_OK
-                   : HRESULT_FROM_WIN32(GetLastError());
+        return completed_ != nullptr && SetEvent(completed_) ? S_OK
+                                                             : HRESULT_FROM_WIN32(GetLastError());
     }
 
     HANDLE completed_event() const
@@ -467,8 +466,7 @@ static reach_result scan(void *userdata, reach_windows_update_list *out_updates,
     if (out_updates == nullptr || out_hresult == nullptr)
         return REACH_INVALID_ARGUMENT;
 
-    reach_windows_update_adapter *adapter =
-        static_cast<reach_windows_update_adapter *>(userdata);
+    reach_windows_update_adapter *adapter = static_cast<reach_windows_update_adapter *>(userdata);
     if (adapter == nullptr)
         return REACH_INVALID_ARGUMENT;
 
@@ -748,8 +746,7 @@ static void save_pending_verification(const reach_windows_update_operation_resul
     if (!pending_verification_path(path, MAX_PATH))
         return;
 
-    std::unique_ptr<pending_verification_file> file(
-        new (std::nothrow) pending_verification_file());
+    std::unique_ptr<pending_verification_file> file(new (std::nothrow) pending_verification_file());
     if (file == nullptr)
         return;
     memset(file.get(), 0, sizeof(*file));
@@ -802,8 +799,7 @@ static reach_result load_pending_verification(void *, reach_windows_update_ident
     if (input == INVALID_HANDLE_VALUE)
         return GetLastError() == ERROR_FILE_NOT_FOUND ? REACH_OK : REACH_ERROR;
 
-    std::unique_ptr<pending_verification_file> file(
-        new (std::nothrow) pending_verification_file());
+    std::unique_ptr<pending_verification_file> file(new (std::nothrow) pending_verification_file());
     if (file == nullptr)
     {
         CloseHandle(input);
@@ -1420,15 +1416,14 @@ static reach_result install(void *userdata, const reach_windows_update_identity 
         selected_count > REACH_WINDOWS_UPDATE_MAX_UPDATES || result == nullptr)
         return REACH_INVALID_ARGUMENT;
 
-    reach_windows_update_adapter *adapter =
-        static_cast<reach_windows_update_adapter *>(userdata);
+    reach_windows_update_adapter *adapter = static_cast<reach_windows_update_adapter *>(userdata);
     if (adapter == nullptr)
         return REACH_INVALID_ARGUMENT;
 
-    return is_elevated()
-               ? install_elevated(adapter, selected, selected_count, progress, progress_user, result)
-               : request_elevated_install(selected, selected_count, progress, progress_user,
-                                          result);
+    return is_elevated() ? install_elevated(adapter, selected, selected_count, progress,
+                                            progress_user, result)
+                         : request_elevated_install(selected, selected_count, progress,
+                                                    progress_user, result);
 }
 
 static reach_result verify(void *userdata, const reach_windows_update_identity *installed,
@@ -1438,8 +1433,7 @@ static reach_result verify(void *userdata, const reach_windows_update_identity *
         installed_count > REACH_WINDOWS_UPDATE_MAX_UPDATES || result == nullptr)
         return REACH_INVALID_ARGUMENT;
 
-    reach_windows_update_adapter *adapter =
-        static_cast<reach_windows_update_adapter *>(userdata);
+    reach_windows_update_adapter *adapter = static_cast<reach_windows_update_adapter *>(userdata);
     if (adapter == nullptr)
         return REACH_INVALID_ARGUMENT;
 
@@ -1505,8 +1499,7 @@ static reach_result verify(void *userdata, const reach_windows_update_identity *
 
 static void cancel(void *userdata)
 {
-    reach_windows_update_adapter *adapter =
-        static_cast<reach_windows_update_adapter *>(userdata);
+    reach_windows_update_adapter *adapter = static_cast<reach_windows_update_adapter *>(userdata);
     if (adapter != nullptr)
         adapter->cancel_requested.store(1);
 }
@@ -1556,9 +1549,8 @@ extern "C" int reach_windows_update_helper_run(const wchar_t *request_path,
         return 2;
     }
 
-    response->result =
-        install_elevated(nullptr, request->selected, request->count, nullptr, nullptr,
-                         &response->operation);
+    response->result = install_elevated(nullptr, request->selected, request->count, nullptr,
+                                        nullptr, &response->operation);
     if (!write_all(response_path, response.get(), sizeof(*response)))
         return 3;
     return response->result == REACH_OK ? 0 : 1;

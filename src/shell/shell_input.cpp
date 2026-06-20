@@ -439,8 +439,8 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         uint64_t pressed_item_id = shell->clipboard_model.pressed_item_id;
         reach_clipboard_model_clear_press(&shell->clipboard_model);
         if (clipboard_hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE &&
-            pressed_hit_type == REACH_CLIPBOARD_HIT_ITEM_CLOSE &&
-            clipboard_hit.index == pressed && clipboard_hit.index < shell->clipboard_model.count &&
+            pressed_hit_type == REACH_CLIPBOARD_HIT_ITEM_CLOSE && clipboard_hit.index == pressed &&
+            clipboard_hit.index < shell->clipboard_model.count &&
             shell->clipboard_model.items[clipboard_hit.index].id == pressed_item_id)
         {
             reach_clipboard_item removed_item = shell->clipboard_model.items[clipboard_hit.index];

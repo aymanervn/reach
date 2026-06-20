@@ -53,8 +53,7 @@ typedef enum reach_shell_animation_id
     REACH_SHELL_ANIMATION_CLIPBOARD_HOVER_BASE,
     REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE =
         REACH_SHELL_ANIMATION_CLIPBOARD_HOVER_BASE + REACH_CLIPBOARD_MAX_ITEMS,
-    REACH_SHELL_ANIMATION_COUNT =
-        REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + REACH_MAX_PINNED_APPS
+    REACH_SHELL_ANIMATION_COUNT = REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + REACH_MAX_PINNED_APPS
 } reach_shell_animation_id;
 
 typedef struct reach_shell_surface_transition
@@ -582,20 +581,20 @@ reach_result reach_shell_apply_window_state(reach_platform_window_port *window,
                                             int32_t *bounds_valid, int32_t *opacity_valid,
                                             int32_t *out_changed);
 void reach_shell_surface_transition_init(reach_shell *shell,
-                                         reach_shell_surface_transition *transition,
-                                         size_t y_track, size_t opacity_track);
+                                         reach_shell_surface_transition *transition, size_t y_track,
+                                         size_t opacity_track);
 void reach_shell_surface_transitions_init(reach_shell *shell);
 void reach_shell_surface_transition_set(reach_shell *shell,
                                         reach_shell_surface_transition *transition, int32_t open);
-reach_rect_f32 reach_shell_surface_transition_bounds(
-    const reach_shell *shell, const reach_shell_surface_transition *transition,
-    reach_rect_f32 target_bounds);
-float reach_shell_surface_transition_opacity(
-    const reach_shell *shell, const reach_shell_surface_transition *transition);
-int32_t reach_shell_surface_transition_visible(
-    const reach_shell_surface_transition *transition);
-int32_t reach_shell_surface_transition_active(
-    const reach_shell *shell, const reach_shell_surface_transition *transition);
+reach_rect_f32
+reach_shell_surface_transition_bounds(const reach_shell *shell,
+                                      const reach_shell_surface_transition *transition,
+                                      reach_rect_f32 target_bounds);
+float reach_shell_surface_transition_opacity(const reach_shell *shell,
+                                             const reach_shell_surface_transition *transition);
+int32_t reach_shell_surface_transition_visible(const reach_shell_surface_transition *transition);
+int32_t reach_shell_surface_transition_active(const reach_shell *shell,
+                                              const reach_shell_surface_transition *transition);
 void reach_shell_surface_transition_finish(reach_shell *shell,
                                            reach_shell_surface_transition *transition);
 
@@ -636,11 +635,12 @@ void reach_shell_restore_launcher_focus(reach_shell *shell);
 reach_result reach_shell_open_launcher_result(reach_shell *shell);
 reach_result reach_shell_reveal_launcher_result(reach_shell *shell, size_t result_index);
 reach_result reach_shell_schedule_app_launch(reach_shell *shell,
-                                            const reach_app_launch_request *request);
+                                             const reach_app_launch_request *request);
 void reach_shell_stop_app_launch_worker(reach_shell *shell);
 void reach_shell_process_deferred_launcher_app_launch(reach_shell *shell);
-reach_result reach_shell_defer_app_launch_until_launcher_closed(
-    reach_shell *shell, const reach_app_launch_request *request);
+reach_result
+reach_shell_defer_app_launch_until_launcher_closed(reach_shell *shell,
+                                                   const reach_app_launch_request *request);
 
 void reach_shell_cancel_launcher_search(reach_shell *shell);
 reach_result reach_shell_schedule_launcher_search(reach_shell *shell);

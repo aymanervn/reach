@@ -66,8 +66,8 @@ reach_result reach_shell_apply_window_state(reach_platform_window_port *window,
 }
 
 void reach_shell_surface_transition_init(reach_shell *shell,
-                                         reach_shell_surface_transition *transition,
-                                         size_t y_track, size_t opacity_track)
+                                         reach_shell_surface_transition *transition, size_t y_track,
+                                         size_t opacity_track)
 {
     if (shell == nullptr || transition == nullptr)
     {
@@ -86,26 +86,24 @@ void reach_shell_surface_transitions_init(reach_shell *shell)
     {
         return;
     }
-    reach_shell_surface_transition_init(
-        shell, &shell->launcher_transition, REACH_SHELL_ANIMATION_LAUNCHER_TRANSITION_Y,
-        REACH_SHELL_ANIMATION_LAUNCHER_TRANSITION_OPACITY);
-    reach_shell_surface_transition_init(
-        shell, &shell->tray_transition, REACH_SHELL_ANIMATION_TRAY_TRANSITION_Y,
-        REACH_SHELL_ANIMATION_TRAY_TRANSITION_OPACITY);
-    reach_shell_surface_transition_init(
-        shell, &shell->quick_settings_transition,
-        REACH_SHELL_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
-        REACH_SHELL_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY);
-    reach_shell_surface_transition_init(
-        shell, &shell->switcher_transition, REACH_SHELL_ANIMATION_SWITCHER_TRANSITION_Y,
-        REACH_SHELL_ANIMATION_SWITCHER_TRANSITION_OPACITY);
-    reach_shell_surface_transition_init(
-        shell, &shell->context_menu_transition,
-        REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
-        REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY);
-    reach_shell_surface_transition_init(
-        shell, &shell->clipboard_transition, REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_Y,
-        REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_OPACITY);
+    reach_shell_surface_transition_init(shell, &shell->launcher_transition,
+                                        REACH_SHELL_ANIMATION_LAUNCHER_TRANSITION_Y,
+                                        REACH_SHELL_ANIMATION_LAUNCHER_TRANSITION_OPACITY);
+    reach_shell_surface_transition_init(shell, &shell->tray_transition,
+                                        REACH_SHELL_ANIMATION_TRAY_TRANSITION_Y,
+                                        REACH_SHELL_ANIMATION_TRAY_TRANSITION_OPACITY);
+    reach_shell_surface_transition_init(shell, &shell->quick_settings_transition,
+                                        REACH_SHELL_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
+                                        REACH_SHELL_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY);
+    reach_shell_surface_transition_init(shell, &shell->switcher_transition,
+                                        REACH_SHELL_ANIMATION_SWITCHER_TRANSITION_Y,
+                                        REACH_SHELL_ANIMATION_SWITCHER_TRANSITION_OPACITY);
+    reach_shell_surface_transition_init(shell, &shell->context_menu_transition,
+                                        REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
+                                        REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY);
+    reach_shell_surface_transition_init(shell, &shell->clipboard_transition,
+                                        REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_Y,
+                                        REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_OPACITY);
 }
 
 void reach_shell_surface_transition_set(reach_shell *shell,
@@ -117,8 +115,7 @@ void reach_shell_surface_transition_set(reach_shell *shell,
     }
 
     int32_t target_open = open ? 1 : 0;
-    if (transition->target_open == target_open &&
-        (target_open || !transition->visible))
+    if (transition->target_open == target_open && (target_open || !transition->visible))
     {
         return;
     }
@@ -142,10 +139,9 @@ void reach_shell_surface_transition_set(reach_shell *shell,
     }
     else if (transition->visible)
     {
-        reach_animation_manager_animate_to(&shell->animations, transition->y_track,
-                                           REACH_SHELL_TRANSITION_OFFSET,
-                                           REACH_SHELL_TRANSITION_CLOSE_SECONDS,
-                                           REACH_EASING_EASE_IN);
+        reach_animation_manager_animate_to(
+            &shell->animations, transition->y_track, REACH_SHELL_TRANSITION_OFFSET,
+            REACH_SHELL_TRANSITION_CLOSE_SECONDS, REACH_EASING_EASE_IN);
         reach_animation_manager_animate_to(&shell->animations, transition->opacity_track, 0.0f,
                                            REACH_SHELL_TRANSITION_CLOSE_SECONDS,
                                            REACH_EASING_EASE_IN);
@@ -153,9 +149,10 @@ void reach_shell_surface_transition_set(reach_shell *shell,
     reach_shell_request_update(shell);
 }
 
-reach_rect_f32 reach_shell_surface_transition_bounds(
-    const reach_shell *shell, const reach_shell_surface_transition *transition,
-    reach_rect_f32 target_bounds)
+reach_rect_f32
+reach_shell_surface_transition_bounds(const reach_shell *shell,
+                                      const reach_shell_surface_transition *transition,
+                                      reach_rect_f32 target_bounds)
 {
     if (shell != nullptr && transition != nullptr)
     {
@@ -165,22 +162,21 @@ reach_rect_f32 reach_shell_surface_transition_bounds(
     return target_bounds;
 }
 
-float reach_shell_surface_transition_opacity(
-    const reach_shell *shell, const reach_shell_surface_transition *transition)
+float reach_shell_surface_transition_opacity(const reach_shell *shell,
+                                             const reach_shell_surface_transition *transition)
 {
     return shell != nullptr && transition != nullptr
                ? reach_animation_manager_value(&shell->animations, transition->opacity_track)
                : 0.0f;
 }
 
-int32_t reach_shell_surface_transition_visible(
-    const reach_shell_surface_transition *transition)
+int32_t reach_shell_surface_transition_visible(const reach_shell_surface_transition *transition)
 {
     return transition != nullptr && transition->visible;
 }
 
-int32_t reach_shell_surface_transition_active(
-    const reach_shell *shell, const reach_shell_surface_transition *transition)
+int32_t reach_shell_surface_transition_active(const reach_shell *shell,
+                                              const reach_shell_surface_transition *transition)
 {
     return shell != nullptr && transition != nullptr &&
            (reach_animation_manager_active(&shell->animations, transition->y_track) ||
@@ -191,8 +187,7 @@ void reach_shell_surface_transition_finish(reach_shell *shell,
                                            reach_shell_surface_transition *transition)
 {
     if (shell == nullptr || transition == nullptr || transition->target_open ||
-        !transition->visible ||
-        reach_shell_surface_transition_active(shell, transition))
+        !transition->visible || reach_shell_surface_transition_active(shell, transition))
     {
         return;
     }

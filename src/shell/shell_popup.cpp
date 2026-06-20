@@ -14,8 +14,7 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
     reach_rect_f32 context_bounds = shell->context_menu.bounds_valid
                                         ? shell->context_menu.last_bounds
                                         : shell->context_menu_state.bounds;
-    int32_t on_context = shell->context_menu_state.open &&
-                         (float)point.x >= context_bounds.x &&
+    int32_t on_context = shell->context_menu_state.open && (float)point.x >= context_bounds.x &&
                          (float)point.x <= context_bounds.x + context_bounds.width &&
                          (float)point.y >= context_bounds.y &&
                          (float)point.y <= context_bounds.y + context_bounds.height;
@@ -33,14 +32,13 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
                           (float)point.x <= launcher_bounds.x + launcher_bounds.width &&
                           (float)point.y >= launcher_bounds.y &&
                           (float)point.y <= launcher_bounds.y + launcher_bounds.height;
-    reach_rect_f32 clipboard_bounds =
-        shell->clipboard_surface.bounds_valid ? shell->clipboard_surface.last_bounds
-                                              : shell->clipboard_layout.bounds;
-    int32_t on_clipboard =
-        shell->clipboard_model.open && (float)point.x >= clipboard_bounds.x &&
-        (float)point.x <= clipboard_bounds.x + clipboard_bounds.width &&
-        (float)point.y >= clipboard_bounds.y &&
-        (float)point.y <= clipboard_bounds.y + clipboard_bounds.height;
+    reach_rect_f32 clipboard_bounds = shell->clipboard_surface.bounds_valid
+                                          ? shell->clipboard_surface.last_bounds
+                                          : shell->clipboard_layout.bounds;
+    int32_t on_clipboard = shell->clipboard_model.open && (float)point.x >= clipboard_bounds.x &&
+                           (float)point.x <= clipboard_bounds.x + clipboard_bounds.width &&
+                           (float)point.y >= clipboard_bounds.y &&
+                           (float)point.y <= clipboard_bounds.y + clipboard_bounds.height;
     reach_point_i32 dock_point =
         shell->has_layout ? reach_shell_dock_local_point(&shell->layout.dock, point.x, point.y)
                           : reach_point_i32{};

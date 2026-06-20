@@ -112,13 +112,12 @@ void reach_shell_relayout_quick_settings(reach_shell *shell, int32_t animate_hei
     if (animate_height &&
         reach_shell_quick_settings_height_changed(old_target.height, new_target.height))
     {
-        reach_animation_manager_start(&shell->animations,
-                                      REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT,
-                                      current_bounds.height, new_target.height, 0.16,
-                                      REACH_EASING_EASE_IN_OUT);
+        reach_animation_manager_start(
+            &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT, current_bounds.height,
+            new_target.height, 0.16, REACH_EASING_EASE_IN_OUT);
     }
-    else if (!reach_animation_manager_active(
-                 &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT))
+    else if (!reach_animation_manager_active(&shell->animations,
+                                             REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT))
     {
         shell->quick_settings_bounds = new_target;
     }
@@ -138,8 +137,8 @@ void reach_shell_refresh_quick_settings_layout(reach_shell *shell)
     float anchor_x = button.x + button.width * 0.5f;
 
     shell->quick_settings_target_bounds = reach_shell_quick_settings_target_bounds(shell);
-    if (!reach_animation_manager_active(
-            &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT))
+    if (!reach_animation_manager_active(&shell->animations,
+                                        REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT))
     {
         shell->quick_settings_bounds = shell->quick_settings_target_bounds;
     }
@@ -162,8 +161,8 @@ void reach_shell_update_quick_settings_animation(reach_shell *shell)
         return;
     }
 
-    if (reach_animation_manager_active(
-            &shell->animations, REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT) ||
+    if (reach_animation_manager_active(&shell->animations,
+                                       REACH_SHELL_ANIMATION_QUICK_SETTINGS_HEIGHT) ||
         reach_shell_quick_settings_height_changed(shell->quick_settings_bounds.height,
                                                   shell->quick_settings_target_bounds.height))
     {

@@ -64,21 +64,19 @@ int32_t reach_shell_dock_icon_size_px(const reach_shell *shell)
 static int32_t reach_shell_switcher_width_animation_active(const reach_shell *shell)
 {
     return shell != nullptr &&
-           reach_animation_manager_active(&shell->animations,
-                                          REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
+           reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
 }
 
 static reach_rect_f32 reach_shell_apply_switcher_bounds_animation(reach_shell *shell,
                                                                   reach_rect_f32 target)
 {
-    if (shell == nullptr ||
-        !reach_shell_surface_transition_visible(&shell->switcher_transition))
+    if (shell == nullptr || !reach_shell_surface_transition_visible(&shell->switcher_transition))
     {
         return target;
     }
 
-    float animation_target = reach_animation_manager_target(
-        &shell->animations, REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
+    float animation_target =
+        reach_animation_manager_target(&shell->animations, REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
     if (!shell->switcher.bounds_valid || animation_target <= 0.0f)
     {
         reach_animation_manager_set(&shell->animations, REACH_SHELL_ANIMATION_SWITCHER_WIDTH,
@@ -97,8 +95,8 @@ static reach_rect_f32 reach_shell_apply_switcher_bounds_animation(reach_shell *s
     float width = target.width;
     if (reach_shell_switcher_width_animation_active(shell))
     {
-        width = reach_animation_manager_value(&shell->animations,
-                                              REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
+        width =
+            reach_animation_manager_value(&shell->animations, REACH_SHELL_ANIMATION_SWITCHER_WIDTH);
         shell->switcher.dirty_flags = 1;
     }
     else if (reach_animation_manager_target(&shell->animations,
@@ -537,8 +535,8 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
         &shell->animations, REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY);
     int32_t tray_feedback_was_active = reach_animation_manager_active(
         &shell->animations, REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY);
-    int32_t drag_snap_was_active = reach_animation_manager_active(
-        &shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP);
+    int32_t drag_snap_was_active =
+        reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP);
     int32_t dock_item_was_active[REACH_MAX_PINNED_APPS] = {};
     for (size_t index = 0; index < shell->dock_model.item_count; ++index)
     {
@@ -567,8 +565,8 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
         reach_animation_manager_value(&shell->animations,
                                       REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY) <= 0.001f)
     {
-        reach_animation_manager_set(&shell->animations,
-                                    REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY, 0.0f);
+        reach_animation_manager_set(&shell->animations, REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY,
+                                    0.0f);
         shell->feedback.dock_index = REACH_SHELL_DOCK_FEEDBACK_NONE;
     }
 
@@ -585,8 +583,8 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
         reach_animation_manager_value(&shell->animations,
                                       REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY) <= 0.001f)
     {
-        reach_animation_manager_set(&shell->animations,
-                                    REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY, 0.0f);
+        reach_animation_manager_set(&shell->animations, REACH_SHELL_ANIMATION_TRAY_FEEDBACK_OPACITY,
+                                    0.0f);
         shell->feedback.tray_index = REACH_MAX_TRAY_ITEMS;
     }
 
@@ -601,16 +599,14 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
     }
 
     if (drag_snap_was_active ||
-        reach_animation_manager_active(&shell->animations,
-                                       REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP))
+        reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP))
     {
-        shell->dock_drag.x = reach_animation_manager_value(
-            &shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP);
+        shell->dock_drag.x =
+            reach_animation_manager_value(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP);
         shell->dock.dirty_flags = 1;
     }
     if (drag_snap_was_active &&
-        !reach_animation_manager_active(&shell->animations,
-                                        REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP))
+        !reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP))
     {
         shell->dock_drag.source_index = REACH_MAX_PINNED_APPS;
         shell->dock_drag.target_index = REACH_MAX_PINNED_APPS;
@@ -775,9 +771,9 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 }
                 reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
                 reach_rect_f32 animated_dock_bounds =
-                    game_mode ? shown_dock_bounds
-                              : reach_shell_reconcile_dock_visibility(shell, shown_dock_bounds,
-                                                                     bounds);
+                    game_mode
+                        ? shown_dock_bounds
+                        : reach_shell_reconcile_dock_visibility(shell, shown_dock_bounds, bounds);
                 if (game_mode)
                 {
                     if (shell->dock_reveal_edge.ops.hide != nullptr)
@@ -838,8 +834,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 }
 
                 if (!game_mode && shell->ui.launcher.open &&
-                    (shell->dirty.render || shell->launcher.dirty_flags ||
-                     launcher_layout_changed))
+                    (shell->dirty.render || shell->launcher.dirty_flags || launcher_layout_changed))
                 {
                     (void)reach_shell_render_launcher_surface(shell, &layout.launcher);
                 }
@@ -894,8 +889,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 result = reach_shell_apply_window_state(
                     &shell->clipboard_surface.window, clipboard_bounds, clipboard_opacity,
                     &shell->clipboard_surface.last_bounds, &shell->clipboard_surface.last_opacity,
-                    &shell->clipboard_surface.bounds_valid,
-                    &shell->clipboard_surface.opacity_valid, &clipboard_window_changed);
+                    &shell->clipboard_surface.bounds_valid, &shell->clipboard_surface.opacity_valid,
+                    &clipboard_window_changed);
                 if (result != REACH_OK)
                 {
                     return result;
@@ -905,8 +900,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 {
                     (void)shell->clipboard_surface.window.ops.apply_rounded_corners(
                         shell->clipboard_surface.window.window,
-                        shell->theme->clipboard_panel_radius *
-                            reach_shell_layout_dpi_scale(shell));
+                        shell->theme->clipboard_panel_radius * reach_shell_layout_dpi_scale(shell));
                 }
                 if (!game_mode &&
                     reach_shell_surface_transition_visible(&shell->clipboard_transition))
@@ -967,8 +961,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         !reach_animation_manager_active(&shell->animations,
                                                         REACH_SHELL_ANIMATION_DOCK_WIDTH) &&
                         !shell->dock_drag.active &&
-                        !reach_animation_manager_active(
-                            &shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP) &&
+                        !reach_animation_manager_active(&shell->animations,
+                                                        REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP) &&
                         !reach_animation_manager_active(
                             &shell->animations, REACH_SHELL_ANIMATION_DOCK_FEEDBACK_OPACITY);
 
@@ -1039,16 +1033,14 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
 
                     reach_rect_f32 animated_quick_settings_bounds =
                         reach_shell_surface_transition_bounds(
-                            shell, &shell->quick_settings_transition,
-                            shell->quick_settings_bounds);
+                            shell, &shell->quick_settings_transition, shell->quick_settings_bounds);
                     float quick_settings_opacity = reach_shell_surface_transition_opacity(
                         shell, &shell->quick_settings_transition);
                     result = reach_shell_apply_window_state(
                         &shell->quick_settings.window, animated_quick_settings_bounds,
-                        quick_settings_opacity,
-                        &shell->quick_settings.last_bounds, &shell->quick_settings.last_opacity,
-                        &shell->quick_settings.bounds_valid, &shell->quick_settings.opacity_valid,
-                        &quick_window_changed);
+                        quick_settings_opacity, &shell->quick_settings.last_bounds,
+                        &shell->quick_settings.last_opacity, &shell->quick_settings.bounds_valid,
+                        &shell->quick_settings.opacity_valid, &quick_window_changed);
                     if (result != REACH_OK)
                     {
                         return result;
@@ -1062,8 +1054,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                             reach_popup_radius_scaled(reach_shell_layout_dpi_scale(shell)));
                     }
 
-                    if (!game_mode && reach_shell_surface_transition_visible(
-                                          &shell->quick_settings_transition))
+                    if (!game_mode &&
+                        reach_shell_surface_transition_visible(&shell->quick_settings_transition))
                     {
                         if (shell->quick_settings.window.ops.show != nullptr)
                         {
@@ -1134,8 +1126,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 if (shell->context_menu.window.ops.set_bounds != nullptr)
                 {
                     reach_rect_f32 context_bounds = reach_shell_surface_transition_bounds(
-                        shell, &shell->context_menu_transition,
-                        shell->context_menu_state.bounds);
+                        shell, &shell->context_menu_transition, shell->context_menu_state.bounds);
                     float context_opacity = reach_shell_surface_transition_opacity(
                         shell, &shell->context_menu_transition);
                     int32_t context_window_changed = 0;
@@ -1156,8 +1147,8 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                             shell->context_menu.window.window,
                             reach_popup_radius_scaled(reach_shell_layout_dpi_scale(shell)));
                     }
-                    if (!game_mode && reach_shell_surface_transition_visible(
-                                          &shell->context_menu_transition))
+                    if (!game_mode &&
+                        reach_shell_surface_transition_visible(&shell->context_menu_transition))
                     {
                         if (shell->context_menu.window.ops.show != nullptr)
                         {
@@ -1176,7 +1167,6 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                             shell->context_menu.window.window);
                     }
                 }
-
             }
         }
     }

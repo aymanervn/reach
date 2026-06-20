@@ -17,14 +17,12 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
 
     size_t dragged_render_index =
         (shell->dock_drag.active ||
-         reach_animation_manager_active(&shell->animations,
-                                        REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP))
+         reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP))
             ? reach_shell_find_dock_item_key(shell, shell->dock_drag.pinned,
                                              shell->dock_drag.pin_id, shell->dock_drag.window)
             : REACH_MAX_PINNED_APPS;
     float dragged_x =
-        reach_animation_manager_active(&shell->animations,
-                                       REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)
+        reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)
             ? reach_animation_manager_value(&shell->animations,
                                             REACH_SHELL_ANIMATION_DOCK_DRAG_SNAP)
             : shell->dock_drag.x;
@@ -151,10 +149,9 @@ size_t reach_shell_switcher_visible_count(const reach_shell *shell)
     {
         return 0;
     }
-    size_t window_count =
-        reach_shell_surface_transition_visible(&shell->switcher_transition)
-            ? shell->switcher_state.window_count
-            : shell->open_window_count;
+    size_t window_count = reach_shell_surface_transition_visible(&shell->switcher_transition)
+                              ? shell->switcher_state.window_count
+                              : shell->open_window_count;
     return reach_switcher_visible_count(window_count);
 }
 
@@ -166,10 +163,9 @@ void reach_shell_update_switcher_visible_start(reach_shell *shell)
     }
 
     reach_switcher_model model = {};
-    model.window_count =
-        reach_shell_surface_transition_visible(&shell->switcher_transition)
-            ? shell->switcher_state.window_count
-            : shell->open_window_count;
+    model.window_count = reach_shell_surface_transition_visible(&shell->switcher_transition)
+                             ? shell->switcher_state.window_count
+                             : shell->open_window_count;
     model.selected_index = shell->switcher_state.selected_index;
     model.visible_start = shell->switcher_state.visible_start;
     reach_switcher_update_visible_start(&model);
