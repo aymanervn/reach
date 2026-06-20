@@ -36,12 +36,14 @@ extern "C"
     {
         reach_rect_f32 bounds;
         reach_rect_f32 title;
+        reach_rect_f32 clear_button;
         reach_rect_f32 viewport;
         reach_rect_f32 items[REACH_CLIPBOARD_MAX_ITEMS];
         reach_rect_f32 close_buttons[REACH_CLIPBOARD_MAX_ITEMS];
         reach_scrollbar_layout scrollbar;
         float content_height;
         float item_large_size;
+        float item_width;
     } reach_clipboard_layout;
 
     typedef enum reach_clipboard_hit_type
@@ -49,6 +51,7 @@ extern "C"
         REACH_CLIPBOARD_HIT_NONE = 0,
         REACH_CLIPBOARD_HIT_ITEM = 1,
         REACH_CLIPBOARD_HIT_ITEM_CLOSE = 4,
+        REACH_CLIPBOARD_HIT_CLEAR = 5,
         REACH_CLIPBOARD_HIT_SCROLLBAR_TRACK = 2,
         REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB = 3
     } reach_clipboard_hit_type;
@@ -71,6 +74,7 @@ extern "C"
 
     void reach_clipboard_model_init(reach_clipboard_model *model);
     void reach_clipboard_model_clear_press(reach_clipboard_model *model);
+    void reach_clipboard_model_clear_items(reach_clipboard_model *model);
     reach_clipboard_insert_result reach_clipboard_model_insert(reach_clipboard_model *model,
                                                                reach_clipboard_item item);
     int32_t reach_clipboard_model_promote(reach_clipboard_model *model, size_t index);
@@ -79,6 +83,9 @@ extern "C"
                                                           reach_rect_f32 monitor_bounds,
                                                           reach_rect_f32 launcher_bounds,
                                                           float dpi_scale);
+    reach_clipboard_layout reach_clipboard_compute_layout_animated(
+        reach_clipboard_model *model, reach_rect_f32 monitor_bounds, reach_rect_f32 launcher_bounds,
+        float dpi_scale, float animated_height, float animated_item_width);
     reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model *model,
                                                         const reach_clipboard_layout *layout,
                                                         int32_t x, int32_t y);

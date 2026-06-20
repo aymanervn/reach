@@ -17,6 +17,11 @@ struct reach_clipboard_metrics
     float title_font_size;
     int32_t title_font_weight;
     float items_font_size;
+    float clear_button_width;
+    float clear_button_height;
+    float clear_button_gap;
+    float clear_button_radius;
+    float clear_button_background_alpha;
 
     float scrollbar_gutter;
     float item_scrollbar_gap;
@@ -54,6 +59,11 @@ static constexpr reach_clipboard_metrics reach_clipboard_make_metrics()
     metrics.title_font_size = 15.0f;
     metrics.title_font_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     metrics.items_font_size = 12.0f;
+    metrics.clear_button_width = 54.0f;
+    metrics.clear_button_height = 24.0f;
+    metrics.clear_button_gap = 8.0f;
+    metrics.clear_button_radius = 5.0f;
+    metrics.clear_button_background_alpha = 0.10f;
 
     metrics.padding = 8.0f;
     metrics.scrollbar_gutter = 15.0f;
@@ -105,6 +115,12 @@ static inline reach_clipboard_metrics reach_clipboard_metrics_for_scale(float dp
     metrics.title_gap = reach_clipboard_scale_value(metrics.title_gap, dpi_scale);
     metrics.title_font_size = reach_clipboard_scale_value(metrics.title_font_size, dpi_scale);
     metrics.items_font_size = reach_clipboard_scale_value(metrics.items_font_size, dpi_scale);
+    metrics.clear_button_width = reach_clipboard_scale_value(metrics.clear_button_width, dpi_scale);
+    metrics.clear_button_height =
+        reach_clipboard_scale_value(metrics.clear_button_height, dpi_scale);
+    metrics.clear_button_gap = reach_clipboard_scale_value(metrics.clear_button_gap, dpi_scale);
+    metrics.clear_button_radius =
+        reach_clipboard_scale_value(metrics.clear_button_radius, dpi_scale);
 
     metrics.padding = reach_clipboard_scale_value(metrics.padding, dpi_scale);
     metrics.scrollbar_gutter = reach_clipboard_scale_value(metrics.scrollbar_gutter, dpi_scale);

@@ -1,6 +1,6 @@
 #include "shell_internal.h"
 
-static void reach_shell_release_clipboard_item(reach_shell *shell, const reach_clipboard_item *item)
+void reach_shell_release_clipboard_item(reach_shell *shell, const reach_clipboard_item *item)
 {
     if (shell == nullptr || item == nullptr || item->id == 0)
     {
@@ -28,6 +28,25 @@ void reach_shell_release_clipboard_items(reach_shell *shell)
         reach_shell_release_clipboard_item(shell, &shell->clipboard_model.items[index]);
     }
     reach_clipboard_model_init(&shell->clipboard_model);
+}
+
+void reach_shell_clear_clipboard(reach_shell *shell)
+{
+    if (shell == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = 0; index < shell->clipboard_model.count; ++index)
+    {
+        reach_shell_release_clipboard_item(shell, &shell->clipboard_model.items[index]);
+    }
+
+    reach_clipboard_model_clear_items(&shell->clipboard_model);
+    reach_scrollbar_end_drag(&shell->clipboard_scrollbar_drag);
+    shell->clipboard_surface.dirty_flags = 1;
+    shell->dirty.layout = 1;
+    reach_shell_request_update(shell);
 }
 
 void reach_shell_set_clipboard_open(reach_shell *shell, int32_t open)

@@ -62,6 +62,25 @@ void reach_clipboard_model_init(reach_clipboard_model *model)
     reach_scrollbar_model_init(&model->scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
 }
 
+void reach_clipboard_model_clear_items(reach_clipboard_model *model)
+{
+    if (model == nullptr)
+    {
+        return;
+    }
+
+    const int32_t was_open = model->open;
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    {
+        model->items[index] = {};
+    }
+    model->count = 0;
+    model->open = was_open;
+    model->hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
+    reach_clipboard_model_clear_press(model);
+    reach_scrollbar_model_init(&model->scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+}
+
 int32_t reach_clipboard_model_promote(reach_clipboard_model *model, size_t index)
 {
     if (model == nullptr)
