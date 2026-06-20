@@ -1163,7 +1163,7 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
 
     if (event->type == REACH_UI_EVENT_POINTER_DOWN)
     {
-        return reach_shell_handle_pointer_down(shell, event);
+        return reach_shell_handle_pointer_down(shell, event, source);
     }
 
     if (event->type == REACH_UI_EVENT_POINTER_MOVE)

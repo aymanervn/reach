@@ -29,6 +29,7 @@ void reach_clipboard_model_clear_press(reach_clipboard_model *model)
     model->pressed_hit_type = REACH_CLIPBOARD_HIT_NONE;
     model->pressed_item_id = 0;
 }
+
 void reach_clipboard_model_init(reach_clipboard_model *model)
 {
     if (model == nullptr)
