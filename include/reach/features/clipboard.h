@@ -4,7 +4,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/core/clipboard.h"
-#include "reach/features/scrollbar.h"
+#include "reach/core/scrollbar.h"
 
 #ifdef __cplusplus
 extern "C"

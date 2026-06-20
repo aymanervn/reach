@@ -138,11 +138,11 @@ static void test_scroll_and_operation_states(void)
         new reach_windows_update_operation_result());
     reach_settings_model_init(model.get());
     model->update_list = sample_updates(12);
-    model->update_scroll_max = 500.0f;
+    reach_scrollbar_set_extents(&model->update_scrollbar, 600.0f, 100.0f);
     reach_settings_model_scroll_updates(model.get(), 120.0f);
-    expect_true(model->update_scroll_target == 120.0f, "update list scrolls down");
+    expect_true(model->update_scrollbar.target == 120.0f, "update list scrolls down");
     reach_settings_model_scroll_updates(model.get(), -40.0f);
-    expect_true(model->update_scroll_target == 80.0f, "update list scrolls up");
+    expect_true(model->update_scrollbar.target == 80.0f, "update list scrolls up");
 
     result->overall_reboot_required = 1;
     result->per_update_result_count = 1;

@@ -90,17 +90,6 @@ reach_shell_music_widget_hit_test_event(const reach_shell *shell, const reach_ui
                                        point.x, point.y);
 }
 
-static size_t reach_shell_launcher_visible_result_count(const reach_shell *shell)
-{
-    if (shell == nullptr)
-    {
-        return 0;
-    }
-    return shell->ui.launcher.result_count < REACH_SEARCH_VISIBLE_RESULTS
-               ? shell->ui.launcher.result_count
-               : REACH_SEARCH_VISIBLE_RESULTS;
-}
-
 static void reach_shell_note_launcher_viewport_changed(reach_shell *shell)
 {
     if (shell == nullptr)
@@ -113,42 +102,6 @@ static void reach_shell_note_launcher_viewport_changed(reach_shell *shell)
     reach_shell_request_update(shell);
 }
 
-static size_t reach_shell_launcher_scroll_offset_for_y(reach_shell *shell, int32_t y)
-{
-    if (shell == nullptr)
-    {
-        return 0;
-    }
-
-    size_t visible_count = reach_shell_launcher_visible_result_count(shell);
-    if (visible_count == 0 || shell->ui.launcher.result_count <= visible_count)
-    {
-        return 0;
-    }
-
-    size_t max_offset = shell->ui.launcher.result_count - visible_count;
-    reach_rect_f32 track = shell->layout.launcher.search_result_scrollbar_track;
-    reach_rect_f32 thumb = shell->layout.launcher.search_result_scrollbar_thumb;
-    float travel = track.height - thumb.height;
-    if (travel <= 0.0f)
-    {
-        return 0;
-    }
-
-    float thumb_y = (float)y - shell->launcher_scrollbar_drag.grab_offset_y;
-    float progress = (thumb_y - track.y) / travel;
-    if (progress < 0.0f)
-    {
-        progress = 0.0f;
-    }
-    if (progress > 1.0f)
-    {
-        progress = 1.0f;
-    }
-
-    return (size_t)(progress * (float)max_offset + 0.5f);
-}
-
 static reach_result reach_shell_scroll_launcher_results(reach_shell *shell, int32_t delta)
 {
     if (shell == nullptr || delta == 0)
@@ -156,13 +109,13 @@ static reach_result reach_shell_scroll_launcher_results(reach_shell *shell, int3
         return REACH_OK;
     }
 
-    size_t old_offset = shell->ui.launcher.result_scroll_offset;
+    size_t old_offset = reach_ui_state_launcher_result_scroll_offset(&shell->ui);
     reach_result result = reach_ui_state_scroll_launcher_results(&shell->ui, delta);
     if (result != REACH_OK)
     {
         return result;
     }
-    if (old_offset != shell->ui.launcher.result_scroll_offset)
+    if (old_offset != reach_ui_state_launcher_result_scroll_offset(&shell->ui))
     {
         reach_shell_note_launcher_viewport_changed(shell);
     }
@@ -219,8 +172,7 @@ static void reach_shell_end_launcher_scrollbar_drag(reach_shell *shell)
     {
         return;
     }
-    shell->launcher_scrollbar_drag.active = 0;
-    shell->launcher_scrollbar_drag.grab_offset_y = 0.0f;
+    reach_scrollbar_end_drag(&shell->launcher_scrollbar_drag);
     reach_shell_sync_pointer_move_subscriptions(shell);
     if (shell->launcher.window.ops.set_pointer_capture != nullptr)
     {
@@ -237,21 +189,13 @@ static reach_result reach_shell_begin_launcher_scrollbar_drag(reach_shell *shell
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_rect_f32 thumb = shell->layout.launcher.search_result_scrollbar_thumb;
-    if (hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_THUMB)
-    {
-        shell->launcher_scrollbar_drag.grab_offset_y = (float)event->y - thumb.y;
-    }
-    else
-    {
-        shell->launcher_scrollbar_drag.grab_offset_y = thumb.height * 0.5f;
-    }
-
-    shell->launcher_scrollbar_drag.active = 1;
-    size_t old_offset = shell->ui.launcher.result_scroll_offset;
-    size_t offset = reach_shell_launcher_scroll_offset_for_y(shell, event->y);
-    (void)reach_ui_state_set_launcher_result_scroll_offset(&shell->ui, offset);
-    if (old_offset != shell->ui.launcher.result_scroll_offset)
+    size_t old_offset = reach_ui_state_launcher_result_scroll_offset(&shell->ui);
+    reach_scrollbar_layout layout = {shell->layout.launcher.search_result_scrollbar_track,
+                                     shell->layout.launcher.search_result_scrollbar_thumb};
+    reach_scrollbar_begin_drag(
+        &shell->ui.launcher.result_scrollbar, &shell->launcher_scrollbar_drag, &layout,
+        (float)event->y, hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_THUMB);
+    if (old_offset != reach_ui_state_launcher_result_scroll_offset(&shell->ui))
     {
         reach_shell_note_launcher_viewport_changed(shell);
     }
@@ -272,10 +216,12 @@ static reach_result reach_shell_update_launcher_scrollbar_drag(reach_shell *shel
         return REACH_OK;
     }
 
-    size_t old_offset = shell->ui.launcher.result_scroll_offset;
-    size_t offset = reach_shell_launcher_scroll_offset_for_y(shell, event->y);
-    (void)reach_ui_state_set_launcher_result_scroll_offset(&shell->ui, offset);
-    if (old_offset != shell->ui.launcher.result_scroll_offset)
+    size_t old_offset = reach_ui_state_launcher_result_scroll_offset(&shell->ui);
+    reach_scrollbar_layout layout = {shell->layout.launcher.search_result_scrollbar_track,
+                                     shell->layout.launcher.search_result_scrollbar_thumb};
+    reach_scrollbar_update_drag(&shell->ui.launcher.result_scrollbar,
+                                &shell->launcher_scrollbar_drag, &layout, (float)event->y);
+    if (old_offset != reach_ui_state_launcher_result_scroll_offset(&shell->ui))
     {
         reach_shell_note_launcher_viewport_changed(shell);
     }

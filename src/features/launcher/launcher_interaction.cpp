@@ -46,14 +46,14 @@ reach_launcher_hit_result reach_launcher_hit_test(const reach_ui_state *state,
     if (reach_launcher_rect_contains(layout->search_result_scrollbar_thumb, x, y))
     {
         hit.type = REACH_LAUNCHER_HIT_SCROLLBAR_THUMB;
-        hit.index = state->launcher.result_scroll_offset;
+        hit.index = reach_ui_state_launcher_result_scroll_offset(state);
         return hit;
     }
 
     if (reach_launcher_rect_contains(layout->search_result_scrollbar_track, x, y))
     {
         hit.type = REACH_LAUNCHER_HIT_SCROLLBAR_TRACK;
-        hit.index = state->launcher.result_scroll_offset;
+        hit.index = reach_ui_state_launcher_result_scroll_offset(state);
         return hit;
     }
 
@@ -66,7 +66,7 @@ reach_launcher_hit_result reach_launcher_hit_test(const reach_ui_state *state,
             visible_count > 0 ? layout->search_result_items.height / (float)visible_count : 0.0f;
         size_t visible_index =
             row_height > 0.0f && local_y > 0.0f ? (size_t)(local_y / row_height) : 0;
-        size_t index = state->launcher.result_scroll_offset + visible_index;
+        size_t index = reach_ui_state_launcher_result_scroll_offset(state) + visible_index;
         hit.index = index < state->launcher.result_count ? index : REACH_SEARCH_MAX_RESULTS;
     }
     return hit;

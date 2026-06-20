@@ -1,4 +1,4 @@
-#include "reach/features/scrollbar.h"
+#include "reach/core/scrollbar.h"
 
 #include <math.h>
 

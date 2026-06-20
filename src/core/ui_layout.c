@@ -154,38 +154,13 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
         out_layout->launcher.search_result_scrollbar_track.height =
             out_layout->launcher.search_results.height - track_padding_y * 2.0f;
 
-        float track_height = out_layout->launcher.search_result_scrollbar_track.height;
-        float thumb_height =
-            track_height * ((float)visible_result_count / (float)state->launcher.result_count);
         float min_thumb_height = reach_scale(22.0f, scale);
-        if (thumb_height < min_thumb_height)
-        {
-            thumb_height = min_thumb_height;
-        }
-        if (thumb_height > track_height)
-        {
-            thumb_height = track_height;
-        }
-
-        size_t max_offset = state->launcher.result_count - visible_result_count;
-        float progress =
-            max_offset > 0 ? (float)state->launcher.result_scroll_offset / (float)max_offset : 0.0f;
-        if (progress < 0.0f)
-        {
-            progress = 0.0f;
-        }
-        if (progress > 1.0f)
-        {
-            progress = 1.0f;
-        }
-
-        out_layout->launcher.search_result_scrollbar_thumb.x =
-            out_layout->launcher.search_result_scrollbar_track.x;
-        out_layout->launcher.search_result_scrollbar_thumb.y =
-            out_layout->launcher.search_result_scrollbar_track.y +
-            (track_height - thumb_height) * progress;
-        out_layout->launcher.search_result_scrollbar_thumb.width = track_width;
-        out_layout->launcher.search_result_scrollbar_thumb.height = thumb_height;
+        reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
+            &state->launcher.result_scrollbar,
+            out_layout->launcher.search_result_scrollbar_track, (float)visible_result_count,
+            (float)state->launcher.result_count, min_thumb_height);
+        out_layout->launcher.search_result_scrollbar_track = scrollbar.track;
+        out_layout->launcher.search_result_scrollbar_thumb = scrollbar.thumb;
     }
     out_layout->launcher.bounds = out_layout->launcher.search_box;
 
