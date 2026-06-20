@@ -1,9 +1,5 @@
 #include "reach/features/clipboard.h"
-
-static float reach_clipboard_scale(float value, float scale)
-{
-    return value * (scale > 0.0f ? scale : 1.0f);
-}
+#include "clipboard_metrics.h"
 
 static int32_t reach_clipboard_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
@@ -17,15 +13,17 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
                                                       reach_rect_f32 launcher_bounds,
                                                       float dpi_scale)
 {
+
     reach_clipboard_layout layout = {};
     if (model == nullptr)
     {
         return layout;
     }
-    float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    float width = reach_clipboard_scale(390.0f, scale);
-    float height = reach_clipboard_scale(500.0f, scale);
-    float margin = reach_clipboard_scale(12.0f, scale);
+
+    const reach_clipboard_metrics metrics = reach_clipboard_metrics_for_scale(dpi_scale);
+    float width = metrics.panel_width;
+    float height = metrics.panel_height;
+    float margin = metrics.margin;
     if (height > monitor_bounds.height - margin * 2.0f)
     {
         height = monitor_bounds.height - margin * 2.0f;
@@ -50,49 +48,44 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
     layout.bounds.width = width;
     layout.bounds.height = height;
 
-    float padding = reach_clipboard_scale(16.0f, scale);
-    float title_height = reach_clipboard_scale(34.0f, scale);
-    float scrollbar_gutter = reach_clipboard_scale(15.0f, scale);
-    layout.title = {layout.bounds.x + padding, layout.bounds.y + padding,
-                    width - padding * 2.0f, title_height};
+    float padding = metrics.padding;
+    float title_height = metrics.title_height;
+    float scrollbar_gutter = metrics.scrollbar_gutter;
+    layout.title = {layout.bounds.x + padding, layout.bounds.y + padding, width - padding * 2.0f,
+                    title_height};
     layout.viewport = {layout.bounds.x + padding, layout.title.y + title_height,
                        width - padding * 2.0f - scrollbar_gutter,
                        height - padding * 2.0f - title_height};
-    layout.row_height = reach_clipboard_scale(88.0f, scale);
-    float row_gap = reach_clipboard_scale(8.0f, scale);
-    layout.content_height =
-        model->count > 0 ? layout.row_height * (float)model->count +
-                               row_gap * (float)(model->count - 1)
-                         : 0.0f;
-    reach_scrollbar_set_extents(&model->scrollbar, layout.content_height,
-                                layout.viewport.height);
-    float close_button_size = reach_clipboard_scale(20.0f, scale);
-    float close_button_margin = reach_clipboard_scale(6.0f, scale);
+    layout.row_height = metrics.row_height;
+    float row_gap = metrics.row_gap;
+    layout.content_height = model->count > 0 ? layout.row_height * (float)model->count +
+                                                   row_gap * (float)(model->count - 1)
+                                             : 0.0f;
+    reach_scrollbar_set_extents(&model->scrollbar, layout.content_height, layout.viewport.height);
+    float close_button_size = metrics.close_button_size;
+    float close_button_margin = metrics.close_button_margin;
     for (size_t index = 0; index < model->count; ++index)
     {
         layout.items[index] = {layout.viewport.x,
-                               layout.viewport.y +
-                                   (layout.row_height + row_gap) * (float)index -
+                               layout.viewport.y + (layout.row_height + row_gap) * (float)index -
                                    model->scrollbar.offset,
                                layout.viewport.width, layout.row_height};
-        layout.close_buttons[index] = {
-            layout.items[index].x + layout.items[index].width - close_button_size - close_button_margin,
-            layout.items[index].y + close_button_margin,
-            close_button_size,
-            close_button_size};
+        layout.close_buttons[index] = {layout.items[index].x + layout.items[index].width -
+                                           close_button_size - close_button_margin,
+                                       layout.items[index].y + close_button_margin,
+                                       close_button_size, close_button_size};
     }
-    reach_rect_f32 track = {
-        layout.viewport.x + layout.viewport.width + reach_clipboard_scale(7.0f, scale),
-        layout.viewport.y, reach_clipboard_scale(4.0f, scale), layout.viewport.height};
-    layout.scrollbar = reach_scrollbar_compute_layout(
-        &model->scrollbar, track, layout.viewport.height, layout.content_height,
-        reach_clipboard_scale(24.0f, scale));
+    reach_rect_f32 track = {layout.viewport.x + layout.viewport.width + metrics.track_x_offset,
+                            layout.viewport.y, metrics.track_width, layout.viewport.height};
+    layout.scrollbar =
+        reach_scrollbar_compute_layout(&model->scrollbar, track, layout.viewport.height,
+                                       layout.content_height, metrics.thumb_size);
     return layout;
 }
 
 reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model *model,
-                                                    const reach_clipboard_layout *layout,
-                                                    int32_t x, int32_t y)
+                                                    const reach_clipboard_layout *layout, int32_t x,
+                                                    int32_t y)
 {
     reach_clipboard_hit_result result = {};
     result.index = REACH_CLIPBOARD_MAX_ITEMS;
