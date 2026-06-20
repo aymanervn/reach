@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 0.7.0  LANGUAGES C CXX)
+project(reach VERSION 0.8.0  LANGUAGES C CXX)
 
 option(REACH_BUILD_TESTS "Build Reach test executables and register CTest tests" ON)
 option(REACH_RUN_ARCHITECTURE_CHECK "Run architecture boundary checks as part of the default build" ON)
