@@ -33,6 +33,17 @@ static void reach_shell_on_media_controls_changed(void *user)
     reach_shell_request_update(shell);
 }
 
+static void reach_shell_on_clipboard_changed(void *user)
+{
+    reach_shell *shell = static_cast<reach_shell *>(user);
+    if (shell == nullptr || shell->clipboard_surface.window.ops.post_event == nullptr)
+    {
+        return;
+    }
+    (void)shell->clipboard_surface.window.ops.post_event(
+        shell->clipboard_surface.window.window, REACH_UI_EVENT_CLIPBOARD_CHANGED);
+}
+
 static void reach_shell_cleanup(reach_shell *shell)
 {
     if (shell == nullptr)
@@ -48,6 +59,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_stop_open_window_icon_worker(shell);
     reach_shell_stop_window_control_worker(shell);
     reach_shell_stop_app_launch_worker(shell);
+    if (shell->clipboard.ops.stop != nullptr)
+    {
+        (void)shell->clipboard.ops.stop(shell->clipboard.provider);
+    }
     if (shell->system_controls.stop_watching != nullptr)
     {
         shell->system_controls.stop_watching(shell->system_controls.userdata);
@@ -64,6 +79,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_shell_stop_quick_settings_audio_refresh(shell);
     reach_shell_stop_quick_settings_system_refresh(shell);
     reach_shell_release_quick_settings_audio_render_icons(shell);
+    reach_shell_release_clipboard_items(shell);
     if (shell->music_widget_model.cover_icon_id != 0)
     {
         reach_shell_release_render_icon(shell, shell->music_widget_model.cover_icon_id);
@@ -125,6 +141,14 @@ static void reach_shell_cleanup(reach_shell *shell)
     if (shell->quick_settings.renderer.ops.destroy != nullptr)
     {
         shell->quick_settings.renderer.ops.destroy(shell->quick_settings.renderer.backend);
+    }
+    if (shell->clipboard_surface.window.ops.destroy != nullptr)
+    {
+        shell->clipboard_surface.window.ops.destroy(shell->clipboard_surface.window.window);
+    }
+    if (shell->clipboard_surface.renderer.ops.destroy != nullptr)
+    {
+        shell->clipboard_surface.renderer.ops.destroy(shell->clipboard_surface.renderer.backend);
     }
     if (shell->dock_reveal_edge.ops.hide != nullptr)
     {
@@ -198,6 +222,10 @@ static void reach_shell_cleanup(reach_shell *shell)
     {
         shell->media_controls.destroy(shell->media_controls.userdata);
     }
+    if (shell->clipboard.ops.destroy != nullptr)
+    {
+        shell->clipboard.ops.destroy(shell->clipboard.provider);
+    }
 
     shell->monitors = {};
     shell->popup_capture = {};
@@ -207,6 +235,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
+    reach_surface_runtime_init(&shell->clipboard_surface);
     shell->dock_reveal_edge = {};
     shell->dock_reveal = {};
     shell->input_source = {};
@@ -224,6 +253,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     shell->audio_volume = {};
     shell->system_controls = {};
     shell->media_controls = {};
+    shell->clipboard = {};
     shell->music_widget_refresh_requested = 0;
     shell->quick_settings_system_change_flags.store(0);
     shell->quick_settings_audio_refresh.notify = reach_shell_request_update;
@@ -232,6 +262,7 @@ static void reach_shell_cleanup(reach_shell *shell)
     reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
     reach_music_widget_model_init(&shell->music_widget_model);
+    reach_clipboard_model_init(&shell->clipboard_model);
 }
 
 reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
@@ -258,12 +289,14 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     reach_tray_model_init(&shell->tray_state.model);
     reach_quick_settings_model_init(&shell->quick_settings_model);
     reach_music_widget_model_init(&shell->music_widget_model);
+    reach_clipboard_model_init(&shell->clipboard_model);
     reach_surface_runtime_init(&shell->launcher);
     reach_surface_runtime_init(&shell->dock);
     reach_surface_runtime_init(&shell->tray);
     reach_surface_runtime_init(&shell->switcher);
     reach_surface_runtime_init(&shell->context_menu);
     reach_surface_runtime_init(&shell->quick_settings);
+    reach_surface_runtime_init(&shell->clipboard_surface);
     reach_animation_manager_init(&shell->animations, shell->animation_tracks,
                                  REACH_SHELL_ANIMATION_COUNT);
     reach_shell_surface_transitions_init(shell);
@@ -278,6 +311,7 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->launcher_scrollbar_drag.grab_offset_y = 0.0f;
     shell->context_menu_state.target_index = REACH_MAX_PINNED_APPS;
     shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
+    shell->clipboard_refresh_requested = 0;
 
     shell->quick_settings_open = 0;
     shell->quick_settings_drag.active = 0;
@@ -318,6 +352,8 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->context_menu.renderer = dependencies->context_menu_renderer;
     shell->quick_settings.window = dependencies->quick_settings_window;
     shell->quick_settings.renderer = dependencies->quick_settings_renderer;
+    shell->clipboard_surface.window = dependencies->clipboard_window;
+    shell->clipboard_surface.renderer = dependencies->clipboard_renderer;
     shell->input_source = dependencies->input_source;
     shell->monitors = dependencies->monitors;
     shell->window_manager = dependencies->window_manager;
@@ -335,9 +371,11 @@ reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,
     shell->audio_volume = dependencies->audio_volume;
     shell->system_controls = dependencies->system_controls;
     shell->media_controls = dependencies->media_controls;
+    shell->clipboard = dependencies->clipboard;
     shell->theme = reach_theme_default();
 
-    if (shell->monitors.list == nullptr || shell->launcher_textbox.textbox == nullptr)
+    if (shell->monitors.list == nullptr || shell->launcher_textbox.textbox == nullptr ||
+        shell->clipboard.provider == nullptr || shell->clipboard_surface.window.window == nullptr)
     {
         result = REACH_INVALID_ARGUMENT;
     }
@@ -490,6 +528,25 @@ reach_result reach_shell_start(reach_shell *shell)
         {
             return result;
         }
+    }
+    if (shell->clipboard_surface.window.ops.set_event_callback != nullptr)
+    {
+        result = shell->clipboard_surface.window.ops.set_event_callback(
+            shell->clipboard_surface.window.window, reach_shell_on_clipboard_window_event, shell);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
+    if (shell->clipboard.ops.start != nullptr)
+    {
+        result = shell->clipboard.ops.start(shell->clipboard.provider,
+                                            reach_shell_on_clipboard_changed, shell);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+        shell->clipboard_refresh_requested = 1;
     }
     reach_shell_sync_pointer_move_subscriptions(shell);
     if (shell->dock_reveal_edge.ops.set_callback != nullptr)

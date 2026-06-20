@@ -344,6 +344,48 @@ reach_result reach_shell_render_launcher_surface(reach_shell *shell,
     return shell->launcher.renderer.ops.end_frame(shell->launcher.renderer.backend);
 }
 
+reach_result reach_shell_render_clipboard_surface(reach_shell *shell)
+{
+    if (shell == nullptr || shell->clipboard_surface.renderer.ops.begin_frame == nullptr)
+    {
+        return REACH_OK;
+    }
+    float hover_values[REACH_CLIPBOARD_MAX_ITEMS] = {};
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    {
+        hover_values[index] = reach_animation_manager_value(
+            &shell->animations, reach_shell_clipboard_hover_animation_id(index));
+    }
+    reach_clipboard_render_input input = {};
+    input.theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
+    input.model = &shell->clipboard_model;
+    input.layout = &shell->clipboard_layout;
+    input.hover_values = hover_values;
+    input.dpi_scale = reach_shell_layout_dpi_scale(shell);
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+
+    reach_render_command_buffer commands = {};
+    reach_result result = reach_clipboard_build_render_commands(&input, &commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    result = shell->clipboard_surface.renderer.ops.begin_frame(
+        shell->clipboard_surface.renderer.backend);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    result = shell->clipboard_surface.renderer.ops.execute(
+        shell->clipboard_surface.renderer.backend, &commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    return shell->clipboard_surface.renderer.ops.end_frame(
+        shell->clipboard_surface.renderer.backend);
+}
+
 reach_result reach_shell_render_context_menu_surface(reach_shell *shell)
 {
     if (shell == nullptr || shell->context_menu.renderer.ops.begin_frame == nullptr)

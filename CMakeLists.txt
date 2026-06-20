@@ -43,6 +43,7 @@ target_compile_features(reach_support PUBLIC
 )
 
 add_library(reach_core STATIC
+    src/core/clipboard.c
     src/core/ui_state.c
     src/core/ui_layout.c
     src/core/ui_events.c
@@ -58,6 +59,9 @@ target_compile_features(reach_core PUBLIC
 )
 
 add_library(reach_features STATIC
+    src/features/clipboard/clipboard_feature.cpp
+    src/features/clipboard/clipboard_model.cpp
+    src/features/clipboard/clipboard_render.cpp
     src/features/context_menu/context_menu_feature.cpp
     src/features/context_menu/context_menu_interaction.cpp
     src/features/context_menu/context_menu_render.cpp
@@ -83,6 +87,7 @@ add_library(reach_features STATIC
     src/features/settings/settings_startup_apps.cpp
     src/features/settings/settings_update.cpp
     src/features/settings/windows_update_policy.cpp
+    src/features/scrollbar/scrollbar.cpp
     src/features/settings/settings_wifi.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
@@ -104,6 +109,7 @@ target_link_libraries(reach_features PUBLIC
 )
 
 add_library(reach_windows_adapters STATIC
+    src/adapters/windows/clipboard_win32.cpp
     src/adapters/windows/window_win32.cpp
     src/adapters/windows/explorer_desktop_compat_host_win32.cpp
     src/adapters/windows/render_d2d/render_d2d_backend.cpp
@@ -154,6 +160,7 @@ target_compile_features(reach_windows_adapters PUBLIC
     cxx_std_17
 )
 target_link_libraries(reach_windows_adapters PUBLIC
+    reach_core
     reach_support
 )
 target_link_libraries(reach_windows_adapters PRIVATE
@@ -184,6 +191,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
 )
 
 add_library(reach_shell STATIC
+    src/shell/shell_clipboard.cpp
     src/shell/shell_app_launch.cpp
     src/shell/shell_context_menu_orchestration.cpp
     src/shell/shell_config.cpp
@@ -564,6 +572,14 @@ target_link_libraries(reach_launcher_feature_tests PRIVATE
     reach_support
 )
 
+add_executable(reach_clipboard_model_tests
+    tests/clipboard_model_tests.cpp
+)
+
+reach_configure_common(reach_clipboard_model_tests)
+target_compile_features(reach_clipboard_model_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_clipboard_model_tests PRIVATE reach_features)
+
 add_executable(reach_search_ranking_tests
     tests/search_ranking_tests.cpp
 )
@@ -593,6 +609,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_windows_update_feature_tests COMMAND reach_windows_update_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
+    add_test(NAME reach_clipboard_model_tests COMMAND reach_clipboard_model_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
 endif()

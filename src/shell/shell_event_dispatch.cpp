@@ -31,6 +31,7 @@ int32_t reach_shell_has_pending_events(const reach_shell *shell)
                                 reach_shell_surface_has_pending_events(&shell->switcher) ||
                                 reach_shell_surface_has_pending_events(&shell->context_menu) ||
                                 reach_shell_surface_has_pending_events(&shell->quick_settings) ||
+                                reach_shell_surface_has_pending_events(&shell->clipboard_surface) ||
                                 (shell->dock_reveal_edge.ops.has_pending_events != nullptr &&
                                  shell->dock_reveal_edge.ops.has_pending_events(
                                      shell->dock_reveal_edge.edge)));
@@ -55,6 +56,7 @@ reach_result reach_shell_dispatch_events(reach_shell *shell)
     reach_shell_dispatch_surface_events(&shell->switcher);
     reach_shell_dispatch_surface_events(&shell->context_menu);
     reach_shell_dispatch_surface_events(&shell->quick_settings);
+    reach_shell_dispatch_surface_events(&shell->clipboard_surface);
     if (shell->dock_reveal_edge.ops.dispatch_events != nullptr &&
         (shell->dock_reveal_edge.ops.has_pending_events == nullptr ||
          shell->dock_reveal_edge.ops.has_pending_events(shell->dock_reveal_edge.edge)))

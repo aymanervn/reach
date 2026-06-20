@@ -103,6 +103,9 @@ void reach_shell_surface_transitions_init(reach_shell *shell)
         shell, &shell->context_menu_transition,
         REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
         REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY);
+    reach_shell_surface_transition_init(
+        shell, &shell->clipboard_transition, REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_Y,
+        REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_OPACITY);
 }
 
 void reach_shell_surface_transition_set(reach_shell *shell,

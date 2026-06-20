@@ -17,8 +17,9 @@ reach_result reach_ui_handle_event(reach_ui_state *state, const reach_ui_event *
     switch (event->type)
     {
     case REACH_UI_EVENT_WINDOWS_KEY:
-    case REACH_UI_EVENT_ESCAPE:
         return reach_ui_state_toggle_launcher(state);
+    case REACH_UI_EVENT_ESCAPE:
+        return state->launcher.open ? reach_ui_state_close_launcher(state) : REACH_OK;
     case REACH_UI_EVENT_ENTER:
         if (out_intent != 0 && state->launcher.open)
         {

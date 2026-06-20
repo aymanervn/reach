@@ -132,6 +132,14 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
+    case REACH_WM_CLIPBOARD_CHANGED:
+        if (window != nullptr)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_CLIPBOARD_CHANGED;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return 0;
     case WM_DISPLAYCHANGE:
         reach_windows_request_desktop_environment_sync();
 
@@ -457,14 +465,15 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
 {
     return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU ||
            role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-           role == REACH_SURFACE_QUICK_SETTINGS;
+           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD;
 }
 
 static int32_t reach_window_topmost_surface(reach_surface_role role)
 {
     return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
            role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS;
+           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
+           role == REACH_SURFACE_CLIPBOARD;
 }
 
 static DWORD reach_window_ex_style(reach_surface_role role)
@@ -473,6 +482,7 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
         role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
         role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
+        role == REACH_SURFACE_CLIPBOARD ||
         role == REACH_SURFACE_SETTINGS)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
@@ -627,7 +637,8 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
         window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
         window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_SETTINGS)
+        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
+        window->role == REACH_SURFACE_SETTINGS)
     {
         return REACH_OK;
     }
@@ -666,7 +677,8 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
     if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
         window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
         window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_SETTINGS)
+        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
+        window->role == REACH_SURFACE_SETTINGS)
     {
         return REACH_OK;
     }
@@ -901,6 +913,9 @@ static reach_result reach_platform_window_post_event(reach_platform_window *wind
         break;
     case REACH_UI_EVENT_CONFIG_CHANGED:
         message = REACH_WM_CONFIG_CHANGED;
+        break;
+    case REACH_UI_EVENT_CLIPBOARD_CHANGED:
+        message = REACH_WM_CLIPBOARD_CHANGED;
         break;
     case REACH_UI_EVENT_WALLPAPER_CHANGED:
         message = REACH_WM_WALLPAPER_CHANGED;

@@ -33,6 +33,14 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
                           (float)point.x <= launcher_bounds.x + launcher_bounds.width &&
                           (float)point.y >= launcher_bounds.y &&
                           (float)point.y <= launcher_bounds.y + launcher_bounds.height;
+    reach_rect_f32 clipboard_bounds =
+        shell->clipboard_surface.bounds_valid ? shell->clipboard_surface.last_bounds
+                                              : shell->clipboard_layout.bounds;
+    int32_t on_clipboard =
+        shell->clipboard_model.open && (float)point.x >= clipboard_bounds.x &&
+        (float)point.x <= clipboard_bounds.x + clipboard_bounds.width &&
+        (float)point.y >= clipboard_bounds.y &&
+        (float)point.y <= clipboard_bounds.y + clipboard_bounds.height;
     reach_point_i32 dock_point =
         shell->has_layout ? reach_shell_dock_local_point(&shell->layout.dock, point.x, point.y)
                           : reach_point_i32{};
@@ -67,11 +75,14 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
     }
     if (shell->ui.launcher.open && !on_launcher)
     {
-        if (dock_hit.type != REACH_DOCK_HIT_NONE)
+        if (dock_hit.type == REACH_DOCK_HIT_NONE)
         {
-            return;
+            reach_shell_close_launcher(shell);
         }
-        reach_shell_close_launcher(shell);
+    }
+    if (shell->clipboard_model.open && !on_clipboard)
+    {
+        reach_shell_set_clipboard_open(shell, 0);
     }
 }
 
@@ -96,7 +107,8 @@ void reach_shell_sync_popup_mouse_hook(reach_shell *shell)
     if (shell->popup_capture.sync_mouse_hook != nullptr)
     {
         int32_t should_hook = shell->tray_state.popup_open || shell->context_menu_state.open ||
-                              shell->quick_settings_open || shell->ui.launcher.open;
+                              shell->quick_settings_open || shell->ui.launcher.open ||
+                              shell->clipboard_model.open;
         (void)shell->popup_capture.sync_mouse_hook(shell->popup_capture.userdata, should_hook,
                                                    reach_shell_on_popup_mouse_down, shell);
     }

@@ -112,6 +112,16 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_platform_window(REACH_SURFACE_CLIPBOARD,
+                                                      &dependencies.clipboard_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.clipboard_window.window,
+                                                           &dependencies.clipboard_renderer);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_search_provider(&dependencies.search_provider);
     }
     if (result == REACH_OK)
@@ -182,6 +192,10 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_clipboard_provider(&dependencies.clipboard);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_shell_create_with_dependencies(desc, &dependencies, &app->shell);
         if (result == REACH_OK)
         {
@@ -193,6 +207,9 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
             dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
+            dependencies.clipboard_window = {};
+            dependencies.clipboard_renderer = {};
+            dependencies.clipboard = {};
             dependencies.launcher_textbox = {};
         }
     }
@@ -213,6 +230,18 @@ reach_result reach_app_create(const reach_shell_desc *desc, reach_app **out_app)
         if (dependencies.dock_window.ops.destroy != nullptr)
         {
             dependencies.dock_window.ops.destroy(dependencies.dock_window.window);
+        }
+        if (dependencies.clipboard_window.ops.destroy != nullptr)
+        {
+            dependencies.clipboard_window.ops.destroy(dependencies.clipboard_window.window);
+        }
+        if (dependencies.clipboard_renderer.ops.destroy != nullptr)
+        {
+            dependencies.clipboard_renderer.ops.destroy(dependencies.clipboard_renderer.backend);
+        }
+        if (dependencies.clipboard.ops.destroy != nullptr)
+        {
+            dependencies.clipboard.ops.destroy(dependencies.clipboard.provider);
         }
         if (dependencies.dock_renderer.ops.destroy != nullptr)
         {

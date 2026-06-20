@@ -9,6 +9,7 @@
 #include "reach/core/ui_layout.h"
 
 #include "reach/features/context_menu.h"
+#include "reach/features/clipboard.h"
 #include "reach/features/dock.h"
 #include "reach/features/launcher.h"
 #include "reach/features/music_widget.h"
@@ -47,7 +48,11 @@ typedef enum reach_shell_animation_id
     REACH_SHELL_ANIMATION_SWITCHER_TRANSITION_OPACITY,
     REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
     REACH_SHELL_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY,
-    REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE,
+    REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_Y,
+    REACH_SHELL_ANIMATION_CLIPBOARD_TRANSITION_OPACITY,
+    REACH_SHELL_ANIMATION_CLIPBOARD_HOVER_BASE,
+    REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE =
+        REACH_SHELL_ANIMATION_CLIPBOARD_HOVER_BASE + REACH_CLIPBOARD_MAX_ITEMS,
     REACH_SHELL_ANIMATION_COUNT =
         REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + REACH_MAX_PINNED_APPS
 } reach_shell_animation_id;
@@ -63,6 +68,11 @@ typedef struct reach_shell_surface_transition
 static inline size_t reach_shell_dock_item_animation_id(size_t index)
 {
     return REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + index;
+}
+
+static inline size_t reach_shell_clipboard_hover_animation_id(size_t index)
+{
+    return REACH_SHELL_ANIMATION_CLIPBOARD_HOVER_BASE + index;
 }
 
 typedef struct reach_shell_dock_drag_state
@@ -349,6 +359,7 @@ typedef struct reach_shell_dock_reveal_state
     int32_t launcher_move_enabled;
     int32_t context_menu_move_enabled;
     int32_t quick_settings_move_enabled;
+    int32_t clipboard_move_enabled;
     reach_rect_f32 edge_bounds;
 } reach_shell_dock_reveal_state;
 
@@ -445,11 +456,13 @@ struct reach_shell
     reach_surface_runtime switcher;
     reach_surface_runtime context_menu;
     reach_surface_runtime quick_settings;
+    reach_surface_runtime clipboard_surface;
     reach_shell_surface_transition launcher_transition;
     reach_shell_surface_transition tray_transition;
     reach_shell_surface_transition switcher_transition;
     reach_shell_surface_transition context_menu_transition;
     reach_shell_surface_transition quick_settings_transition;
+    reach_shell_surface_transition clipboard_transition;
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
     reach_config_store_port config_store;
@@ -492,6 +505,11 @@ struct reach_shell
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
     reach_shell_launcher_scrollbar_drag_state launcher_scrollbar_drag;
+    reach_clipboard_model clipboard_model;
+    reach_clipboard_layout clipboard_layout;
+    reach_scrollbar_drag clipboard_scrollbar_drag;
+    reach_clipboard_port clipboard;
+    std::atomic<int32_t> clipboard_refresh_requested;
     reach_shell_launcher_search_state launcher_search;
     reach_shell_app_launch_state app_launch;
     reach_shell_open_window_icon_state open_window_icons;
@@ -595,6 +613,7 @@ void reach_shell_on_tray_window_event(void *user, const reach_ui_event *event);
 void reach_shell_on_switcher_window_event(void *user, const reach_ui_event *event);
 void reach_shell_on_context_menu_window_event(void *user, const reach_ui_event *event);
 void reach_shell_on_quick_settings_window_event(void *user, const reach_ui_event *event);
+void reach_shell_on_clipboard_window_event(void *user, const reach_ui_event *event);
 
 /* Popup/window capture helpers */
 
@@ -638,6 +657,14 @@ void reach_shell_stop_launcher_result_icon_worker(reach_shell *shell);
 void reach_shell_release_launcher_result_icons(reach_shell *shell);
 void reach_shell_apply_launcher_result_icon_results(reach_shell *shell);
 int32_t reach_shell_launcher_result_icon_work_pending(const reach_shell *shell);
+
+/* Clipboard orchestration */
+
+void reach_shell_set_clipboard_open(reach_shell *shell, int32_t open);
+void reach_shell_toggle_clipboard(reach_shell *shell);
+void reach_shell_process_clipboard_refresh(reach_shell *shell);
+void reach_shell_release_clipboard_items(reach_shell *shell);
+reach_result reach_shell_render_clipboard_surface(reach_shell *shell);
 
 /* Tray orchestration */
 
