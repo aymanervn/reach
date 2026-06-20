@@ -8,7 +8,9 @@
 
 #include <new>
 #include <vector>
-
+#include <shellapi.h>
+#include <shobjidl_core.h>
+#include <wchar.h>
 struct reach_clipboard_payload
 {
     uint64_t id;
@@ -145,6 +147,16 @@ static HBITMAP reach_clipboard_scale_bitmap(HBITMAP source, uint32_t width, uint
     SetBrushOrgEx(target_dc, 0, 0, nullptr);
     BOOL ok = StretchBlt(target_dc, 0, 0, target_width, target_height, source_dc, 0, 0,
                          (int)width, (int)height, SRCCOPY);
+
+    if (ok && pixels != nullptr)
+    {
+        uint8_t *pixel_bytes = static_cast<uint8_t *>(pixels);
+        const size_t pixel_count = (size_t)target_width * (size_t)target_height;
+        for (size_t index = 0; index < pixel_count; ++index)
+        {
+            pixel_bytes[index * 4u + 3u] = 0xFF;
+        }
+    }
     SelectObject(source_dc, old_source);
     SelectObject(target_dc, old_target);
     DeleteDC(source_dc);
@@ -394,6 +406,276 @@ static reach_result reach_clipboard_capture_bitmap(reach_clipboard_provider *pro
     return REACH_OK;
 }
 
+
+static int32_t reach_clipboard_is_image_file_path(const wchar_t *path)
+{
+    if (path == nullptr || path[0] == 0)
+    {
+        return 0;
+    }
+
+    const wchar_t *extension = wcsrchr(path, L'.');
+    if (extension == nullptr)
+    {
+        return 0;
+    }
+
+    return lstrcmpiW(extension, L".png") == 0 ||
+           lstrcmpiW(extension, L".jpg") == 0 ||
+           lstrcmpiW(extension, L".jpeg") == 0 ||
+           lstrcmpiW(extension, L".jfif") == 0 ||
+           lstrcmpiW(extension, L".bmp") == 0 ||
+           lstrcmpiW(extension, L".gif") == 0 ||
+           lstrcmpiW(extension, L".tif") == 0 ||
+           lstrcmpiW(extension, L".tiff") == 0 ||
+           lstrcmpiW(extension, L".webp") == 0 ||
+           lstrcmpiW(extension, L".ico") == 0 ||
+           lstrcmpiW(extension, L".heic") == 0 ||
+           lstrcmpiW(extension, L".heif") == 0;
+}
+
+static const wchar_t *reach_clipboard_file_name_from_path(const wchar_t *path)
+{
+    if (path == nullptr)
+    {
+        return L"";
+    }
+
+    const wchar_t *slash = wcsrchr(path, L'\\');
+    const wchar_t *forward_slash = wcsrchr(path, L'/');
+    const wchar_t *separator = slash > forward_slash ? slash : forward_slash;
+    return separator != nullptr ? separator + 1 : path;
+}
+
+static void reach_clipboard_force_hbitmap_opaque_alpha(HBITMAP bitmap)
+{
+    if (bitmap == nullptr)
+    {
+        return;
+    }
+
+    BITMAP bitmap_info = {};
+    if (GetObject(bitmap, sizeof(bitmap_info), &bitmap_info) != sizeof(bitmap_info))
+    {
+        return;
+    }
+
+    if (bitmap_info.bmBits == nullptr || bitmap_info.bmBitsPixel != 32 ||
+        bitmap_info.bmWidth <= 0 || bitmap_info.bmHeight == 0)
+    {
+        return;
+    }
+
+    const size_t width = (size_t)bitmap_info.bmWidth;
+    const size_t height =
+        (size_t)(bitmap_info.bmHeight < 0 ? -bitmap_info.bmHeight : bitmap_info.bmHeight);
+    uint8_t *pixels = static_cast<uint8_t *>(bitmap_info.bmBits);
+
+    for (size_t y = 0; y < height; ++y)
+    {
+        uint8_t *row = pixels + y * (size_t)bitmap_info.bmWidthBytes;
+        for (size_t x = 0; x < width; ++x)
+        {
+            row[x * 4u + 3u] = 0xFF;
+        }
+    }
+}
+
+static HBITMAP reach_clipboard_thumbnail_from_file_path(const wchar_t *path, uint32_t *out_width,
+                                                        uint32_t *out_height)
+{
+    if (out_width != nullptr)
+    {
+        *out_width = 0;
+    }
+    if (out_height != nullptr)
+    {
+        *out_height = 0;
+    }
+
+    if (path == nullptr || path[0] == 0)
+    {
+        return nullptr;
+    }
+
+    IShellItemImageFactory *factory = nullptr;
+    HRESULT hr = SHCreateItemFromParsingName(path, nullptr, IID_PPV_ARGS(&factory));
+    if (FAILED(hr) || factory == nullptr)
+    {
+        return nullptr;
+    }
+
+    SIZE size = {};
+    size.cx = 256;
+    size.cy = 256;
+
+    HBITMAP bitmap = nullptr;
+    hr = factory->GetImage(size, SIIGBF_BIGGERSIZEOK, &bitmap);
+    factory->Release();
+
+    if (FAILED(hr) || bitmap == nullptr)
+    {
+        return nullptr;
+    }
+
+    BITMAP bitmap_info = {};
+    if (GetObject(bitmap, sizeof(bitmap_info), &bitmap_info) == sizeof(bitmap_info))
+    {
+        if (out_width != nullptr && bitmap_info.bmWidth > 0)
+        {
+            *out_width = (uint32_t)bitmap_info.bmWidth;
+        }
+        if (out_height != nullptr && bitmap_info.bmHeight != 0)
+        {
+            *out_height =
+                (uint32_t)(bitmap_info.bmHeight < 0 ? -bitmap_info.bmHeight : bitmap_info.bmHeight);
+        }
+    }
+
+    reach_clipboard_force_hbitmap_opaque_alpha(bitmap);
+    return bitmap;
+}
+
+static reach_result reach_clipboard_capture_file_drop(reach_clipboard_provider *provider,
+                                                      reach_clipboard_item *out_item)
+{
+    if (provider == nullptr || out_item == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HGLOBAL handle = static_cast<HGLOBAL>(GetClipboardData(CF_HDROP));
+    if (handle == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    HDROP drop = static_cast<HDROP>(handle);
+    const UINT file_count = DragQueryFileW(drop, 0xFFFFFFFFu, nullptr, 0);
+    if (file_count == 0)
+    {
+        return REACH_ERROR;
+    }
+
+    std::vector<wchar_t> selected_path;
+    for (UINT file_index = 0; file_index < file_count; ++file_index)
+    {
+        const UINT path_length = DragQueryFileW(drop, file_index, nullptr, 0);
+        if (path_length == 0)
+        {
+            continue;
+        }
+
+        std::vector<wchar_t> candidate;
+        try
+        {
+            candidate.resize((size_t)path_length + 1u);
+        }
+        catch (...)
+        {
+            return REACH_ERROR;
+        }
+
+        if (DragQueryFileW(drop, file_index, candidate.data(), path_length + 1u) == 0)
+        {
+            continue;
+        }
+
+        if (reach_clipboard_is_image_file_path(candidate.data()))
+        {
+            selected_path.swap(candidate);
+            break;
+        }
+    }
+
+    if (selected_path.empty())
+    {
+        return REACH_ERROR;
+    }
+
+    uint32_t thumbnail_width = 0;
+    uint32_t thumbnail_height = 0;
+    HBITMAP thumbnail = reach_clipboard_thumbnail_from_file_path(selected_path.data(),
+                                                                 &thumbnail_width,
+                                                                 &thumbnail_height);
+    if (thumbnail == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    void *source = GlobalLock(handle);
+    if (source == nullptr)
+    {
+        DeleteObject(thumbnail);
+        return REACH_ERROR;
+    }
+
+    const SIZE_T byte_count = GlobalSize(handle);
+    if (byte_count == 0)
+    {
+        GlobalUnlock(handle);
+        DeleteObject(thumbnail);
+        return REACH_ERROR;
+    }
+
+    reach_clipboard_payload *payload = new (std::nothrow) reach_clipboard_payload();
+    if (payload == nullptr)
+    {
+        GlobalUnlock(handle);
+        DeleteObject(thumbnail);
+        return REACH_ERROR;
+    }
+
+    try
+    {
+        payload->bytes.resize((size_t)byte_count);
+    }
+    catch (...)
+    {
+        GlobalUnlock(handle);
+        DeleteObject(thumbnail);
+        delete payload;
+        return REACH_ERROR;
+    }
+
+    memcpy(payload->bytes.data(), source, (size_t)byte_count);
+    GlobalUnlock(handle);
+
+    payload->id = ++provider->next_id;
+    payload->kind = REACH_CLIPBOARD_ITEM_IMAGE;
+    payload->format = CF_HDROP;
+    payload->thumbnail_id = reach_windows_icon_id_from_hbitmap(thumbnail);
+    if (payload->thumbnail_id == 0)
+    {
+        delete payload;
+        return REACH_ERROR;
+    }
+
+    try
+    {
+        provider->payloads.push_back(payload);
+    }
+    catch (...)
+    {
+        reach_windows_icon_id_release(payload->thumbnail_id);
+        delete payload;
+        return REACH_ERROR;
+    }
+
+    out_item->id = payload->id;
+    out_item->kind = payload->kind;
+    out_item->content_hash =
+        reach_clipboard_hash_bytes(payload->bytes.data(), payload->bytes.size());
+    out_item->thumbnail_id = payload->thumbnail_id;
+    out_item->image_width = thumbnail_width;
+    out_item->image_height = thumbnail_height;
+
+    const wchar_t *file_name = reach_clipboard_file_name_from_path(selected_path.data());
+    _snwprintf_s(reinterpret_cast<wchar_t *>(out_item->preview),
+                 REACH_CLIPBOARD_PREVIEW_CAPACITY, _TRUNCATE, L"%s", file_name);
+
+    return REACH_OK;
+}
 static reach_result reach_clipboard_capture_current(reach_clipboard_provider *provider,
                                                     reach_clipboard_item *out_item)
 {
@@ -407,11 +689,7 @@ static reach_result reach_clipboard_capture_current(reach_clipboard_provider *pr
         return REACH_ERROR;
     }
     reach_result result = REACH_ERROR;
-    if (IsClipboardFormatAvailable(CF_UNICODETEXT))
-    {
-        result = reach_clipboard_capture_text(provider, out_item);
-    }
-    else if (IsClipboardFormatAvailable(CF_DIBV5))
+    if (IsClipboardFormatAvailable(CF_DIBV5))
     {
         result = reach_clipboard_capture_dib(provider, CF_DIBV5, out_item);
     }
@@ -422,6 +700,14 @@ static reach_result reach_clipboard_capture_current(reach_clipboard_provider *pr
     else if (IsClipboardFormatAvailable(CF_BITMAP))
     {
         result = reach_clipboard_capture_bitmap(provider, out_item);
+    }
+    else if (IsClipboardFormatAvailable(CF_HDROP))
+    {
+        result = reach_clipboard_capture_file_drop(provider, out_item);
+    }
+    else if (IsClipboardFormatAvailable(CF_UNICODETEXT))
+    {
+        result = reach_clipboard_capture_text(provider, out_item);
     }
     CloseClipboard();
     return result;
