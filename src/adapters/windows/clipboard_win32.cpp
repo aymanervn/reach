@@ -44,8 +44,8 @@ static uint64_t reach_clipboard_hash_bytes(const uint8_t *bytes, size_t size)
     return hash;
 }
 
-static reach_clipboard_payload *
-reach_clipboard_find_payload(reach_clipboard_provider *provider, uint64_t id)
+static reach_clipboard_payload *reach_clipboard_find_payload(reach_clipboard_provider *provider,
+                                                             uint64_t id)
 {
     if (provider == nullptr)
     {
@@ -98,9 +98,8 @@ static HBITMAP reach_clipboard_bitmap_from_dib(const uint8_t *bytes, size_t size
     }
 
     HDC dc = GetDC(nullptr);
-    HBITMAP bitmap =
-        CreateDIBitmap(dc, header, CBM_INIT, bytes + pixel_offset,
-                       reinterpret_cast<const BITMAPINFO *>(bytes), DIB_RGB_COLORS);
+    HBITMAP bitmap = CreateDIBitmap(dc, header, CBM_INIT, bytes + pixel_offset,
+                                    reinterpret_cast<const BITMAPINFO *>(bytes), DIB_RGB_COLORS);
     ReleaseDC(nullptr, dc);
     if (bitmap != nullptr)
     {
@@ -145,8 +144,8 @@ static HBITMAP reach_clipboard_scale_bitmap(HBITMAP source, uint32_t width, uint
     HGDIOBJ old_target = SelectObject(target_dc, thumbnail);
     SetStretchBltMode(target_dc, HALFTONE);
     SetBrushOrgEx(target_dc, 0, 0, nullptr);
-    BOOL ok = StretchBlt(target_dc, 0, 0, target_width, target_height, source_dc, 0, 0,
-                         (int)width, (int)height, SRCCOPY);
+    BOOL ok = StretchBlt(target_dc, 0, 0, target_width, target_height, source_dc, 0, 0, (int)width,
+                         (int)height, SRCCOPY);
 
     if (ok && pixels != nullptr)
     {
@@ -271,8 +270,8 @@ static reach_result reach_clipboard_capture_dib(reach_clipboard_provider *provid
 
     uint32_t width = 0;
     uint32_t height = 0;
-    HBITMAP source =
-        reach_clipboard_bitmap_from_dib(payload->bytes.data(), payload->bytes.size(), &width, &height);
+    HBITMAP source = reach_clipboard_bitmap_from_dib(payload->bytes.data(), payload->bytes.size(),
+                                                     &width, &height);
     if (source == nullptr)
     {
         delete payload;
@@ -312,8 +311,8 @@ static reach_result reach_clipboard_capture_dib(reach_clipboard_provider *provid
     out_item->thumbnail_id = payload->thumbnail_id;
     out_item->image_width = width;
     out_item->image_height = height;
-    _snwprintf_s(reinterpret_cast<wchar_t *>(out_item->preview),
-                 REACH_CLIPBOARD_PREVIEW_CAPACITY, _TRUNCATE, L"%u \u00D7 %u image", width, height);
+    _snwprintf_s(reinterpret_cast<wchar_t *>(out_item->preview), REACH_CLIPBOARD_PREVIEW_CAPACITY,
+                 _TRUNCATE, L"%u \u00D7 %u image", width, height);
     return REACH_OK;
 }
 
@@ -347,8 +346,7 @@ static reach_result reach_clipboard_capture_bitmap(reach_clipboard_provider *pro
         delete payload;
         return REACH_ERROR;
     }
-    BITMAPINFOHEADER *header =
-        reinterpret_cast<BITMAPINFOHEADER *>(payload->bytes.data());
+    BITMAPINFOHEADER *header = reinterpret_cast<BITMAPINFOHEADER *>(payload->bytes.data());
     *header = {};
     header->biSize = sizeof(BITMAPINFOHEADER);
     header->biWidth = bitmap_info.bmWidth;
@@ -367,8 +365,8 @@ static reach_result reach_clipboard_capture_bitmap(reach_clipboard_provider *pro
         delete payload;
         return REACH_ERROR;
     }
-    HBITMAP thumbnail = reach_clipboard_scale_bitmap(
-        bitmap, (uint32_t)bitmap_info.bmWidth, (uint32_t)bitmap_info.bmHeight);
+    HBITMAP thumbnail = reach_clipboard_scale_bitmap(bitmap, (uint32_t)bitmap_info.bmWidth,
+                                                     (uint32_t)bitmap_info.bmHeight);
     if (thumbnail == nullptr)
     {
         delete payload;
@@ -400,12 +398,10 @@ static reach_result reach_clipboard_capture_bitmap(reach_clipboard_provider *pro
     out_item->thumbnail_id = payload->thumbnail_id;
     out_item->image_width = (uint32_t)bitmap_info.bmWidth;
     out_item->image_height = (uint32_t)bitmap_info.bmHeight;
-    _snwprintf_s(reinterpret_cast<wchar_t *>(out_item->preview),
-                 REACH_CLIPBOARD_PREVIEW_CAPACITY, _TRUNCATE, L"%u \u00D7 %u image",
-                 out_item->image_width, out_item->image_height);
+    _snwprintf_s(reinterpret_cast<wchar_t *>(out_item->preview), REACH_CLIPBOARD_PREVIEW_CAPACITY,
+                 _TRUNCATE, L"%u \u00D7 %u image", out_item->image_width, out_item->image_height);
     return REACH_OK;
 }
-
 
 static int32_t reach_clipboard_is_image_file_path(const wchar_t *path)
 {
@@ -420,18 +416,12 @@ static int32_t reach_clipboard_is_image_file_path(const wchar_t *path)
         return 0;
     }
 
-    return lstrcmpiW(extension, L".png") == 0 ||
-           lstrcmpiW(extension, L".jpg") == 0 ||
-           lstrcmpiW(extension, L".jpeg") == 0 ||
-           lstrcmpiW(extension, L".jfif") == 0 ||
-           lstrcmpiW(extension, L".bmp") == 0 ||
-           lstrcmpiW(extension, L".gif") == 0 ||
-           lstrcmpiW(extension, L".tif") == 0 ||
-           lstrcmpiW(extension, L".tiff") == 0 ||
-           lstrcmpiW(extension, L".webp") == 0 ||
-           lstrcmpiW(extension, L".ico") == 0 ||
-           lstrcmpiW(extension, L".heic") == 0 ||
-           lstrcmpiW(extension, L".heif") == 0;
+    return lstrcmpiW(extension, L".png") == 0 || lstrcmpiW(extension, L".jpg") == 0 ||
+           lstrcmpiW(extension, L".jpeg") == 0 || lstrcmpiW(extension, L".jfif") == 0 ||
+           lstrcmpiW(extension, L".bmp") == 0 || lstrcmpiW(extension, L".gif") == 0 ||
+           lstrcmpiW(extension, L".tif") == 0 || lstrcmpiW(extension, L".tiff") == 0 ||
+           lstrcmpiW(extension, L".webp") == 0 || lstrcmpiW(extension, L".ico") == 0 ||
+           lstrcmpiW(extension, L".heic") == 0 || lstrcmpiW(extension, L".heif") == 0;
 }
 
 static const wchar_t *reach_clipboard_file_name_from_path(const wchar_t *path)
@@ -595,9 +585,8 @@ static reach_result reach_clipboard_capture_file_drop(reach_clipboard_provider *
 
     uint32_t thumbnail_width = 0;
     uint32_t thumbnail_height = 0;
-    HBITMAP thumbnail = reach_clipboard_thumbnail_from_file_path(selected_path.data(),
-                                                                 &thumbnail_width,
-                                                                 &thumbnail_height);
+    HBITMAP thumbnail = reach_clipboard_thumbnail_from_file_path(
+        selected_path.data(), &thumbnail_width, &thumbnail_height);
     if (thumbnail == nullptr)
     {
         return REACH_ERROR;
@@ -671,8 +660,8 @@ static reach_result reach_clipboard_capture_file_drop(reach_clipboard_provider *
     out_item->image_height = thumbnail_height;
 
     const wchar_t *file_name = reach_clipboard_file_name_from_path(selected_path.data());
-    _snwprintf_s(reinterpret_cast<wchar_t *>(out_item->preview),
-                 REACH_CLIPBOARD_PREVIEW_CAPACITY, _TRUNCATE, L"%s", file_name);
+    _snwprintf_s(reinterpret_cast<wchar_t *>(out_item->preview), REACH_CLIPBOARD_PREVIEW_CAPACITY,
+                 _TRUNCATE, L"%s", file_name);
 
     return REACH_OK;
 }
@@ -777,8 +766,8 @@ static LRESULT CALLBACK reach_clipboard_window_proc(HWND window, UINT message, W
                           reinterpret_cast<LONG_PTR>(create->lpCreateParams));
         return TRUE;
     }
-    reach_clipboard_provider *provider = reinterpret_cast<reach_clipboard_provider *>(
-        GetWindowLongPtrW(window, GWLP_USERDATA));
+    reach_clipboard_provider *provider =
+        reinterpret_cast<reach_clipboard_provider *>(GetWindowLongPtrW(window, GWLP_USERDATA));
     if (message == WM_CLIPBOARDUPDATE && provider != nullptr)
     {
         DWORD sequence = GetClipboardSequenceNumber();
@@ -820,8 +809,9 @@ static reach_result reach_clipboard_start(reach_clipboard_provider *provider,
             CreateWindowExW(0, REACH_CLIPBOARD_WINDOW_CLASS, L"", 0, 0, 0, 0, 0, HWND_MESSAGE,
                             nullptr, GetModuleHandleW(nullptr), provider);
     }
-    return provider->window != nullptr && AddClipboardFormatListener(provider->window) ? REACH_OK
-                                                                                       : REACH_ERROR;
+    return provider->window != nullptr && AddClipboardFormatListener(provider->window)
+               ? REACH_OK
+               : REACH_ERROR;
 }
 
 static reach_result reach_clipboard_stop(reach_clipboard_provider *provider)

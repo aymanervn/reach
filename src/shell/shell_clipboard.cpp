@@ -1,7 +1,6 @@
 #include "shell_internal.h"
 
-static void reach_shell_release_clipboard_item(reach_shell *shell,
-                                               const reach_clipboard_item *item)
+static void reach_shell_release_clipboard_item(reach_shell *shell, const reach_clipboard_item *item)
 {
     if (shell == nullptr || item == nullptr || item->id == 0)
     {
@@ -48,9 +47,9 @@ void reach_shell_set_clipboard_open(reach_shell *shell, int32_t open)
     reach_scrollbar_end_drag(&shell->clipboard_scrollbar_drag);
     for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
     {
-        reach_animation_manager_animate_to(
-            &shell->animations, reach_shell_clipboard_hover_animation_id(index), 0.0f, 0.10,
-            REACH_EASING_EASE_OUT);
+        reach_animation_manager_animate_to(&shell->animations,
+                                           reach_shell_clipboard_hover_animation_id(index), 0.0f,
+                                           0.10, REACH_EASING_EASE_OUT);
     }
     reach_shell_surface_transition_set(shell, &shell->clipboard_transition, next);
     reach_shell_sync_pointer_move_subscriptions(shell);

@@ -52,10 +52,8 @@ extern "C"
     void reach_scrollbar_begin_drag(reach_scrollbar_model *model, reach_scrollbar_drag *drag,
                                     const reach_scrollbar_layout *layout, float pointer_position,
                                     int32_t on_thumb);
-    void reach_scrollbar_update_drag(reach_scrollbar_model *model,
-                                     const reach_scrollbar_drag *drag,
-                                     const reach_scrollbar_layout *layout,
-                                     float pointer_position);
+    void reach_scrollbar_update_drag(reach_scrollbar_model *model, const reach_scrollbar_drag *drag,
+                                     const reach_scrollbar_layout *layout, float pointer_position);
     void reach_scrollbar_end_drag(reach_scrollbar_drag *drag);
 
 #ifdef __cplusplus

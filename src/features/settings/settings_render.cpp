@@ -126,14 +126,13 @@ static void render_update_page(const reach_settings_render_input *input,
     push_rect(commands, layout->update_refresh_button, scale_value(input, 8.0f),
               busy ? disabled_button : refresh_button);
     const uint16_t *scan_button_text =
-        model->update_scan_completed ? (const uint16_t *)u"Refresh"
-                                     : (const uint16_t *)u"Search";
+        model->update_scan_completed ? (const uint16_t *)u"Refresh" : (const uint16_t *)u"Search";
     if (model->update_page_state == REACH_SETTINGS_UPDATE_SCANNING)
         scan_button_text = model->update_scan_completed ? (const uint16_t *)u"Refreshing..."
                                                         : (const uint16_t *)u"Searching...";
-    push_text(commands, layout->update_refresh_button, scan_button_text,
-              scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
-              input->theme->settings_text, 1);
+    push_text(commands, layout->update_refresh_button, scan_button_text, scale_value(input, 13.0f),
+              REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_text,
+              1);
     push_rect(commands, layout->update_install_button, scale_value(input, 8.0f),
               install_enabled ? enabled_button : disabled_button);
     push_text(commands, layout->update_install_button, (const uint16_t *)u"Install selected",
@@ -167,12 +166,12 @@ static void render_update_page(const reach_settings_render_input *input,
                   input->text_alignment_leading, {0.96f, 0.38f, 0.34f, 1.0f}, 1);
     else if (model->update_scan_completed && layout->update_row_count == 0)
         push_text(commands, update_status_message, (const uint16_t *)u"Windows is up to date.",
-                  scale_value(input, 14.0f), REACH_TEXT_WEIGHT_NORMAL,
-                  REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
+                  scale_value(input, 14.0f), REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_CENTER,
+                  input->theme->settings_secondary_text, 1);
     else if (!model->update_scan_completed && layout->update_row_count == 0)
         push_text(commands, update_status_message, (const uint16_t *)u"Search for updates",
-                  scale_value(input, 14.0f), REACH_TEXT_WEIGHT_NORMAL,
-                  REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
+                  scale_value(input, 14.0f), REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_CENTER,
+                  input->theme->settings_secondary_text, 1);
 
     static const uint16_t *section_titles[] = {(const uint16_t *)u"Select updates",
                                                (const uint16_t *)u"Restart required",

@@ -20,8 +20,7 @@ extern "C"
         REACH_DOCK_REVEAL_EDGE_LEAVE = 2
     } reach_dock_reveal_edge_event;
 
-    typedef void (*reach_dock_reveal_edge_callback)(void *user,
-                                                    reach_dock_reveal_edge_event event);
+    typedef void (*reach_dock_reveal_edge_callback)(void *user, reach_dock_reveal_edge_event event);
 
     typedef struct reach_dock_reveal_edge_ops
     {

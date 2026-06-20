@@ -27,10 +27,9 @@ static float reach_animation_ease(float value, reach_easing easing)
     }
     case REACH_EASING_EASE_IN_OUT:
     default:
-        return t < 0.5f ? 4.0f * t * t * t
-                        : 1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f) *
-                                  (-2.0f * t + 2.0f)) /
-                                     2.0f;
+        return t < 0.5f
+                   ? 4.0f * t * t * t
+                   : 1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f;
     }
 }
 
@@ -54,8 +53,8 @@ reach_animation_manager_const_track(const reach_animation_manager *manager, size
                : nullptr;
 }
 
-void reach_animation_manager_init(reach_animation_manager *manager,
-                                  reach_animation_track *tracks, size_t track_count)
+void reach_animation_manager_init(reach_animation_manager *manager, reach_animation_track *tracks,
+                                  size_t track_count)
 {
     REACH_ASSERT(manager != nullptr);
     REACH_ASSERT(track_count == 0 || tracks != nullptr);
@@ -92,10 +91,9 @@ void reach_animation_manager_tick(reach_animation_manager *manager, double delta
         }
 
         track->elapsed_seconds += delta_seconds;
-        float progress =
-            track->duration_seconds > 0.0
-                ? (float)(track->elapsed_seconds / track->duration_seconds)
-                : 1.0f;
+        float progress = track->duration_seconds > 0.0
+                             ? (float)(track->elapsed_seconds / track->duration_seconds)
+                             : 1.0f;
         if (progress >= 1.0f)
         {
             track->value = track->to;
@@ -141,7 +139,8 @@ void reach_animation_manager_animate_to(reach_animation_manager *manager, size_t
     reach_animation_track *track = reach_animation_manager_track(manager, track_id);
     if (track != nullptr)
     {
-        reach_animation_manager_start(manager, track_id, track->value, to, duration_seconds, easing);
+        reach_animation_manager_start(manager, track_id, track->value, to, duration_seconds,
+                                      easing);
     }
 }
 

@@ -74,7 +74,6 @@ reach_result reach_ui_build_render_commands(const reach_ui_state *state,
         command.color.a = 0.95f;
         command.radius = 10.0f;
         reach_render_command_buffer_push(buffer, &command);
-
     }
 
     if (state->dock.visible)

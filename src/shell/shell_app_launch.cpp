@@ -112,8 +112,9 @@ void reach_shell_stop_app_launch_worker(reach_shell *shell)
     shell->app_launch.launch_after_launcher_close = 0;
 }
 
-reach_result reach_shell_defer_app_launch_until_launcher_closed(
-    reach_shell *shell, const reach_app_launch_request *request)
+reach_result
+reach_shell_defer_app_launch_until_launcher_closed(reach_shell *shell,
+                                                   const reach_app_launch_request *request)
 {
     if (shell == nullptr || request == nullptr || request->path[0] == 0)
     {

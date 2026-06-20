@@ -12,7 +12,8 @@ struct reach_explorer_service
 {
 };
 
-static reach_result reach_explorer_execute(const wchar_t *target, const wchar_t *arguments = nullptr)
+static reach_result reach_explorer_execute(const wchar_t *target,
+                                           const wchar_t *arguments = nullptr)
 {
     if (target == nullptr || target[0] == 0)
     {

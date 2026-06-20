@@ -589,16 +589,15 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         {
             const float thumbnail_height =
                 reach_clipboard_min_float(metrics.thumbnail_height, local_item.height);
-            const float thumbnail_max_width =
-                reach_clipboard_max_float(0.0f, local_item.width * metrics.thumbnail_max_width_ratio);
-            const float thumbnail_width =
-                reach_clipboard_thumbnail_width_for_item(item_data, thumbnail_height,
-                                                         thumbnail_max_width);
+            const float thumbnail_max_width = reach_clipboard_max_float(
+                0.0f, local_item.width * metrics.thumbnail_max_width_ratio);
+            const float thumbnail_width = reach_clipboard_thumbnail_width_for_item(
+                item_data, thumbnail_height, thumbnail_max_width);
 
             const float thumbnail_x = local_item.x + padding;
             const float thumbnail_y =
-                local_item.y + reach_clipboard_max_float(0.0f, local_item.height - thumbnail_height) *
-                                   0.5f;
+                local_item.y +
+                reach_clipboard_max_float(0.0f, local_item.height - thumbnail_height) * 0.5f;
 
             command = {};
             command.type = REACH_RENDER_COMMAND_ICON;

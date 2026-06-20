@@ -81,8 +81,7 @@ static void test_remove()
 static void test_preview()
 {
     uint16_t preview[12] = {};
-    const uint16_t text[] = {' ', 'a', '\t', ' ', 'b', '\r', '\n', 'c', '\n', 'd',
-                             '\n', 'e', 0};
+    const uint16_t text[] = {' ', 'a', '\t', ' ', 'b', '\r', '\n', 'c', '\n', 'd', '\n', 'e', 0};
     reach_clipboard_build_text_preview(text, preview, 12);
     const uint16_t expected[] = {'a', ' ', 'b', ' ', 'c', ' ', 'd', 0x2026, 0};
     size_t index = 0;
@@ -114,8 +113,8 @@ static void test_scrollbar_edges()
     reach_scrollbar_set_target(&stepped, 126.0f);
     expect_true(stepped.target == 150.0f, "stepped scrollbar quantizes target");
 
-    reach_scrollbar_layout layout = reach_scrollbar_compute_layout(
-        &model, {0.0f, 0.0f, 4.0f, 100.0f}, 200.0f, 1000.0f, 20.0f);
+    reach_scrollbar_layout layout =
+        reach_scrollbar_compute_layout(&model, {0.0f, 0.0f, 4.0f, 100.0f}, 200.0f, 1000.0f, 20.0f);
     expect_true(layout.thumb.height == 20.0f, "minimum thumb size applies");
     reach_scrollbar_drag drag = {};
     reach_scrollbar_begin_drag(&model, &drag, &layout, 100.0f, 0);

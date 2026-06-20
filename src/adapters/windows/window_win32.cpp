@@ -482,8 +482,7 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
         role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
         role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-        role == REACH_SURFACE_CLIPBOARD ||
-        role == REACH_SURFACE_SETTINGS)
+        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
