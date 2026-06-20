@@ -504,6 +504,78 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     reach_render_command_buffer_push(commands, &command);
 
     const size_t item_count = reach_clipboard_count_clamped(model);
+    if (item_count == 0 && layout->viewport.width > 0.0f && layout->viewport.height > 0.0f)
+    {
+        command = {};
+        const float empty_text_height =
+            reach_clipboard_max_float(1.0f, metrics.items_font_size * 1.5f);
+        reach_rect_f32 empty_text_rect = layout->viewport;
+        empty_text_rect.y +=
+            reach_clipboard_max_float(0.0f, empty_text_rect.height - empty_text_height) * 0.5f;
+        empty_text_rect.height = empty_text_height;
+
+        command.type = REACH_RENDER_COMMAND_TEXT;
+        command.rect = reach_clipboard_local(empty_text_rect, layout->bounds);
+        command.color = theme->clipboard_secondary_text;
+        command.color.a *= 0.75f;
+        command.text_size = metrics.items_font_size;
+        command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+        command.text[0] = 'N';
+        command.text[1] = 'o';
+        command.text[2] = 't';
+        command.text[3] = 'h';
+        command.text[4] = 'i';
+        command.text[5] = 'n';
+        command.text[6] = 'g';
+        command.text[7] = ' ';
+        command.text[8] = 'i';
+        command.text[9] = 'n';
+        command.text[10] = ' ';
+        command.text[11] = 't';
+        command.text[12] = 'h';
+        command.text[13] = 'e';
+        command.text[14] = ' ';
+        command.text[15] = 'c';
+        command.text[16] = 'l';
+        command.text[17] = 'i';
+        command.text[18] = 'p';
+        command.text[19] = 'b';
+        command.text[20] = 'o';
+        command.text[21] = 'a';
+        command.text[22] = 'r';
+        command.text[23] = 'd';
+        command.text[24] = 0;
+        reach_render_command_buffer_push(commands, &command);
+    }
+    if (layout->clear_button.width > 0.0f && layout->clear_button.height > 0.0f)
+    {
+        const int32_t clear_enabled = item_count > 0;
+        const reach_rect_f32 clear_button =
+            reach_clipboard_local(layout->clear_button, layout->bounds);
+
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect = clear_button;
+        command.color = theme->clipboard_secondary_text;
+        command.color.a = metrics.clear_button_background_alpha * (clear_enabled ? 1.0f : 0.35f);
+        command.radius = metrics.clear_button_radius;
+        reach_render_command_buffer_push(commands, &command);
+
+        command = {};
+        command.type = REACH_RENDER_COMMAND_TEXT;
+        command.rect = clear_button;
+        command.color = theme->clipboard_secondary_text;
+        command.color.a *= clear_enabled ? 0.90f : 0.35f;
+        command.text_size = metrics.items_font_size;
+        command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+        command.text[0] = 'C';
+        command.text[1] = 'l';
+        command.text[2] = 'e';
+        command.text[3] = 'a';
+        command.text[4] = 'r';
+        command.text[5] = 0;
+        reach_render_command_buffer_push(commands, &command);
+    }
     const size_t first_rendered_item = reach_clipboard_first_visible_item(layout, item_count);
     size_t last_rendered_item = first_rendered_item + REACH_CLIPBOARD_RENDER_ITEM_LIMIT;
     if (last_rendered_item > item_count)

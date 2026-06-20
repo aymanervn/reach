@@ -448,16 +448,20 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
             (reach_clipboard_hit_type)shell->clipboard_model.pressed_hit_type;
         uint64_t pressed_item_id = shell->clipboard_model.pressed_item_id;
         reach_clipboard_model_clear_press(&shell->clipboard_model);
+        if (clipboard_hit.type == REACH_CLIPBOARD_HIT_CLEAR &&
+            pressed_hit_type == REACH_CLIPBOARD_HIT_CLEAR)
+        {
+            reach_shell_clear_clipboard(shell);
+            return REACH_OK;
+        }
+
         if (clipboard_hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE &&
             pressed_hit_type == REACH_CLIPBOARD_HIT_ITEM_CLOSE && clipboard_hit.index == pressed &&
             clipboard_hit.index < shell->clipboard_model.count &&
             shell->clipboard_model.items[clipboard_hit.index].id == pressed_item_id)
         {
             reach_clipboard_item removed_item = shell->clipboard_model.items[clipboard_hit.index];
-            if (shell->clipboard.ops.release != nullptr)
-            {
-                shell->clipboard.ops.release(shell->clipboard.provider, removed_item.id);
-            }
+            reach_shell_release_clipboard_item(shell, &removed_item);
             reach_clipboard_model_remove(&shell->clipboard_model, clipboard_hit.index);
             shell->clipboard_surface.dirty_flags = 1;
             shell->dirty.layout = 1;
@@ -639,7 +643,8 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
             return REACH_OK;
         }
         if (clipboard_hit.type == REACH_CLIPBOARD_HIT_ITEM ||
-            clipboard_hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE)
+            clipboard_hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE ||
+            clipboard_hit.type == REACH_CLIPBOARD_HIT_CLEAR)
         {
             shell->clipboard_model.pressed_index = clipboard_hit.index;
             shell->clipboard_model.pressed_hit_type = clipboard_hit.type;

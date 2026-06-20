@@ -1,5 +1,37 @@
 #include "shell_internal.h"
 
+static float reach_shell_animate_clipboard_layout_value(reach_shell *shell, size_t track_id,
+                                                        float target)
+{
+    if (shell == nullptr || target <= 0.0f)
+    {
+        return target;
+    }
+
+    float value = reach_animation_manager_value(&shell->animations, track_id);
+    if (value <= 0.0f)
+    {
+        reach_animation_manager_set(&shell->animations, track_id, target);
+        return target;
+    }
+
+    if (fabsf(reach_animation_manager_target(&shell->animations, track_id) - target) >= 0.5f)
+    {
+        reach_animation_manager_animate_to(&shell->animations, track_id, target, 0.16,
+                                           REACH_EASING_EASE_OUT);
+    }
+
+    if (reach_animation_manager_active(&shell->animations, track_id))
+    {
+        shell->dirty.layout = 1;
+        shell->clipboard_surface.dirty_flags = 1;
+        reach_shell_request_update(shell);
+        return reach_animation_manager_value(&shell->animations, track_id);
+    }
+
+    return target;
+}
+
 #include <math.h>
 #include <stdio.h>
 #include <time.h>
@@ -873,9 +905,29 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                 }
 
                 reach_clipboard_layout previous_clipboard_layout = shell->clipboard_layout;
-                shell->clipboard_layout = reach_clipboard_compute_layout(
+                reach_clipboard_layout target_clipboard_layout =
+
+                    reach_clipboard_compute_layout(&shell->clipboard_model, bounds,
+                                                   layout.launcher.bounds,
+                                                   reach_shell_layout_dpi_scale(shell));
+
+                float animated_clipboard_height = reach_shell_animate_clipboard_layout_value(
+
+                    shell, REACH_SHELL_ANIMATION_CLIPBOARD_HEIGHT,
+
+                    target_clipboard_layout.bounds.height);
+
+                float animated_clipboard_item_width = reach_shell_animate_clipboard_layout_value(
+
+                    shell, REACH_SHELL_ANIMATION_CLIPBOARD_ITEM_WIDTH,
+
+                    target_clipboard_layout.item_width);
+
+                shell->clipboard_layout = reach_clipboard_compute_layout_animated(
+
                     &shell->clipboard_model, bounds, layout.launcher.bounds,
-                    reach_shell_layout_dpi_scale(shell));
+                    reach_shell_layout_dpi_scale(shell), animated_clipboard_height,
+                    animated_clipboard_item_width);
                 int32_t clipboard_layout_changed =
                     !reach_shell_rect_equal(previous_clipboard_layout.bounds,
                                             shell->clipboard_layout.bounds) ||

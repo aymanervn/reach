@@ -53,7 +53,10 @@ typedef enum reach_shell_animation_id
     REACH_SHELL_ANIMATION_CLIPBOARD_HOVER_BASE,
     REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE =
         REACH_SHELL_ANIMATION_CLIPBOARD_HOVER_BASE + REACH_CLIPBOARD_MAX_ITEMS,
-    REACH_SHELL_ANIMATION_COUNT = REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + REACH_MAX_PINNED_APPS
+    REACH_SHELL_ANIMATION_CLIPBOARD_HEIGHT =
+        REACH_SHELL_ANIMATION_DOCK_ITEM_X_BASE + REACH_MAX_PINNED_APPS,
+    REACH_SHELL_ANIMATION_CLIPBOARD_ITEM_WIDTH,
+    REACH_SHELL_ANIMATION_COUNT
 } reach_shell_animation_id;
 
 typedef struct reach_shell_surface_transition
@@ -654,6 +657,8 @@ int32_t reach_shell_launcher_result_icon_work_pending(const reach_shell *shell);
 
 /* Clipboard orchestration */
 
+void reach_shell_release_clipboard_item(reach_shell *shell, const reach_clipboard_item *item);
+void reach_shell_clear_clipboard(reach_shell *shell);
 void reach_shell_set_clipboard_open(reach_shell *shell, int32_t open);
 void reach_shell_toggle_clipboard(reach_shell *shell);
 void reach_shell_process_clipboard_refresh(reach_shell *shell);

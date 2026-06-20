@@ -43,10 +43,10 @@ static int32_t reach_clipboard_contains(reach_rect_f32 rect, int32_t x, int32_t 
            (float)x < rect.x + rect.width && (float)y >= rect.y && (float)y < rect.y + rect.height;
 }
 
-reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *model,
-                                                      reach_rect_f32 monitor_bounds,
-                                                      reach_rect_f32 launcher_bounds,
-                                                      float dpi_scale)
+reach_clipboard_layout
+reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect_f32 monitor_bounds,
+                                        reach_rect_f32 launcher_bounds, float dpi_scale,
+                                        float animated_height, float animated_item_width)
 {
     reach_clipboard_layout layout = {};
     if (model == nullptr)
@@ -96,6 +96,11 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
         height = default_height;
     }
     height = reach_clipboard_min_float(height, available_height);
+    const float target_height = height;
+    if (animated_height > 0.0f)
+    {
+        height = reach_clipboard_clamp_float(animated_height, default_height, available_height);
+    }
 
     const float monitor_left = monitor_bounds.x + screen_edge_margin;
     const float monitor_top = monitor_bounds.y + screen_edge_margin;
@@ -110,9 +115,20 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
     layout.bounds.height = height;
 
     const float content_width = reach_clipboard_max_float(0.0f, width - metrics.padding * 2.0f);
-    layout.title = {layout.bounds.x + metrics.padding, layout.bounds.y + metrics.padding,
-                    content_width, metrics.title_height};
+    const float clear_button_height =
+        reach_clipboard_min_float(metrics.clear_button_height, metrics.title_height);
+    layout.clear_button = {
+        layout.bounds.x + layout.bounds.width - metrics.padding - metrics.clear_button_width,
+        layout.bounds.y + metrics.padding + (metrics.title_height - clear_button_height) * 0.5f,
+        metrics.clear_button_width, clear_button_height};
 
+    const float title_width = reach_clipboard_max_float(
+        0.0f, content_width - metrics.clear_button_width - metrics.clear_button_gap);
+    layout.title = {layout.bounds.x + metrics.padding, layout.bounds.y + metrics.padding,
+                    title_width, metrics.title_height};
+
+    const float target_viewport_height =
+        reach_clipboard_max_float(0.0f, target_height - chrome_height);
     layout.viewport = {layout.bounds.x + metrics.padding,
                        layout.title.y + metrics.title_height + metrics.title_gap, content_width,
                        reach_clipboard_max_float(0.0f, height - chrome_height)};
@@ -123,7 +139,7 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
                                            : 0.0f;
 
     const int32_t needs_scrollbar =
-        layout.content_height > layout.viewport.height && layout.viewport.height > 0.0f;
+        layout.content_height > target_viewport_height && target_viewport_height > 0.0f;
 
     reach_scrollbar_set_extents(&model->scrollbar, layout.content_height, layout.viewport.height);
 
@@ -133,6 +149,12 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
         item_width -= metrics.scrollbar_gutter + metrics.item_scrollbar_gap;
     }
     item_width = reach_clipboard_max_float(0.0f, item_width);
+    const float target_item_width = item_width;
+    if (animated_item_width > 0.0f)
+    {
+        item_width = reach_clipboard_clamp_float(animated_item_width, 0.0f, layout.viewport.width);
+    }
+    layout.item_width = item_width;
 
     for (size_t index = 0; index < item_count; ++index)
     {
@@ -160,6 +182,15 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
     return layout;
 }
 
+reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *model,
+                                                      reach_rect_f32 monitor_bounds,
+                                                      reach_rect_f32 launcher_bounds,
+                                                      float dpi_scale)
+{
+    return reach_clipboard_compute_layout_animated(model, monitor_bounds, launcher_bounds,
+                                                   dpi_scale, 0.0f, 0.0f);
+}
+
 reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model *model,
                                                     const reach_clipboard_layout *layout, int32_t x,
                                                     int32_t y)
@@ -168,6 +199,12 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
     result.index = REACH_CLIPBOARD_MAX_ITEMS;
     if (model == nullptr || layout == nullptr || !model->open)
     {
+        return result;
+    }
+
+    if (model->count > 0 && reach_clipboard_contains(layout->clear_button, x, y))
+    {
+        result.type = REACH_CLIPBOARD_HIT_CLEAR;
         return result;
     }
 
