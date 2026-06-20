@@ -41,7 +41,7 @@ extern "C"
         reach_rect_f32 close_buttons[REACH_CLIPBOARD_MAX_ITEMS];
         reach_scrollbar_layout scrollbar;
         float content_height;
-        float row_height;
+        float item_large_size;
     } reach_clipboard_layout;
 
     typedef enum reach_clipboard_hit_type
