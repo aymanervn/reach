@@ -25,6 +25,7 @@
 #include "reach/ports/window_manager.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/dock_reveal_edge.h"
+#include "reach/ports/clipboard.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -55,6 +56,8 @@ extern "C"
         reach_render_backend_port context_menu_renderer;
         reach_platform_window_port quick_settings_window;
         reach_render_backend_port quick_settings_renderer;
+        reach_platform_window_port clipboard_window;
+        reach_render_backend_port clipboard_renderer;
         reach_input_source_port input_source;
         reach_monitor_port monitors;
         reach_window_manager_port window_manager;
@@ -72,6 +75,7 @@ extern "C"
         reach_audio_volume_port audio_volume;
         reach_system_controls_port system_controls;
         reach_media_controls_port media_controls;
+        reach_clipboard_port clipboard;
     } reach_shell_dependencies;
 
     reach_result reach_shell_create_with_dependencies(const reach_shell_desc *desc,

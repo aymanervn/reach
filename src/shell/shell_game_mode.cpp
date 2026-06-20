@@ -20,6 +20,7 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
     cancel.type = REACH_UI_EVENT_POINTER_CANCEL;
     (void)reach_shell_handle_event(shell, &cancel);
     reach_shell_close_transient_surfaces(shell, 1);
+    reach_shell_set_clipboard_open(shell, 0);
 
     shell->switcher_state.open = 0;
     shell->switcher_state.selected_index = 0;
@@ -44,6 +45,7 @@ static void reach_shell_close_transient_ui_for_game_mode(reach_shell *shell)
     shell->switcher.dirty_flags = 1;
     shell->context_menu.dirty_flags = 1;
     shell->quick_settings.dirty_flags = 1;
+    shell->clipboard_surface.dirty_flags = 1;
     shell->dock.dirty_flags = 1;
     shell->dirty.render = 1;
 }
@@ -84,6 +86,7 @@ reach_result reach_shell_update_game_mode(reach_shell *shell)
         shell->switcher.dirty_flags = 1;
         shell->context_menu.dirty_flags = 1;
         shell->quick_settings.dirty_flags = 1;
+        shell->clipboard_surface.dirty_flags = 1;
     }
     reach_shell_sync_pointer_move_subscriptions(shell);
 

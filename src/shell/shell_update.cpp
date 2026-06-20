@@ -552,6 +552,7 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
     reach_shell_surface_transition_finish(shell, &shell->quick_settings_transition);
     reach_shell_surface_transition_finish(shell, &shell->switcher_transition);
     reach_shell_surface_transition_finish(shell, &shell->context_menu_transition);
+    reach_shell_surface_transition_finish(shell, &shell->clipboard_transition);
 
     if (dock_feedback_was_active ||
         reach_animation_manager_active(&shell->animations,
@@ -631,6 +632,14 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
     {
         shell->switcher.dirty_flags = 1;
     }
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    {
+        if (reach_animation_manager_active(&shell->animations,
+                                           reach_shell_clipboard_hover_animation_id(index)))
+        {
+            shell->clipboard_surface.dirty_flags = 1;
+        }
+    }
 }
 
 reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
@@ -652,6 +661,13 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     reach_shell_apply_window_control_result(shell);
     reach_shell_tick_animations(shell, delta_seconds);
     reach_shell_process_deferred_launcher_app_launch(shell);
+    reach_shell_process_clipboard_refresh(shell);
+    if (reach_scrollbar_update(&shell->clipboard_model.scrollbar, delta_seconds))
+    {
+        shell->dirty.layout = 1;
+        shell->clipboard_surface.dirty_flags = 1;
+        reach_shell_request_update(shell);
+    }
 
     if (reach_shell_can_move_dock_without_redraw(shell))
     {
@@ -859,6 +875,58 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
                         (void)shell->launcher.window.ops.hide(shell->launcher.window.window);
                     }
                     reach_shell_hide_launcher_textbox(shell);
+                }
+
+                reach_clipboard_layout previous_clipboard_layout = shell->clipboard_layout;
+                shell->clipboard_layout = reach_clipboard_compute_layout(
+                    &shell->clipboard_model, bounds, layout.launcher.bounds,
+                    reach_shell_layout_dpi_scale(shell));
+                int32_t clipboard_layout_changed =
+                    !reach_shell_rect_equal(previous_clipboard_layout.bounds,
+                                            shell->clipboard_layout.bounds) ||
+                    !reach_shell_rect_equal(previous_clipboard_layout.viewport,
+                                            shell->clipboard_layout.viewport);
+                reach_rect_f32 clipboard_bounds = reach_shell_surface_transition_bounds(
+                    shell, &shell->clipboard_transition, shell->clipboard_layout.bounds);
+                float clipboard_opacity =
+                    reach_shell_surface_transition_opacity(shell, &shell->clipboard_transition);
+                int32_t clipboard_window_changed = 0;
+                result = reach_shell_apply_window_state(
+                    &shell->clipboard_surface.window, clipboard_bounds, clipboard_opacity,
+                    &shell->clipboard_surface.last_bounds, &shell->clipboard_surface.last_opacity,
+                    &shell->clipboard_surface.bounds_valid,
+                    &shell->clipboard_surface.opacity_valid, &clipboard_window_changed);
+                if (result != REACH_OK)
+                {
+                    return result;
+                }
+                if (clipboard_window_changed &&
+                    shell->clipboard_surface.window.ops.apply_rounded_corners != nullptr)
+                {
+                    (void)shell->clipboard_surface.window.ops.apply_rounded_corners(
+                        shell->clipboard_surface.window.window,
+                        shell->theme->clipboard_panel_radius *
+                            reach_shell_layout_dpi_scale(shell));
+                }
+                if (!game_mode &&
+                    reach_shell_surface_transition_visible(&shell->clipboard_transition))
+                {
+                    if (shell->clipboard_surface.window.ops.show != nullptr)
+                    {
+                        (void)shell->clipboard_surface.window.ops.show(
+                            shell->clipboard_surface.window.window);
+                    }
+                    if (shell->clipboard_model.open &&
+                        (shell->dirty.render || shell->clipboard_surface.dirty_flags ||
+                         clipboard_layout_changed || clipboard_window_changed))
+                    {
+                        (void)reach_shell_render_clipboard_surface(shell);
+                    }
+                }
+                else if (shell->clipboard_surface.window.ops.hide != nullptr)
+                {
+                    (void)shell->clipboard_surface.window.ops.hide(
+                        shell->clipboard_surface.window.window);
                 }
                 if (game_mode)
                 {
@@ -1121,6 +1189,7 @@ reach_result reach_shell_update(reach_shell *shell, double delta_seconds)
     shell->switcher.dirty_flags = 0;
     shell->context_menu.dirty_flags = 0;
     shell->quick_settings.dirty_flags = 0;
+    shell->clipboard_surface.dirty_flags = 0;
 
     return REACH_OK;
 }
@@ -1143,7 +1212,7 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
            (shell->dirty.update_requested || window_manager_needs_refresh || shell->dirty.render ||
             shell->dock.dirty_flags || shell->launcher.dirty_flags || shell->tray.dirty_flags ||
             shell->switcher.dirty_flags || shell->context_menu.dirty_flags ||
-            shell->quick_settings.dirty_flags ||
+            shell->quick_settings.dirty_flags || shell->clipboard_surface.dirty_flags ||
             reach_shell_open_window_icon_work_pending(shell) ||
             reach_shell_launcher_result_icon_work_pending(shell) ||
             reach_shell_config_reload_work_pending(shell) ||
@@ -1153,5 +1222,6 @@ int32_t reach_shell_needs_frame(const reach_shell *shell)
             shell->music_widget_refresh_requested.load() ||
             shell->music_widget_hide_grace_seconds > 0.0 ||
             shell->music_widget_pending_cover_seconds > 0.0 ||
-            reach_animation_manager_any_active(&shell->animations) || shell->dock_drag.active);
+            reach_animation_manager_any_active(&shell->animations) || shell->dock_drag.active ||
+            shell->clipboard_scrollbar_drag.active);
 }

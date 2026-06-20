@@ -29,6 +29,7 @@ void reach_shell_release_render_icon(reach_shell *shell, uint64_t icon_id)
     reach_shell_release_render_icon_from_surface(&shell->switcher, icon_id);
     reach_shell_release_render_icon_from_surface(&shell->context_menu, icon_id);
     reach_shell_release_render_icon_from_surface(&shell->quick_settings, icon_id);
+    reach_shell_release_render_icon_from_surface(&shell->clipboard_surface, icon_id);
 }
 
 void reach_shell_release_icon_handle(reach_shell *shell, reach_icon_handle *icon)

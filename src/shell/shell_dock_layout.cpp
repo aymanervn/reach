@@ -92,6 +92,9 @@ void reach_shell_sync_pointer_move_subscriptions(reach_shell *shell)
     reach_shell_sync_pointer_move_enabled(&shell->quick_settings.window,
                                           enabled && shell->quick_settings_drag.active,
                                           &shell->dock_reveal.quick_settings_move_enabled, force);
+    reach_shell_sync_pointer_move_enabled(&shell->clipboard_surface.window,
+                                          enabled && shell->clipboard_model.open,
+                                          &shell->dock_reveal.clipboard_move_enabled, force);
     if (force)
     {
         if (shell->tray.window.ops.set_pointer_move_enabled != nullptr)

@@ -176,7 +176,29 @@ static reach_result reach_shell_handle_pointer_wheel(reach_shell *shell,
     {
         return REACH_OK;
     }
-    if (!shell->has_layout || !shell->ui.launcher.open)
+    if (!shell->has_layout)
+    {
+        return REACH_OK;
+    }
+
+    if (shell->clipboard_model.open && event->wheel_delta != 0 &&
+        reach_rect_contains(shell->clipboard_layout.viewport, event->x, event->y))
+    {
+        reach_scrollbar_scroll(&shell->clipboard_model.scrollbar,
+                               event->wheel_delta > 0 ? -72.0f : 72.0f);
+        shell->clipboard_model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
+        for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+        {
+            reach_animation_manager_animate_to(
+                &shell->animations, reach_shell_clipboard_hover_animation_id(index), 0.0f, 0.10,
+                REACH_EASING_EASE_OUT);
+        }
+        shell->clipboard_surface.dirty_flags = 1;
+        shell->dirty.layout = 1;
+        reach_shell_request_update(shell);
+        return REACH_OK;
+    }
+    if (!shell->ui.launcher.open)
     {
         return REACH_OK;
     }
@@ -450,6 +472,40 @@ static reach_result reach_shell_handle_pointer_up(reach_shell *shell, const reac
         return REACH_OK;
     }
 
+    if (shell->clipboard_scrollbar_drag.active)
+    {
+        reach_scrollbar_end_drag(&shell->clipboard_scrollbar_drag);
+        if (shell->clipboard_surface.window.ops.set_pointer_capture != nullptr)
+        {
+            (void)shell->clipboard_surface.window.ops.set_pointer_capture(
+                shell->clipboard_surface.window.window, 0);
+        }
+        return REACH_OK;
+    }
+
+    if (shell->clipboard_model.open)
+    {
+        reach_clipboard_hit_result clipboard_hit = reach_clipboard_hit_test(
+            &shell->clipboard_model, &shell->clipboard_layout, event->x, event->y);
+        size_t pressed = shell->clipboard_model.pressed_index;
+        shell->clipboard_model.pressed_index = REACH_CLIPBOARD_MAX_ITEMS;
+        if (clipboard_hit.type == REACH_CLIPBOARD_HIT_ITEM &&
+            clipboard_hit.index == pressed && clipboard_hit.index < shell->clipboard_model.count &&
+            shell->clipboard.ops.restore != nullptr)
+        {
+            uint64_t item_id = shell->clipboard_model.items[clipboard_hit.index].id;
+            if (shell->clipboard.ops.restore(shell->clipboard.provider, item_id) == REACH_OK)
+            {
+                (void)reach_clipboard_model_promote(&shell->clipboard_model,
+                                                    clipboard_hit.index);
+                shell->clipboard_model.scrollbar.offset = 0.0f;
+                shell->clipboard_model.scrollbar.target = 0.0f;
+                reach_shell_set_clipboard_open(shell, 0);
+                return REACH_OK;
+            }
+        }
+    }
+
     if (shell->ui.launcher.open)
     {
         reach_launcher_hit_result launcher_hit =
@@ -581,6 +637,33 @@ static reach_result reach_shell_handle_pointer_down(reach_shell *shell, const re
     }
 
     reach_shell_clear_sticky_dock_feedback(shell);
+
+    if (shell->clipboard_model.open)
+    {
+        reach_clipboard_hit_result clipboard_hit = reach_clipboard_hit_test(
+            &shell->clipboard_model, &shell->clipboard_layout, event->x, event->y);
+        if (clipboard_hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB ||
+            clipboard_hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_TRACK)
+        {
+            reach_scrollbar_begin_drag(
+                &shell->clipboard_model.scrollbar, &shell->clipboard_scrollbar_drag,
+                &shell->clipboard_layout.scrollbar, (float)event->y,
+                clipboard_hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB);
+            if (shell->clipboard_surface.window.ops.set_pointer_capture != nullptr)
+            {
+                (void)shell->clipboard_surface.window.ops.set_pointer_capture(
+                    shell->clipboard_surface.window.window, 1);
+            }
+            shell->clipboard_surface.dirty_flags = 1;
+            shell->dirty.layout = 1;
+            return REACH_OK;
+        }
+        if (clipboard_hit.type == REACH_CLIPBOARD_HIT_ITEM)
+        {
+            shell->clipboard_model.pressed_index = clipboard_hit.index;
+            return REACH_OK;
+        }
+    }
 
     if (shell->quick_settings_open)
     {
@@ -761,6 +844,45 @@ static reach_result reach_shell_handle_pointer_move(reach_shell *shell, const re
         return reach_shell_update_launcher_scrollbar_drag(shell, event);
     }
 
+    if (shell->clipboard_scrollbar_drag.active)
+    {
+        reach_scrollbar_update_drag(&shell->clipboard_model.scrollbar,
+                                    &shell->clipboard_scrollbar_drag,
+                                    &shell->clipboard_layout.scrollbar, (float)event->y);
+        shell->clipboard_model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
+        shell->clipboard_surface.dirty_flags = 1;
+        shell->dirty.layout = 1;
+        return REACH_OK;
+    }
+
+    if (source == REACH_SURFACE_CLIPBOARD && shell->clipboard_model.open)
+    {
+        reach_clipboard_hit_result hit = reach_clipboard_hit_test(
+            &shell->clipboard_model, &shell->clipboard_layout, event->x, event->y);
+        size_t next =
+            hit.type == REACH_CLIPBOARD_HIT_ITEM ? hit.index : REACH_CLIPBOARD_MAX_ITEMS;
+        if (next != shell->clipboard_model.hovered_index)
+        {
+            size_t previous = shell->clipboard_model.hovered_index;
+            shell->clipboard_model.hovered_index = next;
+            if (previous < REACH_CLIPBOARD_MAX_ITEMS)
+            {
+                reach_animation_manager_animate_to(
+                    &shell->animations, reach_shell_clipboard_hover_animation_id(previous), 0.0f,
+                    0.12, REACH_EASING_EASE_OUT);
+            }
+            if (next < REACH_CLIPBOARD_MAX_ITEMS)
+            {
+                reach_animation_manager_animate_to(
+                    &shell->animations, reach_shell_clipboard_hover_animation_id(next), 1.0f, 0.14,
+                    REACH_EASING_EASE_OUT);
+            }
+            shell->clipboard_surface.dirty_flags = 1;
+            reach_shell_request_update(shell);
+        }
+        return REACH_OK;
+    }
+
     if (shell->dock_drag.active)
     {
         return reach_shell_update_dock_drag(shell, event);
@@ -807,6 +929,16 @@ static reach_result reach_shell_handle_pointer_leave(reach_shell *shell, reach_s
         shell->context_menu_state.hovered_index = REACH_MAX_PINNED_APPS;
         shell->context_menu.dirty_flags = 1;
     }
+    else if (source == REACH_SURFACE_CLIPBOARD &&
+             shell->clipboard_model.hovered_index < REACH_CLIPBOARD_MAX_ITEMS)
+    {
+        size_t previous = shell->clipboard_model.hovered_index;
+        shell->clipboard_model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
+        reach_animation_manager_animate_to(
+            &shell->animations, reach_shell_clipboard_hover_animation_id(previous), 0.0f, 0.12,
+            REACH_EASING_EASE_OUT);
+        shell->clipboard_surface.dirty_flags = 1;
+    }
 
     return REACH_OK;
 }
@@ -826,6 +958,15 @@ static reach_result reach_shell_handle_pointer_cancel(reach_shell *shell)
     if (shell->launcher_scrollbar_drag.active)
     {
         reach_shell_end_launcher_scrollbar_drag(shell);
+    }
+    if (shell->clipboard_scrollbar_drag.active)
+    {
+        reach_scrollbar_end_drag(&shell->clipboard_scrollbar_drag);
+        if (shell->clipboard_surface.window.ops.set_pointer_capture != nullptr)
+        {
+            (void)shell->clipboard_surface.window.ops.set_pointer_capture(
+                shell->clipboard_surface.window.window, 0);
+        }
     }
 
     if (shell->dock_drag.active)
@@ -998,6 +1139,11 @@ void reach_shell_on_quick_settings_window_event(void *user, const reach_ui_event
     reach_shell_on_surface_event(user, event, REACH_SURFACE_QUICK_SETTINGS);
 }
 
+void reach_shell_on_clipboard_window_event(void *user, const reach_ui_event *event)
+{
+    reach_shell_on_surface_event(user, event, REACH_SURFACE_CLIPBOARD);
+}
+
 static reach_result reach_shell_handle_surface_event(reach_shell *shell,
                                                      const reach_ui_event *event,
                                                      reach_surface_role source)
@@ -1010,6 +1156,13 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
     }
 
     reach_ui_intent intent = {};
+
+    if (event->type == REACH_UI_EVENT_CLIPBOARD_CHANGED)
+    {
+        shell->clipboard_refresh_requested = 1;
+        reach_shell_request_update(shell);
+        return REACH_OK;
+    }
 
     if (reach_shell_game_mode_enabled(shell) && !reach_shell_game_mode_allows_event(event->type))
     {
@@ -1191,6 +1344,14 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
     if (event->type == REACH_UI_EVENT_WINDOWS_KEY && !shell->ui.launcher.open)
     {
         reach_shell_remember_launcher_restore_window(shell);
+    }
+    if (event->type == REACH_UI_EVENT_WINDOWS_KEY)
+    {
+        reach_shell_toggle_clipboard(shell);
+    }
+    else if (event->type == REACH_UI_EVENT_ESCAPE)
+    {
+        reach_shell_set_clipboard_open(shell, 0);
     }
 
     reach_result result = reach_ui_handle_event(&shell->ui, event, &intent);
