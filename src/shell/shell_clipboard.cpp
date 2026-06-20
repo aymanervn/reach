@@ -44,7 +44,7 @@ void reach_shell_set_clipboard_open(reach_shell *shell, int32_t open)
     }
     shell->clipboard_model.open = next;
     shell->clipboard_model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    shell->clipboard_model.pressed_index = REACH_CLIPBOARD_MAX_ITEMS;
+    reach_clipboard_model_clear_press(&shell->clipboard_model);
     reach_scrollbar_end_drag(&shell->clipboard_scrollbar_drag);
     for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
     {

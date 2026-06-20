@@ -19,6 +19,8 @@ extern "C"
         size_t count;
         size_t hovered_index;
         size_t pressed_index;
+        int32_t pressed_hit_type;
+        uint64_t pressed_item_id;
         reach_scrollbar_model scrollbar;
     } reach_clipboard_model;
 
@@ -36,6 +38,7 @@ extern "C"
         reach_rect_f32 title;
         reach_rect_f32 viewport;
         reach_rect_f32 items[REACH_CLIPBOARD_MAX_ITEMS];
+        reach_rect_f32 close_buttons[REACH_CLIPBOARD_MAX_ITEMS];
         reach_scrollbar_layout scrollbar;
         float content_height;
         float row_height;
@@ -45,6 +48,7 @@ extern "C"
     {
         REACH_CLIPBOARD_HIT_NONE = 0,
         REACH_CLIPBOARD_HIT_ITEM = 1,
+        REACH_CLIPBOARD_HIT_ITEM_CLOSE = 4,
         REACH_CLIPBOARD_HIT_SCROLLBAR_TRACK = 2,
         REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB = 3
     } reach_clipboard_hit_type;
@@ -66,6 +70,7 @@ extern "C"
     } reach_clipboard_render_input;
 
     void reach_clipboard_model_init(reach_clipboard_model *model);
+    void reach_clipboard_model_clear_press(reach_clipboard_model *model);
     reach_clipboard_insert_result reach_clipboard_model_insert(reach_clipboard_model *model,
                                                                reach_clipboard_item item);
     int32_t reach_clipboard_model_promote(reach_clipboard_model *model, size_t index);

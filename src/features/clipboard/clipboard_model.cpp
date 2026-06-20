@@ -18,6 +18,17 @@ static size_t reach_clipboard_find_duplicate(const reach_clipboard_model *model,
     return REACH_CLIPBOARD_MAX_ITEMS;
 }
 
+void reach_clipboard_model_clear_press(reach_clipboard_model *model)
+{
+    if (model == nullptr)
+    {
+        return;
+    }
+
+    model->pressed_index = REACH_CLIPBOARD_MAX_ITEMS;
+    model->pressed_hit_type = REACH_CLIPBOARD_HIT_NONE;
+    model->pressed_item_id = 0;
+}
 void reach_clipboard_model_init(reach_clipboard_model *model)
 {
     if (model == nullptr)
@@ -26,7 +37,7 @@ void reach_clipboard_model_init(reach_clipboard_model *model)
     }
     *model = {};
     model->hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    model->pressed_index = REACH_CLIPBOARD_MAX_ITEMS;
+    reach_clipboard_model_clear_press(model);
     reach_scrollbar_model_init(&model->scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
 }
 
@@ -82,7 +93,7 @@ reach_clipboard_insert_result reach_clipboard_model_insert(reach_clipboard_model
     }
     model->items[0] = item;
     model->hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    model->pressed_index = REACH_CLIPBOARD_MAX_ITEMS;
+    reach_clipboard_model_clear_press(model);
     result.inserted = 1;
     return result;
 }
@@ -100,5 +111,5 @@ void reach_clipboard_model_remove(reach_clipboard_model *model, size_t index)
     --model->count;
     model->items[model->count] = {};
     model->hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    model->pressed_index = REACH_CLIPBOARD_MAX_ITEMS;
+    reach_clipboard_model_clear_press(model);
 }

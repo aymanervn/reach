@@ -66,6 +66,8 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
                          : 0.0f;
     reach_scrollbar_set_extents(&model->scrollbar, layout.content_height,
                                 layout.viewport.height);
+    float close_button_size = reach_clipboard_scale(20.0f, scale);
+    float close_button_margin = reach_clipboard_scale(6.0f, scale);
     for (size_t index = 0; index < model->count; ++index)
     {
         layout.items[index] = {layout.viewport.x,
@@ -73,6 +75,11 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
                                    (layout.row_height + row_gap) * (float)index -
                                    model->scrollbar.offset,
                                layout.viewport.width, layout.row_height};
+        layout.close_buttons[index] = {
+            layout.items[index].x + layout.items[index].width - close_button_size - close_button_margin,
+            layout.items[index].y + close_button_margin,
+            close_button_size,
+            close_button_size};
     }
     reach_rect_f32 track = {
         layout.viewport.x + layout.viewport.width + reach_clipboard_scale(7.0f, scale),
@@ -109,6 +116,12 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
     }
     for (size_t index = 0; index < model->count; ++index)
     {
+        if (reach_clipboard_contains(layout->close_buttons[index], x, y))
+        {
+            result.type = REACH_CLIPBOARD_HIT_ITEM_CLOSE;
+            result.index = index;
+            return result;
+        }
         if (reach_clipboard_contains(layout->items[index], x, y))
         {
             result.type = REACH_CLIPBOARD_HIT_ITEM;
