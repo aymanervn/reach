@@ -73,12 +73,9 @@ static void reach_shell_handle_global_mouse_down(reach_shell *shell, reach_point
         reach_shell_set_quick_settings_open(shell, 0);
         reach_shell_clear_sticky_dock_feedback(shell);
     }
-    if (shell->ui.launcher.open && !on_launcher)
+    if (shell->ui.launcher.open && !on_launcher && dock_hit.type == REACH_DOCK_HIT_NONE)
     {
-        if (dock_hit.type == REACH_DOCK_HIT_NONE)
-        {
-            reach_shell_close_launcher(shell);
-        }
+        reach_shell_close_launcher_without_focus_restore(shell);
     }
     if (shell->clipboard_model.open && !on_clipboard)
     {

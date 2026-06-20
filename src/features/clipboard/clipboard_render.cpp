@@ -94,6 +94,38 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command.stroke_width = theme->border_thickness;
         reach_render_command_buffer_push(commands, &command);
 
+        {
+            float close_size = reach_clipboard_render_scale(input, 20.0f);
+            float close_margin = reach_clipboard_render_scale(input, 6.0f);
+            reach_rect_f32 close_rect = {local_item.x + local_item.width - close_size - close_margin,
+                                         local_item.y + close_margin,
+                                         close_size,
+                                         close_size};
+            float close_hover_alpha = 0.12f;
+            command = {};
+            command.type = REACH_RENDER_COMMAND_RECT;
+            command.rect = close_rect;
+            command.color.a = close_hover_alpha * hover;
+            command.radius = reach_clipboard_render_scale(input, 4.0f);
+            reach_render_command_buffer_push(commands, &command);
+
+            float inset = close_size * 0.18f;
+            command = {};
+            command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+            command.rect = {close_rect.x + inset, close_rect.y + inset,
+                            close_rect.width - inset * 2.0f,
+                            close_rect.height - inset * 2.0f};
+            command.icon_id = REACH_VECTOR_ICON_CLOSE;
+            float text_color_r = theme->clipboard_secondary_text.r;
+            float text_color_g = theme->clipboard_secondary_text.g;
+            float text_color_b = theme->clipboard_secondary_text.b;
+            command.color.r = text_color_r;
+            command.color.g = text_color_g;
+            command.color.b = text_color_b;
+            command.color.a = theme->clipboard_secondary_text.a * (0.5f + 0.5f * hover);
+            reach_render_command_buffer_push(commands, &command);
+        }
+
         const reach_clipboard_item *item_data = &model->items[index];
         float padding = reach_clipboard_render_scale(input, 12.0f);
         if (item_data->kind == REACH_CLIPBOARD_ITEM_IMAGE && item_data->thumbnail_id != 0)
