@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/render_commands.h"
+#include "reach/core/scrollbar.h"
 #include "reach/core/theme.h"
 #include "reach/core/windows_update.h"
 
@@ -59,9 +60,7 @@ extern "C"
         reach_settings_update_page_state update_page_state;
         int32_t update_scan_completed;
         reach_windows_update_list update_list;
-        float update_scroll_offset;
-        float update_scroll_target;
-        float update_scroll_max;
+        reach_scrollbar_model update_scrollbar;
     } reach_settings_model;
 
     typedef struct reach_settings_nav_item

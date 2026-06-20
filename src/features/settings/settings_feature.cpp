@@ -14,6 +14,7 @@ void reach_settings_model_init(reach_settings_model *model)
     memset(model, 0, sizeof(*model));
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
+    reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
 }
 
 void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page)
@@ -264,7 +265,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.update_section_titles[section_index] =
             reach_settings_rect(layout.update_viewport.x,
                                 layout.update_viewport.y + content_y -
-                                    (model != nullptr ? model->update_scroll_offset : 0.0f),
+                                    (model != nullptr ? model->update_scrollbar.offset : 0.0f),
                                 layout.update_viewport.width, section_title_height);
         content_y += section_title_height + 5.0f * scale;
 
@@ -277,7 +278,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             layout.update_indices[row_index] = update_index;
             layout.update_rows[row_index] = reach_settings_rect(
                 layout.update_viewport.x,
-                layout.update_viewport.y + content_y - model->update_scroll_offset,
+                layout.update_viewport.y + content_y - model->update_scrollbar.offset,
                 layout.update_viewport.width, row_height);
             float checkbox_size = 18.0f * scale;
             layout.update_checkboxes[row_index] = reach_settings_rect(
@@ -293,23 +294,16 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                            : 0.0f;
     if (model != nullptr)
     {
-        model->update_scroll_max = scroll_max;
-        if (model->update_scroll_target > scroll_max)
-            model->update_scroll_target = scroll_max;
-        if (model->update_scroll_offset > scroll_max)
-            model->update_scroll_offset = scroll_max;
+        reach_scrollbar_set_extents(&model->update_scrollbar, layout.update_content_height,
+                                    layout.update_viewport.height);
     }
-    if (scroll_max > 0.0f)
+    if (scroll_max > 0.0f && model != nullptr)
     {
-        float thumb_height = layout.update_scrollbar_track.height * layout.update_viewport.height /
-                             layout.update_content_height;
-        if (thumb_height < 34.0f * scale)
-            thumb_height = 34.0f * scale;
-        float travel = layout.update_scrollbar_track.height - thumb_height;
-        float progress = model != nullptr ? model->update_scroll_offset / scroll_max : 0.0f;
-        layout.update_scrollbar_thumb = reach_settings_rect(
-            layout.update_scrollbar_track.x, layout.update_scrollbar_track.y + travel * progress,
-            layout.update_scrollbar_track.width, thumb_height);
+        reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
+            &model->update_scrollbar, layout.update_scrollbar_track,
+            layout.update_viewport.height, layout.update_content_height, 34.0f * scale);
+        layout.update_scrollbar_track = scrollbar.track;
+        layout.update_scrollbar_thumb = scrollbar.thumb;
     }
     return layout;
 }

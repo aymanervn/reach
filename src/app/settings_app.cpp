@@ -54,6 +54,7 @@ struct reach_settings_app
     reach_rect_f32 bounds;
     const reach_theme *theme;
     reach_settings_update_worker update_worker;
+    reach_scrollbar_drag update_scrollbar_drag;
     int32_t running;
     int32_t dirty;
 };
@@ -577,6 +578,15 @@ static void reach_settings_apply_result(reach_settings_app *app)
 
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
+    if (app->update_scrollbar_drag.active)
+    {
+        reach_scrollbar_end_drag(&app->update_scrollbar_drag);
+        if (app->window.ops.set_pointer_capture != nullptr)
+        {
+            (void)app->window.ops.set_pointer_capture(app->window.window, 0);
+        }
+        return;
+    }
     reach_settings_refresh_bounds(app);
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
@@ -619,25 +629,51 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             reach_settings_model_toggle_update(&app->model, hit.update_index);
             app->dirty = 1;
         }
-        else if (hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK ||
-                 hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB)
-        {
-            float travel = app->layout.update_scrollbar_track.height -
-                           app->layout.update_scrollbar_thumb.height;
-            if (travel > 0.0f)
-            {
-                float progress = (y - app->layout.update_scrollbar_track.y -
-                                  app->layout.update_scrollbar_thumb.height * 0.5f) /
-                                 travel;
-                if (progress < 0.0f)
-                    progress = 0.0f;
-                if (progress > 1.0f)
-                    progress = 1.0f;
-                app->model.update_scroll_target = progress * app->model.update_scroll_max;
-                app->dirty = 1;
-            }
-        }
     }
+}
+
+static void reach_settings_handle_pointer_down(reach_settings_app *app,
+                                               const reach_ui_event *event)
+{
+    if (app == nullptr || event == nullptr ||
+        app->model.selected_page != REACH_SETTINGS_PAGE_UPDATE)
+    {
+        return;
+    }
+    reach_settings_refresh_bounds(app);
+    float x = (float)event->x - app->bounds.x;
+    float y = (float)event->y - app->bounds.y;
+    reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
+    if (hit.type != REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK &&
+        hit.type != REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB)
+    {
+        return;
+    }
+    reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
+                                     app->layout.update_scrollbar_thumb};
+    reach_scrollbar_begin_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag, &layout,
+                               y, hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB);
+    if (app->window.ops.set_pointer_capture != nullptr)
+    {
+        (void)app->window.ops.set_pointer_capture(app->window.window, 1);
+    }
+    app->dirty = 1;
+}
+
+static void reach_settings_handle_pointer_move(reach_settings_app *app,
+                                               const reach_ui_event *event)
+{
+    if (app == nullptr || event == nullptr || !app->update_scrollbar_drag.active)
+    {
+        return;
+    }
+    reach_settings_refresh_bounds(app);
+    float y = (float)event->y - app->bounds.y;
+    reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
+                                     app->layout.update_scrollbar_thumb};
+    reach_scrollbar_update_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag, &layout,
+                                y);
+    app->dirty = 1;
 }
 
 static void reach_settings_handle_event(void *user, const reach_ui_event *event)
@@ -647,9 +683,21 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     {
         return;
     }
+    else if (event->type == REACH_UI_EVENT_POINTER_DOWN)
+    {
+        reach_settings_handle_pointer_down(app, event);
+    }
+    else if (event->type == REACH_UI_EVENT_POINTER_MOVE)
+    {
+        reach_settings_handle_pointer_move(app, event);
+    }
     else if (event->type == REACH_UI_EVENT_POINTER_UP)
     {
         reach_settings_handle_pointer_up(app, event);
+    }
+    else if (event->type == REACH_UI_EVENT_POINTER_CANCEL)
+    {
+        reach_scrollbar_end_drag(&app->update_scrollbar_drag);
     }
     else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
              app->model.selected_page == REACH_SETTINGS_PAGE_UPDATE && event->wheel_delta != 0)
@@ -802,7 +850,8 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     std::lock_guard<std::mutex> lock(worker->mutex);
     return app->dirty || worker->pending || worker->in_flight || worker->completed ||
            app->update_worker.progress_state.load() != 0 ||
-           app->model.update_scroll_offset != app->model.update_scroll_target;
+           app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
+           app->update_scrollbar_drag.active;
 }
 
 int32_t reach_settings_app_running(const reach_settings_app *app)

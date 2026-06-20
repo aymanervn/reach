@@ -1,5 +1,5 @@
-#ifndef REACH_FEATURES_SCROLLBAR_H
-#define REACH_FEATURES_SCROLLBAR_H
+#ifndef REACH_CORE_SCROLLBAR_H
+#define REACH_CORE_SCROLLBAR_H
 
 #include <stdint.h>
 

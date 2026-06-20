@@ -44,6 +44,7 @@ target_compile_features(reach_support PUBLIC
 
 add_library(reach_core STATIC
     src/core/clipboard.c
+    src/core/scrollbar.cpp
     src/core/ui_state.c
     src/core/ui_layout.c
     src/core/ui_events.c
@@ -56,6 +57,7 @@ add_library(reach_core STATIC
 reach_configure_common(reach_core)
 target_compile_features(reach_core PUBLIC
     c_std_11
+    cxx_std_17
 )
 
 add_library(reach_features STATIC
@@ -87,7 +89,6 @@ add_library(reach_features STATIC
     src/features/settings/settings_startup_apps.cpp
     src/features/settings/settings_update.cpp
     src/features/settings/windows_update_policy.cpp
-    src/features/scrollbar/scrollbar.cpp
     src/features/settings/settings_wifi.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp

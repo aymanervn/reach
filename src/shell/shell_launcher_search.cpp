@@ -144,7 +144,7 @@ void reach_shell_schedule_launcher_result_icons(reach_shell *shell)
     uint32_t generation = shell->launcher_search.icon_generation;
     reach_shell_clear_launcher_result_icon_jobs(shell);
 
-    size_t start = shell->ui.launcher.result_scroll_offset;
+    size_t start = reach_ui_state_launcher_result_scroll_offset(&shell->ui);
     if (start > shell->ui.launcher.result_count)
     {
         start = shell->ui.launcher.result_count;

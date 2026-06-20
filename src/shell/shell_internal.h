@@ -110,12 +110,6 @@ typedef struct reach_shell_quick_settings_drag_state
     uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
 } reach_shell_quick_settings_drag_state;
 
-typedef struct reach_shell_launcher_scrollbar_drag_state
-{
-    int32_t active;
-    float grab_offset_y;
-} reach_shell_launcher_scrollbar_drag_state;
-
 typedef struct reach_shell_launcher_result_icon_job
 {
     uint32_t generation;
@@ -504,7 +498,7 @@ struct reach_shell
     size_t pressed_dock_index;
     reach_launcher_hit_type pressed_launcher_hit_type;
     size_t pressed_launcher_index;
-    reach_shell_launcher_scrollbar_drag_state launcher_scrollbar_drag;
+    reach_scrollbar_drag launcher_scrollbar_drag;
     reach_clipboard_model clipboard_model;
     reach_clipboard_layout clipboard_layout;
     reach_scrollbar_drag clipboard_scrollbar_drag;

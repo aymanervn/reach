@@ -19,9 +19,7 @@ void reach_settings_model_begin_update_scan(reach_settings_model *model)
     if (model == nullptr || reach_settings_model_update_busy(model))
         return;
     model->update_page_state = REACH_SETTINGS_UPDATE_SCANNING;
-    model->update_scroll_offset = 0;
-    model->update_scroll_target = 0;
-    model->update_scroll_max = 0;
+    reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
 }
 
 void reach_settings_model_apply_update_scan(reach_settings_model *model,
@@ -198,28 +196,11 @@ int32_t reach_settings_model_update_busy(const reach_settings_model *model)
 
 void reach_settings_model_scroll_updates(reach_settings_model *model, float delta)
 {
-    if (model == nullptr || delta == 0.0f)
-        return;
-    model->update_scroll_target += delta;
-    if (model->update_scroll_target < 0.0f)
-        model->update_scroll_target = 0.0f;
-    if (model->update_scroll_target > model->update_scroll_max)
-        model->update_scroll_target = model->update_scroll_max;
+    if (model != nullptr)
+        reach_scrollbar_scroll(&model->update_scrollbar, delta);
 }
 
 int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds)
 {
-    if (model == nullptr)
-        return 0;
-    float difference = model->update_scroll_target - model->update_scroll_offset;
-    if (difference > -0.1f && difference < 0.1f)
-    {
-        model->update_scroll_offset = model->update_scroll_target;
-        return 0;
-    }
-    float blend = (float)(delta_seconds * 18.0);
-    if (blend > 1.0f)
-        blend = 1.0f;
-    model->update_scroll_offset += difference * blend;
-    return 1;
+    return model != nullptr ? reach_scrollbar_update(&model->update_scrollbar, delta_seconds) : 0;
 }

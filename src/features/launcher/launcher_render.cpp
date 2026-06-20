@@ -129,7 +129,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             reach_render_command_buffer_push(out_commands, &command);
         }
 
-        size_t start = state->launcher.result_scroll_offset;
+        size_t start = reach_ui_state_launcher_result_scroll_offset(state);
         if (start > state->launcher.result_count)
         {
             start = state->launcher.result_count;

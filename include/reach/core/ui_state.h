@@ -6,6 +6,7 @@
 
 #include "reach/core/geometry.h"
 #include "reach/core/pinned_app.h"
+#include "reach/core/scrollbar.h"
 #include "reach/support/search_types.h"
 #include "reach/support/util.h"
 
@@ -35,7 +36,7 @@ extern "C"
         uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS];
         size_t result_count;
         size_t selected_result_index;
-        size_t result_scroll_offset;
+        reach_scrollbar_model result_scrollbar;
     } reach_launcher_model;
 
     typedef struct reach_ui_state
@@ -64,6 +65,7 @@ extern "C"
     reach_result reach_ui_state_scroll_launcher_results(reach_ui_state *state, int32_t delta);
     reach_result reach_ui_state_set_launcher_result_scroll_offset(reach_ui_state *state,
                                                                   size_t offset);
+    size_t reach_ui_state_launcher_result_scroll_offset(const reach_ui_state *state);
     reach_result reach_ui_state_clear_launcher_results(reach_ui_state *state);
     int32_t reach_ui_state_should_show_pinned_apps(const reach_ui_state *state);
 
