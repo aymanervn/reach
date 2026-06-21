@@ -645,6 +645,24 @@ reach_result
 reach_shell_defer_app_launch_until_launcher_closed(reach_shell *shell,
                                                    const reach_app_launch_request *request);
 
+reach_result reach_shell_focus_window(reach_shell *shell, uintptr_t window_id,
+                                      int32_t minimize_if_foreground);
+reach_result reach_shell_launch_app(reach_shell *shell, const uint16_t *path,
+                                    const uint16_t *arguments,
+                                    int32_t force_new_instance,
+                                    int32_t run_as_admin,
+                                    int32_t defer_until_launcher_closed);
+reach_result reach_shell_open_app(reach_shell *shell, const uint16_t *path,
+                                  const uint16_t *arguments,
+                                  const uint16_t *app_user_model_id,
+                                  int32_t force_new_instance,
+                                  int32_t defer_until_launcher_closed);
+reach_result reach_shell_open_pinned_app(reach_shell *shell, size_t pinned_index,
+                                         int32_t force_new_instance,
+                                         int32_t defer_until_launcher_closed);
+reach_result reach_shell_open_pinned_app_id(reach_shell *shell, uint32_t pin_id,
+                                            int32_t force_new_instance,
+                                            int32_t defer_until_launcher_closed);
 void reach_shell_cancel_launcher_search(reach_shell *shell);
 reach_result reach_shell_schedule_launcher_search(reach_shell *shell);
 void reach_shell_apply_launcher_search_results(reach_shell *shell);
@@ -723,6 +741,7 @@ reach_result reach_shell_schedule_window_control(reach_shell *shell,
                                                  uintptr_t window_id);
 reach_result reach_shell_minimize_open_windows(reach_shell *shell);
 reach_result reach_shell_schedule_minimize_open_windows(reach_shell *shell);
+reach_result reach_shell_schedule_open_terminal(reach_shell *shell);
 reach_result reach_shell_schedule_minimize_windows(reach_shell *shell, const uintptr_t *window_ids,
                                                    size_t window_count);
 void reach_shell_apply_window_control_result(reach_shell *shell);

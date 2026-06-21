@@ -19,7 +19,6 @@ struct reach_input_source
     int32_t alt_tab_active;
     int32_t windows_key_down;
     int32_t windows_key_chord;
-    int32_t windows_d_down;
     uint32_t registered_media_hotkeys;
 };
 
@@ -184,6 +183,53 @@ static void reach_input_post_ui_event(reach_input_source *source, reach_ui_event
     }
 }
 
+typedef struct reach_input_win_chord_event
+{
+    uint32_t key;
+    reach_ui_event_type type;
+} reach_input_win_chord_event;
+
+static const reach_input_win_chord_event REACH_INPUT_WIN_CHORD_EVENTS[] = {
+    {REACH_ELEVATION_HELPER_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL},
+    {REACH_ELEVATION_HELPER_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL},
+};
+
+static int32_t
+reach_input_hotkey_has_win_modifier(const reach_elevation_helper_hotkey_record *record)
+{
+    return record != nullptr &&
+           (record->modifiers & (REACH_ELEVATION_HELPER_MODIFIER_LEFT_WIN |
+                                 REACH_ELEVATION_HELPER_MODIFIER_RIGHT_WIN)) != 0;
+}
+
+static size_t reach_input_win_chord_event_count(void)
+{
+    return sizeof(REACH_INPUT_WIN_CHORD_EVENTS) / sizeof(REACH_INPUT_WIN_CHORD_EVENTS[0]);
+}
+
+static int32_t reach_input_try_post_win_chord_event(
+    reach_input_source *source, const reach_elevation_helper_hotkey_record *record, int32_t pressed)
+{
+    if (source == nullptr || record == nullptr || !pressed ||
+        !reach_input_hotkey_has_win_modifier(record))
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < reach_input_win_chord_event_count(); ++index)
+    {
+        const reach_input_win_chord_event *entry = &REACH_INPUT_WIN_CHORD_EVENTS[index];
+        if (entry->key == record->key)
+        {
+            source->windows_key_chord = 1;
+            reach_input_post_ui_event(source, entry->type, 0);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static void reach_input_reset_hotkey_state(reach_input_source *source)
 {
     if (source == nullptr)
@@ -192,14 +238,13 @@ static void reach_input_reset_hotkey_state(reach_input_source *source)
     }
     if (source->alt_tab_active)
     {
-        reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_CANCEL, 0);
+        reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
     }
     source->alt_down = 0;
     source->shift_down = 0;
     source->alt_tab_active = 0;
     source->windows_key_down = 0;
     source->windows_key_chord = 0;
-    source->windows_d_down = 0;
 }
 
 static void reach_input_handle_hotkey_record(reach_input_source *source,
@@ -218,7 +263,7 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         if (!pressed && source->alt_tab_active)
         {
             source->alt_tab_active = 0;
-            reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_COMMIT, 0);
+            reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_COMMIT, 0);
         }
         break;
     case REACH_ELEVATION_HELPER_HOTKEY_SHIFT:
@@ -230,14 +275,14 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         {
             if (!source->alt_tab_active)
             {
-                reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_BEGIN, 0);
+                reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_BEGIN, 0);
                 source->alt_tab_active = 1;
                 break;
             }
             int32_t shift_down = source->shift_down ||
                                  ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_SHIFT) != 0);
             reach_ui_event_type direction =
-                shift_down ? REACH_UI_EVENT_ALT_TAB_PREVIOUS : REACH_UI_EVENT_ALT_TAB_NEXT;
+                shift_down ? REACH_UI_EVENT_APP_SWITCH_PREVIOUS : REACH_UI_EVENT_APP_SWITCH_NEXT;
             reach_input_post_ui_event(source, direction, 0);
         }
         break;
@@ -245,34 +290,17 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         if (pressed && source->alt_tab_active)
         {
             source->alt_tab_active = 0;
-            reach_input_post_ui_event(source, REACH_UI_EVENT_ALT_TAB_CANCEL, 0);
+            reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
         }
         break;
     case REACH_ELEVATION_HELPER_HOTKEY_D:
-    {
-        int32_t win_modifier =
-            (record->modifiers & (REACH_ELEVATION_HELPER_MODIFIER_LEFT_WIN |
-                                  REACH_ELEVATION_HELPER_MODIFIER_RIGHT_WIN)) != 0;
-        if (!pressed)
-        {
-            source->windows_d_down = 0;
-            if (win_modifier)
-            {
-                source->windows_key_chord = 1;
-            }
-            break;
-        }
-        if (win_modifier)
+    case REACH_ELEVATION_HELPER_HOTKEY_T:
+        if (!reach_input_try_post_win_chord_event(source, record, pressed) && !pressed &&
+            reach_input_hotkey_has_win_modifier(record))
         {
             source->windows_key_chord = 1;
-            if (!source->windows_d_down)
-            {
-                source->windows_d_down = 1;
-                reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOWS_D_MINIMIZE_ALL, 0);
-            }
         }
         break;
-    }
     case REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN:
     case REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN:
         if (source->alt_tab_active)
@@ -292,7 +320,6 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
                             ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_CHORD) != 0);
             source->windows_key_down = 0;
             source->windows_key_chord = 0;
-            source->windows_d_down = 0;
             if (!chord)
             {
                 reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOWS_KEY, 0);

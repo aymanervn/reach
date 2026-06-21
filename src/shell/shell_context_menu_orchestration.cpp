@@ -29,21 +29,18 @@ void reach_shell_close_context_menu(reach_shell *shell)
 static reach_result reach_shell_launch_context_menu_item(reach_shell *shell, const uint16_t *path,
                                                          size_t pinned_index, int32_t run_as_admin)
 {
-    if (shell == nullptr || path == nullptr || path[0] == 0 ||
-        shell->app_launcher.ops.launch == nullptr)
+    if (shell == nullptr || path == nullptr || path[0] == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_app_launch_request request = {};
-    reach_copy_utf16(request.path, 260, path);
+    const uint16_t *arguments = nullptr;
     if (pinned_index < shell->ui.pinned_app_count)
     {
-        reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[pinned_index].arguments);
+        arguments = shell->ui.pinned_apps[pinned_index].arguments;
     }
-    request.force_new_instance = 1;
-    request.run_as_admin = run_as_admin ? 1 : 0;
-    return reach_shell_schedule_app_launch(shell, &request);
+
+    return reach_shell_launch_app(shell, path, arguments, 1, run_as_admin, 0);
 }
 
 static int32_t reach_shell_dock_item_menu_command_allowed(
