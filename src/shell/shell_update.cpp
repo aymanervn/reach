@@ -421,6 +421,7 @@ void reach_shell_refresh_music_widget(reach_shell *shell)
         shell->music_widget_model.playback = state.playback;
         shell->music_widget_model.previous_enabled = state.previous_enabled;
         shell->music_widget_model.next_enabled = state.next_enabled;
+        shell->music_widget_render_model = shell->music_widget_model;
     }
     else
     {

@@ -526,6 +526,7 @@ struct reach_shell
     reach_system_controls_port system_controls;
     reach_media_controls_port media_controls;
     reach_music_widget_model music_widget_model;
+    reach_music_widget_model music_widget_render_model;
     reach_music_widget_layout music_widget_layout;
     reach_music_widget_action_type pressed_music_widget_action;
     double music_widget_hide_grace_seconds;
