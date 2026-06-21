@@ -1,7 +1,7 @@
 #ifndef REACH_PORTS_MEDIA_CONTROLS_H
 #define REACH_PORTS_MEDIA_CONTROLS_H
 
-#include "reach/core/geometry.h"
+#include "reach/core/theme.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus

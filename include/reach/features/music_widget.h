@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #include "reach/core/render_commands.h"
-#include "reach/core/theme.h"
 #include "reach/ports/media_controls.h"
 
 #ifdef __cplusplus

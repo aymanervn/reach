@@ -1,6 +1,7 @@
 #ifndef REACH_CORE_RENDER_COMMANDS_H
 #define REACH_CORE_RENDER_COMMANDS_H
 
+#include "reach/core/theme.h"
 #include "reach/core/ui_layout.h"
 
 #ifdef __cplusplus
