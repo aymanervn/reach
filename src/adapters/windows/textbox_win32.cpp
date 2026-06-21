@@ -170,6 +170,10 @@ static LRESULT CALLBACK reach_textbox_edit_subclass_proc(HWND hwnd, UINT message
 
     if (message == WM_CHAR)
     {
+        if (wparam == L'\t')
+        {
+            return 0;
+        }
         if (wparam == VK_RETURN || wparam == VK_ESCAPE)
             return 0;
     }
