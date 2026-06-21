@@ -87,7 +87,7 @@ int main(void)
             tray_arrow_icon = &render_commands.commands[index];
         }
         if (render_commands.commands[index].type == REACH_RENDER_COMMAND_VECTOR_ICON &&
-            render_commands.commands[index].icon_id == REACH_VECTOR_ICON_SETTINGS)
+            render_commands.commands[index].icon_id == REACH_VECTOR_ICON_QUICK_SETTINGS)
         {
             settings_icon = &render_commands.commands[index];
         }

@@ -244,7 +244,7 @@ static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
                                 REACH_VECTOR_ICON_ARROW_UP, theme->icon_backplate_background);
     reach_dock_push_vector_icon(commands,
                                 reach_dock_center_square(quick_settings_box, system_icon_size),
-                                REACH_VECTOR_ICON_SETTINGS, theme->icon_backplate_background);
+                                REACH_VECTOR_ICON_QUICK_SETTINGS, theme->icon_backplate_background);
 
     if (input->click_feedback_index == input->tray_feedback_index)
     {
