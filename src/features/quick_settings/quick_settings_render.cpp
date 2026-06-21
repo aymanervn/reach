@@ -530,7 +530,7 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
     else
     {
         icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-        icon.icon_id = REACH_VECTOR_ICON_SETTINGS;
+        icon.icon_id = REACH_VECTOR_ICON_QUICK_SETTINGS;
     }
     (void)reach_render_command_buffer_push(commands, &icon);
 

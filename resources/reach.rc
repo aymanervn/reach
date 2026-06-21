@@ -39,6 +39,8 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 234 RCDATA "extra/minimize.svg"
 235 RCDATA "extra/close.svg"
 236 RCDATA "extra/resize.svg"
+237 RCDATA "power/settings.svg"
+
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0

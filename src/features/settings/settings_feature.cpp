@@ -49,7 +49,7 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
          {0.31f, 0.78f, 0.86f, 1.0f},
          {0.31f, 0.78f, 0.86f, 0.20f}},
         {REACH_SETTINGS_PAGE_STARTUP_APPS,
-         REACH_VECTOR_ICON_SETTINGS,
+         REACH_VECTOR_ICON_QUICK_SETTINGS,
          (const uint16_t *)L"Startup Apps",
          {0.70f, 0.38f, 0.95f, 1.0f},
          {0.70f, 0.38f, 0.95f, 0.20f}},
