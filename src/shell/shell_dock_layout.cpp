@@ -10,10 +10,11 @@ static int32_t reach_shell_dock_key_equal(int32_t a_pinned, uint32_t a_pin_id, u
     return reach_dock_key_equal(&a, &b);
 }
 
-static int32_t reach_shell_popup_blocks_dock_autohide(const reach_shell *shell)
+static int32_t reach_shell_transient_open(const reach_shell *shell)
 {
-    return shell != nullptr && (shell->ui.launcher.open || shell->tray_state.popup_open ||
-                                shell->quick_settings_open || shell->context_menu_state.open);
+    return shell != nullptr && (shell->ui.launcher.open || shell->clipboard_model.open ||
+                                shell->tray_state.popup_open || shell->quick_settings_open ||
+                                shell->context_menu_state.open);
 }
 
 enum
@@ -221,26 +222,26 @@ reach_rect_f32 reach_shell_reconcile_dock_visibility(reach_shell *shell,
 
     int32_t game_mode = reach_shell_game_mode_enabled(shell);
     int32_t can_hide = reach_shell_dock_can_hide(shell);
-    int32_t popup_open = reach_shell_popup_blocks_dock_autohide(shell);
+    int32_t transient_open = reach_shell_transient_open(shell);
     int32_t target_hidden = 0;
     int32_t edge_mode = REACH_SHELL_REVEAL_EDGE_DISABLED;
 
     if (game_mode)
     {
         shell->dock_reveal.reveal_session_active = 0;
+        target_hidden = 1;
+        edge_mode = REACH_SHELL_REVEAL_EDGE_DISABLED;
     }
     else if (!can_hide)
     {
         shell->dock_reveal.reveal_session_active = 0;
+        target_hidden = 0;
+        edge_mode = REACH_SHELL_REVEAL_EDGE_BRIDGE;
     }
-    else if (shell->dock_reveal.pointer_sequence_active || popup_open)
+    else if (shell->dock_reveal.pointer_sequence_active || transient_open)
     {
-        shell->dock_reveal.reveal_session_active = 0;
-    }
-    else if (shell->switcher_state.open)
-    {
-        shell->dock_reveal.reveal_session_active = 0;
-        target_hidden = pointer_over_dock ? 0 : 1;
+        target_hidden = 0;
+        edge_mode = REACH_SHELL_REVEAL_EDGE_BRIDGE;
     }
     else if (shell->dock_reveal.reveal_session_active)
     {
