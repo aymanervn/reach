@@ -160,11 +160,7 @@ static reach_color reach_music_widget_background_overlay(const reach_theme *them
 
 static reach_rect_f32 reach_music_widget_centered_circle_bounds(reach_rect_f32 rect)
 {
-    float size = rect.height * 1.15f;
-    if (size > rect.width)
-    {
-        size = rect.width;
-    }
+    const float size = rect.height * 1.1f;
     return reach_music_widget_rect(rect.x + (rect.width - size) * 0.5f,
                                    rect.y + (rect.height - size) * 0.5f, size, size);
 }
@@ -403,6 +399,10 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
         float icon_size = button.height * icon_scale;
         float icon_x = button.x + (button.width - icon_size) * 0.5f;
         float icon_y = button.y + (button.height - icon_size) * 0.5f;
+        if (index == 1 && input->model->playback != REACH_MEDIA_PLAYBACK_PLAYING)
+        {
+            icon_x += icon_size * 0.06f;
+        }
         reach_rect_f32 icon_rect = reach_music_widget_rect(icon_x, icon_y, icon_size, icon_size);
         reach_rect_f32 background_rect = index == 1 ? play_pause_background_rect : button;
         float background_radius_ratio = index == 1 ? 0.5f : (index == 0 ? 0.35f : 0.45f);
