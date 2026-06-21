@@ -389,6 +389,7 @@ target_link_libraries(reach-watchdog PRIVATE
 
 add_executable(reach_elevation_helper WIN32
     src/tools/reach_elevation_helper/reach_elevation_helper.cpp
+    src/tools/reach_elevation_helper/hotkeys.cpp
     src/tools/reach_elevation_helper/window_actions.cpp
     src/adapters/windows/window_management/elevation_helper_protocol.cpp
     src/adapters/windows/window_management/elevation_helper_shared_state_win32.cpp

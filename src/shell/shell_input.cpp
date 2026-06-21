@@ -1280,9 +1280,15 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
         return REACH_OK;
     }
 
-    if (event->type == REACH_UI_EVENT_WINDOWS_D_MINIMIZE_ALL)
+    if (event->type == REACH_UI_EVENT_MINIMIZE_ALL)
     {
         (void)reach_shell_schedule_minimize_open_windows(shell);
+        return REACH_OK;
+    }
+
+    if (event->type == REACH_UI_EVENT_OPEN_TERMINAL)
+    {
+        (void)reach_shell_schedule_open_terminal(shell);
         return REACH_OK;
     }
 
@@ -1326,10 +1332,11 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
         return reach_shell_step_brightness(shell, -0.02f);
     }
 
-    if (event->type == REACH_UI_EVENT_ALT_TAB_BEGIN || event->type == REACH_UI_EVENT_ALT_TAB_NEXT ||
-        event->type == REACH_UI_EVENT_ALT_TAB_PREVIOUS ||
-        event->type == REACH_UI_EVENT_ALT_TAB_COMMIT ||
-        event->type == REACH_UI_EVENT_ALT_TAB_CANCEL)
+    if (event->type == REACH_UI_EVENT_APP_SWITCH_BEGIN ||
+        event->type == REACH_UI_EVENT_APP_SWITCH_NEXT ||
+        event->type == REACH_UI_EVENT_APP_SWITCH_PREVIOUS ||
+        event->type == REACH_UI_EVENT_APP_SWITCH_COMMIT ||
+        event->type == REACH_UI_EVENT_APP_SWITCH_CANCEL)
     {
         return reach_shell_handle_switcher_event(shell, event);
     }
@@ -1365,24 +1372,7 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
 
     else if (intent.type == REACH_UI_INTENT_LAUNCH_APP)
     {
-        for (size_t index = 0; index < shell->ui.pinned_app_count; ++index)
-        {
-            if (shell->ui.pinned_apps[index].id == intent.id &&
-                shell->app_launcher.ops.launch != nullptr)
-            {
-                reach_app_launch_request request = {};
-
-                reach_copy_utf16(request.path, 260, shell->ui.pinned_apps[index].path);
-
-                reach_copy_utf16(request.arguments, 260, shell->ui.pinned_apps[index].arguments);
-
-                if (shell->ui.launcher.open)
-                {
-                    return reach_shell_defer_app_launch_until_launcher_closed(shell, &request);
-                }
-                return reach_shell_schedule_app_launch(shell, &request);
-            }
-        }
+        return reach_shell_open_pinned_app_id(shell, intent.id, 0, shell->ui.launcher.open);
     }
     else if (intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT)
     {

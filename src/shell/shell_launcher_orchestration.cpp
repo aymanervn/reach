@@ -344,13 +344,10 @@ reach_result reach_shell_open_launcher_result(reach_shell *shell)
         {
             return REACH_OK;
         }
-        if (result->kind == REACH_SEARCH_RESULT_APP && shell->app_launcher.ops.launch != nullptr)
+        if (result->kind == REACH_SEARCH_RESULT_APP)
         {
-            reach_app_launch_request request = {};
-            reach_copy_utf16(request.path, 260, result->path);
-            return shell->ui.launcher.open
-                       ? reach_shell_defer_app_launch_until_launcher_closed(shell, &request)
-                       : reach_shell_schedule_app_launch(shell, &request);
+            return reach_shell_open_app(shell, result->path, nullptr, nullptr, 0,
+                                        shell->ui.launcher.open);
         }
         if (shell->explorer_service.ops.open_path != nullptr)
         {

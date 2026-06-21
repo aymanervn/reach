@@ -2,6 +2,7 @@
 #include "../../adapters/windows/window_management/elevation_helper_shared_state_win32.h"
 #include "../../adapters/windows/window_management/window_query_win32.h"
 #include "window_actions.h"
+#include "hotkeys.h"
 
 #include <windows.h>
 #include <sddl.h>
@@ -23,20 +24,6 @@ struct reach_helper_session_state
     HWINEVENTHOOK name_hook;
 };
 
-struct reach_helper_hotkey_state
-{
-    HHOOK hook;
-    HANDLE thread;
-    DWORD thread_id;
-    int32_t alt_down;
-    int32_t shift_down;
-    int32_t alt_tab_active;
-    int32_t left_win_down;
-    int32_t right_win_down;
-    int32_t windows_key_chord;
-    int32_t windows_d_down;
-};
-
 struct reach_helper_window_metadata
 {
     HWND hwnd;
@@ -55,7 +42,6 @@ struct reach_helper_window_state
 };
 
 static reach_helper_session_state g_session;
-static reach_helper_hotkey_state g_hotkeys;
 static INIT_ONCE g_metadata_cache_once = INIT_ONCE_STATIC_INIT;
 static CRITICAL_SECTION g_metadata_cache_lock;
 static std::vector<reach_helper_window_metadata> g_metadata_cache;
@@ -70,7 +56,6 @@ static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
 
 static reach_result reach_helper_execute(const reach_elevation_helper_request *request,
                                          reach_elevation_helper_response *response);
-static void reach_helper_clear_reach_hotkey_state(void);
 static void reach_helper_publish_window_state(void);
 
 static void reach_helper_copy_wide(wchar_t *destination, size_t destination_count,
@@ -695,7 +680,7 @@ static void reach_helper_publish_game_mode(void)
     int32_t active = reach_helper_detect_game_mode();
     if (active)
     {
-        reach_helper_clear_reach_hotkey_state();
+        reach_helper_clear_hotkey_state();
     }
     InterlockedExchange(&g_game_mode_active, active ? 1 : 0);
     (void)reach_elevation_helper_shared_publish_game_mode(active);
@@ -1143,125 +1128,6 @@ static int32_t reach_helper_same_user_client(HANDLE pipe)
     return EqualSid(process_token_user->User.Sid, client_token_user->User.Sid);
 }
 
-static uint32_t reach_helper_hotkey_modifiers(void)
-{
-    uint32_t modifiers = 0;
-    if (g_hotkeys.alt_down)
-    {
-        modifiers |= REACH_ELEVATION_HELPER_MODIFIER_ALT;
-    }
-    if (g_hotkeys.shift_down)
-    {
-        modifiers |= REACH_ELEVATION_HELPER_MODIFIER_SHIFT;
-    }
-    if (g_hotkeys.left_win_down)
-    {
-        modifiers |= REACH_ELEVATION_HELPER_MODIFIER_LEFT_WIN;
-    }
-    if (g_hotkeys.right_win_down)
-    {
-        modifiers |= REACH_ELEVATION_HELPER_MODIFIER_RIGHT_WIN;
-    }
-    return modifiers;
-}
-
-static uint32_t reach_helper_hotkey_key_from_vk(DWORD vk)
-{
-    switch (vk)
-    {
-    case VK_MENU:
-    case VK_LMENU:
-    case VK_RMENU:
-        return REACH_ELEVATION_HELPER_HOTKEY_ALT;
-    case VK_SHIFT:
-    case VK_LSHIFT:
-    case VK_RSHIFT:
-        return REACH_ELEVATION_HELPER_HOTKEY_SHIFT;
-    case VK_TAB:
-        return REACH_ELEVATION_HELPER_HOTKEY_TAB;
-    case VK_ESCAPE:
-        return REACH_ELEVATION_HELPER_HOTKEY_ESCAPE;
-    case VK_LWIN:
-        return REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN;
-    case VK_RWIN:
-        return REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN;
-    case 'D':
-        return REACH_ELEVATION_HELPER_HOTKEY_D;
-    default:
-        return 0;
-    }
-}
-
-static void reach_helper_update_key_state(uint32_t key, int32_t pressed)
-{
-    switch (key)
-    {
-    case REACH_ELEVATION_HELPER_HOTKEY_ALT:
-        g_hotkeys.alt_down = pressed;
-        break;
-    case REACH_ELEVATION_HELPER_HOTKEY_SHIFT:
-        g_hotkeys.shift_down = pressed;
-        break;
-    case REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN:
-        g_hotkeys.left_win_down = pressed;
-        break;
-    case REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN:
-        g_hotkeys.right_win_down = pressed;
-        break;
-    default:
-        break;
-    }
-}
-
-static int32_t reach_helper_virtual_key_down(int virtual_key)
-{
-    return (GetAsyncKeyState(virtual_key) & 0x8000) != 0;
-}
-
-static void reach_helper_reconcile_modifier_state(void)
-{
-    g_hotkeys.alt_down = reach_helper_virtual_key_down(VK_MENU) ||
-                         reach_helper_virtual_key_down(VK_LMENU) ||
-                         reach_helper_virtual_key_down(VK_RMENU);
-    g_hotkeys.shift_down = reach_helper_virtual_key_down(VK_SHIFT) ||
-                           reach_helper_virtual_key_down(VK_LSHIFT) ||
-                           reach_helper_virtual_key_down(VK_RSHIFT);
-    g_hotkeys.left_win_down = reach_helper_virtual_key_down(VK_LWIN);
-    g_hotkeys.right_win_down = reach_helper_virtual_key_down(VK_RWIN);
-    if (!g_hotkeys.left_win_down && !g_hotkeys.right_win_down)
-    {
-        g_hotkeys.windows_key_chord = 0;
-    }
-}
-
-static int32_t reach_helper_windows_key_down(void)
-{
-    return g_hotkeys.left_win_down || g_hotkeys.right_win_down;
-}
-
-static int32_t reach_helper_hotkey_is_windows_key(uint32_t key)
-{
-    return key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
-           key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN;
-}
-
-static void reach_helper_clear_reach_hotkey_state(void)
-{
-    g_hotkeys.alt_down = 0;
-    g_hotkeys.shift_down = 0;
-    g_hotkeys.alt_tab_active = 0;
-    g_hotkeys.left_win_down = 0;
-    g_hotkeys.right_win_down = 0;
-    g_hotkeys.windows_key_chord = 0;
-    g_hotkeys.windows_d_down = 0;
-}
-
-static int32_t reach_helper_alt_down(void)
-{
-    return reach_helper_virtual_key_down(VK_MENU) || reach_helper_virtual_key_down(VK_LMENU) ||
-           reach_helper_virtual_key_down(VK_RMENU);
-}
-
 static int32_t reach_helper_post_minimize_game(HWND hwnd)
 {
     if (hwnd != nullptr && g_session.window_event_thread_id != 0)
@@ -1274,201 +1140,9 @@ static int32_t reach_helper_post_minimize_game(HWND hwnd)
     return 0;
 }
 
-static int32_t reach_helper_hotkey_is_modifier(uint32_t key)
+static int32_t reach_helper_game_mode_active(void)
 {
-    return key == REACH_ELEVATION_HELPER_HOTKEY_ALT || key == REACH_ELEVATION_HELPER_HOTKEY_SHIFT ||
-           key == REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN ||
-           key == REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN;
-}
-
-static void reach_helper_stop_hotkeys(void);
-
-static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPARAM lparam)
-{
-    const int32_t game_mode_active = InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0;
-    const bool key_down = wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN;
-    const bool key_up = wparam == WM_KEYUP || wparam == WM_SYSKEYUP;
-    uint32_t key = 0;
-
-    if (code == HC_ACTION)
-    {
-        const KBDLLHOOKSTRUCT *keyboard = reinterpret_cast<const KBDLLHOOKSTRUCT *>(lparam);
-        if (keyboard != nullptr && (keyboard->flags & LLKHF_INJECTED) == 0)
-        {
-            key = reach_helper_hotkey_key_from_vk(keyboard->vkCode);
-            if (game_mode_active)
-            {
-                reach_helper_reconcile_modifier_state();
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down && reach_helper_alt_down())
-                {
-                    HWND game = GetForegroundWindow();
-                    reach_helper_clear_reach_hotkey_state();
-                    if (reach_helper_post_minimize_game(game))
-                    {
-                        return 1;
-                    }
-                }
-                return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
-            }
-            if (!reach_helper_hotkey_is_modifier(key))
-            {
-                reach_helper_reconcile_modifier_state();
-            }
-            if (key == 0 && key_down && (g_hotkeys.left_win_down || g_hotkeys.right_win_down))
-            {
-                g_hotkeys.windows_key_chord = 1;
-            }
-            if (key != 0 && (key_down || key_up))
-            {
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_D && key_up && g_hotkeys.windows_d_down)
-                {
-                    g_hotkeys.windows_d_down = 0;
-                    uint32_t modifiers = reach_helper_hotkey_modifiers();
-                    (void)reach_elevation_helper_shared_append_hotkey(
-                        key, REACH_ELEVATION_HELPER_HOTKEY_RELEASED, modifiers);
-                    return 1;
-                }
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_D && reach_helper_windows_key_down())
-                {
-                    g_hotkeys.windows_key_chord = 1;
-                    if (key_down)
-                    {
-                        if (!g_hotkeys.windows_d_down)
-                        {
-                            g_hotkeys.windows_d_down = 1;
-                            uint32_t modifiers = reach_helper_hotkey_modifiers();
-                            (void)reach_elevation_helper_shared_append_hotkey(
-                                key, REACH_ELEVATION_HELPER_HOTKEY_PRESSED, modifiers);
-                        }
-                        return 1;
-                    }
-                    if (g_hotkeys.windows_d_down)
-                    {
-                        g_hotkeys.windows_d_down = 0;
-                        uint32_t modifiers = reach_helper_hotkey_modifiers();
-                        (void)reach_elevation_helper_shared_append_hotkey(
-                            key, REACH_ELEVATION_HELPER_HOTKEY_RELEASED, modifiers);
-                        return 1;
-                    }
-                }
-                if (reach_helper_hotkey_is_windows_key(key) && key_down &&
-                    !reach_helper_windows_key_down())
-                {
-                    g_hotkeys.windows_key_chord = 0;
-                }
-                int32_t windows_chord = g_hotkeys.windows_key_chord;
-                if (!reach_helper_hotkey_is_windows_key(key))
-                {
-                    if (reach_helper_windows_key_down() && key_down)
-                    {
-                        g_hotkeys.windows_key_chord = 1;
-                    }
-                }
-                if (reach_helper_hotkey_is_modifier(key))
-                {
-                    reach_helper_update_key_state(key, key_down ? 1 : 0);
-                }
-                if (reach_helper_hotkey_is_windows_key(key) && g_hotkeys.alt_tab_active)
-                {
-                    g_hotkeys.windows_key_chord = 0;
-                    return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
-                }
-                uint32_t modifiers = reach_helper_hotkey_modifiers();
-                if (reach_helper_hotkey_is_windows_key(key) && key_up && windows_chord)
-                {
-                    modifiers |= REACH_ELEVATION_HELPER_MODIFIER_CHORD;
-                }
-                uint32_t action = key_down ? REACH_ELEVATION_HELPER_HOTKEY_PRESSED
-                                           : REACH_ELEVATION_HELPER_HOTKEY_RELEASED;
-                (void)reach_elevation_helper_shared_append_hotkey(key, action, modifiers);
-
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_TAB && key_down && g_hotkeys.alt_down)
-                {
-                    g_hotkeys.alt_tab_active = 1;
-                    return 1;
-                }
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_ESCAPE && key_down &&
-                    g_hotkeys.alt_tab_active)
-                {
-                    g_hotkeys.alt_tab_active = 0;
-                    return 1;
-                }
-                if (key == REACH_ELEVATION_HELPER_HOTKEY_ALT && key_up && g_hotkeys.alt_tab_active)
-                {
-                    g_hotkeys.alt_tab_active = 0;
-                }
-                if (reach_helper_hotkey_is_windows_key(key))
-                {
-                    if (key_up && !g_hotkeys.left_win_down && !g_hotkeys.right_win_down)
-                    {
-                        g_hotkeys.windows_key_chord = 0;
-                    }
-                    return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
-                }
-            }
-        }
-    }
-
-    return CallNextHookEx(g_hotkeys.hook, code, wparam, lparam);
-}
-
-static DWORD WINAPI reach_helper_hotkey_thread(void *param)
-{
-    (void)param;
-    MSG message = {};
-    PeekMessageW(&message, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
-    g_hotkeys.thread_id = GetCurrentThreadId();
-    g_hotkeys.hook =
-        SetWindowsHookExW(WH_KEYBOARD_LL, reach_helper_keyboard_proc, GetModuleHandleW(nullptr), 0);
-    while (GetMessageW(&message, nullptr, 0, 0) > 0)
-    {
-    }
-    if (g_hotkeys.hook != nullptr)
-    {
-        UnhookWindowsHookEx(g_hotkeys.hook);
-        g_hotkeys.hook = nullptr;
-    }
-    return 0;
-}
-
-static reach_result reach_helper_start_hotkeys(void)
-{
-    if (g_hotkeys.thread != nullptr)
-    {
-        return REACH_OK;
-    }
-
-    g_hotkeys.thread = CreateThread(nullptr, 0, reach_helper_hotkey_thread, nullptr, 0, nullptr);
-    for (int attempt = 0; g_hotkeys.thread != nullptr &&
-                          (g_hotkeys.thread_id == 0 || g_hotkeys.hook == nullptr) && attempt < 20;
-         ++attempt)
-    {
-        Sleep(10);
-    }
-
-    if (g_hotkeys.thread == nullptr || g_hotkeys.hook == nullptr)
-    {
-        reach_helper_stop_hotkeys();
-        return REACH_ERROR;
-    }
-
-    return REACH_OK;
-}
-
-static void reach_helper_stop_hotkeys(void)
-{
-    if (g_hotkeys.thread != nullptr)
-    {
-        if (g_hotkeys.thread_id != 0)
-        {
-            PostThreadMessageW(g_hotkeys.thread_id, WM_QUIT, 0, 0);
-        }
-        WaitForSingleObject(g_hotkeys.thread, 1000);
-        CloseHandle(g_hotkeys.thread);
-        g_hotkeys.thread = nullptr;
-    }
-
-    g_hotkeys = {};
+    return InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0;
 }
 
 static reach_result reach_helper_execute(const reach_elevation_helper_request *request,
@@ -1788,6 +1462,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
         CloseHandle(shell_mutex);
         return 1;
     }
+    reach_helper_hotkey_callbacks hotkey_callbacks = {};
+    hotkey_callbacks.game_mode_active = reach_helper_game_mode_active;
+    hotkey_callbacks.minimize_game = reach_helper_post_minimize_game;
+    reach_helper_hotkeys_configure(&hotkey_callbacks);
+
     reach_helper_publish_window_state();
     reach_helper_start_window_events();
     (void)reach_helper_start_hotkeys();
