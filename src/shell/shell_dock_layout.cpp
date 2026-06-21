@@ -399,6 +399,14 @@ void reach_shell_apply_dock_width_animation(reach_shell *shell, reach_dock_layou
     layout->quick_settings_button.x =
         layout->system_separator.x - gap - layout->quick_settings_button.width;
     layout->tray_button.x = layout->quick_settings_button.x - layout->tray_button.width;
+
+    const float app_slots_right = layout->tray_button.x - gap;
+    for (size_t index = 0; index < layout->app_slot_count; ++index)
+    {
+        const size_t reverse_index = layout->app_slot_count - 1 - index;
+        layout->app_slots[index].x = app_slots_right - layout->app_slots[index].width -
+                                     (layout->app_slots[index].width + gap) * (float)reverse_index;
+    }
 }
 
 reach_result reach_shell_refresh_monitor_layout(reach_shell *shell)
@@ -532,6 +540,11 @@ float reach_shell_dock_item_current_x(const reach_shell *shell, const reach_dock
         index >= layout->app_slot_count)
     {
         return 0.0f;
+    }
+
+    if (reach_animation_manager_active(&shell->animations, REACH_SHELL_ANIMATION_DOCK_WIDTH))
+    {
+        return reach_shell_dock_slot_box_x(shell, layout, index);
     }
     if ((shell->dock_drag.active ||
          reach_animation_manager_active(&shell->animations,

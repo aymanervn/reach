@@ -723,17 +723,30 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
         shell->open_window_count, reach_shell_dock_window_matches_pinned, shell);
 
     layout->app_slot_count = shell->dock_model.item_count;
-    float scale = reach_shell_layout_dpi_scale(shell);
-    float icon_size = shell->ui.dock.icon_size * scale;
-    float gap = shell->ui.dock.gap * scale;
-    size_t count = shell->dock_model.item_count;
+    const float scale = reach_shell_layout_dpi_scale(shell);
+    const float icon_size = shell->ui.dock.icon_size * scale;
+    const float gap = shell->ui.dock.gap * scale;
+    const size_t count = shell->dock_model.item_count;
     const reach_theme *theme = shell->theme != nullptr ? shell->theme : reach_theme_default();
-    float clock_width = theme->dock_clock_width * scale;
-    float separator_width = theme->dock_system_separator_width * scale;
-    float separator_height = layout->bounds.height * theme->dock_system_separator_height_ratio;
-    float music_widget_width =
-        reach_music_widget_desired_width(&shell->music_widget_model, theme, scale);
-    float music_widget_height = reach_theme_music_widget_height(theme, layout->bounds.height);
+    const float clock_width = theme->dock_clock_width * scale;
+    const float separator_width = theme->dock_system_separator_width * scale;
+    const float separator_height =
+        layout->bounds.height * theme->dock_system_separator_height_ratio;
+
+    reach_music_widget_model music_widget_layout_model = shell->music_widget_model.visible
+                                                             ? shell->music_widget_model
+                                                             : shell->music_widget_render_model;
+    if (music_widget_layout_model.title[0] != 0 || music_widget_layout_model.artist[0] != 0 ||
+        music_widget_layout_model.cover_icon_id != 0)
+    {
+        music_widget_layout_model.visible = 1;
+    }
+
+    const float music_widget_render_width =
+        reach_music_widget_desired_width(&music_widget_layout_model, theme, scale);
+    const float music_widget_reserved_width =
+        shell->music_widget_model.visible ? music_widget_render_width : 0.0f;
+    const float music_widget_height = reach_theme_music_widget_height(theme, layout->bounds.height);
 
     float dock_width = ceilf(icon_size * (float)(count + 3) + clock_width + separator_width +
                              gap * (float)(count + 5));
@@ -742,59 +755,65 @@ void reach_shell_build_dock_items(reach_shell *shell, reach_dock_layout *layout)
     {
         dock_width = ceilf(icon_size * 3.0f + clock_width + separator_width + gap * 4.0f);
     }
-    if (music_widget_width > 0.0f)
+    if (music_widget_reserved_width > 0.0f)
     {
-        dock_width += ceilf(music_widget_width + gap);
+        dock_width += ceilf(music_widget_reserved_width + gap);
     }
 
-    float old_width = layout->bounds.width;
+    const float old_width = layout->bounds.width;
     if (dock_width != old_width)
     {
         layout->bounds.x += (old_width - dock_width) * 0.5f;
         layout->bounds.width = dock_width;
     }
 
-    float music_widget_left = theme->music_widget_left_margin * scale;
-    float top = (layout->bounds.height - icon_size) * 0.5f;
-    float left = gap;
+    const float music_widget_left = theme->music_widget_left_margin * scale;
+    const float top = (layout->bounds.height - icon_size) * 0.5f;
+
     layout->music_widget = {};
-    if (music_widget_width > 0.0f)
+    if (music_widget_render_width > 0.0f)
     {
         layout->music_widget.x = music_widget_left;
         layout->music_widget.y = (layout->bounds.height - music_widget_height) * 0.5f;
-        layout->music_widget.width = music_widget_width;
+        layout->music_widget.width = music_widget_render_width;
         layout->music_widget.height = music_widget_height;
-        left = music_widget_left + music_widget_width + gap;
     }
     shell->music_widget_layout = reach_music_widget_compute_layout(
-        &shell->music_widget_model, theme, layout->music_widget, scale);
-
-    for (size_t index = 0; index < layout->app_slot_count; ++index)
-    {
-        layout->app_slots[index].x = left + (icon_size + gap) * (float)index;
-        layout->app_slots[index].y = top;
-        layout->app_slots[index].width = icon_size;
-        layout->app_slots[index].height = icon_size;
-    }
+        &music_widget_layout_model, theme, layout->music_widget, scale);
 
     layout->power_button.width = icon_size;
     layout->power_button.height = icon_size;
     layout->power_button.x = dock_width - icon_size - gap;
     layout->power_button.y = top;
+
     layout->clock.width = clock_width;
     layout->clock.height = icon_size;
     layout->clock.x = layout->power_button.x - gap - clock_width;
     layout->clock.y = top;
+
     layout->system_separator.width = separator_width;
     layout->system_separator.height = separator_height;
     layout->system_separator.x = layout->clock.x - gap - separator_width;
     layout->system_separator.y = (layout->bounds.height - separator_height) * 0.5f;
+
     layout->quick_settings_button.width = icon_size;
     layout->quick_settings_button.height = icon_size;
     layout->quick_settings_button.x = layout->system_separator.x - gap - icon_size;
     layout->quick_settings_button.y = top;
+
     layout->tray_button.width = icon_size;
     layout->tray_button.height = icon_size;
     layout->tray_button.x = layout->quick_settings_button.x - icon_size;
     layout->tray_button.y = top;
+
+    const float app_slots_right = layout->tray_button.x - gap;
+    for (size_t index = 0; index < layout->app_slot_count; ++index)
+    {
+        const size_t reverse_index = layout->app_slot_count - 1 - index;
+        layout->app_slots[index].width = icon_size;
+        layout->app_slots[index].height = icon_size;
+        layout->app_slots[index].x =
+            app_slots_right - icon_size - (icon_size + gap) * (float)reverse_index;
+        layout->app_slots[index].y = top;
+    }
 }

@@ -1,5 +1,7 @@
 #include "shell_internal.h"
 
+#include <math.h>
+
 reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_dock_layout *layout)
 {
     REACH_ASSERT(shell != nullptr);
@@ -58,10 +60,45 @@ reach_result reach_shell_render_dock_surface(reach_shell *shell, const reach_doc
         return result;
     }
 
+    const float music_scale = reach_shell_layout_dpi_scale(shell);
+    const float music_icon_size = shell->ui.dock.icon_size * music_scale;
+    const float music_gap = shell->ui.dock.gap * music_scale;
+    const size_t music_item_count = shell->dock_model.item_count;
+    const float music_clock_width = input.theme->dock_clock_width * music_scale;
+    const float music_separator_width = input.theme->dock_system_separator_width * music_scale;
+
+    float music_base_width =
+        ceilf(music_icon_size * (float)(music_item_count + 3) + music_clock_width +
+              music_separator_width + music_gap * (float)(music_item_count + 5));
+    if (music_item_count == 0)
+    {
+        music_base_width = ceilf(music_icon_size * 3.0f + music_clock_width +
+                                 music_separator_width + music_gap * 4.0f);
+    }
+
+    float music_reveal_width = layout->bounds.width - music_base_width - music_gap;
+    if (music_reveal_width < 0.0f)
+    {
+        music_reveal_width = 0.0f;
+    }
+    if (music_reveal_width > shell->music_widget_layout.bounds.width)
+    {
+        music_reveal_width = shell->music_widget_layout.bounds.width;
+    }
+
+    reach_music_widget_model music_widget_model = shell->music_widget_model.visible
+                                                      ? shell->music_widget_model
+                                                      : shell->music_widget_render_model;
+    if (music_reveal_width > 0.001f)
+    {
+        music_widget_model.visible = 1;
+    }
+
     reach_music_widget_render_input music_input = {};
     music_input.theme = input.theme;
-    music_input.model = &shell->music_widget_model;
+    music_input.model = &music_widget_model;
     music_input.layout = &shell->music_widget_layout;
+    music_input.reveal_width = music_reveal_width;
     music_input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     music_input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
     result = reach_music_widget_build_render_commands(&music_input, &commands);

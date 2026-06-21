@@ -5,6 +5,54 @@ static const uint16_t REACH_MUSIC_WIDGET_COVER[] = {'M', 0};
 
 static const float REACH_MUSIC_WIDGET_BG_CONTRAST = 1.20f;
 
+static float reach_music_widget_max_float(float a, float b)
+{
+    return a > b ? a : b;
+}
+
+static float reach_music_widget_min_float(float a, float b)
+{
+    return a < b ? a : b;
+}
+
+static reach_rect_f32 reach_music_widget_intersect_rect(reach_rect_f32 a, reach_rect_f32 b)
+{
+    const float left = reach_music_widget_max_float(a.x, b.x);
+    const float top = reach_music_widget_max_float(a.y, b.y);
+    const float right = reach_music_widget_min_float(a.x + a.width, b.x + b.width);
+    const float bottom = reach_music_widget_min_float(a.y + a.height, b.y + b.height);
+
+    reach_rect_f32 result = {};
+    result.x = left;
+    result.y = top;
+    result.width = right > left ? right - left : 0.0f;
+    result.height = bottom > top ? bottom - top : 0.0f;
+    return result;
+}
+
+static void reach_music_widget_apply_reveal_clip(reach_render_command *command,
+                                                 reach_rect_f32 reveal_clip, float radius)
+{
+    if (command == nullptr)
+    {
+        return;
+    }
+
+    reach_rect_f32 clip = reveal_clip;
+    if (command->has_clip_rect)
+    {
+        clip = reach_music_widget_intersect_rect(command->clip_rect, reveal_clip);
+    }
+
+    command->has_clip_rect = 1;
+    command->clip_rect = clip;
+    command->clip_radius = radius;
+    if (clip.width <= 0.0f || clip.height <= 0.0f)
+    {
+        command->color.a = 0.0f;
+    }
+}
+
 static reach_rect_f32 reach_music_widget_rect(float x, float y, float width, float height)
 {
     reach_rect_f32 rect = {};
@@ -261,6 +309,20 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
         return REACH_OK;
     }
 
+    float reveal_width = input->reveal_width;
+    if (reveal_width > input->layout->bounds.width)
+    {
+        reveal_width = input->layout->bounds.width;
+    }
+    if (reveal_width <= 0.001f)
+    {
+        return REACH_OK;
+    }
+
+    reach_rect_f32 reveal_clip = input->layout->bounds;
+    reveal_clip.width = reveal_width;
+
+    const size_t first_widget_command = out_commands->count;
     const reach_theme *theme = input->theme;
     float radius = reach_theme_music_widget_corner_radius(theme, input->layout->bounds.height);
 
@@ -360,6 +422,13 @@ reach_result reach_music_widget_build_render_commands(const reach_music_widget_r
             icon.color.a *= 0.30f;
         }
         reach_render_command_buffer_push(out_commands, &icon);
+    }
+
+    for (size_t command_index = first_widget_command; command_index < out_commands->count;
+         ++command_index)
+    {
+        reach_music_widget_apply_reveal_clip(&out_commands->commands[command_index], reveal_clip,
+                                             radius);
     }
 
     return REACH_OK;

@@ -48,6 +48,7 @@ extern "C"
         const reach_theme *theme;
         const reach_music_widget_model *model;
         const reach_music_widget_layout *layout;
+        float reveal_width;
         int32_t text_alignment_center;
         int32_t text_alignment_leading;
     } reach_music_widget_render_input;
