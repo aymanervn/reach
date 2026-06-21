@@ -77,7 +77,7 @@ const reach_theme *reach_theme_default(void)
         .music_widget_corner_radius_max = 18.0f,
         .music_widget_padding = 6.0f,
         .music_widget_gap = 6.0f,
-        .music_widget_play_button_width = 22.0f,
+        .music_widget_play_button_width = 20.0f,
         .music_widget_prev_next_button_width = 13.2f,
         .music_widget_title_text_size = 12.0f,
     };
