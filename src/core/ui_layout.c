@@ -126,15 +126,22 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
         out_layout->launcher.pinned_app_slots[index].height = launcher_icon;
     }
 
+    float search_results_top_padding = reach_scale(8.0f, scale);
     out_layout->launcher.search_results.x = out_layout->launcher.search_box.x;
-    out_layout->launcher.search_results.y = out_layout->launcher.search_box.y +
-                                            out_layout->launcher.search_box.height +
-                                            reach_scale(8.0f, scale);
+    out_layout->launcher.search_results.y =
+        out_layout->launcher.search_box.y + out_layout->launcher.search_box.height;
     out_layout->launcher.search_results.width = out_layout->launcher.search_box.width;
     size_t visible_result_count = reach_visible_launcher_result_count(state);
     out_layout->launcher.search_results.height =
-        reach_scale(56.0f * (float)visible_result_count, scale);
+        visible_result_count > 0
+            ? search_results_top_padding + reach_scale(56.0f * (float)visible_result_count, scale)
+            : 0.0f;
     out_layout->launcher.search_result_items = out_layout->launcher.search_results;
+    out_layout->launcher.search_result_items.y += search_results_top_padding;
+    out_layout->launcher.search_result_items.height =
+        out_layout->launcher.search_results.height > search_results_top_padding
+            ? out_layout->launcher.search_results.height - search_results_top_padding
+            : 0.0f;
     out_layout->launcher.search_result_scrollbar_track = (reach_rect_f32){0};
     out_layout->launcher.search_result_scrollbar_thumb = (reach_rect_f32){0};
 
@@ -149,10 +156,10 @@ reach_result reach_ui_layout_compute(const reach_ui_state *state,
             out_layout->launcher.search_results.x + out_layout->launcher.search_results.width -
             gutter_width * 0.5f - track_width * 0.5f;
         out_layout->launcher.search_result_scrollbar_track.y =
-            out_layout->launcher.search_results.y + track_padding_y;
+            out_layout->launcher.search_result_items.y + track_padding_y;
         out_layout->launcher.search_result_scrollbar_track.width = track_width;
         out_layout->launcher.search_result_scrollbar_track.height =
-            out_layout->launcher.search_results.height - track_padding_y * 2.0f;
+            out_layout->launcher.search_result_items.height - track_padding_y * 2.0f;
 
         float min_thumb_height = reach_scale(22.0f, scale);
         reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(

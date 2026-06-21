@@ -162,9 +162,6 @@ reach_result reach_ui_state_close_launcher(reach_ui_state *state)
     }
 
     state->launcher.open = 0;
-    state->launcher.query[0] = 0;
-    state->launcher.query_length = 0;
-    reach_ui_state_clear_launcher_results(state);
     return REACH_OK;
 }
 

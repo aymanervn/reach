@@ -578,7 +578,17 @@ static void reach_shell_tick_animations(reach_shell *shell, double delta_seconds
     }
 
     reach_animation_manager_tick(&shell->animations, delta_seconds);
+    int32_t launcher_transition_was_visible =
+        reach_shell_surface_transition_visible(&shell->launcher_transition);
     reach_shell_surface_transition_finish(shell, &shell->launcher_transition);
+    if (launcher_transition_was_visible &&
+        !reach_shell_surface_transition_visible(&shell->launcher_transition) &&
+        !shell->ui.launcher.open)
+    {
+        reach_shell_cleanup_closed_launcher(shell);
+        shell->dirty.layout = 1;
+        shell->launcher.dirty_flags = 1;
+    }
     reach_shell_surface_transition_finish(shell, &shell->tray_transition);
     reach_shell_surface_transition_finish(shell, &shell->quick_settings_transition);
     reach_shell_surface_transition_finish(shell, &shell->switcher_transition);
