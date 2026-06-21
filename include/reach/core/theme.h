@@ -8,6 +8,14 @@ extern "C"
 {
 #endif
 
+    typedef struct reach_color
+    {
+        float r;
+        float g;
+        float b;
+        float a;
+    } reach_color;
+
     typedef struct reach_theme
     {
         reach_color light_background;

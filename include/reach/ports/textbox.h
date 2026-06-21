@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "reach/core/geometry.h"
+#include "reach/core/theme.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus

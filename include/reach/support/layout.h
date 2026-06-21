@@ -8,6 +8,14 @@ extern "C"
 {
 #endif
 
+    typedef struct reach_rect_i32
+    {
+        int32_t left;
+        int32_t top;
+        int32_t right;
+        int32_t bottom;
+    } reach_rect_i32;
+
     typedef enum reach_split_mode
     {
         REACH_SPLIT_LEFT = 0,

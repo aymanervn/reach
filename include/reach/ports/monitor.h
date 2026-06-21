@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/support/layout.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
