@@ -1359,10 +1359,6 @@ static reach_result reach_shell_handle_surface_event(reach_shell *shell,
     {
         reach_shell_surface_transition_set(shell, &shell->launcher_transition,
                                            shell->ui.launcher.open);
-        if (!shell->ui.launcher.open)
-        {
-            reach_shell_cleanup_closed_launcher(shell);
-        }
 
         reach_shell_sync_popup_mouse_hook(shell);
     }

@@ -68,6 +68,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float row_path_y = reach_launcher_scale(input, 28.0f);
     float row_path_height = reach_launcher_scale(input, 20.0f);
     float row_path_size = reach_launcher_scale(input, 12.0f);
+    int32_t results_attached = state->launcher.result_count > 0 ? 1 : 0;
 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
@@ -79,31 +80,49 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     command.radius = launcher_radius;
     reach_render_command_buffer_push(out_commands, &command);
 
-    command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect.x = layout->search_box.x - layout->bounds.x + 0.5f;
-    command.rect.y = layout->search_box.y - layout->bounds.y + 0.5f;
-    command.rect.width = layout->search_box.width - 1.0f;
-    command.rect.height = layout->search_box.height - 1.0f;
-    command.color = theme->launcher_search_border;
-    command.radius = launcher_radius;
-    command.stroke_width = theme->border_thickness;
-    reach_render_command_buffer_push(out_commands, &command);
+    if (results_attached)
+    {
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect.x = layout->search_box.x - layout->bounds.x;
+        command.rect.y =
+            layout->search_box.y - layout->bounds.y + layout->search_box.height - launcher_radius;
+        command.rect.width = layout->search_box.width;
+        command.rect.height = launcher_radius;
+        command.color = reach_launcher_opaque(theme->launcher_search_background);
+        command.radius = 0.0f;
+        reach_render_command_buffer_push(out_commands, &command);
+    }
 
     if (state->launcher.result_count > 0)
     {
         size_t visible_count = reach_launcher_visible_result_count(state);
-        float row_height =
-            visible_count > 0 ? layout->search_results.height / (float)visible_count : 0.0f;
+        float row_height = reach_launcher_scale(input, 56.0f);
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect.x = layout->search_results.x - layout->bounds.x;
         command.rect.y = layout->search_results.y - layout->bounds.y;
         command.rect.width = layout->search_results.width;
         command.rect.height = layout->search_results.height;
-        command.color = theme->dark_background;
-        command.color.a = 0.96f;
+        reach_color results_background = theme->dark_background;
+        results_background.a = 0.96f;
+        command.color = results_background;
         command.radius = launcher_radius;
+        reach_render_command_buffer_push(out_commands, &command);
+
+        float results_square_top_height = launcher_radius;
+        if (results_square_top_height > layout->search_results.height)
+        {
+            results_square_top_height = layout->search_results.height;
+        }
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect.x = layout->search_results.x - layout->bounds.x;
+        command.rect.y = layout->search_results.y - layout->bounds.y;
+        command.rect.width = layout->search_results.width;
+        command.rect.height = results_square_top_height;
+        command.color = results_background;
+        command.radius = 0.0f;
         reach_render_command_buffer_push(out_commands, &command);
 
         if (layout->search_result_scrollbar_track.height > 0.0f)
@@ -232,6 +251,21 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             reach_render_command_buffer_push(out_commands, &command);
         }
     }
+
+    float outer_height = layout->search_box.height;
+    if (results_attached)
+    {
+        outer_height =
+            (layout->search_results.y - layout->bounds.y) + layout->search_results.height;
+    }
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
+    command.rect = {0.5f, 0.5f, layout->bounds.width - 1.0f, outer_height - 1.0f};
+    command.color = theme->clipboard_border;
+    command.radius = reach_launcher_scale(input, theme->clipboard_panel_radius);
+    command.stroke_width = theme->border_thickness;
+    reach_render_command_buffer_push(out_commands, &command);
 
     return REACH_OK;
 }

@@ -176,6 +176,9 @@ void reach_shell_cleanup_closed_launcher(reach_shell *shell)
 
     reach_shell_cancel_launcher_search(shell);
     reach_shell_release_launcher_result_icons(shell);
+    shell->ui.launcher.query[0] = 0;
+    shell->ui.launcher.query_length = 0;
+    (void)reach_ui_state_clear_launcher_results(&shell->ui);
     shell->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     shell->pressed_launcher_index = REACH_MAX_PINNED_APPS;
     reach_shell_reset_launcher_textbox(shell);
@@ -300,7 +303,6 @@ static void reach_shell_close_launcher_impl(reach_shell *shell, int32_t restore_
     }
 
     (void)reach_ui_state_close_launcher(&shell->ui);
-    reach_shell_cleanup_closed_launcher(shell);
     shell->dirty.layout = 1;
     shell->launcher.dirty_flags = 1;
     reach_shell_surface_transition_set(shell, &shell->launcher_transition, 0);

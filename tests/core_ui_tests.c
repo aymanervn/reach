@@ -58,7 +58,12 @@ int main(void)
     failed += expect(state.launcher.result_count == 2);
     failed += expect(state.launcher.selected_result_index == 0);
     failed += expect(reach_ui_layout_compute(&state, &input, &layout) == REACH_OK);
-    failed += expect(layout.launcher.search_results.height == 112.0f);
+    failed += expect(layout.launcher.search_results.y ==
+                     layout.launcher.search_box.y + layout.launcher.search_box.height);
+    failed += expect(layout.launcher.search_results.height == 120.0f);
+    failed +=
+        expect(layout.launcher.search_result_items.y == layout.launcher.search_results.y + 8.0f);
+    failed += expect(layout.launcher.search_result_items.height == 112.0f);
     failed += expect(layout.launcher.bounds.height == 172.0f);
     event.type = REACH_UI_EVENT_ARROW_DOWN;
     event.modifiers = 0;
