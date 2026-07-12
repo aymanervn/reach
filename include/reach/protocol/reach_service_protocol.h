@@ -88,6 +88,10 @@ enum reach_service_hotkey_key : uint32_t
     REACH_SERVICE_HOTKEY_RIGHT_WIN = 6,
     REACH_SERVICE_HOTKEY_D = 7,
     REACH_SERVICE_HOTKEY_T = 8,
+    REACH_SERVICE_HOTKEY_ARROW_LEFT = 9,
+    REACH_SERVICE_HOTKEY_ARROW_RIGHT = 10,
+    REACH_SERVICE_HOTKEY_ARROW_UP = 11,
+    REACH_SERVICE_HOTKEY_ARROW_DOWN = 12,
 };
 
 enum reach_service_hotkey_action : uint32_t

@@ -448,6 +448,7 @@ reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing
 reach_result reach_host_step_main_volume(reach_host *host, float delta);
 reach_result reach_host_toggle_main_volume_mute(reach_host *host);
 reach_result reach_host_step_brightness(reach_host *host, float delta);
+reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mode mode);
 void reach_host_relayout_quick_settings(reach_host *host, int32_t animate_height);
 
 void reach_host_update_quick_settings_animation(reach_host *host);

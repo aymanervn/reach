@@ -63,6 +63,27 @@ reach_result reach_host_toggle_main_volume_mute(reach_host *host)
     return host->audio_volume.set_muted(host->audio_volume.userdata, state.muted ? 0 : 1);
 }
 
+reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mode mode)
+{
+    if (host == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    uintptr_t foreground = reach_host_foreground_window(host);
+    if (foreground == 0)
+    {
+        return REACH_OK;
+    }
+
+    reach_result result = reach_app_control_schedule_snap(host->app_control, foreground, mode);
+    if (result == REACH_OK)
+    {
+        reach_host_request_update(host);
+    }
+    return result;
+}
+
 reach_result reach_host_step_brightness(reach_host *host, float delta)
 {
     if (host == nullptr || host->system_controls.get_brightness_state == nullptr ||

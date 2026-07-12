@@ -44,6 +44,10 @@ static reach_helper_hotkey_callbacks g_callbacks;
 static const uint32_t REACH_HELPER_OWNED_WIN_CHORD_KEYS[] = {
     REACH_SERVICE_HOTKEY_D,
     REACH_SERVICE_HOTKEY_T,
+    REACH_SERVICE_HOTKEY_ARROW_LEFT,
+    REACH_SERVICE_HOTKEY_ARROW_RIGHT,
+    REACH_SERVICE_HOTKEY_ARROW_UP,
+    REACH_SERVICE_HOTKEY_ARROW_DOWN,
 };
 
 void reach_helper_hotkeys_configure(const reach_helper_hotkey_callbacks *callbacks)
@@ -115,6 +119,18 @@ static uint32_t reach_helper_hotkey_key_from_vk(DWORD vk)
 
     case 'T':
         return REACH_SERVICE_HOTKEY_T;
+
+    case VK_LEFT:
+        return REACH_SERVICE_HOTKEY_ARROW_LEFT;
+
+    case VK_RIGHT:
+        return REACH_SERVICE_HOTKEY_ARROW_RIGHT;
+
+    case VK_UP:
+        return REACH_SERVICE_HOTKEY_ARROW_UP;
+
+    case VK_DOWN:
+        return REACH_SERVICE_HOTKEY_ARROW_DOWN;
 
     default:
         return 0;

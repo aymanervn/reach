@@ -51,7 +51,11 @@ extern "C"
 
         REACH_UI_EVENT_TEXT_CHAR = 45,
         REACH_UI_EVENT_TEXT_EDIT = 46,
-        REACH_UI_EVENT_NOW_PLAYING_CHANGED = 47
+        REACH_UI_EVENT_NOW_PLAYING_CHANGED = 47,
+        REACH_UI_EVENT_SNAP_LEFT = 48,
+        REACH_UI_EVENT_SNAP_RIGHT = 49,
+        REACH_UI_EVENT_SNAP_TOP = 50,
+        REACH_UI_EVENT_SNAP_BOTTOM = 51
     } reach_ui_event_type;
 
     typedef enum reach_ui_edit_key
