@@ -932,6 +932,26 @@ static reach_result reach_host_handle_surface_event(reach_host *host,
         return REACH_OK;
     }
 
+    if (event->type == REACH_UI_EVENT_SNAP_LEFT)
+    {
+        return reach_host_snap_foreground_window(host, REACH_SPLIT_LEFT);
+    }
+
+    if (event->type == REACH_UI_EVENT_SNAP_RIGHT)
+    {
+        return reach_host_snap_foreground_window(host, REACH_SPLIT_RIGHT);
+    }
+
+    if (event->type == REACH_UI_EVENT_SNAP_TOP)
+    {
+        return reach_host_snap_foreground_window(host, REACH_SPLIT_TOP);
+    }
+
+    if (event->type == REACH_UI_EVENT_SNAP_BOTTOM)
+    {
+        return reach_host_snap_foreground_window(host, REACH_SPLIT_BOTTOM);
+    }
+
     if (event->type == REACH_UI_EVENT_OPEN_TERMINAL)
     {
         (void)reach_host_schedule_open_terminal(host);

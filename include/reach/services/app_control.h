@@ -5,6 +5,7 @@
 
 #include "reach/ports/app_launcher.h"
 #include "reach/ports/window_manager.h"
+#include "reach/support/layout.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -38,7 +39,8 @@ extern "C"
     reach_result reach_app_control_schedule_minimize(reach_app_control *service,
                                                      const uintptr_t *window_ids,
                                                      size_t window_count);
-
+    reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
+                                                 reach_split_mode mode);
     int32_t reach_app_control_take_window_completed(reach_app_control *service,
                                                     reach_result *out_result);
 

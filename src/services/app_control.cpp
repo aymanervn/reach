@@ -106,6 +106,9 @@ struct reach_app_control
     reach_window_control_action window_pending_action = REACH_WINDOW_CONTROL_ACTIVATE;
     uintptr_t window_pending_windows[REACH_APP_CONTROL_MAX_WINDOWS] = {};
     size_t window_pending_window_count = 0;
+
+    int32_t window_pending_is_snap = 0;
+    reach_split_mode window_pending_snap_mode = REACH_SPLIT_LEFT;
     reach_result window_completed_result = REACH_OK;
 };
 
@@ -165,6 +168,45 @@ static reach_result reach_app_control_window_execute(reach_app_control *service,
     return reach_app_control_window_dispatch(service, action, window_id);
 }
 
+static reach_result reach_app_control_snap_dispatch(reach_app_control *service,
+                                                    uintptr_t window_id, reach_split_mode mode)
+{
+    return service->window_manager.ops.snap != nullptr
+               ? service->window_manager.ops.snap(service->window_manager.manager, window_id,
+                                                  mode)
+               : REACH_ERROR;
+}
+
+static reach_result reach_app_control_snap_execute(reach_app_control *service,
+                                                   uintptr_t window_id, reach_split_mode mode)
+{
+    if (service == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (service->window_manager.ops.privileged_control_available != nullptr &&
+        service->window_manager.ops.privileged_control_available(service->window_manager.manager))
+    {
+        return reach_app_control_snap_dispatch(service, window_id, mode);
+    }
+
+    if (service->window_manager.ops.start_privileged_control == nullptr ||
+        service->window_manager.ops.start_privileged_control(service->window_manager.manager) !=
+            REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+
+    if (service->window_manager.ops.privileged_control_available != nullptr &&
+        !service->window_manager.ops.privileged_control_available(service->window_manager.manager))
+    {
+        return REACH_ERROR;
+    }
+
+    return reach_app_control_snap_dispatch(service, window_id, mode);
+}
+
 static void reach_app_control_window_thread_main(reach_app_control *service)
 {
     for (;;)
@@ -172,6 +214,8 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
         reach_window_control_action action = REACH_WINDOW_CONTROL_ACTIVATE;
         uintptr_t windows[REACH_APP_CONTROL_MAX_WINDOWS] = {};
         size_t window_count = 0;
+        int32_t is_snap = 0;
+        reach_split_mode snap_mode = REACH_SPLIT_LEFT;
 
         {
             std::unique_lock<std::mutex> lock(service->window_mutex);
@@ -184,6 +228,8 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
             }
 
             action = service->window_pending_action;
+            is_snap = service->window_pending_is_snap;
+            snap_mode = service->window_pending_snap_mode;
             window_count = service->window_pending_window_count;
             if (window_count > REACH_APP_CONTROL_MAX_WINDOWS)
             {
@@ -200,7 +246,8 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
         for (size_t index = 0; index < window_count; ++index)
         {
             reach_result window_result =
-                reach_app_control_window_execute(service, action, windows[index]);
+                is_snap ? reach_app_control_snap_execute(service, windows[index], snap_mode)
+                        : reach_app_control_window_execute(service, action, windows[index]);
             if (window_result != REACH_OK && result == REACH_OK)
             {
                 result = window_result;
@@ -412,6 +459,34 @@ reach_result reach_app_control_schedule_window(reach_app_control *service,
         service->window_pending_action = action;
         service->window_pending_windows[0] = window_id;
         service->window_pending_window_count = 1;
+        service->window_pending_is_snap = 0;
+        service->window_pending = 1;
+    }
+
+    service->window_cv.notify_one();
+    return REACH_OK;
+}
+
+reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
+                                             reach_split_mode mode)
+{
+    if (service == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_result result = reach_app_control_start_window_worker(service);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(service->window_mutex);
+        service->window_pending_windows[0] = window_id;
+        service->window_pending_window_count = 1;
+        service->window_pending_is_snap = 1;
+        service->window_pending_snap_mode = mode;
         service->window_pending = 1;
     }
 
@@ -442,6 +517,7 @@ reach_result reach_app_control_schedule_minimize(reach_app_control *service,
     {
         std::lock_guard<std::mutex> lock(service->window_mutex);
         service->window_pending_action = REACH_WINDOW_CONTROL_MINIMIZE;
+        service->window_pending_is_snap = 0;
         service->window_pending_window_count = window_count;
         for (size_t index = 0; index < window_count; ++index)
         {

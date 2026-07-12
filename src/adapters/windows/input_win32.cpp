@@ -192,6 +192,10 @@ typedef struct reach_input_win_chord_event
 static const reach_input_win_chord_event REACH_INPUT_WIN_CHORD_EVENTS[] = {
     {REACH_SERVICE_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL},
     {REACH_SERVICE_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL},
+    {REACH_SERVICE_HOTKEY_ARROW_LEFT, REACH_UI_EVENT_SNAP_LEFT},
+    {REACH_SERVICE_HOTKEY_ARROW_RIGHT, REACH_UI_EVENT_SNAP_RIGHT},
+    {REACH_SERVICE_HOTKEY_ARROW_UP, REACH_UI_EVENT_SNAP_TOP},
+    {REACH_SERVICE_HOTKEY_ARROW_DOWN, REACH_UI_EVENT_SNAP_BOTTOM},
 };
 
 static int32_t
@@ -295,6 +299,10 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         break;
     case REACH_SERVICE_HOTKEY_D:
     case REACH_SERVICE_HOTKEY_T:
+    case REACH_SERVICE_HOTKEY_ARROW_LEFT:
+    case REACH_SERVICE_HOTKEY_ARROW_RIGHT:
+    case REACH_SERVICE_HOTKEY_ARROW_UP:
+    case REACH_SERVICE_HOTKEY_ARROW_DOWN:
         if (!reach_input_try_post_win_chord_event(source, record, pressed) && !pressed &&
             reach_input_hotkey_has_win_modifier(record))
         {
