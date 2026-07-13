@@ -148,8 +148,7 @@ static int32_t reach_now_playing_adopt_core_locked(reach_now_playing_service *se
     {
         candidate->cover_image_id = service->stable.cover_image_id;
         candidate->cover_accent = service->stable.cover_accent;
-        if (!service->stable.has_session ||
-            media_generation != service->stable_media_generation)
+        if (!service->stable.has_session || media_generation != service->stable_media_generation)
         {
             service->stable_media_generation = media_generation;
             service->cover_request_generation = media_generation;
@@ -247,14 +246,14 @@ static void reach_now_playing_apply_fetch(reach_now_playing_service *service,
             else if (service->absence_confirmation_requested && now >= service->absence_deadline)
             {
                 changed = reach_now_playing_adopt_core_locked(service, &candidate,
-                                                               state->media_generation);
+                                                              state->media_generation);
                 stable_core_ready = 1;
             }
         }
         else
         {
-            changed = reach_now_playing_adopt_core_locked(service, &candidate,
-                                                           state->media_generation);
+            changed =
+                reach_now_playing_adopt_core_locked(service, &candidate, state->media_generation);
             stable_core_ready = 1;
         }
         if (stable_core_ready && service->transport_pending && !service->command_in_flight)
@@ -311,9 +310,9 @@ static void reach_now_playing_cover_worker_main(reach_now_playing_service *servi
             std::unique_lock<std::mutex> lock(service->mutex);
             for (;;)
             {
-                service->cover_cv.wait(lock, [service]()
-                                       { return service->stop_requested ||
-                                                service->cover_request_pending; });
+                service->cover_cv.wait(
+                    lock, [service]()
+                    { return service->stop_requested || service->cover_request_pending; });
                 if (service->stop_requested)
                 {
                     return;
@@ -330,11 +329,10 @@ static void reach_now_playing_cover_worker_main(reach_now_playing_service *servi
         }
 
         reach_media_cover cover = {};
-        reach_result result =
-            service->media_controls.get_cover != nullptr
-                ? service->media_controls.get_cover(service->media_controls.userdata,
-                                                    media_generation, &cover)
-                : REACH_ERROR;
+        reach_result result = service->media_controls.get_cover != nullptr
+                                  ? service->media_controls.get_cover(
+                                        service->media_controls.userdata, media_generation, &cover)
+                                  : REACH_ERROR;
         if (service->media_controls.get_cover == nullptr)
         {
             cover.media_generation = media_generation;
@@ -486,8 +484,7 @@ reach_result reach_now_playing_service_start(reach_now_playing_service *service)
             service->stop_requested = 0;
             try
             {
-                service->cover_worker =
-                    std::thread(reach_now_playing_cover_worker_main, service);
+                service->cover_worker = std::thread(reach_now_playing_cover_worker_main, service);
                 service->cover_worker_started = 1;
                 service->worker = std::thread(reach_now_playing_worker_main, service);
                 service->worker_started = 1;

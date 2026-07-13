@@ -84,7 +84,6 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
     reach_host_surface_transition_finish(host, &host->switcher_transition);
     reach_host_surface_transition_finish(host, &host->context_menu_transition);
     reach_host_surface_transition_finish(host, &host->clipboard_transition);
-
 }
 
 reach_result reach_host_update(reach_host *host, double delta_seconds)
@@ -154,7 +153,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
             host->switcher.dirty_flags = 1;
         }
 
-        if (foreground_changed && foreground_window != 0 && reach_launcher_is_open(host->launcher_capsule))
+        if (foreground_changed && foreground_window != 0 &&
+            reach_launcher_is_open(host->launcher_capsule))
         {
             reach_host_clear_launcher_restore_window(host);
             reach_host_close_launcher_without_focus_restore(host);
@@ -271,10 +271,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
 
                 host->layout = layout;
                 host->has_layout = 1;
-                reach_launcher_set_pointer_context(host->launcher_capsule,
-                                                   &host->layout.launcher,
-                                                   host->pinned_apps,
-                                                   host->pinned_app_count);
+                reach_launcher_set_pointer_context(host->launcher_capsule, &host->layout.launcher,
+                                                   host->pinned_apps, host->pinned_app_count);
 
                 reach_host_frame_context frame_ctx = {};
                 frame_ctx.game_mode = game_mode;
@@ -345,8 +343,7 @@ int32_t reach_host_needs_frame(const reach_host *host)
     }
 
     if (host->dirty.update_requested || window_manager_needs_refresh || host->dirty.render ||
-        reach_host_any_surface_dirty(host) ||
-        reach_icon_service_work_pending(host->icon_service) ||
+        reach_host_any_surface_dirty(host) || reach_icon_service_work_pending(host->icon_service) ||
         reach_host_config_reload_work_pending(host) ||
         reach_animation_manager_any_active(&host->animations))
     {

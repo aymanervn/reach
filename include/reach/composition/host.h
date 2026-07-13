@@ -77,8 +77,8 @@ extern "C"
     } reach_host_dependencies;
 
     reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
-                                                      const reach_host_dependencies *dependencies,
-                                                      reach_host **out_shell);
+                                                     const reach_host_dependencies *dependencies,
+                                                     reach_host **out_shell);
     void reach_host_set_initial_foreground(reach_host *host, uintptr_t window);
     void reach_host_destroy(reach_host *host);
     reach_result reach_host_start(reach_host *host);

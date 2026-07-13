@@ -130,7 +130,8 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
     if (command->stroke_width > 0.0f && command->border_color.a > 0.0f)
     {
         ID2D1SolidColorBrush *border = nullptr;
-        if (SUCCEEDED(target->CreateSolidColorBrush(reach_d2d_color(command->border_color), &border)))
+        if (SUCCEEDED(
+                target->CreateSolidColorBrush(reach_d2d_color(command->border_color), &border)))
         {
             if (radius > 0.0f)
             {
@@ -160,16 +161,14 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
     const float inset = font_size * 0.5f;
     const float content_left = command->rect.x + inset;
     const float content_top = command->rect.y;
-    const float content_width = command->rect.width - inset * 2.0f > 0.0f
-                                    ? command->rect.width - inset * 2.0f
-                                    : 0.0f;
+    const float content_width =
+        command->rect.width - inset * 2.0f > 0.0f ? command->rect.width - inset * 2.0f : 0.0f;
     const float content_height = command->rect.height;
 
     IDWriteTextFormat *format = nullptr;
-    HRESULT hr = backend->text_factory->CreateTextFormat(L"Segoe UI", nullptr, weight,
-                                                         DWRITE_FONT_STYLE_NORMAL,
-                                                         DWRITE_FONT_STRETCH_NORMAL, font_size, L"",
-                                                         &format);
+    HRESULT hr = backend->text_factory->CreateTextFormat(
+        L"Segoe UI", nullptr, weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+        font_size, L"", &format);
     if (FAILED(hr))
     {
         return REACH_ERROR;
@@ -193,9 +192,10 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
         UINT32 sel_begin = static_cast<UINT32>(command->selection_start < command->selection_end
                                                    ? command->selection_start
                                                    : command->selection_end);
-        UINT32 sel_count = static_cast<UINT32>(command->selection_start < command->selection_end
-                                                   ? command->selection_end - command->selection_start
-                                                   : command->selection_start - command->selection_end);
+        UINT32 sel_count =
+            static_cast<UINT32>(command->selection_start < command->selection_end
+                                    ? command->selection_end - command->selection_start
+                                    : command->selection_start - command->selection_end);
 
         DWRITE_HIT_TEST_METRICS metrics[8] = {};
         UINT32 hit_count = 0;
@@ -208,11 +208,10 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
             {
                 for (UINT32 i = 0; i < hit_count && i < 8; ++i)
                 {
-                    target->FillRectangle(
-                        D2D1::RectF(metrics[i].left, metrics[i].top,
-                                    metrics[i].left + metrics[i].width,
-                                    metrics[i].top + metrics[i].height),
-                        sel);
+                    target->FillRectangle(D2D1::RectF(metrics[i].left, metrics[i].top,
+                                                      metrics[i].left + metrics[i].width,
+                                                      metrics[i].top + metrics[i].height),
+                                          sel);
                 }
                 sel->Release();
             }
@@ -244,11 +243,12 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
         FLOAT caret_y = 0.0f;
         DWRITE_HIT_TEST_METRICS caret_metrics = {};
         if (SUCCEEDED(layout->HitTestTextPosition(showing_placeholder ? 0 : caret_pos, FALSE,
-                                                   &caret_x, &caret_y, &caret_metrics)))
+                                                  &caret_x, &caret_y, &caret_metrics)))
         {
             ID2D1SolidColorBrush *caret_brush = nullptr;
             reach_color caret_color = command->text_color;
-            if (SUCCEEDED(target->CreateSolidColorBrush(reach_d2d_color(caret_color), &caret_brush)))
+            if (SUCCEEDED(
+                    target->CreateSolidColorBrush(reach_d2d_color(caret_color), &caret_brush)))
             {
                 float x = content_left + caret_x;
                 float top = content_top + caret_y;

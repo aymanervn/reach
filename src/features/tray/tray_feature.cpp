@@ -53,11 +53,11 @@ static void reach_tray_tick(reach_tray *animations, double delta_seconds,
         return;
     }
 
-    int32_t feedback_was_active = reach_animation_manager_active(&animations->manager,
-                                                                 REACH_TRAY_ANIM_FEEDBACK_OPACITY);
+    int32_t feedback_was_active =
+        reach_animation_manager_active(&animations->manager, REACH_TRAY_ANIM_FEEDBACK_OPACITY);
     reach_animation_manager_tick(&animations->manager, delta_seconds);
-    int32_t feedback_active = reach_animation_manager_active(&animations->manager,
-                                                             REACH_TRAY_ANIM_FEEDBACK_OPACITY);
+    int32_t feedback_active =
+        reach_animation_manager_active(&animations->manager, REACH_TRAY_ANIM_FEEDBACK_OPACITY);
 
     if ((feedback_was_active || feedback_active) && out != nullptr)
     {
@@ -186,8 +186,7 @@ static int32_t reach_tray_capsule_needs_frame(const void *capsule)
 static void reach_tray_capsule_set_action(const reach_tray_feature_action *action,
                                           reach_capsule_pointer_result *out)
 {
-    if (action == nullptr || out == nullptr ||
-        action->type != REACH_TRAY_FEATURE_ACTION_ACTIVATE)
+    if (action == nullptr || out == nullptr || action->type != REACH_TRAY_FEATURE_ACTION_ACTIVATE)
     {
         return;
     }
@@ -198,8 +197,7 @@ static void reach_tray_capsule_set_action(const reach_tray_feature_action *actio
     out->action.id = action->item_id;
 }
 
-static void reach_tray_capsule_handle_pointer(void *capsule,
-                                              const reach_pointer_event *event,
+static void reach_tray_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
                                               reach_capsule_pointer_result *out)
 {
     if (out != nullptr)
@@ -217,8 +215,8 @@ static void reach_tray_capsule_handle_pointer(void *capsule,
     hit.index = REACH_MAX_TRAY_ITEMS;
     if (tray->state.popup_open && tray->pointer_bounds_valid)
     {
-        hit = reach_tray_hit_test_popup(&tray->state.model, tray->pointer_bounds, event->x,
-                                        event->y);
+        hit =
+            reach_tray_hit_test_popup(&tray->state.model, tray->pointer_bounds, event->x, event->y);
     }
 
     if (event->kind == REACH_POINTER_EVENT_DOWN)
@@ -239,8 +237,8 @@ static void reach_tray_capsule_handle_pointer(void *capsule,
         out->redraw = reach_tray_feedback_release(tray);
         if (hit.type == REACH_TRAY_HIT_ITEM)
         {
-            reach_tray_feature_action action = reach_tray_action_for_hit(
-                &tray->state.model, hit, REACH_TRAY_ACTION_LEFT_CLICK);
+            reach_tray_feature_action action =
+                reach_tray_action_for_hit(&tray->state.model, hit, REACH_TRAY_ACTION_LEFT_CLICK);
             reach_tray_capsule_set_action(&action, out);
             out->handled = 1;
         }
@@ -256,8 +254,8 @@ static void reach_tray_capsule_handle_pointer(void *capsule,
         {
             out->redraw = reach_tray_feedback_press(tray, hit.index);
             out->redraw = reach_tray_feedback_release(tray) || out->redraw;
-            reach_tray_feature_action action = reach_tray_action_for_hit(
-                &tray->state.model, hit, REACH_TRAY_ACTION_RIGHT_CLICK);
+            reach_tray_feature_action action =
+                reach_tray_action_for_hit(&tray->state.model, hit, REACH_TRAY_ACTION_RIGHT_CLICK);
             reach_tray_capsule_set_action(&action, out);
             out->handled = 1;
         }
@@ -267,8 +265,7 @@ static void reach_tray_capsule_handle_pointer(void *capsule,
         }
         return;
     }
-    if (event->kind == REACH_POINTER_EVENT_MIDDLE ||
-        event->kind == REACH_POINTER_EVENT_CANCEL)
+    if (event->kind == REACH_POINTER_EVENT_MIDDLE || event->kind == REACH_POINTER_EVENT_CANCEL)
     {
         out->redraw = reach_tray_feedback_release(tray);
         out->handled = out->redraw;
@@ -278,10 +275,13 @@ static void reach_tray_capsule_handle_pointer(void *capsule,
 const reach_feature_capsule_ops *reach_tray_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_tray_capsule_reset,  reach_tray_capsule_tick,
-        reach_tray_capsule_is_open, reach_tray_capsule_force_close,
-        nullptr  , reach_tray_capsule_needs_frame,
-        nullptr  ,
+        reach_tray_capsule_reset,
+        reach_tray_capsule_tick,
+        reach_tray_capsule_is_open,
+        reach_tray_capsule_force_close,
+        nullptr,
+        reach_tray_capsule_needs_frame,
+        nullptr,
         reach_tray_capsule_handle_pointer,
     };
     return &ops;
@@ -359,8 +359,8 @@ reach_result reach_tray_append_render_commands(reach_tray *tray,
     input.dock_height = ctx->dock_height;
     input.dpi_scale = ctx->dpi_scale;
     input.click_feedback_index = state->feedback_index;
-    input.click_feedback_opacity = reach_animation_manager_value(
-        reach_tray_animation_manager(tray), REACH_TRAY_ANIM_FEEDBACK_OPACITY);
+    input.click_feedback_opacity = reach_animation_manager_value(reach_tray_animation_manager(tray),
+                                                                 REACH_TRAY_ANIM_FEEDBACK_OPACITY);
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     return reach_tray_build_render_commands(&input, out_commands);

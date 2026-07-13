@@ -14,9 +14,9 @@ typedef struct reach_context_menu_action
     uint32_t command;
 } reach_context_menu_action;
 
-reach_context_menu_hit_result
-reach_context_menu_hit_test_items(const reach_rect_f32 *item_slots, size_t item_count,
-                                  int32_t x, int32_t y);
+reach_context_menu_hit_result reach_context_menu_hit_test_items(const reach_rect_f32 *item_slots,
+                                                                size_t item_count, int32_t x,
+                                                                int32_t y);
 reach_context_menu_action reach_context_menu_action_for_hit(const uint32_t *item_commands,
                                                             size_t item_count,
                                                             reach_context_menu_hit_result hit);

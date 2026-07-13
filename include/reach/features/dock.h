@@ -179,8 +179,8 @@ extern "C"
 
     int32_t reach_dock_pointer_sequence_active(const reach_dock *dock);
 
-    reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock,
-                                                           int32_t local_x, int32_t local_y);
+    reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
+                                                           int32_t local_y);
 
     void reach_dock_begin_reveal_session(reach_dock *dock);
 
@@ -298,8 +298,7 @@ extern "C"
 
     size_t reach_dock_order_count(reach_dock *dock);
     reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index);
-    void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys,
-                                  size_t count);
+    void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys, size_t count);
 
     typedef enum reach_dock_reveal_edge_mode
     {

@@ -29,12 +29,13 @@ extern "C"
 
     reach_result reach_window_tracking_refresh(reach_window_tracking *service,
                                                reach_window_tracking_refresh_report *out_report);
-    const reach_window_snapshot *reach_window_tracking_windows(const reach_window_tracking *service);
+    const reach_window_snapshot *
+    reach_window_tracking_windows(const reach_window_tracking *service);
     size_t reach_window_tracking_window_count(const reach_window_tracking *service);
     int32_t reach_window_tracking_window_is_minimized(const reach_window_tracking *service,
                                                       uintptr_t window_id);
-    const reach_window_snapshot *reach_window_tracking_window_by_id(
-        const reach_window_tracking *service, uintptr_t window_id);
+    const reach_window_snapshot *
+    reach_window_tracking_window_by_id(const reach_window_tracking *service, uintptr_t window_id);
 
     int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
                                                      const reach_window_snapshot *window);

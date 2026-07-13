@@ -10,15 +10,17 @@ const uint16_t *reach_host_dock_item_path(const reach_host *host, size_t item_in
     {
         size_t pinned_index = reach_dock_item_at(host->dock_capsule, item_index)->pinned_index;
         return pinned_index < host->pinned_app_count ? host->pinned_apps[pinned_index].path
-                                                         : nullptr;
+                                                     : nullptr;
     }
 
     size_t open_index = reach_dock_item_at(host->dock_capsule, item_index)->open_index;
-    return open_index < reach_host_open_window_count(host) ? reach_host_open_windows(host)[open_index].path : nullptr;
+    return open_index < reach_host_open_window_count(host)
+               ? reach_host_open_windows(host)[open_index].path
+               : nullptr;
 }
 
 reach_result reach_host_launch_dock_item(reach_host *host, size_t item_index,
-                                          int32_t force_new_instance)
+                                         int32_t force_new_instance)
 {
     if (host == nullptr || item_index >= reach_dock_item_count(host->dock_capsule))
     {

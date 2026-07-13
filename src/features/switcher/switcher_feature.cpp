@@ -201,7 +201,7 @@ reach_switcher_action reach_switcher_sync_windows(reach_switcher *switcher)
 const reach_ui_event_type *reach_switcher_routed_events(size_t *out_count)
 {
     static const reach_ui_event_type events[] = {
-        REACH_UI_EVENT_APP_SWITCH_BEGIN,   REACH_UI_EVENT_APP_SWITCH_NEXT,
+        REACH_UI_EVENT_APP_SWITCH_BEGIN,    REACH_UI_EVENT_APP_SWITCH_NEXT,
         REACH_UI_EVENT_APP_SWITCH_PREVIOUS, REACH_UI_EVENT_APP_SWITCH_COMMIT,
         REACH_UI_EVENT_APP_SWITCH_CANCEL,
     };
@@ -215,13 +215,13 @@ const reach_ui_event_type *reach_switcher_routed_events(size_t *out_count)
 const reach_feature_capsule_ops *reach_switcher_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        nullptr  ,
+        nullptr,
         reach_switcher_capsule_tick,
         reach_switcher_capsule_is_open,
         reach_switcher_capsule_force_close,
-        nullptr  ,
+        nullptr,
         reach_switcher_capsule_needs_frame,
-        nullptr  ,
+        nullptr,
     };
     return &ops;
 }
@@ -500,7 +500,8 @@ reach_switcher_sync_windows_with_context(reach_switcher *switcher,
 reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
                                                     int32_t transition_visible, int32_t open,
                                                     int32_t bounds_valid, float last_bounds_width,
-                                                    reach_rect_f32 target, int32_t *out_request_redraw)
+                                                    reach_rect_f32 target,
+                                                    int32_t *out_request_redraw)
 {
     if (switcher == nullptr || !transition_visible)
     {
@@ -534,8 +535,8 @@ reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
             *out_request_redraw = 1;
         }
     }
-    else if (reach_animation_manager_target(&switcher->animations,
-                                            REACH_SWITCHER_ANIMATION_WIDTH) > 0.0f)
+    else if (reach_animation_manager_target(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH) >
+             0.0f)
     {
         width =
             reach_animation_manager_target(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);

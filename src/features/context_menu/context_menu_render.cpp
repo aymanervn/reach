@@ -171,10 +171,9 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     return REACH_OK;
 }
 
-reach_result
-reach_context_menu_append_render_commands(reach_context_menu *menu,
-                                          const reach_context_menu_render_context *ctx,
-                                          reach_render_command_buffer *out_commands)
+reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
+                                                       const reach_context_menu_render_context *ctx,
+                                                       reach_render_command_buffer *out_commands)
 {
     if (menu == nullptr || ctx == nullptr || ctx->theme == nullptr || ctx->dock_layout == nullptr ||
         out_commands == nullptr)
@@ -196,8 +195,7 @@ reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.dock_layout = ctx->dock_layout;
     input.has_layout = ctx->has_layout;
     input.use_anchor_x = state->power_open && ctx->has_layout;
-    input.anchor_x =
-        ctx->dock_layout->power_button.x + ctx->dock_layout->power_button.width * 0.5f;
+    input.anchor_x = ctx->dock_layout->power_button.x + ctx->dock_layout->power_button.width * 0.5f;
     input.dpi_scale = ctx->dpi_scale;
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 

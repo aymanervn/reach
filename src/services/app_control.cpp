@@ -168,17 +168,16 @@ static reach_result reach_app_control_window_execute(reach_app_control *service,
     return reach_app_control_window_dispatch(service, action, window_id);
 }
 
-static reach_result reach_app_control_snap_dispatch(reach_app_control *service,
-                                                    uintptr_t window_id, reach_split_mode mode)
+static reach_result reach_app_control_snap_dispatch(reach_app_control *service, uintptr_t window_id,
+                                                    reach_split_mode mode)
 {
     return service->window_manager.ops.snap != nullptr
-               ? service->window_manager.ops.snap(service->window_manager.manager, window_id,
-                                                  mode)
+               ? service->window_manager.ops.snap(service->window_manager.manager, window_id, mode)
                : REACH_ERROR;
 }
 
-static reach_result reach_app_control_snap_execute(reach_app_control *service,
-                                                   uintptr_t window_id, reach_split_mode mode)
+static reach_result reach_app_control_snap_execute(reach_app_control *service, uintptr_t window_id,
+                                                   reach_split_mode mode)
 {
     if (service == nullptr || window_id == 0)
     {
@@ -219,8 +218,8 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
 
         {
             std::unique_lock<std::mutex> lock(service->window_mutex);
-            service->window_cv.wait(
-                lock, [service]() { return service->window_stop || service->window_pending; });
+            service->window_cv.wait(lock, [service]()
+                                    { return service->window_stop || service->window_pending; });
 
             if (service->window_stop)
             {
@@ -495,8 +494,7 @@ reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr
 }
 
 reach_result reach_app_control_schedule_minimize(reach_app_control *service,
-                                                 const uintptr_t *window_ids,
-                                                 size_t window_count)
+                                                 const uintptr_t *window_ids, size_t window_count)
 {
     if (service == nullptr || window_ids == nullptr || window_count == 0)
     {

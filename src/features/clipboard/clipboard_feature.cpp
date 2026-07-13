@@ -252,7 +252,8 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
 enum
 {
     REACH_CLIPBOARD_ANIMATION_HOVER_BASE = 0,
-    REACH_CLIPBOARD_ANIMATION_HEIGHT = REACH_CLIPBOARD_ANIMATION_HOVER_BASE + REACH_CLIPBOARD_MAX_ITEMS,
+    REACH_CLIPBOARD_ANIMATION_HEIGHT =
+        REACH_CLIPBOARD_ANIMATION_HOVER_BASE + REACH_CLIPBOARD_MAX_ITEMS,
     REACH_CLIPBOARD_ANIMATION_ITEM_WIDTH,
     REACH_CLIPBOARD_ANIMATION_COUNT
 };
@@ -313,8 +314,7 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
         clipboard, REACH_CLIPBOARD_LAYOUT_HEIGHT, target_layout.bounds.height, &height_active);
     int32_t item_width_active = 0;
     float animated_item_width = reach_clipboard_feature_animate_layout_value(
-        clipboard, REACH_CLIPBOARD_LAYOUT_ITEM_WIDTH, target_layout.item_width,
-        &item_width_active);
+        clipboard, REACH_CLIPBOARD_LAYOUT_ITEM_WIDTH, target_layout.item_width, &item_width_active);
 
     state->layout =
         reach_clipboard_compute_layout_animated(&state->model, monitor_bounds, launcher_bounds,
@@ -346,8 +346,8 @@ static void reach_clipboard_capsule_reset(void *capsule)
 
 static int32_t reach_clipboard_capsule_is_open(const void *capsule)
 {
-    reach_clipboard_feature *clipboard =
-        const_cast<reach_clipboard_feature *>(static_cast<const reach_clipboard_feature *>(capsule));
+    reach_clipboard_feature *clipboard = const_cast<reach_clipboard_feature *>(
+        static_cast<const reach_clipboard_feature *>(capsule));
     return reach_clipboard_is_open(clipboard);
 }
 
@@ -358,8 +358,8 @@ static void reach_clipboard_capsule_force_close(void *capsule)
 
 static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
 {
-    reach_clipboard_feature *clipboard =
-        const_cast<reach_clipboard_feature *>(static_cast<const reach_clipboard_feature *>(capsule));
+    reach_clipboard_feature *clipboard = const_cast<reach_clipboard_feature *>(
+        static_cast<const reach_clipboard_feature *>(capsule));
     if (clipboard == nullptr)
     {
         return 0;
@@ -370,13 +370,14 @@ static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
 
 static int32_t reach_clipboard_capsule_wants_pointer_move(const void *capsule)
 {
-    reach_clipboard_feature *clipboard =
-        const_cast<reach_clipboard_feature *>(static_cast<const reach_clipboard_feature *>(capsule));
+    reach_clipboard_feature *clipboard = const_cast<reach_clipboard_feature *>(
+        static_cast<const reach_clipboard_feature *>(capsule));
     return reach_clipboard_is_open(clipboard);
 }
 
-static void reach_clipboard_capsule_apply_event_result(
-    const reach_clipboard_event_result *event_result, reach_capsule_pointer_result *out)
+static void
+reach_clipboard_capsule_apply_event_result(const reach_clipboard_event_result *event_result,
+                                           reach_capsule_pointer_result *out)
 {
     if (event_result == nullptr || out == nullptr)
     {
@@ -404,8 +405,7 @@ static void reach_clipboard_capsule_apply_event_result(
     }
 }
 
-static void reach_clipboard_capsule_handle_pointer(void *capsule,
-                                                   const reach_pointer_event *event,
+static void reach_clipboard_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
                                                    reach_capsule_pointer_result *out)
 {
     if (out != nullptr)
@@ -480,7 +480,7 @@ const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void)
         reach_clipboard_capsule_tick,
         reach_clipboard_capsule_is_open,
         reach_clipboard_capsule_force_close,
-        nullptr  ,
+        nullptr,
         reach_clipboard_capsule_needs_frame,
         reach_clipboard_capsule_wants_pointer_move,
         reach_clipboard_capsule_handle_pointer,
@@ -577,8 +577,8 @@ void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size
     if (previous < REACH_CLIPBOARD_MAX_ITEMS)
     {
         reach_animation_manager_animate_to(&clipboard->animations,
-                                           reach_clipboard_feature_hover_track(previous), 0.0f, 0.12,
-                                           REACH_EASING_EASE_OUT);
+                                           reach_clipboard_feature_hover_track(previous), 0.0f,
+                                           0.12, REACH_EASING_EASE_OUT);
     }
     if (next < REACH_CLIPBOARD_MAX_ITEMS)
     {

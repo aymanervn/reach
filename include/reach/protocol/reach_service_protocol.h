@@ -7,8 +7,7 @@
 #include <stdint.h>
 static const wchar_t REACH_SERVICE_PIPE_NAME[] = L"\\\\.\\pipe\\ReachService";
 static const wchar_t REACH_SERVICE_STATE_NAME[] = L"Local\\ReachServiceState";
-static const wchar_t REACH_SERVICE_UPDATE_EVENT_NAME[] =
-    L"Local\\ReachServiceUpdated";
+static const wchar_t REACH_SERVICE_UPDATE_EVENT_NAME[] = L"Local\\ReachServiceUpdated";
 
 static const wchar_t REACH_SHELL_INSTANCE_MUTEX_NAME[] = L"Local\\Reach.Shell.Instance";
 

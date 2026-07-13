@@ -183,16 +183,15 @@ static void reach_input_post_ui_event(reach_input_source *source, reach_ui_event
     }
 }
 
-static int32_t
-reach_input_hotkey_has_win_modifier(const reach_service_hotkey_record *record)
+static int32_t reach_input_hotkey_has_win_modifier(const reach_service_hotkey_record *record)
 {
-    return record != nullptr &&
-           (record->modifiers & (REACH_SERVICE_MODIFIER_LEFT_WIN |
-                                 REACH_SERVICE_MODIFIER_RIGHT_WIN)) != 0;
+    return record != nullptr && (record->modifiers & (REACH_SERVICE_MODIFIER_LEFT_WIN |
+                                                      REACH_SERVICE_MODIFIER_RIGHT_WIN)) != 0;
 }
 
-static int32_t reach_input_try_post_win_chord_event(
-    reach_input_source *source, const reach_service_hotkey_record *record, int32_t pressed)
+static int32_t reach_input_try_post_win_chord_event(reach_input_source *source,
+                                                    const reach_service_hotkey_record *record,
+                                                    int32_t pressed)
 {
     if (source == nullptr || record == nullptr || !pressed ||
         !reach_input_hotkey_has_win_modifier(record))
@@ -254,8 +253,7 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         source->shift_down = pressed;
         break;
     case REACH_SERVICE_HOTKEY_TAB:
-        if (pressed &&
-            (source->alt_down || (record->modifiers & REACH_SERVICE_MODIFIER_ALT) != 0))
+        if (pressed && (source->alt_down || (record->modifiers & REACH_SERVICE_MODIFIER_ALT) != 0))
         {
             if (!source->alt_tab_active)
             {
@@ -263,8 +261,8 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
                 source->alt_tab_active = 1;
                 break;
             }
-            int32_t shift_down = source->shift_down ||
-                                 ((record->modifiers & REACH_SERVICE_MODIFIER_SHIFT) != 0);
+            int32_t shift_down =
+                source->shift_down || ((record->modifiers & REACH_SERVICE_MODIFIER_SHIFT) != 0);
             reach_ui_event_type direction =
                 shift_down ? REACH_UI_EVENT_APP_SWITCH_PREVIOUS : REACH_UI_EVENT_APP_SWITCH_NEXT;
             reach_input_post_ui_event(source, direction, 0);
@@ -329,8 +327,8 @@ static void reach_input_process_shared_hotkeys(reach_input_source *source)
     uint64_t first_available = 0;
     uint64_t last_available = 0;
     if (reach_service_shared_copy_hotkeys_since(
-            source->last_hotkey_event, records, REACH_SERVICE_HOTKEY_QUEUE_CAPACITY,
-            &record_count, &missed, &first_available, &last_available) != REACH_OK)
+            source->last_hotkey_event, records, REACH_SERVICE_HOTKEY_QUEUE_CAPACITY, &record_count,
+            &missed, &first_available, &last_available) != REACH_OK)
     {
         return;
     }
@@ -348,8 +346,7 @@ static void reach_input_process_shared_hotkeys(reach_input_source *source)
     }
 }
 
-static void reach_input_shared_callback(void *user,
-                                        reach_service_shared_reader_event event)
+static void reach_input_shared_callback(void *user, reach_service_shared_reader_event event)
 {
     reach_input_source *source = static_cast<reach_input_source *>(user);
     if (source == nullptr || source->window == nullptr)

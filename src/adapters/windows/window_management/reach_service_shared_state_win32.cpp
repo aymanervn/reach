@@ -160,16 +160,15 @@ static int32_t reach_shared_reader_open_mapping(void)
         return 0;
     }
 
-    g_reader.view = static_cast<const reach_service_shared_state *>(MapViewOfFile(
-        g_reader.mapping, FILE_MAP_READ, 0, 0, sizeof(reach_service_shared_state)));
+    g_reader.view = static_cast<const reach_service_shared_state *>(
+        MapViewOfFile(g_reader.mapping, FILE_MAP_READ, 0, 0, sizeof(reach_service_shared_state)));
     if (g_reader.view == nullptr)
     {
         reach_shared_reader_close_mapping();
         return 0;
     }
 
-    g_reader.update_event =
-        OpenEventW(SYNCHRONIZE, FALSE, REACH_SERVICE_UPDATE_EVENT_NAME);
+    g_reader.update_event = OpenEventW(SYNCHRONIZE, FALSE, REACH_SERVICE_UPDATE_EVENT_NAME);
     if (g_reader.update_event == nullptr)
     {
         reach_shared_reader_close_mapping();
@@ -393,8 +392,8 @@ static void reach_shared_reader_stop_if_unused(void)
     reach_shared_reader_unlock();
 }
 
-reach_result reach_service_shared_reader_subscribe(
-    reach_service_shared_reader_callback callback, void *user)
+reach_result reach_service_shared_reader_subscribe(reach_service_shared_reader_callback callback,
+                                                   void *user)
 {
     if (callback == nullptr || user == nullptr)
     {
@@ -458,9 +457,8 @@ int32_t reach_service_shared_reader_connected(void)
     return connected;
 }
 
-reach_result
-reach_service_shared_copy_windows(reach_service_window_snapshot *windows,
-                                           uint32_t max_windows, uint32_t *out_window_count)
+reach_result reach_service_shared_copy_windows(reach_service_window_snapshot *windows,
+                                               uint32_t max_windows, uint32_t *out_window_count)
 {
     if (out_window_count == nullptr || (max_windows > 0 && windows == nullptr))
     {
@@ -487,10 +485,11 @@ reach_service_shared_copy_windows(reach_service_window_snapshot *windows,
     return REACH_OK;
 }
 
-reach_result reach_service_shared_copy_hotkeys_since(
-    uint64_t last_consumed_event, reach_service_hotkey_record *records,
-    uint32_t max_records, uint32_t *out_record_count, int32_t *out_missed,
-    uint64_t *out_first_available, uint64_t *out_last_available)
+reach_result
+reach_service_shared_copy_hotkeys_since(uint64_t last_consumed_event,
+                                        reach_service_hotkey_record *records, uint32_t max_records,
+                                        uint32_t *out_record_count, int32_t *out_missed,
+                                        uint64_t *out_first_available, uint64_t *out_last_available)
 {
     if (out_record_count == nullptr || out_missed == nullptr ||
         (max_records > 0 && records == nullptr))
@@ -512,8 +511,8 @@ reach_result reach_service_shared_copy_hotkeys_since(
 
     for (uint32_t offset = 0; offset < queue_count && out_count < max_records; ++offset)
     {
-        uint32_t index = (g_reader.cache.hotkey_queue_start + offset) %
-                         REACH_SERVICE_HOTKEY_QUEUE_CAPACITY;
+        uint32_t index =
+            (g_reader.cache.hotkey_queue_start + offset) % REACH_SERVICE_HOTKEY_QUEUE_CAPACITY;
         const reach_service_hotkey_record &record = g_reader.cache.hotkeys[index];
         if (record.event_number >= next)
         {
@@ -559,8 +558,7 @@ reach_result reach_service_shared_writer_start(void)
     SECURITY_ATTRIBUTES security = reach_shared_security(&descriptor);
     g_writer.mapping = CreateFileMappingW(
         INVALID_HANDLE_VALUE, security.lpSecurityDescriptor != nullptr ? &security : nullptr,
-        PAGE_READWRITE, 0, sizeof(reach_service_shared_state),
-        REACH_SERVICE_STATE_NAME);
+        PAGE_READWRITE, 0, sizeof(reach_service_shared_state), REACH_SERVICE_STATE_NAME);
     if (descriptor != nullptr)
     {
         LocalFree(descriptor);
@@ -570,8 +568,8 @@ reach_result reach_service_shared_writer_start(void)
         return REACH_ERROR;
     }
 
-    g_writer.view = static_cast<reach_service_shared_state *>(MapViewOfFile(
-        g_writer.mapping, FILE_MAP_WRITE, 0, 0, sizeof(reach_service_shared_state)));
+    g_writer.view = static_cast<reach_service_shared_state *>(
+        MapViewOfFile(g_writer.mapping, FILE_MAP_WRITE, 0, 0, sizeof(reach_service_shared_state)));
     if (g_writer.view == nullptr)
     {
         reach_service_shared_writer_stop();
@@ -681,9 +679,8 @@ static int32_t reach_shared_windows_equal(const reach_service_window_snapshot *w
     return 1;
 }
 
-reach_result
-reach_service_shared_publish_windows(const reach_service_window_snapshot *windows,
-                                              uint32_t window_count)
+reach_result reach_service_shared_publish_windows(const reach_service_window_snapshot *windows,
+                                                  uint32_t window_count)
 {
     if (g_writer.view == nullptr)
     {
@@ -745,8 +742,7 @@ reach_result reach_service_shared_publish_game_mode(int32_t active)
     return REACH_OK;
 }
 
-reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action,
-                                                         uint32_t modifiers)
+reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, uint32_t modifiers)
 {
     if (g_writer.view == nullptr)
     {
@@ -762,8 +758,7 @@ reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action,
     uint32_t index = 0;
     if (count < REACH_SERVICE_HOTKEY_QUEUE_CAPACITY)
     {
-        index = (g_writer.view->hotkey_queue_start + count) %
-                REACH_SERVICE_HOTKEY_QUEUE_CAPACITY;
+        index = (g_writer.view->hotkey_queue_start + count) % REACH_SERVICE_HOTKEY_QUEUE_CAPACITY;
         g_writer.view->hotkey_queue_count = count + 1;
     }
     else

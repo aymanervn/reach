@@ -88,12 +88,9 @@ extern "C"
 
     int32_t reach_switcher_width_animation_active(const reach_switcher *switcher);
 
-    reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
-                                                        int32_t transition_visible, int32_t open,
-                                                        int32_t bounds_valid,
-                                                        float last_bounds_width,
-                                                        reach_rect_f32 target,
-                                                        int32_t *out_request_redraw);
+    reach_rect_f32 reach_switcher_apply_width_animation(
+        reach_switcher *switcher, int32_t transition_visible, int32_t open, int32_t bounds_valid,
+        float last_bounds_width, reach_rect_f32 target, int32_t *out_request_redraw);
 
     typedef enum reach_switcher_action_type
     {

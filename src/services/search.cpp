@@ -36,8 +36,7 @@ static void reach_search_service_query(reach_search_service *service, const uint
 {
     *out_count = 0;
     if (query == nullptr || query[0] == 0 || service->provider.ops.query == nullptr ||
-        service->provider.ops.result_count == nullptr ||
-        service->provider.ops.result_at == nullptr)
+        service->provider.ops.result_count == nullptr || service->provider.ops.result_at == nullptr)
     {
         return;
     }
@@ -57,8 +56,7 @@ static void reach_search_service_query(reach_search_service *service, const uint
     for (size_t index = 0; index < count; ++index)
     {
         reach_search_result result = {};
-        if (service->provider.ops.result_at(service->provider.provider, index, &result) ==
-            REACH_OK)
+        if (service->provider.ops.result_at(service->provider.provider, index, &result) == REACH_OK)
         {
             reach_copy_utf16(out_results[write_index].name, REACH_SEARCH_RESULT_NAME_CAPACITY,
                              result.title);
@@ -238,10 +236,8 @@ void reach_search_service_cancel(reach_search_service *service)
     service->completed = 0;
 }
 
-int32_t reach_search_service_take_completed(reach_search_service *service,
-                                            uint32_t *out_generation,
-                                            reach_search_candidate *out_results,
-                                            size_t *out_count)
+int32_t reach_search_service_take_completed(reach_search_service *service, uint32_t *out_generation,
+                                            reach_search_candidate *out_results, size_t *out_count)
 {
     if (service == nullptr || out_generation == nullptr || out_results == nullptr ||
         out_count == nullptr)

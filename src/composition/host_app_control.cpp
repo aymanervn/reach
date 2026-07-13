@@ -1,7 +1,7 @@
 #include "host_internal.h"
 
 reach_result reach_host_schedule_app_launch(reach_host *host,
-                                             const reach_app_launch_request *request)
+                                            const reach_app_launch_request *request)
 {
     if (host == nullptr)
     {
@@ -26,8 +26,8 @@ void reach_host_stop_app_control(reach_host *host)
 }
 
 reach_result reach_host_schedule_window_control(reach_host *host,
-                                                 reach_window_control_action action,
-                                                 uintptr_t window_id)
+                                                reach_window_control_action action,
+                                                uintptr_t window_id)
 {
     if (host == nullptr)
     {
@@ -42,7 +42,7 @@ reach_result reach_host_schedule_window_control(reach_host *host,
 }
 
 reach_result reach_host_schedule_minimize_windows(reach_host *host, const uintptr_t *window_ids,
-                                                   size_t window_count)
+                                                  size_t window_count)
 {
     if (host == nullptr)
     {
@@ -71,8 +71,7 @@ reach_result reach_host_schedule_minimize_open_windows(reach_host *host)
     (void)reach_host_refresh_open_windows(host, nullptr);
 
     uintptr_t windows[REACH_MAX_PINNED_APPS] = {};
-    size_t window_count = reach_window_tracking_collect_unminimized(host->window_tracking,
-                                                                    windows,
+    size_t window_count = reach_window_tracking_collect_unminimized(host->window_tracking, windows,
                                                                     REACH_MAX_PINNED_APPS);
     return window_count > 0 ? reach_host_schedule_minimize_windows(host, windows, window_count)
                             : REACH_OK;
@@ -105,7 +104,7 @@ void reach_host_apply_window_control_result(reach_host *host)
 
 reach_result
 reach_host_defer_app_launch_until_launcher_closed(reach_host *host,
-                                                   const reach_app_launch_request *request)
+                                                  const reach_app_launch_request *request)
 {
     if (host == nullptr || request == nullptr || request->path[0] == 0)
     {
@@ -137,9 +136,9 @@ void reach_host_process_deferred_launcher_app_launch(reach_host *host)
     (void)reach_host_schedule_app_launch(host, &request);
 }
 
-static int32_t reach_host_app_launch_window_matches_app(
-    const reach_window_snapshot *window, const uint16_t *path,
-    const uint16_t *app_user_model_id)
+static int32_t reach_host_app_launch_window_matches_app(const reach_window_snapshot *window,
+                                                        const uint16_t *path,
+                                                        const uint16_t *app_user_model_id)
 {
 
     reach_pinned_app_model app = {};
@@ -155,7 +154,7 @@ static int32_t reach_host_app_launch_window_matches_app(
 }
 
 static uintptr_t reach_host_find_open_app_window(reach_host *host, const uint16_t *path,
-                                                  const uint16_t *app_user_model_id)
+                                                 const uint16_t *app_user_model_id)
 {
     if (host == nullptr)
     {
@@ -182,7 +181,7 @@ static uintptr_t reach_host_find_open_app_window(reach_host *host, const uint16_
 }
 
 reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
-                                      int32_t minimize_if_foreground)
+                                     int32_t minimize_if_foreground)
 {
     if (host == nullptr)
     {
@@ -200,22 +199,19 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
         (void)reach_host_refresh_open_windows(host, nullptr);
     }
 
-    uintptr_t foreground =
-        host->window_manager.ops.foreground != nullptr
-            ? host->window_manager.ops.foreground(host->window_manager.manager)
-            : 0;
+    uintptr_t foreground = host->window_manager.ops.foreground != nullptr
+                               ? host->window_manager.ops.foreground(host->window_manager.manager)
+                               : 0;
 
     reach_result result = REACH_OK;
     if (minimize_if_foreground && foreground == window_id &&
         !reach_host_window_is_minimized(host, window_id))
     {
-        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_MINIMIZE,
-                                                     window_id);
+        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_MINIMIZE, window_id);
     }
     else
     {
-        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE,
-                                                     window_id);
+        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window_id);
     }
 
     host->dock.dirty_flags = 1;
@@ -224,10 +220,8 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
 }
 
 reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
-                                    const uint16_t *arguments,
-                                    int32_t force_new_instance,
-                                    int32_t run_as_admin,
-                                    int32_t defer_until_launcher_closed)
+                                   const uint16_t *arguments, int32_t force_new_instance,
+                                   int32_t run_as_admin, int32_t defer_until_launcher_closed)
 {
     if (host == nullptr || path == nullptr || path[0] == 0)
     {
@@ -250,11 +244,9 @@ reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
                : reach_host_schedule_app_launch(host, &request);
 }
 
-reach_result reach_host_open_app(reach_host *host, const uint16_t *path,
-                                  const uint16_t *arguments,
-                                  const uint16_t *app_user_model_id,
-                                  int32_t force_new_instance,
-                                  int32_t defer_until_launcher_closed)
+reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const uint16_t *arguments,
+                                 const uint16_t *app_user_model_id, int32_t force_new_instance,
+                                 int32_t defer_until_launcher_closed)
 {
     if (host == nullptr || path == nullptr || path[0] == 0)
     {
@@ -271,12 +263,12 @@ reach_result reach_host_open_app(reach_host *host, const uint16_t *path,
     }
 
     return reach_host_launch_app(host, path, arguments, force_new_instance, 0,
-                                  defer_until_launcher_closed);
+                                 defer_until_launcher_closed);
 }
 
 reach_result reach_host_open_pinned_app(reach_host *host, size_t pinned_index,
-                                         int32_t force_new_instance,
-                                         int32_t defer_until_launcher_closed)
+                                        int32_t force_new_instance,
+                                        int32_t defer_until_launcher_closed)
 {
     if (host == nullptr || pinned_index >= host->pinned_app_count)
     {
@@ -285,12 +277,12 @@ reach_result reach_host_open_pinned_app(reach_host *host, size_t pinned_index,
 
     const reach_pinned_app_model *app = &host->pinned_apps[pinned_index];
     return reach_host_open_app(host, app->path, app->arguments, app->app_user_model_id,
-                                force_new_instance, defer_until_launcher_closed);
+                               force_new_instance, defer_until_launcher_closed);
 }
 
 reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
-                                            int32_t force_new_instance,
-                                            int32_t defer_until_launcher_closed)
+                                           int32_t force_new_instance,
+                                           int32_t defer_until_launcher_closed)
 {
     if (host == nullptr || pin_id == 0)
     {
@@ -302,7 +294,7 @@ reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
         if (host->pinned_apps[index].id == pin_id)
         {
             return reach_host_open_pinned_app(host, index, force_new_instance,
-                                               defer_until_launcher_closed);
+                                              defer_until_launcher_closed);
         }
     }
 
@@ -311,9 +303,7 @@ reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
 
 reach_result reach_host_schedule_open_terminal(reach_host *host)
 {
-    static const uint16_t terminal_path[] = {
-        'w', 't', '.', 'e', 'x', 'e', 0
-    };
+    static const uint16_t terminal_path[] = {'w', 't', '.', 'e', 'x', 'e', 0};
 
     return reach_host_open_app(host, terminal_path, nullptr, nullptr, 1, 0);
 }

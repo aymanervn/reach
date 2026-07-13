@@ -18,10 +18,10 @@ int32_t reach_host_opacity_equal(float a, float b)
 }
 
 reach_result reach_host_apply_window_state(reach_platform_window_port *window,
-                                            reach_rect_f32 bounds, float opacity,
-                                            reach_rect_f32 *last_bounds, float *last_opacity,
-                                            int32_t *bounds_valid, int32_t *opacity_valid,
-                                            int32_t *out_changed)
+                                           reach_rect_f32 bounds, float opacity,
+                                           reach_rect_f32 *last_bounds, float *last_opacity,
+                                           int32_t *bounds_valid, int32_t *opacity_valid,
+                                           int32_t *out_changed)
 {
     REACH_ASSERT(window != nullptr);
     REACH_ASSERT(last_bounds != nullptr);
@@ -65,9 +65,8 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
     return REACH_OK;
 }
 
-void reach_host_surface_transition_init(reach_host *host,
-                                         reach_host_surface_transition *transition, size_t y_track,
-                                         size_t opacity_track)
+void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
+                                        size_t y_track, size_t opacity_track)
 {
     if (host == nullptr || transition == nullptr)
     {
@@ -87,27 +86,27 @@ void reach_host_surface_transitions_init(reach_host *host)
         return;
     }
     reach_host_surface_transition_init(host, &host->launcher_transition,
-                                        REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y,
-                                        REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y,
+                                       REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY);
     reach_host_surface_transition_init(host, &host->tray_transition,
-                                        REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
-                                        REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
+                                       REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY);
     reach_host_surface_transition_init(host, &host->quick_settings_transition,
-                                        REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
-                                        REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
+                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY);
     reach_host_surface_transition_init(host, &host->switcher_transition,
-                                        REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
-                                        REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
+                                       REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY);
     reach_host_surface_transition_init(host, &host->context_menu_transition,
-                                        REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
-                                        REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
+                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY);
     reach_host_surface_transition_init(host, &host->clipboard_transition,
-                                        REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_Y,
-                                        REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_Y,
+                                       REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY);
 }
 
-void reach_host_surface_transition_set(reach_host *host,
-                                        reach_host_surface_transition *transition, int32_t open)
+void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
+                                       int32_t open)
 {
     if (host == nullptr || transition == nullptr)
     {
@@ -149,10 +148,9 @@ void reach_host_surface_transition_set(reach_host *host,
     reach_host_request_update(host);
 }
 
-reach_rect_f32
-reach_host_surface_transition_bounds(const reach_host *host,
-                                      const reach_host_surface_transition *transition,
-                                      reach_rect_f32 target_bounds)
+reach_rect_f32 reach_host_surface_transition_bounds(const reach_host *host,
+                                                    const reach_host_surface_transition *transition,
+                                                    reach_rect_f32 target_bounds)
 {
     if (host != nullptr && transition != nullptr)
     {
@@ -163,7 +161,7 @@ reach_host_surface_transition_bounds(const reach_host *host,
 }
 
 float reach_host_surface_transition_opacity(const reach_host *host,
-                                             const reach_host_surface_transition *transition)
+                                            const reach_host_surface_transition *transition)
 {
     return host != nullptr && transition != nullptr
                ? reach_animation_manager_value(&host->animations, transition->opacity_track)
@@ -176,7 +174,7 @@ int32_t reach_host_surface_transition_visible(const reach_host_surface_transitio
 }
 
 int32_t reach_host_surface_transition_active(const reach_host *host,
-                                              const reach_host_surface_transition *transition)
+                                             const reach_host_surface_transition *transition)
 {
     return host != nullptr && transition != nullptr &&
            (reach_animation_manager_active(&host->animations, transition->y_track) ||
@@ -184,7 +182,7 @@ int32_t reach_host_surface_transition_active(const reach_host *host,
 }
 
 void reach_host_surface_transition_finish(reach_host *host,
-                                           reach_host_surface_transition *transition)
+                                          reach_host_surface_transition *transition)
 {
     if (host == nullptr || transition == nullptr || transition->target_open ||
         !transition->visible || reach_host_surface_transition_active(host, transition))
@@ -233,40 +231,63 @@ void reach_host_init_surface_descriptors(reach_host *host)
 
     reach_surface_desc *descs = host->surface_descs;
 
-    descs[REACH_SURFACE_ID_DOCK] = {REACH_SURFACE_ID_DOCK, REACH_SURFACE_CLASS_PERSISTENT,
-                                    &host->dock, nullptr, nullptr, host->dock_capsule,
+    descs[REACH_SURFACE_ID_DOCK] = {REACH_SURFACE_ID_DOCK,
+                                    REACH_SURFACE_CLASS_PERSISTENT,
+                                    &host->dock,
+                                    nullptr,
+                                    nullptr,
+                                    host->dock_capsule,
                                     reach_dock_capsule_ops(),
                                     REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY |
                                         REACH_SURFACE_POINTER_SOURCE_GATED};
-    descs[REACH_SURFACE_ID_LAUNCHER] = {REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT,
-                                        &host->launcher, &host->launcher_transition,
+    descs[REACH_SURFACE_ID_LAUNCHER] = {REACH_SURFACE_ID_LAUNCHER,
+                                        REACH_SURFACE_CLASS_TRANSIENT,
+                                        &host->launcher,
+                                        &host->launcher_transition,
                                         reach_host_surface_launcher_close,
-                                        host->launcher_capsule, reach_launcher_capsule_ops(),
+                                        host->launcher_capsule,
+                                        reach_launcher_capsule_ops(),
                                         REACH_SURFACE_POINTER_RELAYOUT_REDRAWS |
                                             REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED};
-    descs[REACH_SURFACE_ID_CLIPBOARD] = {REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT,
-                                         &host->clipboard_surface, &host->clipboard_transition,
+    descs[REACH_SURFACE_ID_CLIPBOARD] = {REACH_SURFACE_ID_CLIPBOARD,
+                                         REACH_SURFACE_CLASS_TRANSIENT,
+                                         &host->clipboard_surface,
+                                         &host->clipboard_transition,
                                          reach_host_surface_clipboard_close,
                                          host->clipboard_capsule,
                                          reach_clipboard_feature_capsule_ops(),
                                          REACH_SURFACE_POINTER_SOURCE_GATED};
-    descs[REACH_SURFACE_ID_TRAY] = {REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP, &host->tray,
-                                    &host->tray_transition, reach_host_surface_tray_close,
-                                    host->tray_capsule, reach_tray_capsule_ops(),
+    descs[REACH_SURFACE_ID_TRAY] = {REACH_SURFACE_ID_TRAY,
+                                    REACH_SURFACE_CLASS_POPUP,
+                                    &host->tray,
+                                    &host->tray_transition,
+                                    reach_host_surface_tray_close,
+                                    host->tray_capsule,
+                                    reach_tray_capsule_ops(),
                                     REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED};
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS] = {
-        REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_CLASS_POPUP, &host->quick_settings,
-        &host->quick_settings_transition, reach_host_surface_quick_settings_close,
-        host->quick_settings_capsule, reach_quick_settings_capsule_ops(),
-        REACH_SURFACE_POINTER_NONE};
-    descs[REACH_SURFACE_ID_CONTEXT_MENU] = {
-        REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, &host->context_menu,
-        &host->context_menu_transition, reach_host_surface_context_menu_close,
-        host->context_menu_capsule, reach_context_menu_capsule_ops(),
-        REACH_SURFACE_POINTER_NONE};
-    descs[REACH_SURFACE_ID_SWITCHER] = {REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY,
-                                        &host->switcher, &host->switcher_transition, nullptr,
-                                        host->switcher_capsule, reach_switcher_capsule_ops(),
+    descs[REACH_SURFACE_ID_QUICK_SETTINGS] = {REACH_SURFACE_ID_QUICK_SETTINGS,
+                                              REACH_SURFACE_CLASS_POPUP,
+                                              &host->quick_settings,
+                                              &host->quick_settings_transition,
+                                              reach_host_surface_quick_settings_close,
+                                              host->quick_settings_capsule,
+                                              reach_quick_settings_capsule_ops(),
+                                              REACH_SURFACE_POINTER_NONE};
+    descs[REACH_SURFACE_ID_CONTEXT_MENU] = {REACH_SURFACE_ID_CONTEXT_MENU,
+                                            REACH_SURFACE_CLASS_POPUP,
+                                            &host->context_menu,
+                                            &host->context_menu_transition,
+                                            reach_host_surface_context_menu_close,
+                                            host->context_menu_capsule,
+                                            reach_context_menu_capsule_ops(),
+                                            REACH_SURFACE_POINTER_NONE};
+    descs[REACH_SURFACE_ID_SWITCHER] = {REACH_SURFACE_ID_SWITCHER,
+                                        REACH_SURFACE_CLASS_OVERLAY,
+                                        &host->switcher,
+                                        &host->switcher_transition,
+                                        nullptr,
+                                        host->switcher_capsule,
+                                        reach_switcher_capsule_ops(),
                                         REACH_SURFACE_POINTER_NONE};
 
     descs[REACH_SURFACE_ID_CONTEXT_MENU].role = REACH_SURFACE_CONTEXT_MENU;

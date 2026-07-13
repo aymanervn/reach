@@ -1,7 +1,8 @@
 #include "host_internal.h"
 
-reach_result reach_host_apply_clipboard_pointer_action(
-    reach_host *host, const reach_ui_event *event, const reach_capsule_pointer_result *result)
+reach_result reach_host_apply_clipboard_pointer_action(reach_host *host,
+                                                       const reach_ui_event *event,
+                                                       const reach_capsule_pointer_result *result)
 {
     (void)event;
     if (host == nullptr || result == nullptr)
@@ -53,8 +54,8 @@ void reach_host_release_clipboard_item(reach_host *host, const reach_clipboard_i
     }
     if (item->thumbnail_id != 0 && host->clipboard_surface.renderer.ops.release_icon != nullptr)
     {
-        host->clipboard_surface.renderer.ops.release_icon(
-            host->clipboard_surface.renderer.backend, item->thumbnail_id);
+        host->clipboard_surface.renderer.ops.release_icon(host->clipboard_surface.renderer.backend,
+                                                          item->thumbnail_id);
     }
     if (host->clipboard.ops.release != nullptr)
     {
@@ -71,7 +72,7 @@ void reach_host_release_clipboard_items(reach_host *host)
     for (size_t index = 0; index < reach_clipboard_item_count(host->clipboard_capsule); ++index)
     {
         reach_host_release_clipboard_item(host,
-                                           reach_clipboard_item_at(host->clipboard_capsule, index));
+                                          reach_clipboard_item_at(host->clipboard_capsule, index));
     }
     reach_clipboard_reset_items(host->clipboard_capsule);
 }
@@ -86,7 +87,7 @@ void reach_host_clear_clipboard(reach_host *host)
     for (size_t index = 0; index < reach_clipboard_item_count(host->clipboard_capsule); ++index)
     {
         reach_host_release_clipboard_item(host,
-                                           reach_clipboard_item_at(host->clipboard_capsule, index));
+                                          reach_clipboard_item_at(host->clipboard_capsule, index));
     }
 
     reach_clipboard_clear_all(host->clipboard_capsule);

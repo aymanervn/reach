@@ -783,9 +783,9 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     return REACH_OK;
 }
 
-reach_result reach_quick_settings_append_render_commands(
-    reach_quick_settings *quick_settings, const reach_theme *theme, float dpi_scale,
-    reach_render_command_buffer *out_commands)
+reach_result reach_quick_settings_append_render_commands(reach_quick_settings *quick_settings,
+                                                         const reach_theme *theme, float dpi_scale,
+                                                         reach_render_command_buffer *out_commands)
 {
     if (quick_settings == nullptr || theme == nullptr || out_commands == nullptr)
     {

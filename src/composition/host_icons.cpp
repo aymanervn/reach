@@ -1,7 +1,7 @@
 #include "host_internal.h"
 
 static void reach_host_release_render_icon_from_surface(reach_surface_runtime *surface,
-                                                         uint64_t icon_id)
+                                                        uint64_t icon_id)
 {
     if (surface == nullptr || icon_id == 0 || surface->renderer.ops.release_icon == nullptr)
     {
@@ -123,8 +123,7 @@ void reach_host_drain_now_playing_retired_covers(reach_host *host)
         return;
     }
     uint64_t cover_image_id = 0;
-    while (reach_now_playing_service_take_retired_cover(host->now_playing_service,
-                                                        &cover_image_id))
+    while (reach_now_playing_service_take_retired_cover(host->now_playing_service, &cover_image_id))
     {
         reach_host_release_render_icon(host, cover_image_id);
         reach_now_playing_service_release_cover(host->now_playing_service, cover_image_id);

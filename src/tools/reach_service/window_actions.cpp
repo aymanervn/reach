@@ -309,8 +309,8 @@ static void reach_window_management_expand_by_invisible_borders(HWND hwnd, RECT 
         return;
     }
 
-    LONG deltas[4] = {window.left - frame.left, window.top - frame.top,
-                      window.right - frame.right, window.bottom - frame.bottom};
+    LONG deltas[4] = {window.left - frame.left, window.top - frame.top, window.right - frame.right,
+                      window.bottom - frame.bottom};
     const LONG max_border = 64;
     for (size_t index = 0; index < 4; ++index)
     {
@@ -374,8 +374,7 @@ reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
     {
         reach_window_action_state before = reach_window_management_capture_state(hwnd);
         ShowWindow(hwnd, SW_MAXIMIZE);
-        if (reach_window_management_wait_for(hwnd, reach_window_management_maximized, nullptr,
-                                             750))
+        if (reach_window_management_wait_for(hwnd, reach_window_management_maximized, nullptr, 750))
         {
             return REACH_OK;
         }
@@ -399,9 +398,9 @@ reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
     reach_window_action_state before = reach_window_management_capture_state(hwnd);
     RECT expected = {target.left, target.top, target.right, target.bottom};
     reach_window_management_expand_by_invisible_borders(hwnd, &expected);
-    BOOL ok = SetWindowPos(hwnd, nullptr, expected.left, expected.top,
-                           expected.right - expected.left, expected.bottom - expected.top,
-                           SWP_NOZORDER | SWP_NOACTIVATE);
+    BOOL ok =
+        SetWindowPos(hwnd, nullptr, expected.left, expected.top, expected.right - expected.left,
+                     expected.bottom - expected.top, SWP_NOZORDER | SWP_NOACTIVATE);
     if (ok && reach_window_management_wait_for(hwnd, reach_window_management_rect_matches,
                                                &expected, 750))
     {

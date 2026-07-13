@@ -76,8 +76,7 @@ extern "C"
 
     void reach_launcher_clear_query(reach_launcher *launcher);
 
-    reach_result reach_launcher_handle_event(reach_launcher *launcher,
-                                             const reach_ui_event *event,
+    reach_result reach_launcher_handle_event(reach_launcher *launcher, const reach_ui_event *event,
                                              reach_ui_intent *out_intent);
 
     typedef struct reach_launcher_render_input

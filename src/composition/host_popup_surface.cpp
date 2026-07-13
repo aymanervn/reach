@@ -1,8 +1,8 @@
 #include "host_internal.h"
 
 reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_runtime *surface,
-                                              reach_rect_f32 bounds, float notch_anchor_x,
-                                              const reach_render_command_buffer *content_commands)
+                                             reach_rect_f32 bounds, float notch_anchor_x,
+                                             const reach_render_command_buffer *content_commands)
 {
     if (host == nullptr || surface == nullptr || surface->renderer.ops.begin_frame == nullptr)
     {

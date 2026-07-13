@@ -21,7 +21,7 @@ static void reach_host_apply_switcher_action(reach_host *host, reach_switcher_ac
         if (action.window != 0)
         {
             (void)reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE,
-                                                      action.window);
+                                                     action.window);
         }
         break;
     case REACH_SWITCHER_ACTION_NONE:

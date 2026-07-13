@@ -21,8 +21,8 @@ reach_host_quick_settings_layout_context(reach_host *host)
     reach_quick_settings_layout_context ctx = {};
     ctx.theme = host->theme;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    reach_rect_f32 button = reach_dock_rect_to_screen(
-        &host->layout.dock, host->layout.dock.quick_settings_button);
+    reach_rect_f32 button =
+        reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.quick_settings_button);
     ctx.anchor_x = button.x + button.width * 0.5f;
     ctx.dock_top = host->layout.dock.bounds.y;
     return ctx;
@@ -117,8 +117,9 @@ void reach_host_toggle_quick_settings(reach_host *host)
         host, reach_quick_settings_is_open(host->quick_settings_capsule) ? 0 : 1);
 }
 
-reach_result reach_host_apply_quick_settings_pointer_action(
-    reach_host *host, const reach_ui_event *event, const reach_capsule_pointer_result *result)
+reach_result
+reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_event *event,
+                                               const reach_capsule_pointer_result *result)
 {
     (void)event;
     if (host == nullptr || result == nullptr)
@@ -182,8 +183,7 @@ reach_result reach_host_apply_quick_settings_pointer_action(
         reach_host_set_quick_settings_open(host, 0);
         if (host->system_controls.open_system_quick_settings != nullptr)
         {
-            (void)host->system_controls.open_system_quick_settings(
-                host->system_controls.userdata);
+            (void)host->system_controls.open_system_quick_settings(host->system_controls.userdata);
         }
         return REACH_OK;
     }
@@ -212,7 +212,7 @@ reach_result reach_host_apply_quick_settings_pointer_action(
             host->quick_settings.dirty_flags = 1;
             host->dirty.render = 1;
             if (host->system_controls.request_bluetooth_enabled(host->system_controls.userdata,
-                                                                 target_enabled) != REACH_OK)
+                                                                target_enabled) != REACH_OK)
             {
                 reach_quick_settings_set_bluetooth_pending(host->quick_settings_capsule, 0, 0);
                 reach_quick_settings_refresh_system(host->quick_settings_capsule, 0);
@@ -229,7 +229,7 @@ reach_result reach_host_apply_quick_settings_pointer_action(
             host->quick_settings.dirty_flags = 1;
             host->dirty.render = 1;
             (void)host->system_controls.set_bluetooth_enabled(host->system_controls.userdata,
-                                                               target_enabled);
+                                                              target_enabled);
         }
         reach_quick_settings_refresh_system(host->quick_settings_capsule, 0);
         reach_quick_settings_set_bluetooth_pending(host->quick_settings_capsule, 0, 0);
@@ -274,11 +274,10 @@ reach_result reach_host_apply_quick_settings_pointer_action(
         int32_t changed = 0;
         const uint16_t *output_device_id = reach_quick_settings_output_device_id(
             host->quick_settings_capsule, result->action.index);
-        if (output_device_id != nullptr &&
-            host->audio_volume.set_default_output_device != nullptr)
+        if (output_device_id != nullptr && host->audio_volume.set_default_output_device != nullptr)
         {
-            changed = host->audio_volume.set_default_output_device(
-                          host->audio_volume.userdata, output_device_id) == REACH_OK;
+            changed = host->audio_volume.set_default_output_device(host->audio_volume.userdata,
+                                                                   output_device_id) == REACH_OK;
         }
 
         if (changed)
@@ -332,8 +331,8 @@ void reach_host_process_quick_settings_changes(reach_host *host, double delta_se
 
     uint32_t change_flags = host->quick_settings_system_change_flags.exchange(0);
     reach_feature_tick_result changes = {};
-    reach_quick_settings_process_changes(host->quick_settings_capsule, change_flags,
-                                         delta_seconds, &changes);
+    reach_quick_settings_process_changes(host->quick_settings_capsule, change_flags, delta_seconds,
+                                         &changes);
 
     uint64_t retired[REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     size_t retired_count = reach_quick_settings_take_retired_render_icons(

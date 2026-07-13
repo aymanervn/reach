@@ -311,8 +311,8 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
     }
 
     int32_t local_cursor_x = static_cast<int32_t>((float)x - ctx->layout->bounds.x);
-    float next_drag_x =
-        reach_dock_drag_clamped_x(ctx->theme, ctx->layout, local_cursor_x, state->drag.grab_offset_x);
+    float next_drag_x = reach_dock_drag_clamped_x(ctx->theme, ctx->layout, local_cursor_x,
+                                                  state->drag.grab_offset_x);
 
     if (fabsf(next_drag_x - state->drag.x) >= 0.5f)
     {
@@ -410,8 +410,7 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     }
 }
 
-int32_t reach_dock_item_release(reach_dock *dock, size_t index,
-                                reach_dock_item_action *out_action,
+int32_t reach_dock_item_release(reach_dock *dock, size_t index, reach_dock_item_action *out_action,
                                 reach_dock_interaction_result *out)
 {
     if (dock == nullptr || out_action == nullptr || out == nullptr)
