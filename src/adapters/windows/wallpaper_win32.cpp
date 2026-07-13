@@ -158,6 +158,98 @@ static reach_result reach_wallpaper_current(reach_wallpaper_service *service, ui
     return result;
 }
 
+struct reach_wallpaper_monitor_rects
+{
+    RECT rects[REACH_MAX_WALLPAPER_MONITORS];
+    size_t count;
+};
+
+static BOOL CALLBACK reach_wallpaper_monitor_rects_enum_proc(HMONITOR monitor, HDC dc, LPRECT rect,
+                                                             LPARAM param)
+{
+    (void)monitor;
+    (void)dc;
+
+    reach_wallpaper_monitor_rects *state = reinterpret_cast<reach_wallpaper_monitor_rects *>(param);
+    if (state == nullptr || rect == nullptr)
+    {
+        return TRUE;
+    }
+    if (rect->right - rect->left <= 0 || rect->bottom - rect->top <= 0)
+    {
+        return TRUE;
+    }
+    if (state->count < REACH_MAX_WALLPAPER_MONITORS)
+    {
+        state->rects[state->count++] = *rect;
+    }
+    return TRUE;
+}
+
+// monitor_index follows EnumDisplayMonitors order, matching the wallpaper surface's
+// window order; IDesktopWallpaper device paths are matched to it by monitor RECT.
+static reach_result reach_wallpaper_current_monitor(reach_wallpaper_service *service,
+                                                    size_t monitor_index, uint16_t *out_path,
+                                                    size_t out_path_count)
+{
+    if (service == nullptr || out_path == nullptr || out_path_count == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    out_path[0] = 0;
+    if (service->desktop == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_wallpaper_monitor_rects monitors = {};
+    EnumDisplayMonitors(nullptr, nullptr, reach_wallpaper_monitor_rects_enum_proc,
+                        reinterpret_cast<LPARAM>(&monitors));
+    if (monitor_index >= monitors.count)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    RECT target = monitors.rects[monitor_index];
+
+    UINT count = 0;
+    HRESULT hr = service->desktop->GetMonitorDevicePathCount(&count);
+    if (FAILED(hr))
+    {
+        return REACH_ERROR;
+    }
+
+    reach_result result = REACH_ERROR;
+    for (UINT index = 0; index < count && result != REACH_OK; ++index)
+    {
+        LPWSTR monitor_id = nullptr;
+        hr = service->desktop->GetMonitorDevicePathAt(index, &monitor_id);
+        if (FAILED(hr) || monitor_id == nullptr)
+        {
+            continue;
+        }
+
+        RECT rect = {};
+        if (SUCCEEDED(service->desktop->GetMonitorRECT(monitor_id, &rect)) &&
+            EqualRect(&rect, &target))
+        {
+            LPWSTR path = nullptr;
+            if (SUCCEEDED(service->desktop->GetWallpaper(monitor_id, &path)) && path != nullptr &&
+                path[0] != 0)
+            {
+                result = reach_copy_utf16(out_path, out_path_count,
+                                          reinterpret_cast<const uint16_t *>(path));
+            }
+            if (path != nullptr)
+            {
+                CoTaskMemFree(path);
+            }
+        }
+        CoTaskMemFree(monitor_id);
+    }
+    return result;
+}
+
 static void reach_wallpaper_destroy(reach_wallpaper_service *service)
 {
     if (service != nullptr && service->desktop != nullptr)
@@ -204,6 +296,7 @@ reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port
     out_port->ops.set_monitor_wallpaper = reach_wallpaper_set_monitor;
     out_port->ops.clear_wallpaper = reach_wallpaper_clear;
     out_port->ops.current_wallpaper = reach_wallpaper_current;
+    out_port->ops.current_monitor_wallpaper = reach_wallpaper_current_monitor;
     out_port->ops.destroy = reach_wallpaper_destroy;
     return REACH_OK;
 }

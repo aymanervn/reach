@@ -7,6 +7,8 @@ static int failures;
 struct fake_wallpaper_ports
 {
     uint16_t current_path[260];
+    uint16_t current_monitor_paths[4][260];
+    size_t current_monitor_count;
     uint16_t service_set_path[260];
     uint16_t surface_set_path[260];
     uint16_t monitor_paths[4][260];
@@ -15,6 +17,7 @@ struct fake_wallpaper_ports
     size_t surface_set_count;
     size_t monitor_set_count;
     size_t current_query_count;
+    size_t current_monitor_query_count;
 };
 
 struct reach_wallpaper_service
@@ -93,6 +96,32 @@ static reach_result fake_service_current_wallpaper(reach_wallpaper_service *serv
     {
         out_path[index] = service->fake->current_path[index];
         if (service->fake->current_path[index] == 0)
+        {
+            return REACH_OK;
+        }
+    }
+    out_path[out_path_count - 1] = 0;
+    return REACH_OK;
+}
+
+static reach_result fake_service_current_monitor_wallpaper(reach_wallpaper_service *service,
+                                                           size_t monitor_index, uint16_t *out_path,
+                                                           size_t out_path_count)
+{
+    ++service->fake->current_monitor_query_count;
+    if (out_path == nullptr || out_path_count == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    out_path[0] = 0;
+    if (monitor_index >= service->fake->current_monitor_count || monitor_index >= 4)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index + 1 < out_path_count; ++index)
+    {
+        out_path[index] = service->fake->current_monitor_paths[monitor_index][index];
+        if (out_path[index] == 0)
         {
             return REACH_OK;
         }
@@ -249,10 +278,50 @@ static void test_empty_config_without_current_wallpaper_only_applies_monitors(vo
     expect_true(fake.monitor_set_count == 1, "monitor override still applies");
 }
 
+static void test_empty_config_seeds_per_monitor_wallpapers(void)
+{
+    fake_wallpaper_ports fake = {};
+    copy_ascii(fake.current_path, 260, "C:\\Wallpapers\\stitched.jpg");
+    fake.current_monitor_count = 2;
+    copy_ascii(fake.current_monitor_paths[0], 260, "C:\\Wallpapers\\primary.jpg");
+    copy_ascii(fake.current_monitor_paths[1], 260, "C:\\Wallpapers\\secondary.jpg");
+
+    reach_wallpaper_service service = {};
+    reach_wallpaper_surface surface = {};
+    reach_wallpaper_service_port service_port = service_port_for(&fake, &service);
+    service_port.ops.current_monitor_wallpaper = fake_service_current_monitor_wallpaper;
+    reach_wallpaper_surface_port surface_port = surface_port_for(&fake, &surface);
+
+    uint16_t wallpaper_path[260] = {};
+    uint16_t monitor_paths[4][260] = {};
+    uint16_t cached_path[260] = {};
+
+    int32_t changed = reach_wallpaper_seed_or_apply(&service_port, &surface_port, wallpaper_path,
+                                                    260, monitor_paths, 4, cached_path, 260);
+
+    expect_true(changed == 1, "per-monitor seeding reports config change");
+    expect_true(text_equals_ascii(wallpaper_path, "C:\\Wallpapers\\primary.jpg"),
+                "first monitor wallpaper seeds global config");
+    expect_true(text_equals_ascii(cached_path, "C:\\Wallpapers\\primary.jpg"),
+                "first monitor wallpaper is cached");
+    expect_true(fake.current_query_count == 0,
+                "per-monitor seeding skips stitched global wallpaper query");
+    expect_true(fake.surface_set_count == 1 &&
+                    text_equals_ascii(fake.surface_set_path, "C:\\Wallpapers\\primary.jpg"),
+                "first monitor wallpaper applies to surface");
+    expect_true(text_equals_ascii(monitor_paths[1], "C:\\Wallpapers\\secondary.jpg"),
+                "differing monitor wallpaper seeds monitor config");
+    expect_true(monitor_paths[0][0] == 0, "monitor matching global is not seeded as override");
+    expect_true(fake.monitor_set_count == 1 && fake.monitor_indices[0] == 1 &&
+                    text_equals_ascii(fake.monitor_paths[0], "C:\\Wallpapers\\secondary.jpg"),
+                "seeded monitor wallpaper applies to surface");
+}
+
 int main(void)
 {
     test_configured_wallpaper_applies_to_service_surface_and_monitors();
     test_empty_config_seeds_from_current_wallpaper();
     test_empty_config_without_current_wallpaper_only_applies_monitors();
+    test_empty_config_seeds_per_monitor_wallpapers();
     return failures == 0 ? 0 : 1;
 }
