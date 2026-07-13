@@ -123,6 +123,19 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         reach_render_command_buffer_push(out_commands, &command);
     }
 
+    if (model->query[0] == 0)
+    {
+        command = {};
+        command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+        command.rect.x = layout->search_icon.x - layout->bounds.x;
+        command.rect.y = layout->search_icon.y - layout->bounds.y;
+        command.rect.width = layout->search_icon.width;
+        command.rect.height = layout->search_icon.height;
+        command.icon_id = REACH_VECTOR_ICON_SEARCH;
+        command.color = reach_launcher_rgb(255, 255, 255, 0.40f);
+        reach_render_command_buffer_push(out_commands, &command);
+    }
+
     if (model->result_count > 0)
     {
         size_t visible_count = reach_launcher_visible_result_count(model);
