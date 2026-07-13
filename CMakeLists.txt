@@ -501,7 +501,7 @@ set(REACH_RELEASE_TARGETS
 
 add_custom_target(reach_release_zip
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${REACH_DIST_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${REACH_DIST_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${REACH_DIST_DIR}/reach"
 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reach>"
@@ -512,18 +512,11 @@ add_custom_target(reach_release_zip
         "$<TARGET_FILE:reach_update_helper>"
         "${EVERYTHING_DLL}"
         "${REACH_RELEASE_IMAGE}"
-        "${REACH_DIST_DIR}"
+        "${REACH_DIST_DIR}/reach"
 
     COMMAND ${CMAKE_COMMAND} -E chdir "${REACH_DIST_DIR}"
         ${CMAKE_COMMAND} -E tar "cfv" "${REACH_ZIP_PATH}" --format=zip
-        "$<TARGET_FILE_NAME:reach>"
-        "$<TARGET_FILE_NAME:reach_settings>"
-        "$<TARGET_FILE_NAME:reachctl>"
-        "$<TARGET_FILE_NAME:reachWatchdog>"
-        "$<TARGET_FILE_NAME:reach_service>"
-        "$<TARGET_FILE_NAME:reach_update_helper>"
-        "Everything64.dll"
-        "reach.jpg"
+        "reach"
 
     DEPENDS ${REACH_RELEASE_TARGETS}
     BYPRODUCTS "${REACH_ZIP_PATH}"
