@@ -20,6 +20,9 @@ extern "C"
         reach_result (*clear_wallpaper)(reach_wallpaper_service *service);
         reach_result (*current_wallpaper)(reach_wallpaper_service *service, uint16_t *out_path,
                                           size_t out_path_count);
+        reach_result (*current_monitor_wallpaper)(reach_wallpaper_service *service,
+                                                  size_t monitor_index, uint16_t *out_path,
+                                                  size_t out_path_count);
         void (*destroy)(reach_wallpaper_service *service);
     } reach_wallpaper_service_ops;
 

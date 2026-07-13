@@ -24,6 +24,7 @@ struct reach_wallpaper_window
     int32_t bounds_valid;
     int bitmap_width;
     int bitmap_height;
+    uint32_t render_generation;
 };
 
 struct reach_wallpaper_prepared_bitmap
@@ -68,7 +69,6 @@ struct reach_wallpaper_surface
     std::condition_variable render_cv;
     std::vector<reach_wallpaper_render_job> render_jobs;
     std::vector<reach_wallpaper_render_result> render_results;
-    uint32_t render_generation;
     int32_t render_thread_started;
     int32_t render_stop_requested;
 };
@@ -785,7 +785,7 @@ static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *sur
         for (const reach_wallpaper_render_job &job : surface->render_jobs)
         {
             if (job.window == window && job.monitor_index == monitor_index &&
-                job.generation == surface->render_generation && job.target_width == target_width &&
+                job.generation == window->render_generation && job.target_width == target_width &&
                 job.target_height == target_height && reach_wallpaper_path_equal(job.path, path))
             {
                 return REACH_OK;
@@ -795,7 +795,7 @@ static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *sur
         reach_wallpaper_render_job job = {};
         job.window = window;
         job.monitor_index = monitor_index;
-        job.generation = surface->render_generation;
+        job.generation = window->render_generation;
         job.target_width = target_width;
         job.target_height = target_height;
         (void)reach_copy_utf16(job.path, 260, path);
@@ -1008,6 +1008,7 @@ static reach_result reach_wallpaper_apply_window_bounds(reach_wallpaper_surface 
 
     window->last_bounds = bounds;
     window->bounds_valid = 1;
+    ++window->render_generation;
     reach_wallpaper_unload_bitmap(window);
     reach_windows_request_desktop_environment_sync();
 
@@ -1154,8 +1155,6 @@ static reach_result reach_wallpaper_surface_set_wallpaper(reach_wallpaper_surfac
         return result;
     }
 
-    ++surface->render_generation;
-
     return reach_wallpaper_render_all(surface);
 }
 
@@ -1173,7 +1172,6 @@ static reach_result reach_wallpaper_surface_set_monitor_wallpaper(reach_wallpape
     {
         return result;
     }
-    ++surface->render_generation;
 
     if (monitor_index < surface->windows.size())
     {
@@ -1192,7 +1190,6 @@ reach_wallpaper_surface_clear_monitor_wallpaper(reach_wallpaper_surface *surface
     {
         return REACH_INVALID_ARGUMENT;
     }
-    ++surface->render_generation;
     surface->monitor_paths[monitor_index][0] = 0;
 
     if (monitor_index < surface->windows.size())
@@ -1210,7 +1207,6 @@ static reach_result reach_wallpaper_surface_clear(reach_wallpaper_surface *surfa
     {
         return REACH_INVALID_ARGUMENT;
     }
-    ++surface->render_generation;
     for (reach_wallpaper_window *window : surface->windows)
     {
         reach_wallpaper_unload_bitmap(window);
@@ -1343,9 +1339,9 @@ static int32_t reach_wallpaper_apply_render_results(reach_wallpaper_surface *sur
     {
         int32_t used = 0;
 
-        if (result.generation == surface->render_generation && result.result == REACH_OK &&
-            result.window != nullptr && result.window->hwnd != nullptr &&
-            reach_wallpaper_surface_contains_window(surface, result.window))
+        if (result.result == REACH_OK && result.window != nullptr &&
+            reach_wallpaper_surface_contains_window(surface, result.window) &&
+            result.window->hwnd != nullptr && result.generation == result.window->render_generation)
         {
             const uint16_t *current_path =
                 reach_wallpaper_path_for_monitor(surface, result.monitor_index);

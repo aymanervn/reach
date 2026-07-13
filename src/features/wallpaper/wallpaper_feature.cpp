@@ -2,6 +2,20 @@
 
 #include <new>
 
+static int32_t reach_wallpaper_path_equals(const uint16_t *a, const uint16_t *b)
+{
+    size_t index = 0;
+    while (a[index] != 0 && b[index] != 0)
+    {
+        if (a[index] != b[index])
+        {
+            return 0;
+        }
+        ++index;
+    }
+    return a[index] == b[index];
+}
+
 int32_t reach_wallpaper_seed_or_apply(reach_wallpaper_service_port *wallpaper_service,
                                       reach_wallpaper_surface_port *wallpaper_surface,
                                       uint16_t *wallpaper_path, size_t wallpaper_path_count,
@@ -43,15 +57,42 @@ int32_t reach_wallpaper_seed_or_apply(reach_wallpaper_service_port *wallpaper_se
         }
         return 0;
     }
-    if (wallpaper_service->ops.current_wallpaper == nullptr)
-    {
-        return 0;
-    }
     uint16_t current[260] = {};
     int32_t changed = 0;
-    if (wallpaper_service->ops.current_wallpaper(wallpaper_service->service, current, 260) ==
-            REACH_OK &&
-        current[0] != 0)
+    // Seed per monitor: the global query can return the stitched multi-monitor
+    // composite (TranscodedWallpaper) when monitors have different wallpapers.
+    if (wallpaper_service->ops.current_monitor_wallpaper != nullptr &&
+        monitor_wallpaper_paths != nullptr)
+    {
+        for (size_t index = 0; index < monitor_wallpaper_count; ++index)
+        {
+            uint16_t monitor_current[260] = {};
+            if (wallpaper_service->ops.current_monitor_wallpaper(
+                    wallpaper_service->service, index, monitor_current, 260) != REACH_OK ||
+                monitor_current[0] == 0)
+            {
+                continue;
+            }
+            if (current[0] == 0)
+            {
+                reach_copy_utf16(current, 260, monitor_current);
+            }
+            else if (monitor_wallpaper_paths[index][0] == 0 &&
+                     !reach_wallpaper_path_equals(monitor_current, current) &&
+                     reach_copy_utf16(monitor_wallpaper_paths[index], 260, monitor_current) ==
+                         REACH_OK)
+            {
+                changed = 1;
+            }
+        }
+    }
+    if (current[0] == 0 && wallpaper_service->ops.current_wallpaper != nullptr &&
+        wallpaper_service->ops.current_wallpaper(wallpaper_service->service, current, 260) !=
+            REACH_OK)
+    {
+        current[0] = 0;
+    }
+    if (current[0] != 0)
     {
         reach_copy_utf16(cached_wallpaper_path, cached_wallpaper_path_count, current);
         if (reach_copy_utf16(wallpaper_path, wallpaper_path_count, current) == REACH_OK)
@@ -87,20 +128,6 @@ struct reach_wallpaper
     reach_rect_f32 bounds;
     uint16_t path[260];
 };
-
-static int32_t reach_wallpaper_path_equals(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    while (a[index] != 0 && b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return a[index] == b[index];
-}
 
 static int32_t reach_wallpaper_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 {
