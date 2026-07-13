@@ -288,7 +288,10 @@ reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings 
     float local_x = (float)x - state->bounds.x;
     float next_level = reach_quick_settings_clamp01((local_x - track.x) / track.width);
 
-    if (state->drag.level_valid && fabsf(next_level - state->drag.last_level) < 0.005f)
+    if (state->drag.level_valid &&
+        (next_level == state->drag.last_level ||
+         (fabsf(next_level - state->drag.last_level) < 0.005f && next_level > 0.0f &&
+          next_level < 1.0f)))
     {
         return action;
     }
