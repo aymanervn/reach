@@ -315,6 +315,22 @@ uint64_t reach_icon_service_get(reach_icon_service *service, const uint16_t *pat
     return 0;
 }
 
+void reach_icon_service_touch(reach_icon_service *service, const uint16_t *path,
+                              int32_t size_px)
+{
+    if (service == nullptr || path == nullptr || path[0] == 0)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(service->mutex);
+    reach_icon_cache_entry *entry = reach_icon_service_find(service, path, size_px);
+    if (entry != nullptr && entry->id != 0)
+    {
+        entry->last_used = reach_icon_service_now();
+    }
+}
+
 void reach_icon_service_trim(reach_icon_service *service, double max_age_seconds)
 {
     if (service == nullptr)

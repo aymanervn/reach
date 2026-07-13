@@ -36,6 +36,7 @@ void reach_host_drain_icon_evictions(reach_host *host)
         return;
     }
 
+    reach_dock_touch_icons(host->dock_capsule, reach_host_dock_icon_size_px(host));
     reach_icon_service_trim(host->icon_service, REACH_HOST_ICON_TRIM_SECONDS);
     for (;;)
     {

@@ -24,6 +24,9 @@ extern "C"
     uint64_t reach_icon_service_get(reach_icon_service *service, const uint16_t *path,
                                     int32_t size_px);
 
+    void reach_icon_service_touch(reach_icon_service *service, const uint16_t *path,
+                                  int32_t size_px);
+
     void reach_icon_service_trim(reach_icon_service *service, double max_age_seconds);
     size_t reach_icon_service_take_evicted(reach_icon_service *service, uint64_t *out_icon_ids,
                                            size_t capacity);

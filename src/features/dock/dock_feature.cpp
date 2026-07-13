@@ -83,6 +83,43 @@ reach_window_tracking *reach_dock_windows(reach_dock *dock)
     return dock != nullptr ? dock->windows : nullptr;
 }
 
+void reach_dock_touch_icons(reach_dock *dock, int32_t icon_size_px)
+{
+    if (dock == nullptr || dock->icons == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = 0; index < dock->state.model.item_count; ++index)
+    {
+        const reach_dock_item_model *item = &dock->state.model.items[index];
+        const uint16_t *icon_path = nullptr;
+        if (item->pinned)
+        {
+            if (dock->pointer_pinned_apps != nullptr &&
+                item->pinned_index < dock->pointer_pinned_app_count)
+            {
+                const reach_pinned_app_model *app =
+                    &dock->pointer_pinned_apps[item->pinned_index];
+                icon_path = app->icon_ref[0] != 0 ? app->icon_ref : app->path;
+            }
+        }
+        else
+        {
+            const reach_window_snapshot *window =
+                reach_window_tracking_window_by_id(dock->windows, item->window);
+            if (window != nullptr)
+            {
+                icon_path = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
+            }
+        }
+        if (icon_path != nullptr && icon_path[0] != 0)
+        {
+            reach_icon_service_touch(dock->icons, icon_path, icon_size_px);
+        }
+    }
+}
+
 const reach_dock_state *reach_dock_state_ptr(reach_dock *animations)
 {
     return animations != nullptr ? &animations->state : nullptr;
