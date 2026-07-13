@@ -391,7 +391,8 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
     }
 
     reach_dock_order_key drag_key = {state->drag.pinned, state->drag.pin_id, state->drag.window};
-    if ((state->drag.active || reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)) &&
+    if ((state->drag.active ||
+         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)) &&
         reach_dock_feature_model_item_matches_key(&state->model, index, drag_key))
     {
         return reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
@@ -445,8 +446,8 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
                           : state->drag.x;
 
     reach_dock_render_item render_items[REACH_MAX_PINNED_APPS] = {};
-    for (size_t index = 0;
-         index < state->model.item_count && index < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_PINNED_APPS;
+         ++index)
     {
         const reach_dock_item_model *item = &state->model.items[index];
         const uint16_t *icon_path = nullptr;
@@ -512,6 +513,6 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     now_playing.dpi_scale = ctx->dpi_scale;
     now_playing.reveal_width =
         reach_dock_now_playing_reveal_width(dock, ctx->dock_gap * ctx->dpi_scale);
-    return reach_dock_now_playing_append_render_commands(
-        reach_dock_now_playing_subfeature(dock), &now_playing, out_commands);
+    return reach_dock_now_playing_append_render_commands(reach_dock_now_playing_subfeature(dock),
+                                                         &now_playing, out_commands);
 }

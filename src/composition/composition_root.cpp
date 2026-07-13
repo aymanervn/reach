@@ -364,8 +364,7 @@ reach_result reach_app_start(reach_app *app)
     {
 
         reach_app_launch_request startup_requests[32] = {};
-        size_t startup_count =
-            reach_windows_collect_startup_apps(startup_requests, 32);
+        size_t startup_count = reach_windows_collect_startup_apps(startup_requests, 32);
         for (size_t index = 0; index < startup_count; ++index)
         {
             (void)reach_host_schedule_app_launch(app->host, &startup_requests[index]);

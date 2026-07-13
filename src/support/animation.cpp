@@ -106,8 +106,7 @@ void reach_animation_manager_tick(reach_animation_manager *manager, double delta
     }
 }
 
-double reach_animation_track_time_to_value(const reach_animation_track *track,
-                                           float target_value)
+double reach_animation_track_time_to_value(const reach_animation_track *track, float target_value)
 {
     if (track == nullptr || !track->active || track->duration_seconds <= 0.0)
     {

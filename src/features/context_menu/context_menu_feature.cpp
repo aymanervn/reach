@@ -131,8 +131,8 @@ int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
 }
 
 static void reach_context_menu_place(reach_context_menu_state *state,
-                                     const reach_context_menu_open_context *ctx,
-                                     float popup_width, float anchor_ratio)
+                                     const reach_context_menu_open_context *ctx, float popup_width,
+                                     float anchor_ratio)
 {
     state->anchored = ctx->anchored;
     state->anchor_popup_width = popup_width;
@@ -254,8 +254,8 @@ static int32_t reach_context_menu_capsule_wants_pointer_move(const void *capsule
     return reach_context_menu_is_open(static_cast<const reach_context_menu *>(capsule));
 }
 
-static int32_t reach_context_menu_point_in_bounds(const reach_context_menu_state *state,
-                                                  int32_t x, int32_t y)
+static int32_t reach_context_menu_point_in_bounds(const reach_context_menu_state *state, int32_t x,
+                                                  int32_t y)
 {
     return state != nullptr && (float)x >= state->bounds.x &&
            (float)x <= state->bounds.x + state->bounds.width && (float)y >= state->bounds.y &&
@@ -316,8 +316,7 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     case REACH_POINTER_EVENT_LEAVE:
     case REACH_POINTER_EVENT_CANCEL:
         out->handled = 1;
-        out->redraw =
-            reach_context_menu_set_hovered(menu, REACH_CONTEXT_MENU_MAX_ITEMS);
+        out->redraw = reach_context_menu_set_hovered(menu, REACH_CONTEXT_MENU_MAX_ITEMS);
         break;
 
     case REACH_POINTER_EVENT_CONTEXT:
@@ -336,11 +335,11 @@ const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
         reach_context_menu_capsule_reset,
-        nullptr  ,
+        nullptr,
         reach_context_menu_capsule_is_open,
         reach_context_menu_capsule_force_close,
-        nullptr  ,
-        nullptr  ,
+        nullptr,
+        nullptr,
         reach_context_menu_capsule_wants_pointer_move,
         reach_context_menu_capsule_handle_pointer,
     };

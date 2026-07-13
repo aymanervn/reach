@@ -16,7 +16,6 @@ struct reach_window_tracking
     uintptr_t foreground_window;
     uintptr_t focus_history[REACH_MAX_PINNED_APPS];
     size_t focus_history_count;
-
 };
 
 static int32_t reach_window_tracking_utf16_equal(const uint16_t *a, const uint16_t *b)
@@ -95,8 +94,8 @@ size_t reach_window_tracking_collect_unminimized(const reach_window_tracking *se
     }
 
     size_t window_count = 0;
-    for (size_t index = 0;
-         index < service->open_window_count && window_count < out_window_count; ++index)
+    for (size_t index = 0; index < service->open_window_count && window_count < out_window_count;
+         ++index)
     {
         if (service->open_windows[index].id != 0 && !service->open_windows[index].minimized)
         {
@@ -106,8 +105,8 @@ size_t reach_window_tracking_collect_unminimized(const reach_window_tracking *se
     return window_count;
 }
 
-const reach_window_snapshot *reach_window_tracking_window_by_id(
-    const reach_window_tracking *service, uintptr_t window_id)
+const reach_window_snapshot *
+reach_window_tracking_window_by_id(const reach_window_tracking *service, uintptr_t window_id)
 {
     if (service == nullptr || window_id == 0)
     {
@@ -165,8 +164,7 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
     {
         return 0;
     }
-    if (reach_window_tracking_nonempty_equals_ci(app->app_user_model_id,
-                                                 window->app_user_model_id))
+    if (reach_window_tracking_nonempty_equals_ci(app->app_user_model_id, window->app_user_model_id))
     {
         return 1;
     }
@@ -356,8 +354,8 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
 
     service->open_window_count = 0;
     size_t count = service->window_manager.ops.window_count(service->window_manager.manager);
-    for (size_t index = 0;
-         index < count && service->open_window_count < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = 0; index < count && service->open_window_count < REACH_MAX_PINNED_APPS;
+         ++index)
     {
         reach_window_snapshot snapshot = {};
         if (service->window_manager.ops.window_at(service->window_manager.manager, index,
@@ -429,4 +427,3 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
     }
     return REACH_OK;
 }
-

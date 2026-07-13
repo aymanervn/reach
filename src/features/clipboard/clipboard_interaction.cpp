@@ -156,9 +156,10 @@ void reach_clipboard_pointer_move(reach_clipboard_feature *clipboard, int32_t x,
     }
 
     reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &state->layout, x, y);
-    size_t next = (hit.type == REACH_CLIPBOARD_HIT_ITEM || hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE)
-                      ? hit.index
-                      : REACH_CLIPBOARD_MAX_ITEMS;
+    size_t next =
+        (hit.type == REACH_CLIPBOARD_HIT_ITEM || hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE)
+            ? hit.index
+            : REACH_CLIPBOARD_MAX_ITEMS;
     if (next != state->model.hovered_index)
     {
         size_t previous = state->model.hovered_index;

@@ -145,11 +145,11 @@ void reach_launcher_pointer_up(reach_launcher *launcher, int32_t x, int32_t y,
 
     reach_launcher_hit_result hit = reach_launcher_hit_test(&state->model, ctx->layout, x, y);
 
-    reach_launcher_action action = reach_launcher_action_for_hit(&state->model, ctx->pinned_apps,
-                                                                 ctx->pinned_app_count, hit);
+    reach_launcher_action action =
+        reach_launcher_action_for_hit(&state->model, ctx->pinned_apps, ctx->pinned_app_count, hit);
 
-    int32_t pressed_match = state->pressed_launcher_hit_type == hit.type &&
-                            state->pressed_launcher_index == hit.index;
+    int32_t pressed_match =
+        state->pressed_launcher_hit_type == hit.type && state->pressed_launcher_index == hit.index;
 
     state->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     state->pressed_launcher_index = REACH_MAX_PINNED_APPS;
@@ -210,8 +210,7 @@ void reach_launcher_scrollbar_release(reach_launcher *launcher, reach_launcher_e
 }
 
 void reach_launcher_wheel(reach_launcher *launcher, int32_t x, int32_t y, int32_t wheel_delta,
-                          const reach_launcher_event_context *ctx,
-                          reach_launcher_event_result *out)
+                          const reach_launcher_event_context *ctx, reach_launcher_event_result *out)
 {
     if (launcher == nullptr || ctx == nullptr || ctx->layout == nullptr || out == nullptr)
     {

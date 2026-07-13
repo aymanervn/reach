@@ -123,9 +123,8 @@ static void reach_config_service_thread_main(reach_config_service *service)
     }
 }
 
-reach_result reach_config_service_create(reach_config_store_port store,
-                                         void (*notify)(void *user), void *notify_user,
-                                         reach_config_service **out_service)
+reach_result reach_config_service_create(reach_config_store_port store, void (*notify)(void *user),
+                                         void *notify_user, reach_config_service **out_service)
 {
     if (out_service == nullptr)
     {
@@ -179,8 +178,7 @@ void reach_config_service_stop(reach_config_service *service)
     service->completed = 0;
 }
 
-static reach_result reach_config_service_schedule(reach_config_service *service,
-                                                  int32_t operation,
+static reach_result reach_config_service_schedule(reach_config_service *service, int32_t operation,
                                                   const reach_pinned_app_model *app,
                                                   uint32_t pin_id, size_t target_index)
 {
@@ -245,8 +243,8 @@ reach_result reach_config_service_schedule_unpin(reach_config_service *service, 
     return reach_config_service_schedule(service, REACH_CONFIG_JOB_UNPIN_ID, nullptr, pin_id, 0);
 }
 
-reach_result reach_config_service_schedule_move_pin(reach_config_service *service,
-                                                    uint32_t pin_id, size_t target_index)
+reach_result reach_config_service_schedule_move_pin(reach_config_service *service, uint32_t pin_id,
+                                                    size_t target_index)
 {
     if (pin_id == 0)
     {
@@ -256,8 +254,7 @@ reach_result reach_config_service_schedule_move_pin(reach_config_service *servic
                                          target_index);
 }
 
-int32_t reach_config_service_take_completed(reach_config_service *service,
-                                            reach_result *out_result,
+int32_t reach_config_service_take_completed(reach_config_service *service, reach_result *out_result,
                                             reach_config_snapshot *out_snapshot,
                                             int32_t *out_current)
 {

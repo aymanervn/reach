@@ -89,8 +89,7 @@ static void reach_icon_service_thread_main(reach_icon_service *service)
         reach_icon_load_job job = {};
         {
             std::unique_lock<std::mutex> lock(service->mutex);
-            service->cv.wait(lock,
-                             [service]() { return service->stop || !service->jobs.empty(); });
+            service->cv.wait(lock, [service]() { return service->stop || !service->jobs.empty(); });
 
             if (service->stop)
             {
@@ -106,18 +105,17 @@ static void reach_icon_service_thread_main(reach_icon_service *service)
         reach_copy_utf16(request.path, sizeof(request.path) / sizeof(request.path[0]), job.path);
         request.size_px = job.size_px;
         reach_icon_handle handle = {};
-        reach_result result = service->provider.ops.load != nullptr
-                                  ? service->provider.ops.load(service->provider.provider,
-                                                               &request, &handle)
-                                  : REACH_ERROR;
+        reach_result result =
+            service->provider.ops.load != nullptr
+                ? service->provider.ops.load(service->provider.provider, &request, &handle)
+                : REACH_ERROR;
 
         void (*notify)(void *user) = nullptr;
         void *notify_user = nullptr;
         {
             std::lock_guard<std::mutex> lock(service->mutex);
             service->in_flight = 0;
-            reach_icon_cache_entry *entry =
-                reach_icon_service_find(service, job.path, job.size_px);
+            reach_icon_cache_entry *entry = reach_icon_service_find(service, job.path, job.size_px);
             if (service->stop || entry == nullptr)
             {
 
@@ -252,8 +250,7 @@ static reach_result reach_icon_service_start_worker(reach_icon_service *service)
     return REACH_OK;
 }
 
-uint64_t reach_icon_service_get(reach_icon_service *service, const uint16_t *path,
-                                int32_t size_px)
+uint64_t reach_icon_service_get(reach_icon_service *service, const uint16_t *path, int32_t size_px)
 {
     if (service == nullptr || path == nullptr || path[0] == 0 ||
         service->provider.ops.load == nullptr)
@@ -315,8 +312,7 @@ uint64_t reach_icon_service_get(reach_icon_service *service, const uint16_t *pat
     return 0;
 }
 
-void reach_icon_service_touch(reach_icon_service *service, const uint16_t *path,
-                              int32_t size_px)
+void reach_icon_service_touch(reach_icon_service *service, const uint16_t *path, int32_t size_px)
 {
     if (service == nullptr || path == nullptr || path[0] == 0)
     {

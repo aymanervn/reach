@@ -143,9 +143,8 @@ reach_dock_now_playing_compute_layout(const reach_dock_now_playing_model *model,
     {
         return layout;
     }
-    layout.cover = reach_dock_now_playing_rect(bounds.x, bounds.y,
-                                               bounds.width * REACH_DOCK_NOW_PLAYING_COVER_WIDTH,
-                                               bounds.height);
+    layout.cover = reach_dock_now_playing_rect(
+        bounds.x, bounds.y, bounds.width * REACH_DOCK_NOW_PLAYING_COVER_WIDTH, bounds.height);
 
     float title_height = actual->now_playing_title_text_size * dpi_scale;
     float artist_height = actual->now_playing_artist_text_size * dpi_scale;

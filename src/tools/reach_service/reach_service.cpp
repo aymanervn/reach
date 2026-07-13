@@ -738,8 +738,7 @@ static void reach_helper_publish_window_state(void)
     reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS] = {};
     uint32_t window_count = 0;
     for (uint32_t index = 0;
-         index < response.window_count && window_count < REACH_SERVICE_MAX_WINDOWS;
-         ++index)
+         index < response.window_count && window_count < REACH_SERVICE_MAX_WINDOWS; ++index)
     {
         if (response.windows[index].include_in_switcher)
         {
@@ -1200,8 +1199,8 @@ static reach_result reach_helper_execute(const reach_service_request *request,
 
     if (response != nullptr)
     {
-        response->action_result = result == REACH_OK ? REACH_SERVICE_ACTION_SUCCEEDED
-                                                     : REACH_SERVICE_ACTION_TIMED_OUT;
+        response->action_result =
+            result == REACH_OK ? REACH_SERVICE_ACTION_SUCCEEDED : REACH_SERVICE_ACTION_TIMED_OUT;
     }
     if (result == REACH_OK)
     {
@@ -1279,9 +1278,9 @@ static reach_helper_pipe_wait_result reach_helper_wait_for_pipe_io(HANDLE shell_
     return REACH_HELPER_PIPE_WAIT_COMPLETED;
 }
 
-static reach_helper_pipe_wait_result
-reach_helper_read_request(HANDLE shell_mutex, HANDLE pipe, OVERLAPPED *overlapped,
-                          reach_service_request *request)
+static reach_helper_pipe_wait_result reach_helper_read_request(HANDLE shell_mutex, HANDLE pipe,
+                                                               OVERLAPPED *overlapped,
+                                                               reach_service_request *request)
 {
     ResetEvent(overlapped->hEvent);
     DWORD read = 0;

@@ -454,8 +454,8 @@ static reach_result reach_media_controls_read_state(reach_media_controls_adapter
 }
 
 static reach_result reach_media_controls_read_cover(reach_media_controls_adapter *adapter,
-                                                     uint64_t media_generation,
-                                                     reach_media_cover *out_cover)
+                                                    uint64_t media_generation,
+                                                    reach_media_cover *out_cover)
 {
     REACH_ASSERT(adapter != nullptr);
     REACH_ASSERT(out_cover != nullptr);
@@ -514,8 +514,7 @@ static reach_result reach_media_controls_read_cover(reach_media_controls_adapter
     }
     catch (winrt::hresult_error const &)
     {
-        out_cover->current =
-            reach_media_controls_generation(adapter) == media_generation ? 1 : 0;
+        out_cover->current = reach_media_controls_generation(adapter) == media_generation ? 1 : 0;
         return REACH_ERROR;
     }
 }
@@ -550,8 +549,8 @@ static reach_result reach_media_controls_get_state_on_worker(reach_media_control
 }
 
 static reach_result reach_media_controls_get_cover_on_worker(reach_media_controls_adapter *adapter,
-                                                              uint64_t media_generation,
-                                                              reach_media_cover *out_cover)
+                                                             uint64_t media_generation,
+                                                             reach_media_cover *out_cover)
 {
     REACH_ASSERT(adapter != nullptr);
     REACH_ASSERT(out_cover != nullptr);
@@ -575,8 +574,7 @@ static reach_result reach_media_controls_get_cover_on_worker(reach_media_control
     }
     catch (...)
     {
-        out_cover->current =
-            reach_media_controls_generation(adapter) == media_generation ? 1 : 0;
+        out_cover->current = reach_media_controls_generation(adapter) == media_generation ? 1 : 0;
         return REACH_ERROR;
     }
 

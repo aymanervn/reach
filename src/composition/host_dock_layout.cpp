@@ -3,7 +3,7 @@
 #include <math.h>
 
 static int32_t reach_host_dock_key_equal(int32_t a_pinned, uint32_t a_pin_id, uintptr_t a_window,
-                                          int32_t b_pinned, uint32_t b_pin_id, uintptr_t b_window)
+                                         int32_t b_pinned, uint32_t b_pin_id, uintptr_t b_window)
 {
     reach_dock_order_key a = {a_pinned, a_pin_id, a_window};
     reach_dock_order_key b = {b_pinned, b_pin_id, b_window};
@@ -13,9 +13,9 @@ static int32_t reach_host_dock_key_equal(int32_t a_pinned, uint32_t a_pin_id, ui
 static int32_t reach_host_transient_open(const reach_host *host)
 {
 
-    return reach_host_any_surface_open(
-        const_cast<reach_host *>(host), reach_surface_class_bit(REACH_SURFACE_CLASS_TRANSIENT) |
-                                            reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
+    return reach_host_any_surface_open(const_cast<reach_host *>(host),
+                                       reach_surface_class_bit(REACH_SURFACE_CLASS_TRANSIENT) |
+                                           reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
 }
 
 int32_t reach_host_dock_can_hide(const reach_host *host)
@@ -53,7 +53,7 @@ void reach_host_request_dock_visibility_update(reach_host *host)
 }
 
 static void reach_host_sync_pointer_move_enabled(reach_platform_window_port *window,
-                                                  int32_t desired, int32_t *current, int32_t force)
+                                                 int32_t desired, int32_t *current, int32_t force)
 {
     if (window == nullptr || current == nullptr)
     {
@@ -88,10 +88,10 @@ void reach_host_sync_pointer_move_subscriptions(reach_host *host)
         {
             continue;
         }
-        int32_t wants = desc->capsule_ops != nullptr &&
-                                desc->capsule_ops->wants_pointer_move != nullptr
-                            ? desc->capsule_ops->wants_pointer_move(desc->capsule)
-                            : 0;
+        int32_t wants =
+            desc->capsule_ops != nullptr && desc->capsule_ops->wants_pointer_move != nullptr
+                ? desc->capsule_ops->wants_pointer_move(desc->capsule)
+                : 0;
         if (desc->id == REACH_SURFACE_ID_DOCK)
         {
             wants = wants || reach_host_dock_can_hide(host);
@@ -120,8 +120,8 @@ static int32_t reach_host_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f3
 }
 
 static void reach_host_apply_reveal_edge(reach_host *host, int32_t mode,
-                                          reach_rect_f32 shown_dock_bounds,
-                                          reach_rect_f32 monitor_bounds)
+                                         reach_rect_f32 shown_dock_bounds,
+                                         reach_rect_f32 monitor_bounds)
 {
     if (host == nullptr || host->dock_reveal_edge.edge == nullptr)
     {
@@ -168,9 +168,8 @@ static void reach_host_apply_reveal_edge(reach_host *host, int32_t mode,
     }
 }
 
-reach_rect_f32 reach_host_reconcile_dock_visibility(reach_host *host,
-                                                     reach_rect_f32 shown_bounds,
-                                                     reach_rect_f32 monitor_bounds)
+reach_rect_f32 reach_host_reconcile_dock_visibility(reach_host *host, reach_rect_f32 shown_bounds,
+                                                    reach_rect_f32 monitor_bounds)
 {
     REACH_ASSERT(host != nullptr);
 
@@ -299,7 +298,8 @@ int32_t reach_host_can_move_dock_without_redraw(const reach_host *host)
         return 0;
     }
 
-    return reach_animation_manager_active(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y) &&
+    return reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
+                                          REACH_DOCK_ANIM_Y) &&
            host->has_layout && !host->dirty.update_requested && !host->dirty.layout &&
            !host->dirty.render && !host->dock.dirty_flags && !host->launcher.dirty_flags &&
            !host->tray.dirty_flags && !host->switcher.dirty_flags &&
@@ -323,7 +323,8 @@ reach_result reach_host_move_dock_animation_frame(reach_host *host)
     }
 
     reach_rect_f32 dock_bounds = host->layout.dock.bounds;
-    dock_bounds.y = reach_animation_manager_value(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y);
+    dock_bounds.y =
+        reach_animation_manager_value(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y);
 
     int32_t dock_window_changed = 0;
     reach_result result = reach_host_apply_window_state(

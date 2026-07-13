@@ -310,8 +310,8 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     reach_launcher_state *state = reach_launcher_state_mut(launcher);
 
     uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS] = {};
-    for (size_t index = 0;
-         index < state->model.result_count && index < REACH_SEARCH_MAX_RESULTS; ++index)
+    for (size_t index = 0; index < state->model.result_count && index < REACH_SEARCH_MAX_RESULTS;
+         ++index)
     {
         const uint16_t *path = state->model.results[index].path;
         if (path[0] != 0)

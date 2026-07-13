@@ -357,8 +357,7 @@ int32_t reach_system_status_take_system(reach_system_status *service,
 
 static int32_t reach_system_status_worker_pending(const reach_system_status_worker *worker)
 {
-    reach_system_status_worker *mutable_worker =
-        const_cast<reach_system_status_worker *>(worker);
+    reach_system_status_worker *mutable_worker = const_cast<reach_system_status_worker *>(worker);
     std::lock_guard<std::mutex> lock(mutable_worker->mutex);
     return mutable_worker->pending || mutable_worker->in_flight || mutable_worker->completed;
 }

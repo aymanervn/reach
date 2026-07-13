@@ -85,17 +85,17 @@ reach_result reach_host_render_quick_settings_surface(reach_host *host)
 
     reach_render_command_buffer commands = {};
     reach_result result = reach_quick_settings_append_render_commands(
-        host->quick_settings_capsule,
-        host->theme != nullptr ? host->theme : reach_theme_default(),
+        host->quick_settings_capsule, host->theme != nullptr ? host->theme : reach_theme_default(),
         reach_host_layout_dpi_scale(host), &commands);
     if (result != REACH_OK)
     {
         return result;
     }
 
-    return reach_host_render_popup_surface(host, &host->quick_settings,
-                                            reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds,
-                                            reach_quick_settings_state_ptr(host->quick_settings_capsule)->notch_anchor_x, &commands);
+    return reach_host_render_popup_surface(
+        host, &host->quick_settings,
+        reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds,
+        reach_quick_settings_state_ptr(host->quick_settings_capsule)->notch_anchor_x, &commands);
 }
 
 size_t reach_host_switcher_visible_count(const reach_host *host)
@@ -141,12 +141,11 @@ reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32
 }
 
 reach_result reach_host_render_launcher_surface(reach_host *host,
-                                                 const reach_launcher_layout *layout)
+                                                const reach_launcher_layout *layout)
 {
     REACH_ASSERT(host != nullptr);
     REACH_ASSERT(layout != nullptr);
-    if (host == nullptr || layout == nullptr ||
-        host->launcher.renderer.ops.begin_frame == nullptr)
+    if (host == nullptr || layout == nullptr || host->launcher.renderer.ops.begin_frame == nullptr)
     {
         return REACH_OK;
     }
@@ -187,17 +186,17 @@ reach_result reach_host_render_clipboard_surface(reach_host *host)
     {
         return result;
     }
-    result = host->clipboard_surface.renderer.ops.begin_frame(
-        host->clipboard_surface.renderer.backend);
+    result =
+        host->clipboard_surface.renderer.ops.begin_frame(host->clipboard_surface.renderer.backend);
     if (result != REACH_OK)
     {
         return result;
     }
 
-    result = host->clipboard_surface.renderer.ops.execute(
-        host->clipboard_surface.renderer.backend, &commands);
-    reach_result end_result = host->clipboard_surface.renderer.ops.end_frame(
-        host->clipboard_surface.renderer.backend);
+    result = host->clipboard_surface.renderer.ops.execute(host->clipboard_surface.renderer.backend,
+                                                          &commands);
+    reach_result end_result =
+        host->clipboard_surface.renderer.ops.end_frame(host->clipboard_surface.renderer.backend);
     return result != REACH_OK ? result : end_result;
 }
 

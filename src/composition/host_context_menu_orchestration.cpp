@@ -19,7 +19,7 @@ void reach_host_close_context_menu(reach_host *host)
 }
 
 static reach_result reach_host_launch_context_menu_item(reach_host *host, const uint16_t *path,
-                                                         size_t pinned_index, int32_t run_as_admin)
+                                                        size_t pinned_index, int32_t run_as_admin)
 {
     if (host == nullptr || path == nullptr || path[0] == 0)
     {
@@ -39,8 +39,8 @@ static int32_t reach_host_dock_item_command_allowed(reach_host *host, size_t ite
                                                     uint32_t command)
 {
     uint32_t commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
-    size_t count = reach_dock_build_item_context_commands(host->dock_capsule, item_index,
-                                                          commands, REACH_CONTEXT_MENU_MAX_ITEMS);
+    size_t count = reach_dock_build_item_context_commands(host->dock_capsule, item_index, commands,
+                                                          REACH_CONTEXT_MENU_MAX_ITEMS);
     for (size_t index = 0; index < count; ++index)
     {
         if (commands[index] == command)
@@ -111,7 +111,8 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
         return reach_host_schedule_app_launch(host, &settings_request);
     }
 
-    if (reach_context_menu_state_ptr(host->context_menu_capsule)->target_index >= reach_dock_item_count(host->dock_capsule))
+    if (reach_context_menu_state_ptr(host->context_menu_capsule)->target_index >=
+        reach_dock_item_count(host->dock_capsule))
     {
         return REACH_OK;
     }
@@ -157,7 +158,7 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
 
             if (host->window_manager.ops.pin_app_for_window != nullptr &&
                 host->window_manager.ops.pin_app_for_window(host->window_manager.manager,
-                                                             window->id, window, &app) == REACH_OK)
+                                                            window->id, window, &app) == REACH_OK)
             {
             }
             else
@@ -182,8 +183,7 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE)
     {
-        return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE,
-                                                   window_id);
+        return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id);
     }
 
     return REACH_OK;
@@ -275,8 +275,8 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     return REACH_OK;
 }
 
-reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item_index,
-                                                    int32_t x, int32_t y)
+reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item_index, int32_t x,
+                                                   int32_t y)
 {
     if (host == nullptr || item_index >= reach_dock_item_count(host->dock_capsule))
     {
@@ -296,8 +296,8 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
     ctx.pointer_y = (float)y;
     if (host->has_layout && item_index < host->layout.dock.app_slot_count)
     {
-        reach_rect_f32 slot = reach_dock_rect_to_screen(
-            &host->layout.dock, host->layout.dock.app_slots[item_index]);
+        reach_rect_f32 slot =
+            reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.app_slots[item_index]);
         ctx.anchored = 1;
         ctx.anchor_x = slot.x + slot.width * 0.5f;
         ctx.dock_top_y = host->layout.dock.bounds.y;

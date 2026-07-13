@@ -18,8 +18,7 @@ typedef struct reach_dock_hit_result
     size_t index;
 } reach_dock_hit_result;
 
-reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32_t x,
-                                          int32_t y);
+reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32_t x, int32_t y);
 float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layout *layout,
                                 int32_t cursor_x, float grab_offset_x);
 
@@ -71,8 +70,7 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
                             reach_dock_interaction_result *out);
 void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context *ctx,
                          reach_dock_interaction_result *out);
-int32_t reach_dock_item_release(reach_dock *dock, size_t index,
-                                reach_dock_item_action *out_action,
+int32_t reach_dock_item_release(reach_dock *dock, size_t index, reach_dock_item_action *out_action,
                                 reach_dock_interaction_result *out);
 void reach_dock_clear_pressed(reach_dock *dock);
 reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature_model *model,

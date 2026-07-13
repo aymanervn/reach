@@ -47,7 +47,7 @@ reach_result reach_host_refresh_tray_items(reach_host *host)
 }
 
 void reach_host_compute_tray_popup_layout(reach_host *host, const reach_dock_layout *dock_layout,
-                                           reach_rect_f32 *out_bounds)
+                                          reach_rect_f32 *out_bounds)
 {
     if (host == nullptr || dock_layout == nullptr || out_bounds == nullptr)
     {
@@ -59,8 +59,8 @@ void reach_host_compute_tray_popup_layout(reach_host *host, const reach_dock_lay
                             reach_host_layout_dpi_scale(host), out_bounds);
 }
 
-reach_result reach_host_apply_tray_pointer_action(
-    reach_host *host, const reach_ui_event *event, const reach_capsule_pointer_result *result)
+reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_ui_event *event,
+                                                  const reach_capsule_pointer_result *result)
 {
     (void)event;
     if (host == nullptr || result == nullptr)
@@ -87,7 +87,6 @@ reach_result reach_host_apply_tray_pointer_action(
     {
         (void)host->tray.window.ops.set_topmost(host->tray.window.window, 0);
     }
-    return host->tray_provider.ops.activate(host->tray_provider.provider,
-                                            static_cast<uint32_t>(result->action.id),
-                                            provider_action);
+    return host->tray_provider.ops.activate(
+        host->tray_provider.provider, static_cast<uint32_t>(result->action.id), provider_action);
 }

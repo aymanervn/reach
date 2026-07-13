@@ -59,7 +59,7 @@ void reach_host_notify_launcher_search_ready(reach_host *host)
     }
 
     (void)host->launcher.window.ops.post_event(host->launcher.window.window,
-                                                REACH_UI_EVENT_LAUNCHER_SEARCH_READY);
+                                               REACH_UI_EVENT_LAUNCHER_SEARCH_READY);
 }
 
 void reach_host_remember_launcher_restore_window(reach_host *host)
@@ -69,10 +69,9 @@ void reach_host_remember_launcher_restore_window(reach_host *host)
         return;
     }
 
-    uintptr_t foreground =
-        host->window_manager.ops.foreground != nullptr
-            ? host->window_manager.ops.foreground(host->window_manager.manager)
-            : 0;
+    uintptr_t foreground = host->window_manager.ops.foreground != nullptr
+                               ? host->window_manager.ops.foreground(host->window_manager.manager)
+                               : 0;
     reach_launcher_remember_restore_window(host->launcher_capsule, foreground);
 }
 
@@ -164,10 +163,11 @@ reach_result reach_host_open_launcher_result(reach_host *host)
     }
 
     if (reach_launcher_result_count(host->launcher_capsule) > 0 &&
-        reach_launcher_selected_result_index(host->launcher_capsule) < reach_launcher_result_count(host->launcher_capsule))
+        reach_launcher_selected_result_index(host->launcher_capsule) <
+            reach_launcher_result_count(host->launcher_capsule))
     {
-        const reach_search_candidate *result =
-            reach_launcher_result_at(host->launcher_capsule, reach_launcher_selected_result_index(host->launcher_capsule));
+        const reach_search_candidate *result = reach_launcher_result_at(
+            host->launcher_capsule, reach_launcher_selected_result_index(host->launcher_capsule));
         if (result->path[0] == 0)
         {
             return REACH_OK;
@@ -175,7 +175,7 @@ reach_result reach_host_open_launcher_result(reach_host *host)
         if (result->kind == REACH_SEARCH_RESULT_APP)
         {
             return reach_host_open_app(host, result->path, nullptr, nullptr, 0,
-                                        reach_launcher_is_open(host->launcher_capsule));
+                                       reach_launcher_is_open(host->launcher_capsule));
         }
 
         return reach_host_launch_app(host, result->path, nullptr, 0, 0,
@@ -196,7 +196,7 @@ reach_result reach_host_open_launcher_result(reach_host *host)
         host->explorer_service.ops.open_shell_location != nullptr)
     {
         return host->explorer_service.ops.open_shell_location(host->explorer_service.service,
-                                                               query);
+                                                              query);
     }
 
     if (host->explorer_service.ops.path_exists != nullptr &&
@@ -227,7 +227,8 @@ reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_i
         return REACH_INVALID_ARGUMENT;
     }
 
-    const reach_search_candidate *result = reach_launcher_result_at(host->launcher_capsule, result_index);
+    const reach_search_candidate *result =
+        reach_launcher_result_at(host->launcher_capsule, result_index);
     if (result->kind != REACH_SEARCH_RESULT_APP || result->path[0] == 0)
     {
         return REACH_OK;

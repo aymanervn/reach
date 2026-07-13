@@ -25,12 +25,13 @@ typedef enum reach_quick_settings_hit_type
 extern "C"
 {
 #endif
-reach_quick_settings_state *reach_quick_settings_state_mut(reach_quick_settings *quick_settings);
-void reach_quick_settings_reset(reach_quick_settings *quick_settings);
-void reach_quick_settings_tick(reach_quick_settings *quick_settings, double delta_seconds);
-void reach_quick_settings_start_height_animation(reach_quick_settings *quick_settings,
-                                                 float from_height, float to_height);
-float reach_quick_settings_height_animation_value(const reach_quick_settings *quick_settings);
+    reach_quick_settings_state *
+    reach_quick_settings_state_mut(reach_quick_settings *quick_settings);
+    void reach_quick_settings_reset(reach_quick_settings *quick_settings);
+    void reach_quick_settings_tick(reach_quick_settings *quick_settings, double delta_seconds);
+    void reach_quick_settings_start_height_animation(reach_quick_settings *quick_settings,
+                                                     float from_height, float to_height);
+    float reach_quick_settings_height_animation_value(const reach_quick_settings *quick_settings);
 #ifdef __cplusplus
 }
 #endif

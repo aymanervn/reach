@@ -65,8 +65,7 @@ int wmain(int argc, wchar_t **argv)
                 user_id = argv[index + 2];
             }
             int ok = reachctl_install_service(user_id) == REACH_OK;
-            reachctl_print(ok ? L"Reach service repaired."
-                              : L"Reach service repair failed.");
+            reachctl_print(ok ? L"Reach service repaired." : L"Reach service repair failed.");
             return ok ? 0 : 1;
         }
 

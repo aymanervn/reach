@@ -32,7 +32,7 @@ static void reach_host_on_config_service_ready(void *user)
     if (host->launcher.window.ops.post_event != nullptr)
     {
         (void)host->launcher.window.ops.post_event(host->launcher.window.window,
-                                                    REACH_UI_EVENT_CONFIG_CHANGED);
+                                                   REACH_UI_EVENT_CONFIG_CHANGED);
     }
     else
     {
@@ -80,7 +80,7 @@ static void reach_host_on_clipboard_changed(void *user)
         return;
     }
     (void)host->clipboard_surface.window.ops.post_event(host->clipboard_surface.window.window,
-                                                         REACH_UI_EVENT_CLIPBOARD_CHANGED);
+                                                        REACH_UI_EVENT_CLIPBOARD_CHANGED);
 }
 
 static void reach_host_cleanup(reach_host *host)
@@ -314,12 +314,11 @@ static void reach_host_cleanup(reach_host *host)
     host->now_playing_service = nullptr;
     host->clipboard = {};
     host->quick_settings_system_change_flags.store(0);
-
 }
 
 reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
-                                                  const reach_host_dependencies *dependencies,
-                                                  reach_host **out_shell)
+                                                 const reach_host_dependencies *dependencies,
+                                                 reach_host **out_shell)
 {
     (void)desc;
     REACH_ASSERT(dependencies != nullptr);
@@ -432,8 +431,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->tray_provider = dependencies->tray_provider;
     host->search_provider = dependencies->search_provider;
     host->search_service = nullptr;
-    if (reach_search_service_create(host->search_provider, reach_host_on_search_service_ready,
-                                    host, &host->search_service) != REACH_OK)
+    if (reach_search_service_create(host->search_provider, reach_host_on_search_service_ready, host,
+                                    &host->search_service) != REACH_OK)
     {
         result = REACH_ERROR;
     }
@@ -441,8 +440,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->app_control = nullptr;
     if (reach_app_control_create(host->app_launcher, host->window_manager,
                                  reach_host_on_app_control_notify, host,
-                                 &host->app_control) !=
-        REACH_OK)
+                                 &host->app_control) != REACH_OK)
     {
         result = REACH_ERROR;
     }
@@ -509,8 +507,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                 host->dock_config.width = snapshot.dock_width;
             host->dock_config.icon_size =
                 reach_theme_icon_box_size(host->theme, host->dock_config.height);
-            (void)reach_host_set_pinned_apps(host, snapshot.pinned_apps,
-                                              snapshot.pinned_app_count);
+            (void)reach_host_set_pinned_apps(host, snapshot.pinned_apps, snapshot.pinned_app_count);
             reach_host_seed_or_apply_wallpaper(host, &snapshot);
         }
     }
@@ -574,7 +571,7 @@ reach_result reach_host_start(reach_host *host)
     if (host->dock.window.ops.set_event_callback != nullptr)
     {
         result = host->dock.window.ops.set_event_callback(host->dock.window.window,
-                                                           reach_host_on_dock_window_event, host);
+                                                          reach_host_on_dock_window_event, host);
         if (result != REACH_OK)
         {
             return result;
@@ -592,7 +589,7 @@ reach_result reach_host_start(reach_host *host)
     if (host->tray.window.ops.set_event_callback != nullptr)
     {
         result = host->tray.window.ops.set_event_callback(host->tray.window.window,
-                                                           reach_host_on_tray_window_event, host);
+                                                          reach_host_on_tray_window_event, host);
         if (result != REACH_OK)
         {
             return result;
@@ -637,7 +634,7 @@ reach_result reach_host_start(reach_host *host)
     if (host->clipboard.ops.start != nullptr)
     {
         result = host->clipboard.ops.start(host->clipboard.provider,
-                                            reach_host_on_clipboard_changed, host);
+                                           reach_host_on_clipboard_changed, host);
         if (result != REACH_OK)
         {
             return result;
@@ -648,7 +645,7 @@ reach_result reach_host_start(reach_host *host)
     if (host->dock_reveal_edge.ops.set_callback != nullptr)
     {
         result = host->dock_reveal_edge.ops.set_callback(host->dock_reveal_edge.edge,
-                                                          reach_host_on_dock_reveal_edge, host);
+                                                         reach_host_on_dock_reveal_edge, host);
         if (result != REACH_OK)
         {
             return result;
@@ -657,7 +654,7 @@ reach_result reach_host_start(reach_host *host)
     if (host->system_controls.start_watching != nullptr)
     {
         (void)host->system_controls.start_watching(host->system_controls.userdata,
-                                                    reach_host_on_system_controls_changed, host);
+                                                   reach_host_on_system_controls_changed, host);
     }
     result = reach_now_playing_service_start(host->now_playing_service);
     if (result != REACH_OK)
@@ -688,7 +685,7 @@ reach_result reach_host_start(reach_host *host)
         if (host->window_manager.ops.activate != nullptr)
         {
             (void)host->window_manager.ops.activate(host->window_manager.manager,
-                                                     startup_foreground);
+                                                    startup_foreground);
         }
     }
 

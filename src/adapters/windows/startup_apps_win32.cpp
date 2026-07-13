@@ -502,12 +502,10 @@ static void reach_windows_collect_run_command(reach_windows_startup_collector *c
         return;
     }
 
-    reach_windows_startup_collect(collector, executable,
-                                  arguments[0] != 0 ? arguments : nullptr);
+    reach_windows_startup_collect(collector, executable, arguments[0] != 0 ? arguments : nullptr);
 }
 
-static void reach_windows_collect_run_key(reach_windows_startup_collector *collector,
-                                          HKEY root)
+static void reach_windows_collect_run_key(reach_windows_startup_collector *collector, HKEY root)
 {
     HKEY key = nullptr;
 
@@ -572,8 +570,7 @@ static void reach_windows_collect_run_key(reach_windows_startup_collector *colle
     RegCloseKey(key);
 }
 
-size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
-                                          size_t capacity)
+size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests, size_t capacity)
 {
     if (out_requests == nullptr || capacity == 0)
     {

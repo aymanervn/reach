@@ -196,7 +196,8 @@ extern "C"
     reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settings);
     void reach_quick_settings_destroy(reach_quick_settings *quick_settings);
     void reach_quick_settings_reset_height_animation(reach_quick_settings *quick_settings);
-    int32_t reach_quick_settings_height_animation_active(const reach_quick_settings *quick_settings);
+    int32_t
+    reach_quick_settings_height_animation_active(const reach_quick_settings *quick_settings);
 
     typedef struct reach_quick_settings_drag_state
     {
@@ -233,12 +234,13 @@ extern "C"
                                                 int32_t muted);
     void reach_quick_settings_apply_sessions(reach_quick_settings *quick_settings,
                                              const reach_audio_volume_session_list *sessions);
-    void reach_quick_settings_apply_output_devices(
-        reach_quick_settings *quick_settings, const reach_audio_output_device_list *devices);
+    void reach_quick_settings_apply_output_devices(reach_quick_settings *quick_settings,
+                                                   const reach_audio_output_device_list *devices);
 
-    reach_result reach_quick_settings_append_render_commands(
-        reach_quick_settings *quick_settings, const reach_theme *theme, float dpi_scale,
-        reach_render_command_buffer *out_commands);
+    reach_result
+    reach_quick_settings_append_render_commands(reach_quick_settings *quick_settings,
+                                                const reach_theme *theme, float dpi_scale,
+                                                reach_render_command_buffer *out_commands);
 
     typedef struct reach_quick_settings_layout_context
     {
@@ -271,8 +273,9 @@ extern "C"
 
     const uint16_t *reach_quick_settings_set_session_level(reach_quick_settings *quick_settings,
                                                            size_t session_index, float level);
-    const uint16_t *reach_quick_settings_output_device_id(
-        const reach_quick_settings *quick_settings, size_t output_device_index);
+    const uint16_t *
+    reach_quick_settings_output_device_id(const reach_quick_settings *quick_settings,
+                                          size_t output_device_index);
 
     typedef struct reach_quick_settings_system_apply_result
     {
@@ -280,11 +283,13 @@ extern "C"
         int32_t relayout;
     } reach_quick_settings_system_apply_result;
 
-    void reach_quick_settings_apply_system_states(
-        reach_quick_settings *quick_settings, const reach_network_state *network,
-        const reach_bluetooth_state *bluetooth, const reach_power_state *power,
-        const reach_brightness_state *brightness, int32_t bluetooth_valid,
-        reach_quick_settings_system_apply_result *out);
+    void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settings,
+                                                  const reach_network_state *network,
+                                                  const reach_bluetooth_state *bluetooth,
+                                                  const reach_power_state *power,
+                                                  const reach_brightness_state *brightness,
+                                                  int32_t bluetooth_valid,
+                                                  reach_quick_settings_system_apply_result *out);
 
     void reach_quick_settings_attach_status(reach_quick_settings *quick_settings,
                                             reach_system_status *status);

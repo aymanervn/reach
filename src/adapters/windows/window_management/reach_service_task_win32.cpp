@@ -154,7 +154,7 @@ static int32_t reach_same_directory(const wchar_t *a, const wchar_t *b)
 }
 
 static int32_t reach_service_registered_task_valid(IRegisteredTask *task,
-                                                            const wchar_t *helper_path)
+                                                   const wchar_t *helper_path)
 {
     if (task == nullptr || helper_path == nullptr || helper_path[0] == 0)
     {
@@ -218,8 +218,7 @@ static int32_t reach_service_registered_task_valid(IRegisteredTask *task,
     return valid;
 }
 
-reach_result reach_service_task_register(const wchar_t *helper_path,
-                                                  const wchar_t *user_id)
+reach_result reach_service_task_register(const wchar_t *helper_path, const wchar_t *user_id)
 {
     if (helper_path == nullptr || helper_path[0] == 0)
     {
@@ -459,8 +458,7 @@ int32_t reach_service_task_valid(const wchar_t *helper_path)
     IRegisteredTask *task = nullptr;
     HRESULT hr = task_name != nullptr ? session.root->GetTask(task_name, &task) : E_OUTOFMEMORY;
     SysFreeString(task_name);
-    int32_t valid =
-        SUCCEEDED(hr) && reach_service_registered_task_valid(task, helper_path);
+    int32_t valid = SUCCEEDED(hr) && reach_service_registered_task_valid(task, helper_path);
     if (task != nullptr)
     {
         task->Release();

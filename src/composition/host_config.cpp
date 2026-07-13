@@ -1,7 +1,7 @@
 #include "host_internal.h"
 
 reach_result reach_host_set_pinned_apps(reach_host *host, const reach_pinned_app_model *apps,
-                                         size_t count)
+                                        size_t count)
 {
     if (host == nullptr || (apps == nullptr && count != 0))
     {
@@ -87,9 +87,9 @@ reach_result reach_host_schedule_unpin_id(reach_host *host, uint32_t pin_id)
 
 reach_result reach_host_schedule_move_pin(reach_host *host, uint32_t pin_id, size_t target_index)
 {
-    return host != nullptr ? reach_config_service_schedule_move_pin(host->config_service, pin_id,
-                                                                    target_index)
-                           : REACH_INVALID_ARGUMENT;
+    return host != nullptr
+               ? reach_config_service_schedule_move_pin(host->config_service, pin_id, target_index)
+               : REACH_INVALID_ARGUMENT;
 }
 
 void reach_host_stop_config_reload_worker(reach_host *host)
@@ -132,7 +132,7 @@ int32_t reach_host_apply_config_reload_result(reach_host *host)
 }
 
 static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
-                                                         const reach_config_snapshot *snapshot)
+                                                        const reach_config_snapshot *snapshot)
 {
     if (host == nullptr || snapshot == nullptr)
     {
@@ -159,8 +159,8 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
         }
     }
 
-    reach_result result = reach_host_set_pinned_apps(host, snapshot->pinned_apps,
-                                                      snapshot->pinned_app_count);
+    reach_result result =
+        reach_host_set_pinned_apps(host, snapshot->pinned_apps, snapshot->pinned_app_count);
     if (result != REACH_OK)
     {
         return result;
@@ -172,7 +172,7 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
             for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
             {
                 if (reach_host_path_equals(host->pinned_apps[pin_index].path,
-                                            old_order_paths[order_index]))
+                                           old_order_paths[order_index]))
                 {
                     old_order[order_index].pin_id = host->pinned_apps[pin_index].id;
                     break;
@@ -200,7 +200,7 @@ void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot 
 }
 
 static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, size_t a_count,
-                                             const reach_pinned_app_model *b, size_t b_count)
+                                            const reach_pinned_app_model *b, size_t b_count)
 {
     if (a_count != b_count)
     {
@@ -209,8 +209,7 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
 
     for (size_t index = 0; index < a_count; ++index)
     {
-        if (a[index].id != b[index].id ||
-            !reach_host_utf16_equal(a[index].title, b[index].title) ||
+        if (a[index].id != b[index].id || !reach_host_utf16_equal(a[index].title, b[index].title) ||
             !reach_host_utf16_equal(a[index].path, b[index].path) ||
             !reach_host_utf16_equal(a[index].arguments, b[index].arguments) ||
             !reach_host_utf16_equal(a[index].icon_ref, b[index].icon_ref) ||
@@ -224,8 +223,8 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
 }
 
 reach_result reach_host_apply_config_snapshot(reach_host *host,
-                                               const reach_config_snapshot *snapshot,
-                                               int32_t apply_pins, int32_t apply_wallpaper)
+                                              const reach_config_snapshot *snapshot,
+                                              int32_t apply_pins, int32_t apply_wallpaper)
 {
     if (host == nullptr || snapshot == nullptr)
     {
@@ -234,7 +233,7 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
 
     if (apply_pins &&
         !reach_host_pinned_apps_equal(host->pinned_apps, host->pinned_app_count,
-                                       snapshot->pinned_apps, snapshot->pinned_app_count))
+                                      snapshot->pinned_apps, snapshot->pinned_app_count))
     {
         reach_result pin_result = reach_host_apply_pins_from_snapshot(host, snapshot);
         if (pin_result != REACH_OK)
@@ -259,4 +258,3 @@ void reach_host_reload_wallpaper(reach_host *host, int32_t force)
     }
     reach_wallpaper_reload(host->wallpaper, force);
 }
-

@@ -86,9 +86,12 @@ static reach_result fake_get_cover(void *userdata, uint64_t media_generation,
         std::unique_lock<std::mutex> lock(fake->mutex);
         fake->cover_requests.push_back(media_generation);
         fake->cv.notify_all();
-        fake->cv.wait(lock, [fake, media_generation]()
-                      { return fake->blocked_cover_generation != media_generation ||
-                               fake->allow_blocked_cover; });
+        fake->cv.wait(lock,
+                      [fake, media_generation]()
+                      {
+                          return fake->blocked_cover_generation != media_generation ||
+                                 fake->allow_blocked_cover;
+                      });
         current = fake->state.has_media && fake->state.media_generation == media_generation;
         failed = current && fake->failed_cover_generation == media_generation;
     }
@@ -149,8 +152,8 @@ static void fake_stop_watching(void *userdata)
     fake->callback_user = nullptr;
 }
 
-static void fake_set_state(fake_media_controls *fake, uint64_t media_generation,
-                           const char *title, int32_t has_media)
+static void fake_set_state(fake_media_controls *fake, uint64_t media_generation, const char *title,
+                           int32_t has_media)
 {
     reach_media_controls_change_callback callback = nullptr;
     void *callback_user = nullptr;
@@ -251,13 +254,11 @@ static void test_progressive_latest_only_publication()
     expect_true(reach_now_playing_service_create(port, nullptr, nullptr, &service) == REACH_OK,
                 "service creation succeeds");
     auto service_started_at = std::chrono::steady_clock::now();
-    expect_true(reach_now_playing_service_start(service) == REACH_OK,
-                "service start succeeds");
+    expect_true(reach_now_playing_service_start(service) == REACH_OK, "service start succeeds");
 
     reach_now_playing_snapshot snapshot = {};
     expect_true(wait_for_snapshot(
-                    service,
-                    [](const reach_now_playing_snapshot &value)
+                    service, [](const reach_now_playing_snapshot &value)
                     { return value.has_session && text_equals_ascii(value.title, "First"); },
                     &snapshot),
                 "core state publishes while first cover is blocked");
@@ -286,14 +287,11 @@ static void test_progressive_latest_only_publication()
     }
     fake_set_state(&fake, 2, "Second", 1);
     expect_true(wait_for_cover_request(&fake, 2), "second cover read starts");
-    expect_true(wait_for_snapshot(
-                    service,
-                    [](const reach_now_playing_snapshot &value)
-                    {
-                        return text_equals_ascii(value.title, "Second") &&
-                               value.cover_image_id == 1001;
-                    }),
-                "new core generation temporarily retains the previous cover");
+    expect_true(
+        wait_for_snapshot(
+            service, [](const reach_now_playing_snapshot &value)
+            { return text_equals_ascii(value.title, "Second") && value.cover_image_id == 1001; }),
+        "new core generation temporarily retains the previous cover");
 
     fake_set_state(&fake, 3, "Third", 1);
     expect_true(wait_for_snapshot(service, [](const reach_now_playing_snapshot &value)
@@ -322,27 +320,21 @@ static void test_progressive_latest_only_publication()
     }
     fake_set_state(&fake, 5, "Fifth", 1);
     expect_true(wait_for_cover_request(&fake, 5), "failed current cover read starts");
-    expect_true(wait_for_snapshot(
-                    service,
-                    [](const reach_now_playing_snapshot &value)
-                    {
-                        return text_equals_ascii(value.title, "Fifth") &&
-                               value.cover_image_id == 1004;
-                    }),
-                "old cover remains while the current cover is loading");
+    expect_true(
+        wait_for_snapshot(
+            service, [](const reach_now_playing_snapshot &value)
+            { return text_equals_ascii(value.title, "Fifth") && value.cover_image_id == 1004; }),
+        "old cover remains while the current cover is loading");
     {
         std::lock_guard<std::mutex> lock(fake.mutex);
         fake.allow_blocked_cover = 1;
     }
     fake.cv.notify_all();
-    expect_true(wait_for_snapshot(
-                    service,
-                    [](const reach_now_playing_snapshot &value)
-                    {
-                        return text_equals_ascii(value.title, "Fifth") &&
-                               value.cover_image_id == 0;
-                    }),
-                "current cover failure clears to the placeholder");
+    expect_true(
+        wait_for_snapshot(
+            service, [](const reach_now_playing_snapshot &value)
+            { return text_equals_ascii(value.title, "Fifth") && value.cover_image_id == 0; }),
+        "current cover failure clears to the placeholder");
 
     fake_set_state(&fake, 6, nullptr, 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
@@ -356,9 +348,9 @@ static void test_progressive_latest_only_publication()
 
     auto disappearance_started = std::chrono::steady_clock::now();
     fake_set_state(&fake, 8, nullptr, 0);
-    expect_true(wait_for_snapshot(service, [](const reach_now_playing_snapshot &value)
-                                  { return !value.has_session; },
-                                  nullptr, 5000),
+    expect_true(wait_for_snapshot(
+                    service, [](const reach_now_playing_snapshot &value)
+                    { return !value.has_session; }, nullptr, 5000),
                 "confirmed session absence eventually hides Now Playing");
     auto disappearance_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now() - disappearance_started)
@@ -389,15 +381,12 @@ static void test_progressive_latest_only_publication()
     expect_true(snapshot.has_session && snapshot.transport_pending,
                 "transient empty state neither hides nor unlocks transport");
     fake_set_state(&fake, 11, "Eleventh", 1);
-    expect_true(wait_for_snapshot(
-                    service,
-                    [](const reach_now_playing_snapshot &value)
-                    {
-                        return text_equals_ascii(value.title, "Eleventh") &&
-                               value.transport_pending == 0;
-                    },
-                    &snapshot, 1000),
-                "new core state cancels disappearance and unlocks transport");
+    expect_true(
+        wait_for_snapshot(
+            service, [](const reach_now_playing_snapshot &value)
+            { return text_equals_ascii(value.title, "Eleventh") && value.transport_pending == 0; },
+            &snapshot, 1000),
+        "new core state cancels disappearance and unlocks transport");
     expect_true(snapshot.next_enabled, "transport controls restore from core state");
 
     {

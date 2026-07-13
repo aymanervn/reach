@@ -33,9 +33,9 @@ struct reach_window_manager
 };
 
 static const DWORD REACH_HELPER_RESTART_FAILED_COOLDOWN_MS = 5000;
-static void
-reach_window_manager_icon_ref_for_helper(const reach_service_window_snapshot &helper,
-                                         uint16_t *out_icon_ref, size_t out_icon_ref_count)
+static void reach_window_manager_icon_ref_for_helper(const reach_service_window_snapshot &helper,
+                                                     uint16_t *out_icon_ref,
+                                                     size_t out_icon_ref_count)
 {
     if (out_icon_ref == nullptr || out_icon_ref_count == 0)
     {
@@ -330,8 +330,8 @@ static reach_result reach_window_manager_start_privileged_control(reach_window_m
     wchar_t helper_path[MAX_PATH] = {};
     reach_result result = REACH_ERROR;
 
-    int32_t helper_path_ok = reach_window_manager_sibling_path(L"reachService.exe",
-                                                               helper_path, MAX_PATH) == REACH_OK;
+    int32_t helper_path_ok =
+        reach_window_manager_sibling_path(L"reachService.exe", helper_path, MAX_PATH) == REACH_OK;
 
     int32_t task_valid = helper_path_ok && reach_service_task_valid(helper_path);
 
@@ -412,8 +412,8 @@ static void reach_window_manager_copy_shared_windows(reach_window_manager *manag
 
     reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS] = {};
     uint32_t window_count = 0;
-    if (reach_service_shared_copy_windows(windows, REACH_SERVICE_MAX_WINDOWS,
-                                                   &window_count) != REACH_OK)
+    if (reach_service_shared_copy_windows(windows, REACH_SERVICE_MAX_WINDOWS, &window_count) !=
+        REACH_OK)
     {
         window_count = 0;
     }
@@ -494,8 +494,7 @@ static reach_result reach_window_manager_start(reach_window_manager *manager)
     }
 
     manager->dirty = 1;
-    (void)reach_service_shared_reader_subscribe(reach_window_manager_shared_callback,
-                                                         manager);
+    (void)reach_service_shared_reader_subscribe(reach_window_manager_shared_callback, manager);
     reach_window_manager_copy_shared_windows(manager);
     reach_window_manager_copy_shared_game_mode(manager);
     try
@@ -555,8 +554,8 @@ static reach_result reach_window_manager_refresh(reach_window_manager *manager)
 static reach_result reach_window_manager_snap(reach_window_manager *manager, uintptr_t window_id,
                                               reach_split_mode mode)
 {
-    reach_result result = reach_window_manager_send_helper(
-        manager, REACH_SERVICE_COMMAND_SNAP, window_id, mode);
+    reach_result result =
+        reach_window_manager_send_helper(manager, REACH_SERVICE_COMMAND_SNAP, window_id, mode);
     return result;
 }
 
@@ -765,23 +764,23 @@ static reach_result reach_window_manager_pin_app_for_window(reach_window_manager
 static reach_result reach_window_manager_activate(reach_window_manager *manager,
                                                   uintptr_t window_id)
 {
-    reach_result result = reach_window_manager_send_helper(
-        manager, REACH_SERVICE_COMMAND_ACTIVATE, window_id, REACH_SPLIT_LEFT);
+    reach_result result = reach_window_manager_send_helper(manager, REACH_SERVICE_COMMAND_ACTIVATE,
+                                                           window_id, REACH_SPLIT_LEFT);
     return result;
 }
 
 static reach_result reach_window_manager_minimize(reach_window_manager *manager,
                                                   uintptr_t window_id)
 {
-    reach_result result = reach_window_manager_send_helper(
-        manager, REACH_SERVICE_COMMAND_MINIMIZE, window_id, REACH_SPLIT_LEFT);
+    reach_result result = reach_window_manager_send_helper(manager, REACH_SERVICE_COMMAND_MINIMIZE,
+                                                           window_id, REACH_SPLIT_LEFT);
     return result;
 }
 
 static reach_result reach_window_manager_close(reach_window_manager *manager, uintptr_t window_id)
 {
-    reach_result result = reach_window_manager_send_helper(
-        manager, REACH_SERVICE_COMMAND_CLOSE, window_id, REACH_SPLIT_LEFT);
+    reach_result result = reach_window_manager_send_helper(manager, REACH_SERVICE_COMMAND_CLOSE,
+                                                           window_id, REACH_SPLIT_LEFT);
     return result;
 }
 
@@ -822,8 +821,10 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.refresh = reach_window_manager_refresh;
     out_port->ops.snap = reach_window_manager_snap;
     out_port->ops.foreground = reach_window_manager_foreground;
-    out_port->ops.foreground_is_maximized_on_primary = reach_window_manager_foreground_is_maximized_on_primary;
-    out_port->ops.foreground_is_snapped_on_primary = reach_window_manager_foreground_is_snapped_on_primary;
+    out_port->ops.foreground_is_maximized_on_primary =
+        reach_window_manager_foreground_is_maximized_on_primary;
+    out_port->ops.foreground_is_snapped_on_primary =
+        reach_window_manager_foreground_is_snapped_on_primary;
     out_port->ops.game_mode_active = reach_window_manager_game_mode_active;
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;

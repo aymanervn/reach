@@ -5,7 +5,7 @@
 static const DWORD REACH_SERVICE_IO_TIMEOUT_MS = 750;
 
 static BOOL reach_service_wait_for_overlapped(HANDLE pipe, OVERLAPPED *overlapped,
-                                                       DWORD *out_transferred)
+                                              DWORD *out_transferred)
 {
     if (pipe == INVALID_HANDLE_VALUE || overlapped == nullptr || out_transferred == nullptr)
     {
@@ -28,9 +28,8 @@ static BOOL reach_service_wait_for_overlapped(HANDLE pipe, OVERLAPPED *overlappe
     return FALSE;
 }
 
-static BOOL reach_service_write_request(HANDLE pipe,
-                                                 const reach_service_request *request,
-                                                 DWORD *out_written)
+static BOOL reach_service_write_request(HANDLE pipe, const reach_service_request *request,
+                                        DWORD *out_written)
 {
     if (pipe == INVALID_HANDLE_VALUE || request == nullptr || out_written == nullptr)
     {
@@ -64,9 +63,8 @@ static BOOL reach_service_write_request(HANDLE pipe,
     return ok;
 }
 
-static BOOL reach_service_read_response(HANDLE pipe,
-                                                 reach_service_response *response,
-                                                 DWORD *out_read)
+static BOOL reach_service_read_response(HANDLE pipe, reach_service_response *response,
+                                        DWORD *out_read)
 {
     if (pipe == INVALID_HANDLE_VALUE || response == nullptr || out_read == nullptr)
     {
@@ -101,7 +99,7 @@ static BOOL reach_service_read_response(HANDLE pipe,
 }
 
 reach_result reach_service_send_request(const reach_service_request *request,
-                                                 reach_service_response *out_response)
+                                        reach_service_response *out_response)
 {
     if (!reach_service_request_valid(request))
     {
@@ -112,8 +110,8 @@ reach_result reach_service_send_request(const reach_service_request *request,
         return REACH_ERROR;
     }
 
-    HANDLE pipe = CreateFileW(REACH_SERVICE_PIPE_NAME, GENERIC_READ | GENERIC_WRITE, 0,
-                              nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+    HANDLE pipe = CreateFileW(REACH_SERVICE_PIPE_NAME, GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+                              OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
     if (pipe == INVALID_HANDLE_VALUE)
     {
         return REACH_ERROR;
@@ -135,8 +133,7 @@ reach_result reach_service_send_request(const reach_service_request *request,
     ok = reach_service_read_response(pipe, &response, &read);
     CloseHandle(pipe);
 
-    if (!ok || read != sizeof(response) ||
-        response.version != reach_service_protocol_version())
+    if (!ok || read != sizeof(response) || response.version != reach_service_protocol_version())
     {
         return REACH_ERROR;
     }
@@ -148,8 +145,8 @@ reach_result reach_service_send_request(const reach_service_request *request,
     return static_cast<reach_result>(response.result);
 }
 
-reach_result reach_service_send(reach_service_command command,
-                                         uintptr_t window_id, reach_split_mode mode)
+reach_result reach_service_send(reach_service_command command, uintptr_t window_id,
+                                reach_split_mode mode)
 {
     reach_service_request request = {};
     request.version = reach_service_protocol_version();

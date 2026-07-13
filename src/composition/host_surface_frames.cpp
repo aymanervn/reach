@@ -6,12 +6,9 @@ typedef struct reach_host_frame_state
     int32_t visible;
 } reach_host_frame_state;
 
-static reach_result reach_host_apply_transient_frame(reach_host *host,
-                                                     reach_surface_runtime *surface,
-                                                     reach_host_surface_transition *transition,
-                                                     int32_t game_mode,
-                                                     reach_rect_f32 target_bounds, float radius,
-                                                     reach_host_frame_state *out)
+static reach_result reach_host_apply_transient_frame(
+    reach_host *host, reach_surface_runtime *surface, reach_host_surface_transition *transition,
+    int32_t game_mode, reach_rect_f32 target_bounds, float radius, reach_host_frame_state *out)
 {
     *out = {};
 
@@ -164,11 +161,9 @@ reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_cont
     }
 
     int32_t dock_reveal_position_only =
-        reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
-                                       REACH_DOCK_ANIM_Y) &&
+        reach_animation_manager_active(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y) &&
         !reach_dock_slots_animating(host->dock_capsule) && !host->dirty.render &&
-        !host->dock.dirty_flags &&
-        !reach_dock_state_ptr(host->dock_capsule)->drag.active &&
+        !host->dock.dirty_flags && !reach_dock_state_ptr(host->dock_capsule)->drag.active &&
         !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
                                         REACH_DOCK_ANIM_DRAG_SNAP) &&
         !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
@@ -210,8 +205,7 @@ reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_cont
     return REACH_OK;
 }
 
-reach_result reach_host_frame_quick_settings(reach_host *host,
-                                             const reach_host_frame_context *ctx)
+reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_frame_context *ctx)
 {
     const int32_t game_mode = ctx->game_mode;
     if (host->quick_settings.window.ops.set_bounds == nullptr)
@@ -251,8 +245,7 @@ static reach_rect_f32 reach_host_apply_switcher_bounds_animation(reach_host *hos
     }
     int32_t request_redraw = 0;
     reach_rect_f32 animated = reach_switcher_apply_width_animation(
-        host->switcher_capsule,
-        reach_host_surface_transition_visible(&host->switcher_transition),
+        host->switcher_capsule, reach_host_surface_transition_visible(&host->switcher_transition),
         reach_switcher_is_open(host->switcher_capsule), host->switcher.bounds_valid,
         host->switcher.last_bounds.width, target, &request_redraw);
     if (request_redraw)
@@ -272,8 +265,7 @@ reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_
     }
 
     reach_rect_f32 target_switcher_bounds = reach_switcher_bounds_for_count_scaled(
-        monitor_bounds, reach_host_switcher_visible_count(host),
-        reach_host_layout_dpi_scale(host));
+        monitor_bounds, reach_host_switcher_visible_count(host), reach_host_layout_dpi_scale(host));
     reach_rect_f32 switcher_bounds =
         reach_host_apply_switcher_bounds_animation(host, target_switcher_bounds);
 
@@ -289,15 +281,14 @@ reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_
         (host->dirty.render || host->switcher.dirty_flags))
     {
 
-        reach_rect_f32 transitioned_bounds = reach_host_surface_transition_bounds(
-            host, &host->switcher_transition, switcher_bounds);
+        reach_rect_f32 transitioned_bounds =
+            reach_host_surface_transition_bounds(host, &host->switcher_transition, switcher_bounds);
         (void)reach_host_render_switcher_surface(host, transitioned_bounds);
     }
     return REACH_OK;
 }
 
-reach_result reach_host_frame_context_menu(reach_host *host,
-                                           const reach_host_frame_context *ctx)
+reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx)
 {
     const int32_t game_mode = ctx->game_mode;
     if (host->context_menu.window.ops.set_bounds == nullptr)

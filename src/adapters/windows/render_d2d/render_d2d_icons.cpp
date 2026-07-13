@@ -510,10 +510,9 @@ static HRESULT reach_d2d_push_fade_layer(ID2D1RenderTarget *target, D2D1_RECT_F 
     }
     if (SUCCEEDED(hr))
     {
-        D2D1_LAYER_PARAMETERS params =
-            D2D1::LayerParameters(rect, nullptr, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
-                                  D2D1::IdentityMatrix(), 1.0f, *out_brush,
-                                  D2D1_LAYER_OPTIONS_NONE);
+        D2D1_LAYER_PARAMETERS params = D2D1::LayerParameters(
+            rect, nullptr, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(), 1.0f,
+            *out_brush, D2D1_LAYER_OPTIONS_NONE);
         target->PushLayer(params, *out_layer);
     }
     return hr;
@@ -534,9 +533,8 @@ static void reach_d2d_draw_bitmap_with_fade(reach_render_backend *backend,
     }
     if (backend->d2d_context != nullptr)
     {
-        backend->d2d_context->DrawBitmap(bitmap, &rect, opacity,
-                                         D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, source,
-                                         nullptr);
+        backend->d2d_context->DrawBitmap(
+            bitmap, &rect, opacity, D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, source, nullptr);
     }
     else
     {
@@ -609,8 +607,8 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
                 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
 
             target->PushLayer(layer, clip_layer);
-            reach_d2d_draw_bitmap_with_fade(backend, target, bitmap, rect, command->color.a,
-                                            source, command->icon_fade_start);
+            reach_d2d_draw_bitmap_with_fade(backend, target, bitmap, rect, command->color.a, source,
+                                            command->icon_fade_start);
             target->PopLayer();
         }
 

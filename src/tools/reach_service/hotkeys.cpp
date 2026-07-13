@@ -119,15 +119,13 @@ static uint32_t reach_helper_hotkey_key_from_vk(DWORD vk)
 
 static int32_t reach_helper_hotkey_is_windows_key(uint32_t key)
 {
-    return key == REACH_SERVICE_HOTKEY_LEFT_WIN ||
-           key == REACH_SERVICE_HOTKEY_RIGHT_WIN;
+    return key == REACH_SERVICE_HOTKEY_LEFT_WIN || key == REACH_SERVICE_HOTKEY_RIGHT_WIN;
 }
 
 static int32_t reach_helper_hotkey_is_modifier(uint32_t key)
 {
     return key == REACH_SERVICE_HOTKEY_ALT || key == REACH_SERVICE_HOTKEY_SHIFT ||
-           key == REACH_SERVICE_HOTKEY_LEFT_WIN ||
-           key == REACH_SERVICE_HOTKEY_RIGHT_WIN;
+           key == REACH_SERVICE_HOTKEY_LEFT_WIN || key == REACH_SERVICE_HOTKEY_RIGHT_WIN;
 }
 
 static int32_t reach_helper_windows_key_down(void)
@@ -272,8 +270,7 @@ reach_helper_handle_game_mode_key(const reach_helper_key_event *event)
         return REACH_HELPER_KEY_CONTINUE;
     }
 
-    if (event->key == REACH_SERVICE_HOTKEY_TAB && event->down &&
-        reach_helper_physical_alt_down())
+    if (event->key == REACH_SERVICE_HOTKEY_TAB && event->down && reach_helper_physical_alt_down())
     {
         HWND game = GetForegroundWindow();
         reach_helper_clear_hotkey_state();
@@ -298,8 +295,7 @@ reach_helper_handle_alt_tab_key(const reach_helper_key_event *event)
         return REACH_HELPER_KEY_CONSUME;
     }
 
-    if (event->key == REACH_SERVICE_HOTKEY_ESCAPE && event->down &&
-        g_hotkeys.alt_tab_active)
+    if (event->key == REACH_SERVICE_HOTKEY_ESCAPE && event->down && g_hotkeys.alt_tab_active)
     {
         g_hotkeys.alt_tab_active = 0;
         reach_helper_append_hotkey(event->key, REACH_SERVICE_HOTKEY_PRESSED,
@@ -424,10 +420,9 @@ reach_helper_handle_modifier_key(const reach_helper_key_event *event)
     }
 
     reach_helper_update_modifier_state(event->key, event->down ? 1 : 0);
-    reach_helper_append_hotkey(event->key,
-                               event->down ? REACH_SERVICE_HOTKEY_PRESSED
-                                           : REACH_SERVICE_HOTKEY_RELEASED,
-                               reach_helper_hotkey_modifiers());
+    reach_helper_append_hotkey(
+        event->key, event->down ? REACH_SERVICE_HOTKEY_PRESSED : REACH_SERVICE_HOTKEY_RELEASED,
+        reach_helper_hotkey_modifiers());
     return REACH_HELPER_KEY_PASS;
 }
 
@@ -532,10 +527,9 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
         return reach_helper_pass_key_event(code, wparam, lparam);
     }
 
-    reach_helper_append_hotkey(event.key,
-                               event.down ? REACH_SERVICE_HOTKEY_PRESSED
-                                          : REACH_SERVICE_HOTKEY_RELEASED,
-                               reach_helper_hotkey_modifiers());
+    reach_helper_append_hotkey(
+        event.key, event.down ? REACH_SERVICE_HOTKEY_PRESSED : REACH_SERVICE_HOTKEY_RELEASED,
+        reach_helper_hotkey_modifiers());
 
     return reach_helper_pass_key_event(code, wparam, lparam);
 }

@@ -28,8 +28,8 @@ typedef enum reach_clipboard_layout_track
 } reach_clipboard_layout_track;
 
 reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model *model,
-                                                    const reach_clipboard_layout *layout,
-                                                    int32_t x, int32_t y);
+                                                    const reach_clipboard_layout *layout, int32_t x,
+                                                    int32_t y);
 
 void reach_clipboard_feature_reset(reach_clipboard_feature *clipboard);
 void reach_clipboard_feature_tick(reach_clipboard_feature *clipboard, double delta_seconds);
@@ -42,8 +42,8 @@ int32_t reach_clipboard_feature_any_animation_active(const reach_clipboard_featu
 void reach_clipboard_feature_fill_hover_values(const reach_clipboard_feature *clipboard,
                                                float *out_values, size_t count);
 float reach_clipboard_feature_animate_layout_value(reach_clipboard_feature *clipboard,
-                                                   reach_clipboard_layout_track track,
-                                                   float target, int32_t *out_active);
+                                                   reach_clipboard_layout_track track, float target,
+                                                   int32_t *out_active);
 
 typedef enum reach_clipboard_action_type
 {
