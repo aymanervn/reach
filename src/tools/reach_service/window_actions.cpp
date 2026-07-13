@@ -285,6 +285,43 @@ reach_result reach_window_management_minimize(HWND hwnd)
     return REACH_ERROR;
 }
 
+static void reach_window_management_expand_by_invisible_borders(HWND hwnd, RECT *rect)
+{
+    typedef HRESULT(WINAPI * reach_dwm_get_window_attribute_fn)(HWND, DWORD, PVOID, DWORD);
+    static HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
+    static reach_dwm_get_window_attribute_fn get_window_attribute =
+        dwm != nullptr ? reinterpret_cast<reach_dwm_get_window_attribute_fn>(
+                             GetProcAddress(dwm, "DwmGetWindowAttribute"))
+                       : nullptr;
+    static const DWORD reach_dwma_extended_frame_bounds = 9;
+
+    RECT frame = {};
+    RECT window = {};
+    if (get_window_attribute == nullptr ||
+        FAILED(get_window_attribute(hwnd, reach_dwma_extended_frame_bounds, &frame,
+                                    sizeof(frame))) ||
+        !GetWindowRect(hwnd, &window))
+    {
+        return;
+    }
+
+    LONG deltas[4] = {window.left - frame.left, window.top - frame.top,
+                      window.right - frame.right, window.bottom - frame.bottom};
+    const LONG max_border = 64;
+    for (size_t index = 0; index < 4; ++index)
+    {
+        if (deltas[index] < -max_border || deltas[index] > max_border)
+        {
+            return;
+        }
+    }
+
+    rect->left += deltas[0];
+    rect->top += deltas[1];
+    rect->right += deltas[2];
+    rect->bottom += deltas[3];
+}
+
 reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
@@ -322,8 +359,10 @@ reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
 
     reach_window_action_state before = reach_window_management_capture_state(hwnd);
     RECT expected = {target.left, target.top, target.right, target.bottom};
-    BOOL ok = SetWindowPos(hwnd, nullptr, target.left, target.top, target.right - target.left,
-                           target.bottom - target.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    reach_window_management_expand_by_invisible_borders(hwnd, &expected);
+    BOOL ok = SetWindowPos(hwnd, nullptr, expected.left, expected.top,
+                           expected.right - expected.left, expected.bottom - expected.top,
+                           SWP_NOZORDER | SWP_NOACTIVATE);
     if (ok && reach_window_management_wait_for(hwnd, reach_window_management_rect_matches,
                                                &expected, 750))
     {
