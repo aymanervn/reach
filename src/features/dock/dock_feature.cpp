@@ -1621,6 +1621,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
         if (pool < REACH_DOCK_SLOT_CAPACITY)
         {
             reach_dock_slot *slot = &dock->slots[pool];
+            slot->key = item_key;
             if (slot->lifecycle == REACH_DOCK_SLOT_DYING)
             {
 
