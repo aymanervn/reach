@@ -28,6 +28,9 @@ extern "C"
     reach_result reach_layout_compute_split(reach_rect_i32 work_area, reach_split_mode mode,
                                             reach_rect_i32 *out_rect);
 
+    int32_t reach_layout_rect_matches_split(reach_rect_i32 work_area, reach_rect_i32 rect,
+                                            reach_split_mode mode, int32_t tolerance);
+
 #ifdef __cplusplus
 }
 #endif

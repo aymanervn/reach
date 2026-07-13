@@ -39,3 +39,33 @@ reach_result reach_layout_compute_split(reach_rect_i32 work_area, reach_split_mo
     }
     return REACH_OK;
 }
+
+static int32_t reach_layout_edge_within(int32_t a, int32_t b, int32_t tolerance)
+{
+    int32_t delta = a - b;
+    if (delta < 0)
+    {
+        delta = -delta;
+    }
+    return delta <= tolerance;
+}
+
+int32_t reach_layout_rect_matches_split(reach_rect_i32 work_area, reach_rect_i32 rect,
+                                        reach_split_mode mode, int32_t tolerance)
+{
+    if (tolerance < 0)
+    {
+        return 0;
+    }
+
+    reach_rect_i32 split = {};
+    if (reach_layout_compute_split(work_area, mode, &split) != REACH_OK)
+    {
+        return 0;
+    }
+
+    return reach_layout_edge_within(rect.left, split.left, tolerance) &&
+           reach_layout_edge_within(rect.top, split.top, tolerance) &&
+           reach_layout_edge_within(rect.right, split.right, tolerance) &&
+           reach_layout_edge_within(rect.bottom, split.bottom, tolerance);
+}

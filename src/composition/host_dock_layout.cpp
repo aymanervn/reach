@@ -29,9 +29,15 @@ int32_t reach_host_dock_can_hide(const reach_host *host)
     {
         return 0;
     }
-    if (host->window_manager.ops.foreground_is_maximized_on_primary != nullptr)
+    if (host->window_manager.ops.foreground_is_maximized_on_primary != nullptr &&
+        host->window_manager.ops.foreground_is_maximized_on_primary(host->window_manager.manager))
     {
-        return host->window_manager.ops.foreground_is_maximized_on_primary(host->window_manager.manager);
+        return 1;
+    }
+    if (host->window_manager.ops.foreground_is_snapped_on_primary != nullptr &&
+        host->window_manager.ops.foreground_is_snapped_on_primary(host->window_manager.manager))
+    {
+        return 1;
     }
     return 0;
 }
