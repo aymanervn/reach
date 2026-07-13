@@ -26,7 +26,8 @@ extern "C"
         REACH_RENDER_COMMAND_VECTOR_ICON = 10,
         REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11,
         REACH_RENDER_COMMAND_ICON_TINT = 13,
-        REACH_RENDER_COMMAND_BLURRED_IMAGE = 14
+        REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
+        REACH_RENDER_COMMAND_TEXTBOX = 15
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -121,6 +122,16 @@ extern "C"
         int32_t text_alignment;
         int32_t text_ellipsis;
         uint16_t text[260];
+
+        reach_color text_color;
+        reach_color border_color;
+        reach_color placeholder_color;
+        reach_color selection_color;
+        int32_t caret_index;
+        int32_t caret_visible;
+        int32_t selection_start;
+        int32_t selection_end;
+        uint16_t placeholder[128];
     } reach_render_command;
 
     typedef struct reach_render_command_buffer
@@ -132,9 +143,6 @@ extern "C"
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer,
                                                   const reach_render_command *command);
-    reach_result reach_ui_build_render_commands(const reach_ui_state *state,
-                                                const reach_ui_layout *layout,
-                                                reach_render_command_buffer *buffer);
 
 #ifdef __cplusplus
 }

@@ -9,6 +9,32 @@
 #include <strsafe.h>
 #include <tlhelp32.h>
 
+struct reach_windows_startup_collector
+{
+    reach_app_launch_request *out;
+    size_t capacity;
+    size_t count;
+};
+
+static void reach_windows_startup_collect(reach_windows_startup_collector *collector,
+                                          const wchar_t *path, const wchar_t *arguments)
+{
+    if (collector == nullptr || path == nullptr || path[0] == 0 ||
+        collector->count >= collector->capacity)
+    {
+        return;
+    }
+    reach_app_launch_request *request = &collector->out[collector->count];
+    *request = {};
+    (void)reach_copy_utf16(request->path, 260, reinterpret_cast<const uint16_t *>(path));
+    if (arguments != nullptr && arguments[0] != 0)
+    {
+        (void)reach_copy_utf16(request->arguments, 260,
+                               reinterpret_cast<const uint16_t *>(arguments));
+    }
+    ++collector->count;
+}
+
 static int32_t reach_windows_startup_extension_supported(const wchar_t *path)
 {
     if (path == nullptr)
@@ -210,7 +236,8 @@ static int32_t reach_windows_executable_running(const wchar_t *executable)
     return running;
 }
 
-static void reach_windows_launch_path(const wchar_t *path)
+static void reach_windows_collect_path(reach_windows_startup_collector *collector,
+                                       const wchar_t *path)
 {
     if (path == nullptr || path[0] == 0)
     {
@@ -222,20 +249,12 @@ static void reach_windows_launch_path(const wchar_t *path)
         return;
     }
 
-    SHELLEXECUTEINFOW execute = {};
-    execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
-    execute.lpVerb = L"open";
-    execute.lpFile = path;
-    execute.nShow = SW_SHOWNORMAL;
-
-    if (ShellExecuteExW(&execute) && execute.hProcess != nullptr)
-    {
-        CloseHandle(execute.hProcess);
-    }
+    reach_windows_startup_collect(collector, path, nullptr);
 }
 
-static void reach_windows_launch_startup_folder_known_id(REFKNOWNFOLDERID folder_id)
+static void
+reach_windows_collect_startup_folder_known_id(reach_windows_startup_collector *collector,
+                                              REFKNOWNFOLDERID folder_id)
 {
     PWSTR folder_path = nullptr;
     HRESULT hr = SHGetKnownFolderPath(folder_id, KF_FLAG_DEFAULT, nullptr, &folder_path);
@@ -275,7 +294,7 @@ static void reach_windows_launch_startup_folder_known_id(REFKNOWNFOLDERID folder
                 continue;
             }
 
-            reach_windows_launch_path(full_path);
+            reach_windows_collect_path(collector, full_path);
 
         } while (FindNextFileW(find, &find_data));
 
@@ -461,7 +480,8 @@ static int32_t reach_windows_parse_run_command(const wchar_t *command, wchar_t *
                                                     out_arguments, out_arguments_count);
 }
 
-static void reach_windows_launch_run_command(const wchar_t *command)
+static void reach_windows_collect_run_command(reach_windows_startup_collector *collector,
+                                              const wchar_t *command)
 {
     if (command == nullptr || command[0] == 0)
     {
@@ -482,21 +502,12 @@ static void reach_windows_launch_run_command(const wchar_t *command)
         return;
     }
 
-    SHELLEXECUTEINFOW execute = {};
-    execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
-    execute.lpVerb = L"open";
-    execute.lpFile = executable;
-    execute.lpParameters = arguments[0] != 0 ? arguments : nullptr;
-    execute.nShow = SW_SHOWNORMAL;
-
-    if (ShellExecuteExW(&execute) && execute.hProcess != nullptr)
-    {
-        CloseHandle(execute.hProcess);
-    }
+    reach_windows_startup_collect(collector, executable,
+                                  arguments[0] != 0 ? arguments : nullptr);
 }
 
-static void reach_windows_launch_run_key(HKEY root)
+static void reach_windows_collect_run_key(reach_windows_startup_collector *collector,
+                                          HKEY root)
 {
     HKEY key = nullptr;
 
@@ -549,27 +560,34 @@ static void reach_windows_launch_run_key(HKEY root)
 
             if (ExpandEnvironmentStringsW(raw_data, expanded, _countof(expanded)) > 0)
             {
-                reach_windows_launch_run_command(expanded);
+                reach_windows_collect_run_command(collector, expanded);
             }
         }
         else
         {
-            reach_windows_launch_run_command(raw_data);
+            reach_windows_collect_run_command(collector, raw_data);
         }
     }
 
     RegCloseKey(key);
 }
 
-reach_result reach_windows_launch_startup_apps(void)
+size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
+                                          size_t capacity)
 {
-    reach_windows_launch_startup_folder_known_id(FOLDERID_Startup);
-    reach_windows_launch_startup_folder_known_id(FOLDERID_CommonStartup);
+    if (out_requests == nullptr || capacity == 0)
+    {
+        return 0;
+    }
+    reach_windows_startup_collector collector = {out_requests, capacity, 0};
 
-    reach_windows_launch_run_key(HKEY_CURRENT_USER);
-    reach_windows_launch_run_key(HKEY_LOCAL_MACHINE);
+    reach_windows_collect_startup_folder_known_id(&collector, FOLDERID_Startup);
+    reach_windows_collect_startup_folder_known_id(&collector, FOLDERID_CommonStartup);
 
-    return REACH_OK;
+    reach_windows_collect_run_key(&collector, HKEY_CURRENT_USER);
+    reach_windows_collect_run_key(&collector, HKEY_LOCAL_MACHINE);
+
+    return collector.count;
 }
 
 uintptr_t reach_windows_get_current_foreground(void)

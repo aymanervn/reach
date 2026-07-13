@@ -4,31 +4,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/menu_commands.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
+#include "reach/features/feature_capsule.h"
 #include "reach/features/popup.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
-
-#define REACH_CONTEXT_MENU_MAX_ITEMS 6
-
-    typedef enum reach_context_menu_command
-    {
-        REACH_CONTEXT_MENU_COMMAND_UNPIN = 100,
-        REACH_CONTEXT_MENU_COMMAND_CLOSE = 101,
-        REACH_CONTEXT_MENU_COMMAND_OPEN_NEW = 102,
-        REACH_CONTEXT_MENU_COMMAND_PIN = 103,
-        REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN = 105,
-        REACH_CONTEXT_MENU_COMMAND_POWER_LOCK = 200,
-        REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP = 201,
-        REACH_CONTEXT_MENU_COMMAND_POWER_RESTART = 202,
-        REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN = 203,
-        REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT = 204,
-        REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS = 205
-    } reach_context_menu_command;
 
     typedef struct reach_context_menu_render_input
     {
@@ -48,16 +33,12 @@ extern "C"
         int32_t text_alignment_leading;
     } reach_context_menu_render_input;
 
-    typedef struct reach_context_menu_hit_result
+    typedef enum reach_context_menu_pointer_action_kind
     {
-        int32_t hit;
-        size_t index;
-    } reach_context_menu_hit_result;
-
-    typedef struct reach_context_menu_action
-    {
-        uint32_t command;
-    } reach_context_menu_action;
+        REACH_CONTEXT_MENU_POINTER_ACTION_NONE = 0,
+        REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS = 1,
+        REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE = 2
+    } reach_context_menu_pointer_action_kind;
 
     void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                                  size_t *out_count);
@@ -65,12 +46,70 @@ extern "C"
     reach_result
     reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
                                              reach_render_command_buffer *out_commands);
-    reach_context_menu_hit_result
-    reach_context_menu_hit_test_items(const reach_rect_f32 *item_slots, size_t item_count,
-                                      int32_t x, int32_t y);
-    reach_context_menu_action reach_context_menu_action_for_hit(const uint32_t *item_commands,
-                                                                size_t item_count,
-                                                                reach_context_menu_hit_result hit);
+
+    typedef struct reach_context_menu_state
+    {
+        int32_t open;
+        int32_t power_open;
+        size_t target_index;
+        reach_rect_f32 bounds;
+        reach_rect_f32 item_slots[REACH_CONTEXT_MENU_MAX_ITEMS];
+        uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS];
+        uint32_t item_icon_ids[REACH_CONTEXT_MENU_MAX_ITEMS];
+        size_t item_count;
+        size_t hovered_index;
+
+        int32_t anchored;
+        float anchor_popup_width;
+        float anchor_ratio;
+    } reach_context_menu_state;
+
+    typedef struct reach_context_menu reach_context_menu;
+
+    reach_result reach_context_menu_create(reach_context_menu **out_menu);
+    void reach_context_menu_destroy(reach_context_menu *menu);
+
+    const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void);
+
+    int32_t reach_context_menu_is_open(const reach_context_menu *menu);
+    void reach_context_menu_force_close(reach_context_menu *menu);
+    void reach_context_menu_reset(reach_context_menu *menu);
+
+    typedef struct reach_context_menu_open_context
+    {
+        reach_rect_f32 monitor;
+        float dpi_scale;
+        float anchor_x;
+        float dock_top_y;
+        int32_t anchored;
+        float pointer_x;
+        float pointer_y;
+        const uint32_t *item_commands;
+        size_t item_count;
+    } reach_context_menu_open_context;
+
+    void reach_context_menu_open_power(reach_context_menu *menu,
+                                       const reach_context_menu_open_context *ctx);
+
+    void reach_context_menu_reanchor(reach_context_menu *menu,
+                                     const reach_context_menu_open_context *ctx);
+    void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_index,
+                                          const reach_context_menu_open_context *ctx);
+
+    const reach_context_menu_state *reach_context_menu_state_ptr(reach_context_menu *menu);
+
+    typedef struct reach_context_menu_render_context
+    {
+        const reach_theme *theme;
+        const reach_dock_layout *dock_layout;
+        int32_t has_layout;
+        float dpi_scale;
+    } reach_context_menu_render_context;
+
+    reach_result
+    reach_context_menu_append_render_commands(reach_context_menu *menu,
+                                              const reach_context_menu_render_context *ctx,
+                                              reach_render_command_buffer *out_commands);
 
 #ifdef __cplusplus
 }

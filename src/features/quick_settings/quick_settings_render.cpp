@@ -430,16 +430,6 @@ static reach_result reach_quick_settings_push_volume_pill_commands_with_label(
     return REACH_OK;
 }
 
-reach_result reach_quick_settings_push_volume_pill_commands(
-    const reach_quick_settings_volume_pill_model *model,
-    const reach_quick_settings_volume_pill_layout *layout, const reach_theme *theme,
-    reach_render_command_buffer *commands)
-{
-    return reach_quick_settings_push_volume_pill_commands_with_label(
-        model, layout, theme, commands,
-        reach_quick_settings_metrics_values.default_pill_label_text_size, 0, nullptr, 1.0f);
-}
-
 static reach_result reach_quick_settings_push_output_device_row_commands(
     const reach_audio_output_device *device,
     const reach_quick_settings_output_device_row_layout *layout, size_t row_index, size_t row_count,
@@ -791,4 +781,24 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     (void)reach_render_command_buffer_push(commands, &icon);
 
     return REACH_OK;
+}
+
+reach_result reach_quick_settings_append_render_commands(
+    reach_quick_settings *quick_settings, const reach_theme *theme, float dpi_scale,
+    reach_render_command_buffer *out_commands)
+{
+    if (quick_settings == nullptr || theme == nullptr || out_commands == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
+
+    reach_quick_settings_render_input input = {};
+    input.theme = *theme;
+    input.model = state->model;
+    input.layout = state->layout;
+    input.dpi_scale = dpi_scale;
+
+    return reach_quick_settings_build_render_commands(&input, out_commands);
 }

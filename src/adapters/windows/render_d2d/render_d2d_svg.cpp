@@ -423,15 +423,14 @@ static int reach_svg_parse_paint_active(const std::string &value, int fallback)
         return fallback;
     }
 
-    // Monochrome icon contract: any non-none paint value maps to the caller's icon brush.
     return 1;
 }
 
 static reach_svg_style reach_svg_default_style(void)
 {
     reach_svg_style style = {};
-    style.fill = 1;   // SVG default.
-    style.stroke = 0; // SVG default.
+    style.fill = 1;
+    style.stroke = 0;
     style.stroke_width = 1.0f;
     style.line_cap = D2D1_CAP_STYLE_FLAT;
     style.line_join = D2D1_LINE_JOIN_MITER;
@@ -817,7 +816,6 @@ static reach_result reach_svg_path_to_geometry(ID2D1Factory1 *factory, const std
             continue;
         }
 
-        // Unsupported command. Keep failure loud by producing an invalid geometry result.
         reach_svg_end_figure(sink, &figure_open, D2D1_FIGURE_END_OPEN);
         sink->Close();
         sink->Release();

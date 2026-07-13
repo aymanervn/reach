@@ -2,7 +2,7 @@
 
 #include "reachctl_common.h"
 
-#include "reach/features/pin_config.h"
+#include "reach/services/pin_config.h"
 #include "reach/ports/config_store.h"
 
 #include <windows.h>

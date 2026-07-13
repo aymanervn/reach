@@ -1,5 +1,7 @@
 #include "reach/features/context_menu.h"
 
+#include "context_menu_common.h"
+
 static int32_t reach_context_menu_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
     return (float)x >= rect.x && (float)x <= rect.x + rect.width && (float)y >= rect.y &&

@@ -23,11 +23,7 @@ struct reach_media_controls_adapter
     std::mutex mutex;
     std::condition_variable cv;
     std::thread watcher_thread;
-    uint16_t cached_title[260];
-    uint16_t cached_artist[260];
-    uint64_t cached_cover_icon_id;
-    reach_color cached_cover_accent;
-    int32_t cached_cover_valid;
+    uint64_t media_generation;
     int32_t watcher_started;
     int32_t stop_requested;
     int32_t resubscribe_requested;
@@ -108,23 +104,14 @@ static reach_result reach_media_controls_with_current_session_on_worker(bool (*e
     return result;
 }
 
-static int32_t reach_media_controls_utf16_equal(const uint16_t *a, const uint16_t *b)
+static uint64_t reach_media_controls_generation(reach_media_controls_adapter *adapter)
 {
-    if (a == nullptr || b == nullptr)
+    if (adapter == nullptr)
     {
-        return a == b;
+        return 0;
     }
-
-    size_t index = 0;
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
+    std::lock_guard<std::mutex> lock(adapter->mutex);
+    return adapter->media_generation;
 }
 
 static void reach_media_controls_copy_hstring(uint16_t *dst, size_t dst_count,
@@ -192,7 +179,7 @@ static void reach_media_controls_notify_changed(reach_media_controls_adapter *ad
     }
 }
 
-static void reach_media_controls_invalidate_cached_cover(reach_media_controls_adapter *adapter)
+static void reach_media_controls_advance_generation(reach_media_controls_adapter *adapter)
 {
     if (adapter == nullptr)
     {
@@ -200,29 +187,10 @@ static void reach_media_controls_invalidate_cached_cover(reach_media_controls_ad
     }
 
     std::lock_guard<std::mutex> lock(adapter->mutex);
-    adapter->cached_cover_valid = 0;
-}
-
-static void reach_media_controls_clear_cached_cover(reach_media_controls_adapter *adapter)
-{
-    if (adapter == nullptr)
+    ++adapter->media_generation;
+    if (adapter->media_generation == 0)
     {
-        return;
-    }
-
-    uint64_t cover_icon_id = 0;
-    {
-        std::lock_guard<std::mutex> lock(adapter->mutex);
-        cover_icon_id = adapter->cached_cover_icon_id;
-        adapter->cached_cover_icon_id = 0;
-        adapter->cached_cover_accent = {};
-        adapter->cached_cover_valid = 0;
-        adapter->cached_title[0] = 0;
-    }
-
-    if (cover_icon_id != 0)
-    {
-        reach_windows_icon_id_release(cover_icon_id);
+        adapter->media_generation = 1;
     }
 }
 
@@ -444,14 +412,15 @@ static reach_result reach_media_controls_read_state(reach_media_controls_adapter
 
     try
     {
+        uint64_t generation = reach_media_controls_generation(adapter);
         namespace media = winrt::Windows::Media::Control;
         media::GlobalSystemMediaTransportControlsSessionManager manager =
             media::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
         media::GlobalSystemMediaTransportControlsSession session = manager.GetCurrentSession();
         if (session == nullptr)
         {
-            reach_media_controls_clear_cached_cover(adapter);
             *out_state = {};
+            out_state->media_generation = generation;
             return REACH_OK;
         }
 
@@ -466,42 +435,13 @@ static reach_result reach_media_controls_read_state(reach_media_controls_adapter
         state.playback =
             reach_media_controls_playback_state_from_winrt(playback_info.PlaybackStatus());
         state.previous_enabled = controls.IsPreviousEnabled() ? 1 : 0;
+        state.play_pause_enabled = controls.IsPlayPauseToggleEnabled() ? 1 : 0;
         state.next_enabled = controls.IsNextEnabled() ? 1 : 0;
-        state.has_media = (state.title[0] != 0 || state.artist[0] != 0) ? 1 : 0;
-
-        uint64_t old_cover_icon_id = 0;
+        state.has_media = 1;
+        state.media_generation = generation;
+        if (reach_media_controls_generation(adapter) != generation)
         {
-            std::lock_guard<std::mutex> lock(adapter->mutex);
-            if (adapter->cached_cover_valid &&
-                reach_media_controls_utf16_equal(adapter->cached_title, state.title) &&
-                reach_media_controls_utf16_equal(adapter->cached_artist, state.artist))
-            {
-                state.cover_icon_id = adapter->cached_cover_icon_id;
-                state.cover_accent = adapter->cached_cover_accent;
-                *out_state = state;
-                return REACH_OK;
-            }
-        }
-
-        reach_color cover_accent = {};
-        uint64_t cover_icon_id =
-            reach_media_controls_cover_icon_from_thumbnail(properties.Thumbnail(), &cover_accent);
-
-        {
-            std::lock_guard<std::mutex> lock(adapter->mutex);
-            old_cover_icon_id = adapter->cached_cover_icon_id;
-            adapter->cached_cover_icon_id = cover_icon_id;
-            adapter->cached_cover_accent = cover_accent;
-            adapter->cached_cover_valid = 1;
-            reach_copy_utf16(adapter->cached_title, 260, state.title);
-            reach_copy_utf16(adapter->cached_artist, 260, state.artist);
-            state.cover_icon_id = adapter->cached_cover_icon_id;
-            state.cover_accent = adapter->cached_cover_accent;
-        }
-
-        if (old_cover_icon_id != 0 && old_cover_icon_id != cover_icon_id)
-        {
-            reach_windows_icon_id_release(old_cover_icon_id);
+            return REACH_ERROR;
         }
 
         *out_state = state;
@@ -509,6 +449,73 @@ static reach_result reach_media_controls_read_state(reach_media_controls_adapter
     }
     catch (winrt::hresult_error const &)
     {
+        return REACH_ERROR;
+    }
+}
+
+static reach_result reach_media_controls_read_cover(reach_media_controls_adapter *adapter,
+                                                     uint64_t media_generation,
+                                                     reach_media_cover *out_cover)
+{
+    REACH_ASSERT(adapter != nullptr);
+    REACH_ASSERT(out_cover != nullptr);
+    if (adapter == nullptr || out_cover == nullptr || media_generation == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out_cover = {};
+    out_cover->media_generation = media_generation;
+    if (reach_media_controls_generation(adapter) != media_generation)
+    {
+        return REACH_OK;
+    }
+    if (reach_media_controls_ensure_apartment() != REACH_OK)
+    {
+        out_cover->current = 1;
+        return REACH_ERROR;
+    }
+
+    try
+    {
+        namespace media = winrt::Windows::Media::Control;
+        media::GlobalSystemMediaTransportControlsSessionManager manager =
+            media::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
+        media::GlobalSystemMediaTransportControlsSession session = manager.GetCurrentSession();
+        if (session == nullptr)
+        {
+            out_cover->current =
+                reach_media_controls_generation(adapter) == media_generation ? 1 : 0;
+            return REACH_OK;
+        }
+
+        media::GlobalSystemMediaTransportControlsSessionMediaProperties properties =
+            session.TryGetMediaPropertiesAsync().get();
+        if (reach_media_controls_generation(adapter) != media_generation)
+        {
+            return REACH_OK;
+        }
+
+        reach_color accent = {};
+        uint64_t cover_icon_id =
+            reach_media_controls_cover_icon_from_thumbnail(properties.Thumbnail(), &accent);
+        if (reach_media_controls_generation(adapter) != media_generation)
+        {
+            if (cover_icon_id != 0)
+            {
+                reach_windows_icon_id_release(cover_icon_id);
+            }
+            return REACH_OK;
+        }
+
+        out_cover->cover_icon_id = cover_icon_id;
+        out_cover->cover_accent = accent;
+        out_cover->current = 1;
+        return REACH_OK;
+    }
+    catch (winrt::hresult_error const &)
+    {
+        out_cover->current =
+            reach_media_controls_generation(adapter) == media_generation ? 1 : 0;
         return REACH_ERROR;
     }
 }
@@ -536,6 +543,40 @@ static reach_result reach_media_controls_get_state_on_worker(reach_media_control
     }
     catch (...)
     {
+        return REACH_ERROR;
+    }
+
+    return result;
+}
+
+static reach_result reach_media_controls_get_cover_on_worker(reach_media_controls_adapter *adapter,
+                                                              uint64_t media_generation,
+                                                              reach_media_cover *out_cover)
+{
+    REACH_ASSERT(adapter != nullptr);
+    REACH_ASSERT(out_cover != nullptr);
+    if (adapter == nullptr || out_cover == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out_cover = {};
+    out_cover->media_generation = media_generation;
+
+    reach_result result = REACH_ERROR;
+    try
+    {
+        std::thread worker(
+            [adapter, media_generation, out_cover, &result]()
+            {
+                result = reach_media_controls_read_cover(adapter, media_generation, out_cover);
+                winrt::uninit_apartment();
+            });
+        worker.join();
+    }
+    catch (...)
+    {
+        out_cover->current =
+            reach_media_controls_generation(adapter) == media_generation ? 1 : 0;
         return REACH_ERROR;
     }
 
@@ -581,7 +622,6 @@ static void reach_media_controls_subscribe_current_session(
 
     if (*session == nullptr)
     {
-        reach_media_controls_invalidate_cached_cover(adapter);
         return;
     }
 
@@ -589,7 +629,7 @@ static void reach_media_controls_subscribe_current_session(
         [adapter](media::GlobalSystemMediaTransportControlsSession const &,
                   media::MediaPropertiesChangedEventArgs const &)
         {
-            reach_media_controls_invalidate_cached_cover(adapter);
+            reach_media_controls_advance_generation(adapter);
             reach_media_controls_notify_changed(adapter);
         });
 
@@ -622,6 +662,7 @@ static void reach_media_controls_watcher_thread_main(reach_media_controls_adapte
             [adapter](media::GlobalSystemMediaTransportControlsSessionManager const &,
                       media::SessionsChangedEventArgs const &)
             {
+                reach_media_controls_advance_generation(adapter);
                 reach_media_controls_request_resubscribe(adapter);
                 reach_media_controls_notify_changed(adapter);
             });
@@ -630,7 +671,7 @@ static void reach_media_controls_watcher_thread_main(reach_media_controls_adapte
             [adapter](media::GlobalSystemMediaTransportControlsSessionManager const &,
                       media::CurrentSessionChangedEventArgs const &)
             {
-                reach_media_controls_invalidate_cached_cover(adapter);
+                reach_media_controls_advance_generation(adapter);
                 reach_media_controls_request_resubscribe(adapter);
                 reach_media_controls_notify_changed(adapter);
             });
@@ -699,6 +740,19 @@ static reach_result reach_media_controls_get_state(void *userdata,
 {
     return reach_media_controls_get_state_on_worker(
         static_cast<reach_media_controls_adapter *>(userdata), out_state);
+}
+
+static reach_result reach_media_controls_get_cover(void *userdata, uint64_t media_generation,
+                                                   reach_media_cover *out_cover)
+{
+    return reach_media_controls_get_cover_on_worker(
+        static_cast<reach_media_controls_adapter *>(userdata), media_generation, out_cover);
+}
+
+static void reach_media_controls_release_cover(void *userdata, uint64_t cover_icon_id)
+{
+    (void)userdata;
+    reach_windows_icon_id_release(cover_icon_id);
 }
 
 static reach_result reach_media_controls_previous_track(void *userdata)
@@ -807,7 +861,6 @@ static void reach_media_controls_destroy(void *userdata)
         return;
     }
     reach_media_controls_stop_watching(adapter);
-    reach_media_controls_clear_cached_cover(adapter);
     delete adapter;
 }
 
@@ -825,9 +878,12 @@ extern "C" reach_result reach_windows_create_media_controls(reach_media_controls
     {
         return REACH_ERROR;
     }
+    adapter->media_generation = 1;
 
     out_port->userdata = adapter;
     out_port->get_state = reach_media_controls_get_state;
+    out_port->get_cover = reach_media_controls_get_cover;
+    out_port->release_cover = reach_media_controls_release_cover;
     out_port->previous_track = reach_media_controls_previous_track;
     out_port->play_pause = reach_media_controls_play_pause;
     out_port->next_track = reach_media_controls_next_track;
