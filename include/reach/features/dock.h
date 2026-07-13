@@ -240,6 +240,8 @@ extern "C"
                                                    const reach_dock_render_context *ctx,
                                                    reach_render_command_buffer *out_commands);
 
+    void reach_dock_touch_icons(reach_dock *dock, int32_t icon_size_px);
+
     typedef struct reach_dock_drag_state
     {
         int32_t active;
