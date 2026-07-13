@@ -183,32 +183,12 @@ static void reach_input_post_ui_event(reach_input_source *source, reach_ui_event
     }
 }
 
-typedef struct reach_input_win_chord_event
-{
-    uint32_t key;
-    reach_ui_event_type type;
-} reach_input_win_chord_event;
-
-static const reach_input_win_chord_event REACH_INPUT_WIN_CHORD_EVENTS[] = {
-    {REACH_SERVICE_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL},
-    {REACH_SERVICE_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL},
-    {REACH_SERVICE_HOTKEY_ARROW_LEFT, REACH_UI_EVENT_SNAP_LEFT},
-    {REACH_SERVICE_HOTKEY_ARROW_RIGHT, REACH_UI_EVENT_SNAP_RIGHT},
-    {REACH_SERVICE_HOTKEY_ARROW_UP, REACH_UI_EVENT_SNAP_TOP},
-    {REACH_SERVICE_HOTKEY_ARROW_DOWN, REACH_UI_EVENT_SNAP_BOTTOM},
-};
-
 static int32_t
 reach_input_hotkey_has_win_modifier(const reach_service_hotkey_record *record)
 {
     return record != nullptr &&
            (record->modifiers & (REACH_SERVICE_MODIFIER_LEFT_WIN |
                                  REACH_SERVICE_MODIFIER_RIGHT_WIN)) != 0;
-}
-
-static size_t reach_input_win_chord_event_count(void)
-{
-    return sizeof(REACH_INPUT_WIN_CHORD_EVENTS) / sizeof(REACH_INPUT_WIN_CHORD_EVENTS[0]);
 }
 
 static int32_t reach_input_try_post_win_chord_event(
@@ -220,13 +200,13 @@ static int32_t reach_input_try_post_win_chord_event(
         return 0;
     }
 
-    for (size_t index = 0; index < reach_input_win_chord_event_count(); ++index)
+    for (size_t index = 0; index < REACH_SERVICE_WIN_CHORD_COUNT; ++index)
     {
-        const reach_input_win_chord_event *entry = &REACH_INPUT_WIN_CHORD_EVENTS[index];
-        if (entry->key == record->key)
+        const reach_service_win_chord *entry = &REACH_SERVICE_WIN_CHORDS[index];
+        if (entry->hotkey == record->key)
         {
             source->windows_key_chord = 1;
-            reach_input_post_ui_event(source, entry->type, 0);
+            reach_input_post_ui_event(source, (reach_ui_event_type)entry->ui_event, 0);
             return 1;
         }
     }
@@ -297,18 +277,6 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
             reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
         }
         break;
-    case REACH_SERVICE_HOTKEY_D:
-    case REACH_SERVICE_HOTKEY_T:
-    case REACH_SERVICE_HOTKEY_ARROW_LEFT:
-    case REACH_SERVICE_HOTKEY_ARROW_RIGHT:
-    case REACH_SERVICE_HOTKEY_ARROW_UP:
-    case REACH_SERVICE_HOTKEY_ARROW_DOWN:
-        if (!reach_input_try_post_win_chord_event(source, record, pressed) && !pressed &&
-            reach_input_hotkey_has_win_modifier(record))
-        {
-            source->windows_key_chord = 1;
-        }
-        break;
     case REACH_SERVICE_HOTKEY_LEFT_WIN:
     case REACH_SERVICE_HOTKEY_RIGHT_WIN:
         if (source->alt_tab_active)
@@ -335,9 +303,14 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         }
         break;
     default:
-        if (pressed && source->windows_key_down)
+
+        if (!reach_input_try_post_win_chord_event(source, record, pressed))
         {
-            source->windows_key_chord = 1;
+            if ((pressed && source->windows_key_down) ||
+                (!pressed && reach_input_hotkey_has_win_modifier(record)))
+            {
+                source->windows_key_chord = 1;
+            }
         }
         break;
     }

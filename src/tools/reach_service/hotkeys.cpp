@@ -41,15 +41,6 @@ enum reach_helper_key_decision
 static reach_helper_hotkey_state g_hotkeys;
 static reach_helper_hotkey_callbacks g_callbacks;
 
-static const uint32_t REACH_HELPER_OWNED_WIN_CHORD_KEYS[] = {
-    REACH_SERVICE_HOTKEY_D,
-    REACH_SERVICE_HOTKEY_T,
-    REACH_SERVICE_HOTKEY_ARROW_LEFT,
-    REACH_SERVICE_HOTKEY_ARROW_RIGHT,
-    REACH_SERVICE_HOTKEY_ARROW_UP,
-    REACH_SERVICE_HOTKEY_ARROW_DOWN,
-};
-
 void reach_helper_hotkeys_configure(const reach_helper_hotkey_callbacks *callbacks)
 {
     if (callbacks != nullptr)
@@ -114,25 +105,14 @@ static uint32_t reach_helper_hotkey_key_from_vk(DWORD vk)
     case VK_RWIN:
         return REACH_SERVICE_HOTKEY_RIGHT_WIN;
 
-    case 'D':
-        return REACH_SERVICE_HOTKEY_D;
-
-    case 'T':
-        return REACH_SERVICE_HOTKEY_T;
-
-    case VK_LEFT:
-        return REACH_SERVICE_HOTKEY_ARROW_LEFT;
-
-    case VK_RIGHT:
-        return REACH_SERVICE_HOTKEY_ARROW_RIGHT;
-
-    case VK_UP:
-        return REACH_SERVICE_HOTKEY_ARROW_UP;
-
-    case VK_DOWN:
-        return REACH_SERVICE_HOTKEY_ARROW_DOWN;
-
     default:
+        for (size_t index = 0; index < REACH_SERVICE_WIN_CHORD_COUNT; ++index)
+        {
+            if (REACH_SERVICE_WIN_CHORDS[index].virtual_key == vk)
+            {
+                return REACH_SERVICE_WIN_CHORDS[index].hotkey;
+            }
+        }
         return 0;
     }
 }
@@ -231,11 +211,9 @@ static uint64_t reach_helper_hotkey_bit(uint32_t key)
 
 static int32_t reach_helper_is_owned_win_chord_key(uint32_t key)
 {
-    for (size_t index = 0; index < sizeof(REACH_HELPER_OWNED_WIN_CHORD_KEYS) /
-                                       sizeof(REACH_HELPER_OWNED_WIN_CHORD_KEYS[0]);
-         ++index)
+    for (size_t index = 0; index < REACH_SERVICE_WIN_CHORD_COUNT; ++index)
     {
-        if (REACH_HELPER_OWNED_WIN_CHORD_KEYS[index] == key)
+        if (REACH_SERVICE_WIN_CHORDS[index].hotkey == key)
         {
             return 1;
         }

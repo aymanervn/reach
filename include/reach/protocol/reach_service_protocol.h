@@ -1,6 +1,7 @@
 #ifndef REACH_SERVICE_PROTOCOL_H
 #define REACH_SERVICE_PROTOCOL_H
 
+#include "reach/core/ui_events.h"
 #include "reach/support/layout.h"
 
 #include <stdint.h>
@@ -99,6 +100,25 @@ enum reach_service_hotkey_action : uint32_t
     REACH_SERVICE_HOTKEY_RELEASED = 0,
     REACH_SERVICE_HOTKEY_PRESSED = 1,
 };
+
+typedef struct reach_service_win_chord
+{
+    uint32_t virtual_key;
+    uint32_t hotkey;
+    uint32_t ui_event;
+} reach_service_win_chord;
+
+static const reach_service_win_chord REACH_SERVICE_WIN_CHORDS[] = {
+    {0x44, REACH_SERVICE_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL},
+    {0x54, REACH_SERVICE_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL},
+    {0x25, REACH_SERVICE_HOTKEY_ARROW_LEFT, REACH_UI_EVENT_SNAP_LEFT},
+    {0x27, REACH_SERVICE_HOTKEY_ARROW_RIGHT, REACH_UI_EVENT_SNAP_RIGHT},
+    {0x26, REACH_SERVICE_HOTKEY_ARROW_UP, REACH_UI_EVENT_SNAP_TOP},
+    {0x28, REACH_SERVICE_HOTKEY_ARROW_DOWN, REACH_UI_EVENT_SNAP_BOTTOM},
+};
+
+static const size_t REACH_SERVICE_WIN_CHORD_COUNT =
+    sizeof(REACH_SERVICE_WIN_CHORDS) / sizeof(REACH_SERVICE_WIN_CHORDS[0]);
 
 enum reach_service_hotkey_modifier : uint32_t
 {
