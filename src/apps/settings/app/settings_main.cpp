@@ -13,6 +13,14 @@
 static const wchar_t *REACH_SHELL_INSTANCE_MUTEX = REACH_SHELL_INSTANCE_MUTEX_NAME;
 static const wchar_t *REACH_SETTINGS_INSTANCE_MUTEX = L"Local\\Reach.Settings.Instance";
 static const wchar_t *REACH_SETTINGS_ACTIVATE_EVENT = L"Local\\Reach.Settings.Activate";
+static const wchar_t *REACH_SETTINGS_HOST_ERROR = L"Unable to connect to Reach Host.";
+static const wchar_t *REACH_SETTINGS_LAUNCH_ERROR =
+    L"Launching Reach Settings failed. Please restart Reach.";
+
+static void reach_settings_show_error(const wchar_t *message)
+{
+    MessageBoxW(nullptr, message, L"Reach Settings", MB_OK | MB_ICONERROR);
+}
 
 static int32_t reach_settings_shell_path(wchar_t *path, size_t capacity)
 {
@@ -129,8 +137,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     HANDLE shell_mutex = OpenMutexW(SYNCHRONIZE, FALSE, REACH_SHELL_INSTANCE_MUTEX);
     if (shell_mutex == nullptr)
     {
-        MessageBoxW(nullptr, L"Reach Settings requires the Reach shell to be running.",
-                    L"Reach Settings", MB_OK | MB_ICONINFORMATION);
+        reach_settings_show_error(REACH_SETTINGS_HOST_ERROR);
         return 0;
     }
 
@@ -144,8 +151,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     CloseHandle(shell_mutex);
     if (shell_process == nullptr)
     {
-        MessageBoxW(nullptr, L"Reach Settings could not connect to the Reach shell.",
-                    L"Reach Settings", MB_OK | MB_ICONINFORMATION);
+        reach_settings_show_error(REACH_SETTINGS_HOST_ERROR);
         return 0;
     }
 
@@ -153,6 +159,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     if (activate_event == nullptr)
     {
         CloseHandle(shell_process);
+        reach_settings_show_error(REACH_SETTINGS_LAUNCH_ERROR);
         return 1;
     }
 
@@ -161,14 +168,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     {
         CloseHandle(activate_event);
         CloseHandle(shell_process);
+        reach_settings_show_error(REACH_SETTINGS_LAUNCH_ERROR);
         return 1;
     }
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        SetEvent(activate_event);
+        BOOL activated = SetEvent(activate_event);
         CloseHandle(instance_mutex);
         CloseHandle(activate_event);
         CloseHandle(shell_process);
+        if (!activated)
+        {
+            reach_settings_show_error(REACH_SETTINGS_LAUNCH_ERROR);
+            return 1;
+        }
         return 0;
     }
 
@@ -179,6 +192,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         CloseHandle(activate_event);
         CloseHandle(instance_mutex);
         CloseHandle(shell_process);
+        reach_settings_show_error(REACH_SETTINGS_LAUNCH_ERROR);
         return 1;
     }
 
@@ -195,6 +209,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         CloseHandle(activate_event);
         CloseHandle(instance_mutex);
         CloseHandle(shell_process);
+        reach_settings_show_error(REACH_SETTINGS_LAUNCH_ERROR);
         return 1;
     }
 
