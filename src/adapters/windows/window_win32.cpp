@@ -140,6 +140,14 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
+    case REACH_WM_NOW_PLAYING_CHANGED:
+        if (window != nullptr)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_NOW_PLAYING_CHANGED;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return 0;
     case WM_DISPLAYCHANGE:
         reach_windows_request_desktop_environment_sync();
 
@@ -175,9 +183,11 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_KEYDOWN:
         if (window != nullptr)
         {
+            int32_t ctrl_down = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+            int32_t shift_down = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
             reach_ui_event event = {};
-            event.modifiers =
-                (GetKeyState(VK_CONTROL) & 0x8000) != 0 ? REACH_UI_EVENT_MODIFIER_CTRL : 0;
+            event.modifiers = (ctrl_down ? REACH_UI_EVENT_MODIFIER_CTRL : 0u) |
+                              (shift_down ? REACH_UI_EVENT_MODIFIER_SHIFT : 0u);
             if (wparam == VK_ESCAPE)
             {
                 event.type = REACH_UI_EVENT_ESCAPE;
@@ -194,6 +204,45 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             {
                 event.type = REACH_UI_EVENT_ARROW_DOWN;
             }
+
+            else if (window->role == REACH_SURFACE_LAUNCHER)
+            {
+                reach_ui_edit_key edit_key = REACH_UI_EDIT_KEY_NONE;
+                switch (wparam)
+                {
+                case VK_BACK:
+                    edit_key = REACH_UI_EDIT_KEY_BACKSPACE;
+                    break;
+                case VK_DELETE:
+                    edit_key = REACH_UI_EDIT_KEY_DELETE;
+                    break;
+                case VK_LEFT:
+                    edit_key = REACH_UI_EDIT_KEY_LEFT;
+                    break;
+                case VK_RIGHT:
+                    edit_key = REACH_UI_EDIT_KEY_RIGHT;
+                    break;
+                case VK_HOME:
+                    edit_key = REACH_UI_EDIT_KEY_HOME;
+                    break;
+                case VK_END:
+                    edit_key = REACH_UI_EDIT_KEY_END;
+                    break;
+                case 'A':
+                    if (ctrl_down)
+                    {
+                        edit_key = REACH_UI_EDIT_KEY_SELECT_ALL;
+                    }
+                    break;
+                default:
+                    break;
+                }
+                if (edit_key != REACH_UI_EDIT_KEY_NONE)
+                {
+                    event.type = REACH_UI_EVENT_TEXT_EDIT;
+                    event.id = (uint32_t)edit_key;
+                }
+            }
             if (event.type != REACH_UI_EVENT_NONE)
             {
                 reach_platform_window_queue_event(window, &event);
@@ -202,6 +251,18 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_CHAR:
+        if (window != nullptr && window->role == REACH_SURFACE_LAUNCHER)
+        {
+
+            if (wparam >= 0x20 && wparam != 0x7F)
+            {
+                reach_ui_event event = {};
+                event.type = REACH_UI_EVENT_TEXT_CHAR;
+                event.id = (uint32_t)wparam;
+                reach_platform_window_queue_event(window, &event);
+                return 0;
+            }
+        }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONDOWN:
         if (window != nullptr)
@@ -628,11 +689,6 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
 
     window->corner_radius = radius;
 
-    /*
-        Composition-backed surfaces draw their own rounded shape in Direct2D.
-        Native corners or Win32 regions add a second clipping path and can make
-        edges look different from the dock.
-    */
     if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
         window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
         window->role == REACH_SURFACE_CONTEXT_MENU ||
@@ -918,6 +974,9 @@ static reach_result reach_platform_window_post_event(reach_platform_window *wind
         break;
     case REACH_UI_EVENT_WALLPAPER_CHANGED:
         message = REACH_WM_WALLPAPER_CHANGED;
+        break;
+    case REACH_UI_EVENT_NOW_PLAYING_CHANGED:
+        message = REACH_WM_NOW_PLAYING_CHANGED;
         break;
     default:
         return REACH_INVALID_ARGUMENT;

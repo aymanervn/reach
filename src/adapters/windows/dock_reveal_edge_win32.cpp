@@ -273,11 +273,6 @@ reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *
         return REACH_ERROR;
     }
 
-    /*
-        Alpha 1 keeps the edge effectively invisible while preserving normal
-        hit testing. Do not use WS_EX_TRANSPARENT; this window must receive
-        mouse input.
-    */
     SetLayeredWindowAttributes(edge->hwnd, 0, 1, LWA_ALPHA);
 
     out_port->edge = edge;

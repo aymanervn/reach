@@ -2,7 +2,7 @@
 
 #include "reachctl_common.h"
 #include "reachctl_context_menu.h"
-#include "reachctl_elevation_helper.h"
+#include "reachctl_service.h"
 
 #include "reach/platform/shell_registration.h"
 
@@ -206,7 +206,7 @@ static reach_result reachctl_watchdog_exe(uint16_t *path, DWORD path_count)
         return REACH_ERROR;
     }
 
-    if (!PathAppendW(path_w, L"reach-watchdog.exe"))
+    if (!PathAppendW(path_w, L"reachWatchdog.exe"))
     {
         return REACH_ERROR;
     }
@@ -505,12 +505,12 @@ reach_result reachctl_reset_to_windows_shell(void)
     reach_result restore_result = reach_windows_shell_restore_current_user();
 
     (void)reachctl_unregister_watchdog_task();
-    (void)reachctl_unregister_elevation_helper();
+    (void)reachctl_unregister_service();
     (void)reachctl_remove_context_menus();
 
     (void)reachctl_terminate_processes_by_name(L"reach.exe");
-    (void)reachctl_terminate_processes_by_name(L"reach-watchdog.exe");
-    (void)reachctl_terminate_processes_by_name(L"reach_elevation_helper.exe");
+    (void)reachctl_terminate_processes_by_name(L"reachWatchdog.exe");
+    (void)reachctl_terminate_processes_by_name(L"reachService.exe");
     (void)reachctl_terminate_processes_by_name(L"explorer.exe");
 
     reach_result start_result = reachctl_start_userinit();

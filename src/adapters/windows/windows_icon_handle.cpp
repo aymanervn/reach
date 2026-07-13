@@ -16,6 +16,7 @@ static reach_windows_icon *reach_windows_icon_from_hicon(HICON hicon)
         return nullptr;
     }
 
+    icon->references.store(1);
     icon->magic = REACH_WINDOWS_ICON_MAGIC;
     icon->kind = REACH_WINDOWS_ICON_KIND_HICON;
     icon->hicon = hicon;
@@ -37,6 +38,7 @@ static reach_windows_icon *reach_windows_icon_from_hbitmap(HBITMAP hbitmap)
         return nullptr;
     }
 
+    icon->references.store(1);
     icon->magic = REACH_WINDOWS_ICON_MAGIC;
     icon->kind = REACH_WINDOWS_ICON_KIND_HBITMAP;
     icon->hicon = nullptr;
@@ -87,5 +89,17 @@ void reach_windows_icon_id_release(uint64_t icon_id)
         return;
     }
 
-    reach_windows_icon_destroy(reinterpret_cast<reach_windows_icon *>(icon_id));
+    reach_windows_icon *icon = reinterpret_cast<reach_windows_icon *>(icon_id);
+    if (icon->references.fetch_sub(1) == 1)
+    {
+        reach_windows_icon_destroy(icon);
+    }
+}
+
+void reach_windows_icon_id_retain(uint64_t icon_id)
+{
+    if (icon_id != 0)
+    {
+        reinterpret_cast<reach_windows_icon *>(icon_id)->references.fetch_add(1);
+    }
 }

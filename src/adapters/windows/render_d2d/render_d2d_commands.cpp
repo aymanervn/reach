@@ -134,10 +134,19 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             continue;
         }
 
+        if (command->type == REACH_RENDER_COMMAND_TEXTBOX)
+        {
+            reach_result result = reach_d2d_draw_textbox(backend, command);
+            if (result != REACH_OK)
+            {
+                return result;
+            }
+            continue;
+        }
+
         if (command->type == REACH_RENDER_COMMAND_BLUR_BACKGROUND)
         {
-            // Blur is handled through the platform surface/composition path,
-            // not the core render command execution path.
+
             continue;
         }
     }

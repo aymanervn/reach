@@ -96,11 +96,7 @@ static LRESULT CALLBACK reach_probe_owner_proc(HWND hwnd, UINT message, WPARAM w
 {
     if (message == REACH_PROBE_CALLBACK)
     {
-        /*
-            Heuristic:
-            legacy: wParam == uID and lParam == mouse message.
-            v4:     LOWORD(lParam) == event, HIWORD(lParam) == uID.
-        */
+
         UINT v4_uid = HIWORD(lparam);
         UINT v4_event = LOWORD(lparam);
 
