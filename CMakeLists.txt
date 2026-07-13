@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 0.8.6  LANGUAGES C CXX)
+project(reach VERSION 1.0  LANGUAGES C CXX)
 
 option(REACH_BUILD_TESTS "Build Reach test executables and register CTest tests" ON)
 option(REACH_RUN_ARCHITECTURE_CHECK "Run architecture boundary checks as part of the default build" ON)
@@ -488,7 +488,7 @@ target_link_libraries(reach_update_helper PRIVATE
 
 set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
 set(REACH_DIST_DIR "${REACH_DIST_ROOT}/$<CONFIG>")
-set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-alpha-$<CONFIG>.zip")
+set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-$<CONFIG>.zip")
 
 set(REACH_RELEASE_TARGETS
     reach
