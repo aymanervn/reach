@@ -14,40 +14,17 @@ void reach_clipboard_build_text_preview(const uint16_t *text, uint16_t *out_prev
     }
 
     size_t output = 0;
-    size_t lines = 1;
-    int32_t pending_space = 0;
     int32_t truncated = 0;
     for (size_t input = 0; text[input] != 0; ++input)
     {
         uint16_t value = text[input];
         if (value == '\r')
         {
-            continue;
-        }
-        if (value == '\n')
-        {
-            if (lines >= 3)
+            if (text[input + 1] == '\n')
             {
-                truncated = 1;
-                break;
+                continue;
             }
-            value = ' ';
-            ++lines;
-        }
-        if (value == '\t' || value == ' ')
-        {
-            pending_space = output > 0 ? 1 : 0;
-            continue;
-        }
-        if (pending_space)
-        {
-            if (output + 1 >= out_capacity)
-            {
-                truncated = 1;
-                break;
-            }
-            out_preview[output++] = ' ';
-            pending_space = 0;
+            value = '\n';
         }
         if (output + 1 >= out_capacity)
         {

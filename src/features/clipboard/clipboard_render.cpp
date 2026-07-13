@@ -353,8 +353,6 @@ reach_clipboard_push_preview_text_lines(reach_render_command_buffer *commands,
         allowed_line_count = 1;
     }
 
-    const float glyph_width = reach_clipboard_max_float(
-        1.0f, text_size * REACH_CLIPBOARD_PREVIEW_AVERAGE_GLYPH_WIDTH_RATIO);
     const size_t line_capacity = reach_clipboard_preview_line_capacity(text_rect.width, text_size);
     reach_clipboard_preview_line lines[REACH_CLIPBOARD_PREVIEW_LINE_LIMIT] = {};
     size_t actual_line_count = 0;
@@ -408,17 +406,7 @@ reach_clipboard_push_preview_text_lines(reach_render_command_buffer *commands,
             continue;
         }
 
-        size_t visible_char_count = 0;
-        while (visible_char_count < sizeof(command.text) / sizeof(command.text[0]) &&
-               command.text[visible_char_count] != 0)
-        {
-            ++visible_char_count;
-        }
-
-        const float estimated_line_width =
-            reach_clipboard_min_float(text_rect.width, glyph_width * (float)visible_char_count);
-        command.rect = {text_rect.x + (text_rect.width - estimated_line_width) * 0.5f,
-                        start_y + line_height * (float)line_index, estimated_line_width,
+        command.rect = {text_rect.x, start_y + line_height * (float)line_index, text_rect.width,
                         line_height};
 
         if (reach_clipboard_clip_rect(&command.rect, clip_rect))
