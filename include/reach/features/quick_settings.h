@@ -3,9 +3,12 @@
 
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
+#include "reach/features/feature_capsule.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/system_controls.h"
+#include "reach/services/system_status.h"
 #include "reach/support/util.h"
+#include "reach/support/animation.h"
 
 #include <stdint.h>
 
@@ -116,57 +119,20 @@ extern "C"
         reach_rect_f32 expand_button_icon;
     } reach_quick_settings_layout;
 
-    typedef enum reach_quick_settings_hit_type
+    typedef enum reach_quick_settings_pointer_action_kind
     {
-        REACH_QUICK_SETTINGS_HIT_NONE = 0,
-        REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER,
-        REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER,
-        REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER,
-        REACH_QUICK_SETTINGS_HIT_NETWORK_TILE,
-        REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE,
-        REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE,
-        REACH_QUICK_SETTINGS_HIT_PROJECT_TILE,
-        REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON,
-        REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
-        REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON
-    } reach_quick_settings_hit_type;
-
-    typedef struct reach_quick_settings_hit_result
-    {
-        reach_quick_settings_hit_type type;
-        float volume_level;
-        size_t session_index;
-        size_t output_device_index;
-        uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
-        uint16_t output_device_id[REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY];
-    } reach_quick_settings_hit_result;
-
-    typedef enum reach_quick_settings_action_type
-    {
-        REACH_QUICK_SETTINGS_ACTION_NONE = 0,
-        REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME,
-        REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME,
-        REACH_QUICK_SETTINGS_ACTION_SET_SESSION_MUTED,
-        REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS,
-        REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE,
-        REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH,
-        REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER,
-        REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT,
-        REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES,
-        REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE,
-        REACH_QUICK_SETTINGS_ACTION_EXPAND
-    } reach_quick_settings_action_type;
-
-    typedef struct reach_quick_settings_action
-    {
-        reach_quick_settings_action_type type;
-        float volume_level;
-        int32_t muted;
-        size_t session_index;
-        size_t output_device_index;
-        uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
-        uint16_t output_device_id[REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY];
-    } reach_quick_settings_action;
+        REACH_QUICK_SETTINGS_POINTER_ACTION_NONE = 0,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_MAIN_VOLUME,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_SESSION_VOLUME,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_BRIGHTNESS,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_NETWORK_TILE,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BLUETOOTH,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BATTERY_SAVER,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_OPEN_PROJECT,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_OUTPUT_DEVICES,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_OUTPUT_DEVICE,
+        REACH_QUICK_SETTINGS_POINTER_ACTION_EXPAND
+    } reach_quick_settings_pointer_action_kind;
 
     typedef struct reach_quick_settings_render_input
     {
@@ -194,18 +160,12 @@ extern "C"
                                                       const reach_power_state *power,
                                                       const reach_brightness_state *brightness);
 
-    void reach_quick_settings_model_set_bluetooth_pending(reach_quick_settings_model *model,
-                                                          int32_t pending, int32_t pending_enabled);
-
     uint32_t reach_quick_settings_volume_icon_id(float volume_level, int32_t muted);
 
     void reach_quick_settings_volume_pill_model_init(reach_quick_settings_volume_pill_model *model,
                                                      float volume_level, int32_t muted,
                                                      const uint16_t *label);
 
-    reach_quick_settings_volume_pill_layout
-    reach_quick_settings_volume_pill_layout_for_bounds(reach_rect_f32 bounds,
-                                                       const reach_theme *theme);
     reach_quick_settings_volume_pill_layout
     reach_quick_settings_volume_pill_layout_for_bounds_scaled(reach_rect_f32 bounds,
                                                               const reach_theme *theme,
@@ -227,21 +187,117 @@ extern "C"
     reach_quick_settings_content_height_for_model_scaled(const reach_quick_settings_model *model,
                                                          float dpi_scale);
 
-    reach_quick_settings_hit_result
-    reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
-                                  const reach_quick_settings_model *model, float x, float y);
-
-    reach_quick_settings_action
-    reach_quick_settings_action_for_hit(reach_quick_settings_hit_result hit);
-
     reach_result
     reach_quick_settings_build_render_commands(const reach_quick_settings_render_input *input,
                                                reach_render_command_buffer *commands);
 
-    reach_result reach_quick_settings_push_volume_pill_commands(
-        const reach_quick_settings_volume_pill_model *model,
-        const reach_quick_settings_volume_pill_layout *layout, const reach_theme *theme,
-        reach_render_command_buffer *commands);
+    typedef struct reach_quick_settings reach_quick_settings;
+
+    reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settings);
+    void reach_quick_settings_destroy(reach_quick_settings *quick_settings);
+    void reach_quick_settings_reset_height_animation(reach_quick_settings *quick_settings);
+    int32_t reach_quick_settings_height_animation_active(const reach_quick_settings *quick_settings);
+
+    typedef struct reach_quick_settings_drag_state
+    {
+        int32_t active;
+        int32_t type;
+        float last_level;
+        int32_t level_valid;
+        size_t session_index;
+        uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
+    } reach_quick_settings_drag_state;
+
+    typedef struct reach_quick_settings_state
+    {
+        reach_quick_settings_model model;
+        reach_quick_settings_layout layout;
+        int32_t open;
+        reach_rect_f32 bounds;
+        reach_rect_f32 target_bounds;
+        reach_rect_f32 content_bounds;
+        float notch_anchor_x;
+        reach_quick_settings_drag_state drag;
+    } reach_quick_settings_state;
+
+    const reach_quick_settings_state *
+    reach_quick_settings_state_ptr(reach_quick_settings *quick_settings);
+
+    const reach_feature_capsule_ops *reach_quick_settings_capsule_ops(void);
+
+    int32_t reach_quick_settings_is_open(const reach_quick_settings *quick_settings);
+    int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int32_t open);
+    void reach_quick_settings_force_close(reach_quick_settings *quick_settings);
+
+    void reach_quick_settings_apply_main_volume(reach_quick_settings *quick_settings, float level,
+                                                int32_t muted);
+    void reach_quick_settings_apply_sessions(reach_quick_settings *quick_settings,
+                                             const reach_audio_volume_session_list *sessions);
+    void reach_quick_settings_apply_output_devices(
+        reach_quick_settings *quick_settings, const reach_audio_output_device_list *devices);
+
+    reach_result reach_quick_settings_append_render_commands(
+        reach_quick_settings *quick_settings, const reach_theme *theme, float dpi_scale,
+        reach_render_command_buffer *out_commands);
+
+    typedef struct reach_quick_settings_layout_context
+    {
+        const reach_theme *theme;
+        float dpi_scale;
+        float anchor_x;
+        float dock_top;
+    } reach_quick_settings_layout_context;
+
+    void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
+                                             const reach_quick_settings_layout_context *ctx);
+
+    void reach_quick_settings_relayout(reach_quick_settings *quick_settings,
+                                       const reach_quick_settings_layout_context *ctx,
+                                       int32_t animate_height);
+
+    int32_t
+    reach_quick_settings_update_open_animation(reach_quick_settings *quick_settings,
+                                               const reach_quick_settings_layout_context *ctx);
+
+    int32_t reach_quick_settings_bluetooth_pending(reach_quick_settings *quick_settings);
+    int32_t reach_quick_settings_bluetooth_available(reach_quick_settings *quick_settings);
+    int32_t reach_quick_settings_bluetooth_enabled(reach_quick_settings *quick_settings);
+    void reach_quick_settings_set_bluetooth_pending(reach_quick_settings *quick_settings,
+                                                    int32_t pending, int32_t pending_enabled);
+
+    int32_t reach_quick_settings_toggle_expanded(reach_quick_settings *quick_settings);
+    int32_t reach_quick_settings_toggle_output_devices(reach_quick_settings *quick_settings);
+    void reach_quick_settings_collapse_output_devices(reach_quick_settings *quick_settings);
+
+    const uint16_t *reach_quick_settings_set_session_level(reach_quick_settings *quick_settings,
+                                                           size_t session_index, float level);
+    const uint16_t *reach_quick_settings_output_device_id(
+        const reach_quick_settings *quick_settings, size_t output_device_index);
+
+    typedef struct reach_quick_settings_system_apply_result
+    {
+        int32_t bluetooth_pending_cleared;
+        int32_t relayout;
+    } reach_quick_settings_system_apply_result;
+
+    void reach_quick_settings_apply_system_states(
+        reach_quick_settings *quick_settings, const reach_network_state *network,
+        const reach_bluetooth_state *bluetooth, const reach_power_state *power,
+        const reach_brightness_state *brightness, int32_t bluetooth_valid,
+        reach_quick_settings_system_apply_result *out);
+
+    void reach_quick_settings_attach_status(reach_quick_settings *quick_settings,
+                                            reach_system_status *status);
+
+    void reach_quick_settings_refresh_audio(reach_quick_settings *quick_settings);
+    void reach_quick_settings_refresh_system(reach_quick_settings *quick_settings,
+                                             uint32_t change_flags);
+
+    void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
+                                              uint32_t change_flags, double delta_seconds,
+                                              reach_feature_tick_result *out);
+    size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quick_settings,
+                                                          uint64_t *out_ids, size_t cap);
 
 #ifdef __cplusplus
 }

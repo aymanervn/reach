@@ -31,8 +31,8 @@ BEGIN
             VALUE "CompanyName", "Reach"
             VALUE "FileDescription", "Reach Settings"
             VALUE "FileVersion", "0.1.0.0"
-            VALUE "InternalName", "reach-settings"
-            VALUE "OriginalFilename", "reach-settings.exe"
+            VALUE "InternalName", "reachSetting"
+            VALUE "OriginalFilename", "reachSetting.exe"
             VALUE "ProductName", "Reach Settings"
             VALUE "ProductVersion", "0.1.0.0"
         END

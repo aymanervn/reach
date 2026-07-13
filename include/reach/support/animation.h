@@ -48,6 +48,9 @@ extern "C"
     void reach_animation_manager_reset(reach_animation_manager *manager, size_t track_id);
     float reach_animation_manager_value(const reach_animation_manager *manager, size_t track_id);
     float reach_animation_manager_target(const reach_animation_manager *manager, size_t track_id);
+
+    double reach_animation_track_time_to_value(const reach_animation_track *track,
+                                               float target_value);
     int32_t reach_animation_manager_active(const reach_animation_manager *manager, size_t track_id);
     int32_t reach_animation_manager_any_active(const reach_animation_manager *manager);
 

@@ -170,3 +170,36 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
 
     return REACH_OK;
 }
+
+reach_result
+reach_context_menu_append_render_commands(reach_context_menu *menu,
+                                          const reach_context_menu_render_context *ctx,
+                                          reach_render_command_buffer *out_commands)
+{
+    if (menu == nullptr || ctx == nullptr || ctx->theme == nullptr || ctx->dock_layout == nullptr ||
+        out_commands == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
+
+    reach_context_menu_render_input input = {};
+    input.theme = ctx->theme;
+    input.bounds = state->bounds;
+    input.item_slots = state->item_slots;
+    input.item_commands = state->item_commands;
+    input.item_icon_ids = state->item_icon_ids;
+    input.item_count = state->item_count;
+    input.hovered_index = state->hovered_index;
+    input.target_index = state->target_index;
+    input.dock_layout = ctx->dock_layout;
+    input.has_layout = ctx->has_layout;
+    input.use_anchor_x = state->power_open && ctx->has_layout;
+    input.anchor_x =
+        ctx->dock_layout->power_button.x + ctx->dock_layout->power_button.width * 0.5f;
+    input.dpi_scale = ctx->dpi_scale;
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+
+    return reach_context_menu_build_render_commands(&input, out_commands);
+}

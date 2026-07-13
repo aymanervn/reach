@@ -17,7 +17,6 @@
 #include "reach/ports/search_provider.h"
 #include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
-#include "reach/ports/textbox.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
@@ -29,6 +28,7 @@
 #define REACH_WM_LAUNCHER_SEARCH_READY 0x8015
 #define REACH_WM_CONFIG_CHANGED 0x8016
 #define REACH_WM_CLIPBOARD_CHANGED 0x8017
+#define REACH_WM_NOW_PLAYING_CHANGED 0x8018
 
 #ifdef __cplusplus
 extern "C"
@@ -44,8 +44,6 @@ extern "C"
 
     reach_result reach_windows_create_platform_window(reach_surface_role role,
                                                       reach_platform_window_port *out_port);
-    reach_result reach_windows_create_textbox(reach_platform_window *parent,
-                                              reach_textbox_port *out_port);
     void *reach_windows_platform_window_native_handle(reach_platform_window *window);
     reach_result reach_windows_create_d2d_render_backend(reach_platform_window *window,
                                                          reach_render_backend_port *out_port);
@@ -77,7 +75,8 @@ extern "C"
     int32_t reach_windows_desktop_compat_external_wallpaper_active(void);
     reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
-    reach_result reach_windows_launch_startup_apps(void);
+    size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
+                                              size_t capacity);
     extern "C" uintptr_t reach_windows_get_current_foreground(void);
     reach_result reach_windows_shell_install_current_user(const uint16_t *exe_path);
     reach_result reach_windows_shell_install_command_current_user(const uint16_t *identity_exe_path,

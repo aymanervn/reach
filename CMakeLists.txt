@@ -42,14 +42,43 @@ target_compile_features(reach_support PUBLIC
     cxx_std_17
 )
 
+add_library(reach_protocol STATIC
+    src/protocol/reach_service_protocol.cpp
+)
+
+reach_configure_common(reach_protocol)
+target_compile_features(reach_protocol PUBLIC
+    cxx_std_17
+)
+target_link_libraries(reach_protocol PUBLIC
+    reach_support
+)
+
+add_library(reach_services STATIC
+    src/services/app_control.cpp
+    src/services/config.cpp
+    src/services/icon_service.cpp
+    src/services/now_playing.cpp
+    src/services/pin_config.cpp
+    src/services/search.cpp
+    src/services/system_status.cpp
+    src/services/window_tracking.cpp
+)
+
+reach_configure_common(reach_services)
+target_compile_features(reach_services PUBLIC
+    cxx_std_17
+)
+target_link_libraries(reach_services PUBLIC
+    reach_support
+)
+
 add_library(reach_core STATIC
     src/core/clipboard.c
     src/core/scrollbar.cpp
     src/core/ui_state.c
     src/core/ui_layout.c
-    src/core/ui_events.c
     src/core/render_commands.c
-    src/core/app_controller.c
     src/core/runtime_policy.c
     src/core/theme.c
 )
@@ -61,35 +90,28 @@ target_compile_features(reach_core PUBLIC
 )
 
 add_library(reach_features STATIC
+    src/features/common/scrollbar/scrollbar_render.cpp
+    src/features/common/text_edit/text_edit.cpp
     src/features/clipboard/clipboard_feature.cpp
+    src/features/clipboard/clipboard_interaction.cpp
     src/features/clipboard/clipboard_model.cpp
     src/features/clipboard/clipboard_render.cpp
     src/features/context_menu/context_menu_feature.cpp
     src/features/context_menu/context_menu_interaction.cpp
     src/features/context_menu/context_menu_render.cpp
     src/features/dock/dock_feature.cpp
-    src/features/dock/dock_icons.cpp
     src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
+    src/features/dock/dock_now_playing.cpp
     src/features/dock/dock_render.cpp
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
-    src/features/music_widget/music_widget_feature.cpp
+    src/features/launcher/launcher_state.cpp
     src/features/popup/popup_render.cpp
     src/features/quick_settings/quick_settings_feature.cpp
     src/features/quick_settings/quick_settings_interaction.cpp
     src/features/quick_settings/quick_settings_render.cpp
-    src/features/settings/settings_account.cpp
-    src/features/settings/settings_bluetooth.cpp
-    src/features/settings/settings_feature.cpp
-    src/features/settings/settings_monitors_scaling.cpp
-    src/features/settings/settings_power_sleep.cpp
-    src/features/settings/settings_render.cpp
-    src/features/settings/settings_startup_apps.cpp
-    src/features/settings/settings_update.cpp
-    src/features/settings/windows_update_policy.cpp
-    src/features/settings/settings_wifi.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
     src/features/tray/tray_feature.cpp
@@ -97,7 +119,6 @@ add_library(reach_features STATIC
     src/features/tray/tray_model.cpp
     src/features/tray/tray_render.cpp
     src/features/wallpaper/wallpaper_feature.cpp
-    src/features/pin_config.cpp
 )
 
 reach_configure_common(reach_features)
@@ -106,6 +127,7 @@ target_compile_features(reach_features PUBLIC
 )
 target_link_libraries(reach_features PUBLIC
     reach_core
+    reach_services
     reach_support
 )
 
@@ -126,7 +148,6 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/search_everything_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp
     src/adapters/windows/settings_launcher_win32.cpp
-    src/adapters/windows/textbox_win32.cpp
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
     src/adapters/windows/windows_icon_handle.cpp
@@ -135,10 +156,9 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
-    src/adapters/windows/window_management/elevation_helper_protocol.cpp
-    src/adapters/windows/window_management/elevation_helper_client_win32.cpp
-    src/adapters/windows/window_management/elevation_helper_shared_state_win32.cpp
-    src/adapters/windows/window_management/elevation_helper_task_win32.cpp
+    src/adapters/windows/window_management/reach_service_client_win32.cpp
+    src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
+    src/adapters/windows/window_management/reach_service_task_win32.cpp
     src/adapters/windows/window_management/window_manager_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/explorer_service_win32.cpp
@@ -162,6 +182,7 @@ target_compile_features(reach_windows_adapters PUBLIC
 )
 target_link_libraries(reach_windows_adapters PUBLIC
     reach_core
+    reach_protocol
     reach_support
 )
 target_link_libraries(reach_windows_adapters PRIVATE
@@ -191,49 +212,51 @@ target_link_libraries(reach_windows_adapters PRIVATE
     Wuguid
 )
 
-add_library(reach_shell STATIC
-    src/shell/shell_clipboard.cpp
-    src/shell/shell_app_launch.cpp
-    src/shell/shell_context_menu_orchestration.cpp
-    src/shell/shell_config.cpp
-    src/shell/shell_dock_drag.cpp
-    src/shell/shell_dock_layout.cpp
-    src/shell/shell_dock_orchestration.cpp
-    src/shell/shell_event_dispatch.cpp
-    src/shell/shell_feedback.cpp
-    src/shell/shell_game_mode.cpp
-    src/shell/shell_icons.cpp
-    src/shell/shell_input.cpp
-    src/shell/shell_launcher_orchestration.cpp
-    src/shell/shell_launcher_search.cpp
-    src/shell/shell_lifecycle.cpp
-    src/shell/shell_popup.cpp
-    src/shell/shell_popup_surface.cpp
-    src/shell/shell_quick_settings.cpp
-    src/shell/shell_quick_settings_input.cpp
-    src/shell/shell_quick_settings_refresh.cpp
-    src/shell/shell_render.cpp
-    src/shell/shell_surfaces.cpp
-    src/shell/shell_switcher_input.cpp
-    src/shell/shell_tray_orchestration.cpp
-    src/shell/shell_update.cpp
-    src/shell/shell_window_tracking.cpp
-    src/shell/surface_runtime.cpp
+add_library(reach_composition STATIC
+    src/composition/host_clipboard.cpp
+    src/composition/host_app_control.cpp
+    src/composition/host_context_menu_orchestration.cpp
+    src/composition/host_config.cpp
+    src/composition/host_dock_layout.cpp
+    src/composition/host_dock_orchestration.cpp
+    src/composition/host_event_dispatch.cpp
+    src/composition/host_feedback.cpp
+    src/composition/host_game_mode.cpp
+    src/composition/host_icons.cpp
+    src/composition/host_input.cpp
+    src/composition/host_launcher_orchestration.cpp
+    src/composition/host_launcher_search.cpp
+    src/composition/host_lifecycle.cpp
+    src/composition/host_popup.cpp
+    src/composition/host_popup_surface.cpp
+    src/composition/host_quick_settings.cpp
+    src/composition/host_render.cpp
+    src/composition/host_surface_frames.cpp
+    src/composition/host_surfaces.cpp
+    src/composition/host_system_actions.cpp
+    src/composition/host_switcher_input.cpp
+    src/composition/host_tray_orchestration.cpp
+    src/composition/host_update.cpp
+    src/composition/host_window_tracking.cpp
+    src/composition/surface_runtime.cpp
+    src/composition/composition_root.cpp
 )
 
-reach_configure_common(reach_shell)
-target_compile_features(reach_shell PUBLIC
+reach_configure_common(reach_composition)
+reach_configure_windows(reach_composition)
+target_compile_features(reach_composition PUBLIC
     c_std_11
     cxx_std_17
 )
-target_link_libraries(reach_shell PUBLIC
+target_link_libraries(reach_composition PUBLIC
     reach_core
     reach_features
+    reach_services
     reach_support
+    reach_windows_adapters
 )
 add_executable(reach WIN32
-    src/app/main.cpp
-    src/app/composition_root.cpp
+    src/tools/reach_main.cpp
     resources/reach.rc
 )
 
@@ -251,7 +274,7 @@ target_compile_features(reach PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach PRIVATE
-    reach_shell
+    reach_composition
     reach_core
     reach_features
     reach_support
@@ -281,12 +304,31 @@ target_link_libraries(reach PRIVATE
     Wuguid
 )
 
+add_library(reach_settings_feature STATIC
+    src/apps/settings/feature/settings_account.cpp
+    src/apps/settings/feature/settings_bluetooth.cpp
+    src/apps/settings/feature/settings_feature.cpp
+    src/apps/settings/feature/settings_monitors_scaling.cpp
+    src/apps/settings/feature/settings_power_sleep.cpp
+    src/apps/settings/feature/settings_render.cpp
+    src/apps/settings/feature/settings_startup_apps.cpp
+    src/apps/settings/feature/settings_update.cpp
+    src/apps/settings/feature/windows_update_policy.cpp
+    src/apps/settings/feature/settings_wifi.cpp
+)
+reach_configure_common(reach_settings_feature)
+target_compile_features(reach_settings_feature PUBLIC cxx_std_17)
+target_link_libraries(reach_settings_feature PUBLIC
+    reach_core
+    reach_support
+)
+
 add_executable(reach_settings WIN32
-    src/app/settings_main.cpp
-    src/app/settings_app.cpp
+    src/apps/settings/app/settings_main.cpp
+    src/apps/settings/app/settings_app.cpp
     resources/settings.rc
 )
-set_target_properties(reach_settings PROPERTIES OUTPUT_NAME "reach-settings")
+set_target_properties(reach_settings PROPERTIES OUTPUT_NAME "reachSetting")
 
 if (MSVC)
     target_link_options(reach_settings PRIVATE
@@ -300,7 +342,7 @@ reach_configure_windows(reach_settings)
 target_compile_features(reach_settings PRIVATE cxx_std_17)
 target_link_libraries(reach_settings PRIVATE
     reach_core
-    reach_features
+    reach_settings_feature
     reach_support
     reach_windows_adapters
     d2d1
@@ -345,8 +387,8 @@ add_executable(reachctl
     src/tools/reachctl/reachctl_session_commands.cpp
     src/tools/reachctl/reachctl_config_commands.cpp
     src/tools/reachctl/reachctl_context_menu.cpp
-    src/tools/reachctl/reachctl_elevation_helper.cpp
-    src/adapters/windows/window_management/elevation_helper_task_win32.cpp
+    src/tools/reachctl/reachctl_service.cpp
+    src/adapters/windows/window_management/reach_service_task_win32.cpp
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
@@ -371,47 +413,49 @@ target_link_libraries(reachctl PRIVATE
     uuid
 )
 
-add_executable(reach-watchdog WIN32
-    src/tools/reach_watchdog.cpp
+add_executable(reachWatchdog WIN32
+    src/tools/reach_watchdog/reach_watchdog.cpp
 )
+set_target_properties(reachWatchdog PROPERTIES OUTPUT_NAME "reachWatchdog")
 
-reach_configure_common(reach-watchdog)
-reach_configure_windows(reach-watchdog)
-target_compile_features(reach-watchdog PRIVATE
+reach_configure_common(reachWatchdog)
+reach_configure_windows(reachWatchdog)
+target_compile_features(reachWatchdog PRIVATE
     cxx_std_17
 )
-target_link_libraries(reach-watchdog PRIVATE
+target_link_libraries(reachWatchdog PRIVATE
     shell32
     shlwapi
     user32
     advapi32
 )
 
-add_executable(reach_elevation_helper WIN32
-    src/tools/reach_elevation_helper/reach_elevation_helper.cpp
-    src/tools/reach_elevation_helper/hotkeys.cpp
-    src/tools/reach_elevation_helper/window_actions.cpp
-    src/adapters/windows/window_management/elevation_helper_protocol.cpp
-    src/adapters/windows/window_management/elevation_helper_shared_state_win32.cpp
+add_executable(reach_service WIN32
+    src/tools/reach_service/reach_service.cpp
+    src/tools/reach_service/hotkeys.cpp
+    src/tools/reach_service/window_actions.cpp
+    src/protocol/reach_service_protocol.cpp
+    src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
     src/support/layout.cpp
     src/support/util.cpp
 )
+set_target_properties(reach_service PROPERTIES OUTPUT_NAME "reachService")
 
 if (MSVC)
-    target_link_options(reach_elevation_helper PRIVATE
+    target_link_options(reach_service PRIVATE
         "/MANIFEST:EMBED"
         "/MANIFESTUAC:NO"
         "/MANIFESTINPUT:${CMAKE_SOURCE_DIR}/resources/elevation_helper.manifest"
     )
 endif()
 
-reach_configure_common(reach_elevation_helper)
-reach_configure_windows(reach_elevation_helper)
-target_compile_features(reach_elevation_helper PRIVATE
+reach_configure_common(reach_service)
+reach_configure_windows(reach_service)
+target_compile_features(reach_service PRIVATE
     cxx_std_17
 )
-target_link_libraries(reach_elevation_helper PRIVATE
+target_link_libraries(reach_service PRIVATE
     user32
     shell32
     advapi32
@@ -450,8 +494,8 @@ set(REACH_RELEASE_TARGETS
     reach
     reach_settings
     reachctl
-    reach-watchdog
-    reach_elevation_helper
+    reachWatchdog
+    reach_service
     reach_update_helper
 )
 
@@ -459,14 +503,12 @@ add_custom_target(reach_release_zip
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${REACH_DIST_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${REACH_DIST_DIR}"
 
-    # Preserve the executable names produced by each target. This avoids
-    # release bundles silently drifting away from target OUTPUT_NAME settings.
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:reach>"
         "$<TARGET_FILE:reach_settings>"
         "$<TARGET_FILE:reachctl>"
-        "$<TARGET_FILE:reach-watchdog>"
-        "$<TARGET_FILE:reach_elevation_helper>"
+        "$<TARGET_FILE:reachWatchdog>"
+        "$<TARGET_FILE:reach_service>"
         "$<TARGET_FILE:reach_update_helper>"
         "${EVERYTHING_DLL}"
         "${REACH_RELEASE_IMAGE}"
@@ -477,8 +519,8 @@ add_custom_target(reach_release_zip
         "$<TARGET_FILE_NAME:reach>"
         "$<TARGET_FILE_NAME:reach_settings>"
         "$<TARGET_FILE_NAME:reachctl>"
-        "$<TARGET_FILE_NAME:reach-watchdog>"
-        "$<TARGET_FILE_NAME:reach_elevation_helper>"
+        "$<TARGET_FILE_NAME:reachWatchdog>"
+        "$<TARGET_FILE_NAME:reach_service>"
         "$<TARGET_FILE_NAME:reach_update_helper>"
         "Everything64.dll"
         "reach.jpg"
@@ -504,31 +546,6 @@ target_link_libraries(reach_tray_probe PRIVATE
 )
 
 if(REACH_BUILD_TESTS)
-add_executable(reach_core_tests
-    tests/core_ui_tests.c
-)
-
-reach_configure_common(reach_core_tests)
-target_compile_features(reach_core_tests PRIVATE
-    c_std_11
-)
-target_link_libraries(reach_core_tests PRIVATE
-    reach_core
-)
-
-add_executable(reach_dock_feature_tests
-    tests/dock_feature_tests.cpp
-)
-
-reach_configure_common(reach_dock_feature_tests)
-target_compile_features(reach_dock_feature_tests PRIVATE
-    cxx_std_17
-)
-target_link_libraries(reach_dock_feature_tests PRIVATE
-    reach_features
-    reach_support
-)
-
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
 )
@@ -538,7 +555,7 @@ target_compile_features(reach_pin_config_tests PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_pin_config_tests PRIVATE
-    reach_features
+    reach_services
 )
 
 add_executable(reach_quick_settings_feature_tests
@@ -553,13 +570,49 @@ target_link_libraries(reach_quick_settings_feature_tests PRIVATE
     reach_features
 )
 
-add_executable(reach_windows_update_feature_tests
-    tests/windows_update_feature_tests.cpp
+add_executable(reach_context_menu_feature_tests
+    tests/context_menu_feature_tests.cpp
 )
 
-reach_configure_common(reach_windows_update_feature_tests)
-target_compile_features(reach_windows_update_feature_tests PRIVATE cxx_std_17)
-target_link_libraries(reach_windows_update_feature_tests PRIVATE reach_features)
+reach_configure_common(reach_context_menu_feature_tests)
+target_compile_features(reach_context_menu_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_context_menu_feature_tests PRIVATE
+    reach_features
+)
+
+add_executable(reach_wallpaper_feature_tests
+    tests/wallpaper_feature_tests.cpp
+)
+
+reach_configure_common(reach_wallpaper_feature_tests)
+target_compile_features(reach_wallpaper_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_wallpaper_feature_tests PRIVATE
+    reach_features
+)
+
+add_executable(reach_now_playing_service_tests
+    tests/now_playing_service_tests.cpp
+)
+
+reach_configure_common(reach_now_playing_service_tests)
+target_compile_features(reach_now_playing_service_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_now_playing_service_tests PRIVATE
+    reach_services
+)
+
+add_executable(reach_settings_feature_tests
+    tests/settings_feature_tests.cpp
+)
+
+reach_configure_common(reach_settings_feature_tests)
+target_compile_features(reach_settings_feature_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_settings_feature_tests PRIVATE reach_settings_feature)
 
 add_executable(reach_launcher_feature_tests
     tests/launcher_feature_tests.cpp
@@ -574,13 +627,21 @@ target_link_libraries(reach_launcher_feature_tests PRIVATE
     reach_support
 )
 
-add_executable(reach_clipboard_model_tests
+add_executable(reach_clipboard_feature_tests
     tests/clipboard_model_tests.cpp
 )
 
-reach_configure_common(reach_clipboard_model_tests)
-target_compile_features(reach_clipboard_model_tests PRIVATE cxx_std_17)
-target_link_libraries(reach_clipboard_model_tests PRIVATE reach_features)
+reach_configure_common(reach_clipboard_feature_tests)
+target_compile_features(reach_clipboard_feature_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_clipboard_feature_tests PRIVATE reach_features)
+
+add_executable(reach_text_edit_tests
+    tests/text_edit_tests.cpp
+)
+
+reach_configure_common(reach_text_edit_tests)
+target_compile_features(reach_text_edit_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_text_edit_tests PRIVATE reach_features)
 
 add_executable(reach_search_ranking_tests
     tests/search_ranking_tests.cpp
@@ -605,13 +666,15 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     cxx_std_17
 )
 
-    add_test(NAME reach_core_tests COMMAND reach_core_tests)
-    add_test(NAME reach_dock_feature_tests COMMAND reach_dock_feature_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
-    add_test(NAME reach_windows_update_feature_tests COMMAND reach_windows_update_feature_tests)
+    add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
+    add_test(NAME reach_wallpaper_feature_tests COMMAND reach_wallpaper_feature_tests)
+    add_test(NAME reach_now_playing_service_tests COMMAND reach_now_playing_service_tests)
+    add_test(NAME reach_settings_feature_tests COMMAND reach_settings_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
-    add_test(NAME reach_clipboard_model_tests COMMAND reach_clipboard_model_tests)
+    add_test(NAME reach_clipboard_feature_tests COMMAND reach_clipboard_feature_tests)
+    add_test(NAME reach_text_edit_tests COMMAND reach_text_edit_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
 endif()
