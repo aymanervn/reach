@@ -22,12 +22,7 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
                 continue;
             }
 
-            reach_result result = reach_d2d_draw_blurred_image(backend, command);
-            if (result != REACH_OK)
-            {
-                continue;
-            }
-
+            (void)reach_d2d_draw_blurred_image(backend, command);
             continue;
         }
 

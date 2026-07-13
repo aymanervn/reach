@@ -48,9 +48,9 @@ const reach_theme *reach_theme_default(void)
         .now_playing_control_text = {1.0f, 0.97f, 0.91f, 0.90f},
         .now_playing_control_background = {0.70f, 0.78f, 0.84f, 0.0f},
         .now_playing_artist_text = {1.0f, 0.97f, 0.91f, 0.55f},
-        .now_playing_artist_text_size = 9.0f,
+        .now_playing_artist_text_size = 11.0f,
         .now_playing_text_gap = 4.0f,
-        .now_playing_control_gap = 4.0f,
+        .now_playing_control_gap = 8.0f,
         .settings_selected_nav_background = {0.08f, 0.22f, 0.42f, 0.92f},
         .settings_text = {1.0f, 1.0f, 1.0f, 0.96f},
         .settings_secondary_text = {1.0f, 1.0f, 1.0f, 0.64f},
@@ -74,11 +74,11 @@ const reach_theme *reach_theme_default(void)
         .now_playing_height_ratio = 0.85f,
         .now_playing_corner_radius_ratio = 0.32f,
         .now_playing_corner_radius_max = 18.0f,
-        .now_playing_padding = 6.0f,
+        .now_playing_padding = 9.0f,
         .now_playing_gap = 6.0f,
         .now_playing_play_button_width = 20.0f,
         .now_playing_prev_next_button_width = 13.2f,
-        .now_playing_title_text_size = 12.0f,
+        .now_playing_title_text_size = 15.0f,
     };
     return &theme;
 }

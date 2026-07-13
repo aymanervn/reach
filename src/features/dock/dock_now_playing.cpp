@@ -3,6 +3,9 @@
 #include <math.h>
 #include <new>
 
+static const float REACH_DOCK_NOW_PLAYING_COVER_WIDTH = 0.70f;
+static const float REACH_DOCK_NOW_PLAYING_COVER_FADE_START = 0.65f;
+static const float REACH_DOCK_NOW_PLAYING_BG_BLUR = 0.45f;
 static const float REACH_DOCK_NOW_PLAYING_BG_CONTRAST = 1.20f;
 
 struct reach_dock_now_playing
@@ -89,29 +92,6 @@ static void reach_dock_now_playing_push_text(reach_render_command_buffer *comman
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static void reach_dock_now_playing_push_blurred_cover(reach_render_command_buffer *commands,
-                                                      reach_rect_f32 rect, uint64_t image_id,
-                                                      float radius, reach_rect_f32 clip)
-{
-    if (image_id == 0)
-    {
-        return;
-    }
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_BLURRED_IMAGE;
-    command.rect = rect;
-    command.icon_id = image_id;
-    command.icon_crop_to_fill = 1;
-    command.radius = radius;
-    command.blur_radius = clip.height * 0.28f;
-    command.image_contrast = REACH_DOCK_NOW_PLAYING_BG_CONTRAST;
-    command.color.a = 1.0f;
-    command.has_clip_rect = 1;
-    command.clip_rect = clip;
-    command.clip_radius = radius;
-    (void)reach_render_command_buffer_push(commands, &command);
-}
-
 void reach_dock_now_playing_model_init(reach_dock_now_playing_model *model)
 {
     if (model != nullptr)
@@ -152,26 +132,21 @@ reach_dock_now_playing_compute_layout(const reach_dock_now_playing_model *model,
     float skip_size = actual->now_playing_prev_next_button_width * dpi_scale;
 
     layout.bounds = bounds;
-    float cover_size = bounds.height;
-    if (cover_size > bounds.width * 0.42f)
-    {
-        cover_size = bounds.width * 0.42f;
-    }
-    layout.cover = reach_dock_now_playing_rect(bounds.x, bounds.y, cover_size, cover_size);
+    layout.cover = bounds;
 
-    float controls_width = skip_size + button_gap + play_size + button_gap + skip_size;
-    if (bounds.width < cover_size + cover_gap + controls_width + padding)
+    float controls_width = play_size + button_gap + skip_size;
+    float previous_x = bounds.x + padding;
+    float text_x = previous_x + skip_size + cover_gap * 2.0f;
+    float controls_x = bounds.x + bounds.width - padding - controls_width;
+    float text_width = controls_x - cover_gap - text_x;
+    if (text_width <= 0.0f)
     {
         return layout;
     }
+    layout.cover = reach_dock_now_playing_rect(bounds.x, bounds.y,
+                                               bounds.width * REACH_DOCK_NOW_PLAYING_COVER_WIDTH,
+                                               bounds.height);
 
-    float controls_x = bounds.x + bounds.width - padding - controls_width;
-    float text_x = layout.cover.x + layout.cover.width + cover_gap;
-    float text_width = controls_x - text_x;
-    if (text_width < 0.0f)
-    {
-        text_width = 0.0f;
-    }
     float title_height = actual->now_playing_title_text_size * dpi_scale;
     float artist_height = actual->now_playing_artist_text_size * dpi_scale;
     float text_y = bounds.y + (bounds.height - title_height - artist_height - text_gap) * 0.5f;
@@ -183,10 +158,9 @@ reach_dock_now_playing_compute_layout(const reach_dock_now_playing_model *model,
     layout.artist = reach_dock_now_playing_rect(text_x, text_y + title_height + text_gap,
                                                 text_width, artist_height);
     layout.previous_button = reach_dock_now_playing_rect(
-        controls_x, bounds.y + (bounds.height - skip_size) * 0.5f, skip_size, skip_size);
+        previous_x, bounds.y + (bounds.height - skip_size) * 0.5f, skip_size, skip_size);
     layout.play_pause_button = reach_dock_now_playing_rect(
-        layout.previous_button.x + skip_size + button_gap,
-        bounds.y + (bounds.height - play_size) * 0.5f, play_size, play_size);
+        controls_x, bounds.y + (bounds.height - play_size) * 0.5f, play_size, play_size);
     layout.next_button = reach_dock_now_playing_rect(
         layout.play_pause_button.x + play_size + button_gap,
         bounds.y + (bounds.height - skip_size) * 0.5f, skip_size, skip_size);
@@ -253,23 +227,20 @@ reach_dock_now_playing_build_render_commands(const reach_dock_now_playing_render
             input->layout->bounds.x - (width - input->layout->bounds.width) * 0.5f,
             input->layout->bounds.y - (height - input->layout->bounds.height) * 0.5f, width,
             height};
-        reach_dock_now_playing_push_blurred_cover(
-            out_commands, background, input->model->cover_image_id, radius, input->layout->bounds);
-    }
-    reach_color overlay = theme->now_playing_background;
-    overlay.r *= 0.34f;
-    overlay.g *= 0.34f;
-    overlay.b *= 0.34f;
-    if (overlay.a < 0.48f)
-    {
-        overlay.a = 0.48f;
-    }
-    reach_dock_now_playing_push_rect(out_commands, input->layout->bounds, overlay, radius);
+        reach_render_command blurred = {};
+        blurred.type = REACH_RENDER_COMMAND_BLURRED_IMAGE;
+        blurred.rect = background;
+        blurred.icon_id = input->model->cover_image_id;
+        blurred.icon_crop_to_fill = 1;
+        blurred.radius = radius;
+        blurred.blur_radius = input->layout->bounds.height * REACH_DOCK_NOW_PLAYING_BG_BLUR;
+        blurred.image_contrast = REACH_DOCK_NOW_PLAYING_BG_CONTRAST;
+        blurred.color.a = 1.0f;
+        blurred.has_clip_rect = 1;
+        blurred.clip_rect = input->layout->bounds;
+        blurred.clip_radius = radius;
+        (void)reach_render_command_buffer_push(out_commands, &blurred);
 
-    reach_color fallback = {1.0f, 1.0f, 1.0f, 0.85f};
-    reach_dock_now_playing_push_rect(out_commands, input->layout->cover, fallback, radius);
-    if (input->model->cover_image_id != 0)
-    {
         reach_render_command cover = {};
         cover.type = REACH_RENDER_COMMAND_ICON;
         cover.rect = input->layout->cover;
@@ -277,8 +248,28 @@ reach_dock_now_playing_build_render_commands(const reach_dock_now_playing_render
         cover.icon_crop_to_fill = 1;
         cover.radius = radius;
         cover.corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT;
+        cover.icon_fade_start = REACH_DOCK_NOW_PLAYING_COVER_FADE_START;
         cover.color.a = 1.0f;
         (void)reach_render_command_buffer_push(out_commands, &cover);
+
+        reach_color overlay = theme->now_playing_background;
+        overlay.r *= 0.34f;
+        overlay.g *= 0.34f;
+        overlay.b *= 0.34f;
+        if (overlay.a < 0.44f)
+        {
+            overlay.a = 0.44f;
+        }
+        else if (overlay.a > 0.50f)
+        {
+            overlay.a = 0.50f;
+        }
+        reach_dock_now_playing_push_rect(out_commands, input->layout->bounds, overlay, radius);
+    }
+    else
+    {
+        reach_dock_now_playing_push_rect(out_commands, input->layout->bounds,
+                                         theme->dock_button_background, radius);
     }
 
     if (input->layout->title.height <= 0.0f || input->layout->play_pause_button.width <= 0.0f)
