@@ -93,7 +93,7 @@ reach_popup_capture_sync_mouse_hook(void *userdata, int32_t should_hook,
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (should_hook && adapter->mouse_hook == nullptr)
+    if (should_hook)
     {
         adapter->mouse_callback = callback;
         adapter->mouse_callback_userdata = callback_userdata;
@@ -106,6 +106,12 @@ reach_popup_capture_sync_mouse_hook(void *userdata, int32_t should_hook,
                 adapter->mouse_callback_userdata = nullptr;
                 return REACH_ERROR;
             }
+        }
+
+        if (adapter->mouse_hook != nullptr)
+        {
+            UnhookWindowsHookEx(adapter->mouse_hook);
+            adapter->mouse_hook = nullptr;
         }
         adapter->mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, reach_popup_capture_mouse_hook_proc,
                                                 GetModuleHandleW(nullptr), 0);

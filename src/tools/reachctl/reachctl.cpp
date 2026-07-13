@@ -1,6 +1,6 @@
 #include "reachctl_common.h"
 #include "reachctl_config_commands.h"
-#include "reachctl_elevation_helper.h"
+#include "reachctl_service.h"
 #include "reachctl_session_commands.h"
 
 #include <windows.h>
@@ -28,10 +28,10 @@ int wmain(int argc, wchar_t **argv)
             }
 
             reach_result shell_result = reachctl_install_reach_shell_and_watchdog(reach_exe);
-            reach_result helper_result = reachctl_install_elevation_helper(nullptr);
+            reach_result helper_result = reachctl_install_service(nullptr);
             int ok = shell_result == REACH_OK && helper_result == REACH_OK;
             reachctl_print(ok ? L"Reach installed. Shell registry, watchdog task, "
-                                L"elevation helper task, and Explorer context menus "
+                                L"reach service task, and Explorer context menus "
                                 L"configured."
                               : L"Reach install failed.");
             return ok ? 0 : 1;
@@ -51,11 +51,11 @@ int wmain(int argc, wchar_t **argv)
             return ok ? 0 : 1;
         }
 
-        if (lstrcmpiW(argv[index], L"--install-elevation-helper") == 0)
+        if (lstrcmpiW(argv[index], L"--install-service") == 0)
         {
             if (!reachctl_is_process_elevated())
             {
-                reachctl_print(L"Elevation helper repair requires Administrator privileges.");
+                reachctl_print(L"Reach service repair requires Administrator privileges.");
                 return 1;
             }
 
@@ -64,9 +64,9 @@ int wmain(int argc, wchar_t **argv)
             {
                 user_id = argv[index + 2];
             }
-            int ok = reachctl_install_elevation_helper(user_id) == REACH_OK;
-            reachctl_print(ok ? L"Reach elevation helper repaired."
-                              : L"Reach elevation helper repair failed.");
+            int ok = reachctl_install_service(user_id) == REACH_OK;
+            reachctl_print(ok ? L"Reach service repaired."
+                              : L"Reach service repair failed.");
             return ok ? 0 : 1;
         }
 
@@ -122,7 +122,7 @@ int wmain(int argc, wchar_t **argv)
 
     reachctl_print(L"Usage: reachctl.exe\n"
                    L"  --install\n"
-                   L"  --install-elevation-helper\n"
+                   L"  --install-service\n"
                    L"  --start\n"
                    L"  --reset\n"
                    L"  --list-monitors\n"

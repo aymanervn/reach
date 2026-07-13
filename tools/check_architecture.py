@@ -18,7 +18,6 @@ RESET = "\033[0m"
 
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s+([<"])([^>"]+)[>"]', re.MULTILINE)
 
-# Catches target_link_libraries(...) declarations
 TARGET_LINK_LIBRARIES_RE = re.compile(
     r"target_link_libraries\s*\(\s*([A-Za-z0-9_:\-\.]+)\s+(.+?)\)",
     re.IGNORECASE | re.DOTALL,
@@ -34,40 +33,111 @@ CMAKE_SCOPE_KEYWORDS = {
 }
 
 ALLOWED_SRC_LAYER_DIRS = {
-    "adapters",
-    "app",
+
     "core",
+    "protocol",
+    "ports",
+    "services",
     "features",
+    "adapters",
+    "composition",
+    "tools",
+    "apps",
+
+    "app",
     "shell",
     "support",
-    "tools",
 }
 
 ALLOWED_INCLUDE_LAYER_DIRS = {
-    "app",
+
     "core",
-    "features",
-    "platform",
+    "protocol",
     "ports",
+    "services",
+    "features",
+    "adapters",
+    "composition",
+    "tools",
+    "apps",
+
+    "app",
+    "platform",
     "shell",
     "support",
 }
 
 ALLOWED_LAYER_DEPENDENCIES: dict[str, set[str]] = {
-    "support": set(),
+
     "core": {"support"},
-    "ports": {"core", "support"},
-    "features": {"core", "ports", "support"},
-    "shell": {"core", "ports", "features", "support"},
-    "app": {"shell", "ports", "features", "core", "support", "platform", "adapters"},
-    "platform": {"ports", "core", "support"},
-    "adapters": {"ports", "core", "support"},
-    "tools": {"app", "platform", "adapters", "features", "ports", "core", "support"},
-    "tests": {
+    "protocol": {"core", "support"},
+    "ports": {"core", "protocol", "support"},
+    "services": {"ports", "protocol", "core", "support"},
+    "features": {"services", "ports", "protocol", "core", "support"},
+    "adapters": {"ports", "protocol", "core", "support"},
+    "composition": {
+        "features",
+        "services",
+        "adapters",
+        "ports",
+        "protocol",
+        "core",
+
+        "shell",
+        "app",
+        "platform",
+        "support",
+    },
+    "tools": {
+        "composition",
+        "adapters",
+        "features",
+        "services",
+        "ports",
+        "protocol",
+        "core",
+
         "app",
         "shell",
+        "platform",
+        "support",
+    },
+
+    "apps": {
         "features",
+        "services",
+        "adapters",
         "ports",
+        "protocol",
+        "core",
+        "support",
+        "platform",
+    },
+
+    "support": set(),
+    "shell": {"features", "services", "ports", "protocol", "core", "support"},
+    "app": {
+        "composition",
+        "shell",
+        "features",
+        "services",
+        "ports",
+        "protocol",
+        "core",
+        "support",
+        "platform",
+        "adapters",
+    },
+    "platform": {"ports", "protocol", "core", "support"},
+    "tests": {
+        "composition",
+        "app",
+        "apps",
+        "shell",
+        "features",
+        "services",
+        "ports",
+        "protocol",
         "core",
         "support",
         "platform",
@@ -75,19 +145,30 @@ ALLOWED_LAYER_DEPENDENCIES: dict[str, set[str]] = {
     },
 }
 
-INNER_LAYERS = {"support", "core", "ports", "features", "shell"}
-OUTER_LAYERS = {"app", "platform", "adapters", "tools", "tests"}
+INNER_LAYERS = {"support", "core", "protocol", "ports", "services", "features"}
+OUTER_LAYERS = {
+    "app",
+    "apps",
+    "platform",
+    "shell",
+    "adapters",
+    "composition",
+    "tools",
+    "tests",
+}
 WINDOWS_ALLOWED_LAYERS = OUTER_LAYERS
 
-# Map CMake targets to architectural layers.
 EXACT_TARGET_LAYERS = {
     "reach_support": "support",
     "reach_core": "core",
     "reach_features": "features",
     "reach_shell": "shell",
     "reach_windows_adapters": "adapters",
-    "reach": "app",
-    "reach_settings": "app",
+    "reach_composition": "composition",
+    "reach": "tools",
+    "reach_settings": "apps",
+    "reach_settings_feature": "apps",
+    "reach_settings_feature_tests": "tests",
     "reachctl": "tools",
     "reach_elevation_helper": "tools",
     "reach_tray_probe": "tools",
@@ -100,8 +181,20 @@ TARGET_LAYER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "core",
     ),
     (
+        re.compile(r"(^|::|_|-)(protocol|protocols|ipc)(_|-|$)", re.IGNORECASE),
+        "protocol",
+    ),
+    (
         re.compile(r"(^|::|_|-)(port|ports|boundary|boundaries)(_|-|$)", re.IGNORECASE),
         "ports",
+    ),
+    (
+        re.compile(r"(^|::|_|-)(service|services)(_|-|$)", re.IGNORECASE),
+        "services",
+    ),
+    (
+        re.compile(r"(^|::|_|-)(composition|compositionroot)(_|-|$)", re.IGNORECASE),
+        "composition",
     ),
     (
         re.compile(
@@ -244,12 +337,6 @@ PUBLIC_INNER_FORBIDDEN_TOKEN_PATTERNS: dict[str, list[str]] = {
     ],
 }
 
-# Inner-layer public headers should not expose implementation/storage/framework headers.
-
-# These patterns are suspicious in public ports because they often mean an untyped
-# platform handle is crossing the boundary. They are warnings, not failures, because
-# C/C++ ports often use opaque handles deliberately to keep OS headers out of the
-# inner API. Prefer named project-owned handle typedefs where possible.
 PUBLIC_INNER_WARNING_TOKEN_PATTERNS: dict[str, list[str]] = {
     "ports": [
         r"\buintptr_t\b",
@@ -267,24 +354,19 @@ PUBLIC_INNER_FORBIDDEN_INCLUDE_PATTERNS = [
     r"(^|/)(qt|gtk|wx|imgui|sdl)(/|\.|$)",
 ]
 
-
 @dataclass(frozen=True)
 class Include:
     delimiter: str
     value: str
 
-
 def rel(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
-
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
 
-
 def is_source(path: Path) -> bool:
     return path.suffix.lower() in SOURCE_EXTENSIONS
-
 
 def iter_source_files() -> list[Path]:
     paths: list[Path] = []
@@ -296,10 +378,8 @@ def iter_source_files() -> list[Path]:
             )
     return paths
 
-
 def iter_cmake_files() -> list[Path]:
     return [p for p in ROOT.rglob("CMakeLists.txt") if ".git" not in p.parts]
-
 
 def layer_for_path(path: Path) -> str | None:
     relative = rel(path)
@@ -323,7 +403,6 @@ def layer_for_path(path: Path) -> str | None:
 
     return None
 
-
 def layer_for_reach_include(include: str) -> str | None:
     if not include.startswith("reach/"):
         return None
@@ -336,7 +415,6 @@ def layer_for_reach_include(include: str) -> str | None:
     if layer in ALLOWED_INCLUDE_LAYER_DIRS:
         return layer
     return None
-
 
 def resolve_local_include(source: Path, include: str) -> Path | None:
     candidates = [
@@ -352,35 +430,29 @@ def resolve_local_include(source: Path, include: str) -> Path | None:
 
     return None
 
-
 def layer_for_include(source: Path, include: Include) -> str | None:
     reach_layer = layer_for_reach_include(include.value)
     if reach_layer is not None:
         return reach_layer
 
-    # Resolve quoted and angle-bracket includes. System includes will simply not resolve.
     resolved = resolve_local_include(source, include.value)
     if resolved is not None:
         return layer_for_path(resolved)
 
     return None
 
-
 def includes_from(text: str) -> list[Include]:
     return [Include(delimiter, value) for delimiter, value in INCLUDE_RE.findall(text)]
-
 
 def strip_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     return re.sub(r"//.*", "", text)
-
 
 def is_public_header(path: Path) -> bool:
     return rel(path).startswith("include/reach/") and path.suffix.lower() in {
         ".h",
         ".hpp",
     }
-
 
 def target_layer(target: str) -> str | None:
     simplified = target.split("/")[-1]
@@ -391,7 +463,6 @@ def target_layer(target: str) -> str | None:
             return layer
     return None
 
-
 def cmake_tokens(body: str) -> list[str]:
     body = re.sub(r"#.*", "", body)
     raw = re.split(r"[\s\n\r\t]+", body.strip())
@@ -400,7 +471,6 @@ def cmake_tokens(body: str) -> list[str]:
         for token in raw
         if token and token not in CMAKE_SCOPE_KEYWORDS and not token.startswith("$<")
     ]
-
 
 def validate_layer_directories() -> list[str]:
     violations: list[str] = []
@@ -429,18 +499,21 @@ def validate_layer_directories() -> list[str]:
 
     return violations
 
-
 def validate_document_contract() -> list[str]:
     text = read(ARCHITECTURE_DOC)
     if not text:
         return ["docs/architecture.md: missing or unreadable"]
 
     required_terms = (
-        "Dependency Rule",
-        "Allowed Dependencies",
-        "Forbidden Dependencies",
-        "Required Verification",
-        "Do not weaken",
+        "## core",
+        "## protocol",
+        "## ports",
+        "## services",
+        "## features",
+        "## adapters",
+        "## composition",
+        "## tools",
+        "inward",
     )
 
     return [
@@ -448,7 +521,6 @@ def validate_document_contract() -> list[str]:
         for term in required_terms
         if term not in text
     ]
-
 
 def validate_imports(path: Path, text: str) -> list[str]:
     violations: list[str] = []
@@ -474,7 +546,6 @@ def validate_imports(path: Path, text: str) -> list[str]:
 
     return violations
 
-
 def validate_windows_boundary(path: Path, text: str) -> list[str]:
     violations: list[str] = []
     source_layer = layer_for_path(path)
@@ -499,6 +570,22 @@ def validate_windows_boundary(path: Path, text: str) -> list[str]:
 
     return violations
 
+def validate_capsule_state_encapsulation(path: Path, text: str) -> list[str]:
+    """Feature capsule state is compiler-enforced const outside the feature:
+    the internal mutable accessors (reach_<f>_state_mut) must never appear
+    outside src/features/. A hit means someone re-opened the hole the
+    class-driven capsule interface closed."""
+    violations: list[str] = []
+    relative = rel(path)
+    if relative.replace("\\", "/").startswith("src/features/"):
+        return violations
+    scan_text = strip_comments(text)
+    if re.search(r"\b\w+_state_mut\s*\(", scan_text):
+        violations.append(
+            f"{relative}: capsule state must stay const outside src/features/ "
+            f"(found a *_state_mut( accessor use)"
+        )
+    return violations
 
 def validate_public_inner_api(path: Path, text: str) -> list[str]:
     violations: list[str] = []
@@ -526,7 +613,6 @@ def validate_public_inner_api(path: Path, text: str) -> list[str]:
 
     return violations
 
-
 def validate_public_inner_api_warnings(path: Path, text: str) -> list[str]:
     warnings: list[str] = []
     source_layer = layer_for_path(path)
@@ -545,7 +631,6 @@ def validate_public_inner_api_warnings(path: Path, text: str) -> list[str]:
             )
 
     return warnings
-
 
 def validate_cmake_dependencies() -> list[str]:
     violations: list[str] = []
@@ -576,7 +661,6 @@ def validate_cmake_dependencies() -> list[str]:
 
     return violations
 
-
 def main() -> int:
     violations: list[str] = []
     warnings: list[str] = []
@@ -589,6 +673,7 @@ def main() -> int:
         violations.extend(validate_imports(path, text))
         violations.extend(validate_windows_boundary(path, text))
         violations.extend(validate_public_inner_api(path, text))
+        violations.extend(validate_capsule_state_encapsulation(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 
     if violations:
@@ -608,7 +693,6 @@ def main() -> int:
 
     print(f"{GREEN}Architecture check passed.{RESET}")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

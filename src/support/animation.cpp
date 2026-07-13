@@ -106,6 +106,53 @@ void reach_animation_manager_tick(reach_animation_manager *manager, double delta
     }
 }
 
+double reach_animation_track_time_to_value(const reach_animation_track *track,
+                                           float target_value)
+{
+    if (track == nullptr || !track->active || track->duration_seconds <= 0.0)
+    {
+        return 0.0;
+    }
+    const float span = track->to - track->from;
+    if (span == 0.0f)
+    {
+        return 0.0;
+    }
+
+    float needed = (target_value - track->from) / span;
+    if (needed <= 0.0f)
+    {
+        return 0.0;
+    }
+    if (needed >= 1.0f)
+    {
+        double remaining = track->duration_seconds - track->elapsed_seconds;
+        return remaining > 0.0 ? remaining : 0.0;
+    }
+
+    float lo = (float)(track->elapsed_seconds / track->duration_seconds);
+    float hi = 1.0f;
+    if (reach_animation_ease(lo, track->easing) >= needed)
+    {
+        return 0.0;
+    }
+    for (int step = 0; step < 32; ++step)
+    {
+        float mid = (lo + hi) * 0.5f;
+        if (reach_animation_ease(mid, track->easing) < needed)
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid;
+        }
+    }
+    double cross_seconds = (double)hi * track->duration_seconds;
+    double remaining = cross_seconds - track->elapsed_seconds;
+    return remaining > 0.0 ? remaining : 0.0;
+}
+
 void reach_animation_manager_set(reach_animation_manager *manager, size_t track_id, float value)
 {
     reach_animation_track *track = reach_animation_manager_track(manager, track_id);

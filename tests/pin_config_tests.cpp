@@ -1,4 +1,4 @@
-#include "reach/features/pin_config.h"
+#include "reach/services/pin_config.h"
 
 struct test_store
 {

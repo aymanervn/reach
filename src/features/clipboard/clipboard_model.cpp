@@ -1,5 +1,7 @@
 #include "reach/features/clipboard.h"
 
+#include "clipboard_common.h"
+
 static size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
 {
     if (model == nullptr)

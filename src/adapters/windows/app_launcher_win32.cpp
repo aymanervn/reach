@@ -25,7 +25,8 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
 
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI;
+
+    execute.fMask = SEE_MASK_ASYNCOK | SEE_MASK_FLAG_NO_UI;
     execute.lpVerb = request->run_as_admin ? L"runas" : nullptr;
     execute.lpFile = reinterpret_cast<const wchar_t *>(request->path);
     execute.lpParameters = request->arguments[0] != 0
@@ -47,15 +48,7 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
         CoUninitialize();
     }
 
-    if (!launched)
-    {
-        return REACH_ERROR;
-    }
-    if (execute.hProcess != nullptr)
-    {
-        CloseHandle(execute.hProcess);
-    }
-    return REACH_OK;
+    return launched ? REACH_OK : REACH_ERROR;
 }
 
 static void reach_app_launcher_destroy(reach_app_launcher *launcher)

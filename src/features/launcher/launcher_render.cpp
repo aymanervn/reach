@@ -1,5 +1,9 @@
 #include "reach/features/launcher.h"
 
+#include "launcher_common.h"
+
+#include "reach/features/common/scrollbar_render.h"
+
 static reach_color reach_launcher_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
 {
     reach_color color = {};
@@ -27,28 +31,27 @@ static float reach_launcher_scale(const reach_launcher_render_input *input, floa
     return value * scale;
 }
 
-static size_t reach_launcher_visible_result_count(const reach_ui_state *state)
+static size_t reach_launcher_visible_result_count(const reach_launcher_model *model)
 {
-    if (state == nullptr)
+    if (model == nullptr)
     {
         return 0;
     }
-    return state->launcher.result_count < REACH_SEARCH_VISIBLE_RESULTS
-               ? state->launcher.result_count
-               : REACH_SEARCH_VISIBLE_RESULTS;
+    return model->result_count < REACH_SEARCH_VISIBLE_RESULTS ? model->result_count
+                                                              : REACH_SEARCH_VISIBLE_RESULTS;
 }
 
 reach_result reach_launcher_build_render_commands(const reach_launcher_render_input *input,
                                                   reach_render_command_buffer *out_commands)
 {
-    if (input == nullptr || input->theme == nullptr || input->state == nullptr ||
+    if (input == nullptr || input->theme == nullptr || input->model == nullptr ||
         input->layout == nullptr || out_commands == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
     const reach_theme *theme = input->theme;
-    const reach_ui_state *state = input->state;
+    const reach_launcher_model *model = input->model;
     const reach_launcher_layout *layout = input->layout;
     reach_render_command_buffer_clear(out_commands);
     float launcher_radius = reach_launcher_scale(input, 10.0f);
@@ -68,7 +71,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float row_path_y = reach_launcher_scale(input, 28.0f);
     float row_path_height = reach_launcher_scale(input, 20.0f);
     float row_path_size = reach_launcher_scale(input, 12.0f);
-    int32_t results_attached = state->launcher.result_count > 0 ? 1 : 0;
+    int32_t results_attached = model->result_count > 0 ? 1 : 0;
 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
@@ -94,9 +97,35 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         reach_render_command_buffer_push(out_commands, &command);
     }
 
-    if (state->launcher.result_count > 0)
     {
-        size_t visible_count = reach_launcher_visible_result_count(state);
+        reach_color transparent = {};
+        command = {};
+        command.type = REACH_RENDER_COMMAND_TEXTBOX;
+        command.rect.x = layout->search_text_input.x - layout->bounds.x;
+        command.rect.y = layout->search_text_input.y - layout->bounds.y;
+        command.rect.width = layout->search_text_input.width;
+        command.rect.height = layout->search_text_input.height;
+        command.color = transparent;
+        command.radius = 0.0f;
+        command.stroke_width = 0.0f;
+        command.text_size = reach_launcher_scale(input, 18.0f);
+        command.text_weight = REACH_TEXT_WEIGHT_NORMAL;
+        command.text_alignment = input->text_alignment_leading;
+        command.text_color = reach_launcher_opaque(theme->launcher_search_text);
+        command.placeholder_color = reach_launcher_rgb(255, 255, 255, 0.40f);
+        command.selection_color = reach_launcher_rgb(255, 255, 255, 0.25f);
+        command.caret_index = input->caret_index;
+        command.caret_visible = input->caret_visible;
+        command.selection_start = input->selection_start;
+        command.selection_end = input->selection_end;
+        reach_copy_utf16(command.text, 260, model->query);
+        reach_copy_utf16(command.placeholder, 128, (const uint16_t *)L"Search for anything");
+        reach_render_command_buffer_push(out_commands, &command);
+    }
+
+    if (model->result_count > 0)
+    {
+        size_t visible_count = reach_launcher_visible_result_count(model);
         float row_height = reach_launcher_scale(input, 56.0f);
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
@@ -127,36 +156,21 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
         if (layout->search_result_scrollbar_track.height > 0.0f)
         {
-            command = {};
-            command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect.x = layout->search_result_scrollbar_track.x - layout->bounds.x;
-            command.rect.y = layout->search_result_scrollbar_track.y - layout->bounds.y;
-            command.rect.width = layout->search_result_scrollbar_track.width;
-            command.rect.height = layout->search_result_scrollbar_track.height;
-            command.color = reach_launcher_rgb(255, 255, 255, 0.16f);
-            command.radius = command.rect.width * 0.5f;
-            reach_render_command_buffer_push(out_commands, &command);
-
-            command = {};
-            command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect.x = layout->search_result_scrollbar_thumb.x - layout->bounds.x;
-            command.rect.y = layout->search_result_scrollbar_thumb.y - layout->bounds.y;
-            command.rect.width = layout->search_result_scrollbar_thumb.width;
-            command.rect.height = layout->search_result_scrollbar_thumb.height;
-            command.color = reach_launcher_rgb(255, 255, 255, 0.72f);
-            command.radius = command.rect.width * 0.5f;
-            reach_render_command_buffer_push(out_commands, &command);
+            reach_scrollbar_build_render_commands(
+                layout->search_result_scrollbar_track, layout->search_result_scrollbar_thumb,
+                layout->bounds, reach_launcher_rgb(255, 255, 255, 0.16f),
+                reach_launcher_rgb(255, 255, 255, 0.72f), out_commands);
         }
 
-        size_t start = reach_ui_state_launcher_result_scroll_offset(state);
-        if (start > state->launcher.result_count)
+        size_t start = reach_launcher_model_result_scroll_offset(model);
+        if (start > model->result_count)
         {
-            start = state->launcher.result_count;
+            start = model->result_count;
         }
         size_t end = start + visible_count;
-        if (end > state->launcher.result_count)
+        if (end > model->result_count)
         {
-            end = state->launcher.result_count;
+            end = model->result_count;
         }
 
         for (size_t index = start; index < end && index < REACH_SEARCH_MAX_RESULTS; ++index)
@@ -166,7 +180,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             float row_y = layout->search_result_items.y - layout->bounds.y +
                           row_height * (float)visible_index;
             float row_width = layout->search_result_items.width;
-            int32_t selected = index == state->launcher.selected_result_index;
+            int32_t selected = index == model->selected_result_index;
 
             if (selected)
             {
@@ -184,7 +198,8 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             float icon_size = row_icon_size;
             float icon_x = row_x + row_icon_x;
             float icon_y = row_y + row_icon_y;
-            uint64_t icon_id = state->launcher.result_icon_ids[index];
+            uint64_t icon_id =
+                input->result_icon_ids != nullptr ? input->result_icon_ids[index] : 0;
 
             if (icon_id != 0)
             {
@@ -218,8 +233,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.width = icon_size;
                 command.rect.height = icon_size;
                 command.color = reach_launcher_rgb(255, 255, 255, 0.78f);
-                command.icon_id =
-                    reach_launcher_fallback_icon(state->launcher.results[index].is_directory);
+                command.icon_id = reach_launcher_fallback_icon(model->results[index].is_directory);
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
@@ -234,7 +248,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
-            reach_copy_utf16(command.text, 260, state->launcher.results[index].name);
+            reach_copy_utf16(command.text, 260, model->results[index].name);
             reach_render_command_buffer_push(out_commands, &command);
 
             command = {};
@@ -247,7 +261,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_size = row_path_size;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
-            reach_copy_utf16(command.text, 260, state->launcher.results[index].path);
+            reach_copy_utf16(command.text, 260, model->results[index].path);
             reach_render_command_buffer_push(out_commands, &command);
         }
     }
@@ -268,4 +282,43 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     reach_render_command_buffer_push(out_commands, &command);
 
     return REACH_OK;
+}
+
+reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
+                                                   const reach_launcher_render_context *ctx,
+                                                   reach_render_command_buffer *out_commands)
+{
+    if (launcher == nullptr || ctx == nullptr || ctx->theme == nullptr || ctx->layout == nullptr ||
+        out_commands == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_launcher_state *state = reach_launcher_state_mut(launcher);
+
+    uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS] = {};
+    for (size_t index = 0;
+         index < state->model.result_count && index < REACH_SEARCH_MAX_RESULTS; ++index)
+    {
+        const uint16_t *path = state->model.results[index].path;
+        if (path[0] != 0)
+        {
+            result_icon_ids[index] =
+                reach_icon_service_get(reach_launcher_icons(launcher), path, 32);
+        }
+    }
+
+    reach_launcher_render_input input = {};
+    input.theme = ctx->theme;
+    input.model = &state->model;
+    input.layout = ctx->layout;
+    input.result_icon_ids = result_icon_ids;
+    input.dpi_scale = ctx->dpi_scale;
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+    input.caret_index = state->launcher_text_edit.caret;
+    input.caret_visible = state->launcher_caret_visible;
+    reach_text_edit_selection_range(&state->launcher_text_edit, &input.selection_start,
+                                    &input.selection_end);
+
+    return reach_launcher_build_render_commands(&input, out_commands);
 }

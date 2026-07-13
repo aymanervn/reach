@@ -1,6 +1,6 @@
 #include "windows_adapters_internal.h"
 
-#include "window_management/elevation_helper_shared_state_win32.h"
+#include "window_management/reach_service_shared_state_win32.h"
 
 #include "reach/ports/input_source.h"
 
@@ -190,16 +190,16 @@ typedef struct reach_input_win_chord_event
 } reach_input_win_chord_event;
 
 static const reach_input_win_chord_event REACH_INPUT_WIN_CHORD_EVENTS[] = {
-    {REACH_ELEVATION_HELPER_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL},
-    {REACH_ELEVATION_HELPER_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL},
+    {REACH_SERVICE_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL},
+    {REACH_SERVICE_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL},
 };
 
 static int32_t
-reach_input_hotkey_has_win_modifier(const reach_elevation_helper_hotkey_record *record)
+reach_input_hotkey_has_win_modifier(const reach_service_hotkey_record *record)
 {
     return record != nullptr &&
-           (record->modifiers & (REACH_ELEVATION_HELPER_MODIFIER_LEFT_WIN |
-                                 REACH_ELEVATION_HELPER_MODIFIER_RIGHT_WIN)) != 0;
+           (record->modifiers & (REACH_SERVICE_MODIFIER_LEFT_WIN |
+                                 REACH_SERVICE_MODIFIER_RIGHT_WIN)) != 0;
 }
 
 static size_t reach_input_win_chord_event_count(void)
@@ -208,7 +208,7 @@ static size_t reach_input_win_chord_event_count(void)
 }
 
 static int32_t reach_input_try_post_win_chord_event(
-    reach_input_source *source, const reach_elevation_helper_hotkey_record *record, int32_t pressed)
+    reach_input_source *source, const reach_service_hotkey_record *record, int32_t pressed)
 {
     if (source == nullptr || record == nullptr || !pressed ||
         !reach_input_hotkey_has_win_modifier(record))
@@ -248,17 +248,17 @@ static void reach_input_reset_hotkey_state(reach_input_source *source)
 }
 
 static void reach_input_handle_hotkey_record(reach_input_source *source,
-                                             const reach_elevation_helper_hotkey_record *record)
+                                             const reach_service_hotkey_record *record)
 {
     if (source == nullptr || record == nullptr)
     {
         return;
     }
 
-    int32_t pressed = record->action == REACH_ELEVATION_HELPER_HOTKEY_PRESSED;
+    int32_t pressed = record->action == REACH_SERVICE_HOTKEY_PRESSED;
     switch (record->key)
     {
-    case REACH_ELEVATION_HELPER_HOTKEY_ALT:
+    case REACH_SERVICE_HOTKEY_ALT:
         source->alt_down = pressed;
         if (!pressed && source->alt_tab_active)
         {
@@ -266,12 +266,12 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
             reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_COMMIT, 0);
         }
         break;
-    case REACH_ELEVATION_HELPER_HOTKEY_SHIFT:
+    case REACH_SERVICE_HOTKEY_SHIFT:
         source->shift_down = pressed;
         break;
-    case REACH_ELEVATION_HELPER_HOTKEY_TAB:
+    case REACH_SERVICE_HOTKEY_TAB:
         if (pressed &&
-            (source->alt_down || (record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_ALT) != 0))
+            (source->alt_down || (record->modifiers & REACH_SERVICE_MODIFIER_ALT) != 0))
         {
             if (!source->alt_tab_active)
             {
@@ -280,29 +280,29 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
                 break;
             }
             int32_t shift_down = source->shift_down ||
-                                 ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_SHIFT) != 0);
+                                 ((record->modifiers & REACH_SERVICE_MODIFIER_SHIFT) != 0);
             reach_ui_event_type direction =
                 shift_down ? REACH_UI_EVENT_APP_SWITCH_PREVIOUS : REACH_UI_EVENT_APP_SWITCH_NEXT;
             reach_input_post_ui_event(source, direction, 0);
         }
         break;
-    case REACH_ELEVATION_HELPER_HOTKEY_ESCAPE:
+    case REACH_SERVICE_HOTKEY_ESCAPE:
         if (pressed && source->alt_tab_active)
         {
             source->alt_tab_active = 0;
             reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
         }
         break;
-    case REACH_ELEVATION_HELPER_HOTKEY_D:
-    case REACH_ELEVATION_HELPER_HOTKEY_T:
+    case REACH_SERVICE_HOTKEY_D:
+    case REACH_SERVICE_HOTKEY_T:
         if (!reach_input_try_post_win_chord_event(source, record, pressed) && !pressed &&
             reach_input_hotkey_has_win_modifier(record))
         {
             source->windows_key_chord = 1;
         }
         break;
-    case REACH_ELEVATION_HELPER_HOTKEY_LEFT_WIN:
-    case REACH_ELEVATION_HELPER_HOTKEY_RIGHT_WIN:
+    case REACH_SERVICE_HOTKEY_LEFT_WIN:
+    case REACH_SERVICE_HOTKEY_RIGHT_WIN:
         if (source->alt_tab_active)
         {
             source->windows_key_down = 0;
@@ -317,7 +317,7 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         else if (source->windows_key_down)
         {
             int32_t chord = source->windows_key_chord ||
-                            ((record->modifiers & REACH_ELEVATION_HELPER_MODIFIER_CHORD) != 0);
+                            ((record->modifiers & REACH_SERVICE_MODIFIER_CHORD) != 0);
             source->windows_key_down = 0;
             source->windows_key_chord = 0;
             if (!chord)
@@ -342,13 +342,13 @@ static void reach_input_process_shared_hotkeys(reach_input_source *source)
         return;
     }
 
-    reach_elevation_helper_hotkey_record records[REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY] = {};
+    reach_service_hotkey_record records[REACH_SERVICE_HOTKEY_QUEUE_CAPACITY] = {};
     uint32_t record_count = 0;
     int32_t missed = 0;
     uint64_t first_available = 0;
     uint64_t last_available = 0;
-    if (reach_elevation_helper_shared_copy_hotkeys_since(
-            source->last_hotkey_event, records, REACH_ELEVATION_HELPER_HOTKEY_QUEUE_CAPACITY,
+    if (reach_service_shared_copy_hotkeys_since(
+            source->last_hotkey_event, records, REACH_SERVICE_HOTKEY_QUEUE_CAPACITY,
             &record_count, &missed, &first_available, &last_available) != REACH_OK)
     {
         return;
@@ -368,7 +368,7 @@ static void reach_input_process_shared_hotkeys(reach_input_source *source)
 }
 
 static void reach_input_shared_callback(void *user,
-                                        reach_elevation_helper_shared_reader_event event)
+                                        reach_service_shared_reader_event event)
 {
     reach_input_source *source = static_cast<reach_input_source *>(user);
     if (source == nullptr || source->window == nullptr)
@@ -376,20 +376,20 @@ static void reach_input_shared_callback(void *user,
         return;
     }
 
-    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_CONNECTED)
+    if (event == REACH_SERVICE_SHARED_EVENT_CONNECTED)
     {
         PostMessageW(source->window, REACH_INPUT_WM_HELPER_CONNECTED, 0, 0);
         return;
     }
 
-    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_WINDOWS_CHANGED ||
-        event == REACH_ELEVATION_HELPER_SHARED_EVENT_GAME_MODE_CHANGED)
+    if (event == REACH_SERVICE_SHARED_EVENT_WINDOWS_CHANGED ||
+        event == REACH_SERVICE_SHARED_EVENT_GAME_MODE_CHANGED)
     {
         reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOW_STATE_CHANGED, 0);
         return;
     }
 
-    if (event == REACH_ELEVATION_HELPER_SHARED_EVENT_HOTKEYS_CHANGED)
+    if (event == REACH_SERVICE_SHARED_EVENT_HOTKEYS_CHANGED)
     {
         PostMessageW(source->window, REACH_INPUT_WM_SHARED_HOTKEYS, 0, 0);
         return;
@@ -480,7 +480,7 @@ static reach_result reach_input_start(reach_input_source *source,
         return REACH_ERROR;
     }
 
-    (void)reach_elevation_helper_shared_reader_subscribe(reach_input_shared_callback, source);
+    (void)reach_service_shared_reader_subscribe(reach_input_shared_callback, source);
     reach_input_register_media_hotkeys(source);
     return REACH_OK;
 }
@@ -493,7 +493,7 @@ static reach_result reach_input_stop(reach_input_source *source)
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_elevation_helper_shared_reader_unsubscribe(source);
+    reach_service_shared_reader_unsubscribe(source);
     reach_input_unregister_media_hotkeys(source);
     reach_input_reset_hotkey_state(source);
     source->callback = nullptr;

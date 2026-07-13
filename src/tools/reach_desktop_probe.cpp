@@ -1,5 +1,4 @@
-// Build: cl /std:c++17 /EHsc /DUNICODE /D_UNICODE reach_desktop_probe.cpp user32.lib gdi32.lib
-// ole32.lib shell32.lib shlwapi.lib psapi.lib shcore.lib dwmapi.lib wtsapi32.lib
+
 
 #ifndef UNICODE
 #define UNICODE
@@ -736,7 +735,7 @@ int wmain(int argc, wchar_t **argv)
 
     if (!g_cfg.watch)
     {
-        // Pump briefly so messages generated during startup are captured.
+
         DWORD until = GetTickCount() + 500;
         while (GetTickCount() < until)
         {

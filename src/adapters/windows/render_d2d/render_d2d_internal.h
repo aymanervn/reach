@@ -68,32 +68,26 @@ struct reach_render_backend
     UINT target_height;
 };
 
-/* Shared helpers */
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
 D2D1_COLOR_F reach_d2d_color(reach_color color);
 void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr);
 
-/* Device / target setup */
 HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level);
 reach_result reach_d2d_create_target(reach_render_backend *backend);
 
-/* DirectComposition target setup */
 reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT width, UINT height);
 reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend);
 reach_result reach_dcomp_create_target(reach_render_backend *backend);
 reach_result reach_dcomp_create_blur_target(reach_render_backend *backend);
 
-/* WinUI Composition target setup */
 HRESULT
 reach_winrt_activate_compositor(ABI::Windows::UI::Composition::ICompositor **out_compositor);
 HRESULT reach_visual_set_size(IInspectable *inspectable, float width, float height);
 reach_result reach_wuc_create_target(reach_render_backend *backend);
 
-/* Frame lifecycle */
 reach_result reach_d2d_begin_frame(reach_render_backend *backend);
 reach_result reach_d2d_end_frame(reach_render_backend *backend);
 
-/* Raster icon drawing */
 void reach_d2d_clear_icon_cache(reach_render_backend *backend);
 reach_result reach_d2d_draw_icon(reach_render_backend *backend,
                                  const reach_render_command *command);
@@ -102,11 +96,10 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
 void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t icon_id);
 reach_result reach_d2d_draw_icon_tint(reach_render_backend *backend,
                                       const reach_render_command *command);
-/* Vector icon / SVG resource drawing */
+
 reach_result reach_d2d_draw_vector_icon(reach_render_backend *backend,
                                         const reach_render_command *command);
 
-/* Shape drawing */
 reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target,
@@ -118,15 +111,14 @@ reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
 reach_result reach_d2d_draw_clipped_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command);
 
-/* Text drawing */
 reach_result reach_d2d_draw_text(reach_render_backend *backend,
                                  const reach_render_command *command);
+reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
+                                    const reach_render_command *command);
 
-/* Command execution */
 reach_result reach_d2d_execute(reach_render_backend *backend,
                                const reach_render_command_buffer *commands);
 
-/* Backend lifetime */
 void reach_d2d_destroy(reach_render_backend *backend);
 
 #endif

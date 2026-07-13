@@ -22,6 +22,7 @@ extern "C"
 
     typedef struct reach_app_launcher_ops
     {
+
         reach_result (*launch)(reach_app_launcher *launcher,
                                const reach_app_launch_request *request);
         void (*destroy)(reach_app_launcher *launcher);
