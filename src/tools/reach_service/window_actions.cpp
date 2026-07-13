@@ -285,7 +285,7 @@ reach_result reach_window_management_minimize(HWND hwnd)
     return REACH_ERROR;
 }
 
-static void reach_window_management_expand_by_invisible_borders(HWND hwnd, RECT *rect)
+static int32_t reach_window_management_frame_bounds(HWND hwnd, RECT *out_frame)
 {
     typedef HRESULT(WINAPI * reach_dwm_get_window_attribute_fn)(HWND, DWORD, PVOID, DWORD);
     static HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
@@ -295,12 +295,16 @@ static void reach_window_management_expand_by_invisible_borders(HWND hwnd, RECT 
                        : nullptr;
     static const DWORD reach_dwma_extended_frame_bounds = 9;
 
+    return get_window_attribute != nullptr &&
+           SUCCEEDED(get_window_attribute(hwnd, reach_dwma_extended_frame_bounds, out_frame,
+                                          sizeof(*out_frame)));
+}
+
+static void reach_window_management_expand_by_invisible_borders(HWND hwnd, RECT *rect)
+{
     RECT frame = {};
     RECT window = {};
-    if (get_window_attribute == nullptr ||
-        FAILED(get_window_attribute(hwnd, reach_dwma_extended_frame_bounds, &frame,
-                                    sizeof(frame))) ||
-        !GetWindowRect(hwnd, &window))
+    if (!reach_window_management_frame_bounds(hwnd, &frame) || !GetWindowRect(hwnd, &window))
     {
         return;
     }
@@ -320,6 +324,26 @@ static void reach_window_management_expand_by_invisible_borders(HWND hwnd, RECT 
     rect->top += deltas[1];
     rect->right += deltas[2];
     rect->bottom += deltas[3];
+}
+
+static int32_t reach_window_management_maximized(HWND hwnd, const RECT *expected)
+{
+    (void)expected;
+    return hwnd != nullptr && IsWindow(hwnd) && IsZoomed(hwnd);
+}
+
+static int32_t reach_window_management_matches_split(HWND hwnd, reach_rect_i32 work_area,
+                                                     reach_split_mode mode)
+{
+    RECT frame = {};
+    if (!reach_window_management_frame_bounds(hwnd, &frame) && !GetWindowRect(hwnd, &frame))
+    {
+        return 0;
+    }
+
+    reach_rect_i32 rect = {frame.left, frame.top, frame.right, frame.bottom};
+    const int32_t tolerance = 8;
+    return reach_layout_rect_matches_split(work_area, rect, mode, tolerance);
 }
 
 reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
@@ -344,6 +368,21 @@ reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
     if (result != REACH_OK)
     {
         return result;
+    }
+
+    if (!IsZoomed(hwnd) && reach_window_management_matches_split(hwnd, work_area, mode))
+    {
+        reach_window_action_state before = reach_window_management_capture_state(hwnd);
+        ShowWindow(hwnd, SW_MAXIMIZE);
+        if (reach_window_management_wait_for(hwnd, reach_window_management_maximized, nullptr,
+                                             750))
+        {
+            return REACH_OK;
+        }
+
+        reach_window_action_state after = reach_window_management_capture_state(hwnd);
+        reach_window_management_log_failure("snap.maximize", hwnd, &before, &after);
+        return REACH_ERROR;
     }
 
     if (IsZoomed(hwnd))
