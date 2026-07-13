@@ -83,13 +83,13 @@ static void test_preview()
     uint16_t preview[12] = {};
     const uint16_t text[] = {' ', 'a', '\t', ' ', 'b', '\r', '\n', 'c', '\n', 'd', '\n', 'e', 0};
     reach_clipboard_build_text_preview(text, preview, 12);
-    const uint16_t expected[] = {'a', ' ', 'b', ' ', 'c', ' ', 'd', 0x2026, 0};
+    const uint16_t expected[] = {' ', 'a', '\t', ' ', 'b', '\n', 'c', '\n', 'd', '\n', 'e', 0};
     size_t index = 0;
     while (expected[index] != 0 && preview[index] == expected[index])
     {
         ++index;
     }
-    expect_true(expected[index] == preview[index], "preview normalizes whitespace and line limit");
+    expect_true(expected[index] == preview[index], "preview preserves whitespace and line breaks");
 
     uint16_t tiny[5] = {};
     const uint16_t long_text[] = {'a', 'b', 'c', 'd', 'e', 'f', 0};
