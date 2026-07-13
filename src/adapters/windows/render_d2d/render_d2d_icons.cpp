@@ -483,6 +483,79 @@ reach_result reach_d2d_draw_icon_tint(reach_render_backend *backend,
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
+static HRESULT reach_d2d_push_fade_layer(ID2D1RenderTarget *target, D2D1_RECT_F rect,
+                                         float fade_start, ID2D1Layer **out_layer,
+                                         ID2D1LinearGradientBrush **out_brush)
+{
+    D2D1_GRADIENT_STOP stops[2] = {
+        {fade_start, D2D1::ColorF(D2D1::ColorF::White, 1.0f)},
+        {1.0f, D2D1::ColorF(D2D1::ColorF::White, 0.0f)},
+    };
+    ID2D1GradientStopCollection *collection = nullptr;
+    HRESULT hr = target->CreateGradientStopCollection(stops, 2, &collection);
+    if (SUCCEEDED(hr))
+    {
+        hr = target->CreateLinearGradientBrush(
+            D2D1::LinearGradientBrushProperties(D2D1::Point2F(rect.left, rect.top),
+                                                D2D1::Point2F(rect.right, rect.top)),
+            collection, out_brush);
+    }
+    if (collection != nullptr)
+    {
+        collection->Release();
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = target->CreateLayer(nullptr, out_layer);
+    }
+    if (SUCCEEDED(hr))
+    {
+        D2D1_LAYER_PARAMETERS params =
+            D2D1::LayerParameters(rect, nullptr, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                                  D2D1::IdentityMatrix(), 1.0f, *out_brush,
+                                  D2D1_LAYER_OPTIONS_NONE);
+        target->PushLayer(params, *out_layer);
+    }
+    return hr;
+}
+
+static void reach_d2d_draw_bitmap_with_fade(reach_render_backend *backend,
+                                            ID2D1RenderTarget *target, ID2D1Bitmap *bitmap,
+                                            D2D1_RECT_F rect, float opacity,
+                                            const D2D1_RECT_F *source, float fade_start)
+{
+    ID2D1Layer *fade_layer = nullptr;
+    ID2D1LinearGradientBrush *fade_brush = nullptr;
+    int32_t fade = fade_start > 0.0f && fade_start < 1.0f;
+    if (fade &&
+        FAILED(reach_d2d_push_fade_layer(target, rect, fade_start, &fade_layer, &fade_brush)))
+    {
+        fade = 0;
+    }
+    if (backend->d2d_context != nullptr)
+    {
+        backend->d2d_context->DrawBitmap(bitmap, &rect, opacity,
+                                         D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, source,
+                                         nullptr);
+    }
+    else
+    {
+        target->DrawBitmap(bitmap, rect, opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
+    }
+    if (fade)
+    {
+        target->PopLayer();
+    }
+    if (fade_brush != nullptr)
+    {
+        fade_brush->Release();
+    }
+    if (fade_layer != nullptr)
+    {
+        fade_layer->Release();
+    }
+}
+
 reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_render_command *command)
 {
     REACH_ASSERT(backend != nullptr);
@@ -536,8 +609,8 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
                 1.0f, nullptr, D2D1_LAYER_OPTIONS_NONE);
 
             target->PushLayer(layer, clip_layer);
-            target->DrawBitmap(bitmap, rect, command->color.a,
-                               D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, source);
+            reach_d2d_draw_bitmap_with_fade(backend, target, bitmap, rect, command->color.a,
+                                            source, command->icon_fade_start);
             target->PopLayer();
         }
 
@@ -560,8 +633,8 @@ reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_rend
         source = &source_rect;
     }
 
-    target->DrawBitmap(bitmap, rect, command->color.a, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                       source);
+    reach_d2d_draw_bitmap_with_fade(backend, target, bitmap, rect, command->color.a, source,
+                                    command->icon_fade_start);
 
     return REACH_OK;
 }

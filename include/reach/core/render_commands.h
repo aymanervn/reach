@@ -109,6 +109,7 @@ extern "C"
         float radius;
         float blur_radius;
         float image_contrast;
+        float icon_fade_start;
         int32_t has_clip_rect;
         float clip_radius;
         float stroke_width;
