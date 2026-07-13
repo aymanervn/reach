@@ -47,10 +47,34 @@ extern "C"
         REACH_UI_EVENT_POINTER_WHEEL = 41,
         REACH_UI_EVENT_WINDOW_BOUNDS_CHANGED = 42,
         REACH_UI_EVENT_CLIPBOARD_CHANGED = 43,
-        REACH_UI_EVENT_OPEN_TERMINAL = 44
+        REACH_UI_EVENT_OPEN_TERMINAL = 44,
+        /* Text entry, delivered only to a focused editable surface (the launcher
+         * search box). TEXT_CHAR carries a typed UTF-16 code unit in `id`;
+         * TEXT_EDIT carries a reach_ui_edit_key in `id` plus shift/ctrl in
+         * `modifiers`. Navigation/submit (ENTER/ESCAPE/ARROW_UP/ARROW_DOWN) keep
+         * flowing through their existing event types. */
+        REACH_UI_EVENT_TEXT_CHAR = 45,
+        REACH_UI_EVENT_TEXT_EDIT = 46,
+        REACH_UI_EVENT_NOW_PLAYING_CHANGED = 47
     } reach_ui_event_type;
 
+    /* Neutral editing-key vocabulary carried by REACH_UI_EVENT_TEXT_EDIT (in the
+     * event's `id`). Adapters live below the feature layer, so they cannot name
+     * reach_text_edit_key directly; composition maps these onto it. */
+    typedef enum reach_ui_edit_key
+    {
+        REACH_UI_EDIT_KEY_NONE = 0,
+        REACH_UI_EDIT_KEY_BACKSPACE = 1,
+        REACH_UI_EDIT_KEY_DELETE = 2,
+        REACH_UI_EDIT_KEY_LEFT = 3,
+        REACH_UI_EDIT_KEY_RIGHT = 4,
+        REACH_UI_EDIT_KEY_HOME = 5,
+        REACH_UI_EDIT_KEY_END = 6,
+        REACH_UI_EDIT_KEY_SELECT_ALL = 7
+    } reach_ui_edit_key;
+
 #define REACH_UI_EVENT_MODIFIER_CTRL 0x1u
+#define REACH_UI_EVENT_MODIFIER_SHIFT 0x2u
 
     typedef struct reach_ui_event
     {
@@ -78,8 +102,8 @@ extern "C"
         uint32_t id;
     } reach_ui_intent;
 
-    reach_result reach_ui_handle_event(reach_ui_state *state, const reach_ui_event *event,
-                                       reach_ui_intent *out_intent);
+    /* Launcher key/intent dispatch moved to the launcher capsule
+     * (reach_launcher_handle_event in reach/features/launcher.h) in E. */
 
 #ifdef __cplusplus
 }

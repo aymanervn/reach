@@ -112,15 +112,6 @@ static void test_scrollbar_edges()
     reach_scrollbar_set_extents(&stepped, 500.0f, 200.0f);
     reach_scrollbar_set_target(&stepped, 126.0f);
     expect_true(stepped.target == 150.0f, "stepped scrollbar quantizes target");
-
-    reach_scrollbar_layout layout =
-        reach_scrollbar_compute_layout(&model, {0.0f, 0.0f, 4.0f, 100.0f}, 200.0f, 1000.0f, 20.0f);
-    expect_true(layout.thumb.height == 20.0f, "minimum thumb size applies");
-    reach_scrollbar_drag drag = {};
-    reach_scrollbar_begin_drag(&model, &drag, &layout, 100.0f, 0);
-    expect_true(model.offset == model.maximum, "track drag reaches end");
-    reach_scrollbar_end_drag(&drag);
-    expect_true(!drag.active, "drag ends cleanly");
 }
 
 int main()

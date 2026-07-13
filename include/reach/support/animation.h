@@ -48,6 +48,12 @@ extern "C"
     void reach_animation_manager_reset(reach_animation_manager *manager, size_t track_id);
     float reach_animation_manager_value(const reach_animation_manager *manager, size_t track_id);
     float reach_animation_manager_target(const reach_animation_manager *manager, size_t track_id);
+    /* Seconds from now until the running track's value reaches target_value
+       (0 when already reached or the track is idle; the remaining duration
+       when the run never reaches it). Consumers schedule follow-up animations
+       off this instead of hardcoding threshold timings. */
+    double reach_animation_track_time_to_value(const reach_animation_track *track,
+                                               float target_value);
     int32_t reach_animation_manager_active(const reach_animation_manager *manager, size_t track_id);
     int32_t reach_animation_manager_any_active(const reach_animation_manager *manager);
 

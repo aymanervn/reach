@@ -26,7 +26,8 @@ extern "C"
         REACH_RENDER_COMMAND_VECTOR_ICON = 10,
         REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11,
         REACH_RENDER_COMMAND_ICON_TINT = 13,
-        REACH_RENDER_COMMAND_BLURRED_IMAGE = 14
+        REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
+        REACH_RENDER_COMMAND_TEXTBOX = 15
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -121,6 +122,23 @@ extern "C"
         int32_t text_alignment;
         int32_t text_ellipsis;
         uint16_t text[260];
+        /*
+         * TEXTBOX fields (REACH_RENDER_COMMAND_TEXTBOX). The textbox reuses the
+         * generic fields above for its frame and font: rect = bounds,
+         * radius = corner radius, color = background (alpha honored),
+         * stroke_width = border width, text[] = current text,
+         * text_size/text_weight/text_alignment = font. The fields below carry the
+         * editing-specific extras a render-command text input needs.
+         */
+        reach_color text_color;
+        reach_color border_color;
+        reach_color placeholder_color;
+        reach_color selection_color;
+        int32_t caret_index;       /* UTF-16 index of the caret within text[] */
+        int32_t caret_visible;     /* 1 while the blink is in its "on" phase */
+        int32_t selection_start;   /* UTF-16 selection range; start==end => none */
+        int32_t selection_end;
+        uint16_t placeholder[128]; /* shown when text[] is empty */
     } reach_render_command;
 
     typedef struct reach_render_command_buffer
@@ -132,9 +150,6 @@ extern "C"
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer,
                                                   const reach_render_command *command);
-    reach_result reach_ui_build_render_commands(const reach_ui_state *state,
-                                                const reach_ui_layout *layout,
-                                                reach_render_command_buffer *buffer);
 
 #ifdef __cplusplus
 }

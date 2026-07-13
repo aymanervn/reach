@@ -13,12 +13,14 @@ extern "C"
         reach_rect_f32 monitor_bounds;
         reach_rect_f32 work_area;
         float dpi_scale;
+        /* Composition-owned pinned-app count (pinned_apps left reach_ui_state). */
+        size_t pinned_app_count;
     } reach_ui_layout_input;
 
     typedef struct reach_dock_layout
     {
         reach_rect_f32 bounds;
-        reach_rect_f32 music_widget;
+        reach_rect_f32 now_playing;
         reach_rect_f32 app_slots[REACH_MAX_PINNED_APPS];
         reach_rect_f32 tray_button;
         reach_rect_f32 quick_settings_button;
@@ -47,9 +49,15 @@ extern "C"
         reach_launcher_layout launcher;
     } reach_ui_layout;
 
-    reach_result reach_ui_layout_compute(const reach_ui_state *state,
-                                         const reach_ui_layout_input *input,
-                                         reach_ui_layout *out_layout);
+    /* Dock and launcher layout are computed independently from their own models
+     * (the launcher model lives in the reach_launcher capsule). Composition calls
+     * both and assembles a reach_ui_layout. */
+    reach_result reach_dock_layout_compute(const reach_dock_model *dock,
+                                           const reach_ui_layout_input *input,
+                                           reach_dock_layout *out_layout);
+    reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
+                                               const reach_ui_layout_input *input,
+                                               reach_launcher_layout *out_layout);
 
 #ifdef __cplusplus
 }

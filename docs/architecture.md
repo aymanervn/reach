@@ -1,201 +1,195 @@
 # Reach Architecture
 
-Reach follows Clean Architecture with ports and adapters. Dependencies must point inward. Inner layers define policy and stable data. Outer layers perform composition, platform work, IO, persistence, and process integration.
+Dependencies flow inward: outer folders may include inner ones, never the reverse.
+Features and services depend on **ports** (interfaces), never on **adapters**
+(implementations); only composition and tools know concrete adapters.
 
-This document is the architecture contract for new code.
-
-## Dependency Rule
-
-- Inner layers must not depend on outer layers.
-- Product policy must not depend on implementation details.
-- Windows APIs, COM, Direct2D, DirectComposition, registry access, shell APIs, process APIs, file formats, and external services are details.
-- Data crossing inward must be neutral project data, not native Windows objects.
-- Features decide behavior; shell orchestrates; adapters perform platform work;
-  app composition wires concrete dependencies.
-
-## Layers
-
-### `include/reach/support` and `src/support`
-
-Shared low-level utilities.
-
-Rules:
-
-- May not depend on app, shell, features, ports, platform, or adapters.
-- Must stay platform-neutral.
-- Must not include Windows headers or expose Windows types.
-
-### `include/reach/core` and `src/core`
-
-Stable product/domain types and pure state models.
-
-Rules:
-
-- May depend only on support, or on nothing.
-- Must not depend on ports, features, shell, app, platform, or adapters.
-- Must not include Windows headers or expose Windows types.
-- Shared domain models belong here when they are used across layers.
-
-### `include/reach/ports`
-
-Platform-neutral capability interfaces.
-
-Rules:
-
-- May depend only on core and support.
-- Must not depend on app, shell, features, platform, or adapters.
-- Must not include Windows headers or expose native Windows types.
-- Must describe capabilities, not Windows mechanisms.
-
-### `include/reach/features` and `src/features`
-
-Feature policy, feature models, hit testing, rendering inputs, and feature actions.
-
-Rules:
-
-- May depend only on core, ports, and support.
-- Must not depend on app, shell, platform, or adapters.
-- Must not include Windows headers or call Windows APIs.
-- Must not know registry, config-file formats, shell replacement mechanics, Direct2D, DirectComposition, process APIs, or AppUserModel implementation details.
-- Should operate on data and ports passed in.
-- Should return actions/intents when shell or adapters must perform effects.
-
-### `include/reach/shell` and `src/shell`
-
-Shell orchestration.
-
-Rules:
-
-- May depend on core, ports, features, and support.
-- Must not depend on app, platform headers, or adapter implementations.
-- Must not include Windows headers or call Windows APIs.
-- Owns lifecycle orchestration, input routing, feature coordination, reloads, dirty flags, surface state, and port calls.
-- Must not absorb feature policy that belongs in `features`.
-
-### `include/reach/app` and `src/app`
-
-Executable startup and composition.
-
-Rules:
-
-- May depend on shell, ports, features, core, support, platform factory headers,
-  and adapters through composition.
-- Owns application startup, composition, and outer process lifecycle.
-- Owns executable-specific runtimes, including the Settings process.
-- May contain deliberate executable-bound platform integration.
-- Must not become a second shell implementation.
-- Must not move feature policy or adapter implementation details into app code.
-
-### `include/reach/platform`
-
-Outer platform-facing declarations used by composition and tools.
-
-Rules:
-
-- May describe platform factories, platform messages, and platform registration surfaces.
-- Must not be included by core, ports, features, or shell.
-- Must not be used as a back door around ports.
-
-### `src/adapters/windows`
-
-Windows implementations of ports and Windows-specific integration.
-
-Rules:
-
-- May depend inward on ports, core, and support.
-- May use Win32, COM, WIC, Direct2D, DirectComposition, registry, shell APIs, process APIs, AppUserModel APIs, and native Windows handles.
-- Must not leak Windows types or platform assumptions into core, ports, features, or shell.
-- Owns Windows metadata extraction and platform resource lifetime.
-
-### `src/tools`
-
-CLI and diagnostic tools.
-
-Rules:
-
-- May use app composition surfaces, feature policy, ports, support, platform
-  declarations, and Windows adapters as needed.
-- Must not become another shell implementation.
-- Diagnostic behavior must be labelled as diagnostic behavior.
-
-### `tests`
-
-Tests for neutral behavior and isolated platform behavior.
-
-Rules:
-
-- Prefer tests for core, features, ports-facing policy, and support without
-  requiring platform state.
-- Platform-specific tests must remain isolated.
-- New architectural rules should be covered by the architecture check.
-
-## Allowed Dependencies
-
-- support -> nothing
-- core -> support
-- ports -> core, support
-- features -> core, ports, support
-- shell -> core, ports, features, support
-- app -> shell, ports, features, core, support, platform, adapters
-- adapters/windows -> ports, core, support
-- tools -> app, platform, adapters, features, ports, core, support
-- tests -> the layer under test and its allowed inward dependencies
-
-No other dependency direction is allowed.
-
-## Forbidden Dependencies
-
-- core -> ports, features, shell, app, platform, adapters
-- ports -> features, shell, app, platform, adapters
-- features -> shell, app, platform, adapters
-- shell -> app, platform, adapters
-- support -> core, ports, features, shell, app, platform, adapters
-- adapters/windows -> shell or app policy
-- any inner layer -> Windows headers or native Windows types
-
-## Identity Rules
-
-- `path` means launch identity.
-- `arguments` means launch arguments.
-- `icon_ref` means icon lookup identity only.
-- `app_user_model_id` means match/group identity.
-- Dock matching must use AppUserModelID first, then exact launch path.
-- Dock matching must not use filename, folder ancestry, launch-time
-  correlation, or icon reference as identity.
-- Pinning from a running window must ask a platform-neutral port for pin metadata.
-- Platform relaunch metadata belongs in Windows adapters.
-- Relaunch metadata probing must be on demand, not part of hot window snapshot refresh.
-
-## Runtime Rules
-
-- Window procedures must translate native messages into queued project events.
-- Heavy work must happen in shell update/orchestration, not inside native window callbacks.
-- Runtime debug logging must not remain in hot paths.
-- Native resources must have clear owners and release paths.
-- Caches must have explicit refresh or eviction rules.
-- Config changes from tools must notify the running shell.
-- The running shell must reload relevant config live.
-
-## Adding Code
-
-1. Put stable product data in core.
-2. Put feature behavior in features.
-3. Put capability interfaces in ports.
-4. Put orchestration in shell.
-5. Put composition and executable startup in app.
-6. Put Windows implementation details in adapters/windows.
-7. Put CLI behavior in tools.
-8. Add or update tests at the lowest layer that can verify the behavior.
-9. Extend the architecture check when adding a new boundary rule.
-
-## Required Verification
-
-Before finishing architecture-affecting work, run:
-
-```powershell
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+```
+core ← protocol ← ports ← services ← features
+                    ↑          ↑          ↑
+                 adapters ────────────────┘   (implement ports; touch the OS)
+                    ↑
+              composition (wires everything, runs the app)
+                    ↑
+                  tools (executables)
 ```
 
-The architecture check is part of the contract. Do not weaken it or add allowlist entries without explicit approval.
+## core
+
+Primitives and neutral shared data — geometry, color, results, ids, render commands,
+theme, app/window/media/config data. No state, no policy, no OS. Includes nothing but
+the standard library.
+
+## protocol
+
+Cross-process contracts — Reach Service messages, shared-memory layout, kernel object
+names, version constants. Includes `core`.
+
+## ports
+
+Abstract interfaces for every external boundary — renderer, surface, input, monitor,
+OS controls, filesystem, clipboard, media, icons, the Reach Service client. The media
+port separates fast core-state reads from generation-checked cover reads so image I/O
+cannot block transport state. Interfaces only. Includes `core`, `protocol`.
+
+## adapters
+
+The Windows implementations of `ports`; the **only** layer that touches the OS.
+Includes `ports`, `protocol`, `core`, and platform SDKs.
+
+## services
+
+Shared in-process capabilities with state/cache/policy — config, icons, search,
+system status, Now Playing, … Includes `ports`, `protocol`, `core`. Now Playing
+publishes atomic core media generations immediately, enriches them with the latest
+generation's cover asynchronously, owns transport serialization and cover lifetime,
+and masks every transport control while a command is settling. A new core generation
+temporarily retains the previous cover; a missing or failed current cover replaces it
+with the UI placeholder. A media-to-no-media transition retains the last snapshot for
+four seconds, then refetches and publishes disappearance only if absence is confirmed.
+Cover acquisition waits for a 300-millisecond quiet period on the latest media
+generation, coalescing provider thumbnail bursts without delaying core state.
+
+## features
+
+Self-contained UI capsules — dock, launcher, switcher, tray, quick settings, clipboard,
+settings, context menu, wallpaper. Each owns its state, layout, animation,
+hit-testing, render composition, and interaction behind
+create/update/handle_event/append_render_commands entry points, and returns semantic
+actions instead of calling ports. Includes `services`, `ports`, `protocol`, `core` —
+never another feature's internals.
+
+Every capsule also implements the uniform hooks in
+`reach/features/feature_capsule.h` (`reset`, `tick`, `is_open`, `force_close`,
+`on_game_mode`, `needs_frame`, `wants_pointer_move`, `handle_pointer`);
+composition orchestrates through these, so adding a feature costs no
+feature-specific composition code. `handle_pointer` carries the complete
+down/up/move/wheel/leave/cancel/context/middle stream so cleanup semantics do
+not fall back to feature-specific host branches.
+The Dock is fully migrated to this contract: it owns press/release, hosted-button
+feedback, drag/reorder, middle/context actions, cancellation, and its private Now
+Playing input. Composition translates only its semantic actions and cross-feature
+popup policy. Raw hit types and row/index results are feature-private; the Dock
+exposes only a semantic pointer-region query for the global popup mouse hook.
+The Dock also owns its geometry (`reach_dock_local_point` /
+`reach_dock_rect_to_screen` / `reach_dock_layout_to_screen`), converts the
+screen-space pointer stream to dock-local coordinates itself, performs the
+animated item rebuild (snapshot/build/rebind) as one op, and assembles the
+context-menu command list for its items from its pin state and window service;
+the command vocabulary lives in `reach/core/menu_commands.h` so the dock and
+the context_menu display capsule share it without a feature→feature edge.
+The Launcher is also fully migrated: it owns result and pinned-app presses,
+scrolling and scrollbar capture, cancellation, and context-hit semantics through
+`handle_pointer`. Composition translates launch/open/reveal actions and retains
+focus restoration plus transient-surface policy.
+The Clipboard is fully migrated as well: it owns item, close, clear, hover,
+scroll, scrollbar-capture, leave, and cancellation behavior. Composition handles
+only restore/provider calls, external resource release, and transient-surface
+policy for the semantic actions it reports.
+Quick Settings owns tile, slider, output-device, expansion, drag/capture, release,
+and cancellation behavior through the same hook. Composition translates its
+semantic actions into audio and system-control calls and retains popup policy.
+Quick Settings also attaches the system-status service directly (the
+launcher→search precedent): refresh requests, snapshot take/apply, and the
+bluetooth-pending grace timers run inside the capsule
+(`reach_quick_settings_process_changes`); its pending service work folds into
+`needs_frame`. The system-controls watcher fires on a port thread, so
+composition keeps the atomic change-flag accumulator and passes the drained
+flags in — capsule state is never written off-thread. GPU lifetime stays in
+composition: audio applies retire the replaced session/device render icons
+and the host drains and releases them.
+Tray owns popup item hit resolution, press/release feedback, left/right activation
+semantics, and cancellation. Composition retains provider activation, topmost
+window handling, and popup lifecycle.
+Context Menu owns row hit resolution, hover state, command selection, dismissal,
+and cancellation through `handle_pointer`. Composition executes the reported
+command and retains OS calls plus cross-popup and Dock power-button policy.
+Interaction hit contracts for every migrated feature remain private to that
+feature; public capsule APIs expose semantic actions, queries, and render inputs.
+Capsule state is compiler-enforced private: the public `reach_<f>_state_ptr()`
+accessors return `const`, mutation goes through semantic ops, and the internal
+`reach_<f>_state_mut()` accessors must never appear outside `src/features/`
+(checked by `tools/check_architecture.py`), with no exceptions: the launcher
+owns its text input end-to-end (`reach_launcher_handle_text_event` drives the
+edit model, query, and attached search; composition only routes the raw
+TEXT_CHAR/TEXT_EDIT events and applies the reported redraw/relayout).
+
+**Accepted coupling (by design — do not “fix”):** the dock cluster. The dock
+hosts the tray / quick-settings / power buttons, so those popup features may
+take the dock layout directly (e.g. `reach_tray_layout_popup(…, dock_layout,
+…)`); no anchor indirection is wanted between them. Now Playing is not a
+separate feature: its private UI subfeature lives inside dock and consumes the
+shared Now Playing service, leaving room for a future standalone music feature
+to consume the same stable service independently.
+
+## composition
+
+The host (`reach_host`): wires adapters into ports, constructs services and features,
+and runs the app — frame loop, input routing, action→port translators, worker threads,
+and surface lifecycle. Surfaces register a descriptor with a class
+(persistent | transient | popup | overlay) plus the feature capsule and its uniform
+hooks; policy runs as class loops over that table — tick, needs-frame, game mode,
+lifecycle resets, pointer-move subscription sync, the popup mouse hook, transient
+dismissal, and the “opening a popup closes the other popups” rule. Pointer input
+uses one descriptor-driven dispatcher for capsule delivery, surface dirtying,
+relayout, capture, subscription sync, and update scheduling; capsules receive
+screen-space coordinates and convert locally themselves. Each pointer event kind
+runs as a generic loop over the table in `pointer_priority` order (popups →
+transients → persistent, first handled result wins), with the descriptor's
+`role` resolving source-gated delivery, its `apply_pointer_action` translating
+handled results, and its flags declaring the outside-press policy
+(SOURCE_GATED / DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED). Dock-cluster
+pairwise policy (QS-button pass-through, power-press dismissal, tray/launcher
+close rules) and true capture pre-emption (dock drag, QS slider, launcher
+scrollbar) stay as named, commented exceptions ahead of the loops. Hotkey and
+action→port translators for media transport, volume, and brightness live in
+`host_system_actions.cpp`, out of the input routing path.
+Per-frame layout resolves in dependency order in `reach_host_update` (monitor →
+dock cluster → launcher → clipboard → switcher); the per-surface frame steps
+(`host_surface_frames.cpp`, layout refresh → transition → window state →
+corners → show/render) run as one loop over the table in `frame_priority`
+order against a shared `reach_host_frame_context`.
+Genuinely per-feature policies stay as named exceptions (e.g. the launcher closes
+on a foreground-window change); a growing exception list signals a missing class
+rule. May include everything.
+
+### Adding a feature
+
+Everything a new interactive surface needs is authored in its own directory
+plus one descriptor row; no other feature's code changes.
+
+1. **Capsule** (`src/features/<name>/`, header in `include/reach/features/`):
+   implement `reach_feature_capsule_ops` (null-skip the hooks you don't need;
+   `handle_pointer` gets the complete screen-space stream and converts
+   locally), keep state compiler-private (`const` `state_ptr`, internal
+   `state_mut`, semantic ops for writes), and return semantic actions —
+   never call ports.
+2. **Services**: attach any you consume at wiring
+   (`reach_<name>_attach_...`, lifecycle attach/detach pair) — read +
+   request only; mutations stay composition's.
+3. **Descriptor row** (`reach_host_init_surface_descriptors`): id, class,
+   surface runtime, transition, host-level `force_close`, capsule + ops,
+   pointer flags, `role`, `pointer_priority`, `apply_pointer_action`
+   (your action→port translator), `dismiss` if outside-press close differs
+   from `force_close`, `frame` + `frame_priority`, and declarative
+   `toggle_events`/`routed_events` for activation.
+4. **Frame step** (`host_surface_frames.cpp`): one function over
+   `reach_host_apply_transient_frame` for the common case.
+5. **Tests**: logic-only, against the capsule ops — no UI or service tests.
+6. Run build + ctest + `tools/check_architecture.py`, then the live-run
+   protocol with a visual pass.
+
+If the feature needs cross-feature policy the class rules don't cover, add a
+named, commented exception in composition — and treat a growing exception
+list as a missing class rule.
+
+## tools
+
+The executables — reach shell, Reach Service, watchdog, reachctl, update helper,
+probes. Each includes what it needs.
+
+## apps
+
+Self-contained leaf executables outside the shell process — e.g. the standalone
+Settings app (`reachSetting.exe`). May include `features` … `core`. Nothing depends on
+an app — apps are leaves, like `tools`.

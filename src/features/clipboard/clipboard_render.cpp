@@ -1,4 +1,7 @@
 #include "reach/features/clipboard.h"
+
+#include "clipboard_common.h"
+#include "reach/features/common/scrollbar_render.h"
 #include "clipboard_metrics.h"
 static float reach_clipboard_max_float(float a, float b)
 {
@@ -707,20 +710,34 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
 
     if (reach_clipboard_layout_has_scrollbar(layout))
     {
-        command = {};
-        command.type = REACH_RENDER_COMMAND_RECT;
-        command.rect = reach_clipboard_local(layout->scrollbar.track, layout->bounds);
-        command.color = theme->clipboard_scrollbar_track;
-        command.radius = command.rect.width * 0.5f;
-        reach_render_command_buffer_push(commands, &command);
-
-        command = {};
-        command.type = REACH_RENDER_COMMAND_RECT;
-        command.rect = reach_clipboard_local(layout->scrollbar.thumb, layout->bounds);
-        command.color = theme->clipboard_scrollbar_thumb;
-        command.radius = command.rect.width * 0.5f;
-        reach_render_command_buffer_push(commands, &command);
+        reach_scrollbar_build_render_commands(layout->scrollbar.track, layout->scrollbar.thumb,
+                                              layout->bounds, theme->clipboard_scrollbar_track,
+                                              theme->clipboard_scrollbar_thumb, commands);
     }
 
     return REACH_OK;
+}
+reach_result reach_clipboard_append_render_commands(reach_clipboard_feature *clipboard,
+                                                    const reach_theme *theme, float dpi_scale,
+                                                    reach_render_command_buffer *out_commands)
+{
+    if (clipboard == nullptr || theme == nullptr || out_commands == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
+
+    float hover_values[REACH_CLIPBOARD_MAX_ITEMS] = {};
+    reach_clipboard_feature_fill_hover_values(clipboard, hover_values, REACH_CLIPBOARD_MAX_ITEMS);
+
+    reach_clipboard_render_input input = {};
+    input.theme = theme;
+    input.model = &state->model;
+    input.layout = &state->layout;
+    input.hover_values = hover_values;
+    input.dpi_scale = dpi_scale;
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+
+    return reach_clipboard_build_render_commands(&input, out_commands);
 }

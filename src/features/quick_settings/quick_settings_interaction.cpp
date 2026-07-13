@@ -2,6 +2,8 @@
 
 #include "quick_settings_common.h"
 
+#include <math.h>
+
 static int reach_quick_settings_point_in_rect(reach_rect_f32 rect, float x, float y)
 {
     return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
@@ -222,4 +224,116 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
     }
 
     return action;
+}
+
+/*
+ * Slider drag interaction (moved out of composition in the class-driven
+ * interface phase): the capsule hit-tests against its own layout/bounds, arms
+ * and advances the drag, and returns semantic actions; composition owns
+ * pointer capture, subscription sync, and the action translator.
+ */
+
+reach_quick_settings_action
+reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int32_t x, int32_t y)
+{
+    reach_quick_settings_action action = {};
+    if (quick_settings == nullptr)
+    {
+        return action;
+    }
+    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
+
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(&state->layout, &state->model,
+                                      (float)x - state->bounds.x, (float)y - state->bounds.y);
+    action = reach_quick_settings_action_for_hit(hit);
+    if (action.type == REACH_QUICK_SETTINGS_ACTION_NONE)
+    {
+        return action;
+    }
+
+    state->drag.active = action.type == REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME ||
+                         action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME ||
+                         action.type == REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
+    state->drag.type = hit.type;
+    state->drag.last_level = action.volume_level;
+    state->drag.level_valid = state->drag.active;
+    state->drag.session_index = hit.session_index;
+    reach_quick_settings_copy_utf16(state->drag.session_instance_id,
+                                    REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                                    hit.session_instance_id);
+    return action;
+}
+
+reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings *quick_settings,
+                                                           int32_t x, int32_t y)
+{
+    (void)y;
+    reach_quick_settings_action action = {};
+    if (quick_settings == nullptr)
+    {
+        return action;
+    }
+    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
+
+    reach_rect_f32 track = state->layout.main_slider_track;
+    if (state->drag.type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER &&
+        state->drag.session_index < state->layout.app_volume_row_count)
+    {
+        track = state->layout.app_volume_rows[state->drag.session_index].slider_full_range_line;
+    }
+    else if (state->drag.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER)
+    {
+        track = state->layout.brightness_slider_track;
+    }
+
+    if (track.width <= 0.0f)
+    {
+        return action;
+    }
+
+    float local_x = (float)x - state->bounds.x;
+    float next_level = reach_quick_settings_clamp01((local_x - track.x) / track.width);
+
+    if (state->drag.level_valid && fabsf(next_level - state->drag.last_level) < 0.005f)
+    {
+        return action;
+    }
+
+    state->drag.last_level = next_level;
+    state->drag.level_valid = 1;
+
+    if (state->drag.type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER)
+    {
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
+    }
+    else if (state->drag.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER)
+    {
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
+    }
+    else
+    {
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
+    }
+
+    action.volume_level = next_level;
+    action.session_index = state->drag.session_index;
+    reach_quick_settings_copy_utf16(action.session_instance_id,
+                                    REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                                    state->drag.session_instance_id);
+    return action;
+}
+
+void reach_quick_settings_end_drag(reach_quick_settings *quick_settings)
+{
+    if (quick_settings == nullptr)
+    {
+        return;
+    }
+    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
+    state->drag.active = 0;
+    state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
+    state->drag.level_valid = 0;
+    state->drag.session_index = 0;
+    state->drag.session_instance_id[0] = 0;
 }

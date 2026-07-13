@@ -1,5 +1,7 @@
 #include "reach/features/dock.h"
 
+#include "dock_common_state.h"
+
 #include "dock_common.h"
 #include "dock_metrics.h"
 
@@ -159,9 +161,25 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
 {
     const reach_theme *theme = input->theme;
     const reach_dock_layout *layout = input->layout;
+    float reveal = 1.0f;
+    if (input->item_reveal != nullptr && index < input->item_reveal_count)
+    {
+        reveal = input->item_reveal[index];
+    }
+    if (reveal <= 0.0f)
+    {
+        /* The slot is growing but hasn't reached the reveal threshold — it
+           holds position; nothing draws on top yet. */
+        return;
+    }
     uint16_t fallback_initial = '?';
-    reach_icon_handle icon =
-        reach_dock_icon_for_item(input->icons, input->model, index, &fallback_initial);
+    reach_icon_handle icon = {};
+    if (input->render_items != nullptr && index < input->render_item_count)
+    {
+        const reach_dock_render_item *item = &input->render_items[index];
+        icon = item->icon;
+        fallback_initial = item->fallback_initial != 0 ? item->fallback_initial : '?';
+    }
     reach_rect_f32 icon_box = reach_dock_icon_box_for_slot(layout->app_slots[index], icon_box_size);
     if (use_override)
     {
@@ -171,30 +189,43 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     {
         icon_box.x = input->item_box_x[index];
     }
+    if (reveal < 1.0f)
+    {
+        /* Scale the box around its center with the reveal. */
+        const float inset = icon_box.width * (1.0f - reveal) * 0.5f;
+        icon_box.x += inset;
+        icon_box.y += inset;
+        icon_box.width -= inset * 2.0f;
+        icon_box.height -= inset * 2.0f;
+    }
 
     if (icon.id != 0)
     {
         reach_color color = {};
-        color.a = 1.0f;
+        color.a = reveal;
         reach_dock_push_icon(commands, icon_box, icon.id, color);
     }
     else
     {
         reach_color fallback_background = theme->icon_box_background;
-        fallback_background.a *= reach_dock_metrics_values.fallback_icon_background_alpha;
+        fallback_background.a *= reach_dock_metrics_values.fallback_icon_background_alpha * reveal;
         reach_dock_push_rect(commands, icon_box, fallback_background, icon_box_radius);
 
         reach_render_command command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
         command.rect = icon_box;
         command.color = theme->fallback_icon_text;
+        command.color.a *= reveal;
         command.text_alignment = input->text_alignment_center;
         command.text[0] = fallback_initial;
         command.text[1] = 0;
         reach_render_command_buffer_push(commands, &command);
     }
 
-    reach_dock_push_running_indicator(input, commands, index, icon_box);
+    if (reveal >= 1.0f)
+    {
+        reach_dock_push_running_indicator(input, commands, index, icon_box);
+    }
 
     if (input->click_feedback_index == index)
     {
@@ -342,4 +373,150 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     reach_dock_push_power_button(input, out_commands, icon_box_size);
 
     return REACH_OK;
+}
+
+float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
+                                const reach_dock_layout *layout, size_t index)
+{
+    if (dock == nullptr || theme == nullptr || layout == nullptr)
+    {
+        return 0.0f;
+    }
+
+    reach_dock_state *state = reach_dock_state_mut(dock);
+    reach_animation_manager *manager = reach_dock_manager(dock);
+
+    if (index >= state->model.item_count || index >= layout->app_slot_count)
+    {
+        return 0.0f;
+    }
+
+    reach_dock_order_key drag_key = {state->drag.pinned, state->drag.pin_id, state->drag.window};
+    if ((state->drag.active || reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)) &&
+        reach_dock_feature_model_item_matches_key(&state->model, index, drag_key))
+    {
+        return reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
+                   ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)
+                   : state->drag.x;
+    }
+
+    /* Slot position (moving while the slot layer animates) + the decaying
+       reorder offset — the icon rides its slot. */
+    const float slot_x = reach_dock_slot_box_x(theme, layout, index);
+    reach_dock_order_key item_x_key = {state->item_x_pinned[index], state->item_x_pin_ids[index],
+                                       state->item_x_windows[index]};
+    reach_dock_order_key item_key = {state->model.items[index].pinned,
+                                     reach_dock_feature_model_item_pin_id(&state->model, index),
+                                     state->model.items[index].window};
+    if (state->item_x_valid[index] && reach_dock_key_equal(&item_x_key, &item_key))
+    {
+        return slot_x + reach_animation_manager_value(manager, reach_dock_item_animation_id(index));
+    }
+
+    return slot_x;
+}
+
+reach_result reach_dock_append_render_commands(reach_dock *dock,
+                                               const reach_dock_render_context *ctx,
+                                               reach_render_command_buffer *out_commands)
+{
+    if (dock == nullptr || ctx == nullptr || out_commands == nullptr || ctx->theme == nullptr ||
+        ctx->layout == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_dock_state *state = reach_dock_state_mut(dock);
+    reach_animation_manager *manager = reach_dock_manager(dock);
+
+    float item_box_x[REACH_MAX_PINNED_APPS] = {};
+    float item_reveal[REACH_MAX_PINNED_APPS] = {};
+    for (size_t index = 0; index < ctx->layout->app_slot_count && index < REACH_MAX_PINNED_APPS;
+         ++index)
+    {
+        item_box_x[index] = reach_dock_item_current_x(dock, ctx->theme, ctx->layout, index);
+        item_reveal[index] = reach_dock_item_reveal(dock, index);
+    }
+
+    reach_dock_order_key drag_key = {state->drag.pinned, state->drag.pin_id, state->drag.window};
+    size_t dragged_render_index =
+        (state->drag.active || reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
+            ? reach_dock_feature_model_find_item_key(&state->model, drag_key)
+            : REACH_MAX_PINNED_APPS;
+    float dragged_x = reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
+                          ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)
+                          : state->drag.x;
+
+    /* Pull each item's icon from the icon service by path (cached -> render
+       icon id; miss -> 0 and the fallback initial draws until the load lands). */
+    reach_dock_render_item render_items[REACH_MAX_PINNED_APPS] = {};
+    for (size_t index = 0;
+         index < state->model.item_count && index < REACH_MAX_PINNED_APPS; ++index)
+    {
+        const reach_dock_item_model *item = &state->model.items[index];
+        const uint16_t *icon_path = nullptr;
+        uint16_t initial = '?';
+        if (item->pinned)
+        {
+            if (ctx->pinned_apps != nullptr && item->pinned_index < ctx->pinned_app_count)
+            {
+                const reach_pinned_app_model *app = &ctx->pinned_apps[item->pinned_index];
+                icon_path = app->icon_ref[0] != 0 ? app->icon_ref : app->path;
+                initial = app->title[0] != 0 ? app->title[0] : '?';
+            }
+        }
+        else
+        {
+            const reach_window_snapshot *window =
+                reach_window_tracking_window_by_id(reach_dock_windows(dock), item->window);
+            if (window != nullptr)
+            {
+                icon_path = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
+                initial = window->title[0] != 0 ? window->title[0] : '?';
+            }
+        }
+        render_items[index].fallback_initial = initial;
+        if (icon_path != nullptr && icon_path[0] != 0)
+        {
+            render_items[index].icon.id =
+                reach_icon_service_get(reach_dock_icons(dock), icon_path, ctx->icon_size_px);
+        }
+    }
+
+    reach_dock_render_input input = {};
+    input.theme = ctx->theme;
+    input.layout = ctx->layout;
+    input.model = &state->model;
+    input.render_items = render_items;
+    input.render_item_count = REACH_MAX_PINNED_APPS;
+    input.item_box_x = item_box_x;
+    input.item_box_x_count = REACH_MAX_PINNED_APPS;
+    input.item_reveal = item_reveal;
+    input.item_reveal_count = REACH_MAX_PINNED_APPS;
+    input.focused_window = ctx->focused_window;
+    input.dragged_render_index = dragged_render_index;
+    input.dragged_box_x = dragged_x;
+    input.click_feedback_index = state->feedback_index;
+    input.click_feedback_opacity =
+        reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
+    input.tray_feedback_index = REACH_DOCK_FEEDBACK_TRAY_BUTTON;
+    input.quick_settings_feedback_index = REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON;
+    input.power_feedback_index = REACH_DOCK_FEEDBACK_POWER_BUTTON;
+    input.time_text = state->clock_time_text;
+    input.date_text = state->clock_date_text;
+    input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
+
+    reach_result result = reach_dock_build_render_commands(&input, out_commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    reach_dock_now_playing_render_context now_playing = {};
+    now_playing.theme = ctx->theme;
+    now_playing.dpi_scale = ctx->dpi_scale;
+    now_playing.reveal_width =
+        reach_dock_now_playing_reveal_width(dock, ctx->dock_gap * ctx->dpi_scale);
+    return reach_dock_now_playing_append_render_commands(
+        reach_dock_now_playing_subfeature(dock), &now_playing, out_commands);
 }

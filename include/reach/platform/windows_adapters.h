@@ -17,7 +17,6 @@
 #include "reach/ports/search_provider.h"
 #include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
-#include "reach/ports/textbox.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
@@ -32,8 +31,6 @@ extern "C"
 
     reach_result reach_windows_create_platform_window(reach_surface_role role,
                                                       reach_platform_window_port *out_port);
-    reach_result reach_windows_create_textbox(reach_platform_window *parent,
-                                              reach_textbox_port *out_port);
     reach_result reach_windows_create_d2d_render_backend(reach_platform_window *window,
                                                          reach_render_backend_port *out_port);
     reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
@@ -64,7 +61,11 @@ extern "C"
     void reach_windows_notify_desktop_environment_changed(void);
     void reach_windows_request_desktop_environment_sync(void);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
-    reach_result reach_windows_launch_startup_apps(void);
+    /* Enumerate the startup entries (Startup folders + Run keys, honoring
+       StartupApproved and skipping already-running executables) as launch
+       requests; the caller schedules them through the app-launch service. */
+    size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
+                                              size_t capacity);
     uintptr_t reach_windows_get_current_foreground(void);
 
 #ifdef __cplusplus

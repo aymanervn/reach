@@ -33,41 +33,122 @@ CMAKE_SCOPE_KEYWORDS = {
     "general",
 }
 
+# Target architecture (docs/architecture.md):
+#   core <- protocol <- ports <- services <- features
+#   adapters implement ports; composition wires everything; tools are executables.
+#
+# This check encodes the TARGET dependency rules. While the master->target
+# migration is in progress, the legacy layers (support, shell, app, platform)
+# still exist and are tolerated here with their legacy rules so the build stays
+# green at every step. As each legacy layer is fully migrated away, delete its
+# entries below and the check tightens automatically.
 ALLOWED_SRC_LAYER_DIRS = {
-    "adapters",
-    "app",
+    # target layers
     "core",
+    "protocol",
+    "ports",
+    "services",
     "features",
+    "adapters",
+    "composition",
+    "tools",
+    "apps",
+    # legacy (transitional)
+    "app",
     "shell",
     "support",
-    "tools",
 }
 
 ALLOWED_INCLUDE_LAYER_DIRS = {
-    "app",
+    # target layers
     "core",
-    "features",
-    "platform",
+    "protocol",
     "ports",
+    "services",
+    "features",
+    "adapters",
+    "composition",
+    "tools",
+    "apps",
+    # legacy (transitional)
+    "app",
+    "platform",
     "shell",
     "support",
 }
 
 ALLOWED_LAYER_DEPENDENCIES: dict[str, set[str]] = {
-    "support": set(),
-    "core": {"support"},
-    "ports": {"core", "support"},
-    "features": {"core", "ports", "support"},
-    "shell": {"core", "ports", "features", "support"},
-    "app": {"shell", "ports", "features", "core", "support", "platform", "adapters"},
-    "platform": {"ports", "core", "support"},
-    "adapters": {"ports", "core", "support"},
-    "tools": {"app", "platform", "adapters", "features", "ports", "core", "support"},
-    "tests": {
+    # ----- target layers -----
+    "core": {"support"},  # target: {}; "support" tolerated until folded into core
+    "protocol": {"core", "support"},  # target: {core}
+    "ports": {"core", "protocol", "support"},  # target: {core, protocol}
+    "services": {"ports", "protocol", "core", "support"},
+    "features": {"services", "ports", "protocol", "core", "support"},
+    "adapters": {"ports", "protocol", "core", "support"},
+    "composition": {
+        "features",
+        "services",
+        "adapters",
+        "ports",
+        "protocol",
+        "core",
+        # legacy (transitional)
+        "shell",
+        "app",
+        "platform",
+        "support",
+    },
+    "tools": {
+        "composition",
+        "adapters",
+        "features",
+        "services",
+        "ports",
+        "protocol",
+        "core",
+        # legacy (transitional)
         "app",
         "shell",
+        "platform",
+        "support",
+    },
+    # apps are leaf executables (e.g. the standalone Settings app): they may use
+    # features/services/adapters/ports/protocol/core, but nothing depends on them.
+    "apps": {
         "features",
+        "services",
+        "adapters",
         "ports",
+        "protocol",
+        "core",
+        "support",
+        "platform",
+    },
+    # ----- legacy layers (transitional; remove as migration proceeds) -----
+    "support": set(),
+    "shell": {"features", "services", "ports", "protocol", "core", "support"},
+    "app": {
+        "composition",
+        "shell",
+        "features",
+        "services",
+        "ports",
+        "protocol",
+        "core",
+        "support",
+        "platform",
+        "adapters",
+    },
+    "platform": {"ports", "protocol", "core", "support"},
+    "tests": {
+        "composition",
+        "app",
+        "apps",
+        "shell",
+        "features",
+        "services",
+        "ports",
+        "protocol",
         "core",
         "support",
         "platform",
@@ -75,8 +156,17 @@ ALLOWED_LAYER_DEPENDENCIES: dict[str, set[str]] = {
     },
 }
 
-INNER_LAYERS = {"support", "core", "ports", "features", "shell"}
-OUTER_LAYERS = {"app", "platform", "adapters", "tools", "tests"}
+INNER_LAYERS = {"support", "core", "protocol", "ports", "services", "features"}
+OUTER_LAYERS = {
+    "app",
+    "apps",
+    "platform",
+    "shell",
+    "adapters",
+    "composition",
+    "tools",
+    "tests",
+}
 WINDOWS_ALLOWED_LAYERS = OUTER_LAYERS
 
 # Map CMake targets to architectural layers.
@@ -86,8 +176,11 @@ EXACT_TARGET_LAYERS = {
     "reach_features": "features",
     "reach_shell": "shell",
     "reach_windows_adapters": "adapters",
-    "reach": "app",
-    "reach_settings": "app",
+    "reach_composition": "composition",
+    "reach": "tools",
+    "reach_settings": "apps",
+    "reach_settings_feature": "apps",
+    "reach_settings_feature_tests": "tests",
     "reachctl": "tools",
     "reach_elevation_helper": "tools",
     "reach_tray_probe": "tools",
@@ -100,8 +193,20 @@ TARGET_LAYER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "core",
     ),
     (
+        re.compile(r"(^|::|_|-)(protocol|protocols|ipc)(_|-|$)", re.IGNORECASE),
+        "protocol",
+    ),
+    (
         re.compile(r"(^|::|_|-)(port|ports|boundary|boundaries)(_|-|$)", re.IGNORECASE),
         "ports",
+    ),
+    (
+        re.compile(r"(^|::|_|-)(service|services)(_|-|$)", re.IGNORECASE),
+        "services",
+    ),
+    (
+        re.compile(r"(^|::|_|-)(composition|compositionroot)(_|-|$)", re.IGNORECASE),
+        "composition",
     ),
     (
         re.compile(
@@ -436,11 +541,15 @@ def validate_document_contract() -> list[str]:
         return ["docs/architecture.md: missing or unreadable"]
 
     required_terms = (
-        "Dependency Rule",
-        "Allowed Dependencies",
-        "Forbidden Dependencies",
-        "Required Verification",
-        "Do not weaken",
+        "## core",
+        "## protocol",
+        "## ports",
+        "## services",
+        "## features",
+        "## adapters",
+        "## composition",
+        "## tools",
+        "inward",
     )
 
     return [
@@ -497,6 +606,24 @@ def validate_windows_boundary(path: Path, text: str) -> list[str]:
                 f"{relative}: {source_layer} must not use Windows/native token {pattern}"
             )
 
+    return violations
+
+
+def validate_capsule_state_encapsulation(path: Path, text: str) -> list[str]:
+    """Feature capsule state is compiler-enforced const outside the feature:
+    the internal mutable accessors (reach_<f>_state_mut) must never appear
+    outside src/features/. A hit means someone re-opened the hole the
+    class-driven capsule interface closed."""
+    violations: list[str] = []
+    relative = rel(path)
+    if relative.replace("\\", "/").startswith("src/features/"):
+        return violations
+    scan_text = strip_comments(text)
+    if re.search(r"\b\w+_state_mut\s*\(", scan_text):
+        violations.append(
+            f"{relative}: capsule state must stay const outside src/features/ "
+            f"(found a *_state_mut( accessor use)"
+        )
     return violations
 
 
@@ -589,6 +716,7 @@ def main() -> int:
         violations.extend(validate_imports(path, text))
         violations.extend(validate_windows_boundary(path, text))
         violations.extend(validate_public_inner_api(path, text))
+        violations.extend(validate_capsule_state_encapsulation(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 
     if violations:

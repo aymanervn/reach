@@ -22,6 +22,9 @@ extern "C"
 
     typedef struct reach_app_launcher_ops
     {
+        /* CONTRACT: launch() must not depend on launcher instance state — the
+           app-launch service runs it on abandoned-at-shutdown workers that may
+           outlive the adapter object (a hung OS launch cannot be joined). */
         reach_result (*launch)(reach_app_launcher *launcher,
                                const reach_app_launch_request *request);
         void (*destroy)(reach_app_launcher *launcher);

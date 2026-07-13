@@ -36,7 +36,7 @@ extern "C"
         reach_color quick_settings_slider_fill_color;
         reach_color quick_settings_slider_muted_fill_color;
         reach_color quick_settings_button_color;
-        reach_color music_widget_background;
+        reach_color now_playing_background;
         reach_color launcher_search_background;
         reach_color launcher_search_border;
         reach_color launcher_search_text;
@@ -53,13 +53,12 @@ extern "C"
         float clipboard_item_radius;
         float clipboard_title_text_size;
         float clipboard_body_text_size;
-        reach_color music_widget_cover_background;
-        reach_color music_widget_title;
-        reach_color music_widget_control_text;
-        reach_color music_widget_control_background;
-        reach_color music_widget_artist_text;
-        float music_widget_artist_text_size;
-        float music_widget_text_gap;
+        reach_color now_playing_title;
+        reach_color now_playing_control_text;
+        reach_color now_playing_control_background;
+        reach_color now_playing_artist_text;
+        float now_playing_artist_text_size;
+        float now_playing_text_gap;
         reach_color settings_selected_nav_background;
         reach_color settings_text;
         reach_color settings_secondary_text;
@@ -78,17 +77,17 @@ extern "C"
         float dock_system_separator_width;
         float dock_system_separator_height_ratio;
         float dock_clock_width;
-        float music_widget_width;
-        float music_widget_left_margin;
-        float music_widget_height_ratio;
-        float music_widget_corner_radius_ratio;
-        float music_widget_corner_radius_max;
-        float music_widget_padding;
-        float music_widget_gap;
-        float music_widget_control_gap;
-        float music_widget_play_button_width;
-        float music_widget_prev_next_button_width;
-        float music_widget_title_text_size;
+        float now_playing_width;
+        float now_playing_left_margin;
+        float now_playing_height_ratio;
+        float now_playing_corner_radius_ratio;
+        float now_playing_corner_radius_max;
+        float now_playing_padding;
+        float now_playing_gap;
+        float now_playing_control_gap;
+        float now_playing_play_button_width;
+        float now_playing_prev_next_button_width;
+        float now_playing_title_text_size;
     } reach_theme;
 
     const reach_theme *reach_theme_default(void);
@@ -97,8 +96,8 @@ extern "C"
     float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);
     float reach_theme_icon_box_corner_radius(const reach_theme *theme, float icon_box_size);
     float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height);
-    float reach_theme_music_widget_height(const reach_theme *theme, float dock_height);
-    float reach_theme_music_widget_corner_radius(const reach_theme *theme, float widget_height);
+    float reach_theme_now_playing_height(const reach_theme *theme, float dock_height);
+    float reach_theme_now_playing_corner_radius(const reach_theme *theme, float widget_height);
 
 #ifdef __cplusplus
 }
