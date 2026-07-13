@@ -132,7 +132,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.rect.width = layout->search_icon.width;
         command.rect.height = layout->search_icon.height;
         command.icon_id = REACH_VECTOR_ICON_SEARCH;
-        command.color = reach_launcher_rgb(255, 255, 255, 0.40f);
+        command.color = reach_launcher_rgb(255, 255, 255, 0.32f);
         reach_render_command_buffer_push(out_commands, &command);
     }
 
