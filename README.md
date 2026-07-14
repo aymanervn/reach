@@ -1,6 +1,6 @@
 # Reach
 
-> A Direct2d based lightweight Windows 11 shell replacement.
+> A Direct2d based lightweight Windows 11 desktop replacement.
 
 ## Screenshots
 
@@ -11,20 +11,16 @@
 
 ## Important notice
 
-Reach replaces Windows Explorer, which will not be running in the background. This breaks a few apps that rely on it, most importantly Windows settings. I haven't tested other Windows Store apps as I don't use them.
-
-## Important hotkeys
-
-In case of an emergency, you can always open Task manager (CTRL + SHIFT + ESC), click on run, type powershell, then press CTRL + SHIFT + ENTER. This will open an elevated powershell session, and you can follow the instructions below to restore explorer.
+Reach replaces Windows Explorer, nothing gets deleted, only an entry in the registy gets changed. With reach running a few apps that rely on windows explorer break, most importantly Windows settings. I haven't tested other Windows Store apps as I don't use them.
 
 ## Features
 
-- Animated wallpapers through Wallpaper Engine.
+- Animated wallpapers through Wallpaper Engine are supported.
 - Split screen: WIN + arrow keys snaps the focused window, pressing again maximizes it. Works both horizontally and vertically.
-- Now playing controls on the dock for whatever media is playing.
-- Clipboard history with text and image previews.
-- Windows security updates can be checked and installed from Reach's own settings.
-- No distractions: no ads, no widgets, no news. Reach also purposefully stops rendering its UI during a game session, and the game gets minimized on alt tab.
+- Now playing media can be controlled on the dock.
+- Clipboard history supporting text and image previews.
+- Windows security updates can be checked and installed from Reach's own settings app.
+- No distractions: no ads, no widgets, no news. Reach also purposefully stops rendering its UI during a game session, disables hotkeys except for alt tab, which will minmimize the game when used.
 
 ## Reach app launcher
 
