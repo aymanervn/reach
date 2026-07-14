@@ -31,7 +31,7 @@ static constexpr reach_dock_metrics reach_dock_make_metrics()
 {
     reach_dock_metrics metrics = {};
 
-    metrics.fallback_icon_background_alpha = 0.35f;
+    metrics.fallback_icon_background_alpha = 0.80f;
     metrics.running_indicator_size = 4.0f;
     metrics.running_indicator_gap = 4.0f;
     metrics.running_indicator_bottom_inset = 2.0f;

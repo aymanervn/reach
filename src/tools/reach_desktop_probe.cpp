@@ -46,6 +46,8 @@ struct Config
     bool createExplorerShim = false;
     bool pokeProgman052c = false;
     bool shellHook = true;
+    bool minimizeLab = false;
+    bool taskmanHost = false;
     DWORD intervalMs = 3000;
     std::wstring outPath = L"reach_desktop_probe.jsonl";
 };
@@ -612,6 +614,168 @@ static void CreateExplorerShim()
     LogEvent(L"created_explorer_shim", ss.str());
 }
 
+static void MinimizeLabPump(DWORD ms)
+{
+    DWORD start = GetTickCount();
+    for (;;)
+    {
+        MSG m{};
+        while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&m);
+            DispatchMessageW(&m);
+        }
+        if (GetTickCount() - start >= ms)
+            break;
+        Sleep(15);
+    }
+}
+
+static void MinimizeLabLogMetrics(const wchar_t *stage)
+{
+    MINIMIZEDMETRICS mm{};
+    mm.cbSize = sizeof(mm);
+    BOOL ok = SystemParametersInfoW(SPI_GETMINIMIZEDMETRICS, sizeof(mm), &mm, 0);
+    std::wstringstream ss;
+    ss << L"\"stage\":\"" << stage << L"\",\"ok\":" << (ok ? L"true" : L"false")
+       << L",\"iArrange\":" << mm.iArrange << L",\"arwHide\":"
+       << (((UINT)mm.iArrange & ARW_HIDE) != 0 ? L"true" : L"false") << L",\"iWidth\":" << mm.iWidth
+       << L",\"iHorzGap\":" << mm.iHorzGap << L",\"iVertGap\":" << mm.iVertGap;
+    LogEvent(L"minimize_lab_metrics", ss.str());
+}
+
+static BOOL CALLBACK MinimizeLabIconicEnumProc(HWND h, LPARAM lp)
+{
+    if (!IsIconic(h) || !IsWindowVisible(h))
+        return TRUE;
+    RECT r{};
+    GetWindowRect(h, &r);
+    DWORD pid = 0;
+    GetWindowThreadProcessId(h, &pid);
+    std::wstringstream ss;
+    ss << L"\"stage\":\"" << (const wchar_t *)lp << L"\",\"hwnd\":\"" << HwndHex(h)
+       << L"\",\"class\":\"" << JsonEscape(GetClass(h)) << L"\",\"title\":\""
+       << JsonEscape(GetText(h)) << L"\",\"process\":\"" << JsonEscape(BaseName(ProcessPath(pid)))
+       << L"\",\"rect\":\"" << RectStr(r) << L"\"";
+    LogEvent(L"minimize_lab_iconic_window", ss.str());
+    return TRUE;
+}
+
+static void MinimizeLabTest(const wchar_t *stage)
+{
+    HWND test = CreateWindowExW(0, L"ReachDesktopProbeHost", L"Reach Minimize Lab",
+                                WS_OVERLAPPEDWINDOW | WS_VISIBLE, 200, 200, 480, 320, nullptr,
+                                nullptr, GetModuleHandleW(nullptr), nullptr);
+    if (!test)
+    {
+        std::wstringstream ss;
+        ss << L"\"stage\":\"" << stage << L"\",\"error\":\"create_failed\",\"lastError\":"
+           << GetLastError();
+        LogEvent(L"minimize_lab_result", ss.str());
+        return;
+    }
+
+    MinimizeLabPump(250);
+    ShowWindow(test, SW_MINIMIZE);
+    MinimizeLabPump(500);
+
+    RECT r{};
+    GetWindowRect(test, &r);
+    WINDOWPLACEMENT wp{};
+    wp.length = sizeof(wp);
+    GetWindowPlacement(test, &wp);
+
+    bool onScreen = MonitorFromRect(&r, MONITOR_DEFAULTTONULL) != nullptr;
+    std::wstringstream ss;
+    ss << L"\"stage\":\"" << stage << L"\",\"iconic\":" << (IsIconic(test) ? L"true" : L"false")
+       << L",\"visible\":" << (IsWindowVisible(test) ? L"true" : L"false") << L",\"rect\":\""
+       << RectStr(r) << L"\",\"onScreen\":" << (onScreen ? L"true" : L"false") << L",\"showCmd\":"
+       << wp.showCmd << L",\"placementFlags\":" << wp.flags << L",\"ptMinPosition\":\"["
+       << wp.ptMinPosition.x << L"," << wp.ptMinPosition.y << L"]\"";
+    LogEvent(L"minimize_lab_result", ss.str());
+
+    DestroyWindow(test);
+    MinimizeLabPump(100);
+    MinimizeLabLogMetrics(stage);
+    EnumWindows(MinimizeLabIconicEnumProc, (LPARAM)stage);
+}
+
+static void MinimizeLabRun(HWND msgWnd)
+{
+    HWND shell = GetShellWindow();
+    HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr);
+    std::wstringstream intro;
+    intro << L"\"GetShellWindow\":\"" << HwndHex(shell) << L"\",\"Shell_TrayWnd\":\""
+          << HwndHex(tray) << L"\"";
+    LogEvent(L"minimize_lab_start", intro.str());
+    MinimizeLabLogMetrics(L"initial");
+
+    MinimizeLabTest(L"baseline");
+
+    MINIMIZEDMETRICS original{};
+    original.cbSize = sizeof(original);
+    BOOL haveOriginal = SystemParametersInfoW(SPI_GETMINIMIZEDMETRICS, sizeof(original), &original, 0);
+
+    MINIMIZEDMETRICS hidden = original;
+    hidden.cbSize = sizeof(hidden);
+    hidden.iArrange = original.iArrange | ARW_HIDE;
+    BOOL setOk =
+        SystemParametersInfoW(SPI_SETMINIMIZEDMETRICS, sizeof(hidden), &hidden, SPIF_SENDCHANGE);
+    {
+        std::wstringstream ss;
+        ss << L"\"ok\":" << (setOk ? L"true" : L"false");
+        LogEvent(L"minimize_lab_set_arw_hide", ss.str());
+    }
+    MinimizeLabTest(L"arw_hide");
+
+    if (haveOriginal)
+    {
+        (void)SystemParametersInfoW(SPI_SETMINIMIZEDMETRICS, sizeof(original), &original,
+                                    SPIF_SENDCHANGE);
+        MinimizeLabTest(L"arw_hide_restored");
+    }
+
+    BOOL hookOk = RegisterShellHookWindow(msgWnd);
+    {
+        std::wstringstream ss;
+        ss << L"\"hwnd\":\"" << HwndHex(msgWnd) << L"\",\"ok\":" << (hookOk ? L"true" : L"false")
+           << L",\"lastError\":" << GetLastError();
+        LogEvent(L"minimize_lab_register_shell_hook", ss.str());
+    }
+    MinimizeLabTest(L"shell_hook");
+
+    typedef BOOL(WINAPI * SetTaskmanWindowFn)(HWND);
+    SetTaskmanWindowFn setTaskman = (SetTaskmanWindowFn)GetProcAddress(
+        GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow");
+    if (setTaskman)
+    {
+        BOOL taskmanOk = setTaskman(msgWnd);
+        std::wstringstream ss;
+        ss << L"\"hwnd\":\"" << HwndHex(msgWnd) << L"\",\"ok\":"
+           << (taskmanOk ? L"true" : L"false") << L",\"lastError\":" << GetLastError();
+        LogEvent(L"minimize_lab_set_taskman_window", ss.str());
+        MinimizeLabTest(L"shell_hook+taskman");
+    }
+    else
+    {
+        LogEvent(L"minimize_lab_set_taskman_window", L"\"error\":\"export_not_found\"");
+    }
+
+    (void)SystemParametersInfoW(SPI_SETMINIMIZEDMETRICS, sizeof(hidden), &hidden, SPIF_SENDCHANGE);
+    MinimizeLabTest(L"shell_hook+taskman+arw_hide");
+
+    if (haveOriginal)
+    {
+        (void)SystemParametersInfoW(SPI_SETMINIMIZEDMETRICS, sizeof(original), &original,
+                                    SPIF_SENDCHANGE);
+    }
+    if (hookOk)
+    {
+        (void)DeregisterShellHookWindow(msgWnd);
+    }
+    LogEvent(L"minimize_lab_done", L"");
+}
+
 static void Usage()
 {
     wprintf(L"Reach desktop probe\n");
@@ -626,6 +790,10 @@ static void Usage()
     wprintf(L"  --poke-progman-052c       send private Progman 0x052C using SendMessageTimeout; "
             L"diagnostic only\n");
     wprintf(L"  --no-shell-hook           do not call RegisterShellHookWindow\n");
+    wprintf(L"  --minimize-lab            test minimized-window placement across shell "
+            L"registration stages, then exit\n");
+    wprintf(L"  --taskman-host            register as shell hook + taskman window and stay "
+            L"alive\n");
 }
 
 static void ParseArgs(int argc, wchar_t **argv)
@@ -652,6 +820,16 @@ static void ParseArgs(int argc, wchar_t **argv)
             g_cfg.pokeProgman052c = true;
         else if (a == L"--no-shell-hook")
             g_cfg.shellHook = false;
+        else if (a == L"--minimize-lab")
+        {
+            g_cfg.minimizeLab = true;
+            g_cfg.shellHook = false;
+        }
+        else if (a == L"--taskman-host")
+        {
+            g_cfg.taskmanHost = true;
+            g_cfg.shellHook = false;
+        }
     }
 }
 
@@ -686,6 +864,43 @@ int wmain(int argc, wchar_t **argv)
     }
 
     LogEvent(L"start", L"\"program\":\"reach_desktop_probe\"");
+    if (g_cfg.minimizeLab)
+    {
+        if (msgWnd)
+        {
+            MinimizeLabRun(msgWnd);
+        }
+        else
+        {
+            LogEvent(L"minimize_lab_error", L"\"error\":\"message_window_create_failed\"");
+        }
+        if (g_log)
+            fclose(g_log);
+        return 0;
+    }
+
+    if (g_cfg.taskmanHost)
+    {
+        BOOL hookOk = msgWnd ? RegisterShellHookWindow(msgWnd) : FALSE;
+        typedef BOOL(WINAPI * SetTaskmanWindowFn)(HWND);
+        SetTaskmanWindowFn setTaskman = (SetTaskmanWindowFn)GetProcAddress(
+            GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow");
+        BOOL taskmanOk = (msgWnd && setTaskman) ? setTaskman(msgWnd) : FALSE;
+        std::wstringstream ss;
+        ss << L"\"hwnd\":\"" << HwndHex(msgWnd) << L"\",\"shellHookOk\":"
+           << (hookOk ? L"true" : L"false") << L",\"taskmanOk\":"
+           << (taskmanOk ? L"true" : L"false");
+        LogEvent(L"taskman_host", ss.str());
+        MSG msg{};
+        while (GetMessageW(&msg, nullptr, 0, 0) > 0)
+        {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+        if (g_log)
+            fclose(g_log);
+        return 0;
+    }
     if (g_cfg.createExplorerShim)
         CreateExplorerShim();
     if (g_cfg.dumpMonitors)
