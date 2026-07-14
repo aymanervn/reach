@@ -214,6 +214,7 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
         command.type = REACH_RENDER_COMMAND_TEXT;
         command.rect = icon_box;
         command.color = theme->fallback_icon_text;
+        command.text_weight = REACH_TEXT_WEIGHT_BOLD;
         command.color.a *= reveal;
         command.text_alignment = input->text_alignment_center;
         command.text[0] = fallback_initial;

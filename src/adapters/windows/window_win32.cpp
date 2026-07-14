@@ -34,7 +34,45 @@ struct reach_platform_window
     int pointer_move_enabled;
     int topmost_enabled;
     int suppress_capture_changed;
+    int shell_hook_registered;
 };
+
+// Workaround for user32's legacy minimize behavior: without a registered taskman
+// window, minimized windows are parked as visible caption rectangles on the
+// desktop instead of being moved off-screen. SetTaskmanWindow is undocumented
+// but is what Explorer uses to flip that policy.
+static void reach_platform_window_register_taskman(reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr || GetShellWindow() != nullptr)
+    {
+        return;
+    }
+
+    if (RegisterShellHookWindow(window->hwnd))
+    {
+        window->shell_hook_registered = 1;
+    }
+
+    typedef BOOL(WINAPI * reach_set_taskman_window_fn)(HWND);
+    reach_set_taskman_window_fn set_taskman_window =
+        reinterpret_cast<reach_set_taskman_window_fn>(
+            GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow"));
+    if (set_taskman_window != nullptr)
+    {
+        (void)set_taskman_window(window->hwnd);
+    }
+}
+
+static void reach_platform_window_unregister_taskman(reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr || !window->shell_hook_registered)
+    {
+        return;
+    }
+
+    (void)DeregisterShellHookWindow(window->hwnd);
+    window->shell_hook_registered = 0;
+}
 
 static int32_t reach_platform_window_queue_event(reach_platform_window *window,
                                                  const reach_ui_event *event);
@@ -994,6 +1032,7 @@ static void reach_platform_window_destroy(reach_platform_window *window)
 
     if (window->hwnd != nullptr)
     {
+        reach_platform_window_unregister_taskman(window);
         reach_platform_window_release_capture(window->hwnd);
         DestroyWindow(window->hwnd);
         window->hwnd = nullptr;
@@ -1046,6 +1085,10 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
         SendMessageW(window->hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(small_icon));
     }
     SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
+    if (role == REACH_SURFACE_DOCK)
+    {
+        reach_platform_window_register_taskman(window);
+    }
     out_port->window = window;
     out_port->role = role;
     out_port->ops.show = reach_platform_window_show;
