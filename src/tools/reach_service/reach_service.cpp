@@ -111,8 +111,7 @@ static int32_t reach_helper_string_has_prefix(const wchar_t *value, const wchar_
 static int32_t reach_helper_is_reach_window_class(const wchar_t *class_name)
 {
     return lstrcmpiW(class_name, L"ReachPlatformWindow") == 0 ||
-           lstrcmpiW(class_name, L"ReachInputMessageWindow") == 0 ||
-           lstrcmpiW(class_name, L"ReachWallpaperWindow") == 0;
+           lstrcmpiW(class_name, L"ReachInputMessageWindow") == 0;
 }
 
 static int32_t reach_helper_window_cloaked(HWND hwnd)

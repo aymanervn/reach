@@ -42,6 +42,20 @@ extern "C"
         int32_t reach_is_shell;
     } reach_shell_registration_status;
 
+    typedef struct reach_desktop_background_slot
+    {
+        int32_t x;
+        int32_t y;
+        int32_t width;
+        int32_t height;
+        void *memory_dc;
+        int32_t bitmap_width;
+        int32_t bitmap_height;
+    } reach_desktop_background_slot;
+
+    void reach_windows_desktop_compat_set_background(const reach_desktop_background_slot *slots,
+                                                     size_t count, int32_t visible);
+
     reach_result reach_windows_create_platform_window(reach_surface_role role,
                                                       reach_platform_window_port *out_port);
     void *reach_windows_platform_window_native_handle(reach_platform_window *window);
@@ -72,7 +86,6 @@ extern "C"
     void reach_windows_destroy_explorer_desktop_compat_host(void);
     void reach_windows_notify_desktop_environment_changed(void);
     void reach_windows_request_desktop_environment_sync(void);
-    int32_t reach_windows_desktop_compat_external_wallpaper_active(void);
     reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
     size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
