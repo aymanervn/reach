@@ -3,12 +3,15 @@
 #include <windows.h>
 
 #include <atomic>
+#include <mutex>
 #include <vector>
 #include <wchar.h>
 
 static HWND g_progmanHwnd = nullptr;
 static HWND g_workerwHwnd = nullptr;
-static std::vector<HWND> g_hiddenReachWallpaperHwnds;
+static std::mutex g_backgroundMutex;
+static std::vector<reach_desktop_background_slot> g_backgroundSlots;
+static int32_t g_backgroundVisible = 0;
 static HWINEVENTHOOK g_wpeCreateHook = nullptr;
 static HWINEVENTHOOK g_wpeDestroyHook = nullptr;
 static HANDLE g_hostThread = nullptr;
@@ -16,7 +19,6 @@ static HANDLE g_hostReadyEvent = nullptr;
 static std::atomic<DWORD> g_hostThreadId{0};
 static std::atomic<int32_t> g_hostCreateResult{REACH_ERROR};
 static int32_t g_syncScheduled = 0;
-static std::atomic<int32_t> g_wallpaperEngineRendererPresent{-1};
 
 static const UINT_PTR REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER = 0x381;
 static const UINT REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS = 33;
@@ -36,11 +38,6 @@ static const wchar_t *reach_explorer_desktop_compat_workerw_class(void)
     return L"WorkerW";
 }
 
-static const wchar_t *reach_explorer_desktop_compat_wallpaper_visible_property(void)
-{
-    return L"ReachWallpaperIntendedVisible";
-}
-
 static void reach_explorer_desktop_compat_schedule_sync(UINT delay_ms)
 {
     if (g_progmanHwnd != nullptr && IsWindow(g_progmanHwnd))
@@ -58,11 +55,79 @@ static void reach_explorer_desktop_compat_schedule_sync(UINT delay_ms)
     }
 }
 
+static void reach_explorer_desktop_compat_paint_background(HWND hwnd, HDC dc)
+{
+    RECT client = {};
+    GetClientRect(hwnd, &client);
+
+    std::lock_guard<std::mutex> lock(g_backgroundMutex);
+
+    int saved = SaveDC(dc);
+    if (g_backgroundVisible)
+    {
+        for (const reach_desktop_background_slot &slot : g_backgroundSlots)
+        {
+            POINT origin = {slot.x, slot.y};
+            ScreenToClient(hwnd, &origin);
+            ExcludeClipRect(dc, origin.x, origin.y, origin.x + slot.width, origin.y + slot.height);
+        }
+    }
+
+    FillRect(dc, &client, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    RestoreDC(dc, saved);
+
+    if (!g_backgroundVisible)
+    {
+        return;
+    }
+
+    for (const reach_desktop_background_slot &slot : g_backgroundSlots)
+    {
+        HDC memory_dc = static_cast<HDC>(slot.memory_dc);
+        if (memory_dc == nullptr || slot.width <= 0 || slot.height <= 0 || slot.bitmap_width <= 0 ||
+            slot.bitmap_height <= 0)
+        {
+            continue;
+        }
+
+        POINT origin = {slot.x, slot.y};
+        ScreenToClient(hwnd, &origin);
+
+        if (slot.width == slot.bitmap_width && slot.height == slot.bitmap_height)
+        {
+            BitBlt(dc, origin.x, origin.y, slot.width, slot.height, memory_dc, 0, 0, SRCCOPY);
+        }
+        else
+        {
+            SetStretchBltMode(dc, HALFTONE);
+            StretchBlt(dc, origin.x, origin.y, slot.width, slot.height, memory_dc, 0, 0,
+                       slot.bitmap_width, slot.bitmap_height, SRCCOPY);
+        }
+    }
+}
+
 static LRESULT CALLBACK reach_explorer_desktop_compat_host_proc(HWND hwnd, UINT message,
                                                                 WPARAM wparam, LPARAM lparam)
 {
     switch (message)
     {
+    case WM_ERASEBKGND:
+        return 1;
+
+    case WM_PAINT:
+        if (hwnd == g_workerwHwnd)
+        {
+            PAINTSTRUCT paint = {};
+            HDC dc = BeginPaint(hwnd, &paint);
+            if (dc != nullptr)
+            {
+                reach_explorer_desktop_compat_paint_background(hwnd, dc);
+            }
+            EndPaint(hwnd, &paint);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+
     case REACH_EXPLORER_DESKTOP_COMPAT_REQUEST_SYNC:
         reach_explorer_desktop_compat_schedule_sync(REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS);
         return 0;
@@ -286,12 +351,6 @@ static void reach_explorer_desktop_compat_stop_winevent_hooks(void)
     reach_explorer_desktop_compat_unhook_winevent(&g_wpeDestroyHook);
 }
 
-struct reach_explorer_desktop_compat_resize_children_state
-{
-    RECT worker_client;
-    int32_t found_wallpaper_engine_renderer;
-};
-
 static int32_t reach_explorer_desktop_compat_attach_wallpaper_engine_child(HWND hwnd)
 {
     if (hwnd == nullptr || !IsWindow(hwnd) || g_workerwHwnd == nullptr || !IsWindow(g_workerwHwnd))
@@ -313,7 +372,6 @@ static int32_t reach_explorer_desktop_compat_attach_wallpaper_engine_child(HWND 
     if (desired_ex_style != ex_style)
     {
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, desired_ex_style);
-        changed = 1;
     }
 
     if (GetParent(hwnd) != g_workerwHwnd)
@@ -383,10 +441,9 @@ static void reach_explorer_desktop_compat_size_wallpaper_engine_child(HWND hwnd,
 
 static BOOL CALLBACK reach_explorer_desktop_compat_resize_child_proc(HWND hwnd, LPARAM param)
 {
-    reach_explorer_desktop_compat_resize_children_state *state =
-        reinterpret_cast<reach_explorer_desktop_compat_resize_children_state *>(param);
+    const RECT *worker_client = reinterpret_cast<const RECT *>(param);
 
-    if (state == nullptr)
+    if (worker_client == nullptr)
     {
         return TRUE;
     }
@@ -396,19 +453,17 @@ static BOOL CALLBACK reach_explorer_desktop_compat_resize_child_proc(HWND hwnd, 
         return TRUE;
     }
 
-    state->found_wallpaper_engine_renderer = 1;
     int32_t changed = reach_explorer_desktop_compat_attach_wallpaper_engine_child(hwnd);
-    reach_explorer_desktop_compat_size_wallpaper_engine_child(hwnd, &state->worker_client, changed);
+    reach_explorer_desktop_compat_size_wallpaper_engine_child(hwnd, worker_client, changed);
 
     return TRUE;
 }
 
 static BOOL CALLBACK reach_explorer_desktop_compat_find_wallpaper_proc(HWND hwnd, LPARAM param)
 {
-    reach_explorer_desktop_compat_resize_children_state *state =
-        reinterpret_cast<reach_explorer_desktop_compat_resize_children_state *>(param);
+    const RECT *worker_client = reinterpret_cast<const RECT *>(param);
 
-    if (state == nullptr || hwnd == nullptr || !IsWindow(hwnd))
+    if (worker_client == nullptr || hwnd == nullptr || !IsWindow(hwnd))
     {
         return TRUE;
     }
@@ -420,116 +475,13 @@ static BOOL CALLBACK reach_explorer_desktop_compat_find_wallpaper_proc(HWND hwnd
 
     if (reach_explorer_desktop_compat_is_wallpaper_engine_child(hwnd))
     {
-        state->found_wallpaper_engine_renderer = 1;
         int32_t changed = reach_explorer_desktop_compat_attach_wallpaper_engine_child(hwnd);
-        reach_explorer_desktop_compat_size_wallpaper_engine_child(hwnd, &state->worker_client,
-                                                                  changed);
+        reach_explorer_desktop_compat_size_wallpaper_engine_child(hwnd, worker_client, changed);
         return TRUE;
     }
 
     EnumChildWindows(hwnd, reach_explorer_desktop_compat_find_wallpaper_proc, param);
     return TRUE;
-}
-
-static int32_t reach_explorer_desktop_compat_hidden_wallpaper_contains(HWND hwnd)
-{
-    for (HWND existing : g_hiddenReachWallpaperHwnds)
-    {
-        if (existing == hwnd)
-        {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-static int32_t reach_explorer_desktop_compat_is_reach_wallpaper_window(HWND hwnd)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd))
-    {
-        return 0;
-    }
-
-    DWORD process_id = 0;
-    GetWindowThreadProcessId(hwnd, &process_id);
-
-    if (process_id != GetCurrentProcessId())
-    {
-        return 0;
-    }
-
-    wchar_t class_name[128] = {};
-    GetClassNameW(hwnd, class_name, 128);
-
-    return lstrcmpiW(class_name, L"ReachWallpaperWindow") == 0;
-}
-
-static int32_t reach_explorer_desktop_compat_reach_wallpaper_intended_visible(HWND hwnd)
-{
-    return GetPropW(hwnd, reach_explorer_desktop_compat_wallpaper_visible_property()) != nullptr;
-}
-
-static BOOL CALLBACK reach_explorer_desktop_compat_hide_reach_wallpaper_proc(HWND hwnd,
-                                                                             LPARAM param)
-{
-    (void)param;
-
-    if (!reach_explorer_desktop_compat_is_reach_wallpaper_window(hwnd))
-    {
-        return TRUE;
-    }
-
-    if (!reach_explorer_desktop_compat_reach_wallpaper_intended_visible(hwnd))
-    {
-        return TRUE;
-    }
-
-    if (!reach_explorer_desktop_compat_hidden_wallpaper_contains(hwnd))
-    {
-        g_hiddenReachWallpaperHwnds.push_back(hwnd);
-    }
-
-    if (IsWindowVisible(hwnd))
-    {
-        ShowWindow(hwnd, SW_HIDE);
-    }
-    return TRUE;
-}
-
-static void reach_explorer_desktop_compat_restore_reach_wallpaper_fallback(void)
-{
-    for (size_t index = 0; index < g_hiddenReachWallpaperHwnds.size();)
-    {
-        HWND hwnd = g_hiddenReachWallpaperHwnds[index];
-
-        if (hwnd == nullptr || !IsWindow(hwnd) ||
-            !reach_explorer_desktop_compat_is_reach_wallpaper_window(hwnd))
-        {
-            g_hiddenReachWallpaperHwnds.erase(g_hiddenReachWallpaperHwnds.begin() + index);
-            continue;
-        }
-
-        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-        SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
-
-        g_hiddenReachWallpaperHwnds.erase(g_hiddenReachWallpaperHwnds.begin() + index);
-    }
-}
-
-static void reach_explorer_desktop_compat_sync_reach_wallpaper_fallback(
-    int32_t wallpaper_engine_renderer_present)
-{
-    if (wallpaper_engine_renderer_present)
-    {
-        EnumWindows(reach_explorer_desktop_compat_hide_reach_wallpaper_proc, 0);
-    }
-    else if (g_wallpaperEngineRendererPresent.load() != 0 || !g_hiddenReachWallpaperHwnds.empty())
-    {
-        reach_explorer_desktop_compat_restore_reach_wallpaper_fallback();
-    }
-
-    g_wallpaperEngineRendererPresent.store(wallpaper_engine_renderer_present ? 1 : 0);
 }
 
 static void reach_explorer_desktop_compat_resize_wallpaper_children(void)
@@ -539,16 +491,13 @@ static void reach_explorer_desktop_compat_resize_wallpaper_children(void)
         return;
     }
 
-    reach_explorer_desktop_compat_resize_children_state state = {};
-    GetClientRect(g_workerwHwnd, &state.worker_client);
+    RECT worker_client = {};
+    GetClientRect(g_workerwHwnd, &worker_client);
 
     EnumWindows(reach_explorer_desktop_compat_find_wallpaper_proc,
-                reinterpret_cast<LPARAM>(&state));
+                reinterpret_cast<LPARAM>(&worker_client));
     EnumChildWindows(g_workerwHwnd, reach_explorer_desktop_compat_resize_child_proc,
-                     reinterpret_cast<LPARAM>(&state));
-
-    reach_explorer_desktop_compat_sync_reach_wallpaper_fallback(
-        state.found_wallpaper_engine_renderer);
+                     reinterpret_cast<LPARAM>(&worker_client));
 }
 
 static void reach_explorer_desktop_compat_resize_host(void)
@@ -623,7 +572,7 @@ static reach_result reach_explorer_desktop_compat_create_host_windows(void)
 
     DWORD progman_style = WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 
-    DWORD progman_ex_style = WS_EX_TOOLWINDOW | WS_EX_NOREDIRECTIONBITMAP | WS_EX_NOACTIVATE;
+    DWORD progman_ex_style = WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
 
     g_progmanHwnd = CreateWindowExW(progman_ex_style, reach_explorer_desktop_compat_progman_class(),
                                     L"Program Manager", progman_style, x, y, width, height, nullptr,
@@ -677,10 +626,6 @@ static void reach_explorer_desktop_compat_destroy_host_windows(void)
         KillTimer(g_progmanHwnd, REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER);
     }
     g_syncScheduled = 0;
-
-    reach_explorer_desktop_compat_restore_reach_wallpaper_fallback();
-    g_hiddenReachWallpaperHwnds.clear();
-    g_wallpaperEngineRendererPresent.store(-1);
 
     if (g_workerwHwnd != nullptr)
     {
@@ -843,7 +788,26 @@ extern "C" void reach_windows_request_desktop_environment_sync(void)
     }
 }
 
-extern "C" int32_t reach_windows_desktop_compat_external_wallpaper_active(void)
+extern "C" void
+reach_windows_desktop_compat_set_background(const reach_desktop_background_slot *slots,
+                                            size_t count, int32_t visible)
 {
-    return g_wallpaperEngineRendererPresent.load() == 1;
+    {
+        std::lock_guard<std::mutex> lock(g_backgroundMutex);
+        if (slots != nullptr && count > 0)
+        {
+            g_backgroundSlots.assign(slots, slots + count);
+        }
+        else
+        {
+            g_backgroundSlots.clear();
+        }
+        g_backgroundVisible = visible ? 1 : 0;
+    }
+
+    HWND workerw = g_workerwHwnd;
+    if (workerw != nullptr && IsWindow(workerw))
+    {
+        InvalidateRect(workerw, nullptr, FALSE);
+    }
 }
