@@ -360,7 +360,10 @@ static int32_t reach_explorer_desktop_compat_attach_wallpaper_engine_child(HWND 
 
     int32_t changed = 0;
     LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-    LONG_PTR desired_style = (style | WS_CHILD | WS_VISIBLE) & ~WS_POPUP;
+    // Never force WS_VISIBLE: Wallpaper Engine hides this window itself to pause
+    // playback while it is occluded (fullscreen/maximized apps); re-showing it
+    // here fights that and flashes the reach wallpaper behind it.
+    LONG_PTR desired_style = (style | WS_CHILD) & ~WS_POPUP;
     if (desired_style != style)
     {
         SetWindowLongPtrW(hwnd, GWL_STYLE, desired_style);
@@ -416,24 +419,19 @@ static void reach_explorer_desktop_compat_size_wallpaper_engine_child(HWND hwnd,
                          window_rect.bottom - window_rect.top != height;
     }
 
-    int32_t needs_show = !IsWindowVisible(hwnd);
-    if (!needs_position && !needs_show && !force_frame_changed)
+    if (!needs_position && !force_frame_changed)
     {
         return;
     }
 
     UINT flags = SWP_NOACTIVATE;
-    if (!needs_show)
-    {
-        flags |= SWP_NOOWNERZORDER;
-    }
-    else
-    {
-        flags |= SWP_SHOWWINDOW;
-    }
     if (force_frame_changed)
     {
         flags |= SWP_FRAMECHANGED;
+    }
+    else
+    {
+        flags |= SWP_NOZORDER;
     }
 
     SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, width, height, flags);
