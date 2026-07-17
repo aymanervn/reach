@@ -924,6 +924,17 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return REACH_OK;
     }
 
+    if (event->type == REACH_UI_EVENT_WINDOW_FOCUS_LOST)
+    {
+        if (source == REACH_SURFACE_LAUNCHER && reach_launcher_is_open(host->launcher_capsule))
+        {
+            reach_host_clear_launcher_restore_window(host);
+            reach_host_close_launcher_without_focus_restore(host);
+            reach_host_request_update(host);
+        }
+        return REACH_OK;
+    }
+
     if (event->type == REACH_UI_EVENT_MINIMIZE_ALL)
     {
         (void)reach_host_schedule_minimize_open_windows(host);

@@ -146,6 +146,15 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_SETCURSOR:
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
         return TRUE;
+    case WM_ACTIVATE:
+        if (window != nullptr && LOWORD(wparam) == WA_INACTIVE &&
+            window->role == REACH_SURFACE_LAUNCHER)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_WINDOW_FOCUS_LOST;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case REACH_WM_WALLPAPER_CHANGED:
         if (window != nullptr)
         {

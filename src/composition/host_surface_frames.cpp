@@ -69,9 +69,12 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
     if (!game_mode && reach_host_surface_transition_visible(&host->launcher_transition))
     {
 
-        if (reach_launcher_is_open(host->launcher_capsule) &&
-            !reach_launcher_state_ptr(host->launcher_capsule)->launcher_focused &&
-            host->launcher.window.ops.show != nullptr)
+        if (!reach_launcher_is_open(host->launcher_capsule))
+        {
+            reach_launcher_set_focused(host->launcher_capsule, 0);
+        }
+        else if (!reach_launcher_state_ptr(host->launcher_capsule)->launcher_focused &&
+                 host->launcher.window.ops.show != nullptr)
         {
             (void)host->launcher.window.ops.show(host->launcher.window.window);
             reach_launcher_set_focused(host->launcher_capsule, 1);
