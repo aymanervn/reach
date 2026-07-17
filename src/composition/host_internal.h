@@ -25,6 +25,7 @@
 #include "reach/services/app_control.h"
 #include "reach/services/config.h"
 #include "reach/services/icon_service.h"
+#include "reach/services/idle_watch.h"
 #include "reach/services/now_playing.h"
 #include "reach/services/search.h"
 #include "reach/services/system_status.h"
@@ -218,6 +219,7 @@ struct reach_host
     reach_wallpaper_service_port wallpaper_service;
     reach_wallpaper_surface_port wallpaper_surface;
     reach_power_session_port power_session;
+    reach_idle_watch *idle_watch;
     const reach_theme *theme;
 
     reach_window_tracking *window_tracking;
@@ -478,6 +480,7 @@ void reach_host_stop_config_reload_worker(reach_host *host);
 reach_result reach_host_apply_config_snapshot(reach_host *host,
                                               const reach_config_snapshot *snapshot,
                                               int32_t apply_pins, int32_t apply_wallpaper);
+void reach_host_apply_power_config(reach_host *host, const reach_config_snapshot *snapshot);
 
 void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot *snapshot);
 

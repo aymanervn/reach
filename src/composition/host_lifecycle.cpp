@@ -108,6 +108,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_host_close_context_menu(host);
     reach_host_sync_popup_mouse_hook(host);
     reach_host_release_tray_render_icons(host);
+    reach_idle_watch_stop(host->idle_watch);
     reach_system_status_stop(host->system_status);
     reach_host_release_quick_settings_audio_render_icons(host);
     reach_host_release_clipboard_items(host);
@@ -258,6 +259,8 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->popup_capture.destroy(host->popup_capture.userdata);
     }
+    reach_idle_watch_destroy(host->idle_watch);
+    host->idle_watch = nullptr;
     if (host->power_session.ops.destroy != nullptr)
     {
         host->power_session.ops.destroy(host->power_session.session);
@@ -463,6 +466,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     host->popup_capture = dependencies->popup_capture;
     host->power_session = dependencies->power_session;
+    host->idle_watch = nullptr;
+    if (reach_idle_watch_create(host->power_session, &host->idle_watch) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
     host->audio_volume = dependencies->audio_volume;
     host->system_controls = dependencies->system_controls;
     host->system_status = nullptr;
@@ -509,6 +517,16 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                 reach_theme_icon_box_size(host->theme, host->dock_config.height);
             (void)reach_host_set_pinned_apps(host, snapshot.pinned_apps, snapshot.pinned_app_count);
             reach_host_seed_or_apply_wallpaper(host, &snapshot);
+            if (snapshot.power_shutdown_minutes != 0 || snapshot.power_restart_minutes != 0)
+            {
+                snapshot.power_shutdown_minutes = 0;
+                snapshot.power_restart_minutes = 0;
+                if (host->config_store.ops.save != nullptr)
+                {
+                    (void)host->config_store.ops.save(host->config_store.store, &snapshot);
+                }
+            }
+            reach_host_apply_power_config(host, &snapshot);
         }
     }
     if (result != REACH_OK)
@@ -722,6 +740,7 @@ reach_result reach_host_stop(reach_host *host)
     reach_host_stop_launcher_search_worker(host);
     reach_icon_service_stop(host->icon_service);
     reach_host_stop_app_control(host);
+    reach_idle_watch_stop(host->idle_watch);
     reach_now_playing_service_stop(host->now_playing_service);
     if (host->system_controls.stop_watching != nullptr)
     {

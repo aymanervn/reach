@@ -1,6 +1,8 @@
 #ifndef REACH_PORTS_POWER_SESSION_H
 #define REACH_PORTS_POWER_SESSION_H
 
+#include <stdint.h>
+
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -17,6 +19,10 @@ extern "C"
         reach_result (*restart)(reach_power_session *session);
         reach_result (*shutdown)(reach_power_session *session);
         reach_result (*sign_out)(reach_power_session *session);
+        reach_result (*input_idle_milliseconds)(reach_power_session *session,
+                                                uint64_t *out_milliseconds);
+        reach_result (*system_awake_required)(reach_power_session *session, int32_t *out_required);
+        uint64_t (*now_milliseconds)(reach_power_session *session);
         void (*destroy)(reach_power_session *session);
     } reach_power_session_ops;
 

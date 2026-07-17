@@ -72,6 +72,49 @@ static reach_result reach_power_session_sign_out(reach_power_session *session)
     return reach_power_session_exit_windows(EWX_LOGOFF);
 }
 
+static reach_result reach_power_session_input_idle_milliseconds(reach_power_session *session,
+                                                                uint64_t *out_milliseconds)
+{
+    (void)session;
+    REACH_ASSERT(out_milliseconds != nullptr);
+    if (out_milliseconds == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    LASTINPUTINFO info = {};
+    info.cbSize = sizeof(info);
+    if (!GetLastInputInfo(&info))
+    {
+        return REACH_ERROR;
+    }
+    *out_milliseconds = (uint64_t)(uint32_t)(GetTickCount() - info.dwTime);
+    return REACH_OK;
+}
+
+static reach_result reach_power_session_system_awake_required(reach_power_session *session,
+                                                              int32_t *out_required)
+{
+    (void)session;
+    REACH_ASSERT(out_required != nullptr);
+    if (out_required == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    ULONG state = 0;
+    if (CallNtPowerInformation(SystemExecutionState, nullptr, 0, &state, sizeof(state)) != 0)
+    {
+        return REACH_ERROR;
+    }
+    *out_required = (state & (ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)) != 0;
+    return REACH_OK;
+}
+
+static uint64_t reach_power_session_now_milliseconds(reach_power_session *session)
+{
+    (void)session;
+    return (uint64_t)GetTickCount64();
+}
+
 static void reach_power_session_destroy(reach_power_session *session)
 {
     delete session;
@@ -97,6 +140,9 @@ reach_result reach_windows_create_power_session(reach_power_session_port *out_po
     out_port->ops.restart = reach_power_session_restart;
     out_port->ops.shutdown = reach_power_session_shutdown;
     out_port->ops.sign_out = reach_power_session_sign_out;
+    out_port->ops.input_idle_milliseconds = reach_power_session_input_idle_milliseconds;
+    out_port->ops.system_awake_required = reach_power_session_system_awake_required;
+    out_port->ops.now_milliseconds = reach_power_session_now_milliseconds;
     out_port->ops.destroy = reach_power_session_destroy;
     return REACH_OK;
 }

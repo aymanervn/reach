@@ -69,6 +69,20 @@ static reach_result reach_config_store_load(reach_config_store *store,
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
     out_snapshot->dock_width = (float)GetPrivateProfileIntW(L"dock", L"width", 560, path);
     out_snapshot->dock_icon_size = (float)GetPrivateProfileIntW(L"dock", L"icon_size", 40, path);
+    out_snapshot->power_sleep_minutes =
+        (int32_t)GetPrivateProfileIntW(L"power", L"sleep_minutes", 30, path);
+    out_snapshot->power_lock_minutes =
+        (int32_t)GetPrivateProfileIntW(L"power", L"lock_minutes", 0, path);
+    out_snapshot->power_shutdown_minutes =
+        (int32_t)GetPrivateProfileIntW(L"power", L"shutdown_minutes", 0, path);
+    out_snapshot->power_restart_minutes =
+        (int32_t)GetPrivateProfileIntW(L"power", L"restart_minutes", 0, path);
+    out_snapshot->power_sleep_wait_apps =
+        (int32_t)GetPrivateProfileIntW(L"power", L"sleep_wait_apps", 0, path) != 0;
+    out_snapshot->power_shutdown_wait_apps =
+        (int32_t)GetPrivateProfileIntW(L"power", L"shutdown_wait_apps", 0, path) != 0;
+    out_snapshot->power_restart_wait_apps =
+        (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 0, path) != 0;
     GetPrivateProfileStringW(L"wallpaper", L"path", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->wallpaper_path), 260, path);
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)
@@ -128,6 +142,20 @@ static reach_result reach_config_store_save(reach_config_store *store,
     WritePrivateProfileStringW(L"dock", L"width", value, path);
     swprintf_s(value, L"%.0f", snapshot->dock_icon_size);
     WritePrivateProfileStringW(L"dock", L"icon_size", value, path);
+    swprintf_s(value, L"%d", snapshot->power_sleep_minutes);
+    WritePrivateProfileStringW(L"power", L"sleep_minutes", value, path);
+    swprintf_s(value, L"%d", snapshot->power_lock_minutes);
+    WritePrivateProfileStringW(L"power", L"lock_minutes", value, path);
+    swprintf_s(value, L"%d", snapshot->power_shutdown_minutes);
+    WritePrivateProfileStringW(L"power", L"shutdown_minutes", value, path);
+    swprintf_s(value, L"%d", snapshot->power_restart_minutes);
+    WritePrivateProfileStringW(L"power", L"restart_minutes", value, path);
+    swprintf_s(value, L"%d", snapshot->power_sleep_wait_apps ? 1 : 0);
+    WritePrivateProfileStringW(L"power", L"sleep_wait_apps", value, path);
+    swprintf_s(value, L"%d", snapshot->power_shutdown_wait_apps ? 1 : 0);
+    WritePrivateProfileStringW(L"power", L"shutdown_wait_apps", value, path);
+    swprintf_s(value, L"%d", snapshot->power_restart_wait_apps ? 1 : 0);
+    WritePrivateProfileStringW(L"power", L"restart_wait_apps", value, path);
     WritePrivateProfileStringW(L"wallpaper", L"path",
                                reinterpret_cast<const wchar_t *>(snapshot->wallpaper_path), path);
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)
@@ -178,6 +206,36 @@ static reach_result reach_config_store_save(reach_config_store *store,
 static void reach_config_store_destroy(reach_config_store *store)
 {
     delete store;
+}
+
+static BOOL CALLBACK reach_config_notify_window_proc(HWND hwnd, LPARAM param)
+{
+    int32_t *posted = reinterpret_cast<int32_t *>(param);
+    if (posted == nullptr || hwnd == nullptr || !IsWindow(hwnd))
+    {
+        return TRUE;
+    }
+
+    wchar_t class_name[64] = {};
+    GetClassNameW(hwnd, class_name, 64);
+    if (lstrcmpiW(class_name, L"ReachPlatformWindow") != 0)
+    {
+        return TRUE;
+    }
+
+    if (PostMessageW(hwnd, REACH_WM_CONFIG_CHANGED, 0, 0))
+    {
+        *posted = 1;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+reach_result reach_windows_notify_config_changed(void)
+{
+    int32_t posted = 0;
+    EnumWindows(reach_config_notify_window_proc, reinterpret_cast<LPARAM>(&posted));
+    return posted ? REACH_OK : REACH_ERROR;
 }
 
 reach_result reach_windows_create_config_store(const uint16_t *path,

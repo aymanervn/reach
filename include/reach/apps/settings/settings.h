@@ -8,6 +8,8 @@
 #include "reach/core/scrollbar.h"
 #include "reach/core/theme.h"
 #include "reach/core/windows_update.h"
+#include "reach/features/common/text_edit.h"
+#include "reach/support/animation.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -15,6 +17,14 @@ extern "C"
 #endif
 
 #define REACH_SETTINGS_NAV_ITEM_COUNT 7
+#define REACH_SETTINGS_POWER_TIMER_COUNT 4
+#define REACH_SETTINGS_POWER_OPTION_COUNT 6
+#define REACH_SETTINGS_POWER_PRESET_COUNT (REACH_SETTINGS_POWER_OPTION_COUNT - 1)
+#define REACH_SETTINGS_POWER_CUSTOM_OPTION REACH_SETTINGS_POWER_PRESET_COUNT
+#define REACH_SETTINGS_POWER_CUSTOM_DIGITS 2
+#define REACH_SETTINGS_POWER_FIELD_HOURS 0
+#define REACH_SETTINGS_POWER_FIELD_MINUTES 1
+#define REACH_SETTINGS_POWER_FIELD_COUNT 2
 
     typedef enum reach_settings_page
     {
@@ -38,8 +48,19 @@ extern "C"
         REACH_SETTINGS_HIT_UPDATE_RESTART,
         REACH_SETTINGS_HIT_UPDATE_CHECKBOX,
         REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK,
-        REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB
+        REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB,
+        REACH_SETTINGS_HIT_POWER_OPTION,
+        REACH_SETTINGS_HIT_POWER_APPLY,
+        REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE
     } reach_settings_hit_type;
+
+    typedef enum reach_settings_power_timer
+    {
+        REACH_SETTINGS_POWER_TIMER_SLEEP = 0,
+        REACH_SETTINGS_POWER_TIMER_LOCK = 1,
+        REACH_SETTINGS_POWER_TIMER_SHUTDOWN = 2,
+        REACH_SETTINGS_POWER_TIMER_RESTART = 3
+    } reach_settings_power_timer;
 
     typedef enum reach_settings_update_page_state
     {
@@ -61,6 +82,22 @@ extern "C"
         int32_t update_scan_completed;
         reach_windows_update_list update_list;
         reach_scrollbar_model update_scrollbar;
+        int32_t power_minutes[REACH_SETTINGS_POWER_TIMER_COUNT];
+        int32_t power_applied_minutes[REACH_SETTINGS_POWER_TIMER_COUNT];
+        int32_t power_wait_apps[REACH_SETTINGS_POWER_TIMER_COUNT];
+        int32_t power_applied_wait_apps[REACH_SETTINGS_POWER_TIMER_COUNT];
+        size_t power_selected[REACH_SETTINGS_POWER_TIMER_COUNT];
+        size_t power_previous[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_text_edit power_custom_edits[REACH_SETTINGS_POWER_TIMER_COUNT]
+                                          [REACH_SETTINGS_POWER_FIELD_COUNT];
+        int32_t power_focused_timer;
+        int32_t power_focused_field;
+        int32_t power_caret_visible;
+        double power_caret_phase;
+        reach_animation_track power_tracks[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_animation_manager power_animations;
+        reach_animation_track power_wait_tracks[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_animation_manager power_wait_animations;
     } reach_settings_model;
 
     typedef struct reach_settings_nav_item
@@ -103,6 +140,17 @@ extern "C"
         size_t update_indices[REACH_WINDOWS_UPDATE_MAX_UPDATES];
         size_t update_row_count;
         float update_content_height;
+        reach_rect_f32 power_cards[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_rect_f32 power_icon_boxes[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_rect_f32 power_titles[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_rect_f32 power_subtitles[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_rect_f32
+            power_options[REACH_SETTINGS_POWER_TIMER_COUNT][REACH_SETTINGS_POWER_OPTION_COUNT];
+        reach_rect_f32 power_custom_fields[REACH_SETTINGS_POWER_TIMER_COUNT]
+                                          [REACH_SETTINGS_POWER_FIELD_COUNT];
+        reach_rect_f32 power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_rect_f32 power_wait_labels[REACH_SETTINGS_POWER_TIMER_COUNT];
+        reach_rect_f32 power_apply_button;
         reach_settings_nav_item_layout nav_items[REACH_SETTINGS_NAV_ITEM_COUNT];
         size_t nav_item_count;
     } reach_settings_layout;
@@ -112,6 +160,9 @@ extern "C"
         reach_settings_hit_type type;
         reach_settings_page page;
         size_t update_index;
+        size_t power_timer;
+        size_t power_option;
+        size_t power_custom_field;
     } reach_settings_hit_result;
 
     typedef struct reach_settings_render_input
@@ -138,6 +189,33 @@ extern "C"
     int32_t reach_settings_model_update_busy(const reach_settings_model *model);
     void reach_settings_model_scroll_updates(reach_settings_model *model, float delta);
     int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds);
+
+    int32_t reach_settings_power_option_minutes(size_t timer, size_t option);
+    const uint16_t *reach_settings_power_option_label(size_t timer, size_t option);
+    void reach_settings_model_set_power_minutes(reach_settings_model *model, size_t timer,
+                                                int32_t minutes);
+    int32_t reach_settings_model_power_minutes(const reach_settings_model *model, size_t timer);
+    void reach_settings_model_select_power_option(reach_settings_model *model, size_t timer,
+                                                  size_t option);
+    int32_t reach_settings_model_tick_power_animations(reach_settings_model *model,
+                                                       double delta_seconds);
+    int32_t reach_settings_model_power_animations_active(const reach_settings_model *model);
+    void reach_settings_model_power_focus_custom(reach_settings_model *model, size_t timer,
+                                                 size_t field);
+    void reach_settings_model_power_blur(reach_settings_model *model);
+    int32_t reach_settings_model_power_insert_char(reach_settings_model *model, uint16_t ch);
+    int32_t reach_settings_model_power_handle_edit_key(reach_settings_model *model,
+                                                       reach_text_edit_key key,
+                                                       reach_text_edit_modifiers modifiers);
+    int32_t reach_settings_power_timer_supports_wait(size_t timer);
+    void reach_settings_model_set_power_wait_apps(reach_settings_model *model, size_t timer,
+                                                  int32_t enabled);
+    int32_t reach_settings_model_power_wait_apps(const reach_settings_model *model, size_t timer);
+    int32_t reach_settings_model_toggle_power_wait_apps(reach_settings_model *model, size_t timer);
+    int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
+    void reach_settings_model_power_mark_applied(reach_settings_model *model);
+    int32_t reach_settings_model_tick_power_caret(reach_settings_model *model,
+                                                  double delta_seconds);
 
     int32_t
     reach_windows_update_matches_security_maintenance(const reach_windows_update_item *update);

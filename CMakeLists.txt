@@ -58,6 +58,7 @@ add_library(reach_services STATIC
     src/services/app_control.cpp
     src/services/config.cpp
     src/services/icon_service.cpp
+    src/services/idle_watch.cpp
     src/services/now_playing.cpp
     src/services/pin_config.cpp
     src/services/search.cpp
@@ -92,6 +93,7 @@ target_compile_features(reach_core PUBLIC
 add_library(reach_features STATIC
     src/features/common/scrollbar/scrollbar_render.cpp
     src/features/common/text_edit/text_edit.cpp
+    src/features/common/ui_controls/ui_controls.cpp
     src/features/clipboard/clipboard_feature.cpp
     src/features/clipboard/clipboard_interaction.cpp
     src/features/clipboard/clipboard_model.cpp
@@ -320,6 +322,7 @@ reach_configure_common(reach_settings_feature)
 target_compile_features(reach_settings_feature PUBLIC cxx_std_17)
 target_link_libraries(reach_settings_feature PUBLIC
     reach_core
+    reach_features
     reach_support
 )
 
@@ -599,6 +602,18 @@ target_link_libraries(reach_now_playing_service_tests PRIVATE
     reach_services
 )
 
+add_executable(reach_idle_watch_tests
+    tests/idle_watch_tests.cpp
+)
+
+reach_configure_common(reach_idle_watch_tests)
+target_compile_features(reach_idle_watch_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_idle_watch_tests PRIVATE
+    reach_services
+)
+
 add_executable(reach_settings_feature_tests
     tests/settings_feature_tests.cpp
 )
@@ -664,6 +679,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_wallpaper_feature_tests COMMAND reach_wallpaper_feature_tests)
     add_test(NAME reach_now_playing_service_tests COMMAND reach_now_playing_service_tests)
+    add_test(NAME reach_idle_watch_tests COMMAND reach_idle_watch_tests)
     add_test(NAME reach_settings_feature_tests COMMAND reach_settings_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
     add_test(NAME reach_clipboard_feature_tests COMMAND reach_clipboard_feature_tests)
