@@ -98,7 +98,8 @@ extern "C"
     typedef enum reach_text_alignment
     {
         REACH_TEXT_ALIGNMENT_LEADING = 0,
-        REACH_TEXT_ALIGNMENT_CENTER = 1
+        REACH_TEXT_ALIGNMENT_CENTER = 1,
+        REACH_TEXT_ALIGNMENT_TRAILING = 2
     } reach_text_alignment;
 
     typedef struct reach_render_command
