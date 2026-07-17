@@ -41,6 +41,12 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
         execute.lpDirectory = working_directory;
     }
 
+    // Reach surfaces are mostly WS_EX_NOACTIVATE, so the launched process is not
+    // "started by the foreground process" and Windows denies it foreground; the new
+    // window then flashes and stays behind. Hand over our foreground rights (granted
+    // by the user's click/keypress on reach) before launching.
+    (void)AllowSetForegroundWindow(ASFW_ANY);
+
     HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     BOOL launched = ShellExecuteExW(&execute);
     if (SUCCEEDED(com_result))

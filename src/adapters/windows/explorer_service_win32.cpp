@@ -26,6 +26,9 @@ static reach_result reach_explorer_execute(const wchar_t *target,
     info.lpFile = target;
     info.lpParameters = arguments;
     info.nShow = SW_SHOWNORMAL;
+    // Same foreground handover as app_launcher_win32.cpp: without it the opened
+    // explorer window stays behind because reach never holds the foreground.
+    (void)AllowSetForegroundWindow(ASFW_ANY);
     return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
 }
 
