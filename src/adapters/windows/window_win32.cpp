@@ -252,7 +252,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 event.type = REACH_UI_EVENT_ARROW_DOWN;
             }
 
-            else if (window->role == REACH_SURFACE_LAUNCHER)
+            else if (window->role == REACH_SURFACE_LAUNCHER ||
+                     window->role == REACH_SURFACE_SETTINGS)
             {
                 reach_ui_edit_key edit_key = REACH_UI_EDIT_KEY_NONE;
                 switch (wparam)
@@ -298,7 +299,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_CHAR:
-        if (window != nullptr && window->role == REACH_SURFACE_LAUNCHER)
+        if (window != nullptr && (window->role == REACH_SURFACE_LAUNCHER ||
+                                  window->role == REACH_SURFACE_SETTINGS))
         {
 
             if (wparam >= 0x20 && wparam != 0x7F)

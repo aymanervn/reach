@@ -15,6 +15,24 @@ void reach_settings_model_init(reach_settings_model *model)
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_animation_manager_init(&model->power_animations, model->power_tracks,
+                                 REACH_SETTINGS_POWER_TIMER_COUNT);
+    reach_animation_manager_init(&model->power_wait_animations, model->power_wait_tracks,
+                                 REACH_SETTINGS_POWER_TIMER_COUNT);
+    model->power_focused_timer = -1;
+    for (size_t timer = 0; timer < REACH_SETTINGS_POWER_TIMER_COUNT; ++timer)
+    {
+        for (size_t field = 0; field < REACH_SETTINGS_POWER_FIELD_COUNT; ++field)
+        {
+            reach_text_edit_init(&model->power_custom_edits[timer][field],
+                                 REACH_SETTINGS_POWER_CUSTOM_DIGITS);
+        }
+    }
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SLEEP, 30);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_LOCK, 0);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN, 0);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_RESTART, 0);
+    reach_settings_model_power_mark_applied(model);
 }
 
 void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page)
@@ -208,11 +226,111 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
     }
 
     layout.content_title =
-        reach_settings_rect(layout.content.x + 28.0f * scale, layout.content.y + 36.0f * scale,
+        reach_settings_rect(layout.content.x + 28.0f * scale, layout.content.y + 22.0f * scale,
                             layout.content.width - 124.0f * scale, 42.0f * scale);
     layout.content_placeholder =
         reach_settings_rect(layout.content_title.x, layout.content_title.y + 56.0f * scale,
                             layout.content_title.width, 34.0f * scale);
+
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
+    {
+        float area_x = layout.content_title.x;
+        float area_y = layout.content_title.y + layout.content_title.height + 14.0f * scale;
+        float area_width = layout.content.x + layout.content.width - 28.0f * scale - area_x;
+        float area_bottom = layout.content.y + layout.content.height - 22.0f * scale;
+        float apply_height = 34.0f * scale;
+        float apply_gap = 12.0f * scale;
+        float apply_width = 104.0f * scale;
+        layout.power_apply_button = reach_settings_rect(
+            area_x + area_width - apply_width, area_bottom - apply_height, apply_width,
+            apply_height);
+        area_bottom -= apply_height + apply_gap;
+        float card_gap = 10.0f * scale;
+        float card_height = 104.0f * scale;
+        float needed = card_height * (float)REACH_SETTINGS_POWER_TIMER_COUNT +
+                       card_gap * (float)(REACH_SETTINGS_POWER_TIMER_COUNT - 1);
+        if (needed > area_bottom - area_y)
+        {
+            card_height = (area_bottom - area_y -
+                           card_gap * (float)(REACH_SETTINGS_POWER_TIMER_COUNT - 1)) /
+                          (float)REACH_SETTINGS_POWER_TIMER_COUNT;
+            if (card_height < 74.0f * scale)
+            {
+                card_height = 74.0f * scale;
+            }
+        }
+        int32_t show_subtitle = card_height >= 76.0f * scale;
+        float icon_box = (show_subtitle ? 30.0f : 22.0f) * scale;
+        float pill_height = 26.0f * scale;
+        float pill_gap = 8.0f * scale;
+        float card_y = area_y;
+        for (size_t timer = 0; timer < REACH_SETTINGS_POWER_TIMER_COUNT; ++timer)
+        {
+            layout.power_cards[timer] =
+                reach_settings_rect(area_x, card_y, area_width, card_height);
+            layout.power_icon_boxes[timer] =
+                reach_settings_rect(area_x + 16.0f * scale,
+                                    card_y + (show_subtitle ? 12.0f : 7.0f) * scale, icon_box,
+                                    icon_box);
+            float text_x = area_x + 16.0f * scale + icon_box + 12.0f * scale;
+            float text_width = area_x + area_width - text_x - 16.0f * scale;
+            if (reach_settings_power_timer_supports_wait(timer))
+            {
+                float toggle_width = 34.0f * scale;
+                float toggle_height = 18.0f * scale;
+                float toggle_x = area_x + area_width - 16.0f * scale - toggle_width;
+                float toggle_y = card_y + (show_subtitle ? 12.0f : 7.0f) * scale;
+                layout.power_wait_toggles[timer] =
+                    reach_settings_rect(toggle_x, toggle_y, toggle_width, toggle_height);
+                float label_width = 216.0f * scale;
+                layout.power_wait_labels[timer] =
+                    reach_settings_rect(toggle_x - 8.0f * scale - label_width, toggle_y,
+                                        label_width, toggle_height);
+                float title_max = layout.power_wait_labels[timer].x - text_x - 12.0f * scale;
+                if (text_width > title_max)
+                {
+                    text_width = title_max;
+                }
+            }
+            layout.power_titles[timer] = reach_settings_rect(
+                text_x, card_y + (show_subtitle ? 10.0f : 7.0f) * scale, text_width,
+                18.0f * scale);
+            if (show_subtitle)
+            {
+                layout.power_subtitles[timer] = reach_settings_rect(
+                    text_x, card_y + 29.0f * scale, text_width, 14.0f * scale);
+            }
+            float pills_x = area_x + 16.0f * scale;
+            float pills_width = area_width - 32.0f * scale;
+            float pill_width =
+                (pills_width - pill_gap * (float)(REACH_SETTINGS_POWER_OPTION_COUNT - 1)) /
+                (float)(REACH_SETTINGS_POWER_OPTION_COUNT + 1);
+            float pill_y =
+                card_y + card_height - pill_height - (show_subtitle ? 10.0f : 7.0f) * scale;
+            for (size_t option = 0; option < REACH_SETTINGS_POWER_OPTION_COUNT; ++option)
+            {
+                layout.power_options[timer][option] = reach_settings_rect(
+                    pills_x + (float)option * (pill_width + pill_gap), pill_y,
+                    option == REACH_SETTINGS_POWER_CUSTOM_OPTION ? pill_width * 2.0f : pill_width,
+                    pill_height);
+            }
+            reach_rect_f32 custom = layout.power_options[timer][REACH_SETTINGS_POWER_CUSTOM_OPTION];
+            float field_pad = 8.0f * scale;
+            float field_gap = 10.0f * scale;
+            float field_width = (custom.width - field_pad * 2.0f - field_gap) * 0.5f;
+            layout.power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_HOURS] =
+                reach_settings_rect(custom.x + field_pad, custom.y, field_width, custom.height);
+            layout.power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_MINUTES] =
+                reach_settings_rect(custom.x + field_pad + field_width + field_gap, custom.y,
+                                    field_width, custom.height);
+            card_y += card_height + card_gap;
+        }
+    }
+
+    if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
+    {
+        return layout;
+    }
 
     float button_y = layout.content_title.y + 54.0f * scale;
     float button_height = 34.0f * scale;
@@ -371,6 +489,46 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             result.type = REACH_SETTINGS_HIT_UPDATE_CHECKBOX;
             result.update_index = layout->update_indices[index];
             return result;
+        }
+    }
+    if (layout->power_apply_button.width > 0.0f &&
+        reach_settings_rect_contains(layout->power_apply_button, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_POWER_APPLY;
+        return result;
+    }
+    for (size_t timer = 0; timer < REACH_SETTINGS_POWER_TIMER_COUNT; ++timer)
+    {
+        const reach_rect_f32 toggle = layout->power_wait_toggles[timer];
+        const reach_rect_f32 toggle_label = layout->power_wait_labels[timer];
+        if (toggle.width > 0.0f && (reach_settings_rect_contains(toggle, x, y) ||
+                                    reach_settings_rect_contains(toggle_label, x, y)))
+        {
+            result.type = REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE;
+            result.power_timer = timer;
+            return result;
+        }
+    }
+    for (size_t timer = 0; timer < REACH_SETTINGS_POWER_TIMER_COUNT; ++timer)
+    {
+        for (size_t option = 0; option < REACH_SETTINGS_POWER_OPTION_COUNT; ++option)
+        {
+            const reach_rect_f32 pill = layout->power_options[timer][option];
+            if (pill.width > 0.0f && reach_settings_rect_contains(pill, x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_POWER_OPTION;
+                result.power_timer = timer;
+                result.power_option = option;
+                if (option == REACH_SETTINGS_POWER_CUSTOM_OPTION)
+                {
+                    result.power_custom_field =
+                        x >= layout->power_custom_fields[timer]
+                                                        [REACH_SETTINGS_POWER_FIELD_MINUTES].x
+                            ? REACH_SETTINGS_POWER_FIELD_MINUTES
+                            : REACH_SETTINGS_POWER_FIELD_HOURS;
+                }
+                return result;
+            }
         }
     }
     size_t nav_count = 0;

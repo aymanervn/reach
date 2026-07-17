@@ -190,6 +190,23 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
     return result;
 }
 
+void reach_host_apply_power_config(reach_host *host, const reach_config_snapshot *snapshot)
+{
+    if (host == nullptr || snapshot == nullptr)
+    {
+        return;
+    }
+    reach_idle_watch_config config = {};
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SLEEP] = snapshot->power_sleep_minutes;
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_LOCK] = snapshot->power_lock_minutes;
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SHUTDOWN] = snapshot->power_shutdown_minutes;
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_RESTART] = snapshot->power_restart_minutes;
+    config.wait_awake_apps[REACH_IDLE_WATCH_ACTION_SLEEP] = snapshot->power_sleep_wait_apps;
+    config.wait_awake_apps[REACH_IDLE_WATCH_ACTION_SHUTDOWN] = snapshot->power_shutdown_wait_apps;
+    config.wait_awake_apps[REACH_IDLE_WATCH_ACTION_RESTART] = snapshot->power_restart_wait_apps;
+    reach_idle_watch_set_config(host->idle_watch, &config);
+}
+
 void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot *snapshot)
 {
     if (host == nullptr || snapshot == nullptr)
@@ -247,6 +264,7 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
         reach_config_snapshot writable_snapshot = *snapshot;
         reach_host_seed_or_apply_wallpaper(host, &writable_snapshot);
     }
+    reach_host_apply_power_config(host, snapshot);
     return REACH_OK;
 }
 

@@ -25,6 +25,13 @@ extern "C"
         float dock_height;
         float dock_width;
         float dock_icon_size;
+        int32_t power_sleep_minutes;
+        int32_t power_lock_minutes;
+        int32_t power_shutdown_minutes;
+        int32_t power_restart_minutes;
+        int32_t power_sleep_wait_apps;
+        int32_t power_shutdown_wait_apps;
+        int32_t power_restart_wait_apps;
     } reach_config_snapshot;
 
     typedef struct reach_config_store_ops

@@ -1,5 +1,8 @@
 #include "reach/core/render_commands.h"
 #include "reach/apps/settings/settings.h"
+#include "reach/features/common/ui_controls.h"
+
+#include "settings_pages_internal.h"
 
 static float scale_value(const reach_settings_render_input *input, float value)
 {
@@ -108,6 +111,159 @@ static void build_status_text(const reach_windows_update_item *update, uint16_t 
                                                : (const uint16_t *)u"No");
 }
 
+static reach_color color_with_alpha(reach_color color, float alpha)
+{
+    color.a = alpha;
+    return color;
+}
+
+static reach_ui_button_style settings_button_style(const reach_settings_render_input *input,
+                                                   reach_color background)
+{
+    reach_ui_button_style style = {};
+    style.background = background;
+    style.disabled_background = {0.22f, 0.25f, 0.28f, 0.72f};
+    style.text = input->theme->settings_text;
+    style.disabled_text = input->theme->settings_secondary_text;
+    style.radius = scale_value(input, 8.0f);
+    style.text_size = scale_value(input, 13.0f);
+    style.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+    return style;
+}
+
+static reach_ui_selection_item_style settings_pill_style(const reach_settings_render_input *input,
+                                                         reach_color accent)
+{
+    reach_ui_selection_item_style style = {};
+    style.background = {1.0f, 1.0f, 1.0f, 0.05f};
+    style.accent = accent;
+    style.text = input->theme->settings_secondary_text;
+    style.stroke_width = scale_value(input, 1.0f);
+    style.text_size = scale_value(input, 11.0f);
+    style.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+    return style;
+}
+
+static void render_power_page(const reach_settings_render_input *input,
+                              reach_render_command_buffer *commands)
+{
+    const reach_settings_model *model = input->model;
+    const reach_settings_layout *layout = input->layout;
+    const reach_settings_power_row_style *styles = reach_settings_power_row_styles();
+
+    for (size_t timer = 0; timer < REACH_SETTINGS_POWER_TIMER_COUNT; ++timer)
+    {
+        const reach_settings_power_row_style *style = &styles[timer];
+        push_rect(commands, layout->power_cards[timer], scale_value(input, 10.0f),
+                  {0.12f, 0.15f, 0.18f, 0.82f});
+        push_rect(commands, layout->power_icon_boxes[timer], scale_value(input, 8.0f),
+                  color_with_alpha(style->accent, 0.18f));
+        push_icon(commands, layout->power_icon_boxes[timer], style->accent,
+                  (reach_vector_icon_id)style->icon_id, 0.22f);
+        push_text(commands, layout->power_titles[timer], style->title, scale_value(input, 13.5f),
+                  REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+                  input->theme->settings_text, 1);
+        if (layout->power_subtitles[timer].height > 0.0f)
+        {
+            push_text(commands, layout->power_subtitles[timer], style->subtitle,
+                      scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL,
+                      input->text_alignment_leading, input->theme->settings_secondary_text, 1);
+        }
+        if (layout->power_wait_toggles[timer].width > 0.0f)
+        {
+            float wait_t = reach_animation_manager_value(&model->power_wait_animations, timer);
+            push_text(commands, layout->power_wait_labels[timer],
+                      (const uint16_t *)L"Wait for apps keeping the PC awake",
+                      scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL,
+                      REACH_TEXT_ALIGNMENT_TRAILING,
+                      color_with_alpha(input->theme->settings_secondary_text,
+                                       0.7f + 0.3f * wait_t),
+                      1);
+            reach_ui_toggle_style toggle_style = {};
+            toggle_style.track_off = {1.0f, 1.0f, 1.0f, 0.10f};
+            toggle_style.track_on = color_with_alpha(style->accent, 0.85f);
+            toggle_style.knob = {1.0f, 1.0f, 1.0f, 0.92f};
+            reach_ui_toggle_render(commands, layout->power_wait_toggles[timer], &toggle_style,
+                                   wait_t);
+        }
+
+        float t = reach_animation_manager_value(&model->power_animations, timer);
+        size_t selected = model->power_selected[timer];
+        size_t previous = model->power_previous[timer];
+        reach_ui_selection_item_style pill_style = settings_pill_style(input, style->accent);
+        for (size_t option = 0; option < REACH_SETTINGS_POWER_OPTION_COUNT; ++option)
+        {
+            float selection = 0.0f;
+            if (option == selected)
+            {
+                selection = t;
+            }
+            else if (option == previous)
+            {
+                selection = 1.0f - t;
+            }
+            if (option == REACH_SETTINGS_POWER_CUSTOM_OPTION)
+            {
+                const reach_rect_f32 slot = layout->power_options[timer][option];
+                reach_ui_selection_item_backdrop_render(commands, slot, &pill_style, selection);
+                const reach_rect_f32 hours =
+                    layout->power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_HOURS];
+                const reach_rect_f32 minutes =
+                    layout->power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_MINUTES];
+                float divider_x = (hours.x + hours.width + minutes.x) * 0.5f;
+                push_rect(commands,
+                          {divider_x, slot.y + slot.height * 0.25f, scale_value(input, 1.0f),
+                           slot.height * 0.5f},
+                          0.0f, {1.0f, 1.0f, 1.0f, 0.12f});
+
+                static const uint16_t *suffixes[REACH_SETTINGS_POWER_FIELD_COUNT] = {
+                    (const uint16_t *)L"hr", (const uint16_t *)L"min"};
+                for (size_t field = 0; field < REACH_SETTINGS_POWER_FIELD_COUNT; ++field)
+                {
+                    const reach_text_edit *edit = &model->power_custom_edits[timer][field];
+                    int32_t focused = model->power_focused_timer == (int32_t)timer &&
+                                      model->power_focused_field == (int32_t)field;
+                    reach_ui_textbox_state state = {};
+                    state.text = edit->text;
+                    state.placeholder = (const uint16_t *)L"0";
+                    state.suffix = suffixes[field];
+                    state.suffix_width = scale_value(
+                        input, field == REACH_SETTINGS_POWER_FIELD_HOURS ? 16.0f : 24.0f);
+                    state.text_alignment = REACH_TEXT_ALIGNMENT_TRAILING;
+                    state.caret_index = edit->caret;
+                    state.caret_visible = focused && model->power_caret_visible;
+                    reach_text_edit_selection_range(edit, &state.selection_start,
+                                                    &state.selection_end);
+                    if (!focused)
+                    {
+                        state.selection_start = 0;
+                        state.selection_end = 0;
+                    }
+                    state.text_color = input->theme->settings_secondary_text;
+                    state.placeholder_color =
+                        color_with_alpha(input->theme->settings_secondary_text, 0.55f);
+                    state.selection_color = color_with_alpha(style->accent, 0.30f);
+                    state.suffix_color =
+                        color_with_alpha(input->theme->settings_secondary_text, 0.65f);
+                    reach_ui_textbox_render(commands, layout->power_custom_fields[timer][field],
+                                            &pill_style, selection, &state);
+                }
+            }
+            else
+            {
+                reach_ui_selection_item_render(commands, layout->power_options[timer][option],
+                                               reach_settings_power_option_label(timer, option),
+                                               &pill_style, selection);
+            }
+        }
+    }
+
+    reach_ui_button_style apply_style =
+        settings_button_style(input, {0.12f, 0.43f, 0.62f, 1.0f});
+    reach_ui_button_render(commands, layout->power_apply_button, (const uint16_t *)L"Apply",
+                           &apply_style, reach_settings_model_power_dirty(model));
+}
+
 static void render_update_page(const reach_settings_render_input *input,
                                reach_render_command_buffer *commands)
 {
@@ -117,33 +273,25 @@ static void render_update_page(const reach_settings_render_input *input,
     const int32_t install_enabled = !busy && reach_settings_model_selected_update_count(model) > 0;
     const int32_t restart_enabled = !busy && reach_settings_model_restart_required_count(model) > 0;
     reach_color accent = {0.20f, 0.72f, 0.96f, 1.0f};
-    reach_color refresh_button = {0.16f, 0.58f, 0.30f, 1.0f};
-    reach_color enabled_button = {0.12f, 0.43f, 0.62f, 1.0f};
-    reach_color restart_button = {0.78f, 0.20f, 0.20f, 1.0f};
-    reach_color disabled_button = {0.22f, 0.25f, 0.28f, 0.72f};
 
-    push_rect(commands, layout->update_refresh_button, scale_value(input, 8.0f),
-              busy ? disabled_button : refresh_button);
     const uint16_t *scan_button_text =
         model->update_scan_completed ? (const uint16_t *)u"Refresh" : (const uint16_t *)u"Search";
     if (model->update_page_state == REACH_SETTINGS_UPDATE_SCANNING)
         scan_button_text = model->update_scan_completed ? (const uint16_t *)u"Refreshing..."
                                                         : (const uint16_t *)u"Searching...";
-    push_text(commands, layout->update_refresh_button, scan_button_text, scale_value(input, 13.0f),
-              REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_text,
-              1);
-    push_rect(commands, layout->update_install_button, scale_value(input, 8.0f),
-              install_enabled ? enabled_button : disabled_button);
-    push_text(commands, layout->update_install_button, (const uint16_t *)u"Install selected",
-              scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
-              install_enabled ? input->theme->settings_text : input->theme->settings_secondary_text,
-              1);
-    push_rect(commands, layout->update_restart_button, scale_value(input, 8.0f),
-              restart_enabled ? restart_button : disabled_button);
-    push_text(commands, layout->update_restart_button, (const uint16_t *)u"Restart now",
-              scale_value(input, 13.0f), REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
-              restart_enabled ? input->theme->settings_text : input->theme->settings_secondary_text,
-              1);
+    reach_ui_button_style refresh_style =
+        settings_button_style(input, {0.16f, 0.58f, 0.30f, 1.0f});
+    refresh_style.disabled_text = input->theme->settings_text;
+    reach_ui_button_render(commands, layout->update_refresh_button, scan_button_text,
+                           &refresh_style, !busy);
+    reach_ui_button_style install_style =
+        settings_button_style(input, {0.12f, 0.43f, 0.62f, 1.0f});
+    reach_ui_button_render(commands, layout->update_install_button,
+                           (const uint16_t *)u"Install selected", &install_style, install_enabled);
+    reach_ui_button_style restart_style =
+        settings_button_style(input, {0.78f, 0.20f, 0.20f, 1.0f});
+    reach_ui_button_render(commands, layout->update_restart_button,
+                           (const uint16_t *)u"Restart now", &restart_style, restart_enabled);
 
     reach_rect_f32 update_status_message = layout->update_viewport;
     update_status_message.y = layout->content_title.y + layout->content_title.height;
@@ -293,6 +441,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
               input->theme->settings_text, 1);
     if (input->model->selected_page == REACH_SETTINGS_PAGE_UPDATE)
         render_update_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
+        render_power_page(input, commands);
     else
         push_text(commands, input->layout->content_placeholder,
                   reach_settings_page_placeholder(input->model->selected_page),

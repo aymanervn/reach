@@ -73,6 +73,7 @@ extern "C"
     reach_result reach_windows_create_windows_update(reach_windows_update_port *out_port);
     reach_result reach_windows_create_config_store(const uint16_t *path,
                                                    reach_config_store_port *out_port);
+    reach_result reach_windows_notify_config_changed(void);
     reach_result reach_windows_create_window_manager(reach_window_manager_port *out_port);
     reach_result reach_windows_create_explorer_service(reach_explorer_service_port *out_port);
     reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port *out_port);

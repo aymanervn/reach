@@ -48,6 +48,7 @@ struct reach_settings_app
     reach_monitor_port monitors;
     reach_power_session_port power_session;
     reach_windows_update_port windows_update;
+    reach_config_store_port config_store;
     reach_settings_model model;
     reach_settings_layout layout;
     reach_render_command_buffer render_commands;
@@ -235,6 +236,68 @@ static reach_result reach_settings_render(reach_settings_app *app)
         return result;
     }
     return app->renderer.ops.end_frame(app->renderer.backend);
+}
+
+static void reach_settings_load_power_config(reach_settings_app *app)
+{
+    if (app == nullptr || app->config_store.ops.load == nullptr)
+    {
+        return;
+    }
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
+    if (snapshot == nullptr ||
+        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
+    {
+        return;
+    }
+    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP,
+                                           snapshot->power_sleep_minutes);
+    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_LOCK,
+                                           snapshot->power_lock_minutes);
+    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN,
+                                           snapshot->power_shutdown_minutes);
+    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART,
+                                           snapshot->power_restart_minutes);
+    reach_settings_model_set_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP,
+                                             snapshot->power_sleep_wait_apps);
+    reach_settings_model_set_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN,
+                                             snapshot->power_shutdown_wait_apps);
+    reach_settings_model_set_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART,
+                                             snapshot->power_restart_wait_apps);
+    reach_settings_model_power_mark_applied(&app->model);
+}
+
+static void reach_settings_save_power_config(reach_settings_app *app)
+{
+    if (app == nullptr || app->config_store.ops.load == nullptr ||
+        app->config_store.ops.save == nullptr)
+    {
+        return;
+    }
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
+    if (snapshot == nullptr ||
+        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
+    {
+        return;
+    }
+    snapshot->power_sleep_minutes =
+        reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP);
+    snapshot->power_lock_minutes =
+        reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_LOCK);
+    snapshot->power_shutdown_minutes =
+        reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN);
+    snapshot->power_restart_minutes =
+        reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART);
+    snapshot->power_sleep_wait_apps =
+        reach_settings_model_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP);
+    snapshot->power_shutdown_wait_apps =
+        reach_settings_model_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN);
+    snapshot->power_restart_wait_apps =
+        reach_settings_model_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART);
+    if (app->config_store.ops.save(app->config_store.store, snapshot.get()) == REACH_OK)
+    {
+        (void)reach_windows_notify_config_changed();
+    }
 }
 
 static void reach_settings_update_progress(void *user, reach_windows_update_progress progress)
@@ -630,6 +693,101 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             app->dirty = 1;
         }
     }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
+    {
+        if (hit.type == REACH_SETTINGS_HIT_POWER_OPTION)
+        {
+            if (hit.power_option == REACH_SETTINGS_POWER_CUSTOM_OPTION)
+            {
+                reach_settings_model_power_focus_custom(&app->model, hit.power_timer,
+                                                        hit.power_custom_field);
+            }
+            else
+            {
+                reach_settings_model_power_blur(&app->model);
+                reach_settings_model_select_power_option(&app->model, hit.power_timer,
+                                                         hit.power_option);
+            }
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE)
+        {
+            reach_settings_model_power_blur(&app->model);
+            (void)reach_settings_model_toggle_power_wait_apps(&app->model, hit.power_timer);
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_POWER_APPLY)
+        {
+            reach_settings_model_power_blur(&app->model);
+            if (reach_settings_model_power_dirty(&app->model))
+            {
+                reach_settings_save_power_config(app);
+                reach_settings_model_power_mark_applied(&app->model);
+            }
+        }
+        else
+        {
+            reach_settings_model_power_blur(&app->model);
+        }
+        app->dirty = 1;
+    }
+}
+
+static void reach_settings_handle_text_event(reach_settings_app *app, const reach_ui_event *event)
+{
+    if (app->model.selected_page != REACH_SETTINGS_PAGE_POWER_SLEEP ||
+        app->model.power_focused_timer < 0)
+    {
+        return;
+    }
+    int32_t handled = 0;
+    if (event->type == REACH_UI_EVENT_TEXT_CHAR)
+    {
+        handled = reach_settings_model_power_insert_char(&app->model, (uint16_t)event->id);
+    }
+    else
+    {
+        reach_text_edit_modifiers modifiers = {};
+        modifiers.shift = (event->modifiers & REACH_UI_EVENT_MODIFIER_SHIFT) ? 1 : 0;
+        modifiers.ctrl = (event->modifiers & REACH_UI_EVENT_MODIFIER_CTRL) ? 1 : 0;
+        reach_text_edit_key key = REACH_TEXT_EDIT_KEY_NONE;
+        switch ((reach_ui_edit_key)event->id)
+        {
+        case REACH_UI_EDIT_KEY_BACKSPACE:
+            key = REACH_TEXT_EDIT_KEY_BACKSPACE;
+            break;
+        case REACH_UI_EDIT_KEY_DELETE:
+            key = REACH_TEXT_EDIT_KEY_DELETE;
+            break;
+        case REACH_UI_EDIT_KEY_LEFT:
+            key = REACH_TEXT_EDIT_KEY_LEFT;
+            break;
+        case REACH_UI_EDIT_KEY_RIGHT:
+            key = REACH_TEXT_EDIT_KEY_RIGHT;
+            break;
+        case REACH_UI_EDIT_KEY_HOME:
+            key = REACH_TEXT_EDIT_KEY_HOME;
+            break;
+        case REACH_UI_EDIT_KEY_END:
+            key = REACH_TEXT_EDIT_KEY_END;
+            break;
+        case REACH_UI_EDIT_KEY_SELECT_ALL:
+            reach_text_edit_select_all(
+                &app->model.power_custom_edits[app->model.power_focused_timer]
+                                              [app->model.power_focused_field]);
+            handled = 1;
+            break;
+        case REACH_UI_EDIT_KEY_NONE:
+        default:
+            break;
+        }
+        if (key != REACH_TEXT_EDIT_KEY_NONE)
+        {
+            handled = reach_settings_model_power_handle_edit_key(&app->model, key, modifiers);
+        }
+    }
+    if (handled)
+    {
+        app->dirty = 1;
+    }
 }
 
 static void reach_settings_handle_pointer_down(reach_settings_app *app, const reach_ui_event *event)
@@ -697,6 +855,18 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
     }
+    else if (event->type == REACH_UI_EVENT_TEXT_CHAR || event->type == REACH_UI_EVENT_TEXT_EDIT)
+    {
+        reach_settings_handle_text_event(app, event);
+    }
+    else if (event->type == REACH_UI_EVENT_ENTER || event->type == REACH_UI_EVENT_ESCAPE)
+    {
+        if (app->model.power_focused_timer >= 0)
+        {
+            reach_settings_model_power_blur(&app->model);
+            app->dirty = 1;
+        }
+    }
     else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
              app->model.selected_page == REACH_SETTINGS_PAGE_UPDATE && event->wheel_delta != 0)
     {
@@ -759,6 +929,13 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
         return result;
     }
 
+    uint16_t config_path[260] = {};
+    if (reach_windows_default_config_path(config_path, 260) == REACH_OK &&
+        reach_windows_create_config_store(config_path, &app->config_store) == REACH_OK)
+    {
+        reach_settings_load_power_config(app);
+    }
+
     app->bounds = reach_settings_default_bounds(app);
     reach_settings_refresh_layout(app);
     *out_app = app;
@@ -808,6 +985,14 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    if (reach_settings_model_tick_power_animations(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_tick_power_caret(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
     if (app->dirty)
     {
         reach_settings_refresh_bounds(app);
@@ -849,7 +1034,9 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     return app->dirty || worker->pending || worker->in_flight || worker->completed ||
            app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
-           app->update_scrollbar_drag.active;
+           app->update_scrollbar_drag.active ||
+           reach_settings_model_power_animations_active(&app->model) ||
+           app->model.power_focused_timer >= 0;
 }
 
 int32_t reach_settings_app_running(const reach_settings_app *app)
@@ -888,6 +1075,10 @@ void reach_settings_app_destroy(reach_settings_app *app)
     if (app->windows_update.destroy != nullptr)
     {
         app->windows_update.destroy(app->windows_update.userdata);
+    }
+    if (app->config_store.ops.destroy != nullptr)
+    {
+        app->config_store.ops.destroy(app->config_store.store);
     }
     if (app->power_session.ops.destroy != nullptr)
     {
