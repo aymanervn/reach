@@ -43,6 +43,10 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_rend
         {
             alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
         }
+        else if (command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING)
+        {
+            alignment = DWRITE_TEXT_ALIGNMENT_TRAILING;
+        }
 
         (void)format->SetTextAlignment(alignment);
         (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
@@ -173,7 +177,16 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
     {
         return REACH_ERROR;
     }
-    (void)format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+    DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
+    if (command->text_alignment == REACH_TEXT_ALIGNMENT_CENTER)
+    {
+        alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
+    }
+    else if (command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING)
+    {
+        alignment = DWRITE_TEXT_ALIGNMENT_TRAILING;
+    }
+    (void)format->SetTextAlignment(alignment);
     (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 
