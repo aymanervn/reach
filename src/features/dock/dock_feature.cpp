@@ -196,6 +196,8 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     int32_t feedback_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
+    int32_t power_hover_was_active =
+        reach_animation_manager_active(manager, REACH_DOCK_ANIM_POWER_HOVER);
     int32_t drag_snap_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP);
     int32_t item_was_active[REACH_MAX_PINNED_APPS] = {};
@@ -214,6 +216,12 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
     int32_t redraw = 0;
     if (feedback_was_active ||
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY))
+    {
+        redraw = 1;
+    }
+
+    if (power_hover_was_active ||
+        reach_animation_manager_active(manager, REACH_DOCK_ANIM_POWER_HOVER))
     {
         redraw = 1;
     }
@@ -466,6 +474,8 @@ static void reach_dock_capsule_reset(void *capsule)
         reach_dock_now_playing_reset(dock->now_playing_subfeature);
         dock->pointer_layout_valid = 0;
         dock->state.pressed_control = REACH_DOCK_HIT_NONE;
+        dock->state.power_hovered = 0;
+        reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f);
 
         dock->slots_synced = 0;
     }
@@ -771,6 +781,19 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     }
     if (event->kind == REACH_POINTER_EVENT_MOVE)
     {
+        if (!state->drag.active)
+        {
+            int32_t hovered = hit.type == REACH_DOCK_HIT_POWER_BUTTON;
+            if (hovered != state->power_hovered)
+            {
+                state->power_hovered = hovered;
+                reach_animation_manager_animate_to(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER,
+                                                   hovered ? 1.0f : 0.0f, 0.18,
+                                                   REACH_EASING_EASE_IN_OUT);
+                out->handled = 1;
+                out->redraw = 1;
+            }
+        }
         if (state->drag.active)
         {
             reach_dock_interaction_result interaction = {};
@@ -828,6 +851,13 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     {
         out->redraw =
             out->redraw || reach_dock_now_playing_pointer_cancel(dock->now_playing_subfeature);
+        if (state->power_hovered)
+        {
+            state->power_hovered = 0;
+            reach_animation_manager_animate_to(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f,
+                                               0.18, REACH_EASING_EASE_IN_OUT);
+            out->redraw = 1;
+        }
     }
 }
 

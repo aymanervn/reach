@@ -25,6 +25,12 @@ struct reach_dock_metrics
     int32_t clock_date_text_weight;
 
     float reorder_neighbor_threshold_ratio;
+
+    float power_ring_stroke_width;
+    float power_ring_inset;
+    float power_ring_track_alpha;
+    float power_percent_text_size;
+    int32_t power_percent_text_weight;
 };
 
 static constexpr reach_dock_metrics reach_dock_make_metrics()
@@ -51,6 +57,12 @@ static constexpr reach_dock_metrics reach_dock_make_metrics()
     metrics.clock_date_text_weight = REACH_TEXT_WEIGHT_NORMAL;
 
     metrics.reorder_neighbor_threshold_ratio = 0.25f;
+
+    metrics.power_ring_stroke_width = 2.25f;
+    metrics.power_ring_inset = 0.5f;
+    metrics.power_ring_track_alpha = 0.16f;
+    metrics.power_percent_text_size = 13.0f;
+    metrics.power_percent_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
 
     return metrics;
 }
