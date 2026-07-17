@@ -94,7 +94,7 @@ void reach_host_sync_pointer_move_subscriptions(reach_host *host)
                 : 0;
         if (desc->id == REACH_SURFACE_ID_DOCK)
         {
-            wants = wants || reach_host_dock_can_hide(host);
+            wants = 1;
         }
         reach_host_sync_pointer_move_enabled(&desc->surface->window, enabled && wants,
                                              &host->dock_reveal.move_enabled[desc->id], force);

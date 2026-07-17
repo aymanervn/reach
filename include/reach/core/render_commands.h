@@ -27,7 +27,8 @@ extern "C"
         REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11,
         REACH_RENDER_COMMAND_ICON_TINT = 13,
         REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
-        REACH_RENDER_COMMAND_TEXTBOX = 15
+        REACH_RENDER_COMMAND_TEXTBOX = 15,
+        REACH_RENDER_COMMAND_ARC_STROKE = 16
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -113,6 +114,7 @@ extern "C"
         int32_t has_clip_rect;
         float clip_radius;
         float stroke_width;
+        float arc_sweep;
         uint64_t icon_id;
         int32_t icon_crop_to_fill;
         int32_t corner_mask;

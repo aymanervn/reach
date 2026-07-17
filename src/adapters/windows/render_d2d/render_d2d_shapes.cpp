@@ -1,5 +1,7 @@
 #include "render_d2d_internal.h"
 
+#include <math.h>
+
 static HRESULT reach_d2d_draw_gradient_line(ID2D1RenderTarget *target, D2D1_POINT_2F start,
                                             D2D1_POINT_2F end, reach_color color,
                                             float stroke_width, float end_alpha = 0.0f)
@@ -392,6 +394,106 @@ reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
     brush->Release();
 
     return REACH_OK;
+}
+
+reach_result reach_d2d_draw_arc_stroke(ID2D1RenderTarget *target,
+                                       const reach_render_command *command)
+{
+    if (target == nullptr || command == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    float sweep = command->arc_sweep;
+    if (sweep <= 0.0f)
+    {
+        return REACH_OK;
+    }
+
+    float stroke_width = command->stroke_width > 0.0f ? command->stroke_width : 1.0f;
+    float rx = command->rect.width * 0.5f;
+    float ry = command->rect.height * 0.5f;
+    float cx = command->rect.x + rx;
+    float cy = command->rect.y + ry;
+
+    ID2D1SolidColorBrush *brush = nullptr;
+    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+    if (FAILED(hr) || brush == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    if (sweep >= 0.999f)
+    {
+        target->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(cx, cy), rx, ry), brush, stroke_width);
+        brush->Release();
+        return REACH_OK;
+    }
+
+    ID2D1Factory *factory = nullptr;
+    ID2D1PathGeometry *geometry = nullptr;
+    ID2D1GeometrySink *sink = nullptr;
+    ID2D1StrokeStyle *stroke_style = nullptr;
+
+    target->GetFactory(&factory);
+    hr = factory != nullptr ? factory->CreatePathGeometry(&geometry) : E_FAIL;
+
+    if (SUCCEEDED(hr))
+    {
+        hr = geometry->Open(&sink);
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        const float two_pi = 6.28318530718f;
+        float angle = sweep * two_pi;
+        D2D1_POINT_2F start = D2D1::Point2F(cx, cy - ry);
+        D2D1_POINT_2F end = D2D1::Point2F(cx + rx * sinf(angle), cy - ry * cosf(angle));
+
+        sink->BeginFigure(start, D2D1_FIGURE_BEGIN_HOLLOW);
+
+        D2D1_ARC_SEGMENT arc = {};
+        arc.point = end;
+        arc.size = D2D1::SizeF(rx, ry);
+        arc.rotationAngle = 0.0f;
+        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+        arc.arcSize = sweep > 0.5f ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL;
+
+        sink->AddArc(arc);
+        sink->EndFigure(D2D1_FIGURE_END_OPEN);
+        hr = sink->Close();
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        D2D1_STROKE_STYLE_PROPERTIES properties = D2D1::StrokeStyleProperties(
+            D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND);
+        (void)factory->CreateStrokeStyle(properties, nullptr, 0, &stroke_style);
+        target->DrawGeometry(geometry, brush, stroke_width, stroke_style);
+    }
+
+    if (stroke_style != nullptr)
+    {
+        stroke_style->Release();
+    }
+    if (sink != nullptr)
+    {
+        sink->Release();
+    }
+    if (geometry != nullptr)
+    {
+        geometry->Release();
+    }
+    if (factory != nullptr)
+    {
+        factory->Release();
+    }
+    if (brush != nullptr)
+    {
+        brush->Release();
+    }
+
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
 reach_result reach_d2d_draw_clipped_rounded_rect(ID2D1RenderTarget *target,

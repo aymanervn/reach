@@ -357,7 +357,7 @@ static void reach_quick_settings_push_output_icon(reach_render_command_buffer *c
 {
     reach_render_command icon = {};
     icon.rect = rect;
-    icon.color = theme->icon_backplate_background;
+    icon.color = theme->system_glyph;
     if (icon_id != 0)
     {
         icon.type = REACH_RENDER_COMMAND_ICON;
@@ -398,7 +398,7 @@ static reach_result reach_quick_settings_push_volume_pill_commands_with_label(
     icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
     icon.rect = pill.header_icon;
     icon.icon_id = model->icon_id;
-    icon.color = theme->icon_backplate_background;
+    icon.color = theme->system_glyph;
     (void)reach_render_command_buffer_push(commands, &icon);
 
     reach_rect_f32 label_rect = pill.header_label;
@@ -480,7 +480,7 @@ static reach_result reach_quick_settings_push_output_device_row_commands(
         check.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         check.rect = layout->checkmark;
         check.icon_id = REACH_VECTOR_ICON_CHECK;
-        check.color = theme->icon_backplate_background;
+        check.color = theme->system_glyph;
         (void)reach_render_command_buffer_push(commands, &check);
     }
 
@@ -511,7 +511,7 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
 
     reach_render_command icon = {};
     icon.rect = layout->app_icon;
-    icon.color = theme->icon_backplate_background;
+    icon.color = theme->system_glyph;
     if (session->icon_id != 0)
     {
         icon.type = REACH_RENDER_COMMAND_ICON;
@@ -692,7 +692,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         output_chevron.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         output_chevron.rect = input->layout.output_device_button_chevron;
         output_chevron.icon_id = REACH_VECTOR_ICON_ARROW_DOWN;
-        output_chevron.color = input->theme.icon_backplate_background;
+        output_chevron.color = input->theme.system_glyph;
         (void)reach_render_command_buffer_push(commands, &output_chevron);
     }
     else
@@ -708,7 +708,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         output_chevron.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         output_chevron.rect = input->layout.output_devices_title_chevron;
         output_chevron.icon_id = REACH_VECTOR_ICON_ARROW_UP;
-        output_chevron.color = input->theme.icon_backplate_background;
+        output_chevron.color = input->theme.system_glyph;
         (void)reach_render_command_buffer_push(commands, &output_chevron);
 
         reach_quick_settings_push_rounded_rect(commands, input->layout.output_devices_panel,
@@ -777,7 +777,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     icon.rect = input->layout.expand_button_icon;
     icon.icon_id =
         input->model.expanded ? REACH_VECTOR_ICON_ARROW_UP : REACH_VECTOR_ICON_ARROW_DOWN;
-    icon.color = input->theme.icon_backplate_background;
+    icon.color = input->theme.system_glyph;
     (void)reach_render_command_buffer_push(commands, &icon);
 
     return REACH_OK;

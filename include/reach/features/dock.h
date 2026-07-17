@@ -103,6 +103,9 @@ extern "C"
         const uint16_t *time_text;
         const uint16_t *date_text;
         int32_t text_alignment_center;
+        int32_t battery_valid;
+        int32_t battery_percent;
+        float power_hover;
     } reach_dock_render_input;
 
     reach_result reach_dock_build_render_commands(const reach_dock_render_input *input,
@@ -151,6 +154,7 @@ extern "C"
         REACH_DOCK_ANIM_DRAG_SNAP,
         REACH_DOCK_ANIM_FEEDBACK_OPACITY,
         REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
+        REACH_DOCK_ANIM_POWER_HOVER,
         REACH_DOCK_ANIM_ITEM_X_BASE,
         REACH_DOCK_ANIM_SLOT_BASE = REACH_DOCK_ANIM_ITEM_X_BASE + REACH_MAX_PINNED_APPS,
         REACH_DOCK_ANIM_COUNT = REACH_DOCK_ANIM_SLOT_BASE + REACH_DOCK_SLOT_CAPACITY
@@ -234,6 +238,8 @@ extern "C"
         int32_t icon_size_px;
         float dpi_scale;
         float dock_gap;
+        int32_t battery_valid;
+        int32_t battery_percent;
     } reach_dock_render_context;
 
     reach_result reach_dock_append_render_commands(reach_dock *dock,
@@ -271,6 +277,7 @@ extern "C"
         int32_t pressed_control;
 
         int32_t power_release_suppressed;
+        int32_t power_hovered;
 
         size_t feedback_index;
         int32_t feedback_pressed;

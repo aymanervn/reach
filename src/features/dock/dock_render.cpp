@@ -272,10 +272,10 @@ static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
     reach_dock_push_rect(commands, reach_dock_union_rect(tray_box, quick_settings_box),
                          theme->dock_button_background, icon_box_radius);
     reach_dock_push_vector_icon(commands, reach_dock_center_square(tray_box, system_icon_size),
-                                REACH_VECTOR_ICON_ARROW_UP, theme->icon_backplate_background);
+                                REACH_VECTOR_ICON_ARROW_UP, theme->system_glyph);
     reach_dock_push_vector_icon(commands,
                                 reach_dock_center_square(quick_settings_box, system_icon_size),
-                                REACH_VECTOR_ICON_QUICK_SETTINGS, theme->icon_backplate_background);
+                                REACH_VECTOR_ICON_QUICK_SETTINGS, theme->system_glyph);
 
     if (input->click_feedback_index == input->tray_feedback_index)
     {
@@ -310,6 +310,124 @@ static void reach_dock_push_clock(const reach_dock_render_input *input,
         input->theme->dock_clock_date);
 }
 
+static reach_color reach_dock_rgba(float r, float g, float b, float a)
+{
+    reach_color color = {};
+    color.r = r;
+    color.g = g;
+    color.b = b;
+    color.a = a;
+    return color;
+}
+
+static reach_color reach_dock_lerp_color(reach_color from, reach_color to, float t)
+{
+    reach_color color = {};
+    color.r = from.r + (to.r - from.r) * t;
+    color.g = from.g + (to.g - from.g) * t;
+    color.b = from.b + (to.b - from.b) * t;
+    color.a = from.a + (to.a - from.a) * t;
+    return color;
+}
+
+static int32_t reach_dock_battery_low(int32_t percent)
+{
+    return percent <= 15;
+}
+
+static reach_color reach_dock_battery_accent(const reach_dock_render_input *input, int32_t percent)
+{
+    return reach_dock_battery_low(percent) ? reach_dock_rgba(1.0f, 0.27f, 0.23f, 1.0f)
+                                           : input->theme->system_glyph;
+}
+
+static int32_t reach_dock_battery_percent_clamped(const reach_dock_render_input *input)
+{
+    int32_t percent = input->battery_percent;
+    if (percent < 0)
+    {
+        percent = 0;
+    }
+    if (percent > 100)
+    {
+        percent = 100;
+    }
+    return percent;
+}
+
+static void reach_dock_push_battery_ring(const reach_dock_render_input *input,
+                                         reach_render_command_buffer *commands,
+                                         reach_rect_f32 power_box, int32_t percent)
+{
+    const reach_dock_metrics &metrics = reach_dock_metrics_values;
+
+    float inset = metrics.power_ring_inset + metrics.power_ring_stroke_width * 0.5f;
+    reach_rect_f32 ring_box =
+        reach_dock_rect(power_box.x + inset, power_box.y + inset, power_box.width - inset * 2.0f,
+                        power_box.height - inset * 2.0f);
+
+    reach_render_command track = {};
+    track.type = REACH_RENDER_COMMAND_ARC_STROKE;
+    track.rect = ring_box;
+    track.color = input->theme->system_glyph;
+    track.color.a *= metrics.power_ring_track_alpha;
+    track.stroke_width = metrics.power_ring_stroke_width;
+    track.arc_sweep = 1.0f;
+    reach_render_command_buffer_push(commands, &track);
+
+    reach_render_command arc = {};
+    arc.type = REACH_RENDER_COMMAND_ARC_STROKE;
+    arc.rect = ring_box;
+    arc.color = reach_dock_battery_accent(input, percent);
+    arc.stroke_width = metrics.power_ring_stroke_width;
+    arc.arc_sweep = (float)percent / 100.0f;
+    reach_render_command_buffer_push(commands, &arc);
+}
+
+static void reach_dock_push_battery_percent(const reach_dock_render_input *input,
+                                            reach_render_command_buffer *commands,
+                                            reach_rect_f32 power_box, int32_t percent)
+{
+    const reach_dock_metrics &metrics = reach_dock_metrics_values;
+    float hover = input->power_hover;
+    if (hover <= 0.001f)
+    {
+        return;
+    }
+
+    uint16_t percent_text[8] = {};
+    size_t length = 0;
+    if (percent >= 100)
+    {
+        percent_text[length++] = '1';
+        percent_text[length++] = '0';
+        percent_text[length++] = '0';
+    }
+    else
+    {
+        if (percent >= 10)
+        {
+            percent_text[length++] = (uint16_t)('0' + percent / 10);
+        }
+        percent_text[length++] = (uint16_t)('0' + percent % 10);
+    }
+    percent_text[length++] = '%';
+    percent_text[length] = 0;
+
+    reach_color text_color = reach_dock_battery_accent(input, percent);
+    text_color.a *= hover;
+
+    reach_render_command text_command = {};
+    text_command.type = REACH_RENDER_COMMAND_TEXT;
+    text_command.rect = power_box;
+    text_command.color = text_color;
+    text_command.text_size = metrics.power_percent_text_size;
+    text_command.text_weight = metrics.power_percent_text_weight;
+    text_command.text_alignment = input->text_alignment_center;
+    reach_copy_utf16(text_command.text, 260, percent_text);
+    reach_render_command_buffer_push(commands, &text_command);
+}
+
 static void reach_dock_push_power_button(const reach_dock_render_input *input,
                                          reach_render_command_buffer *commands, float icon_box_size)
 {
@@ -318,10 +436,26 @@ static void reach_dock_push_power_button(const reach_dock_render_input *input,
     float system_icon_size = icon_box_size * reach_dock_metrics_values.system_icon_box_scale;
     reach_rect_f32 power_box = reach_dock_icon_box_for_slot(layout->power_button, icon_box_size);
 
-    reach_dock_push_rect(commands, power_box, theme->dock_button_background,
-                         theme->dock_power_button_corner_radius);
+    int32_t percent = reach_dock_battery_percent_clamped(input);
+
+    reach_color glyph_color = theme->system_glyph;
+    reach_color background = theme->dock_button_background;
+    if (input->battery_valid)
+    {
+        glyph_color.a *= 1.0f - input->power_hover;
+        background = reach_dock_lerp_color(background, reach_dock_rgba(0.09f, 0.11f, 0.13f, 0.85f),
+                                           input->power_hover);
+    }
+
+    reach_dock_push_rect(commands, power_box, background, theme->dock_power_button_corner_radius);
     reach_dock_push_vector_icon(commands, reach_dock_center_square(power_box, system_icon_size),
-                                REACH_VECTOR_ICON_POWER, theme->dock_power_glyph);
+                                REACH_VECTOR_ICON_POWER, glyph_color);
+
+    if (input->battery_valid)
+    {
+        reach_dock_push_battery_percent(input, commands, power_box, percent);
+        reach_dock_push_battery_ring(input, commands, power_box, percent);
+    }
 
     if (input->click_feedback_index == input->power_feedback_index)
     {
@@ -502,6 +636,9 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.time_text = state->clock_time_text;
     input.date_text = state->clock_date_text;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
+    input.battery_valid = ctx->battery_valid;
+    input.battery_percent = ctx->battery_percent;
+    input.power_hover = reach_animation_manager_value(manager, REACH_DOCK_ANIM_POWER_HOVER);
 
     reach_result result = reach_dock_build_render_commands(&input, out_commands);
     if (result != REACH_OK)

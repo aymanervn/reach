@@ -29,6 +29,15 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     render_ctx.dock_gap = host->dock_config.gap;
 
+    reach_power_state power = {};
+    if (host->system_controls.get_power_state != nullptr &&
+        host->system_controls.get_power_state(host->system_controls.userdata, &power) == REACH_OK &&
+        power.has_battery && power.battery_percent >= 0)
+    {
+        render_ctx.battery_valid = 1;
+        render_ctx.battery_percent = power.battery_percent;
+    }
+
     reach_result result =
         reach_dock_append_render_commands(host->dock_capsule, &render_ctx, &commands);
     if (result != REACH_OK)

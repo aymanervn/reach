@@ -14,7 +14,7 @@ const reach_theme *reach_theme_default(void)
         .dark_border = {0.10f, 0.13f, 0.16f, 0.88f},
         .dock_shadow = {0.55f, 0.57f, 0.60f, 0.16f},
         .icon_box_background = {1.0f, 1.0f, 1.0f, 1.0f},
-        .icon_backplate_background = {1.0f, 0.97f, 0.91f, 0.96f},
+        .system_glyph = {1.0f, 0.97f, 0.91f, 0.96f},
         .fallback_icon_background = {0.18f, 0.20f, 0.24f, 1.0f},
         .fallback_icon_text = {0.12f, 0.14f, 0.17f, 0.92f},
         .dock_button_background = {0.52f, 0.59f, 0.65f, 0.66f},

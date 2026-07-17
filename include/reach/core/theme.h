@@ -24,7 +24,7 @@ extern "C"
         reach_color dark_border;
         reach_color dock_shadow;
         reach_color icon_box_background;
-        reach_color icon_backplate_background;
+        reach_color system_glyph;
         reach_color fallback_icon_background;
         reach_color fallback_icon_text;
         reach_color dock_system_separator;

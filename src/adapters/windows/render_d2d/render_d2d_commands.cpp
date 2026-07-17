@@ -109,6 +109,16 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             continue;
         }
 
+        if (command->type == REACH_RENDER_COMMAND_ARC_STROKE)
+        {
+            reach_result result = reach_d2d_draw_arc_stroke(target, command);
+            if (result != REACH_OK)
+            {
+                return result;
+            }
+            continue;
+        }
+
         if (command->type == REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT)
         {
             reach_result result = reach_d2d_draw_clipped_rounded_rect(target, command);
