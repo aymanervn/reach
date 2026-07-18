@@ -174,6 +174,15 @@ typedef struct reach_host_dirty_state
     int32_t monitors;
 } reach_host_dirty_state;
 
+typedef struct reach_host_window_list_state
+{
+    int32_t dwell_active;
+    size_t dwell_item;
+    double dwell_seconds;
+    size_t open_item;
+    double grace_seconds;
+} reach_host_window_list_state;
+
 typedef struct reach_host_dock_reveal_state
 {
     int32_t edge_visible;
@@ -233,6 +242,7 @@ struct reach_host
     reach_wallpaper *wallpaper;
     reach_dock *dock_capsule;
     reach_host_dock_reveal_state dock_reveal;
+    reach_host_window_list_state window_list;
     reach_clipboard_feature *clipboard_capsule;
     reach_clipboard_port clipboard;
     reach_search_service *search_service;
@@ -394,6 +404,11 @@ reach_result reach_host_show_power_context_menu(reach_host *host);
 
 reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item_index, int32_t x,
                                                    int32_t y);
+
+void reach_host_dock_item_hovered(reach_host *host, size_t item_index);
+void reach_host_window_list_update(reach_host *host, double delta_seconds);
+int32_t reach_host_window_list_wants_frames(const reach_host *host);
+reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_index);
 
 int32_t reach_host_dock_icon_size_px(const reach_host *host);
 

@@ -104,6 +104,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
 
     reach_host_apply_window_control_result(host);
     reach_host_tick_animations(host, delta_seconds);
+    reach_host_window_list_update(host, delta_seconds);
     reach_host_drain_now_playing_retired_covers(host);
     reach_host_process_deferred_launcher_app_launch(host);
     reach_host_process_clipboard_refresh(host);
@@ -345,7 +346,8 @@ int32_t reach_host_needs_frame(const reach_host *host)
     if (host->dirty.update_requested || window_manager_needs_refresh || host->dirty.render ||
         reach_host_any_surface_dirty(host) || reach_icon_service_work_pending(host->icon_service) ||
         reach_host_config_reload_work_pending(host) ||
-        reach_animation_manager_any_active(&host->animations))
+        reach_animation_manager_any_active(&host->animations) ||
+        reach_host_window_list_wants_frames(host))
     {
         return 1;
     }

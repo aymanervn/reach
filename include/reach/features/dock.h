@@ -139,7 +139,8 @@ extern "C"
         REACH_DOCK_POINTER_ACTION_MEDIA_PLAY_PAUSE = 14,
         REACH_DOCK_POINTER_ACTION_MEDIA_NEXT = 15,
         REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS = 16,
-        REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17
+        REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17,
+        REACH_DOCK_POINTER_ACTION_HOVER_ITEM = 18
     } reach_dock_pointer_action_kind;
 
     size_t reach_dock_reorder_target(const reach_dock_feature_model *model,
@@ -275,6 +276,7 @@ extern "C"
         reach_dock_drag_state drag;
         size_t pressed_index;
         int32_t pressed_control;
+        size_t hovered_item;
 
         int32_t power_release_suppressed;
         int32_t power_hovered;
@@ -302,6 +304,25 @@ extern "C"
 
     size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_index,
                                                   uint32_t *out_commands, size_t cap);
+
+    typedef struct reach_dock_item_window
+    {
+        uintptr_t window;
+        const uint16_t *title;
+    } reach_dock_item_window;
+
+    size_t reach_dock_collect_matching_windows(const reach_pinned_app_model *pinned_app,
+                                               const reach_window_snapshot *windows,
+                                               size_t window_count,
+                                               const uintptr_t *focus_history,
+                                               size_t focus_history_count,
+                                               reach_dock_window_matches_pinned_fn matches,
+                                               void *match_user, size_t *out_indices, size_t cap);
+
+    size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
+                                           const reach_pinned_app_model *pinned_apps,
+                                           size_t pinned_app_count, reach_dock_item_window *out,
+                                           size_t cap);
 
     size_t reach_dock_order_count(reach_dock *dock);
     reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index);

@@ -115,6 +115,62 @@ void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t
     model->order[target] = key;
 }
 
+static int32_t reach_dock_index_collected(const size_t *indices, size_t count, size_t index)
+{
+    for (size_t at = 0; at < count; ++at)
+    {
+        if (indices[at] == index)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+size_t reach_dock_collect_matching_windows(const reach_pinned_app_model *pinned_app,
+                                           const reach_window_snapshot *windows,
+                                           size_t window_count, const uintptr_t *focus_history,
+                                           size_t focus_history_count,
+                                           reach_dock_window_matches_pinned_fn matches,
+                                           void *match_user, size_t *out_indices, size_t cap)
+{
+    if (pinned_app == nullptr || windows == nullptr || matches == nullptr ||
+        out_indices == nullptr || cap == 0)
+    {
+        return 0;
+    }
+
+    size_t count = 0;
+    for (size_t history_index = 0;
+         focus_history != nullptr && history_index < focus_history_count && count < cap;
+         ++history_index)
+    {
+        for (size_t index = 0; index < window_count; ++index)
+        {
+            if (windows[index].id != focus_history[history_index] ||
+                reach_dock_index_collected(out_indices, count, index) ||
+                !matches(match_user, pinned_app, &windows[index]))
+            {
+                continue;
+            }
+            out_indices[count++] = index;
+            break;
+        }
+    }
+
+    for (size_t index = 0; index < window_count && count < cap; ++index)
+    {
+        if (reach_dock_index_collected(out_indices, count, index) ||
+            !matches(match_user, pinned_app, &windows[index]))
+        {
+            continue;
+        }
+        out_indices[count++] = index;
+    }
+
+    return count;
+}
+
 size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_model *model,
                                                    uint32_t pin_id)
 {

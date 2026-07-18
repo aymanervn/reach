@@ -22,6 +22,7 @@ extern "C"
         const reach_rect_f32 *item_slots;
         const uint32_t *item_commands;
         const uint32_t *item_icon_ids;
+        const uint16_t (*item_titles)[260];
         size_t item_count;
         size_t hovered_index;
         size_t target_index;
@@ -31,13 +32,16 @@ extern "C"
         float anchor_x;
         float dpi_scale;
         int32_t text_alignment_leading;
+        int32_t window_list;
+        float hover_opacity;
     } reach_context_menu_render_input;
 
     typedef enum reach_context_menu_pointer_action_kind
     {
         REACH_CONTEXT_MENU_POINTER_ACTION_NONE = 0,
         REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS = 1,
-        REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE = 2
+        REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE = 2,
+        REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW = 3
     } reach_context_menu_pointer_action_kind;
 
     void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
@@ -51,11 +55,14 @@ extern "C"
     {
         int32_t open;
         int32_t power_open;
+        int32_t window_list_open;
         size_t target_index;
         reach_rect_f32 bounds;
         reach_rect_f32 item_slots[REACH_CONTEXT_MENU_MAX_ITEMS];
         uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS];
         uint32_t item_icon_ids[REACH_CONTEXT_MENU_MAX_ITEMS];
+        uintptr_t item_windows[REACH_CONTEXT_MENU_MAX_ITEMS];
+        uint16_t item_titles[REACH_CONTEXT_MENU_MAX_ITEMS][260];
         size_t item_count;
         size_t hovered_index;
 
@@ -63,6 +70,12 @@ extern "C"
         float anchor_popup_width;
         float anchor_ratio;
     } reach_context_menu_state;
+
+    typedef struct reach_context_menu_window_entry
+    {
+        uintptr_t window;
+        const uint16_t *title;
+    } reach_context_menu_window_entry;
 
     typedef struct reach_context_menu reach_context_menu;
 
@@ -86,6 +99,8 @@ extern "C"
         float pointer_y;
         const uint32_t *item_commands;
         size_t item_count;
+        const reach_context_menu_window_entry *window_entries;
+        size_t window_entry_count;
     } reach_context_menu_open_context;
 
     void reach_context_menu_open_power(reach_context_menu *menu,
@@ -95,6 +110,15 @@ extern "C"
                                      const reach_context_menu_open_context *ctx);
     void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_index,
                                           const reach_context_menu_open_context *ctx);
+    void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target_index,
+                                             const reach_context_menu_open_context *ctx);
+
+    int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu);
+    float reach_context_menu_hover_opacity(const reach_context_menu *menu);
+
+    int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
+                                                     reach_rect_f32 anchor_slot, float dock_top_y,
+                                                     float margin, float x, float y);
 
     const reach_context_menu_state *reach_context_menu_state_ptr(reach_context_menu *menu);
 

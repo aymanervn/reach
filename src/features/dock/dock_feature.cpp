@@ -150,6 +150,7 @@ reach_result reach_dock_create(reach_dock **out_animations)
     animations->state.drag.target_index = REACH_MAX_PINNED_APPS;
     animations->state.pressed_index = REACH_MAX_PINNED_APPS;
     animations->state.pressed_control = REACH_DOCK_HIT_NONE;
+    animations->state.hovered_item = REACH_MAX_PINNED_APPS;
     animations->state.feedback_index = REACH_DOCK_FEEDBACK_NONE;
     *out_animations = animations;
     return REACH_OK;
@@ -465,6 +466,53 @@ static void reach_dock_build_items(reach_dock *dock, const reach_pinned_app_mode
                                          reach_dock_window_matches_app_thunk, nullptr);
 }
 
+size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
+                                       const reach_pinned_app_model *pinned_apps,
+                                       size_t pinned_app_count, reach_dock_item_window *out,
+                                       size_t cap)
+{
+    if (dock == nullptr || out == nullptr || cap == 0 ||
+        item_index >= dock->state.model.item_count)
+    {
+        return 0;
+    }
+
+    const reach_dock_item_model *item = &dock->state.model.items[item_index];
+    const reach_window_snapshot *windows = reach_window_tracking_windows(dock->windows);
+    size_t window_count = reach_window_tracking_window_count(dock->windows);
+
+    if (item->pinned && pinned_apps != nullptr && item->pinned_index < pinned_app_count &&
+        windows != nullptr)
+    {
+        size_t indices[16];
+        size_t index_cap = cap < 16 ? cap : 16;
+        size_t count = reach_dock_collect_matching_windows(
+            &pinned_apps[item->pinned_index], windows, window_count,
+            reach_window_tracking_focus_history(dock->windows),
+            reach_window_tracking_focus_history_count(dock->windows),
+            reach_dock_window_matches_app_thunk, nullptr, indices, index_cap);
+        for (size_t at = 0; at < count; ++at)
+        {
+            out[at].window = windows[indices[at]].id;
+            out[at].title = windows[indices[at]].title;
+        }
+        if (count > 0)
+        {
+            return count;
+        }
+    }
+
+    if (item->window == 0)
+    {
+        return 0;
+    }
+    const reach_window_snapshot *window =
+        reach_window_tracking_window_by_id(dock->windows, item->window);
+    out[0].window = item->window;
+    out[0].title = window != nullptr ? window->title : nullptr;
+    return 1;
+}
+
 static void reach_dock_capsule_reset(void *capsule)
 {
     reach_dock *dock = static_cast<reach_dock *>(capsule);
@@ -475,6 +523,7 @@ static void reach_dock_capsule_reset(void *capsule)
         dock->pointer_layout_valid = 0;
         dock->state.pressed_control = REACH_DOCK_HIT_NONE;
         dock->state.power_hovered = 0;
+        dock->state.hovered_item = REACH_MAX_PINNED_APPS;
         reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f);
 
         dock->slots_synced = 0;
@@ -793,6 +842,16 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                 out->handled = 1;
                 out->redraw = 1;
             }
+
+            size_t hovered_item = hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
+                                      ? hit.index
+                                      : REACH_MAX_PINNED_APPS;
+            if (hovered_item != state->hovered_item)
+            {
+                state->hovered_item = hovered_item;
+                out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
+                out->action.index = hovered_item;
+            }
         }
         if (state->drag.active)
         {
@@ -844,6 +903,12 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         out->redraw = out->redraw || reach_dock_feedback_release(dock);
         state->pressed_control = REACH_DOCK_HIT_NONE;
         reach_dock_clear_pressed(dock);
+        if (state->hovered_item != REACH_MAX_PINNED_APPS)
+        {
+            state->hovered_item = REACH_MAX_PINNED_APPS;
+            out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
+            out->action.index = REACH_MAX_PINNED_APPS;
+        }
         reach_dock_capsule_end_pointer_sequence(dock, out);
         return;
     }
@@ -857,6 +922,12 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             reach_animation_manager_animate_to(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f,
                                                0.18, REACH_EASING_EASE_IN_OUT);
             out->redraw = 1;
+        }
+        if (state->hovered_item != REACH_MAX_PINNED_APPS)
+        {
+            state->hovered_item = REACH_MAX_PINNED_APPS;
+            out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
+            out->action.index = REACH_MAX_PINNED_APPS;
         }
     }
 }
