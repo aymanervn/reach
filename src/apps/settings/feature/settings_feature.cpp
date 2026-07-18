@@ -20,6 +20,14 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_animation_manager_init(&model->power_wait_animations, model->power_wait_tracks,
                                  REACH_SETTINGS_POWER_TIMER_COUNT);
     model->power_focused_timer = -1;
+    model->account_focused_field = -1;
+    model->pressed_button = REACH_SETTINGS_HIT_NONE;
+    reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
+    for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
+    {
+        reach_text_edit_init(&model->account_password_edits[field],
+                             REACH_SETTINGS_ACCOUNT_PASSWORD_CAPACITY);
+    }
     for (size_t timer = 0; timer < REACH_SETTINGS_POWER_TIMER_COUNT; ++timer)
     {
         for (size_t field = 0; field < REACH_SETTINGS_POWER_FIELD_COUNT; ++field)
@@ -46,6 +54,57 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
         return;
     }
     model->selected_page = page;
+}
+
+void reach_settings_model_press_button(reach_settings_model *model, int32_t hit_type)
+{
+    if (model == nullptr || hit_type == REACH_SETTINGS_HIT_NONE)
+    {
+        return;
+    }
+    model->pressed_button = hit_type;
+    reach_animation_manager_set(&model->button_press_animation, 0, 1.0f);
+}
+
+void reach_settings_model_release_button(reach_settings_model *model)
+{
+    if (model == nullptr || model->pressed_button == REACH_SETTINGS_HIT_NONE)
+    {
+        return;
+    }
+    float current = reach_animation_manager_value(&model->button_press_animation, 0);
+    reach_animation_manager_start(&model->button_press_animation, 0, current, 0.0f, 0.18,
+                                  REACH_EASING_EASE_OUT);
+}
+
+float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)
+{
+    if (model == nullptr || model->pressed_button != hit_type)
+    {
+        return 0.0f;
+    }
+    return reach_animation_manager_value(&model->button_press_animation, 0);
+}
+
+int32_t reach_settings_model_tick_button_press(reach_settings_model *model, double delta_seconds)
+{
+    if (model == nullptr || !reach_animation_manager_any_active(&model->button_press_animation))
+    {
+        return 0;
+    }
+    reach_animation_manager_tick(&model->button_press_animation, delta_seconds);
+    if (!reach_animation_manager_any_active(&model->button_press_animation) &&
+        reach_animation_manager_value(&model->button_press_animation, 0) <= 0.0f)
+    {
+        model->pressed_button = REACH_SETTINGS_HIT_NONE;
+    }
+    return 1;
+}
+
+int32_t reach_settings_model_button_press_active(const reach_settings_model *model)
+{
+    return model != nullptr &&
+           reach_animation_manager_any_active(&model->button_press_animation);
 }
 
 const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
@@ -327,6 +386,67 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         }
     }
 
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_ACCOUNT)
+    {
+        float area_x = layout.content_title.x;
+        float area_y = layout.content_title.y + layout.content_title.height + 14.0f * scale;
+        float area_width = layout.content.x + layout.content.width - 28.0f * scale - area_x;
+
+        float card_height = 128.0f * scale;
+        layout.account_card = reach_settings_rect(area_x, area_y, area_width, card_height);
+
+        float avatar = 84.0f * scale;
+        layout.account_avatar =
+            reach_settings_rect(area_x + 22.0f * scale, area_y + (card_height - avatar) * 0.5f,
+                                avatar, avatar);
+
+        float text_x = layout.account_avatar.x + avatar + 20.0f * scale;
+        float text_width = area_x + area_width - text_x - 22.0f * scale;
+        layout.account_name =
+            reach_settings_rect(text_x, area_y + 26.0f * scale, text_width, 26.0f * scale);
+        layout.account_user =
+            reach_settings_rect(text_x, area_y + 54.0f * scale, text_width, 16.0f * scale);
+        layout.account_type_badge =
+            reach_settings_rect(text_x, area_y + 78.0f * scale, 118.0f * scale, 24.0f * scale);
+
+        float password_y = area_y + card_height + 12.0f * scale;
+        float password_height = 156.0f * scale;
+        layout.account_password_card =
+            reach_settings_rect(area_x, password_y, area_width, password_height);
+        float icon_box = 30.0f * scale;
+        layout.account_password_icon =
+            reach_settings_rect(area_x + 18.0f * scale, password_y + 16.0f * scale, icon_box,
+                                icon_box);
+        float password_text_x = layout.account_password_icon.x + icon_box + 14.0f * scale;
+        float password_right = area_x + area_width - 18.0f * scale;
+        layout.account_password_title = reach_settings_rect(
+            password_text_x, password_y + 14.0f * scale, password_right - password_text_x,
+            18.0f * scale);
+        layout.account_password_subtitle = reach_settings_rect(
+            password_text_x, password_y + 34.0f * scale, password_right - password_text_x,
+            14.0f * scale);
+        layout.account_password_status = layout.account_password_subtitle;
+
+        float row_y = password_y + 66.0f * scale;
+        float row_height = 32.0f * scale;
+        float field_gap = 10.0f * scale;
+        float fields_x = area_x + 18.0f * scale;
+        float fields_width = password_right - fields_x;
+        float field_width =
+            (fields_width - field_gap * (float)(REACH_SETTINGS_ACCOUNT_FIELD_COUNT - 1)) /
+            (float)REACH_SETTINGS_ACCOUNT_FIELD_COUNT;
+        for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
+        {
+            layout.account_password_fields[field] = reach_settings_rect(
+                fields_x + (float)field * (field_width + field_gap), row_y, field_width,
+                row_height);
+        }
+        float button_width = 96.0f * scale;
+        layout.account_password_button = reach_settings_rect(
+            password_right - button_width, row_y + row_height + 12.0f * scale, button_width,
+            row_height);
+    }
+
     if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
     {
         return layout;
@@ -529,6 +649,22 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
                 }
                 return result;
             }
+        }
+    }
+    if (layout->account_password_button.width > 0.0f &&
+        reach_settings_rect_contains(layout->account_password_button, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
+        return result;
+    }
+    for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
+    {
+        const reach_rect_f32 field_rect = layout->account_password_fields[field];
+        if (field_rect.width > 0.0f && reach_settings_rect_contains(field_rect, x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD;
+            result.account_field = field;
+            return result;
         }
     }
     size_t nav_count = 0;

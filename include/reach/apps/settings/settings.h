@@ -25,6 +25,12 @@ extern "C"
 #define REACH_SETTINGS_POWER_FIELD_HOURS 0
 #define REACH_SETTINGS_POWER_FIELD_MINUTES 1
 #define REACH_SETTINGS_POWER_FIELD_COUNT 2
+#define REACH_SETTINGS_ACCOUNT_NAME_CAPACITY 128
+#define REACH_SETTINGS_ACCOUNT_PASSWORD_CAPACITY 64
+#define REACH_SETTINGS_ACCOUNT_FIELD_CURRENT 0
+#define REACH_SETTINGS_ACCOUNT_FIELD_NEW 1
+#define REACH_SETTINGS_ACCOUNT_FIELD_CONFIRM 2
+#define REACH_SETTINGS_ACCOUNT_FIELD_COUNT 3
 
     typedef enum reach_settings_page
     {
@@ -51,8 +57,21 @@ extern "C"
         REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB,
         REACH_SETTINGS_HIT_POWER_OPTION,
         REACH_SETTINGS_HIT_POWER_APPLY,
-        REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE
+        REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE,
+        REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
+        REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD
     } reach_settings_hit_type;
+
+    typedef enum reach_settings_account_status
+    {
+        REACH_SETTINGS_ACCOUNT_STATUS_NONE = 0,
+        REACH_SETTINGS_ACCOUNT_STATUS_EMPTY,
+        REACH_SETTINGS_ACCOUNT_STATUS_MISMATCH,
+        REACH_SETTINGS_ACCOUNT_STATUS_WRONG_CURRENT,
+        REACH_SETTINGS_ACCOUNT_STATUS_POLICY,
+        REACH_SETTINGS_ACCOUNT_STATUS_ERROR,
+        REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS
+    } reach_settings_account_status;
 
     typedef enum reach_settings_power_timer
     {
@@ -98,6 +117,18 @@ extern "C"
         reach_animation_manager power_animations;
         reach_animation_track power_wait_tracks[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_animation_manager power_wait_animations;
+        uint16_t account_display_name[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY];
+        uint16_t account_user_name[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY];
+        int32_t account_is_admin;
+        uint64_t account_picture;
+        reach_text_edit account_password_edits[REACH_SETTINGS_ACCOUNT_FIELD_COUNT];
+        int32_t account_focused_field;
+        int32_t account_caret_visible;
+        double account_caret_phase;
+        int32_t account_status;
+        int32_t pressed_button;
+        reach_animation_track button_press_track;
+        reach_animation_manager button_press_animation;
     } reach_settings_model;
 
     typedef struct reach_settings_nav_item
@@ -151,6 +182,18 @@ extern "C"
         reach_rect_f32 power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_wait_labels[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_apply_button;
+        reach_rect_f32 account_card;
+        reach_rect_f32 account_avatar;
+        reach_rect_f32 account_name;
+        reach_rect_f32 account_user;
+        reach_rect_f32 account_type_badge;
+        reach_rect_f32 account_password_card;
+        reach_rect_f32 account_password_icon;
+        reach_rect_f32 account_password_title;
+        reach_rect_f32 account_password_subtitle;
+        reach_rect_f32 account_password_status;
+        reach_rect_f32 account_password_fields[REACH_SETTINGS_ACCOUNT_FIELD_COUNT];
+        reach_rect_f32 account_password_button;
         reach_settings_nav_item_layout nav_items[REACH_SETTINGS_NAV_ITEM_COUNT];
         size_t nav_item_count;
     } reach_settings_layout;
@@ -163,6 +206,7 @@ extern "C"
         size_t power_timer;
         size_t power_option;
         size_t power_custom_field;
+        size_t account_field;
     } reach_settings_hit_result;
 
     typedef struct reach_settings_render_input
@@ -216,6 +260,31 @@ extern "C"
     void reach_settings_model_power_mark_applied(reach_settings_model *model);
     int32_t reach_settings_model_tick_power_caret(reach_settings_model *model,
                                                   double delta_seconds);
+
+    void reach_settings_model_set_account(reach_settings_model *model,
+                                          const uint16_t *display_name, const uint16_t *user_name,
+                                          int32_t is_admin, uint64_t picture);
+    const uint16_t *reach_settings_account_type_label(int32_t is_admin);
+    uint16_t reach_settings_account_initial(const reach_settings_model *model);
+    void reach_settings_model_account_focus_password(reach_settings_model *model, size_t field);
+    void reach_settings_model_account_blur(reach_settings_model *model);
+    int32_t reach_settings_model_account_insert_char(reach_settings_model *model, uint16_t ch);
+    int32_t reach_settings_model_account_handle_edit_key(reach_settings_model *model,
+                                                         reach_text_edit_key key,
+                                                         reach_text_edit_modifiers modifiers);
+    int32_t reach_settings_model_account_submit_ready(reach_settings_model *model);
+    void reach_settings_model_account_apply_status(reach_settings_model *model, int32_t status);
+    int32_t reach_settings_model_tick_account_caret(reach_settings_model *model,
+                                                    double delta_seconds);
+    const uint16_t *reach_settings_account_status_message(int32_t status);
+
+    void reach_settings_model_press_button(reach_settings_model *model, int32_t hit_type);
+    void reach_settings_model_release_button(reach_settings_model *model);
+    float reach_settings_model_button_press_value(const reach_settings_model *model,
+                                                  int32_t hit_type);
+    int32_t reach_settings_model_tick_button_press(reach_settings_model *model,
+                                                   double delta_seconds);
+    int32_t reach_settings_model_button_press_active(const reach_settings_model *model);
 
     int32_t
     reach_windows_update_matches_security_maintenance(const reach_windows_update_item *update);

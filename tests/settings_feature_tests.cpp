@@ -361,6 +361,131 @@ static void test_power_wait_apps_toggle(void)
                 "setting the lock row wait flag is ignored");
 }
 
+static void test_account_model_and_layout(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    expect_true(reach_settings_account_initial(model.get()) == (uint16_t)'?',
+                "missing account name falls back to placeholder initial");
+
+    uint16_t display[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY] = {};
+    uint16_t user[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY] = {};
+    copy_ascii(display, REACH_SETTINGS_ACCOUNT_NAME_CAPACITY, "aymane");
+    copy_ascii(user, REACH_SETTINGS_ACCOUNT_NAME_CAPACITY, "aymane");
+    reach_settings_model_set_account(model.get(), display, user, 1, 42);
+    expect_true(equals_ascii(model->account_display_name, "aymane"),
+                "account display name is stored");
+    expect_true(model->account_is_admin == 1 && model->account_picture == 42,
+                "account type and picture are stored");
+    expect_true(reach_settings_account_initial(model.get()) == (uint16_t)'A',
+                "account initial is uppercased");
+    expect_true(equals_ascii(reach_settings_account_type_label(1), "Administrator"),
+                "admin account is labelled Administrator");
+    expect_true(equals_ascii(reach_settings_account_type_label(0), "Standard user"),
+                "non-admin account is labelled Standard user");
+
+    reach_rect_f32 bounds = {0.0f, 0.0f, 900.0f, 600.0f};
+    reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_ACCOUNT);
+    reach_settings_layout layout =
+        reach_settings_layout_for_bounds(bounds, nullptr, 1.0f, model.get());
+    expect_true(layout.account_card.width > 0.0f && layout.account_avatar.width > 0.0f,
+                "account page lays out the profile card");
+    expect_true(layout.account_password_button.width > 0.0f,
+                "account page lays out the change password button");
+
+    reach_settings_hit_result hit = reach_settings_hit_test(
+        &layout, layout.account_password_button.x + 1.0f, layout.account_password_button.y + 1.0f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
+                "change password button is hit-testable");
+
+    hit = reach_settings_hit_test(
+        &layout, layout.account_password_fields[REACH_SETTINGS_ACCOUNT_FIELD_NEW].x + 1.0f,
+        layout.account_password_fields[REACH_SETTINGS_ACCOUNT_FIELD_NEW].y + 1.0f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD &&
+                    hit.account_field == REACH_SETTINGS_ACCOUNT_FIELD_NEW,
+                "password fields are hit-testable");
+
+    reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_WIFI);
+    layout = reach_settings_layout_for_bounds(bounds, nullptr, 1.0f, model.get());
+    hit = reach_settings_hit_test(&layout, 500.0f, 300.0f);
+    expect_true(hit.type != REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
+                "account controls are absent on other pages");
+}
+
+static void test_account_password_form(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    expect_true(model->account_focused_field < 0, "password fields start unfocused");
+
+    expect_true(!reach_settings_model_account_insert_char(model.get(), (uint16_t)'a'),
+                "typing without focus is ignored");
+    expect_true(!reach_settings_model_account_submit_ready(model.get()),
+                "empty new password cannot be submitted");
+    expect_true(model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_EMPTY,
+                "empty submit reports the empty status");
+
+    reach_settings_model_account_focus_password(model.get(), REACH_SETTINGS_ACCOUNT_FIELD_NEW);
+    expect_true(model->account_focused_field == REACH_SETTINGS_ACCOUNT_FIELD_NEW,
+                "field focus is tracked");
+    expect_true(model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_NONE,
+                "focusing a field clears the status");
+    reach_settings_model_account_insert_char(model.get(), (uint16_t)'x');
+    reach_settings_model_account_focus_password(model.get(), REACH_SETTINGS_ACCOUNT_FIELD_CONFIRM);
+    reach_settings_model_account_insert_char(model.get(), (uint16_t)'y');
+    expect_true(!reach_settings_model_account_submit_ready(model.get()),
+                "mismatched confirmation cannot be submitted");
+    expect_true(model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_MISMATCH,
+                "mismatch reports the mismatch status");
+
+    reach_settings_model_account_focus_password(model.get(), REACH_SETTINGS_ACCOUNT_FIELD_CONFIRM);
+    reach_settings_model_account_insert_char(model.get(), (uint16_t)'x');
+    expect_true(reach_settings_model_account_submit_ready(model.get()),
+                "matching passwords can be submitted");
+
+    reach_settings_model_account_apply_status(model.get(),
+                                              REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS);
+    expect_true(model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS &&
+                    model->account_password_edits[REACH_SETTINGS_ACCOUNT_FIELD_NEW].length == 0 &&
+                    model->account_focused_field < 0,
+                "successful change clears and blurs the form");
+    expect_true(equals_ascii(reach_settings_account_status_message(
+                                 REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS),
+                             "Password changed"),
+                "success status has a message");
+}
+
+static void test_button_press_feedback(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    expect_true(reach_settings_model_button_press_value(model.get(),
+                                                        REACH_SETTINGS_HIT_POWER_APPLY) == 0.0f,
+                "buttons start unpressed");
+
+    reach_settings_model_press_button(model.get(), REACH_SETTINGS_HIT_POWER_APPLY);
+    expect_true(reach_settings_model_button_press_value(model.get(),
+                                                        REACH_SETTINGS_HIT_POWER_APPLY) == 1.0f,
+                "pressed button reports full press");
+    expect_true(reach_settings_model_button_press_value(
+                    model.get(), REACH_SETTINGS_HIT_ACCOUNT_PASSWORD) == 0.0f,
+                "other buttons stay unpressed");
+
+    reach_settings_model_release_button(model.get());
+    expect_true(reach_settings_model_button_press_active(model.get()),
+                "release starts the fade animation");
+    reach_settings_model_tick_button_press(model.get(), 0.05);
+    float mid = reach_settings_model_button_press_value(model.get(),
+                                                        REACH_SETTINGS_HIT_POWER_APPLY);
+    expect_true(mid > 0.0f && mid < 1.0f, "press fades out gradually");
+    reach_settings_model_tick_button_press(model.get(), 0.5);
+    expect_true(reach_settings_model_button_press_value(model.get(),
+                                                        REACH_SETTINGS_HIT_POWER_APPLY) == 0.0f,
+                "press fade completes");
+    expect_true(model->pressed_button == REACH_SETTINGS_HIT_NONE,
+                "completed fade clears the pressed button");
+}
+
 int main(void)
 {
     test_policy();
@@ -373,5 +498,8 @@ int main(void)
     test_power_apply_tracking();
     test_power_custom_textbox();
     test_power_wait_apps_toggle();
+    test_account_model_and_layout();
+    test_account_password_form();
+    test_button_press_feedback();
     return failures == 0 ? 0 : 1;
 }

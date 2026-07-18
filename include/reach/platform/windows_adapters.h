@@ -18,6 +18,7 @@
 #include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
+#include "reach/ports/user_account.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
@@ -56,6 +57,7 @@ extern "C"
     reach_result reach_windows_create_system_controls(reach_system_controls_port *out_port);
     reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *out_port);
     reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
+    reach_result reach_windows_create_user_account(reach_user_account_port *out_port);
     reach_result reach_windows_create_explorer_desktop_compat_host(void);
     void reach_windows_destroy_explorer_desktop_compat_host(void);
     void reach_windows_notify_desktop_environment_changed(void);

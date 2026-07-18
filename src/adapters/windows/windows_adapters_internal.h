@@ -18,6 +18,7 @@
 #include "reach/ports/settings_launcher.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
+#include "reach/ports/user_account.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
@@ -88,6 +89,7 @@ extern "C"
     void reach_windows_notify_desktop_environment_changed(void);
     void reach_windows_request_desktop_environment_sync(void);
     reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
+    reach_result reach_windows_create_user_account(reach_user_account_port *out_port);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
     size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
                                               size_t capacity);

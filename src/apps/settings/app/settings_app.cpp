@@ -49,6 +49,7 @@ struct reach_settings_app
     reach_power_session_port power_session;
     reach_windows_update_port windows_update;
     reach_config_store_port config_store;
+    reach_user_account_port user_account;
     reach_settings_model model;
     reach_settings_layout layout;
     reach_render_command_buffer render_commands;
@@ -639,8 +640,60 @@ static void reach_settings_apply_result(reach_settings_app *app)
     app->dirty = 1;
 }
 
+static void reach_settings_submit_password_change(reach_settings_app *app)
+{
+    if (app->user_account.ops.verify_password != nullptr)
+    {
+        int32_t current_valid = 1;
+        if (app->user_account.ops.verify_password(
+                app->user_account.account,
+                app->model.account_password_edits[REACH_SETTINGS_ACCOUNT_FIELD_CURRENT].text,
+                &current_valid) == REACH_OK &&
+            !current_valid)
+        {
+            reach_settings_model_account_apply_status(
+                &app->model, REACH_SETTINGS_ACCOUNT_STATUS_WRONG_CURRENT);
+            return;
+        }
+    }
+    if (!reach_settings_model_account_submit_ready(&app->model))
+    {
+        return;
+    }
+    if (app->user_account.ops.change_password == nullptr)
+    {
+        reach_settings_model_account_apply_status(&app->model,
+                                                  REACH_SETTINGS_ACCOUNT_STATUS_ERROR);
+        return;
+    }
+    reach_user_account_password_status status = REACH_USER_ACCOUNT_PASSWORD_FAILED;
+    reach_result result = app->user_account.ops.change_password(
+        app->user_account.account,
+        app->model.account_password_edits[REACH_SETTINGS_ACCOUNT_FIELD_CURRENT].text,
+        app->model.account_password_edits[REACH_SETTINGS_ACCOUNT_FIELD_NEW].text, &status);
+    int32_t model_status = REACH_SETTINGS_ACCOUNT_STATUS_ERROR;
+    if (result == REACH_OK && status == REACH_USER_ACCOUNT_PASSWORD_CHANGED)
+    {
+        model_status = REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS;
+    }
+    else if (status == REACH_USER_ACCOUNT_PASSWORD_WRONG_CURRENT)
+    {
+        model_status = REACH_SETTINGS_ACCOUNT_STATUS_WRONG_CURRENT;
+    }
+    else if (status == REACH_USER_ACCOUNT_PASSWORD_POLICY)
+    {
+        model_status = REACH_SETTINGS_ACCOUNT_STATUS_POLICY;
+    }
+    reach_settings_model_account_apply_status(&app->model, model_status);
+}
+
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
+    if (app->model.pressed_button != REACH_SETTINGS_HIT_NONE)
+    {
+        reach_settings_model_release_button(&app->model);
+        app->dirty = 1;
+    }
     if (app->update_scrollbar_drag.active)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
@@ -693,6 +746,22 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             app->dirty = 1;
         }
     }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_ACCOUNT)
+    {
+        if (hit.type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD)
+        {
+            reach_settings_model_account_focus_password(&app->model, hit.account_field);
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD)
+        {
+            reach_settings_submit_password_change(app);
+        }
+        else
+        {
+            reach_settings_model_account_blur(&app->model);
+        }
+        app->dirty = 1;
+    }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
     {
         if (hit.type == REACH_SETTINGS_HIT_POWER_OPTION)
@@ -731,57 +800,78 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     }
 }
 
+static reach_text_edit_key reach_settings_map_edit_key(const reach_ui_event *event,
+                                                       int32_t *out_select_all)
+{
+    *out_select_all = 0;
+    switch ((reach_ui_edit_key)event->id)
+    {
+    case REACH_UI_EDIT_KEY_BACKSPACE:
+        return REACH_TEXT_EDIT_KEY_BACKSPACE;
+    case REACH_UI_EDIT_KEY_DELETE:
+        return REACH_TEXT_EDIT_KEY_DELETE;
+    case REACH_UI_EDIT_KEY_LEFT:
+        return REACH_TEXT_EDIT_KEY_LEFT;
+    case REACH_UI_EDIT_KEY_RIGHT:
+        return REACH_TEXT_EDIT_KEY_RIGHT;
+    case REACH_UI_EDIT_KEY_HOME:
+        return REACH_TEXT_EDIT_KEY_HOME;
+    case REACH_UI_EDIT_KEY_END:
+        return REACH_TEXT_EDIT_KEY_END;
+    case REACH_UI_EDIT_KEY_SELECT_ALL:
+        *out_select_all = 1;
+        return REACH_TEXT_EDIT_KEY_NONE;
+    case REACH_UI_EDIT_KEY_NONE:
+    default:
+        return REACH_TEXT_EDIT_KEY_NONE;
+    }
+}
+
 static void reach_settings_handle_text_event(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app->model.selected_page != REACH_SETTINGS_PAGE_POWER_SLEEP ||
-        app->model.power_focused_timer < 0)
+    int32_t power_focused = app->model.selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP &&
+                            app->model.power_focused_timer >= 0;
+    int32_t account_focused = app->model.selected_page == REACH_SETTINGS_PAGE_ACCOUNT &&
+                              app->model.account_focused_field >= 0;
+    if (!power_focused && !account_focused)
     {
         return;
     }
     int32_t handled = 0;
     if (event->type == REACH_UI_EVENT_TEXT_CHAR)
     {
-        handled = reach_settings_model_power_insert_char(&app->model, (uint16_t)event->id);
+        handled = power_focused
+                      ? reach_settings_model_power_insert_char(&app->model, (uint16_t)event->id)
+                      : reach_settings_model_account_insert_char(&app->model, (uint16_t)event->id);
     }
     else
     {
         reach_text_edit_modifiers modifiers = {};
         modifiers.shift = (event->modifiers & REACH_UI_EVENT_MODIFIER_SHIFT) ? 1 : 0;
         modifiers.ctrl = (event->modifiers & REACH_UI_EVENT_MODIFIER_CTRL) ? 1 : 0;
-        reach_text_edit_key key = REACH_TEXT_EDIT_KEY_NONE;
-        switch ((reach_ui_edit_key)event->id)
+        int32_t select_all = 0;
+        reach_text_edit_key key = reach_settings_map_edit_key(event, &select_all);
+        if (select_all)
         {
-        case REACH_UI_EDIT_KEY_BACKSPACE:
-            key = REACH_TEXT_EDIT_KEY_BACKSPACE;
-            break;
-        case REACH_UI_EDIT_KEY_DELETE:
-            key = REACH_TEXT_EDIT_KEY_DELETE;
-            break;
-        case REACH_UI_EDIT_KEY_LEFT:
-            key = REACH_TEXT_EDIT_KEY_LEFT;
-            break;
-        case REACH_UI_EDIT_KEY_RIGHT:
-            key = REACH_TEXT_EDIT_KEY_RIGHT;
-            break;
-        case REACH_UI_EDIT_KEY_HOME:
-            key = REACH_TEXT_EDIT_KEY_HOME;
-            break;
-        case REACH_UI_EDIT_KEY_END:
-            key = REACH_TEXT_EDIT_KEY_END;
-            break;
-        case REACH_UI_EDIT_KEY_SELECT_ALL:
-            reach_text_edit_select_all(
-                &app->model.power_custom_edits[app->model.power_focused_timer]
-                                              [app->model.power_focused_field]);
+            if (power_focused)
+            {
+                reach_text_edit_select_all(
+                    &app->model.power_custom_edits[app->model.power_focused_timer]
+                                                  [app->model.power_focused_field]);
+            }
+            else
+            {
+                reach_text_edit_select_all(
+                    &app->model.account_password_edits[app->model.account_focused_field]);
+            }
             handled = 1;
-            break;
-        case REACH_UI_EDIT_KEY_NONE:
-        default:
-            break;
         }
         if (key != REACH_TEXT_EDIT_KEY_NONE)
         {
-            handled = reach_settings_model_power_handle_edit_key(&app->model, key, modifiers);
+            handled = power_focused
+                          ? reach_settings_model_power_handle_edit_key(&app->model, key, modifiers)
+                          : reach_settings_model_account_handle_edit_key(&app->model, key,
+                                                                         modifiers);
         }
     }
     if (handled)
@@ -790,10 +880,16 @@ static void reach_settings_handle_text_event(reach_settings_app *app, const reac
     }
 }
 
+static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
+{
+    return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
+           type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_POWER_APPLY ||
+           type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
+}
+
 static void reach_settings_handle_pointer_down(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app == nullptr || event == nullptr ||
-        app->model.selected_page != REACH_SETTINGS_PAGE_UPDATE)
+    if (app == nullptr || event == nullptr)
     {
         return;
     }
@@ -801,6 +897,15 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
+    if (reach_settings_hit_is_button(hit.type))
+    {
+        reach_settings_model_press_button(&app->model, hit.type);
+        app->dirty = 1;
+    }
+    if (app->model.selected_page != REACH_SETTINGS_PAGE_UPDATE)
+    {
+        return;
+    }
     if (hit.type != REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK &&
         hit.type != REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB)
     {
@@ -854,6 +959,11 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     else if (event->type == REACH_UI_EVENT_POINTER_CANCEL)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
+        if (app->model.pressed_button != REACH_SETTINGS_HIT_NONE)
+        {
+            reach_settings_model_release_button(&app->model);
+            app->dirty = 1;
+        }
     }
     else if (event->type == REACH_UI_EVENT_TEXT_CHAR || event->type == REACH_UI_EVENT_TEXT_EDIT)
     {
@@ -864,6 +974,18 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         if (app->model.power_focused_timer >= 0)
         {
             reach_settings_model_power_blur(&app->model);
+            app->dirty = 1;
+        }
+        if (app->model.account_focused_field >= 0)
+        {
+            if (event->type == REACH_UI_EVENT_ENTER)
+            {
+                reach_settings_submit_password_change(app);
+            }
+            else
+            {
+                reach_settings_model_account_blur(&app->model);
+            }
             app->dirty = 1;
         }
     }
@@ -927,6 +1049,17 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     {
         reach_settings_app_destroy(app);
         return result;
+    }
+
+    if (reach_windows_create_user_account(&app->user_account) == REACH_OK &&
+        app->user_account.ops.query != nullptr)
+    {
+        reach_user_account_info info = {};
+        if (app->user_account.ops.query(app->user_account.account, &info) == REACH_OK)
+        {
+            reach_settings_model_set_account(&app->model, info.display_name, info.user_name,
+                                             info.is_administrator, info.picture_icon_id);
+        }
     }
 
     uint16_t config_path[260] = {};
@@ -993,6 +1126,14 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    if (reach_settings_model_tick_account_caret(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_tick_button_press(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
     if (app->dirty)
     {
         reach_settings_refresh_bounds(app);
@@ -1036,7 +1177,8 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
            app->update_scrollbar_drag.active ||
            reach_settings_model_power_animations_active(&app->model) ||
-           app->model.power_focused_timer >= 0;
+           reach_settings_model_button_press_active(&app->model) ||
+           app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0;
 }
 
 int32_t reach_settings_app_running(const reach_settings_app *app)
@@ -1079,6 +1221,10 @@ void reach_settings_app_destroy(reach_settings_app *app)
     if (app->config_store.ops.destroy != nullptr)
     {
         app->config_store.ops.destroy(app->config_store.store);
+    }
+    if (app->user_account.ops.destroy != nullptr)
+    {
+        app->user_account.ops.destroy(app->user_account.account);
     }
     if (app->power_session.ops.destroy != nullptr)
     {
