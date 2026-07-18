@@ -144,6 +144,135 @@ static reach_ui_selection_item_style settings_pill_style(const reach_settings_re
     return style;
 }
 
+static void push_avatar_image(reach_render_command_buffer *commands, reach_rect_f32 rect,
+                              uint64_t icon_id)
+{
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_ICON;
+    command.rect = rect;
+    command.radius = rect.width * 0.5f;
+    command.icon_id = icon_id;
+    command.icon_crop_to_fill = 1;
+    command.color = {1.0f, 1.0f, 1.0f, 1.0f};
+    (void)reach_render_command_buffer_push(commands, &command);
+}
+
+static void render_account_page(const reach_settings_render_input *input,
+                                reach_render_command_buffer *commands)
+{
+    const reach_settings_model *model = input->model;
+    const reach_settings_layout *layout = input->layout;
+    reach_color accent = {0.31f, 0.78f, 0.86f, 1.0f};
+
+    push_rect(commands, layout->account_card, scale_value(input, 10.0f),
+              {0.12f, 0.15f, 0.18f, 0.82f});
+
+    const reach_rect_f32 avatar = layout->account_avatar;
+    if (model->account_picture != 0)
+    {
+        push_avatar_image(commands, avatar, model->account_picture);
+    }
+    else
+    {
+        push_rect(commands, avatar, avatar.width * 0.5f, color_with_alpha(accent, 0.22f));
+        uint16_t initial[2] = {reach_settings_account_initial(model), 0};
+        push_text(commands, avatar, initial, avatar.width * 0.42f, REACH_TEXT_WEIGHT_DEMIBOLD,
+                  REACH_TEXT_ALIGNMENT_CENTER, accent, 0);
+    }
+    reach_rect_f32 ring = {avatar.x - scale_value(input, 3.0f), avatar.y - scale_value(input, 3.0f),
+                           avatar.width + scale_value(input, 6.0f),
+                           avatar.height + scale_value(input, 6.0f)};
+    push_stroke(commands, ring, ring.width * 0.5f, scale_value(input, 1.5f),
+                color_with_alpha(accent, 0.55f));
+
+    const uint16_t *display_name = model->account_display_name[0] != 0
+                                       ? model->account_display_name
+                                       : (const uint16_t *)L"Windows user";
+    push_text(commands, layout->account_name, display_name, scale_value(input, 20.0f),
+              REACH_TEXT_WEIGHT_DEMIBOLD, input->text_alignment_leading,
+              input->theme->settings_text, 1);
+    if (model->account_user_name[0] != 0)
+    {
+        push_text(commands, layout->account_user, model->account_user_name,
+                  scale_value(input, 11.5f), REACH_TEXT_WEIGHT_NORMAL,
+                  input->text_alignment_leading, input->theme->settings_secondary_text, 1);
+    }
+    reach_ui_selection_item_style badge_style = settings_pill_style(input, accent);
+    reach_ui_selection_item_render(commands, layout->account_type_badge,
+                                   reach_settings_account_type_label(model->account_is_admin),
+                                   &badge_style, 1.0f);
+
+    push_rect(commands, layout->account_password_card, scale_value(input, 10.0f),
+              {0.12f, 0.15f, 0.18f, 0.82f});
+    push_rect(commands, layout->account_password_icon, scale_value(input, 8.0f),
+              color_with_alpha(accent, 0.18f));
+    push_icon(commands, layout->account_password_icon, accent, REACH_VECTOR_ICON_LOCK, 0.22f);
+    push_text(commands, layout->account_password_title, (const uint16_t *)L"Password",
+              scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+              input->theme->settings_text, 1);
+    push_text(commands, layout->account_password_subtitle,
+              (const uint16_t *)L"Change the password you use to sign in to Windows",
+              scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+              input->theme->settings_secondary_text, 1);
+
+    if (model->account_status != REACH_SETTINGS_ACCOUNT_STATUS_NONE)
+    {
+        reach_color status_color = model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS
+                                       ? reach_color{0.25f, 0.86f, 0.48f, 1.0f}
+                                       : reach_color{0.96f, 0.38f, 0.34f, 1.0f};
+        push_text(commands, layout->account_password_status,
+                  reach_settings_account_status_message(model->account_status),
+                  scale_value(input, 10.5f), REACH_TEXT_WEIGHT_SEMIBOLD,
+                  REACH_TEXT_ALIGNMENT_TRAILING, status_color, 1);
+    }
+
+    static const uint16_t *placeholders[REACH_SETTINGS_ACCOUNT_FIELD_COUNT] = {
+        (const uint16_t *)L"Current password", (const uint16_t *)L"New password",
+        (const uint16_t *)L"Confirm password"};
+    reach_ui_selection_item_style field_style = settings_pill_style(input, accent);
+    for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
+    {
+        const reach_text_edit *edit = &model->account_password_edits[field];
+        int32_t focused = model->account_focused_field == (int32_t)field;
+
+        const reach_rect_f32 field_rect = layout->account_password_fields[field];
+        reach_ui_selection_item_backdrop_render(commands, field_rect, &field_style,
+                                                focused ? 1.0f : 0.0f);
+
+        uint16_t masked[REACH_SETTINGS_ACCOUNT_PASSWORD_CAPACITY + 1] = {};
+        for (size_t index = 0; index < edit->length; ++index)
+        {
+            masked[index] = 0x2022;
+        }
+
+        reach_ui_textbox_state state = {};
+        state.text = masked;
+        state.placeholder = placeholders[field];
+        state.text_alignment = input->text_alignment_leading;
+        state.caret_index = edit->caret;
+        state.caret_visible = focused && model->account_caret_visible;
+        reach_text_edit_selection_range(edit, &state.selection_start, &state.selection_end);
+        if (!focused)
+        {
+            state.selection_start = 0;
+            state.selection_end = 0;
+        }
+        state.text_color = input->theme->settings_text;
+        state.placeholder_color = color_with_alpha(input->theme->settings_secondary_text, 0.55f);
+        state.selection_color = color_with_alpha(accent, 0.30f);
+        float text_inset = scale_value(input, 13.0f);
+        reach_rect_f32 text_rect = {field_rect.x + text_inset, field_rect.y,
+                                    field_rect.width - text_inset * 2.0f, field_rect.height};
+        reach_ui_textbox_render(commands, text_rect, &field_style, focused ? 1.0f : 0.0f, &state);
+    }
+
+    reach_ui_button_style change_style = settings_button_style(input, {0.12f, 0.43f, 0.62f, 1.0f});
+    reach_ui_button_render(commands, layout->account_password_button, (const uint16_t *)L"Change",
+                           &change_style, 1,
+                           reach_settings_model_button_press_value(
+                               model, REACH_SETTINGS_HIT_ACCOUNT_PASSWORD));
+}
+
 static void render_power_page(const reach_settings_render_input *input,
                               reach_render_command_buffer *commands)
 {
@@ -261,7 +390,9 @@ static void render_power_page(const reach_settings_render_input *input,
     reach_ui_button_style apply_style =
         settings_button_style(input, {0.12f, 0.43f, 0.62f, 1.0f});
     reach_ui_button_render(commands, layout->power_apply_button, (const uint16_t *)L"Apply",
-                           &apply_style, reach_settings_model_power_dirty(model));
+                           &apply_style, reach_settings_model_power_dirty(model),
+                           reach_settings_model_button_press_value(model,
+                                                                   REACH_SETTINGS_HIT_POWER_APPLY));
 }
 
 static void render_update_page(const reach_settings_render_input *input,
@@ -283,15 +414,21 @@ static void render_update_page(const reach_settings_render_input *input,
         settings_button_style(input, {0.16f, 0.58f, 0.30f, 1.0f});
     refresh_style.disabled_text = input->theme->settings_text;
     reach_ui_button_render(commands, layout->update_refresh_button, scan_button_text,
-                           &refresh_style, !busy);
+                           &refresh_style, !busy,
+                           reach_settings_model_button_press_value(
+                               model, REACH_SETTINGS_HIT_UPDATE_REFRESH));
     reach_ui_button_style install_style =
         settings_button_style(input, {0.12f, 0.43f, 0.62f, 1.0f});
     reach_ui_button_render(commands, layout->update_install_button,
-                           (const uint16_t *)u"Install selected", &install_style, install_enabled);
+                           (const uint16_t *)u"Install selected", &install_style, install_enabled,
+                           reach_settings_model_button_press_value(
+                               model, REACH_SETTINGS_HIT_UPDATE_INSTALL));
     reach_ui_button_style restart_style =
         settings_button_style(input, {0.78f, 0.20f, 0.20f, 1.0f});
     reach_ui_button_render(commands, layout->update_restart_button,
-                           (const uint16_t *)u"Restart now", &restart_style, restart_enabled);
+                           (const uint16_t *)u"Restart now", &restart_style, restart_enabled,
+                           reach_settings_model_button_press_value(
+                               model, REACH_SETTINGS_HIT_UPDATE_RESTART));
 
     reach_rect_f32 update_status_message = layout->update_viewport;
     update_status_message.y = layout->content_title.y + layout->content_title.height;
@@ -443,6 +580,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         render_update_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
         render_power_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_ACCOUNT)
+        render_account_page(input, commands);
     else
         push_text(commands, input->layout->content_placeholder,
                   reach_settings_page_placeholder(input->model->selected_page),

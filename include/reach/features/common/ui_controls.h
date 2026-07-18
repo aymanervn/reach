@@ -55,7 +55,7 @@ extern "C"
 
     void reach_ui_button_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                                 const uint16_t *label, const reach_ui_button_style *style,
-                                int32_t enabled);
+                                int32_t enabled, float pressed);
 
     void reach_ui_selection_item_backdrop_render(reach_render_command_buffer *commands,
                                                  reach_rect_f32 bounds,

@@ -59,14 +59,28 @@ static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect
 
 void reach_ui_button_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                             const uint16_t *label, const reach_ui_button_style *style,
-                            int32_t enabled)
+                            int32_t enabled, float pressed)
 {
     if (commands == nullptr || style == nullptr)
     {
         return;
     }
-    reach_ui_push_rect(commands, bounds, style->radius,
-                       enabled ? style->background : style->disabled_background);
+    if (pressed < 0.0f)
+    {
+        pressed = 0.0f;
+    }
+    if (pressed > 1.0f)
+    {
+        pressed = 1.0f;
+    }
+    reach_color background = enabled ? style->background : style->disabled_background;
+    if (enabled && pressed > 0.0f)
+    {
+        reach_color darkened = {background.r * 0.65f, background.g * 0.65f, background.b * 0.65f,
+                                background.a};
+        background = reach_ui_color_mix(background, darkened, pressed);
+    }
+    reach_ui_push_rect(commands, bounds, style->radius, background);
     reach_ui_push_text(commands, bounds, label, style->text_size, style->text_weight,
                        REACH_TEXT_ALIGNMENT_CENTER, enabled ? style->text : style->disabled_text);
 }
