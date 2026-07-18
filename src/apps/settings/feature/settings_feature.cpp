@@ -103,8 +103,7 @@ int32_t reach_settings_model_tick_button_press(reach_settings_model *model, doub
 
 int32_t reach_settings_model_button_press_active(const reach_settings_model *model)
 {
-    return model != nullptr &&
-           reach_animation_manager_any_active(&model->button_press_animation);
+    return model != nullptr && reach_animation_manager_any_active(&model->button_press_animation);
 }
 
 const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
@@ -135,9 +134,9 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
          (const uint16_t *)L"Power and Sleep",
          {0.95f, 0.55f, 0.22f, 1.0f},
          {0.95f, 0.55f, 0.22f, 0.20f}},
-        {REACH_SETTINGS_PAGE_MONITORS_SCALING,
+        {REACH_SETTINGS_PAGE_DISPLAY,
          REACH_VECTOR_ICON_RESIZE,
-         (const uint16_t *)L"Monitors and Scaling",
+         (const uint16_t *)L"Display",
          {0.97f, 0.75f, 0.22f, 1.0f},
          {0.97f, 0.75f, 0.22f, 0.20f}},
         {REACH_SETTINGS_PAGE_UPDATE,
@@ -168,8 +167,8 @@ const uint16_t *reach_settings_page_title(reach_settings_page page)
         return reach_settings_startup_apps_page_title();
     case REACH_SETTINGS_PAGE_POWER_SLEEP:
         return reach_settings_power_sleep_page_title();
-    case REACH_SETTINGS_PAGE_MONITORS_SCALING:
-        return reach_settings_monitors_scaling_page_title();
+    case REACH_SETTINGS_PAGE_DISPLAY:
+        return reach_settings_display_page_title();
     case REACH_SETTINGS_PAGE_UPDATE:
         return reach_settings_update_page_title();
     default:
@@ -191,8 +190,8 @@ const uint16_t *reach_settings_page_placeholder(reach_settings_page page)
         return reach_settings_startup_apps_page_placeholder();
     case REACH_SETTINGS_PAGE_POWER_SLEEP:
         return reach_settings_power_sleep_page_placeholder();
-    case REACH_SETTINGS_PAGE_MONITORS_SCALING:
-        return reach_settings_monitors_scaling_page_placeholder();
+    case REACH_SETTINGS_PAGE_DISPLAY:
+        return reach_settings_display_page_placeholder();
     case REACH_SETTINGS_PAGE_UPDATE:
         return (const uint16_t *)L"";
     default:
@@ -300,9 +299,9 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         float apply_height = 34.0f * scale;
         float apply_gap = 12.0f * scale;
         float apply_width = 104.0f * scale;
-        layout.power_apply_button = reach_settings_rect(
-            area_x + area_width - apply_width, area_bottom - apply_height, apply_width,
-            apply_height);
+        layout.power_apply_button =
+            reach_settings_rect(area_x + area_width - apply_width, area_bottom - apply_height,
+                                apply_width, apply_height);
         area_bottom -= apply_height + apply_gap;
         float card_gap = 10.0f * scale;
         float card_height = 104.0f * scale;
@@ -310,9 +309,9 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                        card_gap * (float)(REACH_SETTINGS_POWER_TIMER_COUNT - 1);
         if (needed > area_bottom - area_y)
         {
-            card_height = (area_bottom - area_y -
-                           card_gap * (float)(REACH_SETTINGS_POWER_TIMER_COUNT - 1)) /
-                          (float)REACH_SETTINGS_POWER_TIMER_COUNT;
+            card_height =
+                (area_bottom - area_y - card_gap * (float)(REACH_SETTINGS_POWER_TIMER_COUNT - 1)) /
+                (float)REACH_SETTINGS_POWER_TIMER_COUNT;
             if (card_height < 74.0f * scale)
             {
                 card_height = 74.0f * scale;
@@ -327,10 +326,9 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         {
             layout.power_cards[timer] =
                 reach_settings_rect(area_x, card_y, area_width, card_height);
-            layout.power_icon_boxes[timer] =
-                reach_settings_rect(area_x + 16.0f * scale,
-                                    card_y + (show_subtitle ? 12.0f : 7.0f) * scale, icon_box,
-                                    icon_box);
+            layout.power_icon_boxes[timer] = reach_settings_rect(
+                area_x + 16.0f * scale, card_y + (show_subtitle ? 12.0f : 7.0f) * scale, icon_box,
+                icon_box);
             float text_x = area_x + 16.0f * scale + icon_box + 12.0f * scale;
             float text_width = area_x + area_width - text_x - 16.0f * scale;
             if (reach_settings_power_timer_supports_wait(timer))
@@ -342,9 +340,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                 layout.power_wait_toggles[timer] =
                     reach_settings_rect(toggle_x, toggle_y, toggle_width, toggle_height);
                 float label_width = 216.0f * scale;
-                layout.power_wait_labels[timer] =
-                    reach_settings_rect(toggle_x - 8.0f * scale - label_width, toggle_y,
-                                        label_width, toggle_height);
+                layout.power_wait_labels[timer] = reach_settings_rect(
+                    toggle_x - 8.0f * scale - label_width, toggle_y, label_width, toggle_height);
                 float title_max = layout.power_wait_labels[timer].x - text_x - 12.0f * scale;
                 if (text_width > title_max)
                 {
@@ -352,12 +349,11 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                 }
             }
             layout.power_titles[timer] = reach_settings_rect(
-                text_x, card_y + (show_subtitle ? 10.0f : 7.0f) * scale, text_width,
-                18.0f * scale);
+                text_x, card_y + (show_subtitle ? 10.0f : 7.0f) * scale, text_width, 18.0f * scale);
             if (show_subtitle)
             {
-                layout.power_subtitles[timer] = reach_settings_rect(
-                    text_x, card_y + 29.0f * scale, text_width, 14.0f * scale);
+                layout.power_subtitles[timer] =
+                    reach_settings_rect(text_x, card_y + 29.0f * scale, text_width, 14.0f * scale);
             }
             float pills_x = area_x + 16.0f * scale;
             float pills_width = area_width - 32.0f * scale;
@@ -396,9 +392,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.account_card = reach_settings_rect(area_x, area_y, area_width, card_height);
 
         float avatar = 84.0f * scale;
-        layout.account_avatar =
-            reach_settings_rect(area_x + 22.0f * scale, area_y + (card_height - avatar) * 0.5f,
-                                avatar, avatar);
+        layout.account_avatar = reach_settings_rect(
+            area_x + 22.0f * scale, area_y + (card_height - avatar) * 0.5f, avatar, avatar);
 
         float text_x = layout.account_avatar.x + avatar + 20.0f * scale;
         float text_width = area_x + area_width - text_x - 22.0f * scale;
@@ -414,17 +409,16 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.account_password_card =
             reach_settings_rect(area_x, password_y, area_width, password_height);
         float icon_box = 30.0f * scale;
-        layout.account_password_icon =
-            reach_settings_rect(area_x + 18.0f * scale, password_y + 16.0f * scale, icon_box,
-                                icon_box);
+        layout.account_password_icon = reach_settings_rect(
+            area_x + 18.0f * scale, password_y + 16.0f * scale, icon_box, icon_box);
         float password_text_x = layout.account_password_icon.x + icon_box + 14.0f * scale;
         float password_right = area_x + area_width - 18.0f * scale;
-        layout.account_password_title = reach_settings_rect(
-            password_text_x, password_y + 14.0f * scale, password_right - password_text_x,
-            18.0f * scale);
-        layout.account_password_subtitle = reach_settings_rect(
-            password_text_x, password_y + 34.0f * scale, password_right - password_text_x,
-            14.0f * scale);
+        layout.account_password_title =
+            reach_settings_rect(password_text_x, password_y + 14.0f * scale,
+                                password_right - password_text_x, 18.0f * scale);
+        layout.account_password_subtitle =
+            reach_settings_rect(password_text_x, password_y + 34.0f * scale,
+                                password_right - password_text_x, 14.0f * scale);
         layout.account_password_status = layout.account_password_subtitle;
 
         float row_y = password_y + 66.0f * scale;
@@ -437,14 +431,14 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             (float)REACH_SETTINGS_ACCOUNT_FIELD_COUNT;
         for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
         {
-            layout.account_password_fields[field] = reach_settings_rect(
-                fields_x + (float)field * (field_width + field_gap), row_y, field_width,
-                row_height);
+            layout.account_password_fields[field] =
+                reach_settings_rect(fields_x + (float)field * (field_width + field_gap), row_y,
+                                    field_width, row_height);
         }
         float button_width = 96.0f * scale;
-        layout.account_password_button = reach_settings_rect(
-            password_right - button_width, row_y + row_height + 12.0f * scale, button_width,
-            row_height);
+        layout.account_password_button =
+            reach_settings_rect(password_right - button_width, row_y + row_height + 12.0f * scale,
+                                button_width, row_height);
     }
 
     if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
@@ -642,8 +636,8 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
                 if (option == REACH_SETTINGS_POWER_CUSTOM_OPTION)
                 {
                     result.power_custom_field =
-                        x >= layout->power_custom_fields[timer]
-                                                        [REACH_SETTINGS_POWER_FIELD_MINUTES].x
+                        x >= layout->power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_MINUTES]
+                                    .x
                             ? REACH_SETTINGS_POWER_FIELD_MINUTES
                             : REACH_SETTINGS_POWER_FIELD_HOURS;
                 }

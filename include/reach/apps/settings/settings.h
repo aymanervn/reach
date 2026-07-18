@@ -39,7 +39,7 @@ extern "C"
         REACH_SETTINGS_PAGE_ACCOUNT = 2,
         REACH_SETTINGS_PAGE_STARTUP_APPS = 3,
         REACH_SETTINGS_PAGE_POWER_SLEEP = 4,
-        REACH_SETTINGS_PAGE_MONITORS_SCALING = 5,
+        REACH_SETTINGS_PAGE_DISPLAY = 5,
         REACH_SETTINGS_PAGE_UPDATE = 6
     } reach_settings_page;
 
@@ -175,8 +175,8 @@ extern "C"
         reach_rect_f32 power_icon_boxes[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_titles[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_subtitles[REACH_SETTINGS_POWER_TIMER_COUNT];
-        reach_rect_f32
-            power_options[REACH_SETTINGS_POWER_TIMER_COUNT][REACH_SETTINGS_POWER_OPTION_COUNT];
+        reach_rect_f32 power_options[REACH_SETTINGS_POWER_TIMER_COUNT]
+                                    [REACH_SETTINGS_POWER_OPTION_COUNT];
         reach_rect_f32 power_custom_fields[REACH_SETTINGS_POWER_TIMER_COUNT]
                                           [REACH_SETTINGS_POWER_FIELD_COUNT];
         reach_rect_f32 power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
@@ -261,9 +261,9 @@ extern "C"
     int32_t reach_settings_model_tick_power_caret(reach_settings_model *model,
                                                   double delta_seconds);
 
-    void reach_settings_model_set_account(reach_settings_model *model,
-                                          const uint16_t *display_name, const uint16_t *user_name,
-                                          int32_t is_admin, uint64_t picture);
+    void reach_settings_model_set_account(reach_settings_model *model, const uint16_t *display_name,
+                                          const uint16_t *user_name, int32_t is_admin,
+                                          uint64_t picture);
     const uint16_t *reach_settings_account_type_label(int32_t is_admin);
     uint16_t reach_settings_account_initial(const reach_settings_model *model);
     void reach_settings_model_account_focus_password(reach_settings_model *model, size_t field);
