@@ -220,6 +220,12 @@ reach_host_apply_context_menu_pointer_action(reach_host *host, const reach_ui_ev
     {
         return reach_host_execute_context_command(host, static_cast<uint32_t>(result->action.id));
     }
+    else if (result->action.kind == REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW)
+    {
+        uintptr_t window_id = result->action.window;
+        reach_host_close_context_menu(host);
+        return reach_host_focus_window(host, window_id, 0);
+    }
     return REACH_OK;
 }
 
@@ -306,6 +312,9 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
     case REACH_DOCK_POINTER_ACTION_MOVE_PIN:
         return reach_host_schedule_move_pin(host, static_cast<uint32_t>(result->action.id),
                                             result->action.index);
+    case REACH_DOCK_POINTER_ACTION_HOVER_ITEM:
+        reach_host_dock_item_hovered(host, result->action.index);
+        return REACH_OK;
     default:
         return REACH_OK;
     }
@@ -438,6 +447,7 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
     (void)reach_host_apply_clipboard_pointer_action(host, nullptr, &clipboard_cancel);
 
     reach_host_clear_sticky_dock_feedback(host);
+    host->window_list.dwell_active = 0;
 
     if (source == REACH_SURFACE_CLIPBOARD)
     {
@@ -476,6 +486,12 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
 
         reach_host_set_quick_settings_open(host, 0);
         return REACH_OK;
+    }
+
+    if (reach_context_menu_window_list_is_open(host->context_menu_capsule) &&
+        source == REACH_SURFACE_DOCK)
+    {
+        reach_host_close_context_menu(host);
     }
 
     if (reach_context_menu_is_open(host->context_menu_capsule))

@@ -114,6 +114,16 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return popup_result;
     }
 
+    float hover_opacity = input->window_list ? input->hover_opacity : 1.0f;
+    if (hover_opacity < 0.0f)
+    {
+        hover_opacity = 0.0f;
+    }
+    if (hover_opacity > 1.0f)
+    {
+        hover_opacity = 1.0f;
+    }
+
     for (size_t index = 0; index < input->item_count; ++index)
     {
         reach_rect_f32 item = input->item_slots[index];
@@ -123,12 +133,13 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             reach_context_menu_style_for_command(input->item_commands[index]);
         reach_color foreground = style.foreground;
 
-        if (input->hovered_index == index)
+        if (input->hovered_index == index && hover_opacity > 0.01f)
         {
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
             command.color = style.hover_background;
+            command.color.a *= hover_opacity;
             command.radius = reach_context_menu_scale(input, 8.0f);
             reach_render_command_buffer_push(out_commands, &command);
             if (style.use_hover_foreground)
@@ -164,7 +175,9 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         command.text_alignment = input->text_alignment_leading;
         command.text_ellipsis = 1;
         reach_copy_utf16(command.text, 260,
-                         reach_context_menu_command_text(input->item_commands[index]));
+                         input->window_list && input->item_titles != nullptr
+                             ? input->item_titles[index]
+                             : reach_context_menu_command_text(input->item_commands[index]));
         reach_render_command_buffer_push(out_commands, &command);
     }
 
@@ -189,6 +202,9 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.item_slots = state->item_slots;
     input.item_commands = state->item_commands;
     input.item_icon_ids = state->item_icon_ids;
+    input.item_titles = state->item_titles;
+    input.window_list = state->window_list_open;
+    input.hover_opacity = reach_context_menu_hover_opacity(menu);
     input.item_count = state->item_count;
     input.hovered_index = state->hovered_index;
     input.target_index = state->target_index;

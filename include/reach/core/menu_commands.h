@@ -6,7 +6,7 @@ extern "C"
 {
 #endif
 
-#define REACH_CONTEXT_MENU_MAX_ITEMS 6
+#define REACH_CONTEXT_MENU_MAX_ITEMS 8
 
     typedef enum reach_context_menu_command
     {

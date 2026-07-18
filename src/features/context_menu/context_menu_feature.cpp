@@ -2,8 +2,15 @@
 
 #include "context_menu_common.h"
 #include "reach/core/pinned_app.h"
+#include "reach/support/animation.h"
 
 #include <new>
+
+enum
+{
+    REACH_CONTEXT_MENU_ANIM_HOVER = 0,
+    REACH_CONTEXT_MENU_ANIM_COUNT
+};
 
 void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                              size_t *out_count)
@@ -83,6 +90,8 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
 struct reach_context_menu
 {
     reach_context_menu_state state;
+    reach_animation_manager animations;
+    reach_animation_track animation_tracks[REACH_CONTEXT_MENU_ANIM_COUNT];
 };
 
 const reach_context_menu_state *reach_context_menu_state_ptr(reach_context_menu *menu)
@@ -111,13 +120,29 @@ void reach_context_menu_reset(reach_context_menu *menu)
     }
     menu->state.open = 0;
     menu->state.power_open = 0;
+    menu->state.window_list_open = 0;
     menu->state.target_index = REACH_MAX_PINNED_APPS;
     menu->state.hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     menu->state.item_count = 0;
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
     {
         menu->state.item_icon_ids[index] = 0;
+        menu->state.item_windows[index] = 0;
+        menu->state.item_titles[index][0] = 0;
     }
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+}
+
+int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu)
+{
+    return menu != nullptr && menu->state.open && menu->state.window_list_open;
+}
+
+float reach_context_menu_hover_opacity(const reach_context_menu *menu)
+{
+    return menu != nullptr
+               ? reach_animation_manager_value(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER)
+               : 0.0f;
 }
 
 int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
@@ -126,7 +151,15 @@ int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
     {
         return 0;
     }
+    int32_t was_hovered = menu->state.hovered_index < REACH_CONTEXT_MENU_MAX_ITEMS;
+    int32_t is_hovered = index < REACH_CONTEXT_MENU_MAX_ITEMS;
     menu->state.hovered_index = index;
+    if (is_hovered != was_hovered)
+    {
+        reach_animation_manager_animate_to(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER,
+                                           is_hovered ? 1.0f : 0.0f, 0.18,
+                                           REACH_EASING_EASE_IN_OUT);
+    }
     return 1;
 }
 
@@ -193,7 +226,9 @@ void reach_context_menu_open_power(reach_context_menu *menu,
     state->target_index = REACH_MAX_PINNED_APPS;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->power_open = 1;
+    state->window_list_open = 0;
     state->open = 1;
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
 }
 
 void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_index,
@@ -219,7 +254,71 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     state->target_index = target_index;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->power_open = 0;
+    state->window_list_open = 0;
     state->open = 1;
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+}
+
+void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target_index,
+                                         const reach_context_menu_open_context *ctx)
+{
+    if (menu == nullptr || ctx == nullptr || ctx->window_entries == nullptr ||
+        ctx->window_entry_count == 0)
+    {
+        return;
+    }
+    reach_context_menu_state *state = &menu->state;
+    state->item_count = ctx->window_entry_count < REACH_CONTEXT_MENU_MAX_ITEMS
+                            ? ctx->window_entry_count
+                            : REACH_CONTEXT_MENU_MAX_ITEMS;
+    for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
+    {
+        state->item_commands[index] = 0;
+        state->item_icon_ids[index] = 0;
+        state->item_windows[index] = 0;
+        state->item_titles[index][0] = 0;
+    }
+    for (size_t index = 0; index < state->item_count; ++index)
+    {
+        state->item_windows[index] = ctx->window_entries[index].window;
+        if (ctx->window_entries[index].title != nullptr)
+        {
+            (void)reach_copy_utf16(state->item_titles[index], 260,
+                                   ctx->window_entries[index].title);
+        }
+    }
+    reach_context_menu_place(state, ctx, 232.0f * ctx->dpi_scale, 0.5f);
+    state->target_index = target_index;
+    state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    state->power_open = 0;
+    state->window_list_open = 1;
+    state->open = 1;
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+}
+
+int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
+                                                 reach_rect_f32 anchor_slot, float dock_top_y,
+                                                 float margin, float x, float y)
+{
+    if (x >= popup_bounds.x - margin && x <= popup_bounds.x + popup_bounds.width + margin &&
+        y >= popup_bounds.y - margin && y <= popup_bounds.y + popup_bounds.height + margin)
+    {
+        return 1;
+    }
+
+    if (x >= anchor_slot.x - margin && x <= anchor_slot.x + anchor_slot.width + margin &&
+        y >= anchor_slot.y - margin && y <= anchor_slot.y + anchor_slot.height + margin)
+    {
+        return 1;
+    }
+
+    float corridor_left = popup_bounds.x < anchor_slot.x ? popup_bounds.x : anchor_slot.x;
+    float corridor_right = popup_bounds.x + popup_bounds.width > anchor_slot.x + anchor_slot.width
+                               ? popup_bounds.x + popup_bounds.width
+                               : anchor_slot.x + anchor_slot.width;
+    float corridor_top = popup_bounds.y + popup_bounds.height;
+    return x >= corridor_left - margin && x <= corridor_right + margin &&
+           y >= corridor_top - margin && y <= dock_top_y + margin;
 }
 
 void reach_context_menu_reanchor(reach_context_menu *menu,
@@ -288,9 +387,22 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     {
         reach_context_menu_hit_result hit = reach_context_menu_hit_test_items(
             menu->state.item_slots, menu->state.item_count, event->x, event->y);
+        out->handled = 1;
+        if (menu->state.window_list_open)
+        {
+            if (hit.hit && menu->state.item_windows[hit.index] != 0)
+            {
+                out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW;
+                out->action.window = menu->state.item_windows[hit.index];
+            }
+            else
+            {
+                out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
+            }
+            break;
+        }
         reach_context_menu_action action = reach_context_menu_action_for_hit(
             menu->state.item_commands, menu->state.item_count, hit);
-        out->handled = 1;
         if (action.command != 0)
         {
             out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE;
@@ -331,15 +443,41 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     }
 }
 
+static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
+                                            reach_feature_tick_result *out)
+{
+    reach_context_menu *menu = static_cast<reach_context_menu *>(capsule);
+    if (menu == nullptr || out == nullptr)
+    {
+        return;
+    }
+    if (reach_animation_manager_any_active(&menu->animations))
+    {
+        reach_animation_manager_tick(&menu->animations, delta_seconds);
+        if (menu->state.open)
+        {
+            out->redraw = 1;
+            out->request_update = 1;
+        }
+    }
+}
+
+static int32_t reach_context_menu_capsule_needs_frame(const void *capsule)
+{
+    const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
+    return menu != nullptr && menu->state.open &&
+           reach_animation_manager_any_active(&menu->animations);
+}
+
 const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
         reach_context_menu_capsule_reset,
-        nullptr,
+        reach_context_menu_capsule_tick,
         reach_context_menu_capsule_is_open,
         reach_context_menu_capsule_force_close,
         nullptr,
-        nullptr,
+        reach_context_menu_capsule_needs_frame,
         reach_context_menu_capsule_wants_pointer_move,
         reach_context_menu_capsule_handle_pointer,
     };
@@ -357,6 +495,8 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
     {
         return REACH_ERROR;
     }
+    reach_animation_manager_init(&menu->animations, menu->animation_tracks,
+                                 REACH_CONTEXT_MENU_ANIM_COUNT);
     *out_menu = menu;
     return REACH_OK;
 }
