@@ -29,12 +29,15 @@ struct reach_search_service
     uint32_t completed_generation = 0;
     reach_search_candidate completed_results[REACH_SEARCH_MAX_RESULTS] = {};
     size_t completed_count = 0;
+    int32_t completed_error = 0;
 };
 
 static void reach_search_service_query(reach_search_service *service, const uint16_t *query,
-                                       reach_search_candidate *out_results, size_t *out_count)
+                                       reach_search_candidate *out_results, size_t *out_count,
+                                       int32_t *out_error)
 {
     *out_count = 0;
+    *out_error = 0;
     if (query == nullptr || query[0] == 0 || service->provider.ops.query == nullptr ||
         service->provider.ops.result_count == nullptr || service->provider.ops.result_at == nullptr)
     {
@@ -43,6 +46,7 @@ static void reach_search_service_query(reach_search_service *service, const uint
 
     if (service->provider.ops.query(service->provider.provider, query) != REACH_OK)
     {
+        *out_error = 1;
         return;
     }
 
@@ -95,7 +99,8 @@ static void reach_search_service_thread_main(reach_search_service *service)
 
         reach_search_candidate results[REACH_SEARCH_MAX_RESULTS] = {};
         size_t count = 0;
-        reach_search_service_query(service, query, results, &count);
+        int32_t error = 0;
+        reach_search_service_query(service, query, results, &count, &error);
 
         void (*notify)(void *user) = nullptr;
         void *notify_user = nullptr;
@@ -106,6 +111,7 @@ static void reach_search_service_thread_main(reach_search_service *service)
             {
                 service->completed_generation = generation;
                 service->completed_count = count;
+                service->completed_error = error;
                 for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index)
                 {
                     service->completed_results[index] = results[index];
@@ -237,7 +243,8 @@ void reach_search_service_cancel(reach_search_service *service)
 }
 
 int32_t reach_search_service_take_completed(reach_search_service *service, uint32_t *out_generation,
-                                            reach_search_candidate *out_results, size_t *out_count)
+                                            reach_search_candidate *out_results, size_t *out_count,
+                                            int32_t *out_error)
 {
     if (service == nullptr || out_generation == nullptr || out_results == nullptr ||
         out_count == nullptr)
@@ -252,6 +259,10 @@ int32_t reach_search_service_take_completed(reach_search_service *service, uint3
     }
     *out_generation = service->completed_generation;
     *out_count = service->completed_count;
+    if (out_error != nullptr)
+    {
+        *out_error = service->completed_error;
+    }
     for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index)
     {
         out_results[index] = service->completed_results[index];

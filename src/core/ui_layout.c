@@ -15,6 +15,12 @@ static size_t reach_visible_launcher_result_count(const reach_launcher_model *la
                                                                  : REACH_SEARCH_VISIBLE_RESULTS;
 }
 
+static int32_t reach_launcher_error_row_visible(const reach_launcher_model *launcher)
+{
+    return launcher != 0 && launcher->search_error && launcher->result_count == 0 &&
+           launcher->query_length > 0;
+}
+
 reach_result reach_dock_layout_compute(const reach_dock_model *dock,
                                        const reach_ui_layout_input *input,
                                        reach_dock_layout *out_layout)
@@ -149,9 +155,12 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     out_layout->search_results.y = out_layout->search_box.y + out_layout->search_box.height;
     out_layout->search_results.width = out_layout->search_box.width;
     size_t visible_result_count = reach_visible_launcher_result_count(launcher);
+    size_t visible_row_count =
+        visible_result_count > 0 ? visible_result_count
+                                 : (reach_launcher_error_row_visible(launcher) ? 1 : 0);
     out_layout->search_results.height =
-        visible_result_count > 0
-            ? search_results_top_padding + reach_scale(56.0f * (float)visible_result_count, scale)
+        visible_row_count > 0
+            ? search_results_top_padding + reach_scale(56.0f * (float)visible_row_count, scale)
             : 0.0f;
     out_layout->search_result_items = out_layout->search_results;
     out_layout->search_result_items.y += search_results_top_padding;
@@ -186,7 +195,7 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     }
     out_layout->bounds = out_layout->search_box;
 
-    if (launcher->result_count > 0)
+    if (launcher->result_count > 0 || reach_launcher_error_row_visible(launcher))
     {
         out_layout->bounds.x = out_layout->search_box.x;
         out_layout->bounds.width = out_layout->search_box.width;
