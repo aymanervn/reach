@@ -3,6 +3,7 @@
 #include "reach/ports/explorer_service.h"
 
 #include <windows.h>
+#include <objbase.h>
 #include <shellapi.h>
 
 #include <cwchar>
@@ -29,7 +30,15 @@ static reach_result reach_explorer_execute(const wchar_t *target,
     // Same foreground handover as app_launcher_win32.cpp: without it the opened
     // explorer window stays behind because reach never holds the foreground.
     (void)AllowSetForegroundWindow(ASFW_ANY);
-    return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
+    // reveal_path runs on app-control worker threads, which have no COM
+    // apartment; initialize per call like app_launcher_win32.cpp does.
+    HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    BOOL executed = ShellExecuteExW(&info);
+    if (SUCCEEDED(com_result))
+    {
+        CoUninitialize();
+    }
+    return executed ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reach_explorer_open_default(reach_explorer_service *service)

@@ -15,6 +15,20 @@ reach_result reach_host_schedule_app_launch(reach_host *host,
     return result;
 }
 
+reach_result reach_host_schedule_reveal_path(reach_host *host, const uint16_t *path)
+{
+    if (host == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_result result = reach_app_control_schedule_reveal(host->app_control, path);
+    if (result == REACH_OK)
+    {
+        reach_host_request_update(host);
+    }
+    return result;
+}
+
 void reach_host_stop_app_control(reach_host *host)
 {
     if (host == nullptr)
