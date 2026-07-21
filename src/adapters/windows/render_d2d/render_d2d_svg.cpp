@@ -85,6 +85,8 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
         return 237;
     case REACH_VECTOR_ICON_SEARCH:
         return 238;
+    case REACH_VECTOR_ICON_EXECUTABLE:
+        return 239;
     default:
         return 0;
     }

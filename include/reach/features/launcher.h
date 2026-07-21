@@ -39,6 +39,7 @@ extern "C"
     reach_result reach_launcher_set_results(reach_launcher *launcher,
                                             const reach_search_candidate *results, size_t count);
     reach_result reach_launcher_clear_results(reach_launcher *launcher);
+    void reach_launcher_set_search_error(reach_launcher *launcher, int32_t error);
     size_t reach_launcher_model_result_scroll_offset(const reach_launcher_model *launcher);
 
     void reach_launcher_attach_search(reach_launcher *launcher, reach_search_service *search);
@@ -47,7 +48,7 @@ extern "C"
     void reach_launcher_cancel_search(reach_launcher *launcher);
     int32_t reach_launcher_take_search_results(reach_launcher *launcher,
                                                reach_search_candidate *out_results,
-                                               size_t *out_count);
+                                               size_t *out_count, int32_t *out_error);
 
     const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count);
 

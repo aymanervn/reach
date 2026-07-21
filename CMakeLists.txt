@@ -147,7 +147,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_shapes.cpp
     src/adapters/windows/render_d2d/render_d2d_text.cpp
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
-    src/adapters/windows/search_everything_win32.cpp
+    src/adapters/windows/search_retriever_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp
     src/adapters/windows/settings_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
@@ -182,6 +182,9 @@ reach_configure_common(reach_windows_adapters)
 reach_configure_windows(reach_windows_adapters)
 target_compile_features(reach_windows_adapters PUBLIC
     cxx_std_17
+)
+target_include_directories(reach_windows_adapters PRIVATE
+    third_party/retriever
 )
 target_link_libraries(reach_windows_adapters PUBLIC
     reach_core
@@ -375,16 +378,7 @@ target_link_libraries(reach_settings PRIVATE
     Wuguid
 )
 
-set(EVERYTHING_DLL "${CMAKE_CURRENT_SOURCE_DIR}/third_party/everything/dll/Everything64.dll")
-
 set(REACH_RELEASE_IMAGE "${CMAKE_CURRENT_SOURCE_DIR}/resources/reach.jpg")
-
-add_custom_command(TARGET reach POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${EVERYTHING_DLL}"
-        "$<TARGET_FILE_DIR:reach>/Everything64.dll"
-    COMMENT "Copying Everything64.dll next to reach.exe"
-)
 
 add_executable(reachctl
     src/tools/reachctl/reachctl.cpp
@@ -515,7 +509,6 @@ add_custom_target(reach_release_zip
         "$<TARGET_FILE:reachWatchdog>"
         "$<TARGET_FILE:reach_service>"
         "$<TARGET_FILE:reach_update_helper>"
-        "${EVERYTHING_DLL}"
         "${REACH_RELEASE_IMAGE}"
         "${REACH_DIST_DIR}/reach"
 

@@ -15,7 +15,6 @@ extern "C"
 #define REACH_SEARCH_VISIBLE_RESULTS 5
 #define REACH_SEARCH_SCROLL_STEP 4
 #define REACH_SEARCH_MAX_RESULTS 50
-#define REACH_SEARCH_CANDIDATE_MAX 128
 
     typedef enum reach_search_result_kind
     {

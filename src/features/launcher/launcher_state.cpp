@@ -157,6 +157,7 @@ void reach_launcher_state_init(reach_launcher_state *state)
     state->model.query_length = 0;
     state->model.result_count = 0;
     state->model.selected_result_index = 0;
+    state->model.search_error = 0;
     reach_scrollbar_model_init(&state->model.result_scrollbar, REACH_SCROLLBAR_DRAG_STEPPED, 1.0f);
     state->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
     state->pressed_launcher_index = REACH_MAX_PINNED_APPS;
@@ -231,6 +232,7 @@ reach_result reach_launcher_clear_results_state(reach_launcher_state *state)
     }
     state->model.result_count = 0;
     state->model.selected_result_index = 0;
+    state->model.search_error = 0;
     reach_scrollbar_set_extents(&state->model.result_scrollbar, 0.0f, 0.0f);
     reach_launcher_set_scroll_immediate(state, 0);
     return REACH_OK;
@@ -504,6 +506,14 @@ reach_result reach_launcher_clear_results(reach_launcher *launcher)
     return reach_launcher_clear_results_state(reach_launcher_state_mut(launcher));
 }
 
+void reach_launcher_set_search_error(reach_launcher *launcher, int32_t error)
+{
+    if (launcher != nullptr)
+    {
+        launcher->state.model.search_error = error ? 1 : 0;
+    }
+}
+
 void reach_launcher_attach_search(reach_launcher *launcher, reach_search_service *search)
 {
     if (launcher != nullptr)
@@ -536,7 +546,8 @@ void reach_launcher_cancel_search(reach_launcher *launcher)
 }
 
 int32_t reach_launcher_take_search_results(reach_launcher *launcher,
-                                           reach_search_candidate *out_results, size_t *out_count)
+                                           reach_search_candidate *out_results, size_t *out_count,
+                                           int32_t *out_error)
 {
     if (launcher == nullptr || launcher->search == nullptr || out_results == nullptr ||
         out_count == nullptr)
@@ -544,7 +555,8 @@ int32_t reach_launcher_take_search_results(reach_launcher *launcher,
         return 0;
     }
     uint32_t generation = 0;
-    if (!reach_search_service_take_completed(launcher->search, &generation, out_results, out_count))
+    if (!reach_search_service_take_completed(launcher->search, &generation, out_results, out_count,
+                                             out_error))
     {
         return 0;
     }

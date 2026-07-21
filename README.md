@@ -24,12 +24,12 @@ Reach replaces Windows Explorer, nothing gets deleted, only an entry in the regi
 
 ## Reach app launcher
 
-Press the windows key to open the app launcher and the clipboard history, it uses voidtools' Everything SDK and can search any file on the NTFS disks.
+Press the windows key to open the app launcher and the clipboard history, it uses the retriever search service and can search any file on the NTFS disks.
 
 ## Requirements
 
 - Microsoft Visual C++ Redistributable for Visual Studio 2015–2022 (x64)
-- [Everything by voidtools](https://www.voidtools.com/) neeed to be installed and running.
+- The retriever search service will have to be installed and running. You can get it from https://github.com/aymanervn/retriever
 
 ## Build
 
@@ -57,7 +57,7 @@ Then, to start Reach immediately for your current session, run:
 ./reachctl --start
 ```
 
-You also need Voidtools' Everything installed and running to use the launcher feature.
+You also need the retriever service installed and running to use the launcher feature.
 
 In case of a problem, you can reset Windows Explorer as the shell by running this as admin:
 

@@ -20,9 +20,32 @@ static reach_color reach_launcher_opaque(reach_color color)
     return color;
 }
 
-static uint64_t reach_launcher_fallback_icon(int32_t is_directory)
+static uint64_t reach_launcher_fallback_icon(reach_search_result_kind kind)
 {
-    return is_directory ? REACH_VECTOR_ICON_FOLDER : REACH_VECTOR_ICON_FILE;
+    switch (kind)
+    {
+    case REACH_SEARCH_RESULT_APP:
+        return REACH_VECTOR_ICON_EXECUTABLE;
+    case REACH_SEARCH_RESULT_FOLDER:
+        return REACH_VECTOR_ICON_FOLDER;
+    case REACH_SEARCH_RESULT_PHOTO:
+        return REACH_VECTOR_ICON_PHOTO;
+    case REACH_SEARCH_RESULT_VIDEO:
+        return REACH_VECTOR_ICON_VIDEO;
+    case REACH_SEARCH_RESULT_MUSIC:
+        return REACH_VECTOR_ICON_MUSIC;
+    case REACH_SEARCH_RESULT_DOCUMENT:
+        return REACH_VECTOR_ICON_DOCUMENT;
+    case REACH_SEARCH_RESULT_FILE:
+    default:
+        return REACH_VECTOR_ICON_FILE;
+    }
+}
+
+static int32_t reach_launcher_error_row_visible(const reach_launcher_model *model)
+{
+    return model != nullptr && model->search_error && model->result_count == 0 &&
+           model->query_length > 0;
 }
 
 static float reach_launcher_scale(const reach_launcher_render_input *input, float value)
@@ -71,7 +94,8 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float row_path_y = reach_launcher_scale(input, 28.0f);
     float row_path_height = reach_launcher_scale(input, 20.0f);
     float row_path_size = reach_launcher_scale(input, 12.0f);
-    int32_t results_attached = model->result_count > 0 ? 1 : 0;
+    int32_t error_row_visible = reach_launcher_error_row_visible(model);
+    int32_t results_attached = model->result_count > 0 || error_row_visible ? 1 : 0;
 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
@@ -136,7 +160,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         reach_render_command_buffer_push(out_commands, &command);
     }
 
-    if (model->result_count > 0)
+    if (results_attached)
     {
         size_t visible_count = reach_launcher_visible_result_count(model);
         float row_height = reach_launcher_scale(input, 56.0f);
@@ -246,7 +270,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.width = icon_size;
                 command.rect.height = icon_size;
                 command.color = reach_launcher_rgb(255, 255, 255, 0.78f);
-                command.icon_id = reach_launcher_fallback_icon(model->results[index].is_directory);
+                command.icon_id = reach_launcher_fallback_icon(model->results[index].kind);
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
@@ -275,6 +299,41 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
             reach_copy_utf16(command.text, 260, model->results[index].path);
+            reach_render_command_buffer_push(out_commands, &command);
+        }
+
+        if (error_row_visible)
+        {
+            float row_x = layout->search_result_items.x - layout->bounds.x;
+            float row_y = layout->search_result_items.y - layout->bounds.y;
+            float row_width = layout->search_result_items.width;
+
+            command = {};
+            command.type = REACH_RENDER_COMMAND_TEXT;
+            command.rect.x = row_x;
+            command.rect.y = row_y + row_title_y;
+            command.rect.width = row_width;
+            command.rect.height = row_title_height;
+            command.color = reach_launcher_rgb(255, 255, 255, 0.86f);
+            command.text_size = row_title_size;
+            command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+            command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+            command.text_ellipsis = 1;
+            reach_copy_utf16(command.text, 260, (const uint16_t *)L"Search is unavailable");
+            reach_render_command_buffer_push(out_commands, &command);
+
+            command = {};
+            command.type = REACH_RENDER_COMMAND_TEXT;
+            command.rect.x = row_x;
+            command.rect.y = row_y + row_path_y;
+            command.rect.width = row_width;
+            command.rect.height = row_path_height;
+            command.color = reach_launcher_rgb(255, 255, 255, 0.44f);
+            command.text_size = row_path_size;
+            command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+            command.text_ellipsis = 1;
+            reach_copy_utf16(command.text, 260,
+                             (const uint16_t *)L"Could not connect to retriever. Is it installed?");
             reach_render_command_buffer_push(out_commands, &command);
         }
     }
@@ -309,8 +368,15 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
 
     reach_launcher_state *state = reach_launcher_state_mut(launcher);
 
+    const size_t icon_overscan_rows = 4;
+    size_t icon_start = reach_launcher_model_result_scroll_offset(&state->model);
+    icon_start = icon_start > icon_overscan_rows ? icon_start - icon_overscan_rows : 0;
+    size_t icon_end = reach_launcher_model_result_scroll_offset(&state->model) +
+                      REACH_SEARCH_VISIBLE_RESULTS + icon_overscan_rows;
+
     uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS] = {};
-    for (size_t index = 0; index < state->model.result_count && index < REACH_SEARCH_MAX_RESULTS;
+    for (size_t index = icon_start; index < icon_end && index < state->model.result_count &&
+                                    index < REACH_SEARCH_MAX_RESULTS;
          ++index)
     {
         const uint16_t *path = state->model.results[index].path;
