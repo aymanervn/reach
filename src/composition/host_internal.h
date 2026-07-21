@@ -351,6 +351,7 @@ reach_result reach_host_open_launcher_result(reach_host *host);
 reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_index);
 reach_result reach_host_schedule_app_launch(reach_host *host,
                                             const reach_app_launch_request *request);
+reach_result reach_host_schedule_reveal_path(reach_host *host, const uint16_t *path);
 void reach_host_stop_app_control(reach_host *host);
 void reach_host_process_deferred_launcher_app_launch(reach_host *host);
 reach_result

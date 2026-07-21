@@ -17,12 +17,25 @@ enum
 
 static const int64_t REACH_APP_CONTROL_LAUNCH_IDLE_EXIT_MILLISECONDS = 10000;
 
+enum reach_app_control_launch_item_kind
+{
+    REACH_APP_CONTROL_ITEM_LAUNCH = 0,
+    REACH_APP_CONTROL_ITEM_REVEAL = 1
+};
+
+struct reach_app_control_launch_item
+{
+    int32_t kind;
+    reach_app_launch_request launch;
+};
+
 struct reach_app_control_launch_state
 {
     std::mutex mutex;
     std::condition_variable cv;
     reach_app_launcher_port launcher = {};
-    reach_app_launch_request queue[REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = {};
+    reach_explorer_service_port explorer = {};
+    reach_app_control_launch_item queue[REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = {};
     size_t queue_head = 0;
     size_t queue_count = 0;
     int32_t idle_workers = 0;
@@ -49,7 +62,7 @@ static void reach_app_control_launch_worker_main(reach_app_control_launch_state 
 {
     for (;;)
     {
-        reach_app_launch_request request = {};
+        reach_app_control_launch_item item = {};
 
         {
             std::unique_lock<std::mutex> lock(state->mutex);
@@ -76,14 +89,21 @@ static void reach_app_control_launch_worker_main(reach_app_control_launch_state 
                 return;
             }
 
-            request = state->queue[state->queue_head];
+            item = state->queue[state->queue_head];
             state->queue_head = (state->queue_head + 1) % REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY;
             --state->queue_count;
         }
 
-        if (state->launcher.ops.launch != nullptr)
+        if (item.kind == REACH_APP_CONTROL_ITEM_REVEAL)
         {
-            (void)state->launcher.ops.launch(state->launcher.launcher, &request);
+            if (state->explorer.ops.reveal_path != nullptr)
+            {
+                (void)state->explorer.ops.reveal_path(state->explorer.service, item.launch.path);
+            }
+        }
+        else if (state->launcher.ops.launch != nullptr)
+        {
+            (void)state->launcher.ops.launch(state->launcher.launcher, &item.launch);
         }
     }
 }
@@ -291,6 +311,7 @@ static reach_result reach_app_control_start_window_worker(reach_app_control *ser
 }
 
 reach_result reach_app_control_create(reach_app_launcher_port launcher,
+                                      reach_explorer_service_port explorer,
                                       reach_window_manager_port window_manager,
                                       void (*notify)(void *user), void *notify_user,
                                       reach_app_control **out_service)
@@ -308,6 +329,7 @@ reach_result reach_app_control_create(reach_app_launcher_port launcher,
         return REACH_ERROR;
     }
     launch->launcher = launcher;
+    launch->explorer = explorer;
     service->launch = launch;
     service->window_manager = window_manager;
     service->notify = notify;
@@ -374,20 +396,9 @@ int32_t reach_app_control_launch_available(const reach_app_control *service)
            service->launch->launcher.ops.launch != nullptr;
 }
 
-reach_result reach_app_control_schedule_launch(reach_app_control *service,
-                                               const reach_app_launch_request *request)
+static reach_result reach_app_control_enqueue(reach_app_control_launch_state *state,
+                                              const reach_app_control_launch_item *item)
 {
-    if (service == nullptr || service->launch == nullptr || request == nullptr ||
-        request->path[0] == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    reach_app_control_launch_state *state = service->launch;
-    if (state->launcher.ops.launch == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
     int32_t spawn = 0;
     {
         std::lock_guard<std::mutex> lock(state->mutex);
@@ -401,7 +412,7 @@ reach_result reach_app_control_schedule_launch(reach_app_control *service,
             return REACH_ERROR;
         }
         state->queue[(state->queue_head + state->queue_count) %
-                     REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = *request;
+                     REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = *item;
         ++state->queue_count;
 
         if (state->idle_workers > 0)
@@ -436,6 +447,48 @@ reach_result reach_app_control_schedule_launch(reach_app_control *service,
     }
 
     return REACH_OK;
+}
+
+reach_result reach_app_control_schedule_launch(reach_app_control *service,
+                                               const reach_app_launch_request *request)
+{
+    if (service == nullptr || service->launch == nullptr || request == nullptr ||
+        request->path[0] == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->launch->launcher.ops.launch == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_app_control_launch_item item = {};
+    item.kind = REACH_APP_CONTROL_ITEM_LAUNCH;
+    item.launch = *request;
+    return reach_app_control_enqueue(service->launch, &item);
+}
+
+int32_t reach_app_control_reveal_available(const reach_app_control *service)
+{
+    return service != nullptr && service->launch != nullptr &&
+           service->launch->explorer.ops.reveal_path != nullptr;
+}
+
+reach_result reach_app_control_schedule_reveal(reach_app_control *service, const uint16_t *path)
+{
+    if (service == nullptr || service->launch == nullptr || path == nullptr || path[0] == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->launch->explorer.ops.reveal_path == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_app_control_launch_item item = {};
+    item.kind = REACH_APP_CONTROL_ITEM_REVEAL;
+    reach_copy_utf16(item.launch.path, 260, path);
+    return reach_app_control_enqueue(service->launch, &item);
 }
 
 reach_result reach_app_control_schedule_window(reach_app_control *service,

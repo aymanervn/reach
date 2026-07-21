@@ -441,7 +441,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     host->app_launcher = dependencies->app_launcher;
     host->app_control = nullptr;
-    if (reach_app_control_create(host->app_launcher, host->window_manager,
+    if (reach_app_control_create(host->app_launcher, dependencies->explorer_service,
+                                 host->window_manager,
                                  reach_host_on_app_control_notify, host,
                                  &host->app_control) != REACH_OK)
     {

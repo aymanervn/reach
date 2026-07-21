@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "reach/ports/app_launcher.h"
+#include "reach/ports/explorer_service.h"
 #include "reach/ports/window_manager.h"
 #include "reach/support/layout.h"
 
@@ -22,6 +23,7 @@ extern "C"
     } reach_window_control_action;
 
     reach_result reach_app_control_create(reach_app_launcher_port launcher,
+                                          reach_explorer_service_port explorer,
                                           reach_window_manager_port window_manager,
                                           void (*notify)(void *user), void *notify_user,
                                           reach_app_control **out_service);
@@ -32,6 +34,10 @@ extern "C"
     int32_t reach_app_control_launch_available(const reach_app_control *service);
     reach_result reach_app_control_schedule_launch(reach_app_control *service,
                                                    const reach_app_launch_request *request);
+
+    int32_t reach_app_control_reveal_available(const reach_app_control *service);
+    reach_result reach_app_control_schedule_reveal(reach_app_control *service,
+                                                   const uint16_t *path);
 
     reach_result reach_app_control_schedule_window(reach_app_control *service,
                                                    reach_window_control_action action,

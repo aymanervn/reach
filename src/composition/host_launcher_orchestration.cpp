@@ -118,7 +118,7 @@ void reach_host_restore_launcher_focus(reach_host *host)
     uintptr_t window = reach_launcher_take_restore_window(host->launcher_capsule);
     if (window != 0 && reach_host_launcher_can_restore_focus_to(host, window))
     {
-        (void)host->window_manager.ops.activate(host->window_manager.manager, window);
+        (void)reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window);
     }
 }
 
@@ -216,8 +216,7 @@ reach_result reach_host_open_launcher_result(reach_host *host)
 reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_index)
 {
     REACH_ASSERT(host != nullptr);
-    if (host == nullptr || host->explorer_service.service == nullptr ||
-        host->explorer_service.ops.reveal_path == nullptr)
+    if (host == nullptr || !reach_app_control_reveal_available(host->app_control))
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -234,5 +233,5 @@ reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_i
         return REACH_OK;
     }
 
-    return host->explorer_service.ops.reveal_path(host->explorer_service.service, result->path);
+    return reach_host_schedule_reveal_path(host, result->path);
 }
