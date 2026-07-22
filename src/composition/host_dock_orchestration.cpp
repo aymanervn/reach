@@ -13,10 +13,9 @@ const uint16_t *reach_host_dock_item_path(const reach_host *host, size_t item_in
                                                      : nullptr;
     }
 
-    size_t open_index = reach_dock_item_at(host->dock_capsule, item_index)->open_index;
-    return open_index < reach_host_open_window_count(host)
-               ? reach_host_open_windows(host)[open_index].path
-               : nullptr;
+    const reach_window_snapshot *window = reach_window_tracking_window_by_id(
+        host->window_tracking, reach_dock_item_at(host->dock_capsule, item_index)->window);
+    return window != nullptr ? window->path : nullptr;
 }
 
 reach_result reach_host_launch_dock_item(reach_host *host, size_t item_index,

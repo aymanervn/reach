@@ -151,11 +151,10 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
     {
         reach_pinned_app_model app = {};
 
-        size_t open_index = reach_dock_item_at(host->dock_capsule, item_index)->open_index;
-        if (open_index < reach_host_open_window_count(host))
+        const reach_window_snapshot *window = reach_window_tracking_window_by_id(
+            host->window_tracking, reach_dock_item_at(host->dock_capsule, item_index)->window);
+        if (window != nullptr)
         {
-            const reach_window_snapshot *window = &reach_host_open_windows(host)[open_index];
-
             if (host->window_manager.ops.pin_app_for_window != nullptr &&
                 host->window_manager.ops.pin_app_for_window(host->window_manager.manager,
                                                             window->id, window, &app) == REACH_OK)

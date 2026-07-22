@@ -76,7 +76,7 @@ reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature
         action.type = REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW;
         action.window = item->window;
         action.pinned_index = item->pinned_index;
-        action.pin_id = item->pin_id;
+        action.pin_id = item->pinned ? item->app_id : 0;
         return action;
     }
 
@@ -84,7 +84,7 @@ reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature
     {
         action.type = REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED;
         action.pinned_index = item->pinned_index;
-        action.pin_id = item->pin_id;
+        action.pin_id = item->app_id;
     }
 
     return action;
@@ -240,16 +240,7 @@ static void reach_dock_drag_begin(reach_dock *dock, size_t index, int32_t x, int
     state->drag.moved = 0;
     state->drag.source_index = index;
     state->drag.target_index = index;
-    state->drag.pinned = state->model.items[index].pinned;
-    state->drag.pin_id = 0;
-
-    if (state->model.items[index].pinned &&
-        state->model.items[index].pinned_index < ctx->pinned_app_count)
-    {
-        state->drag.pin_id = ctx->pinned_apps[state->model.items[index].pinned_index].id;
-    }
-
-    state->drag.window = state->model.items[index].window;
+    state->drag.key = reach_dock_item_key_at(&state->model, index);
     state->drag.start_x = x;
     state->drag.start_y = y;
 
@@ -322,8 +313,7 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
 
     float dragged_box_x = state->drag.x;
 
-    reach_dock_order_key drag_key = {state->drag.pinned, state->drag.pin_id, state->drag.window};
-    size_t current = reach_dock_feature_model_find_order_key(&state->model, drag_key);
+    size_t current = reach_dock_feature_model_find_order_key(&state->model, state->drag.key);
 
     size_t target = reach_dock_reorder_target(&state->model, ctx->layout, current, dragged_box_x);
 
@@ -341,7 +331,7 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
         return;
     }
 
-    current = reach_dock_feature_model_find_order_key(&state->model, drag_key);
+    current = reach_dock_feature_model_find_order_key(&state->model, state->drag.key);
 
     if (current != REACH_MAX_PINNED_APPS && state->feedback_index != current)
     {
@@ -366,8 +356,8 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
         return;
     }
 
-    uint32_t pin_id = state->drag.pin_id;
-    int32_t dragged_pinned = state->drag.pinned;
+    uint32_t pin_id = state->drag.key.pinned ? state->drag.key.app_id : 0;
+    int32_t dragged_pinned = state->drag.key.pinned;
     int32_t moved = state->drag.moved;
     size_t previous_pressed_dock_index = state->pressed_index;
 
@@ -375,8 +365,7 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
         dragged_pinned ? reach_dock_feature_model_pinned_order_index(&state->model, pin_id)
                        : REACH_MAX_PINNED_APPS;
 
-    reach_dock_order_key drag_key = {state->drag.pinned, state->drag.pin_id, state->drag.window};
-    size_t target_index = reach_dock_feature_model_find_item_key(&state->model, drag_key);
+    size_t target_index = reach_dock_feature_model_find_item_key(&state->model, state->drag.key);
 
     state->drag.active = 0;
     state->drag.moved = 0;
@@ -396,9 +385,7 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     {
         state->drag.source_index = REACH_MAX_PINNED_APPS;
         state->drag.target_index = REACH_MAX_PINNED_APPS;
-        state->drag.pinned = 0;
-        state->drag.pin_id = 0;
-        state->drag.window = 0;
+        state->drag.key = {};
         reach_animation_manager_reset(reach_dock_manager(dock), REACH_DOCK_ANIM_DRAG_SNAP);
     }
 

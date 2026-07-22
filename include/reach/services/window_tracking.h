@@ -39,6 +39,15 @@ extern "C"
 
     int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
                                                      const reach_window_snapshot *window);
+    int32_t reach_window_tracking_identity_equal(const uint16_t *path_a, const uint16_t *aumid_a,
+                                                 const uint16_t *path_b, const uint16_t *aumid_b);
+    int32_t reach_window_tracking_windows_same_app(const reach_window_snapshot *a,
+                                                   const reach_window_snapshot *b);
+    const uint32_t *reach_window_tracking_window_group_ids(const reach_window_tracking *service);
+    uint32_t reach_window_tracking_window_group_id(const reach_window_tracking *service,
+                                                   uintptr_t window_id);
+    uint32_t reach_window_tracking_group_id_for_app(const reach_window_tracking *service,
+                                                    const reach_pinned_app_model *app);
     size_t reach_window_tracking_collect_unminimized(const reach_window_tracking *service,
                                                      uintptr_t *out_windows,
                                                      size_t out_window_count);
