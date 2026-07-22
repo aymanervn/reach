@@ -40,6 +40,24 @@ static void reach_host_on_config_service_ready(void *user)
     }
 }
 
+static void reach_host_on_foreground_changed(void *user)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr)
+    {
+        return;
+    }
+    if (host->dock.window.ops.post_event != nullptr)
+    {
+        (void)host->dock.window.ops.post_event(host->dock.window.window,
+                                               REACH_UI_EVENT_FOREGROUND_CHANGED);
+    }
+    else
+    {
+        reach_host_request_update(host);
+    }
+}
+
 static void reach_host_on_system_status_ready(void *user)
 {
     reach_host_request_update(static_cast<reach_host *>(user));
@@ -186,6 +204,10 @@ static void reach_host_cleanup(reach_host *host)
     }
     reach_window_tracking_destroy(host->window_tracking);
     host->window_tracking = nullptr;
+    if (host->foreground_watcher.ops.destroy != nullptr)
+    {
+        host->foreground_watcher.ops.destroy(host->foreground_watcher.watcher);
+    }
     if (host->window_manager.ops.destroy != nullptr)
     {
         host->window_manager.ops.destroy(host->window_manager.manager);
@@ -295,6 +317,7 @@ static void reach_host_cleanup(reach_host *host)
     host->dock_reveal = {};
     host->input_source = {};
     host->window_manager = {};
+    host->foreground_watcher = {};
     host->config_store = {};
     host->tray_provider = {};
     host->search_provider = {};
@@ -419,6 +442,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->input_source = dependencies->input_source;
     host->monitors = dependencies->monitors;
     host->window_manager = dependencies->window_manager;
+    host->foreground_watcher = dependencies->foreground_watcher;
     host->window_tracking = nullptr;
     if (reach_window_tracking_create(host->window_manager, &host->window_tracking) != REACH_OK)
     {
@@ -442,8 +466,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->app_launcher = dependencies->app_launcher;
     host->app_control = nullptr;
     if (reach_app_control_create(host->app_launcher, dependencies->explorer_service,
-                                 host->window_manager,
-                                 reach_host_on_app_control_notify, host,
+                                 host->window_manager, reach_host_on_app_control_notify, host,
                                  &host->app_control) != REACH_OK)
     {
         result = REACH_ERROR;
@@ -585,6 +608,12 @@ reach_result reach_host_start(reach_host *host)
     if (result != REACH_OK)
     {
         return result;
+    }
+
+    if (host->foreground_watcher.ops.start != nullptr)
+    {
+        (void)host->foreground_watcher.ops.start(host->foreground_watcher.watcher,
+                                                 reach_host_on_foreground_changed, host);
     }
 
     if (host->dock.window.ops.set_event_callback != nullptr)
@@ -746,6 +775,10 @@ reach_result reach_host_stop(reach_host *host)
     if (host->system_controls.stop_watching != nullptr)
     {
         host->system_controls.stop_watching(host->system_controls.userdata);
+    }
+    if (host->foreground_watcher.ops.stop != nullptr)
+    {
+        (void)host->foreground_watcher.ops.stop(host->foreground_watcher.watcher);
     }
     if (host->window_manager.ops.stop != nullptr)
     {

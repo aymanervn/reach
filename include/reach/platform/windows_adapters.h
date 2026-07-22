@@ -5,6 +5,7 @@
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/dock_reveal_edge.h"
+#include "reach/ports/foreground_watcher.h"
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/input_source.h"
@@ -56,6 +57,7 @@ extern "C"
     reach_result reach_windows_create_audio_volume(reach_audio_volume_port *out_port);
     reach_result reach_windows_create_system_controls(reach_system_controls_port *out_port);
     reach_result reach_windows_create_dock_reveal_edge(reach_dock_reveal_edge_port *out_port);
+    reach_result reach_windows_create_foreground_watcher(reach_foreground_watcher_port *out_port);
     reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
     reach_result reach_windows_create_user_account(reach_user_account_port *out_port);
     reach_result reach_windows_create_explorer_desktop_compat_host(void);

@@ -69,10 +69,8 @@ void reach_host_remember_launcher_restore_window(reach_host *host)
         return;
     }
 
-    uintptr_t foreground = host->window_manager.ops.foreground != nullptr
-                               ? host->window_manager.ops.foreground(host->window_manager.manager)
-                               : 0;
-    reach_launcher_remember_restore_window(host->launcher_capsule, foreground);
+    reach_launcher_remember_restore_window(host->launcher_capsule,
+                                           reach_host_foreground_window(host));
 }
 
 void reach_host_toggle_launcher(reach_host *host)

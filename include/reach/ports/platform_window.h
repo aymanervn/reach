@@ -48,6 +48,7 @@ extern "C"
         reach_result (*raise)(reach_platform_window *window);
         reach_result (*minimize)(reach_platform_window *window);
         int32_t (*is_minimized)(const reach_platform_window *window);
+        int32_t (*is_active)(const reach_platform_window *window);
         reach_window_id (*native_id)(const reach_platform_window *window);
         reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);
         void (*destroy)(reach_platform_window *window);

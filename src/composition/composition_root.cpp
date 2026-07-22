@@ -192,6 +192,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_foreground_watcher(&dependencies.foreground_watcher);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_host_create_with_dependencies(desc, &dependencies, &app->host);
         if (result == REACH_OK)
         {
@@ -206,6 +210,7 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.clipboard_window = {};
             dependencies.clipboard_renderer = {};
             dependencies.clipboard = {};
+            dependencies.foreground_watcher = {};
         }
     }
     if (result != REACH_OK)
@@ -284,6 +289,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.window_manager.ops.destroy != nullptr)
         {
             dependencies.window_manager.ops.destroy(dependencies.window_manager.manager);
+        }
+        if (dependencies.foreground_watcher.ops.destroy != nullptr)
+        {
+            dependencies.foreground_watcher.ops.destroy(dependencies.foreground_watcher.watcher);
         }
         if (dependencies.config_store.ops.destroy != nullptr)
         {

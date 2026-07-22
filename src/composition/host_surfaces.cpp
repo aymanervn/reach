@@ -303,6 +303,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_LAUNCHER].apply_pointer_action =
         reach_host_apply_launcher_pointer_action;
     descs[REACH_SURFACE_ID_LAUNCHER].dismiss = reach_host_close_launcher;
+    descs[REACH_SURFACE_ID_LAUNCHER].behavior_flags = REACH_SURFACE_BEHAVIOR_ACTIVATES;
     descs[REACH_SURFACE_ID_TRAY].role = REACH_SURFACE_TRAY_MENU;
     descs[REACH_SURFACE_ID_TRAY].pointer_priority = 40;
     descs[REACH_SURFACE_ID_TRAY].apply_pointer_action = reach_host_apply_tray_pointer_action;
@@ -356,6 +357,37 @@ void reach_host_close_other_popups(reach_host *host, reach_surface_id keep)
         {
             desc->force_close(host);
         }
+    }
+}
+
+int32_t reach_host_surface_is_open(const reach_surface_desc *desc)
+{
+    return desc->capsule_ops->is_open == nullptr || desc->capsule_ops->is_open(desc->capsule);
+}
+
+void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_desc *desc = &host->surface_descs[index];
+        if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0 ||
+            desc->force_close == nullptr || !reach_host_surface_is_open(desc))
+        {
+            continue;
+        }
+
+        if (desc->surface->window.ops.is_active != nullptr &&
+            desc->surface->window.ops.is_active(desc->surface->window.window))
+        {
+            continue;
+        }
+
+        desc->force_close(host);
     }
 }
 

@@ -11,10 +11,7 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
         return REACH_OK;
     }
 
-    uintptr_t focused_window =
-        host->window_manager.ops.foreground != nullptr
-            ? host->window_manager.ops.foreground(host->window_manager.manager)
-            : 0;
+    uintptr_t focused_window = reach_host_foreground_window(host);
 
     const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
 

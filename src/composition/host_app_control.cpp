@@ -213,9 +213,7 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
         (void)reach_host_refresh_open_windows(host, nullptr);
     }
 
-    uintptr_t foreground = host->window_manager.ops.foreground != nullptr
-                               ? host->window_manager.ops.foreground(host->window_manager.manager)
-                               : 0;
+    uintptr_t foreground = reach_host_foreground_window(host);
 
     reach_result result = REACH_OK;
     if (minimize_if_foreground && foreground == window_id &&

@@ -56,7 +56,8 @@ extern "C"
         REACH_UI_EVENT_SNAP_RIGHT = 49,
         REACH_UI_EVENT_SNAP_TOP = 50,
         REACH_UI_EVENT_SNAP_BOTTOM = 51,
-        REACH_UI_EVENT_WINDOW_FOCUS_LOST = 52
+        REACH_UI_EVENT_WINDOW_FOCUS_LOST = 52,
+        REACH_UI_EVENT_FOREGROUND_CHANGED = 53
     } reach_ui_event_type;
 
     typedef enum reach_ui_edit_key

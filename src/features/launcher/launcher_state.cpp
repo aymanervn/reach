@@ -163,7 +163,6 @@ void reach_launcher_state_init(reach_launcher_state *state)
     state->pressed_launcher_index = REACH_MAX_PINNED_APPS;
     state->launcher_scrollbar_drag = reach_scrollbar_drag{};
     reach_text_edit_init(&state->launcher_text_edit, REACH_MAX_SEARCH_CHARS);
-    state->launcher_focused = 0;
     state->launcher_caret_blink_seconds = 0.0;
     state->launcher_caret_visible = 1;
 }
@@ -635,14 +634,6 @@ static void reach_launcher_reset_scrollbar_drag(reach_launcher *launcher)
     }
     launcher->state.launcher_scrollbar_drag.active = 0;
     launcher->state.launcher_scrollbar_drag.grab_offset = 0.0f;
-}
-
-void reach_launcher_set_focused(reach_launcher *launcher, int32_t focused)
-{
-    if (launcher != nullptr)
-    {
-        launcher->state.launcher_focused = focused ? 1 : 0;
-    }
 }
 
 void reach_launcher_remember_restore_window(reach_launcher *launcher, uintptr_t window)

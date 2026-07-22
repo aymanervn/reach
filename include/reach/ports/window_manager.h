@@ -34,11 +34,12 @@ extern "C"
         reach_result (*refresh)(reach_window_manager *manager);
         reach_result (*snap)(reach_window_manager *manager, reach_window_id window_id,
                              reach_split_mode mode);
-        reach_window_id (*foreground)(const reach_window_manager *manager);
 
-        int32_t (*foreground_is_maximized_on_primary)(const reach_window_manager *manager);
+        int32_t (*window_is_maximized_on_primary)(const reach_window_manager *manager,
+                                                  reach_window_id window_id);
 
-        int32_t (*foreground_is_snapped_on_primary)(const reach_window_manager *manager);
+        int32_t (*window_is_snapped_on_primary)(const reach_window_manager *manager,
+                                                reach_window_id window_id);
         int32_t (*game_mode_active)(const reach_window_manager *manager);
         int32_t (*needs_refresh)(const reach_window_manager *manager);
         size_t (*window_count)(const reach_window_manager *manager);

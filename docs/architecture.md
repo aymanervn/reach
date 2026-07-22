@@ -149,9 +149,16 @@ dock cluster → launcher → clipboard → switcher); the per-surface frame ste
 (`host_surface_frames.cpp`, layout refresh → transition → window state →
 corners → show/render) run as one loop over the table in `frame_priority`
 order against a shared `reach_host_frame_context`.
-Genuinely per-feature policies stay as named exceptions (e.g. the launcher closes
-on a foreground-window change); a growing exception list signals a missing class
-rule. May include everything.
+Surfaces that take OS activation declare `BEHAVIOR_ACTIVATES`; the class rules then
+own show-on-activate, close-on-focus-loss, and the staleness check that discards a
+focus-loss signal the surface has already recovered from (reach's own foreground
+handover emits one). The global outside-press rule is likewise one loop over the
+transient and popup rows, closing any surface the press missed. Foreground identity
+has a single producer — the in-process foreground watcher port feeds
+`window_tracking`, and nothing reads focus state out of the Reach Service snapshot.
+Genuinely per-feature policies stay as named exceptions (e.g. dock-cluster pairwise
+button rules); a growing exception list signals a missing class rule. May include
+everything.
 
 ### Adding a feature
 

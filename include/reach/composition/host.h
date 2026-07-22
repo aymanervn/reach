@@ -24,6 +24,7 @@
 #include "reach/ports/window_manager.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/dock_reveal_edge.h"
+#include "reach/ports/foreground_watcher.h"
 #include "reach/ports/clipboard.h"
 #include "reach/support/util.h"
 
@@ -59,6 +60,7 @@ extern "C"
         reach_input_source_port input_source;
         reach_monitor_port monitors;
         reach_window_manager_port window_manager;
+        reach_foreground_watcher_port foreground_watcher;
         reach_config_store_port config_store;
         reach_tray_provider_port tray_provider;
         reach_search_provider_port search_provider;

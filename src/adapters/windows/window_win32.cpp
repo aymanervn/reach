@@ -67,9 +67,8 @@ static void reach_platform_window_register_taskman(reach_platform_window *window
     }
 
     typedef BOOL(WINAPI * reach_set_taskman_window_fn)(HWND);
-    reach_set_taskman_window_fn set_taskman_window =
-        reinterpret_cast<reach_set_taskman_window_fn>(
-            GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow"));
+    reach_set_taskman_window_fn set_taskman_window = reinterpret_cast<reach_set_taskman_window_fn>(
+        GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow"));
     if (set_taskman_window != nullptr)
     {
         (void)set_taskman_window(window->hwnd);
@@ -312,8 +311,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_CHAR:
-        if (window != nullptr && (window->role == REACH_SURFACE_LAUNCHER ||
-                                  window->role == REACH_SURFACE_SETTINGS))
+        if (window != nullptr &&
+            (window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_SETTINGS))
         {
 
             if (wparam >= 0x20 && wparam != 0x7F)
@@ -652,9 +651,14 @@ static void reach_platform_window_focus(HWND hwnd)
         attached_foreground = AttachThreadInput(current_thread, foreground_thread, TRUE);
     }
 
-    SetActiveWindow(hwnd);
-    SetFocus(hwnd);
     SetForegroundWindow(hwnd);
+
+    if (GetForegroundWindow() != hwnd)
+    {
+        SetActiveWindow(hwnd);
+    }
+
+    SetFocus(hwnd);
 
     if (attached_foreground)
     {
@@ -1009,6 +1013,11 @@ static int32_t reach_platform_window_is_minimized(const reach_platform_window *w
     return window != nullptr && window->hwnd != nullptr && IsIconic(window->hwnd);
 }
 
+static int32_t reach_platform_window_is_active(const reach_platform_window *window)
+{
+    return window != nullptr && window->hwnd != nullptr && GetForegroundWindow() == window->hwnd;
+}
+
 static reach_window_id reach_platform_window_native_id(const reach_platform_window *window)
 {
     return window == nullptr ? 0 : reinterpret_cast<reach_window_id>(window->hwnd);
@@ -1131,6 +1140,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.raise = reach_platform_window_raise;
     out_port->ops.minimize = reach_platform_window_minimize;
     out_port->ops.is_minimized = reach_platform_window_is_minimized;
+    out_port->ops.is_active = reach_platform_window_is_active;
     out_port->ops.native_id = reach_platform_window_native_id;
     out_port->ops.post_event = reach_platform_window_post_event;
     out_port->ops.destroy = reach_platform_window_destroy;

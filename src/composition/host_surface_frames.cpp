@@ -6,6 +6,27 @@ typedef struct reach_host_frame_state
     int32_t visible;
 } reach_host_frame_state;
 
+static void reach_host_apply_surface_activation(const reach_surface_desc *desc, int32_t active)
+{
+    reach_surface_runtime *surface = desc->surface;
+    if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0)
+    {
+        return;
+    }
+
+    if (!active)
+    {
+        surface->activated = 0;
+        return;
+    }
+
+    if (!surface->activated && surface->window.ops.show != nullptr)
+    {
+        (void)surface->window.ops.show(surface->window.window);
+        surface->activated = 1;
+    }
+}
+
 static reach_result reach_host_apply_transient_frame(
     reach_host *host, reach_surface_runtime *surface, reach_host_surface_transition *transition,
     int32_t game_mode, reach_rect_f32 target_bounds, float radius, reach_host_frame_state *out)
@@ -66,19 +87,10 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
     {
         (void)reach_host_render_launcher_surface(host, &host->layout.launcher);
     }
+    const reach_surface_desc *desc = &host->surface_descs[REACH_SURFACE_ID_LAUNCHER];
     if (!game_mode && reach_host_surface_transition_visible(&host->launcher_transition))
     {
-
-        if (!reach_launcher_is_open(host->launcher_capsule))
-        {
-            reach_launcher_set_focused(host->launcher_capsule, 0);
-        }
-        else if (!reach_launcher_state_ptr(host->launcher_capsule)->launcher_focused &&
-                 host->launcher.window.ops.show != nullptr)
-        {
-            (void)host->launcher.window.ops.show(host->launcher.window.window);
-            reach_launcher_set_focused(host->launcher_capsule, 1);
-        }
+        reach_host_apply_surface_activation(desc, reach_host_surface_is_open(desc));
     }
     else
     {
@@ -86,7 +98,7 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
         {
             (void)host->launcher.window.ops.hide(host->launcher.window.window);
         }
-        reach_launcher_set_focused(host->launcher_capsule, 0);
+        reach_host_apply_surface_activation(desc, 0);
     }
 
     return REACH_OK;
