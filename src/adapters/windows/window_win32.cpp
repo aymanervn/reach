@@ -40,12 +40,25 @@ struct reach_platform_window
 // Workaround for user32's legacy minimize behavior: without a registered taskman
 // window, minimized windows are parked as visible caption rectangles on the
 // desktop instead of being moved off-screen. SetTaskmanWindow is undocumented
-// but is what Explorer uses to flip that policy.
+// but is what Explorer uses to flip that policy. Skip only when another process
+// owns the shell window (a real Explorer is running); reach's own desktop compat
+// host registers its fake Progman as shell window before this runs.
 static void reach_platform_window_register_taskman(reach_platform_window *window)
 {
-    if (window == nullptr || window->hwnd == nullptr || GetShellWindow() != nullptr)
+    if (window == nullptr || window->hwnd == nullptr)
     {
         return;
+    }
+
+    HWND shell_window = GetShellWindow();
+    if (shell_window != nullptr)
+    {
+        DWORD shell_process_id = 0;
+        GetWindowThreadProcessId(shell_window, &shell_process_id);
+        if (shell_process_id != GetCurrentProcessId())
+        {
+            return;
+        }
     }
 
     if (RegisterShellHookWindow(window->hwnd))

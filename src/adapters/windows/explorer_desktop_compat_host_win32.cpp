@@ -132,6 +132,18 @@ static LRESULT CALLBACK reach_explorer_desktop_compat_host_proc(HWND hwnd, UINT 
         reach_explorer_desktop_compat_schedule_sync(REACH_EXPLORER_DESKTOP_COMPAT_SYNC_DELAY_MS);
         return 0;
 
+    case WM_WINDOWPOSCHANGING:
+        // Fallback for when the undocumented SetShellWindow registration is
+        // unavailable or fails: pin the fake Progman bottom-most ourselves so it
+        // never occludes app windows.
+        if (hwnd == g_progmanHwnd && lparam != 0)
+        {
+            WINDOWPOS *position = reinterpret_cast<WINDOWPOS *>(lparam);
+            position->hwndInsertAfter = HWND_BOTTOM;
+            position->flags &= ~SWP_NOZORDER;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+
     case WM_MOUSEACTIVATE:
         return MA_NOACTIVATE;
 
@@ -513,6 +525,9 @@ static void reach_explorer_desktop_compat_resize_host(void)
 
     reach_explorer_desktop_compat_virtual_screen(&x, &y, &width, &height);
 
+    SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
     RECT progman_rect = {};
     if (!GetWindowRect(g_progmanHwnd, &progman_rect) || progman_rect.left != x ||
         progman_rect.top != y || progman_rect.right - progman_rect.left != width ||
@@ -535,6 +550,26 @@ static void reach_explorer_desktop_compat_resize_host(void)
     }
 
     reach_explorer_desktop_compat_resize_wallpaper_children();
+}
+
+// SetShellWindow is undocumented but is what Explorer uses for the real Progman:
+// win32k then keeps the window bottom-most and activates it as fallback when the
+// foreground window is minimized. Failure is tolerated — the WM_WINDOWPOSCHANGING
+// pin covers the ordering on its own.
+static void reach_explorer_desktop_compat_register_shell_window(HWND hwnd)
+{
+    if (hwnd == nullptr || GetShellWindow() != nullptr)
+    {
+        return;
+    }
+
+    typedef BOOL(WINAPI * reach_set_shell_window_fn)(HWND);
+    reach_set_shell_window_fn set_shell_window = reinterpret_cast<reach_set_shell_window_fn>(
+        GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetShellWindow"));
+    if (set_shell_window != nullptr)
+    {
+        (void)set_shell_window(hwnd);
+    }
 }
 
 static reach_result reach_explorer_desktop_compat_create_host_windows(void)
@@ -582,6 +617,10 @@ static reach_result reach_explorer_desktop_compat_create_host_windows(void)
     }
 
     ShowWindow(g_progmanHwnd, SW_SHOWNOACTIVATE);
+
+    SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    reach_explorer_desktop_compat_register_shell_window(g_progmanHwnd);
 
     DWORD worker_style = WS_CHILD | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 
