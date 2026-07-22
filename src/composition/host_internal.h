@@ -220,6 +220,7 @@ struct reach_host
     reach_surface_runtime quick_settings;
     reach_surface_runtime clipboard_surface;
     reach_host_surface_transition launcher_transition;
+    int32_t launcher_restore_pending;
     reach_host_surface_transition tray_transition;
     reach_host_surface_transition switcher_transition;
     reach_host_surface_transition context_menu_transition;
@@ -359,6 +360,8 @@ void reach_host_remember_launcher_restore_window(reach_host *host);
 void reach_host_toggle_launcher(reach_host *host);
 void reach_host_clear_launcher_restore_window(reach_host *host);
 void reach_host_restore_launcher_focus(reach_host *host);
+void reach_host_request_launcher_focus_restore(reach_host *host);
+void reach_host_flush_launcher_focus_restore(reach_host *host);
 reach_result reach_host_open_launcher_result(reach_host *host);
 reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_index);
 reach_result reach_host_schedule_app_launch(reach_host *host,

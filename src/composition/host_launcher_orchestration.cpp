@@ -81,6 +81,7 @@ void reach_host_toggle_launcher(reach_host *host)
     }
     if (!reach_launcher_is_open(host->launcher_capsule))
     {
+        host->launcher_restore_pending = 0;
         reach_host_remember_launcher_restore_window(host);
     }
     (void)reach_launcher_toggle(host->launcher_capsule);
@@ -104,6 +105,25 @@ static int32_t reach_host_launcher_can_restore_focus_to(reach_host *host, uintpt
     }
 
     return !reach_host_window_is_minimized(host, window);
+}
+
+void reach_host_request_launcher_focus_restore(reach_host *host)
+{
+    if (host != nullptr)
+    {
+        host->launcher_restore_pending = 1;
+    }
+}
+
+void reach_host_flush_launcher_focus_restore(reach_host *host)
+{
+    if (host == nullptr || !host->launcher_restore_pending)
+    {
+        return;
+    }
+
+    host->launcher_restore_pending = 0;
+    reach_host_restore_launcher_focus(host);
 }
 
 void reach_host_restore_launcher_focus(reach_host *host)
@@ -134,10 +154,11 @@ static void reach_host_close_launcher_impl(reach_host *host, int32_t restore_foc
     reach_host_sync_popup_mouse_hook(host);
     if (restore_focus)
     {
-        reach_host_restore_launcher_focus(host);
+        reach_host_request_launcher_focus_restore(host);
     }
     else
     {
+        host->launcher_restore_pending = 0;
         reach_host_clear_launcher_restore_window(host);
     }
 }
