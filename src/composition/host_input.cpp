@@ -1087,7 +1087,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         }
         else
         {
-            reach_host_restore_launcher_focus(host);
+            reach_host_request_launcher_focus_restore(host);
         }
         reach_host_surface_transition_set(host, &host->launcher_transition,
                                           reach_launcher_is_open(host->launcher_capsule));

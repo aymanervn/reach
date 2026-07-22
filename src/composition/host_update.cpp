@@ -76,6 +76,7 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
         !reach_launcher_is_open(host->launcher_capsule))
     {
         reach_host_cleanup_closed_launcher(host);
+        reach_host_flush_launcher_focus_restore(host);
         host->dirty.layout = 1;
         host->launcher.dirty_flags = 1;
     }
