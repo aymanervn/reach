@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/app_update.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/scrollbar.h"
 #include "reach/core/theme.h"
@@ -52,6 +53,7 @@ extern "C"
         REACH_SETTINGS_HIT_UPDATE_REFRESH,
         REACH_SETTINGS_HIT_UPDATE_INSTALL,
         REACH_SETTINGS_HIT_UPDATE_RESTART,
+        REACH_SETTINGS_HIT_REACH_UPDATE,
         REACH_SETTINGS_HIT_UPDATE_CHECKBOX,
         REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK,
         REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB,
@@ -94,6 +96,16 @@ extern "C"
         REACH_SETTINGS_UPDATE_ERROR
     } reach_settings_update_page_state;
 
+    typedef enum reach_settings_reach_update_state
+    {
+        REACH_SETTINGS_REACH_UPDATE_IDLE = 0,
+        REACH_SETTINGS_REACH_UPDATE_CHECKING,
+        REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE,
+        REACH_SETTINGS_REACH_UPDATE_AVAILABLE,
+        REACH_SETTINGS_REACH_UPDATE_DOWNLOADING,
+        REACH_SETTINGS_REACH_UPDATE_ERROR
+    } reach_settings_reach_update_state;
+
     typedef struct reach_settings_model
     {
         reach_settings_page selected_page;
@@ -101,6 +113,11 @@ extern "C"
         int32_t update_scan_completed;
         reach_windows_update_list update_list;
         reach_scrollbar_model update_scrollbar;
+        reach_settings_reach_update_state reach_update_state;
+        reach_app_update_info reach_update_info;
+        uint16_t reach_current_version[REACH_APP_UPDATE_VERSION_CAPACITY];
+        uint64_t reach_download_received;
+        uint64_t reach_download_total;
         int32_t power_minutes[REACH_SETTINGS_POWER_TIMER_COUNT];
         int32_t power_applied_minutes[REACH_SETTINGS_POWER_TIMER_COUNT];
         int32_t power_wait_apps[REACH_SETTINGS_POWER_TIMER_COUNT];
@@ -160,6 +177,10 @@ extern "C"
         reach_rect_f32 update_refresh_button;
         reach_rect_f32 update_install_button;
         reach_rect_f32 update_restart_button;
+        reach_rect_f32 reach_section_title;
+        reach_rect_f32 reach_update_row;
+        reach_rect_f32 reach_update_button;
+        reach_rect_f32 windows_section_title;
         reach_rect_f32 update_viewport;
         reach_rect_f32 update_scrollbar_track;
         reach_rect_f32 update_scrollbar_thumb;
@@ -196,6 +217,7 @@ extern "C"
         reach_rect_f32 account_password_button;
         reach_settings_nav_item_layout nav_items[REACH_SETTINGS_NAV_ITEM_COUNT];
         size_t nav_item_count;
+        reach_rect_f32 nav_footer;
     } reach_settings_layout;
 
     typedef struct reach_settings_hit_result
@@ -233,6 +255,17 @@ extern "C"
     int32_t reach_settings_model_update_busy(const reach_settings_model *model);
     void reach_settings_model_scroll_updates(reach_settings_model *model, float delta);
     int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds);
+
+    void reach_settings_model_set_current_version(reach_settings_model *model,
+                                                  const uint16_t *version);
+    void reach_settings_model_begin_reach_check(reach_settings_model *model);
+    void reach_settings_model_apply_reach_check(reach_settings_model *model,
+                                                const reach_app_update_info *info, int32_t result);
+    void reach_settings_model_begin_reach_download(reach_settings_model *model);
+    void reach_settings_model_apply_reach_download(reach_settings_model *model, int32_t success);
+    int32_t reach_settings_model_reach_update_action_enabled(const reach_settings_model *model);
+    const uint16_t *reach_settings_model_reach_update_status(const reach_settings_model *model);
+    const uint16_t *reach_settings_model_reach_update_button_label(const reach_settings_model *model);
 
     int32_t reach_settings_power_option_minutes(size_t timer, size_t option);
     const uint16_t *reach_settings_power_option_label(size_t timer, size_t option);

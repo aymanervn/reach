@@ -2,6 +2,7 @@
 #define REACH_WINDOWS_ADAPTERS_INTERNAL_H
 
 #include "reach/ports/app_launcher.h"
+#include "reach/ports/app_update.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/dock_reveal_edge.h"
@@ -73,6 +74,7 @@ extern "C"
     reach_result reach_windows_create_input_source(reach_input_source_port *out_port);
     reach_result reach_windows_create_media_controls(reach_media_controls_port *out_port);
     reach_result reach_windows_create_windows_update(reach_windows_update_port *out_port);
+    reach_result reach_windows_create_app_update(reach_app_update_port *out_port);
     reach_result reach_windows_create_config_store(const uint16_t *path,
                                                    reach_config_store_port *out_port);
     reach_result reach_windows_notify_config_changed(void);

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 1.0  LANGUAGES C CXX)
+project(reach VERSION 1.2.0  LANGUAGES C CXX)
 
 option(REACH_BUILD_TESTS "Build Reach test executables and register CTest tests" ON)
 option(REACH_RUN_ARCHITECTURE_CHECK "Run architecture boundary checks as part of the default build" ON)
@@ -12,10 +12,17 @@ endif()
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 set(REACH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+set(REACH_GENERATED_INCLUDE_DIR ${CMAKE_BINARY_DIR}/generated/include)
+configure_file(
+    ${REACH_INCLUDE_DIR}/reach/protocol/version.h.in
+    ${REACH_GENERATED_INCLUDE_DIR}/reach/protocol/version.h
+    @ONLY
+)
 
 function(reach_configure_common target)
     target_include_directories(${target} PUBLIC
         ${REACH_INCLUDE_DIR}
+        ${REACH_GENERATED_INCLUDE_DIR}
     )
     target_compile_definitions(${target} PUBLIC
         UNICODE
@@ -75,6 +82,7 @@ target_link_libraries(reach_services PUBLIC
 )
 
 add_library(reach_core STATIC
+    src/core/app_update.c
     src/core/clipboard.c
     src/core/scrollbar.cpp
     src/core/ui_state.c
@@ -177,6 +185,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/startup_apps_win32.cpp
     src/adapters/windows/user_account_win32.cpp
     src/adapters/windows/windows_update_wua.cpp
+    src/adapters/windows/reach_update_winhttp.cpp
 )
 
 reach_configure_common(reach_windows_adapters)
@@ -217,6 +226,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     iphlpapi
     wbemuuid
     Wuguid
+    winhttp
 )
 
 add_library(reach_composition STATIC
@@ -486,6 +496,28 @@ target_link_libraries(reach_update_helper PRIVATE
     Wuguid
 )
 
+add_executable(reach_updater WIN32
+    src/tools/reach_updater/reach_updater.cpp
+)
+set_target_properties(reach_updater PROPERTIES OUTPUT_NAME "reachUpdater")
+
+if (MSVC)
+    target_link_options(reach_updater PRIVATE
+        "/MANIFEST:EMBED"
+        "/MANIFESTINPUT:${CMAKE_SOURCE_DIR}/resources/updater.manifest"
+    )
+endif()
+
+reach_configure_common(reach_updater)
+reach_configure_windows(reach_updater)
+target_compile_features(reach_updater PRIVATE cxx_std_17)
+target_link_libraries(reach_updater PRIVATE
+    shell32
+    shlwapi
+    user32
+    advapi32
+)
+
 set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
 set(REACH_DIST_DIR "${REACH_DIST_ROOT}/$<CONFIG>")
 set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-$<CONFIG>.zip")
@@ -497,6 +529,7 @@ set(REACH_RELEASE_TARGETS
     reachWatchdog
     reach_service
     reach_update_helper
+    reach_updater
 )
 
 add_custom_target(reach_release_zip
@@ -510,6 +543,7 @@ add_custom_target(reach_release_zip
         "$<TARGET_FILE:reachWatchdog>"
         "$<TARGET_FILE:reach_service>"
         "$<TARGET_FILE:reach_update_helper>"
+        "$<TARGET_FILE:reach_updater>"
         "${REACH_RELEASE_IMAGE}"
         "${REACH_DIST_DIR}/reach"
 

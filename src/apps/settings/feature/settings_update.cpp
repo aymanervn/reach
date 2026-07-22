@@ -7,7 +7,116 @@
 
 const uint16_t *reach_settings_update_page_title(void)
 {
-    return (const uint16_t *)u"Windows Updates";
+    return (const uint16_t *)u"Updates";
+}
+
+static void reach_settings_version_to_ascii(const uint16_t *version, char *out, size_t capacity)
+{
+    size_t index = 0;
+    while (version != nullptr && version[index] != 0 && index + 1 < capacity)
+    {
+        out[index] = version[index] < 128 ? (char)version[index] : '?';
+        ++index;
+    }
+    out[index] = 0;
+}
+
+void reach_settings_model_set_current_version(reach_settings_model *model, const uint16_t *version)
+{
+    if (model == nullptr)
+        return;
+    reach_copy_utf16(model->reach_current_version, REACH_APP_UPDATE_VERSION_CAPACITY, version);
+}
+
+void reach_settings_model_begin_reach_check(reach_settings_model *model)
+{
+    if (model == nullptr || model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_CHECKING ||
+        model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_DOWNLOADING)
+        return;
+    model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_CHECKING;
+}
+
+void reach_settings_model_apply_reach_check(reach_settings_model *model,
+                                            const reach_app_update_info *info, int32_t result)
+{
+    if (model == nullptr)
+        return;
+    if (result == 0 || info == nullptr || !info->has_release)
+    {
+        model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_ERROR;
+        return;
+    }
+    model->reach_update_info = *info;
+    char current[REACH_APP_UPDATE_VERSION_CAPACITY] = {};
+    char latest[REACH_APP_UPDATE_VERSION_CAPACITY] = {};
+    reach_settings_version_to_ascii(model->reach_current_version, current, sizeof(current));
+    reach_settings_version_to_ascii(info->version, latest, sizeof(latest));
+    model->reach_update_state = reach_app_version_compare(current, latest) < 0
+                                    ? REACH_SETTINGS_REACH_UPDATE_AVAILABLE
+                                    : REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE;
+}
+
+void reach_settings_model_begin_reach_download(reach_settings_model *model)
+{
+    if (model == nullptr || model->reach_update_state != REACH_SETTINGS_REACH_UPDATE_AVAILABLE)
+        return;
+    model->reach_download_received = 0;
+    model->reach_download_total = 0;
+    model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_DOWNLOADING;
+}
+
+void reach_settings_model_apply_reach_download(reach_settings_model *model, int32_t success)
+{
+    if (model == nullptr)
+        return;
+    model->reach_update_state = success ? REACH_SETTINGS_REACH_UPDATE_AVAILABLE
+                                        : REACH_SETTINGS_REACH_UPDATE_ERROR;
+}
+
+int32_t reach_settings_model_reach_update_action_enabled(const reach_settings_model *model)
+{
+    return model != nullptr && model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_AVAILABLE;
+}
+
+const uint16_t *reach_settings_model_reach_update_status(const reach_settings_model *model)
+{
+    if (model == nullptr)
+        return (const uint16_t *)u"";
+    switch (model->reach_update_state)
+    {
+    case REACH_SETTINGS_REACH_UPDATE_CHECKING:
+        return (const uint16_t *)u"Checking for updates...";
+    case REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE:
+        return (const uint16_t *)u"Reach is up to date.";
+    case REACH_SETTINGS_REACH_UPDATE_AVAILABLE:
+        return (const uint16_t *)u"A new version is available.";
+    case REACH_SETTINGS_REACH_UPDATE_DOWNLOADING:
+        return (const uint16_t *)u"Downloading update...";
+    case REACH_SETTINGS_REACH_UPDATE_ERROR:
+        return (const uint16_t *)u"Unable to check for updates.";
+    case REACH_SETTINGS_REACH_UPDATE_IDLE:
+    default:
+        return (const uint16_t *)u"Check for the latest Reach release.";
+    }
+}
+
+const uint16_t *reach_settings_model_reach_update_button_label(const reach_settings_model *model)
+{
+    if (model == nullptr)
+        return (const uint16_t *)u"Check";
+    switch (model->reach_update_state)
+    {
+    case REACH_SETTINGS_REACH_UPDATE_CHECKING:
+        return (const uint16_t *)u"Checking...";
+    case REACH_SETTINGS_REACH_UPDATE_AVAILABLE:
+        return (const uint16_t *)u"Update";
+    case REACH_SETTINGS_REACH_UPDATE_DOWNLOADING:
+        return (const uint16_t *)u"Updating...";
+    case REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE:
+        return (const uint16_t *)u"Up to date";
+    default:
+        return (const uint16_t *)u"Check";
+    }
 }
 
 static int identity_equal(const reach_windows_update_identity *left,
