@@ -20,6 +20,7 @@ extern "C"
         float last_opacity;
         int32_t bounds_valid;
         int32_t opacity_valid;
+        int32_t activated;
         uint32_t dirty_flags;
     } reach_surface_runtime;
 

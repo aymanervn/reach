@@ -140,26 +140,13 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         int32_t open_windows_changed = 0;
         (void)reach_host_refresh_open_windows(host, &open_windows_changed);
 
-        uintptr_t foreground_window =
-            host->window_manager.ops.foreground != nullptr
-                ? host->window_manager.ops.foreground(host->window_manager.manager)
-                : 0;
-        int32_t foreground_changed = reach_host_foreground_window(host) != foreground_window;
-        reach_host_note_foreground_window(host, foreground_window);
-
-        if (open_windows_changed || foreground_changed)
+        if (open_windows_changed)
         {
             reach_host_refresh_switcher_windows(host);
             host->dock.dirty_flags = 1;
             host->switcher.dirty_flags = 1;
         }
-
-        if (foreground_changed && foreground_window != 0 &&
-            reach_launcher_is_open(host->launcher_capsule))
-        {
-            reach_host_clear_launcher_restore_window(host);
-            reach_host_close_launcher_without_focus_restore(host);
-        }
+        reach_host_apply_foreground_change(host);
     }
     (void)reach_host_update_game_mode(host);
     int32_t game_mode = reach_host_game_mode_enabled(host);

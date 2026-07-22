@@ -917,37 +917,27 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         int32_t open_windows_changed = 0;
         (void)reach_host_refresh_open_windows(host, &open_windows_changed);
 
-        uintptr_t foreground_window =
-            host->window_manager.ops.foreground != nullptr
-                ? host->window_manager.ops.foreground(host->window_manager.manager)
-                : 0;
-        int32_t foreground_changed = reach_host_foreground_window(host) != foreground_window;
-        reach_host_note_foreground_window(host, foreground_window);
-
-        if (open_windows_changed || foreground_changed)
+        if (open_windows_changed)
         {
             reach_host_refresh_switcher_windows(host);
             host->dock.dirty_flags = 1;
             host->switcher.dirty_flags = 1;
         }
-        if (foreground_changed && foreground_window != 0 &&
-            reach_launcher_is_open(host->launcher_capsule))
-        {
-            reach_host_clear_launcher_restore_window(host);
-            reach_host_close_launcher_without_focus_restore(host);
-        }
+        reach_host_apply_foreground_change(host);
         (void)reach_host_update_game_mode(host);
+        return REACH_OK;
+    }
+
+    if (event->type == REACH_UI_EVENT_FOREGROUND_CHANGED)
+    {
+        reach_host_apply_foreground_change(host);
         return REACH_OK;
     }
 
     if (event->type == REACH_UI_EVENT_WINDOW_FOCUS_LOST)
     {
-        if (source == REACH_SURFACE_LAUNCHER && reach_launcher_is_open(host->launcher_capsule))
-        {
-            reach_host_clear_launcher_restore_window(host);
-            reach_host_close_launcher_without_focus_restore(host);
-            reach_host_request_update(host);
-        }
+        reach_host_close_activating_surfaces_on_focus_loss(host);
+        reach_host_request_update(host);
         return REACH_OK;
     }
 
@@ -1094,6 +1084,10 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         if (reach_launcher_is_open(host->launcher_capsule))
         {
             reach_launcher_reset_text_edit(host->launcher_capsule);
+        }
+        else
+        {
+            reach_host_restore_launcher_focus(host);
         }
         reach_host_surface_transition_set(host, &host->launcher_transition,
                                           reach_launcher_is_open(host->launcher_capsule));

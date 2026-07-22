@@ -172,6 +172,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/system_controls_network.cpp
     src/adapters/windows/system_controls_win32.cpp
     src/adapters/windows/dock_reveal_edge_win32.cpp
+    src/adapters/windows/foreground_watcher_win32.cpp
     src/adapters/windows/monitor_win32.cpp
     src/adapters/windows/startup_apps_win32.cpp
     src/adapters/windows/user_account_win32.cpp

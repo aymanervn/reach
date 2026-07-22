@@ -56,11 +56,7 @@ reach_result reach_host_handle_switcher_event(reach_host *host, const reach_ui_e
         {
             (void)host->window_manager.ops.refresh(host->window_manager.manager);
             (void)reach_host_refresh_open_windows(host, nullptr);
-            if (host->window_manager.ops.foreground != nullptr)
-            {
-                reach_host_note_foreground_window(
-                    host, host->window_manager.ops.foreground(host->window_manager.manager));
-            }
+            reach_host_apply_foreground_change(host);
         }
     }
 

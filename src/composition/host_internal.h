@@ -95,6 +95,13 @@ typedef enum reach_surface_pointer_flags
     REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED = 1u << 4
 } reach_surface_pointer_flags;
 
+typedef enum reach_surface_behavior_flags
+{
+    REACH_SURFACE_BEHAVIOR_NONE = 0,
+
+    REACH_SURFACE_BEHAVIOR_ACTIVATES = 1u << 0
+} reach_surface_behavior_flags;
+
 typedef struct reach_surface_desc
 {
     reach_surface_id id;
@@ -108,6 +115,8 @@ typedef struct reach_surface_desc
     const reach_feature_capsule_ops *capsule_ops;
 
     uint32_t pointer_flags;
+
+    uint32_t behavior_flags;
 
     reach_surface_role role;
 
@@ -132,6 +141,8 @@ typedef struct reach_surface_desc
 
 void reach_host_init_surface_descriptors(reach_host *host);
 
+int32_t reach_host_surface_is_open(const reach_surface_desc *desc);
+void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
 int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask);
 int32_t reach_host_any_surface_dirty(const reach_host *host);
 
@@ -218,6 +229,7 @@ struct reach_host
     reach_surface_desc surface_descs[REACH_HOST_SURFACE_COUNT];
     reach_input_source_port input_source;
     reach_window_manager_port window_manager;
+    reach_foreground_watcher_port foreground_watcher;
     reach_config_store_port config_store;
     reach_tray_provider_port tray_provider;
     reach_search_provider_port search_provider;
@@ -335,7 +347,7 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_run
                                              const reach_render_command_buffer *content_commands);
 
 void reach_host_sync_popup_mouse_hook(reach_host *host);
-void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_launcher_focus);
+void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);
 
 void reach_host_notify_launcher_search_ready(reach_host *host);
 void reach_host_cleanup_closed_launcher(reach_host *host);
@@ -421,6 +433,7 @@ void reach_host_release_quick_settings_audio_render_icons(reach_host *host);
 void reach_host_drain_now_playing_retired_covers(reach_host *host);
 reach_result reach_host_refresh_open_windows(reach_host *host, int32_t *out_changed);
 void reach_host_note_foreground_window(reach_host *host, uintptr_t foreground_window);
+void reach_host_apply_foreground_change(reach_host *host);
 
 int32_t reach_host_window_is_minimized(const reach_host *host, uintptr_t window_id);
 reach_result reach_host_schedule_window_control(reach_host *host,

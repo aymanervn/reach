@@ -53,7 +53,6 @@ extern "C"
     const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count);
 
     void reach_launcher_clear_pressed(reach_launcher *launcher);
-    void reach_launcher_set_focused(reach_launcher *launcher, int32_t focused);
 
     void reach_launcher_remember_restore_window(reach_launcher *launcher, uintptr_t window);
     void reach_launcher_clear_restore_window(reach_launcher *launcher);
@@ -112,8 +111,6 @@ extern "C"
         reach_scrollbar_drag launcher_scrollbar_drag;
 
         reach_text_edit launcher_text_edit;
-        int32_t launcher_focused;
-
         uintptr_t restore_window;
         int32_t restore_window_valid;
         double launcher_caret_blink_seconds;
