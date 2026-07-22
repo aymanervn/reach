@@ -658,6 +658,22 @@ target_link_libraries(reach_search_ranking_tests PRIVATE
     reach_support
 )
 
+add_executable(reach_dock_model_tests
+    tests/dock_model_tests.cpp
+)
+
+reach_configure_common(reach_dock_model_tests)
+target_compile_features(reach_dock_model_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_dock_model_tests PRIVATE reach_features)
+
+add_executable(reach_window_tracking_tests
+    tests/window_tracking_tests.cpp
+)
+
+reach_configure_common(reach_window_tracking_tests)
+target_compile_features(reach_window_tracking_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_window_tracking_tests PRIVATE reach_services)
+
 add_executable(reach_system_controls_network_tests
     tests/system_controls_network_tests.cpp
     src/adapters/windows/system_controls_network.cpp
@@ -681,6 +697,8 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_text_edit_tests COMMAND reach_text_edit_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
+    add_test(NAME reach_dock_model_tests COMMAND reach_dock_model_tests)
+    add_test(NAME reach_window_tracking_tests COMMAND reach_window_tracking_tests)
 endif()
 
 if(REACH_RUN_ARCHITECTURE_CHECK)

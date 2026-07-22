@@ -16,18 +16,7 @@ int32_t reach_dock_key_equal(const reach_dock_order_key *a, const reach_dock_ord
     {
         return 0;
     }
-
-    if (a->pinned && b->pinned)
-    {
-        return a->pin_id != 0 && a->pin_id == b->pin_id;
-    }
-
-    if (!a->pinned && !b->pinned)
-    {
-        return a->window != 0 && a->window == b->window;
-    }
-
-    return a->window != 0 && a->window == b->window;
+    return a->pinned == b->pinned && a->app_id != 0 && a->app_id == b->app_id;
 }
 
 uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *model, size_t index)
@@ -36,7 +25,19 @@ uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *mo
     {
         return 0;
     }
-    return model->items[index].pin_id;
+    return model->items[index].app_id;
+}
+
+reach_dock_order_key reach_dock_item_key_at(const reach_dock_feature_model *model, size_t index)
+{
+    reach_dock_order_key key = {};
+    if (model == nullptr || index >= model->item_count)
+    {
+        return key;
+    }
+    key.pinned = model->items[index].pinned;
+    key.app_id = model->items[index].app_id;
+    return key;
 }
 
 int32_t reach_dock_feature_model_item_matches_key(const reach_dock_feature_model *model,
@@ -47,10 +48,7 @@ int32_t reach_dock_feature_model_item_matches_key(const reach_dock_feature_model
         return 0;
     }
 
-    reach_dock_order_key item_key = {};
-    item_key.pinned = model->items[index].pinned;
-    item_key.pin_id = model->items[index].pin_id;
-    item_key.window = model->items[index].window;
+    reach_dock_order_key item_key = reach_dock_item_key_at(model, index);
     return reach_dock_key_equal(&item_key, &key);
 }
 
@@ -184,7 +182,7 @@ size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_mode
     {
         if (model->order[index].pinned)
         {
-            if (model->order[index].pin_id == pin_id)
+            if (model->order[index].app_id == pin_id)
             {
                 return pinned_index;
             }

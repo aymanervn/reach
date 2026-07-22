@@ -2,14 +2,6 @@
 
 #include <math.h>
 
-static int32_t reach_host_dock_key_equal(int32_t a_pinned, uint32_t a_pin_id, uintptr_t a_window,
-                                         int32_t b_pinned, uint32_t b_pin_id, uintptr_t b_window)
-{
-    reach_dock_order_key a = {a_pinned, a_pin_id, a_window};
-    reach_dock_order_key b = {b_pinned, b_pin_id, b_window};
-    return reach_dock_key_equal(&a, &b);
-}
-
 static int32_t reach_host_transient_open(const reach_host *host)
 {
 

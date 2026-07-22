@@ -525,10 +525,9 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
         return 0.0f;
     }
 
-    reach_dock_order_key drag_key = {state->drag.pinned, state->drag.pin_id, state->drag.window};
     if ((state->drag.active ||
          reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)) &&
-        reach_dock_feature_model_item_matches_key(&state->model, index, drag_key))
+        reach_dock_feature_model_item_matches_key(&state->model, index, state->drag.key))
     {
         return reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
                    ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)
@@ -536,12 +535,9 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
     }
 
     const float slot_x = reach_dock_slot_box_x(theme, layout, index);
-    reach_dock_order_key item_x_key = {state->item_x_pinned[index], state->item_x_pin_ids[index],
-                                       state->item_x_windows[index]};
-    reach_dock_order_key item_key = {state->model.items[index].pinned,
-                                     reach_dock_feature_model_item_pin_id(&state->model, index),
-                                     state->model.items[index].window};
-    if (state->item_x_valid[index] && reach_dock_key_equal(&item_x_key, &item_key))
+    reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
+    if (state->item_x_valid[index] &&
+        reach_dock_key_equal(&state->item_x_keys[index], &item_key))
     {
         return slot_x + reach_animation_manager_value(manager, reach_dock_item_animation_id(index));
     }
@@ -571,10 +567,9 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
         item_reveal[index] = reach_dock_item_reveal(dock, index);
     }
 
-    reach_dock_order_key drag_key = {state->drag.pinned, state->drag.pin_id, state->drag.window};
     size_t dragged_render_index =
         (state->drag.active || reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
-            ? reach_dock_feature_model_find_item_key(&state->model, drag_key)
+            ? reach_dock_feature_model_find_item_key(&state->model, state->drag.key)
             : REACH_MAX_PINNED_APPS;
     float dragged_x = reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
                           ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)

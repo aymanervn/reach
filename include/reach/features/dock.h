@@ -29,17 +29,15 @@ extern "C"
     typedef struct reach_dock_order_key
     {
         int32_t pinned;
-        uint32_t pin_id;
-        uintptr_t window;
+        uint32_t app_id;
     } reach_dock_order_key;
 
     typedef struct reach_dock_item_model
     {
         int32_t pinned;
-        uint32_t pin_id;
+        uint32_t app_id;
         uintptr_t window;
         size_t pinned_index;
-        size_t open_index;
     } reach_dock_item_model;
 
     typedef struct reach_dock_feature_model
@@ -62,6 +60,8 @@ extern "C"
                                                    reach_dock_order_key key);
     void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t source,
                                              size_t target);
+    reach_dock_order_key reach_dock_item_key_at(const reach_dock_feature_model *model,
+                                                size_t index);
     size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_model *model,
                                                        uint32_t pin_id);
     size_t
@@ -72,8 +72,8 @@ extern "C"
     void reach_dock_feature_model_build_items(
         reach_dock_feature_model *model, const reach_pinned_app_model *pinned_apps,
         size_t pinned_app_count, const reach_window_snapshot *open_windows,
-        size_t open_window_count, reach_dock_window_matches_pinned_fn window_matches_pinned,
-        void *match_user);
+        const uint32_t *window_group_ids, size_t open_window_count,
+        reach_dock_window_matches_pinned_fn window_matches_pinned, void *match_user);
     typedef struct reach_dock_render_item
     {
         reach_icon_handle icon;
@@ -255,9 +255,7 @@ extern "C"
         int32_t moved;
         size_t source_index;
         size_t target_index;
-        int32_t pinned;
-        uint32_t pin_id;
-        uintptr_t window;
+        reach_dock_order_key key;
         int32_t start_x;
         int32_t start_y;
         float grab_offset_x;
@@ -286,9 +284,7 @@ extern "C"
         int32_t feedback_sticky;
 
         int32_t item_x_valid[REACH_MAX_PINNED_APPS];
-        int32_t item_x_pinned[REACH_MAX_PINNED_APPS];
-        uint32_t item_x_pin_ids[REACH_MAX_PINNED_APPS];
-        uintptr_t item_x_windows[REACH_MAX_PINNED_APPS];
+        reach_dock_order_key item_x_keys[REACH_MAX_PINNED_APPS];
         int32_t items_changed;
 
         uint16_t clock_time_text[32];

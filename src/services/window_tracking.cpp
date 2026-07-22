@@ -12,7 +12,9 @@ struct reach_window_tracking
     reach_window_manager_port window_manager;
 
     reach_window_snapshot open_windows[REACH_MAX_PINNED_APPS];
+    uint32_t group_ids[REACH_MAX_PINNED_APPS];
     size_t open_window_count;
+    uint32_t next_group_id;
     uintptr_t foreground_window;
     uintptr_t focus_history[REACH_MAX_PINNED_APPS];
     size_t focus_history_count;
@@ -49,6 +51,7 @@ reach_result reach_window_tracking_create(reach_window_manager_port window_manag
         return REACH_ERROR;
     }
     service->window_manager = window_manager;
+    service->next_group_id = 1;
     *out_service = service;
     return REACH_OK;
 }
@@ -157,6 +160,18 @@ static int32_t reach_window_tracking_nonempty_equals_ci(const uint16_t *a, const
            reach_window_tracking_text_equals_ci(a, b);
 }
 
+int32_t reach_window_tracking_identity_equal(const uint16_t *path_a, const uint16_t *aumid_a,
+                                             const uint16_t *path_b, const uint16_t *aumid_b)
+{
+    int32_t aumid_a_set = aumid_a != nullptr && aumid_a[0] != 0;
+    int32_t aumid_b_set = aumid_b != nullptr && aumid_b[0] != 0;
+    if (aumid_a_set && aumid_b_set)
+    {
+        return reach_window_tracking_text_equals_ci(aumid_a, aumid_b);
+    }
+    return reach_window_tracking_nonempty_equals_ci(path_a, path_b);
+}
+
 int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
                                                  const reach_window_snapshot *window)
 {
@@ -164,11 +179,58 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
     {
         return 0;
     }
-    if (reach_window_tracking_nonempty_equals_ci(app->app_user_model_id, window->app_user_model_id))
+    return reach_window_tracking_identity_equal(app->path, app->app_user_model_id, window->path,
+                                                window->app_user_model_id);
+}
+
+int32_t reach_window_tracking_windows_same_app(const reach_window_snapshot *a,
+                                               const reach_window_snapshot *b)
+{
+    if (a == nullptr || b == nullptr)
     {
-        return 1;
+        return 0;
     }
-    return reach_window_tracking_text_equals_ci(app->path, window->path);
+    return reach_window_tracking_identity_equal(a->path, a->app_user_model_id, b->path,
+                                                b->app_user_model_id);
+}
+
+const uint32_t *reach_window_tracking_window_group_ids(const reach_window_tracking *service)
+{
+    return service != nullptr ? service->group_ids : nullptr;
+}
+
+uint32_t reach_window_tracking_window_group_id(const reach_window_tracking *service,
+                                               uintptr_t window_id)
+{
+    if (service == nullptr || window_id == 0)
+    {
+        return 0;
+    }
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        if (service->open_windows[index].id == window_id)
+        {
+            return service->group_ids[index];
+        }
+    }
+    return 0;
+}
+
+uint32_t reach_window_tracking_group_id_for_app(const reach_window_tracking *service,
+                                                const reach_pinned_app_model *app)
+{
+    if (service == nullptr || app == nullptr)
+    {
+        return 0;
+    }
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        if (reach_window_tracking_window_matches_app(app, &service->open_windows[index]))
+        {
+            return service->group_ids[index];
+        }
+    }
+    return 0;
 }
 
 static int32_t reach_window_tracking_open_window_index(const reach_window_tracking *service,
@@ -330,6 +392,7 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
     uint16_t old_icon_refs[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_app_user_model_ids[REACH_MAX_PINNED_APPS][260] = {};
+    uint32_t old_group_ids[REACH_MAX_PINNED_APPS] = {};
     size_t old_count = service->open_window_count;
     if (old_count > REACH_MAX_PINNED_APPS)
     {
@@ -350,6 +413,7 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         reach_copy_utf16(old_titles[index], 260, service->open_windows[index].title);
         reach_copy_utf16(old_app_user_model_ids[index], 260,
                          service->open_windows[index].app_user_model_id);
+        old_group_ids[index] = service->group_ids[index];
     }
 
     service->open_window_count = 0;
@@ -368,6 +432,40 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
 
         size_t out_index = service->open_window_count++;
         service->open_windows[out_index] = snapshot;
+    }
+
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        const reach_window_snapshot *window = &service->open_windows[index];
+        uint32_t group_id = 0;
+        for (size_t old_index = 0; old_index < old_count && group_id == 0; ++old_index)
+        {
+            if (old_windows[old_index] == window->id)
+            {
+                group_id = old_group_ids[old_index];
+            }
+        }
+        for (size_t prior = 0; prior < index && group_id == 0; ++prior)
+        {
+            if (reach_window_tracking_windows_same_app(window, &service->open_windows[prior]))
+            {
+                group_id = service->group_ids[prior];
+            }
+        }
+        for (size_t old_index = 0; old_index < old_count && group_id == 0; ++old_index)
+        {
+            if (reach_window_tracking_identity_equal(window->path, window->app_user_model_id,
+                                                     old_paths[old_index],
+                                                     old_app_user_model_ids[old_index]))
+            {
+                group_id = old_group_ids[old_index];
+            }
+        }
+        if (group_id == 0)
+        {
+            group_id = service->next_group_id++;
+        }
+        service->group_ids[index] = group_id;
     }
 
     int32_t changed = old_count != service->open_window_count;

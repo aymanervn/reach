@@ -18,9 +18,7 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
 
 typedef struct reach_dock_item_x_snapshot
 {
-    int32_t pinned[REACH_MAX_PINNED_APPS];
-    uint32_t pin_ids[REACH_MAX_PINNED_APPS];
-    uintptr_t windows[REACH_MAX_PINNED_APPS];
+    reach_dock_order_key keys[REACH_MAX_PINNED_APPS];
     float x[REACH_MAX_PINNED_APPS];
     size_t count;
 } reach_dock_item_x_snapshot;

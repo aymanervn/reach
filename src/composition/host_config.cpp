@@ -141,6 +141,7 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
 
     reach_dock_order_key old_order[REACH_MAX_PINNED_APPS] = {};
     uint16_t old_order_paths[REACH_MAX_PINNED_APPS][260] = {};
+    uint16_t old_order_aumids[REACH_MAX_PINNED_APPS][260] = {};
     size_t old_order_count = reach_dock_order_count(host->dock_capsule);
     for (size_t order_index = 0; order_index < old_order_count; ++order_index)
     {
@@ -149,10 +150,12 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
         {
             for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
             {
-                if (host->pinned_apps[pin_index].id == old_order[order_index].pin_id)
+                if (host->pinned_apps[pin_index].id == old_order[order_index].app_id)
                 {
                     reach_copy_utf16(old_order_paths[order_index], 260,
                                      host->pinned_apps[pin_index].path);
+                    reach_copy_utf16(old_order_aumids[order_index], 260,
+                                     host->pinned_apps[pin_index].app_user_model_id);
                     break;
                 }
             }
@@ -165,18 +168,60 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
     {
         return result;
     }
+    const reach_window_snapshot *open_windows = reach_host_open_windows(host);
+    const uint32_t *window_group_ids =
+        reach_window_tracking_window_group_ids(host->window_tracking);
+    size_t open_window_count = reach_host_open_window_count(host);
     for (size_t order_index = 0; order_index < old_order_count; ++order_index)
     {
         if (old_order[order_index].pinned && old_order_paths[order_index][0] != 0)
         {
+            int32_t still_pinned = 0;
             for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
             {
                 if (reach_host_path_equals(host->pinned_apps[pin_index].path,
                                            old_order_paths[order_index]))
                 {
-                    old_order[order_index].pin_id = host->pinned_apps[pin_index].id;
+                    old_order[order_index].app_id = host->pinned_apps[pin_index].id;
+                    still_pinned = 1;
                     break;
                 }
+            }
+            if (!still_pinned)
+            {
+                reach_pinned_app_model unpinned_app = {};
+                reach_copy_utf16(unpinned_app.path, 260, old_order_paths[order_index]);
+                reach_copy_utf16(unpinned_app.app_user_model_id, 260,
+                                 old_order_aumids[order_index]);
+                uint32_t group_id =
+                    reach_window_tracking_group_id_for_app(host->window_tracking, &unpinned_app);
+                if (group_id != 0)
+                {
+                    old_order[order_index].pinned = 0;
+                    old_order[order_index].app_id = group_id;
+                }
+            }
+        }
+        else if (!old_order[order_index].pinned && old_order[order_index].app_id != 0 &&
+                 open_windows != nullptr && window_group_ids != nullptr)
+        {
+            for (size_t window_index = 0; window_index < open_window_count; ++window_index)
+            {
+                if (window_group_ids[window_index] != old_order[order_index].app_id)
+                {
+                    continue;
+                }
+                for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
+                {
+                    if (reach_window_tracking_window_matches_app(&host->pinned_apps[pin_index],
+                                                                 &open_windows[window_index]))
+                    {
+                        old_order[order_index].pinned = 1;
+                        old_order[order_index].app_id = host->pinned_apps[pin_index].id;
+                        break;
+                    }
+                }
+                break;
             }
         }
     }
