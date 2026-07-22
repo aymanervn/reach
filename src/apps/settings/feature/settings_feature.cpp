@@ -1,5 +1,6 @@
 #include "reach/core/render_commands.h"
 #include "reach/apps/settings/settings.h"
+#include "reach/protocol/version.h"
 
 #include <string.h>
 
@@ -14,6 +15,15 @@ void reach_settings_model_init(reach_settings_model *model)
     memset(model, 0, sizeof(*model));
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
+    model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_IDLE;
+    {
+        const char *version_text = REACH_VERSION_STRING;
+        uint16_t version_wide[REACH_APP_UPDATE_VERSION_CAPACITY] = {};
+        for (size_t index = 0;
+             version_text[index] != 0 && index + 1 < REACH_APP_UPDATE_VERSION_CAPACITY; ++index)
+            version_wide[index] = (uint16_t)version_text[index];
+        reach_settings_model_set_current_version(model, version_wide);
+    }
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_animation_manager_init(&model->power_animations, model->power_tracks,
                                  REACH_SETTINGS_POWER_TIMER_COUNT);
@@ -141,7 +151,7 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
          {0.97f, 0.75f, 0.22f, 0.20f}},
         {REACH_SETTINGS_PAGE_UPDATE,
          REACH_VECTOR_ICON_RESTART,
-         (const uint16_t *)L"Windows Updates",
+         (const uint16_t *)L"Updates",
          {0.20f, 0.72f, 0.96f, 1.0f},
          {0.20f, 0.72f, 0.96f, 0.20f}},
     };
@@ -282,6 +292,10 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                 item->bounds.width - icon_bg - 26.0f * scale, item_height);
         item_y += item_height + item_gap;
     }
+
+    layout.nav_footer =
+        reach_settings_rect(nav_padding_x, layout.nav.y + layout.nav.height - 32.0f * scale,
+                            layout.nav.width - nav_padding_x * 2.0f, 20.0f * scale);
 
     layout.content_title =
         reach_settings_rect(layout.content.x + 28.0f * scale, layout.content.y + 22.0f * scale,
@@ -461,12 +475,34 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_rect(layout.update_restart_button.x - button_gap - install_width, button_y,
                             install_width, button_height);
 
-    float viewport_y = button_y + button_height + 14.0f * scale;
     float scrollbar_width = 5.0f * scale;
+    float section_header_height = 18.0f * scale;
+    float content_width = layout.content.width - 64.0f * scale - scrollbar_width;
+
+    float reach_title_y = button_y + button_height + 16.0f * scale;
+    layout.reach_section_title = reach_settings_rect(layout.content_title.x, reach_title_y,
+                                                     content_width, section_header_height);
+    float reach_row_y = reach_title_y + section_header_height + 6.0f * scale;
+    float reach_row_height = 64.0f * scale;
+    layout.reach_update_row =
+        reach_settings_rect(layout.content_title.x, reach_row_y, content_width, reach_row_height);
+    float reach_button_width = 128.0f * scale;
+    float reach_button_height = 32.0f * scale;
+    layout.reach_update_button = reach_settings_rect(
+        layout.reach_update_row.x + layout.reach_update_row.width - 14.0f * scale -
+            reach_button_width,
+        reach_row_y + (reach_row_height - reach_button_height) * 0.5f, reach_button_width,
+        reach_button_height);
+
+    float windows_title_y = reach_row_y + reach_row_height + 16.0f * scale;
+    layout.windows_section_title = reach_settings_rect(layout.content_title.x, windows_title_y,
+                                                       content_width, section_header_height);
+
+    float viewport_y = windows_title_y + section_header_height + 6.0f * scale;
     float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
-    layout.update_viewport = reach_settings_rect(
-        layout.content_title.x, viewport_y, layout.content.width - 64.0f * scale - scrollbar_width,
-        viewport_bottom - viewport_y);
+    layout.update_viewport =
+        reach_settings_rect(layout.content_title.x, viewport_y, content_width,
+                            viewport_bottom - viewport_y);
     layout.update_scrollbar_track = reach_settings_rect(
         layout.update_viewport.x + layout.update_viewport.width + 11.0f * scale,
         layout.update_viewport.y, scrollbar_width, layout.update_viewport.height);
@@ -579,6 +615,12 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
     if (reach_settings_rect_contains(layout->update_restart_button, x, y))
     {
         result.type = REACH_SETTINGS_HIT_UPDATE_RESTART;
+        return result;
+    }
+    if (layout->reach_update_button.width > 0.0f &&
+        reach_settings_rect_contains(layout->reach_update_button, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_REACH_UPDATE;
         return result;
     }
     if (reach_settings_rect_contains(layout->update_scrollbar_thumb, x, y))

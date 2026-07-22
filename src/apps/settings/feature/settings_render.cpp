@@ -395,6 +395,92 @@ static void render_power_page(const reach_settings_render_input *input,
                                                                    REACH_SETTINGS_HIT_POWER_APPLY));
 }
 
+static void build_reach_version_line(const reach_settings_model *model, uint16_t *text,
+                                     size_t capacity)
+{
+    text[0] = 0;
+    append_text(text, capacity, (const uint16_t *)u"Reach ");
+    append_text(text, capacity, model->reach_current_version[0] != 0 ? model->reach_current_version
+                                                                      : (const uint16_t *)u"?");
+    if (model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_AVAILABLE &&
+        model->reach_update_info.version[0] != 0)
+    {
+        append_text(text, capacity, (const uint16_t *)u"  →  ");
+        append_text(text, capacity, model->reach_update_info.version);
+    }
+}
+
+static void render_reach_section(const reach_settings_render_input *input,
+                                 reach_render_command_buffer *commands)
+{
+    const reach_settings_model *model = input->model;
+    const reach_settings_layout *layout = input->layout;
+    reach_color accent = {0.20f, 0.72f, 0.96f, 1.0f};
+
+    push_text(commands, layout->reach_section_title, (const uint16_t *)u"Reach",
+              scale_value(input, 11.0f), REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+              input->theme->settings_secondary_text, 1);
+
+    const reach_rect_f32 row = layout->reach_update_row;
+    push_rect(commands, row, scale_value(input, 8.0f), {0.12f, 0.15f, 0.18f, 0.82f});
+
+    reach_rect_f32 icon_box = {row.x + scale_value(input, 12.0f),
+                              row.y + (row.height - scale_value(input, 34.0f)) * 0.5f,
+                              scale_value(input, 34.0f), scale_value(input, 34.0f)};
+    push_rect(commands, icon_box, scale_value(input, 8.0f), color_with_alpha(accent, 0.18f));
+    push_icon(commands, icon_box, accent, REACH_VECTOR_ICON_RESTART, 0.22f);
+
+    float left = icon_box.x + icon_box.width + scale_value(input, 12.0f);
+    float width = layout->reach_update_button.x - left - scale_value(input, 12.0f);
+    uint16_t version_line[128] = {};
+    build_reach_version_line(model, version_line, 128);
+    push_text(commands, {left, row.y + scale_value(input, 12.0f), width, scale_value(input, 18.0f)},
+              version_line, scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD,
+              input->text_alignment_leading, input->theme->settings_text, 1);
+
+    const uint16_t *status = reach_settings_model_reach_update_status(model);
+    uint16_t status_line[128] = {};
+    if (model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_DOWNLOADING &&
+        model->reach_download_total > 0)
+    {
+        int32_t percent =
+            (int32_t)((model->reach_download_received * 100) / model->reach_download_total);
+        uint16_t number[8] = {};
+        int32_t digits = 0;
+        int32_t value = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+        do
+        {
+            number[digits++] = (uint16_t)(u'0' + value % 10);
+            value /= 10;
+        } while (value != 0 && digits < 7);
+        append_text(status_line, 128, (const uint16_t *)u"Downloading update... ");
+        for (int32_t index = digits - 1; index >= 0; --index)
+        {
+            uint16_t single[2] = {number[index], 0};
+            append_text(status_line, 128, single);
+        }
+        append_text(status_line, 128, (const uint16_t *)u"%");
+        status = status_line;
+    }
+    push_text(commands, {left, row.y + scale_value(input, 34.0f), width, scale_value(input, 14.0f)},
+              status, scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL,
+              input->text_alignment_leading, input->theme->settings_secondary_text, 1);
+
+    int32_t busy = model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_CHECKING ||
+                   model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_DOWNLOADING;
+    int32_t enabled = !busy && model->reach_update_state != REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE;
+    reach_color button_color =
+        model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_AVAILABLE
+            ? reach_color{0.16f, 0.58f, 0.30f, 1.0f}
+            : reach_color{0.12f, 0.43f, 0.62f, 1.0f};
+    reach_ui_button_style reach_style = settings_button_style(input, button_color);
+    reach_ui_button_render(commands, layout->reach_update_button,
+                           reach_settings_model_reach_update_button_label(model), &reach_style,
+                           enabled,
+                           reach_settings_model_button_press_value(
+                               model, REACH_SETTINGS_HIT_REACH_UPDATE));
+}
+
 static void render_update_page(const reach_settings_render_input *input,
                                reach_render_command_buffer *commands)
 {
@@ -430,10 +516,13 @@ static void render_update_page(const reach_settings_render_input *input,
                            reach_settings_model_button_press_value(
                                model, REACH_SETTINGS_HIT_UPDATE_RESTART));
 
+    render_reach_section(input, commands);
+
+    push_text(commands, layout->windows_section_title, (const uint16_t *)u"Windows updates",
+              scale_value(input, 11.0f), REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+              input->theme->settings_secondary_text, 1);
+
     reach_rect_f32 update_status_message = layout->update_viewport;
-    update_status_message.y = layout->content_title.y + layout->content_title.height;
-    update_status_message.height =
-        layout->update_viewport.y + layout->update_viewport.height - update_status_message.y;
 
     if (model->update_page_state == REACH_SETTINGS_UPDATE_SCANNING)
     {
@@ -571,6 +660,15 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
                   REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
                   input->theme->settings_text, 1);
     }
+
+    uint16_t footer_text[64] = {};
+    append_text(footer_text, 64, (const uint16_t *)u"Reach v");
+    append_text(footer_text, 64, input->model->reach_current_version[0] != 0
+                                     ? input->model->reach_current_version
+                                     : (const uint16_t *)u"?");
+    push_text(commands, input->layout->nav_footer, footer_text, scale_value(input, 11.0f),
+              REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+              color_with_alpha(input->theme->settings_secondary_text, 0.7f), 1);
 
     push_text(commands, input->layout->content_title,
               reach_settings_page_title(input->model->selected_page), scale_value(input, 28.0f),

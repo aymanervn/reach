@@ -101,8 +101,8 @@ static void test_navigation_pages(void)
     expect_true(nav[0].page == REACH_SETTINGS_PAGE_WIFI && equals_ascii(nav[0].label, "Wi-Fi"),
                 "first nav item is Wi-Fi");
     expect_true(nav[6].page == REACH_SETTINGS_PAGE_UPDATE &&
-                    equals_ascii(nav[6].label, "Windows Updates"),
-                "last nav item is Windows Updates");
+                    equals_ascii(nav[6].label, "Updates"),
+                "last nav item is Updates");
 
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_UPDATE);
     expect_true(model->selected_page == REACH_SETTINGS_PAGE_UPDATE,

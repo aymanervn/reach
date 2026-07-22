@@ -18,6 +18,7 @@ extern "C"
 
     typedef struct reach_config_snapshot
     {
+        uint16_t version[32];
         reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
         size_t pinned_app_count;
         uint16_t wallpaper_path[260];

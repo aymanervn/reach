@@ -4,6 +4,10 @@
 #include "reach/apps/settings/settings.h"
 #include "reach/platform/windows_adapters.h"
 
+#include <windows.h>
+#include <shlwapi.h>
+#include <shellapi.h>
+
 #include <atomic>
 #include <condition_variable>
 #include <memory>
@@ -18,6 +22,33 @@ enum reach_settings_update_work_type
     REACH_SETTINGS_UPDATE_WORK_SCAN,
     REACH_SETTINGS_UPDATE_WORK_INSTALL,
     REACH_SETTINGS_UPDATE_WORK_VERIFY
+};
+
+enum reach_settings_reach_work_type
+{
+    REACH_SETTINGS_REACH_WORK_NONE = 0,
+    REACH_SETTINGS_REACH_WORK_CHECK,
+    REACH_SETTINGS_REACH_WORK_DOWNLOAD
+};
+
+struct reach_settings_reach_worker
+{
+    std::thread thread;
+    std::mutex mutex;
+    std::condition_variable cv;
+    int32_t thread_started;
+    int32_t stop;
+    int32_t pending;
+    int32_t in_flight;
+    int32_t completed;
+    reach_settings_reach_work_type pending_work;
+    reach_settings_reach_work_type completed_work;
+    uint16_t url[REACH_APP_UPDATE_URL_CAPACITY];
+    uint16_t dest[260];
+    reach_app_update_info info;
+    reach_result work_result;
+    std::atomic<uint64_t> received;
+    std::atomic<uint64_t> total;
 };
 
 struct reach_settings_update_worker
@@ -48,6 +79,7 @@ struct reach_settings_app
     reach_monitor_port monitors;
     reach_power_session_port power_session;
     reach_windows_update_port windows_update;
+    reach_app_update_port app_update;
     reach_config_store_port config_store;
     reach_user_account_port user_account;
     reach_settings_model model;
@@ -56,6 +88,8 @@ struct reach_settings_app
     reach_rect_f32 bounds;
     const reach_theme *theme;
     reach_settings_update_worker update_worker;
+    reach_settings_reach_worker reach_worker;
+    uint16_t app_update_zip[260];
     reach_scrollbar_drag update_scrollbar_drag;
     int32_t running;
     int32_t dirty;
@@ -640,6 +674,224 @@ static void reach_settings_apply_result(reach_settings_app *app)
     app->dirty = 1;
 }
 
+static void reach_settings_reach_progress(void *user, uint64_t received, uint64_t total)
+{
+    reach_settings_app *app = static_cast<reach_settings_app *>(user);
+    if (app != nullptr)
+    {
+        app->reach_worker.received = received;
+        app->reach_worker.total = total;
+    }
+}
+
+static void reach_settings_reach_worker_main(reach_settings_app *app)
+{
+    reach_settings_reach_worker *worker = &app->reach_worker;
+    for (;;)
+    {
+        reach_settings_reach_work_type work = REACH_SETTINGS_REACH_WORK_NONE;
+        uint16_t url[REACH_APP_UPDATE_URL_CAPACITY] = {};
+        uint16_t dest[260] = {};
+        {
+            std::unique_lock<std::mutex> lock(worker->mutex);
+            worker->cv.wait(lock, [worker] { return worker->stop || worker->pending; });
+            if (worker->stop)
+            {
+                return;
+            }
+            work = worker->pending_work;
+            reach_copy_utf16(url, REACH_APP_UPDATE_URL_CAPACITY, worker->url);
+            reach_copy_utf16(dest, 260, worker->dest);
+            worker->pending = 0;
+            worker->in_flight = 1;
+        }
+
+        reach_app_update_info info = {};
+        reach_result result = REACH_ERROR;
+        if (work == REACH_SETTINGS_REACH_WORK_CHECK && app->app_update.check != nullptr)
+        {
+            result = app->app_update.check(app->app_update.userdata,
+                                           (const uint16_t *)u"aymanervn",
+                                           (const uint16_t *)u"reach", &info);
+        }
+        else if (work == REACH_SETTINGS_REACH_WORK_DOWNLOAD && app->app_update.download != nullptr)
+        {
+            result = app->app_update.download(app->app_update.userdata, url, dest,
+                                              reach_settings_reach_progress, app);
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(worker->mutex);
+            worker->info = info;
+            worker->work_result = result;
+            worker->completed_work = work;
+            worker->completed = 1;
+            worker->in_flight = 0;
+        }
+    }
+}
+
+static reach_result reach_settings_ensure_reach_worker(reach_settings_app *app)
+{
+    if (app->reach_worker.thread_started)
+    {
+        return REACH_OK;
+    }
+    try
+    {
+        app->reach_worker.stop = 0;
+        app->reach_worker.thread = std::thread(reach_settings_reach_worker_main, app);
+        app->reach_worker.thread_started = 1;
+        return REACH_OK;
+    }
+    catch (...)
+    {
+        return REACH_ERROR;
+    }
+}
+
+static int32_t reach_settings_reach_worker_busy(reach_settings_app *app)
+{
+    std::lock_guard<std::mutex> lock(app->reach_worker.mutex);
+    return app->reach_worker.pending || app->reach_worker.in_flight;
+}
+
+static void reach_settings_schedule_reach_check(reach_settings_app *app)
+{
+    if (app == nullptr || app->app_update.check == nullptr ||
+        reach_settings_reach_worker_busy(app) ||
+        reach_settings_ensure_reach_worker(app) != REACH_OK)
+    {
+        return;
+    }
+    reach_settings_model_begin_reach_check(&app->model);
+    {
+        std::lock_guard<std::mutex> lock(app->reach_worker.mutex);
+        app->reach_worker.pending_work = REACH_SETTINGS_REACH_WORK_CHECK;
+        app->reach_worker.pending = 1;
+    }
+    app->reach_worker.cv.notify_one();
+    app->dirty = 1;
+}
+
+static void reach_settings_schedule_reach_download(reach_settings_app *app)
+{
+    if (app == nullptr || app->app_update.download == nullptr ||
+        app->model.reach_update_info.download_url[0] == 0 ||
+        reach_settings_reach_worker_busy(app) ||
+        reach_settings_ensure_reach_worker(app) != REACH_OK)
+    {
+        return;
+    }
+
+    wchar_t temp[MAX_PATH] = {};
+    GetTempPathW(MAX_PATH, temp);
+    std::wstring dir = std::wstring(temp) + L"reach_update";
+    CreateDirectoryW(dir.c_str(), nullptr);
+    std::wstring zip = dir + L"\\reach_update.zip";
+    reach_copy_utf16(app->app_update_zip, 260, reinterpret_cast<const uint16_t *>(zip.c_str()));
+
+    reach_settings_model_begin_reach_download(&app->model);
+    {
+        std::lock_guard<std::mutex> lock(app->reach_worker.mutex);
+        app->reach_worker.received = 0;
+        app->reach_worker.total = 0;
+        reach_copy_utf16(app->reach_worker.url, REACH_APP_UPDATE_URL_CAPACITY,
+                         app->model.reach_update_info.download_url);
+        reach_copy_utf16(app->reach_worker.dest, 260,
+                         reinterpret_cast<const uint16_t *>(zip.c_str()));
+        app->reach_worker.pending_work = REACH_SETTINGS_REACH_WORK_DOWNLOAD;
+        app->reach_worker.pending = 1;
+    }
+    app->reach_worker.cv.notify_one();
+    app->dirty = 1;
+}
+
+static void reach_settings_launch_updater(reach_settings_app *app)
+{
+    wchar_t module[MAX_PATH] = {};
+    if (GetModuleFileNameW(nullptr, module, MAX_PATH) == 0)
+    {
+        return;
+    }
+    wchar_t install_dir[MAX_PATH] = {};
+    reach_copy_utf16(reinterpret_cast<uint16_t *>(install_dir), MAX_PATH,
+                     reinterpret_cast<const uint16_t *>(module));
+    PathRemoveFileSpecW(install_dir);
+
+    wchar_t source_updater[MAX_PATH] = {};
+    reach_copy_utf16(reinterpret_cast<uint16_t *>(source_updater), MAX_PATH,
+                     reinterpret_cast<const uint16_t *>(install_dir));
+    PathAppendW(source_updater, L"reachUpdater.exe");
+
+    wchar_t temp[MAX_PATH] = {};
+    GetTempPathW(MAX_PATH, temp);
+    std::wstring temp_updater = std::wstring(temp) + L"reachUpdater.exe";
+    if (!CopyFileW(source_updater, temp_updater.c_str(), FALSE))
+    {
+        return;
+    }
+
+    std::wstring parameters = L"\"";
+    parameters += reinterpret_cast<const wchar_t *>(app->app_update_zip);
+    parameters += L"\" \"";
+    parameters += install_dir;
+    parameters += L"\" 1";
+    ShellExecuteW(nullptr, L"open", temp_updater.c_str(), parameters.c_str(), nullptr, SW_HIDE);
+    app->running = 0;
+}
+
+static void reach_settings_apply_reach_progress(reach_settings_app *app)
+{
+    uint64_t received = app->reach_worker.received.load();
+    uint64_t total = app->reach_worker.total.load();
+    if (received != app->model.reach_download_received ||
+        total != app->model.reach_download_total)
+    {
+        app->model.reach_download_received = received;
+        app->model.reach_download_total = total;
+        app->dirty = 1;
+    }
+}
+
+static void reach_settings_apply_reach_result(reach_settings_app *app)
+{
+    reach_settings_reach_worker *worker = &app->reach_worker;
+    reach_settings_reach_work_type work = REACH_SETTINGS_REACH_WORK_NONE;
+    reach_app_update_info info = {};
+    reach_result result = REACH_ERROR;
+    {
+        std::lock_guard<std::mutex> lock(worker->mutex);
+        if (!worker->completed)
+        {
+            return;
+        }
+        work = worker->completed_work;
+        info = worker->info;
+        result = worker->work_result;
+        worker->completed = 0;
+    }
+
+    if (work == REACH_SETTINGS_REACH_WORK_CHECK)
+    {
+        reach_settings_model_apply_reach_check(&app->model, result == REACH_OK ? &info : nullptr,
+                                               result == REACH_OK ? 1 : 0);
+    }
+    else if (work == REACH_SETTINGS_REACH_WORK_DOWNLOAD)
+    {
+        if (result == REACH_OK)
+        {
+            reach_settings_model_apply_reach_download(&app->model, 1);
+            reach_settings_launch_updater(app);
+        }
+        else
+        {
+            reach_settings_model_apply_reach_download(&app->model, 0);
+        }
+    }
+    app->dirty = 1;
+}
+
 static void reach_settings_submit_password_change(reach_settings_app *app)
 {
     if (app->user_account.ops.verify_password != nullptr)
@@ -728,6 +980,18 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         if (hit.type == REACH_SETTINGS_HIT_UPDATE_REFRESH)
         {
             reach_settings_schedule_scan(app);
+            reach_settings_schedule_reach_check(app);
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_REACH_UPDATE)
+        {
+            if (app->model.reach_update_state == REACH_SETTINGS_REACH_UPDATE_AVAILABLE)
+            {
+                reach_settings_schedule_reach_download(app);
+            }
+            else
+            {
+                reach_settings_schedule_reach_check(app);
+            }
         }
         else if (hit.type == REACH_SETTINGS_HIT_UPDATE_INSTALL)
         {
@@ -883,8 +1147,8 @@ static void reach_settings_handle_text_event(reach_settings_app *app, const reac
 static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
 {
     return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
-           type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_POWER_APPLY ||
-           type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
+           type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_REACH_UPDATE ||
+           type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
 }
 
 static void reach_settings_handle_pointer_down(reach_settings_app *app, const reach_ui_event *event)
@@ -1051,6 +1315,8 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
         return result;
     }
 
+    (void)reach_windows_create_app_update(&app->app_update);
+
     if (reach_windows_create_user_account(&app->user_account) == REACH_OK &&
         app->user_account.ops.query != nullptr)
     {
@@ -1103,6 +1369,7 @@ reach_result reach_settings_app_start(reach_settings_app *app)
     app->running = 1;
     app->dirty = 1;
     reach_settings_schedule_verification(app);
+    reach_settings_schedule_reach_check(app);
     return REACH_OK;
 }
 
@@ -1114,6 +1381,8 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     }
     reach_settings_apply_progress(app);
     reach_settings_apply_result(app);
+    reach_settings_apply_reach_progress(app);
+    reach_settings_apply_reach_result(app);
     if (reach_settings_model_update_scroll(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -1169,10 +1438,17 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     {
         return 0;
     }
+    reach_settings_reach_worker *reach_worker =
+        const_cast<reach_settings_reach_worker *>(&app->reach_worker);
+    int32_t reach_busy = 0;
+    {
+        std::lock_guard<std::mutex> reach_lock(reach_worker->mutex);
+        reach_busy = reach_worker->pending || reach_worker->in_flight || reach_worker->completed;
+    }
     reach_settings_update_worker *worker =
         const_cast<reach_settings_update_worker *>(&app->update_worker);
     std::lock_guard<std::mutex> lock(worker->mutex);
-    return app->dirty || worker->pending || worker->in_flight || worker->completed ||
+    return app->dirty || reach_busy || worker->pending || worker->in_flight || worker->completed ||
            app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
            app->update_scrollbar_drag.active ||
@@ -1213,6 +1489,24 @@ void reach_settings_app_destroy(reach_settings_app *app)
         }
         app->update_worker.cv.notify_one();
         app->update_worker.thread.join();
+    }
+    if (app->reach_worker.thread_started)
+    {
+        {
+            std::lock_guard<std::mutex> lock(app->reach_worker.mutex);
+            app->reach_worker.stop = 1;
+            app->reach_worker.pending = 0;
+        }
+        if (app->app_update.cancel != nullptr)
+        {
+            app->app_update.cancel(app->app_update.userdata);
+        }
+        app->reach_worker.cv.notify_one();
+        app->reach_worker.thread.join();
+    }
+    if (app->app_update.destroy != nullptr)
+    {
+        app->app_update.destroy(app->app_update.userdata);
     }
     if (app->windows_update.destroy != nullptr)
     {
