@@ -6,6 +6,7 @@
 #include <winhttp.h>
 
 #include <atomic>
+#include <cstring>
 #include <new>
 #include <string>
 
@@ -91,67 +92,64 @@ static reach_result reach_app_update_https_get(const wchar_t *host, const wchar_
     return result;
 }
 
-static int reach_app_update_find_key(const std::string &json, const char *key, size_t from,
-                                     size_t *out_value_start)
-{
-    std::string needle = std::string("\"") + key + "\"";
-    size_t position = json.find(needle, from);
-    if (position == std::string::npos)
-    {
-        return 0;
-    }
-    position += needle.size();
-    while (position < json.size() && (json[position] == ' ' || json[position] == ':' ||
-                                      json[position] == '\t' || json[position] == '\n'))
-    {
-        ++position;
-    }
-    *out_value_start = position;
-    return 1;
-}
-
-static std::string reach_app_update_read_string(const std::string &json, size_t value_start)
+static std::string reach_app_update_clean_notes(const std::string &html)
 {
     std::string out;
-    if (value_start >= json.size() || json[value_start] != '"')
+    size_t index = 0;
+    int32_t in_tag = 0;
+    while (index < html.size() && out.size() < REACH_APP_UPDATE_NOTES_CAPACITY - 1)
     {
-        return out;
-    }
-    size_t index = value_start + 1;
-    while (index < json.size())
-    {
-        char c = json[index];
-        if (c == '\\' && index + 1 < json.size())
+        char c = html[index];
+        if (c == '<')
         {
-            char next = json[index + 1];
-            if (next == 'n')
+            in_tag = 1;
+            ++index;
+            continue;
+        }
+        if (c == '>')
+        {
+            in_tag = 0;
+            ++index;
+            continue;
+        }
+        if (in_tag)
+        {
+            ++index;
+            continue;
+        }
+        if (c == '&')
+        {
+            if (html.compare(index, 4, "&lt;") == 0)
             {
-                out.push_back('\n');
+                out.push_back('<');
+                index += 4;
             }
-            else if (next == 'r')
+            else if (html.compare(index, 4, "&gt;") == 0)
             {
-                out.push_back('\r');
+                out.push_back('>');
+                index += 4;
             }
-            else if (next == 't')
+            else if (html.compare(index, 5, "&amp;") == 0)
             {
-                out.push_back(' ');
-            }
-            else if (next == 'u' && index + 5 < json.size())
-            {
+                out.push_back('&');
                 index += 5;
-                index += 1;
-                continue;
+            }
+            else if (html.compare(index, 6, "&quot;") == 0)
+            {
+                out.push_back('"');
+                index += 6;
+            }
+            else if (html.compare(index, 5, "&#39;") == 0)
+            {
+                out.push_back('\'');
+                index += 5;
             }
             else
             {
-                out.push_back(next);
+                out.push_back('&');
+                ++index;
             }
-            index += 2;
             continue;
-        }
-        if (c == '"')
-        {
-            break;
         }
         out.push_back(c);
         ++index;
@@ -172,70 +170,63 @@ static reach_result reach_app_update_check(void *userdata, const uint16_t *owner
     }
     *out_info = {};
 
-    std::wstring path = L"/repos/";
-    path += reinterpret_cast<const wchar_t *>(owner);
-    path += L"/";
-    path += reinterpret_cast<const wchar_t *>(repo);
-    path += L"/releases/latest";
+    const wchar_t *owner_w = reinterpret_cast<const wchar_t *>(owner);
+    const wchar_t *repo_w = reinterpret_cast<const wchar_t *>(repo);
 
+    std::wstring path = std::wstring(L"/") + owner_w + L"/" + repo_w + L"/releases.atom";
     std::string body;
-    reach_result result = reach_app_update_https_get(
-        L"api.github.com", path.c_str(),
-        L"Accept: application/vnd.github+json\r\nX-GitHub-Api-Version: 2022-11-28\r\n", &body);
+    reach_result result =
+        reach_app_update_https_get(L"github.com", path.c_str(),
+                                   L"Accept: application/atom+xml\r\n", &body);
     if (result != REACH_OK || body.empty())
     {
         return REACH_ERROR;
     }
 
-    size_t value_start = 0;
-    if (!reach_app_update_find_key(body, "tag_name", 0, &value_start))
+    size_t entry = body.find("<entry>");
+    if (entry == std::string::npos)
     {
         return REACH_ERROR;
     }
-    std::string tag = reach_app_update_read_string(body, value_start);
-    if (tag.empty())
+    const char *tag_marker = "/releases/tag/";
+    size_t tag_start = body.find(tag_marker, entry);
+    if (tag_start == std::string::npos)
     {
         return REACH_ERROR;
     }
-
-    std::string chosen_url;
-    size_t search = 0;
-    while (reach_app_update_find_key(body, "browser_download_url", search, &value_start))
+    tag_start += strlen(tag_marker);
+    size_t tag_end = body.find('"', tag_start);
+    if (tag_end == std::string::npos || tag_end <= tag_start)
     {
-        std::string url = reach_app_update_read_string(body, value_start);
-        search = value_start + url.size() + 1;
-        if (url.size() >= 4 && url.compare(url.size() - 4, 4, ".zip") == 0)
-        {
-            chosen_url = url;
-            break;
-        }
+        return REACH_ERROR;
     }
+    std::string tag = body.substr(tag_start, tag_end - tag_start);
 
     std::string notes;
-    if (reach_app_update_find_key(body, "body", 0, &value_start))
+    size_t content = body.find("<content", entry);
+    if (content != std::string::npos)
     {
-        notes = reach_app_update_read_string(body, value_start);
-        if (notes.size() > REACH_APP_UPDATE_NOTES_CAPACITY - 1)
+        size_t content_start = body.find('>', content);
+        size_t content_end = body.find("</content>", content);
+        if (content_start != std::string::npos && content_end != std::string::npos &&
+            content_end > content_start)
         {
-            notes.resize(REACH_APP_UPDATE_NOTES_CAPACITY - 1);
+            notes = reach_app_update_clean_notes(
+                body.substr(content_start + 1, content_end - content_start - 1));
         }
     }
 
-    reach_app_update_store_utf16(out_info->version, REACH_APP_UPDATE_VERSION_CAPACITY,
-                                 reach_app_update_utf8_to_utf16(tag.c_str(), tag.size()));
-    reach_app_update_store_utf16(out_info->download_url, REACH_APP_UPDATE_URL_CAPACITY,
-                                 reach_app_update_utf8_to_utf16(chosen_url.c_str(),
-                                                                chosen_url.size()));
+    std::wstring tag_w = reach_app_update_utf8_to_utf16(tag.c_str(), tag.size());
+    std::wstring asset_w = L"reach-" + tag_w + L"-Release.zip";
+    std::wstring url_w = std::wstring(L"https://github.com/") + owner_w + L"/" + repo_w +
+                         L"/releases/download/" + tag_w + L"/" + asset_w;
+
+    reach_app_update_store_utf16(out_info->version, REACH_APP_UPDATE_VERSION_CAPACITY, tag_w);
+    reach_app_update_store_utf16(out_info->asset_name, REACH_APP_UPDATE_NAME_CAPACITY, asset_w);
+    reach_app_update_store_utf16(out_info->download_url, REACH_APP_UPDATE_URL_CAPACITY, url_w);
     reach_app_update_store_utf16(out_info->notes, REACH_APP_UPDATE_NOTES_CAPACITY,
                                  reach_app_update_utf8_to_utf16(notes.c_str(), notes.size()));
-
-    size_t slash = chosen_url.find_last_of('/');
-    std::string asset_name =
-        slash == std::string::npos ? chosen_url : chosen_url.substr(slash + 1);
-    reach_app_update_store_utf16(out_info->asset_name, REACH_APP_UPDATE_NAME_CAPACITY,
-                                 reach_app_update_utf8_to_utf16(asset_name.c_str(),
-                                                                asset_name.size()));
-    out_info->has_release = !chosen_url.empty();
+    out_info->has_release = !tag.empty();
     return REACH_OK;
 }
 
