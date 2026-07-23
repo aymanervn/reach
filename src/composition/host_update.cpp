@@ -312,6 +312,11 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     return REACH_OK;
 }
 
+int32_t reach_host_frame_interval_ms(const reach_host *host)
+{
+    return host != nullptr && host->high_refresh_rate ? 8 : 16;
+}
+
 int32_t reach_host_needs_frame(const reach_host *host)
 {
     int32_t window_manager_needs_refresh = 0;

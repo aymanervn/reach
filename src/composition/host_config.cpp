@@ -310,6 +310,7 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
         reach_host_seed_or_apply_wallpaper(host, &writable_snapshot);
     }
     reach_host_apply_power_config(host, snapshot);
+    host->high_refresh_rate = snapshot->high_refresh_rate ? 1 : 0;
     return REACH_OK;
 }
 

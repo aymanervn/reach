@@ -335,6 +335,41 @@ static void reach_settings_save_power_config(reach_settings_app *app)
     }
 }
 
+static void reach_settings_load_display_config(reach_settings_app *app)
+{
+    if (app == nullptr || app->config_store.ops.load == nullptr)
+    {
+        return;
+    }
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
+    if (snapshot == nullptr ||
+        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
+    {
+        return;
+    }
+    reach_settings_model_set_high_refresh_rate(&app->model, snapshot->high_refresh_rate);
+}
+
+static void reach_settings_save_display_config(reach_settings_app *app)
+{
+    if (app == nullptr || app->config_store.ops.load == nullptr ||
+        app->config_store.ops.save == nullptr)
+    {
+        return;
+    }
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
+    if (snapshot == nullptr ||
+        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
+    {
+        return;
+    }
+    snapshot->high_refresh_rate = reach_settings_model_high_refresh_rate(&app->model);
+    if (app->config_store.ops.save(app->config_store.store, snapshot.get()) == REACH_OK)
+    {
+        (void)reach_windows_notify_config_changed();
+    }
+}
+
 static void reach_settings_update_progress(void *user, reach_windows_update_progress progress)
 {
     reach_settings_app *app = static_cast<reach_settings_app *>(user);
@@ -1062,6 +1097,15 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         }
         app->dirty = 1;
     }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_DISPLAY)
+    {
+        if (hit.type == REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE)
+        {
+            (void)reach_settings_model_toggle_high_refresh_rate(&app->model);
+            reach_settings_save_display_config(app);
+            app->dirty = 1;
+        }
+    }
 }
 
 static reach_text_edit_key reach_settings_map_edit_key(const reach_ui_event *event,
@@ -1333,6 +1377,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
         reach_windows_create_config_store(config_path, &app->config_store) == REACH_OK)
     {
         reach_settings_load_power_config(app);
+        reach_settings_load_display_config(app);
     }
 
     app->bounds = reach_settings_default_bounds(app);
@@ -1403,6 +1448,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    if (reach_settings_model_tick_display_animations(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
     if (app->dirty)
     {
         reach_settings_refresh_bounds(app);
@@ -1454,6 +1503,7 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->update_scrollbar_drag.active ||
            reach_settings_model_power_animations_active(&app->model) ||
            reach_settings_model_button_press_active(&app->model) ||
+           reach_settings_model_display_animations_active(&app->model) ||
            app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0;
 }
 

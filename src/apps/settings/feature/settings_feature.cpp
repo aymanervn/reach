@@ -32,6 +32,7 @@ void reach_settings_model_init(reach_settings_model *model)
     model->power_focused_timer = -1;
     model->account_focused_field = -1;
     model->pressed_button = REACH_SETTINGS_HIT_NONE;
+    reach_animation_manager_init(&model->display_fps_animation, &model->display_fps_track, 1);
     reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
     {
@@ -455,6 +456,32 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                 button_width, row_height);
     }
 
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_DISPLAY)
+    {
+        float area_x = layout.content_title.x;
+        float area_y = layout.content_title.y + layout.content_title.height + 14.0f * scale;
+        float area_width = layout.content.x + layout.content.width - 28.0f * scale - area_x;
+
+        float card_height = 72.0f * scale;
+        layout.display_fps_card = reach_settings_rect(area_x, area_y, area_width, card_height);
+        float icon_box = 34.0f * scale;
+        layout.display_fps_icon = reach_settings_rect(
+            area_x + 16.0f * scale, area_y + (card_height - icon_box) * 0.5f, icon_box, icon_box);
+
+        float toggle_width = 40.0f * scale;
+        float toggle_height = 22.0f * scale;
+        float toggle_x = area_x + area_width - 18.0f * scale - toggle_width;
+        layout.display_fps_toggle = reach_settings_rect(
+            toggle_x, area_y + (card_height - toggle_height) * 0.5f, toggle_width, toggle_height);
+
+        float text_x = layout.display_fps_icon.x + icon_box + 14.0f * scale;
+        float text_width = toggle_x - 14.0f * scale - text_x;
+        layout.display_fps_title =
+            reach_settings_rect(text_x, area_y + 15.0f * scale, text_width, 20.0f * scale);
+        layout.display_fps_subtitle =
+            reach_settings_rect(text_x, area_y + 37.0f * scale, text_width, 16.0f * scale);
+    }
+
     if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
     {
         return layout;
@@ -693,6 +720,13 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
                 return result;
             }
         }
+    }
+    if (layout->display_fps_toggle.width > 0.0f &&
+        (reach_settings_rect_contains(layout->display_fps_toggle, x, y) ||
+         reach_settings_rect_contains(layout->display_fps_card, x, y)))
+    {
+        result.type = REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE;
+        return result;
     }
     if (layout->account_password_button.width > 0.0f &&
         reach_settings_rect_contains(layout->account_password_button, x, y))

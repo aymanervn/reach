@@ -113,7 +113,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     while (running)
     {
         int32_t needed_frame_before_wait = app != nullptr && reach_app_needs_frame(app);
-        DWORD wait_ms = needed_frame_before_wait ? 16 : INFINITE;
+        DWORD wait_ms =
+            needed_frame_before_wait ? (DWORD)reach_app_frame_interval_ms(app) : INFINITE;
         DWORD wait_result =
             MsgWaitForMultipleObjectsEx(0, nullptr, wait_ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         (void)wait_result;
