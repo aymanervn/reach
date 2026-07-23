@@ -551,6 +551,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                 }
             }
             reach_host_apply_power_config(host, &snapshot);
+            host->high_refresh_rate = snapshot.high_refresh_rate ? 1 : 0;
         }
     }
     if (result != REACH_OK)

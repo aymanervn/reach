@@ -433,6 +433,11 @@ int32_t reach_app_needs_frame(const reach_app *app)
     return app != nullptr && app->host != nullptr && reach_host_needs_frame(app->host);
 }
 
+int32_t reach_app_frame_interval_ms(const reach_app *app)
+{
+    return app != nullptr && app->host != nullptr ? reach_host_frame_interval_ms(app->host) : 16;
+}
+
 void reach_app_destroy(reach_app *app)
 {
     if (app == nullptr)

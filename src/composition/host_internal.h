@@ -273,6 +273,7 @@ struct reach_host
     reach_now_playing_service *now_playing_service;
 
     double popup_hook_reassert_seconds;
+    int32_t high_refresh_rate;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_system_status *system_status;
     reach_quick_settings *quick_settings_capsule;

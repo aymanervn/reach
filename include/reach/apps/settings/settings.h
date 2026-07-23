@@ -60,6 +60,7 @@ extern "C"
         REACH_SETTINGS_HIT_POWER_OPTION,
         REACH_SETTINGS_HIT_POWER_APPLY,
         REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE,
+        REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD
     } reach_settings_hit_type;
@@ -143,6 +144,9 @@ extern "C"
         int32_t account_caret_visible;
         double account_caret_phase;
         int32_t account_status;
+        int32_t display_high_refresh_rate;
+        reach_animation_track display_fps_track;
+        reach_animation_manager display_fps_animation;
         int32_t pressed_button;
         reach_animation_track button_press_track;
         reach_animation_manager button_press_animation;
@@ -203,6 +207,11 @@ extern "C"
         reach_rect_f32 power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_wait_labels[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_apply_button;
+        reach_rect_f32 display_fps_card;
+        reach_rect_f32 display_fps_icon;
+        reach_rect_f32 display_fps_title;
+        reach_rect_f32 display_fps_subtitle;
+        reach_rect_f32 display_fps_toggle;
         reach_rect_f32 account_card;
         reach_rect_f32 account_avatar;
         reach_rect_f32 account_name;
@@ -289,6 +298,12 @@ extern "C"
                                                   int32_t enabled);
     int32_t reach_settings_model_power_wait_apps(const reach_settings_model *model, size_t timer);
     int32_t reach_settings_model_toggle_power_wait_apps(reach_settings_model *model, size_t timer);
+    void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int32_t enabled);
+    int32_t reach_settings_model_high_refresh_rate(const reach_settings_model *model);
+    int32_t reach_settings_model_toggle_high_refresh_rate(reach_settings_model *model);
+    int32_t reach_settings_model_tick_display_animations(reach_settings_model *model,
+                                                         double delta_seconds);
+    int32_t reach_settings_model_display_animations_active(const reach_settings_model *model);
     int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
     void reach_settings_model_power_mark_applied(reach_settings_model *model);
     int32_t reach_settings_model_tick_power_caret(reach_settings_model *model,
