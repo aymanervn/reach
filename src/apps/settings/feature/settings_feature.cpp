@@ -526,16 +526,19 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         if (section_count == 0)
             continue;
 
-        if (layout.update_section_count > 0)
+        if (content_y > 0.0f)
             content_y += section_gap;
-        size_t section_index = layout.update_section_count++;
-        layout.update_section_ids[section_index] = section;
-        layout.update_section_titles[section_index] =
-            reach_settings_rect(layout.update_viewport.x,
-                                layout.update_viewport.y + content_y -
-                                    (model != nullptr ? model->update_scrollbar.offset : 0.0f),
-                                layout.update_viewport.width, section_title_height);
-        content_y += section_title_height + 5.0f * scale;
+        if (section != 0)
+        {
+            size_t section_index = layout.update_section_count++;
+            layout.update_section_ids[section_index] = section;
+            layout.update_section_titles[section_index] =
+                reach_settings_rect(layout.update_viewport.x,
+                                    layout.update_viewport.y + content_y -
+                                        (model != nullptr ? model->update_scrollbar.offset : 0.0f),
+                                    layout.update_viewport.width, section_title_height);
+            content_y += section_title_height + 5.0f * scale;
+        }
 
         for (size_t update_index = 0; model != nullptr && update_index < model->update_list.count;
              ++update_index)
@@ -556,7 +559,11 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             content_y += row_height + row_gap;
         }
     }
-    layout.update_content_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
+    float base_content_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
+    float bottom_pad = 20.0f * scale;
+    layout.update_content_height = base_content_height > layout.update_viewport.height
+                                       ? base_content_height + bottom_pad
+                                       : base_content_height;
     float scroll_max = layout.update_content_height > layout.update_viewport.height
                            ? layout.update_content_height - layout.update_viewport.height
                            : 0.0f;

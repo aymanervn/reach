@@ -1,5 +1,6 @@
 #include "reach/core/render_commands.h"
 #include "reach/apps/settings/settings.h"
+#include "reach/features/common/scrollbar_render.h"
 #include "reach/features/common/ui_controls.h"
 
 #include "settings_pages_internal.h"
@@ -405,7 +406,7 @@ static void build_reach_version_line(const reach_settings_model *model, uint16_t
     if (model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_AVAILABLE &&
         model->reach_update_info.version[0] != 0)
     {
-        append_text(text, capacity, (const uint16_t *)u"  →  ");
+        append_text(text, capacity, (const uint16_t *)u"  \u2192  ");
         append_text(text, capacity, model->reach_update_info.version);
     }
 }
@@ -613,10 +614,10 @@ static void render_update_page(const reach_settings_render_input *input,
 
     if (layout->update_scrollbar_thumb.height > 0.0f)
     {
-        push_rect(commands, layout->update_scrollbar_track,
-                  layout->update_scrollbar_track.width * 0.5f, {1.0f, 1.0f, 1.0f, 0.14f});
-        push_rect(commands, layout->update_scrollbar_thumb,
-                  layout->update_scrollbar_thumb.width * 0.5f, {1.0f, 1.0f, 1.0f, 0.68f});
+        reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
+        reach_scrollbar_build_render_commands(
+            layout->update_scrollbar_track, layout->update_scrollbar_thumb, origin,
+            {1.0f, 1.0f, 1.0f, 0.14f}, {1.0f, 1.0f, 1.0f, 0.68f}, commands);
     }
 }
 
