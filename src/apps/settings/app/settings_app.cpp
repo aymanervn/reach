@@ -871,7 +871,7 @@ static void reach_settings_launch_updater(reach_settings_app *app)
     parameters += reinterpret_cast<const wchar_t *>(app->app_update_zip);
     parameters += L"\" \"";
     parameters += install_dir;
-    parameters += L"\" 1";
+    parameters += L"\" 0";
     ShellExecuteW(nullptr, L"open", temp_updater.c_str(), parameters.c_str(), nullptr, SW_HIDE);
     app->running = 0;
 }
