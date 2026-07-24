@@ -132,10 +132,25 @@ reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_
     if (action == REACH_QUICK_SETTINGS_POINTER_ACTION_SET_MAIN_VOLUME)
     {
         float level = reach_host_quick_settings_clamp01(result->action.value);
+        int32_t muted =
+            reach_quick_settings_state_ptr(host->quick_settings_capsule)->model.main_muted;
 
-        reach_quick_settings_apply_main_volume(
-            host->quick_settings_capsule, level,
-            reach_quick_settings_state_ptr(host->quick_settings_capsule)->model.main_muted);
+        if (host->audio_volume.get_state != nullptr)
+        {
+            reach_audio_volume_state state = {};
+            if (host->audio_volume.get_state(host->audio_volume.userdata, &state) == REACH_OK)
+            {
+                muted = state.muted ? 1 : 0;
+            }
+        }
+
+        if (muted && host->audio_volume.set_muted != nullptr &&
+            host->audio_volume.set_muted(host->audio_volume.userdata, 0) == REACH_OK)
+        {
+            muted = 0;
+        }
+
+        reach_quick_settings_apply_main_volume(host->quick_settings_capsule, level, muted);
 
         if (host->audio_volume.set_level != nullptr)
         {
