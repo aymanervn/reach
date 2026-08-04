@@ -1,6 +1,7 @@
 #ifndef REACH_PORTS_PLATFORM_WINDOW_H
 #define REACH_PORTS_PLATFORM_WINDOW_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
@@ -25,8 +26,17 @@ extern "C"
         REACH_SURFACE_CLIPBOARD = 7
     } reach_surface_role;
 
+#define REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS 4
+
     typedef struct reach_platform_window reach_platform_window;
     typedef void (*reach_platform_window_event_callback)(void *user, const reach_ui_event *event);
+
+    typedef struct reach_platform_window_caption
+    {
+        reach_rect_f32 bounds;
+        reach_rect_f32 exclusions[REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS];
+        size_t exclusion_count;
+    } reach_platform_window_caption;
 
     typedef struct reach_platform_window_ops
     {
@@ -37,6 +47,8 @@ extern "C"
         reach_result (*set_opacity)(reach_platform_window *window, float opacity);
         reach_result (*set_blur_enabled)(reach_platform_window *window, int32_t enabled);
         reach_result (*apply_rounded_corners)(reach_platform_window *window, float radius);
+        reach_result (*set_caption)(reach_platform_window *window,
+                                    const reach_platform_window_caption *caption);
         reach_result (*set_event_callback)(reach_platform_window *window,
                                            reach_platform_window_event_callback callback,
                                            void *user);

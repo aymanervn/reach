@@ -7,6 +7,7 @@
 #include "reach/core/app_update.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/scrollbar.h"
+#include "reach/core/startup_apps.h"
 #include "reach/core/theme.h"
 #include "reach/core/windows_update.h"
 #include "reach/features/common/text_edit.h"
@@ -62,8 +63,18 @@ extern "C"
         REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE,
         REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
-        REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD
+        REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
+        REACH_SETTINGS_HIT_STARTUP_TOGGLE,
+        REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK,
+        REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB
     } reach_settings_hit_type;
+
+    typedef enum reach_settings_startup_status
+    {
+        REACH_SETTINGS_STARTUP_STATUS_NONE = 0,
+        REACH_SETTINGS_STARTUP_STATUS_LOADING,
+        REACH_SETTINGS_STARTUP_STATUS_FAILED
+    } reach_settings_startup_status;
 
     typedef enum reach_settings_account_status
     {
@@ -144,6 +155,14 @@ extern "C"
         int32_t account_caret_visible;
         double account_caret_phase;
         int32_t account_status;
+        reach_startup_app_list startup_apps;
+        uint64_t startup_icons[REACH_STARTUP_APP_MAX_ENTRIES];
+        reach_scrollbar_model startup_scrollbar;
+        reach_animation_track startup_tracks[REACH_STARTUP_APP_MAX_ENTRIES];
+        reach_animation_manager startup_animations;
+        int32_t startup_loaded;
+        int32_t startup_busy;
+        int32_t startup_status;
         int32_t display_high_refresh_rate;
         reach_animation_track display_fps_track;
         reach_animation_manager display_fps_animation;
@@ -207,6 +226,14 @@ extern "C"
         reach_rect_f32 power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_wait_labels[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_rect_f32 power_apply_button;
+        reach_rect_f32 startup_summary;
+        reach_rect_f32 startup_viewport;
+        reach_rect_f32 startup_scrollbar_track;
+        reach_rect_f32 startup_scrollbar_thumb;
+        reach_rect_f32 startup_rows[REACH_STARTUP_APP_MAX_ENTRIES];
+        reach_rect_f32 startup_toggles[REACH_STARTUP_APP_MAX_ENTRIES];
+        size_t startup_row_count;
+        float startup_content_height;
         reach_rect_f32 display_fps_card;
         reach_rect_f32 display_fps_icon;
         reach_rect_f32 display_fps_title;
@@ -238,6 +265,7 @@ extern "C"
         size_t power_option;
         size_t power_custom_field;
         size_t account_field;
+        size_t startup_index;
     } reach_settings_hit_result;
 
     typedef struct reach_settings_render_input
@@ -298,6 +326,22 @@ extern "C"
                                                   int32_t enabled);
     int32_t reach_settings_model_power_wait_apps(const reach_settings_model *model, size_t timer);
     int32_t reach_settings_model_toggle_power_wait_apps(reach_settings_model *model, size_t timer);
+    void reach_settings_model_apply_startup_apps(reach_settings_model *model,
+                                                 const reach_startup_app_list *list);
+    void reach_settings_model_set_startup_icon(reach_settings_model *model, size_t index,
+                                               uint64_t icon_id);
+    void reach_settings_model_set_startup_enabled(reach_settings_model *model, size_t index,
+                                                  int32_t enabled);
+    int32_t reach_settings_model_startup_enabled(const reach_settings_model *model, size_t index);
+    void reach_settings_model_set_startup_busy(reach_settings_model *model, int32_t busy);
+    void reach_settings_model_set_startup_status(reach_settings_model *model, int32_t status);
+    const uint16_t *reach_settings_startup_status_message(int32_t status);
+    void reach_settings_model_scroll_startup(reach_settings_model *model, float delta);
+    int32_t reach_settings_model_startup_scroll(reach_settings_model *model, double delta_seconds);
+    int32_t reach_settings_model_tick_startup_animations(reach_settings_model *model,
+                                                         double delta_seconds);
+    int32_t reach_settings_model_startup_animations_active(const reach_settings_model *model);
+
     void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int32_t enabled);
     int32_t reach_settings_model_high_refresh_rate(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_high_refresh_rate(reach_settings_model *model);

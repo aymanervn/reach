@@ -9,31 +9,8 @@
 #include <strsafe.h>
 #include <tlhelp32.h>
 
-struct reach_windows_startup_collector
-{
-    reach_app_launch_request *out;
-    size_t capacity;
-    size_t count;
-};
-
-static void reach_windows_startup_collect(reach_windows_startup_collector *collector,
-                                          const wchar_t *path, const wchar_t *arguments)
-{
-    if (collector == nullptr || path == nullptr || path[0] == 0 ||
-        collector->count >= collector->capacity)
-    {
-        return;
-    }
-    reach_app_launch_request *request = &collector->out[collector->count];
-    *request = {};
-    (void)reach_copy_utf16(request->path, 260, reinterpret_cast<const uint16_t *>(path));
-    if (arguments != nullptr && arguments[0] != 0)
-    {
-        (void)reach_copy_utf16(request->arguments, 260,
-                               reinterpret_cast<const uint16_t *>(arguments));
-    }
-    ++collector->count;
-}
+#include <stdlib.h>
+#include <string.h>
 
 static int32_t reach_windows_startup_extension_supported(const wchar_t *path)
 {
@@ -236,75 +213,54 @@ static int32_t reach_windows_executable_running(const wchar_t *executable)
     return running;
 }
 
-static void reach_windows_collect_path(reach_windows_startup_collector *collector,
-                                       const wchar_t *path)
+static const wchar_t *reach_windows_startup_run_path =
+    L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+static const wchar_t *reach_windows_startup_approved_run_path =
+    L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
+static const wchar_t *reach_windows_startup_approved_folder_path =
+    L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\StartupFolder";
+
+static HKEY reach_windows_startup_source_root(reach_startup_app_source source)
 {
-    if (path == nullptr || path[0] == 0)
-    {
-        return;
-    }
-
-    if (reach_windows_executable_running(path))
-    {
-        return;
-    }
-
-    reach_windows_startup_collect(collector, path, nullptr);
+    return reach_startup_app_source_is_machine(source) ? HKEY_LOCAL_MACHINE : HKEY_CURRENT_USER;
 }
 
-static void
-reach_windows_collect_startup_folder_known_id(reach_windows_startup_collector *collector,
-                                              REFKNOWNFOLDERID folder_id)
+static int32_t reach_windows_startup_source_is_run(reach_startup_app_source source)
 {
-    PWSTR folder_path = nullptr;
-    HRESULT hr = SHGetKnownFolderPath(folder_id, KF_FLAG_DEFAULT, nullptr, &folder_path);
-    if (FAILED(hr) || folder_path == nullptr)
-    {
-        return;
-    }
-
-    wchar_t pattern[MAX_PATH] = {};
-    if (FAILED(StringCchPrintfW(pattern, MAX_PATH, L"%ls\\*", folder_path)))
-    {
-        CoTaskMemFree(folder_path);
-        return;
-    }
-
-    WIN32_FIND_DATAW find_data = {};
-    HANDLE find = FindFirstFileW(pattern, &find_data);
-
-    if (find != INVALID_HANDLE_VALUE)
-    {
-        do
-        {
-            if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
-            {
-                continue;
-            }
-
-            if (!reach_windows_startup_extension_supported(find_data.cFileName))
-            {
-                continue;
-            }
-
-            wchar_t full_path[MAX_PATH] = {};
-            if (FAILED(StringCchPrintfW(full_path, MAX_PATH, L"%ls\\%ls", folder_path,
-                                        find_data.cFileName)))
-            {
-                continue;
-            }
-
-            reach_windows_collect_path(collector, full_path);
-
-        } while (FindNextFileW(find, &find_data));
-
-        FindClose(find);
-    }
-
-    CoTaskMemFree(folder_path);
+    return source == REACH_STARTUP_APP_SOURCE_USER_RUN ||
+           source == REACH_STARTUP_APP_SOURCE_MACHINE_RUN;
 }
 
-static int32_t reach_windows_startup_value_enabled(HKEY root, const wchar_t *value_name)
+static const wchar_t *reach_windows_startup_approved_path(reach_startup_app_source source)
+{
+    return reach_windows_startup_source_is_run(source) ? reach_windows_startup_approved_run_path
+                                                       : reach_windows_startup_approved_folder_path;
+}
+
+static reach_startup_app_entry *reach_windows_startup_add_entry(reach_startup_app_list *list,
+                                                                reach_startup_app_source source,
+                                                                const wchar_t *key)
+{
+    if (list == nullptr || key == nullptr || key[0] == 0 ||
+        list->count >= REACH_STARTUP_APP_MAX_ENTRIES)
+    {
+        return nullptr;
+    }
+
+    reach_startup_app_entry *entry = &list->entries[list->count];
+    *entry = {};
+    entry->source = source;
+    entry->enabled = 1;
+    (void)reach_copy_utf16(entry->key, REACH_STARTUP_APP_NAME_CAPACITY,
+                           reinterpret_cast<const uint16_t *>(key));
+    (void)reach_copy_utf16(entry->display_name, REACH_STARTUP_APP_NAME_CAPACITY,
+                           reinterpret_cast<const uint16_t *>(key));
+    ++list->count;
+    return entry;
+}
+
+static int32_t reach_windows_startup_value_enabled(reach_startup_app_source source,
+                                                   const wchar_t *value_name)
 {
     if (value_name == nullptr || value_name[0] == 0)
     {
@@ -313,9 +269,9 @@ static int32_t reach_windows_startup_value_enabled(HKEY root, const wchar_t *val
 
     HKEY key = nullptr;
 
-    LONG open_result = RegOpenKeyExW(
-        root, L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run", 0,
-        KEY_READ, &key);
+    LONG open_result =
+        RegOpenKeyExW(reach_windows_startup_source_root(source),
+                      reach_windows_startup_approved_path(source), 0, KEY_READ, &key);
 
     if (open_result != ERROR_SUCCESS)
     {
@@ -480,37 +436,84 @@ static int32_t reach_windows_parse_run_command(const wchar_t *command, wchar_t *
                                                     out_arguments, out_arguments_count);
 }
 
-static void reach_windows_collect_run_command(reach_windows_startup_collector *collector,
-                                              const wchar_t *command)
+static void reach_windows_startup_enumerate_folder(reach_startup_app_list *list,
+                                                   reach_startup_app_source source,
+                                                   REFKNOWNFOLDERID folder_id)
 {
-    if (command == nullptr || command[0] == 0)
+    PWSTR folder_path = nullptr;
+    HRESULT hr = SHGetKnownFolderPath(folder_id, KF_FLAG_DEFAULT, nullptr, &folder_path);
+    if (FAILED(hr) || folder_path == nullptr)
     {
         return;
     }
 
-    wchar_t executable[4096] = {};
-    wchar_t arguments[4096] = {};
-
-    if (!reach_windows_parse_run_command(command, executable, _countof(executable), arguments,
-                                         _countof(arguments)))
+    wchar_t pattern[MAX_PATH] = {};
+    if (FAILED(StringCchPrintfW(pattern, MAX_PATH, L"%ls\\*", folder_path)))
     {
+        CoTaskMemFree(folder_path);
         return;
     }
 
-    if (reach_windows_executable_running(executable))
+    WIN32_FIND_DATAW find_data = {};
+    HANDLE find = FindFirstFileW(pattern, &find_data);
+
+    if (find != INVALID_HANDLE_VALUE)
     {
-        return;
+        do
+        {
+            if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+            {
+                continue;
+            }
+
+            if (!reach_windows_startup_extension_supported(find_data.cFileName))
+            {
+                continue;
+            }
+
+            wchar_t full_path[MAX_PATH] = {};
+            if (FAILED(StringCchPrintfW(full_path, MAX_PATH, L"%ls\\%ls", folder_path,
+                                        find_data.cFileName)))
+            {
+                continue;
+            }
+
+            reach_startup_app_entry *entry =
+                reach_windows_startup_add_entry(list, source, find_data.cFileName);
+            if (entry == nullptr)
+            {
+                break;
+            }
+
+            wchar_t display[MAX_PATH] = {};
+            if (SUCCEEDED(StringCchCopyW(display, MAX_PATH, find_data.cFileName)))
+            {
+                PathRemoveExtensionW(display);
+                (void)reach_copy_utf16(entry->display_name, REACH_STARTUP_APP_NAME_CAPACITY,
+                                       reinterpret_cast<const uint16_t *>(display));
+            }
+            (void)reach_copy_utf16(entry->command, REACH_STARTUP_APP_COMMAND_CAPACITY,
+                                   reinterpret_cast<const uint16_t *>(full_path));
+            (void)reach_copy_utf16(entry->executable, REACH_STARTUP_APP_PATH_CAPACITY,
+                                   reinterpret_cast<const uint16_t *>(full_path));
+            entry->resolved = 1;
+            entry->enabled = reach_windows_startup_value_enabled(source, find_data.cFileName);
+
+        } while (FindNextFileW(find, &find_data));
+
+        FindClose(find);
     }
 
-    reach_windows_startup_collect(collector, executable, arguments[0] != 0 ? arguments : nullptr);
+    CoTaskMemFree(folder_path);
 }
 
-static void reach_windows_collect_run_key(reach_windows_startup_collector *collector, HKEY root)
+static void reach_windows_startup_enumerate_run_key(reach_startup_app_list *list,
+                                                    reach_startup_app_source source)
 {
     HKEY key = nullptr;
 
-    LONG open_result = RegOpenKeyExW(root, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0,
-                                     KEY_READ, &key);
+    LONG open_result = RegOpenKeyExW(reach_windows_startup_source_root(source),
+                                     reach_windows_startup_run_path, 0, KEY_READ, &key);
 
     if (open_result != ERROR_SUCCESS)
     {
@@ -545,29 +548,190 @@ static void reach_windows_collect_run_key(reach_windows_startup_collector *colle
             continue;
         }
 
-        if (!reach_windows_startup_value_enabled(root, value_name))
-        {
-            continue;
-        }
-
         raw_data[_countof(raw_data) - 1] = 0;
 
-        if (type == REG_EXPAND_SZ)
+        const wchar_t *command = raw_data;
+        wchar_t expanded[4096] = {};
+        if (type == REG_EXPAND_SZ &&
+            ExpandEnvironmentStringsW(raw_data, expanded, _countof(expanded)) > 0)
         {
-            wchar_t expanded[4096] = {};
-
-            if (ExpandEnvironmentStringsW(raw_data, expanded, _countof(expanded)) > 0)
-            {
-                reach_windows_collect_run_command(collector, expanded);
-            }
+            command = expanded;
         }
-        else
+
+        reach_startup_app_entry *entry =
+            reach_windows_startup_add_entry(list, source, value_name);
+        if (entry == nullptr)
         {
-            reach_windows_collect_run_command(collector, raw_data);
+            break;
+        }
+
+        (void)reach_copy_utf16(entry->command, REACH_STARTUP_APP_COMMAND_CAPACITY,
+                               reinterpret_cast<const uint16_t *>(command));
+        entry->enabled = reach_windows_startup_value_enabled(source, value_name);
+
+        wchar_t executable[4096] = {};
+        wchar_t arguments[4096] = {};
+        if (reach_windows_parse_run_command(command, executable, _countof(executable), arguments,
+                                            _countof(arguments)))
+        {
+            (void)reach_copy_utf16(entry->executable, REACH_STARTUP_APP_PATH_CAPACITY,
+                                   reinterpret_cast<const uint16_t *>(executable));
+            (void)reach_copy_utf16(entry->arguments, REACH_STARTUP_APP_PATH_CAPACITY,
+                                   reinterpret_cast<const uint16_t *>(arguments));
+            entry->resolved = 1;
         }
     }
 
     RegCloseKey(key);
+}
+
+static reach_result reach_windows_startup_enumerate(reach_startup_apps *apps,
+                                                    reach_startup_app_list *out_list)
+{
+    (void)apps;
+    if (out_list == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_list = {};
+    reach_windows_startup_enumerate_folder(out_list, REACH_STARTUP_APP_SOURCE_USER_FOLDER,
+                                           FOLDERID_Startup);
+    reach_windows_startup_enumerate_folder(out_list, REACH_STARTUP_APP_SOURCE_MACHINE_FOLDER,
+                                           FOLDERID_CommonStartup);
+    reach_windows_startup_enumerate_run_key(out_list, REACH_STARTUP_APP_SOURCE_USER_RUN);
+    reach_windows_startup_enumerate_run_key(out_list, REACH_STARTUP_APP_SOURCE_MACHINE_RUN);
+    return REACH_OK;
+}
+
+static LONG reach_windows_startup_write_approved(reach_startup_app_source source,
+                                                 const wchar_t *value_name, int32_t enabled)
+{
+    HKEY key = nullptr;
+    LONG open_result = RegCreateKeyExW(reach_windows_startup_source_root(source),
+                                       reach_windows_startup_approved_path(source), 0, nullptr,
+                                       REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, nullptr, &key,
+                                       nullptr);
+    if (open_result != ERROR_SUCCESS)
+    {
+        return open_result;
+    }
+
+    BYTE data[12] = {};
+    data[0] = enabled ? 0x02 : 0x03;
+    if (!enabled)
+    {
+        FILETIME now = {};
+        GetSystemTimeAsFileTime(&now);
+        memcpy(&data[4], &now.dwLowDateTime, sizeof(now.dwLowDateTime));
+        memcpy(&data[8], &now.dwHighDateTime, sizeof(now.dwHighDateTime));
+    }
+
+    LONG set_result = RegSetValueExW(key, value_name, 0, REG_BINARY, data, sizeof(data));
+    RegCloseKey(key);
+    return set_result;
+}
+
+static int32_t reach_windows_startup_elevation_helper(wchar_t *out_path, DWORD out_path_count)
+{
+    wchar_t module[MAX_PATH] = {};
+    if (GetModuleFileNameW(nullptr, module, MAX_PATH) == 0)
+    {
+        return 0;
+    }
+    PathRemoveFileSpecW(module);
+    if (FAILED(StringCchCopyW(out_path, out_path_count, module)) ||
+        !PathAppendW(out_path, L"reachElevate.exe"))
+    {
+        return 0;
+    }
+    return GetFileAttributesW(out_path) != INVALID_FILE_ATTRIBUTES;
+}
+
+static reach_result reach_windows_startup_set_enabled_elevated(reach_startup_app_source source,
+                                                               const wchar_t *value_name,
+                                                               int32_t enabled)
+{
+    if (wcschr(value_name, L'"') != nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    wchar_t helper[MAX_PATH] = {};
+    if (!reach_windows_startup_elevation_helper(helper, MAX_PATH))
+    {
+        return REACH_ERROR;
+    }
+
+    wchar_t parameters[1024] = {};
+    if (FAILED(StringCchPrintfW(parameters, _countof(parameters),
+                                L"startup-set-enabled %ls %d \"%ls\"",
+                                reach_windows_startup_source_is_run(source) ? L"machine-run"
+                                                                            : L"machine-folder",
+                                enabled ? 1 : 0, value_name)))
+    {
+        return REACH_ERROR;
+    }
+
+    SHELLEXECUTEINFOW info = {};
+    info.cbSize = sizeof(info);
+    info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    info.lpVerb = L"runas";
+    info.lpFile = helper;
+    info.lpParameters = parameters;
+    info.nShow = SW_HIDE;
+    if (!ShellExecuteExW(&info) || info.hProcess == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    WaitForSingleObject(info.hProcess, INFINITE);
+    DWORD exit_code = (DWORD)-1;
+    (void)GetExitCodeProcess(info.hProcess, &exit_code);
+    CloseHandle(info.hProcess);
+    return exit_code == 0 ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_windows_startup_set_enabled(reach_startup_apps *apps,
+                                                      const reach_startup_app_entry *entry,
+                                                      int32_t enabled)
+{
+    (void)apps;
+    if (entry == nullptr || entry->key[0] == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const wchar_t *value_name = reinterpret_cast<const wchar_t *>(entry->key);
+    LONG result = reach_windows_startup_write_approved(entry->source, value_name, enabled);
+    if (result == ERROR_SUCCESS)
+    {
+        return REACH_OK;
+    }
+    if (result == ERROR_ACCESS_DENIED && reach_startup_app_source_is_machine(entry->source))
+    {
+        return reach_windows_startup_set_enabled_elevated(entry->source, value_name, enabled);
+    }
+    return REACH_ERROR;
+}
+
+static void reach_windows_startup_destroy(reach_startup_apps *apps)
+{
+    (void)apps;
+}
+
+reach_result reach_windows_create_startup_apps(reach_startup_apps_port *out_port)
+{
+    if (out_port == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_port = {};
+    out_port->ops.enumerate = reach_windows_startup_enumerate;
+    out_port->ops.set_enabled = reach_windows_startup_set_enabled;
+    out_port->ops.destroy = reach_windows_startup_destroy;
+    return REACH_OK;
 }
 
 size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests, size_t capacity)
@@ -576,15 +740,36 @@ size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests
     {
         return 0;
     }
-    reach_windows_startup_collector collector = {out_requests, capacity, 0};
 
-    reach_windows_collect_startup_folder_known_id(&collector, FOLDERID_Startup);
-    reach_windows_collect_startup_folder_known_id(&collector, FOLDERID_CommonStartup);
+    reach_startup_app_list *list =
+        static_cast<reach_startup_app_list *>(malloc(sizeof(reach_startup_app_list)));
+    if (list == nullptr)
+    {
+        return 0;
+    }
+    (void)reach_windows_startup_enumerate(nullptr, list);
 
-    reach_windows_collect_run_key(&collector, HKEY_CURRENT_USER);
-    reach_windows_collect_run_key(&collector, HKEY_LOCAL_MACHINE);
+    size_t count = 0;
+    for (size_t index = 0; index < list->count && count < capacity; ++index)
+    {
+        const reach_startup_app_entry *entry = &list->entries[index];
+        if (!entry->enabled || !entry->resolved)
+        {
+            continue;
+        }
+        if (reach_windows_executable_running(reinterpret_cast<const wchar_t *>(entry->executable)))
+        {
+            continue;
+        }
 
-    return collector.count;
+        reach_app_launch_request *request = &out_requests[count];
+        *request = {};
+        (void)reach_copy_utf16(request->path, 260, entry->executable);
+        (void)reach_copy_utf16(request->arguments, 260, entry->arguments);
+        ++count;
+    }
+    free(list);
+    return count;
 }
 
 uintptr_t reach_windows_get_current_foreground(void)

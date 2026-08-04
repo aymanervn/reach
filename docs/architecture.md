@@ -193,7 +193,7 @@ list as a missing class rule.
 ## tools
 
 The executables — reach shell, Reach Service, watchdog, reachctl, update helper,
-probes. Each includes what it needs.
+elevation helper, probes. Each includes what it needs.
 
 ## apps
 

@@ -86,6 +86,22 @@ static void append_text(uint16_t *destination, size_t capacity, const uint16_t *
         destination[length] = 0;
 }
 
+static void append_number(uint16_t *destination, size_t capacity, size_t value)
+{
+    uint16_t digits[24] = {};
+    int32_t count = 0;
+    do
+    {
+        digits[count++] = (uint16_t)(u'0' + (value % 10));
+        value /= 10;
+    } while (value != 0 && count < 23);
+    for (int32_t index = count - 1; index >= 0; --index)
+    {
+        uint16_t single[2] = {digits[index], 0};
+        append_text(destination, capacity, single);
+    }
+}
+
 static void build_metadata_text(const reach_windows_update_item *update, uint16_t *text,
                                 size_t capacity)
 {
@@ -419,6 +435,146 @@ static void render_display_page(const reach_settings_render_input *input,
     reach_ui_toggle_render(commands, layout->display_fps_toggle, &toggle_style, t);
 }
 
+static void push_app_icon(reach_render_command_buffer *commands, reach_rect_f32 rect,
+                          uint64_t icon_id, float opacity)
+{
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_ICON;
+    command.rect = rect;
+    command.icon_id = icon_id;
+    command.color = {1.0f, 1.0f, 1.0f, opacity};
+    (void)reach_render_command_buffer_push(commands, &command);
+}
+
+static void build_startup_summary(const reach_settings_model *model, uint16_t *text,
+                                  size_t capacity)
+{
+    size_t count = model->startup_apps.count;
+    size_t enabled = reach_startup_app_enabled_count(&model->startup_apps);
+    text[0] = 0;
+    append_number(text, capacity, count);
+    append_text(text, capacity, count == 1 ? (const uint16_t *)u" app is set to run at sign-in"
+                                           : (const uint16_t *)u" apps are set to run at sign-in");
+    append_text(text, capacity, (const uint16_t *)u"  \u00B7  ");
+    append_number(text, capacity, enabled);
+    append_text(text, capacity, (const uint16_t *)u" enabled");
+}
+
+static void render_startup_apps_page(const reach_settings_render_input *input,
+                                     reach_render_command_buffer *commands)
+{
+    const reach_settings_model *model = input->model;
+    const reach_settings_layout *layout = input->layout;
+    reach_color accent = {0.70f, 0.38f, 0.95f, 1.0f};
+
+    uint16_t summary[160] = {};
+    build_startup_summary(model, summary, 160);
+    push_text(commands, layout->startup_summary, summary, scale_value(input, 11.0f),
+              REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+              input->theme->settings_secondary_text, 1);
+
+    if (model->startup_status != REACH_SETTINGS_STARTUP_STATUS_NONE)
+    {
+        reach_color status_color = model->startup_status == REACH_SETTINGS_STARTUP_STATUS_FAILED
+                                       ? reach_color{0.96f, 0.38f, 0.34f, 1.0f}
+                                       : input->theme->settings_secondary_text;
+        push_text(commands, layout->startup_summary,
+                  reach_settings_startup_status_message(model->startup_status),
+                  scale_value(input, 11.0f), REACH_TEXT_WEIGHT_SEMIBOLD,
+                  REACH_TEXT_ALIGNMENT_TRAILING, status_color, 1);
+    }
+
+    if (layout->startup_row_count == 0)
+    {
+        push_text(commands, layout->startup_viewport,
+                  model->startup_loaded ? (const uint16_t *)u"Nothing runs at sign-in."
+                                        : (const uint16_t *)u"Reading startup apps...",
+                  scale_value(input, 14.0f), REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_CENTER,
+                  input->theme->settings_secondary_text, 1);
+        return;
+    }
+
+    reach_ui_selection_item_style badge_style = settings_pill_style(input, accent);
+    reach_render_command_buffer_set_scissor(commands, layout->startup_viewport);
+    for (size_t index = 0; index < layout->startup_row_count; ++index)
+    {
+        if (index >= model->startup_apps.count)
+        {
+            break;
+        }
+        const reach_startup_app_entry *entry = &model->startup_apps.entries[index];
+        const reach_rect_f32 row = layout->startup_rows[index];
+
+        float on = reach_animation_manager_value(&model->startup_animations, index);
+        push_rect(commands, row, scale_value(input, 10.0f), {0.12f, 0.15f, 0.18f, 0.82f});
+
+        float icon_box_size = scale_value(input, 36.0f);
+        reach_rect_f32 icon_box = {row.x + scale_value(input, 14.0f),
+                                   row.y + (row.height - icon_box_size) * 0.5f, icon_box_size,
+                                   icon_box_size};
+        push_rect(commands, icon_box, scale_value(input, 9.0f),
+                  color_with_alpha(accent, 0.10f + 0.10f * on));
+        if (model->startup_icons[index] != 0)
+        {
+            float inset = scale_value(input, 6.0f);
+            reach_rect_f32 image = {icon_box.x + inset, icon_box.y + inset,
+                                    icon_box.width - inset * 2.0f, icon_box.height - inset * 2.0f};
+            push_app_icon(commands, image, model->startup_icons[index], 0.45f + 0.55f * on);
+        }
+        else
+        {
+            push_icon(commands, icon_box, color_with_alpha(accent, 0.55f + 0.45f * on),
+                      REACH_VECTOR_ICON_QUICK_SETTINGS, 0.26f);
+        }
+
+        const reach_rect_f32 toggle = layout->startup_toggles[index];
+        float badge_width = scale_value(input, 86.0f);
+        float badge_height = scale_value(input, 22.0f);
+        reach_rect_f32 badge = {toggle.x - scale_value(input, 16.0f) - badge_width,
+                                row.y + (row.height - badge_height) * 0.5f, badge_width,
+                                badge_height};
+        float badge_accent = reach_startup_app_source_is_machine(entry->source) ? 0.0f : 1.0f;
+        reach_ui_selection_item_render(commands, badge,
+                                       reach_startup_app_source_label(entry->source), &badge_style,
+                                       badge_accent);
+
+        float text_x = icon_box.x + icon_box.width + scale_value(input, 14.0f);
+        float text_width = badge.x - scale_value(input, 14.0f) - text_x;
+        if (text_width < 0.0f)
+        {
+            text_width = 0.0f;
+        }
+        reach_color title_color = input->theme->settings_text;
+        title_color.a = 0.55f + 0.45f * on;
+        push_text(commands,
+                  {text_x, row.y + scale_value(input, 12.0f), text_width, scale_value(input, 18.0f)},
+                  entry->display_name, scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD,
+                  input->text_alignment_leading, title_color, 1);
+
+        const uint16_t *detail = entry->executable[0] != 0 ? entry->executable : entry->command;
+        push_text(commands,
+                  {text_x, row.y + scale_value(input, 33.0f), text_width, scale_value(input, 15.0f)},
+                  detail, scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL,
+                  input->text_alignment_leading,
+                  color_with_alpha(input->theme->settings_secondary_text, 0.55f + 0.35f * on), 1);
+
+        reach_ui_toggle_style toggle_style = {};
+        toggle_style.track_off = {1.0f, 1.0f, 1.0f, 0.10f};
+        toggle_style.track_on = color_with_alpha(accent, 0.85f);
+        toggle_style.knob = {1.0f, 1.0f, 1.0f, 0.92f};
+        reach_ui_toggle_render(commands, toggle, &toggle_style, on);
+    }
+    reach_render_command_buffer_clear_scissor(commands);
+
+    if (layout->startup_scrollbar_thumb.height > 0.0f)
+    {
+        reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
+        reach_scrollbar_build_render_commands(
+            layout->startup_scrollbar_track, layout->startup_scrollbar_thumb, origin,
+            {1.0f, 1.0f, 1.0f, 0.14f}, {1.0f, 1.0f, 1.0f, 0.68f}, commands);
+    }
+}
+
 static void build_reach_version_line(const reach_settings_model *model, uint16_t *text,
                                      size_t capacity)
 {
@@ -568,12 +724,10 @@ static void render_update_page(const reach_settings_render_input *input,
     static const uint16_t *section_titles[] = {(const uint16_t *)u"Select updates",
                                                (const uint16_t *)u"Restart required",
                                                (const uint16_t *)u"Failed"};
+    reach_render_command_buffer_set_scissor(commands, layout->update_viewport);
     for (size_t index = 0; index < layout->update_section_count; ++index)
     {
         const reach_rect_f32 title = layout->update_section_titles[index];
-        if (title.y < layout->update_viewport.y ||
-            title.y + title.height > layout->update_viewport.y + layout->update_viewport.height)
-            continue;
         push_text(commands, title, section_titles[layout->update_section_ids[index]],
                   scale_value(input, 11.0f), REACH_TEXT_WEIGHT_SEMIBOLD,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
@@ -586,9 +740,6 @@ static void render_update_page(const reach_settings_render_input *input,
             break;
         const reach_windows_update_item *update = &model->update_list.updates[update_index];
         const reach_rect_f32 row = layout->update_rows[index];
-        if (row.y < layout->update_viewport.y ||
-            row.y + row.height > layout->update_viewport.y + layout->update_viewport.height)
-            continue;
         const reach_rect_f32 checkbox = layout->update_checkboxes[index];
         reach_color row_color = {0.12f, 0.15f, 0.18f, 0.82f};
         push_rect(commands, row, scale_value(input, 8.0f), row_color);
@@ -629,6 +780,7 @@ static void render_update_page(const reach_settings_render_input *input,
                   status, scale_value(input, 10.0f), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     }
+    reach_render_command_buffer_clear_scissor(commands);
 
     if (layout->update_scrollbar_thumb.height > 0.0f)
     {
@@ -701,6 +853,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         render_account_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_DISPLAY)
         render_display_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS)
+        render_startup_apps_page(input, commands);
     else
         push_text(commands, input->layout->content_placeholder,
                   reach_settings_page_placeholder(input->model->selected_page),

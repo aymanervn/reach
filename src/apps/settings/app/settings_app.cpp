@@ -31,6 +31,32 @@ enum reach_settings_reach_work_type
     REACH_SETTINGS_REACH_WORK_DOWNLOAD
 };
 
+enum reach_settings_startup_work_type
+{
+    REACH_SETTINGS_STARTUP_WORK_NONE = 0,
+    REACH_SETTINGS_STARTUP_WORK_ENUMERATE,
+    REACH_SETTINGS_STARTUP_WORK_SET_ENABLED
+};
+
+struct reach_settings_startup_worker
+{
+    std::thread thread;
+    std::mutex mutex;
+    std::condition_variable cv;
+    int32_t thread_started;
+    int32_t stop;
+    int32_t pending;
+    int32_t in_flight;
+    int32_t completed;
+    reach_settings_startup_work_type pending_work;
+    reach_settings_startup_work_type completed_work;
+    reach_startup_app_entry target;
+    int32_t target_enabled;
+    size_t target_index;
+    reach_startup_app_list list;
+    reach_result work_result;
+};
+
 struct reach_settings_reach_worker
 {
     std::thread thread;
@@ -82,6 +108,8 @@ struct reach_settings_app
     reach_app_update_port app_update;
     reach_config_store_port config_store;
     reach_user_account_port user_account;
+    reach_startup_apps_port startup_apps;
+    reach_icon_provider_port icon_provider;
     reach_settings_model model;
     reach_settings_layout layout;
     reach_render_command_buffer render_commands;
@@ -89,8 +117,12 @@ struct reach_settings_app
     const reach_theme *theme;
     reach_settings_update_worker update_worker;
     reach_settings_reach_worker reach_worker;
+    reach_settings_startup_worker startup_worker;
+    reach_icon_handle startup_icon_handles[REACH_STARTUP_APP_MAX_ENTRIES];
+    size_t startup_icon_count;
     uint16_t app_update_zip[260];
     reach_scrollbar_drag update_scrollbar_drag;
+    reach_scrollbar_drag startup_scrollbar_drag;
     int32_t running;
     int32_t dirty;
 };
@@ -220,6 +252,22 @@ static void reach_settings_refresh_bounds(reach_settings_app *app)
     }
 }
 
+static void reach_settings_apply_caption(reach_settings_app *app)
+{
+    if (app == nullptr || app->window.ops.set_caption == nullptr)
+    {
+        return;
+    }
+    const reach_settings_layout *layout = &app->layout;
+    reach_platform_window_caption caption = {};
+    caption.bounds = {layout->content.x, layout->content.y, layout->content.width,
+                      layout->content_title.y + layout->content_title.height - layout->content.y};
+    caption.exclusions[0] = layout->close_button;
+    caption.exclusions[1] = layout->minimize_button;
+    caption.exclusion_count = 2;
+    (void)app->window.ops.set_caption(app->window.window, &caption);
+}
+
 static void reach_settings_refresh_layout(reach_settings_app *app)
 {
     if (app == nullptr)
@@ -229,6 +277,7 @@ static void reach_settings_refresh_layout(reach_settings_app *app)
     reach_rect_f32 local = {0.0f, 0.0f, app->bounds.width, app->bounds.height};
     app->layout = reach_settings_layout_for_bounds(local, app->theme, reach_settings_app_scale(app),
                                                    &app->model);
+    reach_settings_apply_caption(app);
 }
 
 static reach_result reach_settings_apply_window_style(reach_settings_app *app)
@@ -927,6 +976,220 @@ static void reach_settings_apply_reach_result(reach_settings_app *app)
     app->dirty = 1;
 }
 
+static void reach_settings_startup_worker_main(reach_settings_app *app)
+{
+    reach_settings_startup_worker *worker = &app->startup_worker;
+    for (;;)
+    {
+        reach_settings_startup_work_type work = REACH_SETTINGS_STARTUP_WORK_NONE;
+        reach_startup_app_entry target = {};
+        int32_t target_enabled = 0;
+        {
+            std::unique_lock<std::mutex> lock(worker->mutex);
+            worker->cv.wait(lock, [worker] { return worker->stop || worker->pending; });
+            if (worker->stop)
+            {
+                return;
+            }
+            work = worker->pending_work;
+            target = worker->target;
+            target_enabled = worker->target_enabled;
+            worker->pending = 0;
+            worker->in_flight = 1;
+        }
+
+        reach_startup_app_list list = {};
+        reach_result result = REACH_ERROR;
+        if (work == REACH_SETTINGS_STARTUP_WORK_ENUMERATE)
+        {
+            if (app->startup_apps.ops.enumerate != nullptr)
+            {
+                result = app->startup_apps.ops.enumerate(app->startup_apps.apps, &list);
+            }
+        }
+        else if (work == REACH_SETTINGS_STARTUP_WORK_SET_ENABLED)
+        {
+            if (app->startup_apps.ops.set_enabled != nullptr)
+            {
+                result = app->startup_apps.ops.set_enabled(app->startup_apps.apps, &target,
+                                                           target_enabled);
+            }
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(worker->mutex);
+            worker->in_flight = 0;
+            worker->completed = 1;
+            worker->completed_work = work;
+            worker->work_result = result;
+            worker->list = list;
+        }
+    }
+}
+
+static reach_result reach_settings_ensure_startup_worker(reach_settings_app *app)
+{
+    if (app->startup_worker.thread_started)
+    {
+        return REACH_OK;
+    }
+    app->startup_worker.thread = std::thread(reach_settings_startup_worker_main, app);
+    app->startup_worker.thread_started = 1;
+    return REACH_OK;
+}
+
+static int32_t reach_settings_startup_worker_busy(reach_settings_app *app)
+{
+    std::lock_guard<std::mutex> lock(app->startup_worker.mutex);
+    return app->startup_worker.pending || app->startup_worker.in_flight ||
+           app->startup_worker.completed;
+}
+
+static void reach_settings_schedule_startup_refresh(reach_settings_app *app)
+{
+    if (app->startup_apps.ops.enumerate == nullptr || reach_settings_startup_worker_busy(app))
+    {
+        return;
+    }
+    if (reach_settings_ensure_startup_worker(app) != REACH_OK)
+    {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(app->startup_worker.mutex);
+        app->startup_worker.pending = 1;
+        app->startup_worker.pending_work = REACH_SETTINGS_STARTUP_WORK_ENUMERATE;
+    }
+    reach_settings_model_set_startup_status(&app->model,
+                                            REACH_SETTINGS_STARTUP_STATUS_LOADING);
+    app->startup_worker.cv.notify_one();
+    app->dirty = 1;
+}
+
+static void reach_settings_schedule_startup_toggle(reach_settings_app *app, size_t index)
+{
+    if (app->startup_apps.ops.set_enabled == nullptr || index >= app->model.startup_apps.count ||
+        app->model.startup_busy || reach_settings_startup_worker_busy(app))
+    {
+        return;
+    }
+    if (reach_settings_ensure_startup_worker(app) != REACH_OK)
+    {
+        return;
+    }
+
+    int32_t enabled = reach_settings_model_startup_enabled(&app->model, index) ? 0 : 1;
+    {
+        std::lock_guard<std::mutex> lock(app->startup_worker.mutex);
+        app->startup_worker.pending = 1;
+        app->startup_worker.pending_work = REACH_SETTINGS_STARTUP_WORK_SET_ENABLED;
+        app->startup_worker.target = app->model.startup_apps.entries[index];
+        app->startup_worker.target_enabled = enabled;
+        app->startup_worker.target_index = index;
+    }
+    reach_settings_model_set_startup_enabled(&app->model, index, enabled);
+    reach_settings_model_set_startup_busy(&app->model, 1);
+    reach_settings_model_set_startup_status(&app->model, REACH_SETTINGS_STARTUP_STATUS_NONE);
+    app->startup_worker.cv.notify_one();
+    app->dirty = 1;
+}
+
+static void reach_settings_release_startup_icons(reach_settings_app *app)
+{
+    if (app->icon_provider.ops.release != nullptr)
+    {
+        for (size_t index = 0; index < app->startup_icon_count; ++index)
+        {
+            if (app->startup_icon_handles[index].id != 0)
+            {
+                (void)app->icon_provider.ops.release(app->icon_provider.provider,
+                                                     app->startup_icon_handles[index]);
+            }
+        }
+    }
+    memset(app->startup_icon_handles, 0, sizeof(app->startup_icon_handles));
+    app->startup_icon_count = 0;
+}
+
+static void reach_settings_load_startup_icons(reach_settings_app *app)
+{
+    reach_settings_release_startup_icons(app);
+    if (app->icon_provider.ops.load == nullptr)
+    {
+        return;
+    }
+
+    app->startup_icon_count = app->model.startup_apps.count;
+    for (size_t index = 0; index < app->startup_icon_count; ++index)
+    {
+        const reach_startup_app_entry *entry = &app->model.startup_apps.entries[index];
+        const uint16_t *path = entry->executable[0] != 0 ? entry->executable : entry->command;
+        if (path[0] == 0)
+        {
+            continue;
+        }
+        reach_icon_request request = {};
+        request.size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
+        reach_copy_utf16(request.path, 260, path);
+        reach_icon_handle handle = {};
+        if (app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) ==
+            REACH_OK)
+        {
+            app->startup_icon_handles[index] = handle;
+            reach_settings_model_set_startup_icon(&app->model, index, handle.id);
+        }
+    }
+}
+
+static void reach_settings_apply_startup_result(reach_settings_app *app)
+{
+    reach_settings_startup_worker *worker = &app->startup_worker;
+    reach_settings_startup_work_type work = REACH_SETTINGS_STARTUP_WORK_NONE;
+    reach_startup_app_list list = {};
+    reach_result result = REACH_ERROR;
+    size_t index = 0;
+    int32_t enabled = 0;
+    {
+        std::lock_guard<std::mutex> lock(worker->mutex);
+        if (!worker->completed)
+        {
+            return;
+        }
+        work = worker->completed_work;
+        list = worker->list;
+        result = worker->work_result;
+        index = worker->target_index;
+        enabled = worker->target_enabled;
+        worker->completed = 0;
+    }
+
+    if (work == REACH_SETTINGS_STARTUP_WORK_ENUMERATE)
+    {
+        if (result == REACH_OK)
+        {
+            reach_settings_model_apply_startup_apps(&app->model, &list);
+            reach_settings_load_startup_icons(app);
+        }
+        else
+        {
+            reach_settings_model_apply_startup_apps(&app->model, nullptr);
+            reach_settings_model_set_startup_status(&app->model,
+                                                    REACH_SETTINGS_STARTUP_STATUS_FAILED);
+        }
+    }
+    else if (work == REACH_SETTINGS_STARTUP_WORK_SET_ENABLED)
+    {
+        reach_settings_model_set_startup_busy(&app->model, 0);
+        if (result != REACH_OK)
+        {
+            reach_settings_model_set_startup_enabled(&app->model, index, !enabled);
+            reach_settings_model_set_startup_status(&app->model,
+                                                    REACH_SETTINGS_STARTUP_STATUS_FAILED);
+        }
+    }
+    app->dirty = 1;
+}
+
 static void reach_settings_submit_password_change(reach_settings_app *app)
 {
     if (app->user_account.ops.verify_password != nullptr)
@@ -981,9 +1244,10 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         reach_settings_model_release_button(&app->model);
         app->dirty = 1;
     }
-    if (app->update_scrollbar_drag.active)
+    if (app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
         if (app->window.ops.set_pointer_capture != nullptr)
         {
             (void)app->window.ops.set_pointer_capture(app->window.window, 0);
@@ -991,6 +1255,7 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         return;
     }
     reach_settings_refresh_bounds(app);
+    reach_settings_refresh_layout(app);
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
@@ -1008,6 +1273,10 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     else if (hit.type == REACH_SETTINGS_HIT_NAV_ITEM)
     {
         reach_settings_model_select_page(&app->model, hit.page);
+        if (hit.page == REACH_SETTINGS_PAGE_STARTUP_APPS && !app->model.startup_loaded)
+        {
+            reach_settings_schedule_startup_refresh(app);
+        }
         app->dirty = 1;
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_UPDATE)
@@ -1096,6 +1365,13 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             reach_settings_model_power_blur(&app->model);
         }
         app->dirty = 1;
+    }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS)
+    {
+        if (hit.type == REACH_SETTINGS_HIT_STARTUP_TOGGLE)
+        {
+            reach_settings_schedule_startup_toggle(app, hit.startup_index);
+        }
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_DISPLAY)
     {
@@ -1202,6 +1478,7 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
         return;
     }
     reach_settings_refresh_bounds(app);
+    reach_settings_refresh_layout(app);
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
@@ -1210,19 +1487,28 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
         reach_settings_model_press_button(&app->model, hit.type);
         app->dirty = 1;
     }
-    if (app->model.selected_page != REACH_SETTINGS_PAGE_UPDATE)
+    if (hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK ||
+        hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB)
+    {
+        reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
+                                         app->layout.update_scrollbar_thumb};
+        reach_scrollbar_begin_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag,
+                                   &layout, y,
+                                   hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB);
+    }
+    else if (hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK ||
+             hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB)
+    {
+        reach_scrollbar_layout layout = {app->layout.startup_scrollbar_track,
+                                         app->layout.startup_scrollbar_thumb};
+        reach_scrollbar_begin_drag(&app->model.startup_scrollbar, &app->startup_scrollbar_drag,
+                                   &layout, y,
+                                   hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB);
+    }
+    else
     {
         return;
     }
-    if (hit.type != REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK &&
-        hit.type != REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB)
-    {
-        return;
-    }
-    reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
-                                     app->layout.update_scrollbar_thumb};
-    reach_scrollbar_begin_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag, &layout,
-                               y, hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB);
     if (app->window.ops.set_pointer_capture != nullptr)
     {
         (void)app->window.ops.set_pointer_capture(app->window.window, 1);
@@ -1232,16 +1518,31 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
 
 static void reach_settings_handle_pointer_move(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app == nullptr || event == nullptr || !app->update_scrollbar_drag.active)
+    if (app == nullptr || event == nullptr)
+    {
+        return;
+    }
+    if (!app->update_scrollbar_drag.active && !app->startup_scrollbar_drag.active)
     {
         return;
     }
     reach_settings_refresh_bounds(app);
+    reach_settings_refresh_layout(app);
     float y = (float)event->y - app->bounds.y;
-    reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
-                                     app->layout.update_scrollbar_thumb};
-    reach_scrollbar_update_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag, &layout,
-                                y);
+    if (app->update_scrollbar_drag.active)
+    {
+        reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
+                                         app->layout.update_scrollbar_thumb};
+        reach_scrollbar_update_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag,
+                                    &layout, y);
+    }
+    else
+    {
+        reach_scrollbar_layout layout = {app->layout.startup_scrollbar_track,
+                                         app->layout.startup_scrollbar_thumb};
+        reach_scrollbar_update_drag(&app->model.startup_scrollbar, &app->startup_scrollbar_drag,
+                                    &layout, y);
+    }
     app->dirty = 1;
 }
 
@@ -1267,6 +1568,7 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     else if (event->type == REACH_UI_EVENT_POINTER_CANCEL)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
         if (app->model.pressed_button != REACH_SETTINGS_HIT_NONE)
         {
             reach_settings_model_release_button(&app->model);
@@ -1305,6 +1607,15 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
                                                 : 86.0f * reach_settings_app_scale(app));
         app->dirty = 1;
     }
+    else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
+             app->model.selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS &&
+             event->wheel_delta != 0)
+    {
+        reach_settings_model_scroll_startup(
+            &app->model, event->wheel_delta > 0 ? -86.0f * reach_settings_app_scale(app)
+                                                : 86.0f * reach_settings_app_scale(app));
+        app->dirty = 1;
+    }
     else if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED ||
              event->type == REACH_UI_EVENT_WINDOW_BOUNDS_CHANGED)
     {
@@ -1316,6 +1627,10 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_settings_refresh_layout(app);
         (void)reach_settings_apply_window_style(app);
         app->dirty = 1;
+        if (reach_settings_render(app) == REACH_OK)
+        {
+            app->dirty = 0;
+        }
     }
 }
 
@@ -1360,6 +1675,8 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     }
 
     (void)reach_windows_create_app_update(&app->app_update);
+    (void)reach_windows_create_startup_apps(&app->startup_apps);
+    (void)reach_windows_create_icon_provider(&app->icon_provider);
 
     if (reach_windows_create_user_account(&app->user_account) == REACH_OK &&
         app->user_account.ops.query != nullptr)
@@ -1428,7 +1745,16 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     reach_settings_apply_result(app);
     reach_settings_apply_reach_progress(app);
     reach_settings_apply_reach_result(app);
+    reach_settings_apply_startup_result(app);
     if (reach_settings_model_update_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_startup_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_tick_startup_animations(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -1494,13 +1820,24 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
         std::lock_guard<std::mutex> reach_lock(reach_worker->mutex);
         reach_busy = reach_worker->pending || reach_worker->in_flight || reach_worker->completed;
     }
+    reach_settings_startup_worker *startup_worker =
+        const_cast<reach_settings_startup_worker *>(&app->startup_worker);
+    int32_t startup_busy = 0;
+    {
+        std::lock_guard<std::mutex> startup_lock(startup_worker->mutex);
+        startup_busy =
+            startup_worker->pending || startup_worker->in_flight || startup_worker->completed;
+    }
     reach_settings_update_worker *worker =
         const_cast<reach_settings_update_worker *>(&app->update_worker);
     std::lock_guard<std::mutex> lock(worker->mutex);
-    return app->dirty || reach_busy || worker->pending || worker->in_flight || worker->completed ||
+    return app->dirty || reach_busy || startup_busy || worker->pending || worker->in_flight ||
+           worker->completed ||
            app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
-           app->update_scrollbar_drag.active ||
+           app->model.startup_scrollbar.offset != app->model.startup_scrollbar.target ||
+           app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
+           reach_settings_model_startup_animations_active(&app->model) ||
            reach_settings_model_power_animations_active(&app->model) ||
            reach_settings_model_button_press_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
@@ -1553,6 +1890,25 @@ void reach_settings_app_destroy(reach_settings_app *app)
         }
         app->reach_worker.cv.notify_one();
         app->reach_worker.thread.join();
+    }
+    if (app->startup_worker.thread_started)
+    {
+        {
+            std::lock_guard<std::mutex> lock(app->startup_worker.mutex);
+            app->startup_worker.stop = 1;
+            app->startup_worker.pending = 0;
+        }
+        app->startup_worker.cv.notify_one();
+        app->startup_worker.thread.join();
+    }
+    reach_settings_release_startup_icons(app);
+    if (app->startup_apps.ops.destroy != nullptr)
+    {
+        app->startup_apps.ops.destroy(app->startup_apps.apps);
+    }
+    if (app->icon_provider.ops.destroy != nullptr)
+    {
+        app->icon_provider.ops.destroy(app->icon_provider.provider);
     }
     if (app->app_update.destroy != nullptr)
     {
