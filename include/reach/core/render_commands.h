@@ -108,6 +108,8 @@ extern "C"
         reach_render_command_type type;
         reach_rect_f32 rect;
         reach_rect_f32 clip_rect;
+        reach_rect_f32 scissor_rect;
+        int32_t has_scissor;
         reach_color color;
         float radius;
         float blur_radius;
@@ -144,11 +146,16 @@ extern "C"
     {
         reach_render_command commands[REACH_MAX_RENDER_COMMANDS];
         size_t count;
+        reach_rect_f32 scissor_rect;
+        int32_t has_scissor;
     } reach_render_command_buffer;
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer,
                                                   const reach_render_command *command);
+    void reach_render_command_buffer_set_scissor(reach_render_command_buffer *buffer,
+                                                 reach_rect_f32 scissor_rect);
+    void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buffer);
 
 #ifdef __cplusplus
 }

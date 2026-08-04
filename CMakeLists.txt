@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 1.3.2  LANGUAGES C CXX)
+project(reach VERSION 1.3.5  LANGUAGES C CXX)
 
 option(REACH_BUILD_TESTS "Build Reach test executables and register CTest tests" ON)
 option(REACH_RUN_ARCHITECTURE_CHECK "Run architecture boundary checks as part of the default build" ON)
@@ -89,6 +89,7 @@ add_library(reach_core STATIC
     src/core/ui_layout.c
     src/core/render_commands.c
     src/core/runtime_policy.c
+    src/core/startup_apps.c
     src/core/theme.c
 )
 
@@ -518,6 +519,29 @@ target_link_libraries(reach_updater PRIVATE
     advapi32
 )
 
+add_executable(reach_elevate WIN32
+    src/tools/reach_elevate/reach_elevate.cpp
+)
+set_target_properties(reach_elevate PROPERTIES OUTPUT_NAME "reachElevate")
+
+if (MSVC)
+    target_link_options(reach_elevate PRIVATE
+        "/MANIFEST:EMBED"
+        "/MANIFESTUAC:level='requireAdministrator' uiAccess='false'"
+    )
+endif()
+
+reach_configure_common(reach_elevate)
+reach_configure_windows(reach_elevate)
+target_compile_features(reach_elevate PRIVATE cxx_std_17)
+target_link_libraries(reach_elevate PRIVATE
+    shell32
+    shlwapi
+    ole32
+    user32
+    advapi32
+)
+
 set(REACH_DIST_ROOT "${CMAKE_BINARY_DIR}/dist")
 set(REACH_DIST_DIR "${REACH_DIST_ROOT}/$<CONFIG>")
 set(REACH_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-$<CONFIG>.zip")
@@ -530,6 +554,7 @@ set(REACH_RELEASE_TARGETS
     reach_service
     reach_update_helper
     reach_updater
+    reach_elevate
 )
 
 add_custom_target(reach_release_zip
@@ -544,6 +569,7 @@ add_custom_target(reach_release_zip
         "$<TARGET_FILE:reach_service>"
         "$<TARGET_FILE:reach_update_helper>"
         "$<TARGET_FILE:reach_updater>"
+        "$<TARGET_FILE:reach_elevate>"
         "${REACH_RELEASE_IMAGE}"
         "${REACH_DIST_DIR}/reach"
 

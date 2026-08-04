@@ -18,6 +18,7 @@
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
 #include "reach/ports/settings_launcher.h"
+#include "reach/ports/startup_apps.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/user_account.h"
@@ -69,6 +70,7 @@ extern "C"
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
     reach_result reach_windows_notify_config_changed(void);
 
+    reach_result reach_windows_create_startup_apps(reach_startup_apps_port *out_port);
     size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
                                               size_t capacity);
     uintptr_t reach_windows_get_current_foreground(void);

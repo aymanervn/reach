@@ -25,6 +25,9 @@ void reach_settings_model_init(reach_settings_model *model)
         reach_settings_model_set_current_version(model, version_wide);
     }
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_scrollbar_model_init(&model->startup_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_animation_manager_init(&model->startup_animations, model->startup_tracks,
+                                 REACH_STARTUP_APP_MAX_ENTRIES);
     reach_animation_manager_init(&model->power_animations, model->power_tracks,
                                  REACH_SETTINGS_POWER_TIMER_COUNT);
     reach_animation_manager_init(&model->power_wait_animations, model->power_wait_tracks,
@@ -456,6 +459,62 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                 button_width, row_height);
     }
 
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS)
+    {
+        float scrollbar_width = 5.0f * scale;
+        float area_x = layout.content_title.x;
+        float area_y = layout.content_title.y + layout.content_title.height + 12.0f * scale;
+        float area_width = layout.content.width - 64.0f * scale - scrollbar_width;
+
+        layout.startup_summary =
+            reach_settings_rect(area_x, area_y, area_width, 16.0f * scale);
+
+        float viewport_y = area_y + 16.0f * scale + 12.0f * scale;
+        float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
+        layout.startup_viewport =
+            reach_settings_rect(area_x, viewport_y, area_width, viewport_bottom - viewport_y);
+        layout.startup_scrollbar_track = reach_settings_rect(
+            layout.startup_viewport.x + layout.startup_viewport.width + 11.0f * scale,
+            layout.startup_viewport.y, scrollbar_width, layout.startup_viewport.height);
+
+        float row_height = 62.0f * scale;
+        float row_gap = 8.0f * scale;
+        float toggle_width = 40.0f * scale;
+        float toggle_height = 22.0f * scale;
+        float content_y = 0.0f;
+        layout.startup_row_count = model->startup_apps.count < REACH_STARTUP_APP_MAX_ENTRIES
+                                       ? model->startup_apps.count
+                                       : REACH_STARTUP_APP_MAX_ENTRIES;
+        for (size_t index = 0; index < layout.startup_row_count; ++index)
+        {
+            layout.startup_rows[index] = reach_settings_rect(
+                layout.startup_viewport.x,
+                layout.startup_viewport.y + content_y - model->startup_scrollbar.offset,
+                layout.startup_viewport.width, row_height);
+            layout.startup_toggles[index] = reach_settings_rect(
+                layout.startup_rows[index].x + layout.startup_rows[index].width - 18.0f * scale -
+                    toggle_width,
+                layout.startup_rows[index].y + (row_height - toggle_height) * 0.5f, toggle_width,
+                toggle_height);
+            content_y += row_height + row_gap;
+        }
+
+        float base_content_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
+        layout.startup_content_height = base_content_height > layout.startup_viewport.height
+                                            ? base_content_height + 20.0f * scale
+                                            : base_content_height;
+        reach_scrollbar_set_extents(&model->startup_scrollbar, layout.startup_content_height,
+                                    layout.startup_viewport.height);
+        if (layout.startup_content_height > layout.startup_viewport.height)
+        {
+            reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
+                &model->startup_scrollbar, layout.startup_scrollbar_track,
+                layout.startup_viewport.height, layout.startup_content_height, 34.0f * scale);
+            layout.startup_scrollbar_track = scrollbar.track;
+            layout.startup_scrollbar_thumb = scrollbar.thumb;
+        }
+    }
+
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_DISPLAY)
     {
         float area_x = layout.content_title.x;
@@ -667,18 +726,17 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         result.type = REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK;
         return result;
     }
-    for (size_t index = 0; index < layout->update_row_count; ++index)
+    if (reach_settings_rect_contains(layout->update_viewport, x, y))
     {
-        if (layout->update_rows[index].y < layout->update_viewport.y ||
-            layout->update_rows[index].y + layout->update_rows[index].height >
-                layout->update_viewport.y + layout->update_viewport.height)
-            continue;
-        if (reach_settings_rect_contains(layout->update_checkboxes[index], x, y) ||
-            reach_settings_rect_contains(layout->update_rows[index], x, y))
+        for (size_t index = 0; index < layout->update_row_count; ++index)
         {
-            result.type = REACH_SETTINGS_HIT_UPDATE_CHECKBOX;
-            result.update_index = layout->update_indices[index];
-            return result;
+            if (reach_settings_rect_contains(layout->update_checkboxes[index], x, y) ||
+                reach_settings_rect_contains(layout->update_rows[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_UPDATE_CHECKBOX;
+                result.update_index = layout->update_indices[index];
+                return result;
+            }
         }
     }
     if (layout->power_apply_button.width > 0.0f &&
@@ -744,6 +802,31 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             return result;
         }
     }
+    if (layout->startup_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->startup_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (layout->startup_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->startup_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK;
+        return result;
+    }
+    if (reach_settings_rect_contains(layout->startup_viewport, x, y))
+    {
+        for (size_t index = 0; index < layout->startup_row_count; ++index)
+        {
+            if (reach_settings_rect_contains(layout->startup_rows[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_STARTUP_TOGGLE;
+                result.startup_index = index;
+                return result;
+            }
+        }
+    }
+
     size_t nav_count = 0;
     const reach_settings_nav_item *items = reach_settings_nav_items(&nav_count);
 

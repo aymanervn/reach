@@ -27,8 +27,7 @@ struct reach_platform_window
     void *callback_user;
     reach_ui_event pending_events[REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS];
     size_t pending_event_count;
-    int width;
-    int height;
+    reach_platform_window_caption caption;
     float corner_radius;
     int tracking_mouse_leave;
     int pointer_move_enabled;
@@ -36,6 +35,34 @@ struct reach_platform_window
     int suppress_capture_changed;
     int shell_hook_registered;
 };
+
+static int32_t reach_platform_window_rect_contains(reach_rect_f32 rect, float x, float y)
+{
+    return rect.width > 0.0f && rect.height > 0.0f && x >= rect.x && x <= rect.x + rect.width &&
+           y >= rect.y && y <= rect.y + rect.height;
+}
+
+static int32_t reach_platform_window_point_in_caption(const reach_platform_window *window, float x,
+                                                      float y)
+{
+    if (window == nullptr ||
+        !reach_platform_window_rect_contains(window->caption.bounds, x, y))
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < window->caption.exclusion_count &&
+                           index < REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS;
+         ++index)
+    {
+        if (reach_platform_window_rect_contains(window->caption.exclusions[index], x, y))
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
 
 // Workaround for user32's legacy minimize behavior: without a registered taskman
 // window, minimized windows are parked as visible caption rectangles on the
@@ -328,43 +355,12 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     case WM_LBUTTONDOWN:
         if (window != nullptr)
         {
-            if (window->role == REACH_SURFACE_SETTINGS)
+            if (reach_platform_window_point_in_caption(window, (float)GET_X_LPARAM(lparam),
+                                                       (float)GET_Y_LPARAM(lparam)))
             {
-                POINT client_point = {};
-                client_point.x = GET_X_LPARAM(lparam);
-                client_point.y = GET_Y_LPARAM(lparam);
-                UINT dpi = GetDpiForWindow(hwnd);
-                int drag_height = MulDiv(60, dpi, 96);
-                int nav_width = window->width / 4;
-                int nav_min = MulDiv(176, dpi, 96);
-                int nav_max = MulDiv(240, dpi, 96);
-                if (nav_width < nav_min)
-                {
-                    nav_width = nav_min;
-                }
-                if (nav_width > nav_max)
-                {
-                    nav_width = nav_max;
-                }
-                int control_size = MulDiv(24, dpi, 96);
-                int control_gap = MulDiv(10, dpi, 96);
-                int close_left = window->width - MulDiv(20, dpi, 96) - control_size;
-                int close_right = close_left + control_size;
-                int minimize_left = close_left - control_gap - control_size;
-                int minimize_right = minimize_left + control_size;
-                int control_top = MulDiv(18, dpi, 96);
-                int control_bottom = control_top + control_size;
-                int on_control =
-                    client_point.y >= control_top && client_point.y <= control_bottom &&
-                    ((client_point.x >= close_left && client_point.x <= close_right) ||
-                     (client_point.x >= minimize_left && client_point.x <= minimize_right));
-                if (client_point.x >= nav_width && client_point.y >= 0 &&
-                    client_point.y <= drag_height && !on_control)
-                {
-                    ReleaseCapture();
-                    SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-                    return 0;
-                }
+                ReleaseCapture();
+                SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+                return 0;
             }
             POINT point = {};
             point.x = GET_X_LPARAM(lparam);
@@ -719,9 +715,30 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
 
     BOOL ok = SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST,
                            (int)bounds.x, (int)bounds.y, width, height, SWP_NOACTIVATE);
-    window->width = width;
-    window->height = height;
     return ok ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result reach_platform_window_set_caption(reach_platform_window *window,
+                                                      const reach_platform_window_caption *caption)
+{
+    REACH_ASSERT(window != nullptr);
+    if (window == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (caption == nullptr)
+    {
+        window->caption = {};
+        return REACH_OK;
+    }
+
+    window->caption = *caption;
+    if (window->caption.exclusion_count > REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS)
+    {
+        window->caption.exclusion_count = REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS;
+    }
+    return REACH_OK;
 }
 
 static reach_result reach_platform_window_get_bounds(const reach_platform_window *window,
@@ -768,7 +785,9 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     (void)DwmSetWindowAttribute(window->hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference,
                                 sizeof(preference));
 
-    if (window->width <= 0 || window->height <= 0)
+    RECT client = {};
+    if (!GetClientRect(window->hwnd, &client) || client.right <= client.left ||
+        client.bottom <= client.top)
     {
         return REACH_OK;
     }
@@ -779,8 +798,8 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
         diameter = 18;
     }
 
-    HRGN region =
-        CreateRoundRectRgn(0, 0, window->width + 1, window->height + 1, diameter, diameter);
+    HRGN region = CreateRoundRectRgn(0, 0, client.right - client.left + 1,
+                                     client.bottom - client.top + 1, diameter, diameter);
 
     if (region == nullptr)
     {
@@ -1131,6 +1150,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.set_opacity = reach_platform_window_set_opacity;
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
     out_port->ops.apply_rounded_corners = reach_platform_window_apply_rounded_corners;
+    out_port->ops.set_caption = reach_platform_window_set_caption;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
     out_port->ops.has_pending_events = reach_platform_window_has_pending_events;
     out_port->ops.dispatch_events = reach_platform_window_dispatch_events;

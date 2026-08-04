@@ -32,6 +32,25 @@ void reach_render_command_buffer_clear(reach_render_command_buffer *buffer)
     if (buffer != 0)
     {
         buffer->count = 0;
+        buffer->has_scissor = 0;
+    }
+}
+
+void reach_render_command_buffer_set_scissor(reach_render_command_buffer *buffer,
+                                             reach_rect_f32 scissor_rect)
+{
+    if (buffer != 0)
+    {
+        buffer->scissor_rect = scissor_rect;
+        buffer->has_scissor = 1;
+    }
+}
+
+void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buffer)
+{
+    if (buffer != 0)
+    {
+        buffer->has_scissor = 0;
     }
 }
 
@@ -48,6 +67,11 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
     }
 
     buffer->commands[buffer->count] = *command;
+    if (buffer->has_scissor && !command->has_scissor)
+    {
+        buffer->commands[buffer->count].scissor_rect = buffer->scissor_rect;
+        buffer->commands[buffer->count].has_scissor = 1;
+    }
     buffer->count += 1;
     return REACH_OK;
 }
