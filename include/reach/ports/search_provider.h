@@ -20,6 +20,7 @@ extern "C"
         uint16_t title[REACH_SEARCH_RESULT_NAME_CAPACITY];
         uint16_t subtitle[REACH_SEARCH_RESULT_PATH_CAPACITY];
         uint16_t path[REACH_SEARCH_RESULT_PATH_CAPACITY];
+        uint16_t arguments[REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY];
         reach_search_result_kind kind;
         int32_t is_directory;
         int32_t score;

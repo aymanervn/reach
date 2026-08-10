@@ -68,6 +68,15 @@ extern "C"
     reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
                                                            reach_render_backend_port *out_port);
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
+
+    typedef struct reach_windows_search_catalog reach_windows_search_catalog;
+
+    reach_result reach_windows_search_catalog_create(reach_windows_search_catalog **out_catalog);
+    void reach_windows_search_catalog_destroy(reach_windows_search_catalog *catalog);
+    size_t reach_windows_search_catalog_collect(reach_windows_search_catalog *catalog,
+                                                const uint16_t *query,
+                                                reach_search_candidate *out_candidates,
+                                                size_t capacity);
     reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
     reach_result reach_windows_create_settings_launcher(reach_settings_launcher_port *out_port);
     reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);

@@ -191,13 +191,14 @@ reach_result reach_host_open_launcher_result(reach_host *host)
         {
             return REACH_OK;
         }
+        const uint16_t *arguments = result->arguments[0] != 0 ? result->arguments : nullptr;
         if (result->kind == REACH_SEARCH_RESULT_APP)
         {
-            return reach_host_open_app(host, result->path, nullptr, nullptr, 0,
+            return reach_host_open_app(host, result->path, arguments, nullptr, 0,
                                        reach_launcher_is_open(host->launcher_capsule));
         }
 
-        return reach_host_launch_app(host, result->path, nullptr, 0, 0,
+        return reach_host_launch_app(host, result->path, arguments, 0, 0,
                                      reach_launcher_is_open(host->launcher_capsule));
     }
 

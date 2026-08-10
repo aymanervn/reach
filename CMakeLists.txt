@@ -42,6 +42,7 @@ add_library(reach_support STATIC
     src/support/animation.cpp
     src/support/layout.cpp
     src/support/search_ranking.cpp
+    src/support/search_catalog.cpp
 )
 
 reach_configure_common(reach_support)
@@ -157,6 +158,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_text.cpp
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/search_retriever_win32.cpp
+    src/adapters/windows/search_catalog_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp
     src/adapters/windows/settings_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
