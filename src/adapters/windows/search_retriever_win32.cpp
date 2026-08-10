@@ -21,6 +21,7 @@ struct reach_search_provider
 {
     HANDLE pipe;
     HANDLE io_event;
+    reach_windows_search_catalog *catalog;
     reach_search_candidate results[REACH_SEARCH_MAX_RESULTS];
     size_t result_count;
 };
@@ -258,17 +259,14 @@ static void reach_search_add_candidate(std::vector<reach_search_candidate> *cand
         return;
     }
 
-    DWORD attributes = GetFileAttributesW(reinterpret_cast<LPCWSTR>(path));
-    int32_t is_directory =
-        attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-    if (!is_directory && reach_search_path_has_extension_ci(path, ".lnk"))
+    if (reach_search_path_has_extension_ci(path, ".lnk"))
     {
         return;
     }
 
     for (const reach_search_candidate &candidate : *candidates)
     {
-        if (reach_search_path_equals_ci(candidate.path, path))
+        if (reach_search_path_equals_ci(candidate.path, path) && candidate.arguments[0] == 0)
         {
             return;
         }
@@ -278,8 +276,8 @@ static void reach_search_add_candidate(std::vector<reach_search_candidate> *cand
     reach_search_copy_utf16(candidate.path, REACH_SEARCH_RESULT_PATH_CAPACITY, path);
     reach_search_copy_utf16(candidate.name, REACH_SEARCH_RESULT_NAME_CAPACITY,
                             reach_search_file_name(path));
-    candidate.is_directory = is_directory;
-    candidate.kind = reach_search_classify_result(candidate.path, candidate.is_directory);
+    candidate.is_directory = 0;
+    candidate.kind = reach_search_classify_result(candidate.path, 0);
     candidates->push_back(candidate);
 }
 
@@ -393,6 +391,14 @@ static reach_result reach_search_retriever_query(reach_search_provider *provider
     std::vector<reach_search_candidate> candidates;
     candidates.reserve(REACH_RETRIEVER_REQUEST_CAP);
 
+    reach_search_candidate catalog_candidates[REACH_SEARCH_MAX_RESULTS] = {};
+    size_t catalog_count = reach_windows_search_catalog_collect(
+        provider->catalog, query, catalog_candidates, REACH_SEARCH_MAX_RESULTS);
+    for (size_t index = 0; index < catalog_count; ++index)
+    {
+        candidates.push_back(catalog_candidates[index]);
+    }
+
     uint64_t deadline_ms = GetTickCount64() + REACH_RETRIEVER_QUERY_BUDGET_MS;
     uint32_t modes = reach_retriever_select_modes(query);
     int32_t any_pass_ok = 0;
@@ -416,7 +422,7 @@ static reach_result reach_search_retriever_query(reach_search_provider *provider
             REACH_OK;
     }
 
-    if (!any_pass_ok)
+    if (!any_pass_ok && catalog_count == 0)
     {
         return REACH_ERROR;
     }
@@ -427,6 +433,16 @@ static reach_result reach_search_retriever_query(reach_search_provider *provider
     for (size_t index = 0; index < count; ++index)
     {
         provider->results[index] = candidates[index];
+        if (provider->results[index].source == REACH_SEARCH_SOURCE_CATALOG)
+        {
+            continue;
+        }
+        DWORD attributes =
+            GetFileAttributesW(reinterpret_cast<LPCWSTR>(provider->results[index].path));
+        provider->results[index].is_directory =
+            attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        provider->results[index].kind = reach_search_classify_result(
+            provider->results[index].path, provider->results[index].is_directory);
     }
 
     return REACH_OK;
@@ -452,6 +468,8 @@ static reach_result reach_search_retriever_result_at(const reach_search_provider
     reach_search_copy_utf16(out_result->subtitle, REACH_SEARCH_RESULT_PATH_CAPACITY,
                             candidate->path);
     reach_search_copy_utf16(out_result->path, REACH_SEARCH_RESULT_PATH_CAPACITY, candidate->path);
+    reach_search_copy_utf16(out_result->arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
+                            candidate->arguments);
     out_result->kind = candidate->kind;
     out_result->is_directory = candidate->is_directory;
     out_result->score = candidate->score;
@@ -469,6 +487,7 @@ static void reach_search_retriever_destroy(reach_search_provider *provider)
     {
         CloseHandle(provider->io_event);
     }
+    reach_windows_search_catalog_destroy(provider->catalog);
     delete provider;
 }
 
@@ -489,6 +508,12 @@ reach_result reach_windows_create_search_provider(reach_search_provider_port *ou
     provider->io_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     if (provider->io_event == nullptr)
     {
+        delete provider;
+        return REACH_ERROR;
+    }
+    if (reach_windows_search_catalog_create(&provider->catalog) != REACH_OK)
+    {
+        CloseHandle(provider->io_event);
         delete provider;
         return REACH_ERROR;
     }
