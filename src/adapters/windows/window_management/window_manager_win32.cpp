@@ -573,10 +573,9 @@ static int32_t reach_window_manager_window_on_primary_monitor(uint64_t window)
 }
 
 static int32_t
-reach_window_manager_window_is_maximized_on_primary(const reach_window_manager *manager,
-                                                    reach_window_id window_id)
+reach_window_manager_any_window_maximized_on_primary(const reach_window_manager *manager)
 {
-    if (window_id == 0)
+    if (manager == nullptr)
     {
         return 0;
     }
@@ -585,10 +584,13 @@ reach_window_manager_window_is_maximized_on_primary(const reach_window_manager *
     int32_t maximized = 0;
     for (const reach_service_window_snapshot &snapshot : manager->helper_windows)
     {
-        if (snapshot.window == static_cast<uint64_t>(window_id))
+        if (!snapshot.maximized || snapshot.iconic || !snapshot.visible)
         {
-            maximized = snapshot.maximized &&
-                        reach_window_manager_window_on_primary_monitor(snapshot.window);
+            continue;
+        }
+        if (reach_window_manager_window_on_primary_monitor(snapshot.window))
+        {
+            maximized = 1;
             break;
         }
     }
@@ -811,8 +813,8 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.stop = reach_window_manager_stop;
     out_port->ops.refresh = reach_window_manager_refresh;
     out_port->ops.snap = reach_window_manager_snap;
-    out_port->ops.window_is_maximized_on_primary =
-        reach_window_manager_window_is_maximized_on_primary;
+    out_port->ops.any_window_maximized_on_primary =
+        reach_window_manager_any_window_maximized_on_primary;
     out_port->ops.window_is_snapped_on_primary = reach_window_manager_window_is_snapped_on_primary;
     out_port->ops.game_mode_active = reach_window_manager_game_mode_active;
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
