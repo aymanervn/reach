@@ -11,12 +11,6 @@ enum
     REACH_STAGE_ANIMATION_COUNT
 };
 
-typedef struct reach_stage_grid
-{
-    size_t columns;
-    size_t rows;
-} reach_stage_grid;
-
 struct reach_stage
 {
     reach_animation_manager animations;

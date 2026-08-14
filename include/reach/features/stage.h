@@ -29,6 +29,8 @@ extern "C"
         uint16_t label[260];
         int32_t minimized;
         int32_t desktop;
+        uint32_t monitor_index;
+        int32_t monitor_portrait;
         reach_rect_f32 source_rect;
         reach_rect_f32 target_rect;
         reach_rect_f32 current_rect;
@@ -57,6 +59,8 @@ extern "C"
         const uint16_t *label;
         int32_t minimized;
         int32_t desktop;
+        uint32_t monitor_index;
+        int32_t monitor_portrait;
         reach_rect_f32 frame;
     } reach_stage_open_window;
 
