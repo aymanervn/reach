@@ -1,12 +1,14 @@
 #include "windows_adapters_internal.h"
 
+#include "reach/core/limits.h"
+
 #include <windows.h>
 
 #include <dwmapi.h>
 
 #include <new>
 
-#define REACH_WINDOW_THUMBNAIL_MAX 64
+#define REACH_WINDOW_THUMBNAIL_MAX (REACH_MAX_OPEN_WINDOWS + 1)
 
 typedef struct reach_window_thumbnail_entry
 {

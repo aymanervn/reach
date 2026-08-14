@@ -62,7 +62,7 @@ extern "C"
         int32_t open;
         size_t selected_index;
         size_t visible_start;
-        uintptr_t windows[REACH_MAX_PINNED_APPS];
+        uintptr_t windows[REACH_MAX_OPEN_WINDOWS];
         size_t window_count;
     } reach_switcher_state;
 

@@ -334,7 +334,7 @@ static void reach_switcher_append_ring_window(reach_switcher_state *state,
                                               const reach_switcher_window_context *ctx,
                                               uintptr_t window_id)
 {
-    if (state == nullptr || window_id == 0 || state->window_count >= REACH_MAX_PINNED_APPS ||
+    if (state == nullptr || window_id == 0 || state->window_count >= REACH_MAX_OPEN_WINDOWS ||
         reach_switcher_state_contains(state, window_id) ||
         !reach_switcher_ctx_open_index(ctx, window_id, nullptr))
     {
@@ -347,7 +347,7 @@ static void reach_switcher_rebuild_ring(reach_switcher_state *state,
                                         const reach_switcher_window_context *ctx)
 {
     state->window_count = 0;
-    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = 0; index < REACH_MAX_OPEN_WINDOWS; ++index)
     {
         state->windows[index] = 0;
     }

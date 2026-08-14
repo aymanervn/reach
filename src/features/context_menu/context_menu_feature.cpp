@@ -121,7 +121,7 @@ void reach_context_menu_reset(reach_context_menu *menu)
     menu->state.open = 0;
     menu->state.power_open = 0;
     menu->state.window_list_open = 0;
-    menu->state.target_index = REACH_MAX_PINNED_APPS;
+    menu->state.target_index = REACH_MAX_DOCK_ITEMS;
     menu->state.hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     menu->state.item_count = 0;
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
@@ -223,7 +223,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
     reach_context_menu_build_power_commands(state->item_commands, state->item_icon_ids,
                                             &state->item_count);
     reach_context_menu_place(state, ctx, 176.0f * ctx->dpi_scale, 0.72f);
-    state->target_index = REACH_MAX_PINNED_APPS;
+    state->target_index = REACH_MAX_DOCK_ITEMS;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->power_open = 1;
     state->window_list_open = 0;

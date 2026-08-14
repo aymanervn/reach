@@ -94,8 +94,8 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     reach_switcher_update_visible_start(&visible_model);
     state->visible_start = visible_model.visible_start;
 
-    reach_switcher_render_item items[REACH_MAX_PINNED_APPS] = {};
-    for (size_t index = 0; index < state->window_count && index < REACH_MAX_PINNED_APPS; ++index)
+    reach_switcher_render_item items[REACH_MAX_OPEN_WINDOWS] = {};
+    for (size_t index = 0; index < state->window_count && index < REACH_MAX_OPEN_WINDOWS; ++index)
     {
         const reach_window_snapshot *window = reach_window_tracking_window_by_id(
             reach_switcher_windows(switcher), state->windows[index]);

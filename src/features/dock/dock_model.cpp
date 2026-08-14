@@ -57,7 +57,7 @@ size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *mo
 {
     if (model == nullptr)
     {
-        return REACH_MAX_PINNED_APPS;
+        return REACH_MAX_DOCK_ITEMS;
     }
     for (size_t index = 0; index < model->item_count; ++index)
     {
@@ -66,7 +66,7 @@ size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *mo
             return index;
         }
     }
-    return REACH_MAX_PINNED_APPS;
+    return REACH_MAX_DOCK_ITEMS;
 }
 
 size_t reach_dock_feature_model_find_order_key(const reach_dock_feature_model *model,
@@ -74,7 +74,7 @@ size_t reach_dock_feature_model_find_order_key(const reach_dock_feature_model *m
 {
     if (model == nullptr)
     {
-        return REACH_MAX_PINNED_APPS;
+        return REACH_MAX_DOCK_ITEMS;
     }
     for (size_t index = 0; index < model->order_count; ++index)
     {
@@ -83,7 +83,7 @@ size_t reach_dock_feature_model_find_order_key(const reach_dock_feature_model *m
             return index;
         }
     }
-    return REACH_MAX_PINNED_APPS;
+    return REACH_MAX_DOCK_ITEMS;
 }
 
 void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t source,
@@ -174,7 +174,7 @@ size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_mode
 {
     if (model == nullptr || pin_id == 0)
     {
-        return REACH_MAX_PINNED_APPS;
+        return REACH_MAX_DOCK_ITEMS;
     }
 
     size_t pinned_index = 0;
@@ -189,5 +189,5 @@ size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_mode
             ++pinned_index;
         }
     }
-    return REACH_MAX_PINNED_APPS;
+    return REACH_MAX_DOCK_ITEMS;
 }

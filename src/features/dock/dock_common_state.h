@@ -18,8 +18,8 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
 
 typedef struct reach_dock_item_x_snapshot
 {
-    reach_dock_order_key keys[REACH_MAX_PINNED_APPS];
-    float x[REACH_MAX_PINNED_APPS];
+    reach_dock_order_key keys[REACH_MAX_DOCK_ITEMS];
+    float x[REACH_MAX_DOCK_ITEMS];
     size_t count;
 } reach_dock_item_x_snapshot;
 

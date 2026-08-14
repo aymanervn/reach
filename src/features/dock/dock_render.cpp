@@ -558,9 +558,9 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     reach_dock_state *state = reach_dock_state_mut(dock);
     reach_animation_manager *manager = reach_dock_manager(dock);
 
-    float item_box_x[REACH_MAX_PINNED_APPS] = {};
-    float item_reveal[REACH_MAX_PINNED_APPS] = {};
-    for (size_t index = 0; index < ctx->layout->app_slot_count && index < REACH_MAX_PINNED_APPS;
+    float item_box_x[REACH_MAX_DOCK_ITEMS] = {};
+    float item_reveal[REACH_MAX_DOCK_ITEMS] = {};
+    for (size_t index = 0; index < ctx->layout->app_slot_count && index < REACH_MAX_DOCK_ITEMS;
          ++index)
     {
         item_box_x[index] = reach_dock_item_current_x(dock, ctx->theme, ctx->layout, index);
@@ -570,13 +570,13 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     size_t dragged_render_index =
         (state->drag.active || reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
             ? reach_dock_feature_model_find_item_key(&state->model, state->drag.key)
-            : REACH_MAX_PINNED_APPS;
+            : REACH_MAX_DOCK_ITEMS;
     float dragged_x = reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
                           ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)
                           : state->drag.x;
 
-    reach_dock_render_item render_items[REACH_MAX_PINNED_APPS] = {};
-    for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_PINNED_APPS;
+    reach_dock_render_item render_items[REACH_MAX_DOCK_ITEMS] = {};
+    for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_DOCK_ITEMS;
          ++index)
     {
         const reach_dock_item_model *item = &state->model.items[index];
@@ -614,11 +614,11 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.layout = ctx->layout;
     input.model = &state->model;
     input.render_items = render_items;
-    input.render_item_count = REACH_MAX_PINNED_APPS;
+    input.render_item_count = REACH_MAX_DOCK_ITEMS;
     input.item_box_x = item_box_x;
-    input.item_box_x_count = REACH_MAX_PINNED_APPS;
+    input.item_box_x_count = REACH_MAX_DOCK_ITEMS;
     input.item_reveal = item_reveal;
-    input.item_reveal_count = REACH_MAX_PINNED_APPS;
+    input.item_reveal_count = REACH_MAX_DOCK_ITEMS;
     input.focused_window = ctx->focused_window;
     input.dragged_render_index = dragged_render_index;
     input.dragged_box_x = dragged_x;
