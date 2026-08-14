@@ -99,6 +99,8 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
         tile->icon_id = windows[index].icon_id;
         tile->minimized = windows[index].minimized;
         tile->desktop = windows[index].desktop;
+        tile->monitor_index = windows[index].monitor_index;
+        tile->monitor_portrait = windows[index].monitor_portrait;
         tile->source_rect = windows[index].frame;
         tile->current_rect = windows[index].frame;
         (void)reach_copy_utf16(tile->label, 260, windows[index].label);

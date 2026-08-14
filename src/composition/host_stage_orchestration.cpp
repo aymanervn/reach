@@ -48,6 +48,85 @@ void reach_host_sync_stage_reveal_corner(reach_host *host, reach_rect_f32 monito
     }
 }
 
+static const reach_monitor_info *reach_host_stage_monitor_for(reach_host *host,
+                                                              reach_rect_f32 frame,
+                                                              uint32_t *out_rank)
+{
+    REACH_ASSERT(out_rank != nullptr);
+    *out_rank = 0;
+
+    if (host == nullptr || host->monitors.list == nullptr || host->monitors.ops.count == nullptr ||
+        host->monitors.ops.get == nullptr)
+    {
+        return nullptr;
+    }
+
+    size_t count = host->monitors.ops.count(host->monitors.list);
+    if (count == 0)
+    {
+        return nullptr;
+    }
+
+    float center_x = frame.x + frame.width * 0.5f;
+    float center_y = frame.y + frame.height * 0.5f;
+
+    const reach_monitor_info *match = nullptr;
+    for (size_t index = 0; index < count && match == nullptr; ++index)
+    {
+        const reach_monitor_info *monitor = host->monitors.ops.get(host->monitors.list, index);
+        if (monitor == nullptr)
+        {
+            continue;
+        }
+        if (center_x >= (float)monitor->bounds.left && center_x < (float)monitor->bounds.right &&
+            center_y >= (float)monitor->bounds.top && center_y < (float)monitor->bounds.bottom)
+        {
+            match = monitor;
+        }
+    }
+
+    if (match == nullptr)
+    {
+        match = host->monitors.ops.primary != nullptr
+                    ? host->monitors.ops.primary(host->monitors.list)
+                    : host->monitors.ops.get(host->monitors.list, 0);
+    }
+    if (match == nullptr)
+    {
+        return nullptr;
+    }
+
+    uint32_t rank = 0;
+    for (size_t index = 0; index < count; ++index)
+    {
+        const reach_monitor_info *monitor = host->monitors.ops.get(host->monitors.list, index);
+        if (monitor == nullptr || monitor == match)
+        {
+            continue;
+        }
+        if (monitor->bounds.left < match->bounds.left ||
+            (monitor->bounds.left == match->bounds.left && monitor->bounds.top < match->bounds.top))
+        {
+            rank++;
+        }
+    }
+
+    *out_rank = rank;
+    return match;
+}
+
+static int32_t reach_host_stage_monitor_is_portrait(const reach_monitor_info *monitor)
+{
+    if (monitor == nullptr)
+    {
+        return 0;
+    }
+    return (monitor->bounds.bottom - monitor->bounds.top) >
+                   (monitor->bounds.right - monitor->bounds.left)
+               ? 1
+               : 0;
+}
+
 static size_t reach_host_collect_stage_windows(reach_host *host,
                                                reach_stage_open_window *out_windows,
                                                size_t capacity)
@@ -91,6 +170,10 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
         entry->label = snapshot->title;
         entry->minimized = snapshot->minimized;
         entry->frame = frame;
+
+        const reach_monitor_info *monitor =
+            reach_host_stage_monitor_for(host, frame, &entry->monitor_index);
+        entry->monitor_portrait = reach_host_stage_monitor_is_portrait(monitor);
         entry->icon_id = reach_icon_service_get(host->icon_service, snapshot->icon_ref,
                                                 reach_host_dock_icon_size_px(host));
         collected++;
@@ -114,6 +197,10 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
             entry->label = desktop_label;
             entry->desktop = 1;
             entry->frame = monitor_bounds;
+
+            const reach_monitor_info *monitor =
+                reach_host_stage_monitor_for(host, monitor_bounds, &entry->monitor_index);
+            entry->monitor_portrait = reach_host_stage_monitor_is_portrait(monitor);
             entry->icon_id = host->wallpaper_image_id;
             collected++;
         }
@@ -253,6 +340,11 @@ void reach_host_open_stage(reach_host *host)
     if (!reach_host_primary_monitor_bounds(host, &monitor_bounds))
     {
         return;
+    }
+
+    if (host->monitors.ops.refresh != nullptr)
+    {
+        (void)host->monitors.ops.refresh(host->monitors.list);
     }
 
     if (host->window_manager.ops.refresh != nullptr)

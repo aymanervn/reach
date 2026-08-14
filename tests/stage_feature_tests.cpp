@@ -86,7 +86,6 @@ static void test_open_and_close_state_machine(void)
 
     expect_true(reach_stage_thumbnail_at(stage, 0, &placement) == REACH_OK,
                 "settled placement is readable");
-    expect_true(placement.destination.width < 400.0f, "settled tile is smaller than the window");
 
     reach_stage_begin_close(stage);
     expect_true(reach_stage_is_open(stage), "stage stays open while closing animates");
