@@ -11,14 +11,28 @@ struct reach_window_tracking
 {
     reach_window_manager_port window_manager;
 
-    reach_window_snapshot open_windows[REACH_MAX_PINNED_APPS];
-    uint32_t group_ids[REACH_MAX_PINNED_APPS];
+    reach_window_snapshot window_sets[2][REACH_MAX_OPEN_WINDOWS];
+    uint32_t group_id_sets[2][REACH_MAX_OPEN_WINDOWS];
+    size_t active_set;
+
+    reach_window_snapshot *open_windows;
+    uint32_t *group_ids;
     size_t open_window_count;
+
+    const reach_window_snapshot *previous_windows;
+    const uint32_t *previous_group_ids;
+    size_t previous_window_count;
+
     uint32_t next_group_id;
     uintptr_t foreground_window;
-    uintptr_t focus_history[REACH_MAX_PINNED_APPS];
+    uintptr_t focus_history[REACH_MAX_OPEN_WINDOWS];
     size_t focus_history_count;
 };
+
+static const uint16_t *reach_window_tracking_icon_ref(const reach_window_snapshot *window)
+{
+    return window->icon_ref[0] != 0 ? window->icon_ref : window->path;
+}
 
 static int32_t reach_window_tracking_utf16_equal(const uint16_t *a, const uint16_t *b)
 {
@@ -52,6 +66,11 @@ reach_result reach_window_tracking_create(reach_window_manager_port window_manag
     }
     service->window_manager = window_manager;
     service->next_group_id = 1;
+    service->active_set = 0;
+    service->open_windows = service->window_sets[0];
+    service->group_ids = service->group_id_sets[0];
+    service->previous_windows = service->window_sets[1];
+    service->previous_group_ids = service->group_id_sets[1];
     *out_service = service;
     return REACH_OK;
 }
@@ -289,9 +308,9 @@ static void reach_window_tracking_push_focus_history_front(reach_window_tracking
 
     reach_window_tracking_remove_focus_history_window(service, window_id);
     size_t count = service->focus_history_count;
-    if (count >= REACH_MAX_PINNED_APPS)
+    if (count >= REACH_MAX_OPEN_WINDOWS)
     {
-        count = REACH_MAX_PINNED_APPS - 1;
+        count = REACH_MAX_OPEN_WINDOWS - 1;
     }
     for (size_t index = count; index > 0; --index)
     {
@@ -384,41 +403,21 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         return REACH_OK;
     }
 
-    uintptr_t old_windows[REACH_MAX_PINNED_APPS] = {};
-    int32_t old_minimized[REACH_MAX_PINNED_APPS] = {};
-    int32_t old_maximized[REACH_MAX_PINNED_APPS] = {};
-    int32_t old_visible[REACH_MAX_PINNED_APPS] = {};
-    uint16_t old_paths[REACH_MAX_PINNED_APPS][260] = {};
-    uint16_t old_icon_refs[REACH_MAX_PINNED_APPS][260] = {};
-    uint16_t old_titles[REACH_MAX_PINNED_APPS][260] = {};
-    uint16_t old_app_user_model_ids[REACH_MAX_PINNED_APPS][260] = {};
-    uint32_t old_group_ids[REACH_MAX_PINNED_APPS] = {};
-    size_t old_count = service->open_window_count;
-    if (old_count > REACH_MAX_PINNED_APPS)
-    {
-        old_count = REACH_MAX_PINNED_APPS;
-    }
+    service->previous_windows = service->window_sets[service->active_set];
+    service->previous_group_ids = service->group_id_sets[service->active_set];
+    service->previous_window_count = service->open_window_count;
 
-    for (size_t index = 0; index < old_count; ++index)
-    {
-        old_windows[index] = service->open_windows[index].id;
-        old_minimized[index] = service->open_windows[index].minimized;
-        old_maximized[index] = service->open_windows[index].maximized;
-        old_visible[index] = service->open_windows[index].visible;
-        reach_copy_utf16(old_paths[index], 260, service->open_windows[index].path);
-        reach_copy_utf16(old_icon_refs[index], 260,
-                         service->open_windows[index].icon_ref[0] != 0
-                             ? service->open_windows[index].icon_ref
-                             : service->open_windows[index].path);
-        reach_copy_utf16(old_titles[index], 260, service->open_windows[index].title);
-        reach_copy_utf16(old_app_user_model_ids[index], 260,
-                         service->open_windows[index].app_user_model_id);
-        old_group_ids[index] = service->group_ids[index];
-    }
+    service->active_set ^= 1;
+    service->open_windows = service->window_sets[service->active_set];
+    service->group_ids = service->group_id_sets[service->active_set];
+
+    const reach_window_snapshot *old_windows = service->previous_windows;
+    const uint32_t *old_group_ids = service->previous_group_ids;
+    size_t old_count = service->previous_window_count;
 
     service->open_window_count = 0;
     size_t count = service->window_manager.ops.window_count(service->window_manager.manager);
-    for (size_t index = 0; index < count && service->open_window_count < REACH_MAX_PINNED_APPS;
+    for (size_t index = 0; index < count && service->open_window_count < REACH_MAX_OPEN_WINDOWS;
          ++index)
     {
         reach_window_snapshot snapshot = {};
@@ -440,7 +439,7 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         uint32_t group_id = 0;
         for (size_t old_index = 0; old_index < old_count && group_id == 0; ++old_index)
         {
-            if (old_windows[old_index] == window->id)
+            if (old_windows[old_index].id == window->id)
             {
                 group_id = old_group_ids[old_index];
             }
@@ -455,8 +454,8 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         for (size_t old_index = 0; old_index < old_count && group_id == 0; ++old_index)
         {
             if (reach_window_tracking_identity_equal(window->path, window->app_user_model_id,
-                                                     old_paths[old_index],
-                                                     old_app_user_model_ids[old_index]))
+                                                     old_windows[old_index].path,
+                                                     old_windows[old_index].app_user_model_id))
             {
                 group_id = old_group_ids[old_index];
             }
@@ -477,16 +476,14 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         for (size_t index = 0; index < service->open_window_count; ++index)
         {
             int32_t item_changed =
-                old_windows[index] != service->open_windows[index].id ||
-                !reach_window_tracking_utf16_equal(old_paths[index],
+                old_windows[index].id != service->open_windows[index].id ||
+                !reach_window_tracking_utf16_equal(old_windows[index].path,
                                                    service->open_windows[index].path) ||
-                !reach_window_tracking_utf16_equal(old_app_user_model_ids[index],
+                !reach_window_tracking_utf16_equal(old_windows[index].app_user_model_id,
                                                    service->open_windows[index].app_user_model_id);
-            const uint16_t *icon_ref = service->open_windows[index].icon_ref[0] != 0
-                                           ? service->open_windows[index].icon_ref
-                                           : service->open_windows[index].path;
-            int32_t icon_ref_changed =
-                !reach_window_tracking_utf16_equal(old_icon_refs[index], icon_ref);
+            int32_t icon_ref_changed = !reach_window_tracking_utf16_equal(
+                reach_window_tracking_icon_ref(&old_windows[index]),
+                reach_window_tracking_icon_ref(&service->open_windows[index]));
 
             if (item_changed)
             {
@@ -498,10 +495,11 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
                 icon_identity_changed = 1;
             }
 
-            if (item_changed || old_minimized[index] != service->open_windows[index].minimized ||
-                old_maximized[index] != service->open_windows[index].maximized ||
-                old_visible[index] != service->open_windows[index].visible ||
-                !reach_window_tracking_utf16_equal(old_titles[index],
+            if (item_changed ||
+                old_windows[index].minimized != service->open_windows[index].minimized ||
+                old_windows[index].maximized != service->open_windows[index].maximized ||
+                old_windows[index].visible != service->open_windows[index].visible ||
+                !reach_window_tracking_utf16_equal(old_windows[index].title,
                                                    service->open_windows[index].title))
             {
                 changed = 1;
@@ -516,12 +514,6 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         out_report->changed = changed;
         out_report->items_changed = items_changed;
         out_report->icon_identity_changed = icon_identity_changed;
-        out_report->old_count = old_count;
-        for (size_t index = 0; index < old_count; ++index)
-        {
-            out_report->old_windows[index] = old_windows[index];
-            reach_copy_utf16(out_report->old_icon_refs[index], 260, old_icon_refs[index]);
-        }
     }
     return REACH_OK;
 }

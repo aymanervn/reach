@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/core/limits.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
@@ -18,7 +19,7 @@ extern "C"
 {
 #endif
 
-#define REACH_STAGE_MAX_TILES 32
+#define REACH_STAGE_MAX_TILES (REACH_MAX_OPEN_WINDOWS + 1)
 
     typedef struct reach_stage reach_stage;
 

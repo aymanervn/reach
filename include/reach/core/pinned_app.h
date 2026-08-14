@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "reach/core/limits.h"
+
 #ifdef __cplusplus
 extern "C"
 {

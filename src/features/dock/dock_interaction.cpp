@@ -18,7 +18,7 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
 {
     reach_dock_hit_result result = {};
     result.type = REACH_DOCK_HIT_NONE;
-    result.index = REACH_MAX_PINNED_APPS;
+    result.index = REACH_MAX_DOCK_ITEMS;
 
     if (layout == nullptr)
     {
@@ -62,7 +62,7 @@ reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature
     reach_dock_item_action action = {};
     action.type = REACH_DOCK_ITEM_ACTION_NONE;
     action.item_index = item_index;
-    action.pinned_index = REACH_MAX_PINNED_APPS;
+    action.pinned_index = REACH_MAX_DOCK_ITEMS;
 
     if (model == nullptr || item_index >= model->item_count)
     {
@@ -317,9 +317,9 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
 
     size_t target = reach_dock_reorder_target(&state->model, ctx->layout, current, dragged_box_x);
 
-    if (target != REACH_MAX_PINNED_APPS && target != state->drag.target_index)
+    if (target != REACH_MAX_DOCK_ITEMS && target != state->drag.target_index)
     {
-        if (current != REACH_MAX_PINNED_APPS)
+        if (current != REACH_MAX_DOCK_ITEMS)
         {
             reach_dock_feature_model_move_order(&state->model, current, target);
             out->rebuild_items = 1;
@@ -333,7 +333,7 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
 
     current = reach_dock_feature_model_find_order_key(&state->model, state->drag.key);
 
-    if (current != REACH_MAX_PINNED_APPS && state->feedback_index != current)
+    if (current != REACH_MAX_DOCK_ITEMS && state->feedback_index != current)
     {
         state->feedback_index = current;
         out->redraw = 1;
@@ -363,13 +363,13 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
 
     size_t target_pinned_index =
         dragged_pinned ? reach_dock_feature_model_pinned_order_index(&state->model, pin_id)
-                       : REACH_MAX_PINNED_APPS;
+                       : REACH_MAX_DOCK_ITEMS;
 
     size_t target_index = reach_dock_feature_model_find_item_key(&state->model, state->drag.key);
 
     state->drag.active = 0;
     state->drag.moved = 0;
-    state->pressed_index = moved ? REACH_MAX_PINNED_APPS : previous_pressed_dock_index;
+    state->pressed_index = moved ? REACH_MAX_DOCK_ITEMS : previous_pressed_dock_index;
     out->redraw = 1;
 
     (void)reach_dock_feedback_release(dock);
@@ -383,13 +383,13 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     }
     else
     {
-        state->drag.source_index = REACH_MAX_PINNED_APPS;
-        state->drag.target_index = REACH_MAX_PINNED_APPS;
+        state->drag.source_index = REACH_MAX_DOCK_ITEMS;
+        state->drag.target_index = REACH_MAX_DOCK_ITEMS;
         state->drag.key = {};
         reach_animation_manager_reset(reach_dock_manager(dock), REACH_DOCK_ANIM_DRAG_SNAP);
     }
 
-    if (moved && dragged_pinned && target_pinned_index != REACH_MAX_PINNED_APPS)
+    if (moved && dragged_pinned && target_pinned_index != REACH_MAX_DOCK_ITEMS)
     {
         out->move_pin = 1;
         out->move_pin_id = pin_id;
@@ -412,7 +412,7 @@ int32_t reach_dock_item_release(reach_dock *dock, size_t index, reach_dock_item_
         return 0;
     }
 
-    state->pressed_index = REACH_MAX_PINNED_APPS;
+    state->pressed_index = REACH_MAX_DOCK_ITEMS;
 
     *out_action = reach_dock_item_action_for_index(&state->model, index);
 
@@ -425,7 +425,7 @@ void reach_dock_clear_pressed(reach_dock *dock)
 {
     if (dock != nullptr)
     {
-        reach_dock_state_mut(dock)->pressed_index = REACH_MAX_PINNED_APPS;
+        reach_dock_state_mut(dock)->pressed_index = REACH_MAX_DOCK_ITEMS;
     }
 }
 
@@ -436,7 +436,7 @@ size_t reach_dock_reorder_target(const reach_dock_feature_model *model,
     if (model == nullptr || layout == nullptr || model->item_count == 0 ||
         layout->app_slot_count == 0)
     {
-        return REACH_MAX_PINNED_APPS;
+        return REACH_MAX_DOCK_ITEMS;
     }
 
     size_t count =
@@ -444,7 +444,7 @@ size_t reach_dock_reorder_target(const reach_dock_feature_model *model,
 
     if (current_index >= count)
     {
-        return REACH_MAX_PINNED_APPS;
+        return REACH_MAX_DOCK_ITEMS;
     }
 
     size_t target = current_index;

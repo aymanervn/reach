@@ -146,11 +146,11 @@ reach_result reach_dock_create(reach_dock **out_animations)
         delete animations;
         return REACH_ERROR;
     }
-    animations->state.drag.source_index = REACH_MAX_PINNED_APPS;
-    animations->state.drag.target_index = REACH_MAX_PINNED_APPS;
-    animations->state.pressed_index = REACH_MAX_PINNED_APPS;
+    animations->state.drag.source_index = REACH_MAX_DOCK_ITEMS;
+    animations->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
+    animations->state.pressed_index = REACH_MAX_DOCK_ITEMS;
     animations->state.pressed_control = REACH_DOCK_HIT_NONE;
-    animations->state.hovered_item = REACH_MAX_PINNED_APPS;
+    animations->state.hovered_item = REACH_MAX_DOCK_ITEMS;
     animations->state.feedback_index = REACH_DOCK_FEEDBACK_NONE;
     *out_animations = animations;
     return REACH_OK;
@@ -201,7 +201,7 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_POWER_HOVER);
     int32_t drag_snap_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP);
-    int32_t item_was_active[REACH_MAX_PINNED_APPS] = {};
+    int32_t item_was_active[REACH_MAX_DOCK_ITEMS] = {};
     for (size_t index = 0; index < state->model.item_count; ++index)
     {
         item_was_active[index] =
@@ -253,8 +253,8 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     if (drag_snap_was_active && !reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
     {
-        state->drag.source_index = REACH_MAX_PINNED_APPS;
-        state->drag.target_index = REACH_MAX_PINNED_APPS;
+        state->drag.source_index = REACH_MAX_DOCK_ITEMS;
+        state->drag.target_index = REACH_MAX_DOCK_ITEMS;
         state->drag.key = {};
     }
 
@@ -539,7 +539,7 @@ static void reach_dock_capsule_reset(void *capsule)
         dock->pointer_layout_valid = 0;
         dock->state.pressed_control = REACH_DOCK_HIT_NONE;
         dock->state.power_hovered = 0;
-        dock->state.hovered_item = REACH_MAX_PINNED_APPS;
+        dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
         reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f);
 
         dock->slots_synced = 0;
@@ -698,7 +698,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     reach_dock_interaction_context interaction_ctx = reach_dock_capsule_interaction_context(dock);
     reach_dock_hit_result hit = {};
     hit.type = REACH_DOCK_HIT_NONE;
-    hit.index = REACH_MAX_PINNED_APPS;
+    hit.index = REACH_MAX_DOCK_ITEMS;
     if (dock->pointer_layout_valid)
     {
         hit = reach_dock_hit_test(&dock->pointer_layout, event->x, event->y);
@@ -861,7 +861,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 
             size_t hovered_item = hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
                                       ? hit.index
-                                      : REACH_MAX_PINNED_APPS;
+                                      : REACH_MAX_DOCK_ITEMS;
             if (hovered_item != state->hovered_item)
             {
                 state->hovered_item = hovered_item;
@@ -919,11 +919,11 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         out->redraw = out->redraw || reach_dock_feedback_release(dock);
         state->pressed_control = REACH_DOCK_HIT_NONE;
         reach_dock_clear_pressed(dock);
-        if (state->hovered_item != REACH_MAX_PINNED_APPS)
+        if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
-            state->hovered_item = REACH_MAX_PINNED_APPS;
+            state->hovered_item = REACH_MAX_DOCK_ITEMS;
             out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-            out->action.index = REACH_MAX_PINNED_APPS;
+            out->action.index = REACH_MAX_DOCK_ITEMS;
         }
         reach_dock_capsule_end_pointer_sequence(dock, out);
         return;
@@ -939,11 +939,11 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                                                0.18, REACH_EASING_EASE_IN_OUT);
             out->redraw = 1;
         }
-        if (state->hovered_item != REACH_MAX_PINNED_APPS)
+        if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
-            state->hovered_item = REACH_MAX_PINNED_APPS;
+            state->hovered_item = REACH_MAX_DOCK_ITEMS;
             out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-            out->action.index = REACH_MAX_PINNED_APPS;
+            out->action.index = REACH_MAX_DOCK_ITEMS;
         }
     }
 }
@@ -1204,7 +1204,7 @@ static reach_dock_order_key reach_dock_order_key_for_item(const reach_dock_item_
 static void reach_dock_set_order_key(reach_dock_feature_model *model, size_t index,
                                      const reach_dock_item_model *item)
 {
-    if (model == nullptr || item == nullptr || index >= REACH_MAX_PINNED_APPS)
+    if (model == nullptr || item == nullptr || index >= REACH_MAX_DOCK_ITEMS)
     {
         return;
     }
@@ -1219,7 +1219,7 @@ size_t reach_dock_find_pinned_for_window(const reach_pinned_app_model *pinned_ap
 {
     if (pinned_apps == nullptr || window == nullptr || window_matches_pinned == nullptr)
     {
-        return REACH_MAX_PINNED_APPS;
+        return REACH_MAX_DOCK_ITEMS;
     }
 
     for (size_t index = 0; index < pinned_app_count; ++index)
@@ -1230,7 +1230,7 @@ size_t reach_dock_find_pinned_for_window(const reach_pinned_app_model *pinned_ap
         }
     }
 
-    return REACH_MAX_PINNED_APPS;
+    return REACH_MAX_DOCK_ITEMS;
 }
 
 struct reach_dock_app_group
@@ -1256,12 +1256,12 @@ static void reach_dock_build_candidate_items(
         return;
     }
 
-    reach_dock_app_group groups[REACH_MAX_PINNED_APPS] = {};
+    reach_dock_app_group groups[REACH_MAX_DOCK_ITEMS] = {};
     size_t group_count = 0;
     size_t pinned_group_count = 0;
 
     for (size_t index = 0;
-         pinned_apps != nullptr && index < pinned_app_count && group_count < REACH_MAX_PINNED_APPS;
+         pinned_apps != nullptr && index < pinned_app_count && group_count < REACH_MAX_DOCK_ITEMS;
          ++index)
     {
         groups[group_count].pinned = 1;
@@ -1275,7 +1275,7 @@ static void reach_dock_build_candidate_items(
     {
         size_t pinned_index = reach_dock_find_pinned_for_window(
             pinned_apps, pinned_app_count, &open_windows[index], window_matches_pinned, match_user);
-        if (pinned_index != REACH_MAX_PINNED_APPS)
+        if (pinned_index != REACH_MAX_DOCK_ITEMS)
         {
             if (pinned_index < pinned_group_count && groups[pinned_index].representative == 0)
             {
@@ -1294,14 +1294,14 @@ static void reach_dock_build_candidate_items(
                 break;
             }
         }
-        if (grouped || group_count >= REACH_MAX_PINNED_APPS)
+        if (grouped || group_count >= REACH_MAX_DOCK_ITEMS)
         {
             continue;
         }
 
         groups[group_count].pinned = 0;
         groups[group_count].app_id = group_id;
-        groups[group_count].pinned_index = REACH_MAX_PINNED_APPS;
+        groups[group_count].pinned_index = REACH_MAX_DOCK_ITEMS;
         groups[group_count].representative = open_windows[index].id;
         ++group_count;
     }
@@ -1329,7 +1329,7 @@ static void reach_dock_apply_existing_order(reach_dock_feature_model *model,
     model->item_count = 0;
 
     for (size_t order_index = 0;
-         order_index < model->order_count && model->item_count < REACH_MAX_PINNED_APPS;
+         order_index < model->order_count && model->item_count < REACH_MAX_DOCK_ITEMS;
          ++order_index)
     {
         for (size_t candidate_index = 0; candidate_index < candidate_count; ++candidate_index)
@@ -1357,7 +1357,7 @@ static void reach_dock_append_new_items(reach_dock_feature_model *model,
     }
 
     for (size_t candidate_index = 0;
-         candidate_index < candidate_count && model->item_count < REACH_MAX_PINNED_APPS;
+         candidate_index < candidate_count && model->item_count < REACH_MAX_DOCK_ITEMS;
          ++candidate_index)
     {
         if (!used[candidate_index])
@@ -1392,8 +1392,8 @@ void reach_dock_feature_model_build_items(
         return;
     }
 
-    reach_dock_item_model candidates[REACH_MAX_PINNED_APPS] = {};
-    int32_t used[REACH_MAX_PINNED_APPS] = {};
+    reach_dock_item_model candidates[REACH_MAX_DOCK_ITEMS] = {};
+    int32_t used[REACH_MAX_DOCK_ITEMS] = {};
     size_t candidate_count = 0;
 
     reach_dock_build_candidate_items(candidates, &candidate_count, pinned_apps, pinned_app_count,
@@ -1485,7 +1485,7 @@ reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index)
 
 void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys, size_t count)
 {
-    if (dock == nullptr || keys == nullptr || count > REACH_MAX_PINNED_APPS)
+    if (dock == nullptr || keys == nullptr || count > REACH_MAX_DOCK_ITEMS)
     {
         return;
     }
@@ -1512,7 +1512,7 @@ static void reach_dock_gate_animating_hit(reach_dock *dock, reach_dock_hit_resul
     if (hit->type == REACH_DOCK_HIT_ITEM && reach_dock_slots_animating(dock))
     {
         hit->type = REACH_DOCK_HIT_NONE;
-        hit->index = REACH_MAX_PINNED_APPS;
+        hit->index = REACH_MAX_DOCK_ITEMS;
     }
 }
 
@@ -1616,9 +1616,9 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
 {
     reach_dock_state *state = &dock->state;
     size_t item_count = state->model.item_count;
-    if (item_count > REACH_MAX_PINNED_APPS)
+    if (item_count > REACH_MAX_DOCK_ITEMS)
     {
-        item_count = REACH_MAX_PINNED_APPS;
+        item_count = REACH_MAX_DOCK_ITEMS;
     }
 
     if (!dock->slots_synced)
@@ -2053,7 +2053,7 @@ void reach_dock_rebuild_items(reach_dock *dock, const reach_dock_build_context *
 
 static void reach_dock_start_item_x_animation(reach_dock *dock, size_t index, float from, float to)
 {
-    if (dock == nullptr || index >= REACH_MAX_PINNED_APPS)
+    if (dock == nullptr || index >= REACH_MAX_DOCK_ITEMS)
     {
         return;
     }
@@ -2076,7 +2076,7 @@ void reach_dock_clear_item_x_animations(reach_dock *dock)
         return;
     }
     reach_dock_snap_slots(dock);
-    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = 0; index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         reach_animation_manager_reset(&dock->manager, reach_dock_item_animation_id(index));
         dock->state.item_x_valid[index] = 0;
@@ -2098,9 +2098,9 @@ void reach_dock_item_x_snapshot_take(reach_dock *dock, const reach_theme *theme,
     }
     reach_dock_state *state = &dock->state;
     size_t count = state->model.item_count;
-    if (count > REACH_MAX_PINNED_APPS)
+    if (count > REACH_MAX_DOCK_ITEMS)
     {
-        count = REACH_MAX_PINNED_APPS;
+        count = REACH_MAX_DOCK_ITEMS;
     }
     out_snapshot->count = count;
     for (size_t index = 0; index < count; ++index)
@@ -2145,7 +2145,7 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
             reach_dock_start_item_x_animation(dock, index, from_x, target_x);
         }
     }
-    for (size_t index = state->model.item_count; index < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = state->model.item_count; index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         state->item_x_valid[index] = 0;
         reach_animation_manager_reset(&dock->manager, reach_dock_item_animation_id(index));

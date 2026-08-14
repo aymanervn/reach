@@ -42,9 +42,9 @@ extern "C"
 
     typedef struct reach_dock_feature_model
     {
-        reach_dock_item_model items[REACH_MAX_PINNED_APPS];
+        reach_dock_item_model items[REACH_MAX_DOCK_ITEMS];
         size_t item_count;
-        reach_dock_order_key order[REACH_MAX_PINNED_APPS];
+        reach_dock_order_key order[REACH_MAX_DOCK_ITEMS];
         size_t order_count;
     } reach_dock_feature_model;
 
@@ -147,7 +147,7 @@ extern "C"
                                      const reach_dock_layout *layout, size_t current_index,
                                      float dragged_box_x);
 
-#define REACH_DOCK_SLOT_CAPACITY (REACH_MAX_PINNED_APPS + 2)
+#define REACH_DOCK_SLOT_CAPACITY (REACH_MAX_DOCK_ITEMS + 2)
 
     enum reach_dock_animation_id
     {
@@ -157,7 +157,7 @@ extern "C"
         REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
         REACH_DOCK_ANIM_POWER_HOVER,
         REACH_DOCK_ANIM_ITEM_X_BASE,
-        REACH_DOCK_ANIM_SLOT_BASE = REACH_DOCK_ANIM_ITEM_X_BASE + REACH_MAX_PINNED_APPS,
+        REACH_DOCK_ANIM_SLOT_BASE = REACH_DOCK_ANIM_ITEM_X_BASE + REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_ANIM_COUNT = REACH_DOCK_ANIM_SLOT_BASE + REACH_DOCK_SLOT_CAPACITY
     };
 
@@ -216,7 +216,7 @@ extern "C"
 
     enum
     {
-        REACH_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_PINNED_APPS,
+        REACH_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON,
         REACH_DOCK_FEEDBACK_POWER_BUTTON,
         REACH_DOCK_FEEDBACK_NONE
@@ -283,8 +283,8 @@ extern "C"
         int32_t feedback_pressed;
         int32_t feedback_sticky;
 
-        int32_t item_x_valid[REACH_MAX_PINNED_APPS];
-        reach_dock_order_key item_x_keys[REACH_MAX_PINNED_APPS];
+        int32_t item_x_valid[REACH_MAX_DOCK_ITEMS];
+        reach_dock_order_key item_x_keys[REACH_MAX_DOCK_ITEMS];
         int32_t items_changed;
 
         uint16_t clock_time_text[32];

@@ -139,26 +139,42 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_dock_order_key old_order[REACH_MAX_PINNED_APPS] = {};
+    reach_dock_order_key old_order[REACH_MAX_DOCK_ITEMS] = {};
+    size_t old_order_pin_slot[REACH_MAX_DOCK_ITEMS] = {};
     uint16_t old_order_paths[REACH_MAX_PINNED_APPS][260] = {};
     uint16_t old_order_aumids[REACH_MAX_PINNED_APPS][260] = {};
+    size_t pin_slot_count = 0;
+
     size_t old_order_count = reach_dock_order_count(host->dock_capsule);
+    if (old_order_count > REACH_MAX_DOCK_ITEMS)
+    {
+        old_order_count = REACH_MAX_DOCK_ITEMS;
+    }
+
     for (size_t order_index = 0; order_index < old_order_count; ++order_index)
     {
+        old_order_pin_slot[order_index] = REACH_MAX_PINNED_APPS;
         old_order[order_index] = reach_dock_order_key_at(host->dock_capsule, order_index);
-        if (old_order[order_index].pinned)
+        if (!old_order[order_index].pinned)
         {
-            for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
+            continue;
+        }
+
+        for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
+        {
+            if (host->pinned_apps[pin_index].id != old_order[order_index].app_id)
             {
-                if (host->pinned_apps[pin_index].id == old_order[order_index].app_id)
-                {
-                    reach_copy_utf16(old_order_paths[order_index], 260,
-                                     host->pinned_apps[pin_index].path);
-                    reach_copy_utf16(old_order_aumids[order_index], 260,
-                                     host->pinned_apps[pin_index].app_user_model_id);
-                    break;
-                }
+                continue;
             }
+            if (pin_slot_count < REACH_MAX_PINNED_APPS)
+            {
+                size_t slot = pin_slot_count++;
+                old_order_pin_slot[order_index] = slot;
+                reach_copy_utf16(old_order_paths[slot], 260, host->pinned_apps[pin_index].path);
+                reach_copy_utf16(old_order_aumids[slot], 260,
+                                 host->pinned_apps[pin_index].app_user_model_id);
+            }
+            break;
         }
     }
 
@@ -174,13 +190,15 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
     size_t open_window_count = reach_host_open_window_count(host);
     for (size_t order_index = 0; order_index < old_order_count; ++order_index)
     {
-        if (old_order[order_index].pinned && old_order_paths[order_index][0] != 0)
+        size_t pin_slot = old_order_pin_slot[order_index];
+        if (old_order[order_index].pinned && pin_slot < REACH_MAX_PINNED_APPS &&
+            old_order_paths[pin_slot][0] != 0)
         {
             int32_t still_pinned = 0;
             for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
             {
                 if (reach_host_path_equals(host->pinned_apps[pin_index].path,
-                                           old_order_paths[order_index]))
+                                           old_order_paths[pin_slot]))
                 {
                     old_order[order_index].app_id = host->pinned_apps[pin_index].id;
                     still_pinned = 1;
@@ -190,9 +208,8 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
             if (!still_pinned)
             {
                 reach_pinned_app_model unpinned_app = {};
-                reach_copy_utf16(unpinned_app.path, 260, old_order_paths[order_index]);
-                reach_copy_utf16(unpinned_app.app_user_model_id, 260,
-                                 old_order_aumids[order_index]);
+                reach_copy_utf16(unpinned_app.path, 260, old_order_paths[pin_slot]);
+                reach_copy_utf16(unpinned_app.app_user_model_id, 260, old_order_aumids[pin_slot]);
                 uint32_t group_id =
                     reach_window_tracking_group_id_for_app(host->window_tracking, &unpinned_app);
                 if (group_id != 0)

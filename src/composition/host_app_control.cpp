@@ -84,9 +84,9 @@ reach_result reach_host_schedule_minimize_open_windows(reach_host *host)
     }
     (void)reach_host_refresh_open_windows(host, nullptr);
 
-    uintptr_t windows[REACH_MAX_PINNED_APPS] = {};
+    uintptr_t windows[REACH_MAX_OPEN_WINDOWS] = {};
     size_t window_count = reach_window_tracking_collect_unminimized(host->window_tracking, windows,
-                                                                    REACH_MAX_PINNED_APPS);
+                                                                    REACH_MAX_OPEN_WINDOWS);
     return window_count > 0 ? reach_host_schedule_minimize_windows(host, windows, window_count)
                             : REACH_OK;
 }

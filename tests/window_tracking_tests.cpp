@@ -35,7 +35,7 @@ static reach_window_snapshot make_window(uintptr_t id, const char *path, const c
     return window;
 }
 
-static reach_window_snapshot fake_windows[REACH_MAX_PINNED_APPS];
+static reach_window_snapshot fake_windows[REACH_MAX_OPEN_WINDOWS];
 static size_t fake_window_count;
 
 static size_t fake_window_count_op(const reach_window_manager *manager)

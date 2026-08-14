@@ -18,9 +18,6 @@ extern "C"
         int32_t changed;
         int32_t items_changed;
         int32_t icon_identity_changed;
-        size_t old_count;
-        uintptr_t old_windows[REACH_MAX_PINNED_APPS];
-        uint16_t old_icon_refs[REACH_MAX_PINNED_APPS][260];
     } reach_window_tracking_refresh_report;
 
     reach_result reach_window_tracking_create(reach_window_manager_port window_manager,
