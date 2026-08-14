@@ -238,6 +238,7 @@ static void reach_host_register_stage_thumbnails(reach_host *host)
     }
 
     reach_host_release_stage_thumbnails(host);
+    host->stage_thumbnail_generation = reach_stage_tile_generation(host->stage_capsule);
 
     reach_window_id target = 0;
     if (host->stage.window.ops.native_id != nullptr)
@@ -282,7 +283,14 @@ void reach_host_sync_stage_window_states(reach_host *host)
     {
         return;
     }
-    if (reach_stage_sync_window_states(host->stage_capsule))
+    if (!reach_stage_is_open(host->stage_capsule))
+    {
+        return;
+    }
+
+    reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
+    size_t count = reach_host_collect_stage_windows(host, windows, REACH_STAGE_MAX_TILES);
+    if (reach_stage_update_windows(host->stage_capsule, windows, count))
     {
         reach_host_sync_stage_thumbnails(host);
         host->stage.dirty_flags = 1;
@@ -303,6 +311,12 @@ void reach_host_sync_stage_thumbnails(reach_host *host)
     {
         return;
     }
+
+    if (host->stage_thumbnail_generation != reach_stage_tile_generation(host->stage_capsule))
+    {
+        reach_host_register_stage_thumbnails(host);
+    }
+
     reach_rect_f32 stage_bounds = state->bounds;
 
     size_t count = reach_stage_thumbnail_count(host->stage_capsule);
@@ -454,7 +468,17 @@ reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach
         return reach_host_schedule_minimize_open_windows(host);
     }
 
-
+    if (result->action.kind == REACH_STAGE_ACTION_CLOSE_WINDOW)
+    {
+        host->stage.dirty_flags = 1;
+        host->dirty.render = 1;
+        reach_host_sync_stage_thumbnails(host);
+        reach_host_request_update(host);
+        return result->action.window != 0
+                   ? reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE,
+                                                        result->action.window)
+                   : REACH_OK;
+    }
 
     return REACH_OK;
 }

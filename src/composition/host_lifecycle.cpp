@@ -255,7 +255,6 @@ static void reach_host_cleanup(reach_host *host)
     reach_launcher_attach_icons(host->launcher_capsule, nullptr);
     reach_dock_attach_services(host->dock_capsule, nullptr, nullptr, nullptr);
     reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
-    reach_stage_attach_services(host->stage_capsule, nullptr, nullptr);
     reach_quick_settings_attach_status(host->quick_settings_capsule, nullptr);
     reach_search_service_destroy(host->search_service);
     host->search_service = nullptr;
@@ -571,7 +570,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                host->now_playing_service);
     reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
                                    host->window_tracking);
-    reach_stage_attach_services(host->stage_capsule, host->icon_service, host->window_tracking);
     reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);
     host->clipboard = dependencies->clipboard;
     host->theme = reach_theme_default();
