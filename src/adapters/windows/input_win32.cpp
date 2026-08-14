@@ -34,6 +34,7 @@ static const int REACH_INPUT_HOTKEY_VOLUME_DOWN = 5;
 static const int REACH_INPUT_HOTKEY_VOLUME_MUTE = 6;
 static const int REACH_INPUT_HOTKEY_BRIGHTNESS_UP = 7;
 static const int REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN = 8;
+static const int REACH_INPUT_HOTKEY_STAGE_TOGGLE = 9;
 
 static void reach_input_reset_hotkey_state(reach_input_source *source);
 
@@ -406,6 +407,12 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
     }
     if (message == WM_HOTKEY && source != nullptr)
     {
+        if ((int)wparam == REACH_INPUT_HOTKEY_STAGE_TOGGLE)
+        {
+            reach_input_post_ui_event(source, REACH_UI_EVENT_STAGE_TOGGLE, 0);
+            return 0;
+        }
+
         reach_ui_event_type type = reach_input_media_hotkey_event(wparam);
         if (type != REACH_UI_EVENT_NONE)
         {
@@ -460,6 +467,8 @@ static reach_result reach_input_start(reach_input_source *source,
 
     (void)reach_service_shared_reader_subscribe(reach_input_shared_callback, source);
     reach_input_register_media_hotkeys(source);
+    (void)RegisterHotKey(source->window, REACH_INPUT_HOTKEY_STAGE_TOGGLE,
+                         MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_TAB);
     return REACH_OK;
 }
 
@@ -473,6 +482,10 @@ static reach_result reach_input_stop(reach_input_source *source)
 
     reach_service_shared_reader_unsubscribe(source);
     reach_input_unregister_media_hotkeys(source);
+    if (source->window != nullptr)
+    {
+        (void)UnregisterHotKey(source->window, REACH_INPUT_HOTKEY_STAGE_TOGGLE);
+    }
     reach_input_reset_hotkey_state(source);
     source->callback = nullptr;
     source->user = nullptr;

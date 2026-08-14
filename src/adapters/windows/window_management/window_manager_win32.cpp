@@ -723,6 +723,50 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
     return REACH_OK;
 }
 
+static reach_result reach_window_manager_frame_bounds(const reach_window_manager *manager,
+                                                      reach_window_id window_id,
+                                                      reach_rect_f32 *out_bounds)
+{
+    if (manager == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_bounds = {};
+
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    if (!IsWindow(hwnd))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    RECT frame = {};
+    if (IsIconic(hwnd))
+    {
+        WINDOWPLACEMENT placement = {};
+        placement.length = sizeof(placement);
+        if (!GetWindowPlacement(hwnd, &placement) ||
+            placement.rcNormalPosition.right <= placement.rcNormalPosition.left ||
+            placement.rcNormalPosition.bottom <= placement.rcNormalPosition.top)
+        {
+            return REACH_ERROR;
+        }
+        frame = placement.rcNormalPosition;
+    }
+    else if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame,
+                                          sizeof(frame))) &&
+             !GetWindowRect(hwnd, &frame))
+    {
+        return REACH_ERROR;
+    }
+
+    out_bounds->x = (float)frame.left;
+    out_bounds->y = (float)frame.top;
+    out_bounds->width = (float)(frame.right - frame.left);
+    out_bounds->height = (float)(frame.bottom - frame.top);
+    return REACH_OK;
+}
+
 static reach_result reach_window_manager_pin_app_for_window(reach_window_manager *manager,
                                                             uintptr_t window_id,
                                                             const reach_window_snapshot *snapshot,
@@ -820,6 +864,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;
+    out_port->ops.frame_bounds = reach_window_manager_frame_bounds;
     out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
     out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;

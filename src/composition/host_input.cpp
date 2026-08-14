@@ -793,6 +793,11 @@ void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *even
     reach_host_on_surface_event(user, event, REACH_SURFACE_CLIPBOARD);
 }
 
+void reach_host_on_stage_window_event(void *user, const reach_ui_event *event)
+{
+    reach_host_on_surface_event(user, event, REACH_SURFACE_STAGE);
+}
+
 static reach_result reach_host_handle_surface_event(reach_host *host, const reach_ui_event *event,
                                                     reach_surface_role source)
 {
@@ -923,6 +928,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
             host->dock.dirty_flags = 1;
             host->switcher.dirty_flags = 1;
         }
+        reach_host_sync_stage_window_states(host);
         reach_host_apply_foreground_change(host);
         (void)reach_host_update_game_mode(host);
         return REACH_OK;
@@ -1069,6 +1075,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     if (event->type == REACH_UI_EVENT_ESCAPE)
     {
         reach_host_set_clipboard_open(host, 0);
+        reach_host_close_stage(host);
     }
 
     reach_result result = reach_launcher_handle_event(host->launcher_capsule, event, &intent);

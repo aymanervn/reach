@@ -64,7 +64,7 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dock_reveal_edge(&dependencies.dock_reveal_edge);
+        result = reach_windows_create_screen_hotspot(&dependencies.dock_reveal_edge);
     }
     if (result == REACH_OK)
     {
@@ -85,6 +85,28 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     {
         result = reach_windows_create_dcomp_render_backend(dependencies.switcher_window.window,
                                                            &dependencies.switcher_renderer);
+    }
+    if (result == REACH_OK)
+    {
+        result =
+            reach_windows_create_platform_window(REACH_SURFACE_STAGE, &dependencies.stage_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.stage_window.window,
+                                                           &dependencies.stage_renderer);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_screen_hotspot(&dependencies.stage_reveal_corner);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_window_thumbnails(&dependencies.window_thumbnails);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_image_loader(&dependencies.image_loader);
     }
     if (result == REACH_OK)
     {

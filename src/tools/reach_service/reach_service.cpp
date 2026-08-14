@@ -611,6 +611,12 @@ static int32_t reach_helper_window_is_game(HWND hwnd)
         return 0;
     }
 
+    LONG_PTR ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    if ((ex_style & WS_EX_TOOLWINDOW) != 0)
+    {
+        return 0;
+    }
+
     RECT rect = {};
     if (!GetWindowRect(hwnd, &rect))
     {

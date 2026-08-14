@@ -23,7 +23,8 @@ extern "C"
         REACH_SURFACE_CONTEXT_MENU = 4,
         REACH_SURFACE_QUICK_SETTINGS = 5,
         REACH_SURFACE_SETTINGS = 6,
-        REACH_SURFACE_CLIPBOARD = 7
+        REACH_SURFACE_CLIPBOARD = 7,
+        REACH_SURFACE_STAGE = 8
     } reach_surface_role;
 
 #define REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS 4
@@ -62,6 +63,7 @@ extern "C"
         int32_t (*is_minimized)(const reach_platform_window *window);
         int32_t (*is_active)(const reach_platform_window *window);
         reach_window_id (*native_id)(const reach_platform_window *window);
+        reach_result (*place_behind)(reach_platform_window *window, reach_window_id target);
         reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);
         void (*destroy)(reach_platform_window *window);
     } reach_platform_window_ops;

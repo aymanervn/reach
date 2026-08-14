@@ -31,7 +31,13 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
     host->dock_reveal.edge_bounds_valid = 0;
     if (host->dock_reveal_edge.ops.hide != nullptr)
     {
-        (void)host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.edge);
+        (void)host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.hotspot);
+    }
+    host->stage_reveal.corner_visible = 0;
+    host->stage_reveal.corner_bounds_valid = 0;
+    if (host->stage_reveal_corner.ops.hide != nullptr)
+    {
+        (void)host->stage_reveal_corner.ops.hide(host->stage_reveal_corner.hotspot);
     }
 
     host->launcher.dirty_flags = 1;
@@ -63,7 +69,6 @@ reach_result reach_host_update_game_mode(reach_host *host)
     {
         return REACH_OK;
     }
-
     reach_runtime_policy_set_game_mode(&host->runtime_policy, next_active);
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)

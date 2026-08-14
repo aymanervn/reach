@@ -303,6 +303,92 @@ reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_
     return REACH_OK;
 }
 
+reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx)
+{
+    const int32_t game_mode = ctx->game_mode;
+    if (host->stage.window.ops.set_bounds == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    const reach_stage_state *state = reach_stage_state_ptr(host->stage_capsule);
+    if (state == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    if (!state->open && reach_host_surface_transition_visible(&host->stage_transition))
+    {
+        reach_host_surface_transition_set(host, &host->stage_transition, 0);
+    }
+
+    reach_rect_f32 stage_bounds = state->open ? state->bounds : ctx->monitor_bounds;
+
+    int32_t window_changed = 0;
+    reach_rect_f32 bounds =
+        reach_host_surface_transition_bounds(host, &host->stage_transition, stage_bounds);
+    float opacity = reach_host_surface_transition_opacity(host, &host->stage_transition);
+    reach_result result = reach_host_apply_window_state(
+        &host->stage.window, bounds, opacity, &host->stage.last_bounds, &host->stage.last_opacity,
+        &host->stage.bounds_valid, &host->stage.opacity_valid, &window_changed);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    if (!game_mode && state->open)
+    {
+        if (reach_stage_is_open(host->stage_capsule))
+        {
+            reach_host_sync_stage_thumbnails(host);
+            if (host->dirty.render || host->stage.dirty_flags || window_changed)
+            {
+                (void)reach_host_render_stage_surface(host, stage_bounds);
+            }
+        }
+        if (host->stage.window.ops.show != nullptr)
+        {
+            (void)host->stage.window.ops.show(host->stage.window.window);
+        }
+        if (!state->closing && host->dock.window.ops.native_id != nullptr &&
+            host->stage.window.ops.place_behind != nullptr)
+        {
+            reach_window_id dock_id = host->dock.window.ops.native_id(host->dock.window.window);
+            if (dock_id != 0)
+            {
+                (void)host->stage.window.ops.place_behind(host->stage.window.window, dock_id);
+            }
+        }
+    }
+    else
+    {
+        if (host->stage_topmost && host->stage.window.ops.set_topmost != nullptr &&
+            host->stage.window.ops.set_topmost(host->stage.window.window, 0) == REACH_OK)
+        {
+            host->stage_topmost = 0;
+        }
+        if (host->stage.window.ops.hide != nullptr)
+        {
+            (void)host->stage.window.ops.hide(host->stage.window.window);
+        }
+        reach_host_cleanup_closed_stage(host);
+    }
+
+    if (game_mode)
+    {
+        if (host->stage_reveal_corner.ops.hide != nullptr)
+        {
+            (void)host->stage_reveal_corner.ops.hide(host->stage_reveal_corner.hotspot);
+        }
+        host->stage_reveal.corner_visible = 0;
+    }
+    else
+    {
+        reach_host_sync_stage_reveal_corner(host, ctx->monitor_bounds);
+    }
+    return REACH_OK;
+}
+
 reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx)
 {
     const int32_t game_mode = ctx->game_mode;

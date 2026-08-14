@@ -34,6 +34,7 @@ extern "C"
         int32_t power_shutdown_wait_apps;
         int32_t power_restart_wait_apps;
         int32_t high_refresh_rate;
+        int32_t stage_animation_ms;
     } reach_config_snapshot;
 
     typedef struct reach_config_store_ops

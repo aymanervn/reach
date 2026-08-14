@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/core/window_id.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -25,6 +26,7 @@ extern "C"
         reach_result (*clear_monitor_wallpaper)(reach_wallpaper_surface *surface,
                                                 size_t monitor_index);
         reach_result (*clear)(reach_wallpaper_surface *surface);
+        reach_window_id (*desktop_window)(const reach_wallpaper_surface *surface);
         void (*destroy)(reach_wallpaper_surface *surface);
     } reach_wallpaper_surface_ops;
 

@@ -50,7 +50,8 @@ reach_result reach_host_handle_switcher_event(reach_host *host, const reach_ui_e
 
     if (event->type == REACH_UI_EVENT_APP_SWITCH_BEGIN)
     {
-        reach_host_close_transient_surfaces(host, 0);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_SWITCHER,
+                               REACH_SURFACE_ORIGIN_NONE);
 
         if (host->window_manager.ops.refresh != nullptr)
         {

@@ -80,7 +80,8 @@ void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
 
     if (next_open)
     {
-        reach_host_close_other_popups(host, REACH_SURFACE_ID_QUICK_SETTINGS);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_QUICK_SETTINGS,
+                                   REACH_SURFACE_ID_DOCK);
     }
 
     (void)reach_quick_settings_set_open(host->quick_settings_capsule, next_open);

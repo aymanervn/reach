@@ -28,7 +28,12 @@ names, version constants. Includes `core`.
 ## ports
 
 Abstract interfaces for every external boundary — renderer, surface, input, monitor,
-OS controls, filesystem, clipboard, media, icons, the Reach Service client. The media
+OS controls, filesystem, clipboard, media, icons, the Reach Service client. The
+`window_thumbnail` port abstracts live window previews (DWM thumbnails on Windows);
+`screen_hotspot` abstracts a screen-edge/corner trigger region — the dock's reveal
+edge and the stage's hot corner are two instances of the one port, and its Win32
+adapter registers its window class idempotently so further instances cost nothing.
+The media
 port separates fast core-state reads from generation-checked cover reads so image I/O
 cannot block transport state. Interfaces only. Includes `core`, `protocol`.
 
@@ -101,6 +106,19 @@ and the host drains and releases them.
 Tray owns popup item hit resolution, press/release feedback, left/right activation
 semantics, and cancellation. Composition retains provider activation, topmost
 window handling, and popup lifecycle.
+Stage is the window overview: a fullscreen overlay capsule that shrinks every open
+window into a centered grid. It owns tile layout, the open/close animation, hover
+state, and hit resolution, and reports only activate/dismiss actions. It never calls
+the thumbnail port — it publishes a read-only placement list
+(`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
+into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in
+screen space; the render pass converts to surface-local. Because DWM composites
+thumbnails *on top of* the host surface, stage chrome (labels, selection) must stay
+outside the tile rects — drawing over a tile is not possible from the same surface.
+Minimized windows have no DWM content and fall back to an icon tile.
+Activating a tile suppresses every other tile's thumbnail for the close animation, so
+the chosen window animates alone instead of being covered by a maximized neighbour.
+
 Context Menu owns row hit resolution, hover state, command selection, dismissal,
 and cancellation through `handle_pointer`. Composition executes the reported
 command and retains OS calls plus cross-popup and Dock power-button policy.
@@ -152,8 +170,22 @@ order against a shared `reach_host_frame_context`.
 Surfaces that take OS activation declare `BEHAVIOR_ACTIVATES`; the class rules then
 own show-on-activate, close-on-focus-loss, and the staleness check that discards a
 focus-loss signal the surface has already recovered from (reach's own foreground
-handover emits one). The global outside-press rule is likewise one loop over the
-transient and popup rows, closing any surface the press missed. Foreground identity
+handover emits one). An activating surface must show through
+`reach_host_apply_surface_activation` (idempotent via `surface->activated`), never
+through the per-frame `show()` in `reach_host_apply_transient_frame` — a fullscreen
+surface re-asserting `HWND_TOPMOST` every frame makes the desktop unusable.
+Every open path calls one entry point —
+`reach_host_surface_opening(host, id, origin)` — and never hand-picks close rules. It
+derives the sweep from declarative properties: opening anything closes every open
+`BEHAVIOR_EXCLUSIVE` surface, and opening anything exclusive, transient, or popup
+closes every open transient and popup. The matrix is therefore total. `origin` is the
+surface that spawned this one and is never closed, so a menu opened from a panel does
+not dismiss the panel underneath it; pass `REACH_SURFACE_ORIGIN_NONE` when nothing
+spawned it. Launcher, switcher, and stage are the exclusive surfaces, so at most one
+is ever open, and a fourth needs only the flag. Popups and transients are sibling
+classes, not subtypes — every rule but popup-mutual-exclusion treats them together,
+so a rule keyed on one silently misses the other. The global outside-press rule is likewise one loop
+over the transient and popup rows, closing any surface the press missed. Foreground identity
 has a single producer — the in-process foreground watcher port feeds
 `window_tracking`, and nothing reads focus state out of the Reach Service snapshot.
 Genuinely per-feature policies stay as named exceptions (e.g. dock-cluster pairwise

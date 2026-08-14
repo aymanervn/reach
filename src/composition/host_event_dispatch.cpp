@@ -27,11 +27,14 @@ int32_t reach_host_has_pending_events(const reach_host *host)
             reach_host_surface_has_pending_events(&host->dock) ||
             reach_host_surface_has_pending_events(&host->tray) ||
             reach_host_surface_has_pending_events(&host->switcher) ||
+            reach_host_surface_has_pending_events(&host->stage) ||
+            (host->stage_reveal_corner.ops.has_pending_events != nullptr &&
+             host->stage_reveal_corner.ops.has_pending_events(host->stage_reveal_corner.hotspot)) ||
             reach_host_surface_has_pending_events(&host->context_menu) ||
             reach_host_surface_has_pending_events(&host->quick_settings) ||
             reach_host_surface_has_pending_events(&host->clipboard_surface) ||
             (host->dock_reveal_edge.ops.has_pending_events != nullptr &&
-             host->dock_reveal_edge.ops.has_pending_events(host->dock_reveal_edge.edge)));
+             host->dock_reveal_edge.ops.has_pending_events(host->dock_reveal_edge.hotspot)));
 }
 
 reach_result reach_host_dispatch_events(reach_host *host)
@@ -45,14 +48,21 @@ reach_result reach_host_dispatch_events(reach_host *host)
     reach_host_dispatch_surface_events(&host->dock);
     reach_host_dispatch_surface_events(&host->tray);
     reach_host_dispatch_surface_events(&host->switcher);
+    reach_host_dispatch_surface_events(&host->stage);
     reach_host_dispatch_surface_events(&host->context_menu);
     reach_host_dispatch_surface_events(&host->quick_settings);
     reach_host_dispatch_surface_events(&host->clipboard_surface);
+    if (host->stage_reveal_corner.ops.dispatch_events != nullptr &&
+        (host->stage_reveal_corner.ops.has_pending_events == nullptr ||
+         host->stage_reveal_corner.ops.has_pending_events(host->stage_reveal_corner.hotspot)))
+    {
+        (void)host->stage_reveal_corner.ops.dispatch_events(host->stage_reveal_corner.hotspot);
+    }
     if (host->dock_reveal_edge.ops.dispatch_events != nullptr &&
         (host->dock_reveal_edge.ops.has_pending_events == nullptr ||
-         host->dock_reveal_edge.ops.has_pending_events(host->dock_reveal_edge.edge)))
+         host->dock_reveal_edge.ops.has_pending_events(host->dock_reveal_edge.hotspot)))
     {
-        (void)host->dock_reveal_edge.ops.dispatch_events(host->dock_reveal_edge.edge);
+        (void)host->dock_reveal_edge.ops.dispatch_events(host->dock_reveal_edge.hotspot);
     }
     host->dirty.events_dispatched_this_cycle = 1;
     return REACH_OK;

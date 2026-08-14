@@ -146,6 +146,35 @@ reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32
     return host->switcher.renderer.ops.end_frame(host->switcher.renderer.backend);
 }
 
+reach_result reach_host_render_stage_surface(reach_host *host, reach_rect_f32 bounds)
+{
+    if (host == nullptr || host->stage.renderer.ops.begin_frame == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    reach_stage_render_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    ctx.bounds = bounds;
+    ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+
+    reach_render_command_buffer commands = {};
+    reach_result build_result =
+        reach_stage_append_render_commands(host->stage_capsule, &ctx, &commands);
+    if (build_result != REACH_OK)
+    {
+        return build_result;
+    }
+
+    if (host->stage.renderer.ops.begin_frame(host->stage.renderer.backend) != REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+
+    (void)host->stage.renderer.ops.execute(host->stage.renderer.backend, &commands);
+    return host->stage.renderer.ops.end_frame(host->stage.renderer.backend);
+}
+
 reach_result reach_host_render_launcher_surface(reach_host *host,
                                                 const reach_launcher_layout *layout)
 {

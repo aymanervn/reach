@@ -188,22 +188,10 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
     return REACH_OK;
 }
 
-static reach_rect_f32 reach_host_primary_monitor_bounds(reach_host *host, reach_rect_f32 fallback)
+static reach_rect_f32 reach_host_context_menu_monitor(reach_host *host, reach_rect_f32 fallback)
 {
-    const reach_monitor_info *primary_monitor =
-        host->monitors.list != nullptr && host->monitors.ops.primary != nullptr
-            ? host->monitors.ops.primary(host->monitors.list)
-            : nullptr;
-    if (primary_monitor == nullptr)
-    {
-        return fallback;
-    }
     reach_rect_f32 monitor = {};
-    monitor.x = (float)primary_monitor->bounds.left;
-    monitor.y = (float)primary_monitor->bounds.top;
-    monitor.width = (float)(primary_monitor->bounds.right - primary_monitor->bounds.left);
-    monitor.height = (float)(primary_monitor->bounds.bottom - primary_monitor->bounds.top);
-    return monitor;
+    return reach_host_primary_monitor_bounds(host, &monitor) ? monitor : fallback;
 }
 
 void reach_host_reanchor_context_menu(reach_host *host)
@@ -223,7 +211,7 @@ void reach_host_reanchor_context_menu(reach_host *host)
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchored = 1;
     ctx.dock_top_y = host->layout.dock.bounds.y;
-    ctx.monitor = reach_host_primary_monitor_bounds(host, host->layout.dock.bounds);
+    ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
     if (state->power_open)
     {
         ctx.anchor_x = host->layout.dock.bounds.x + host->layout.dock.power_button.x +
@@ -256,7 +244,8 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_host_close_other_popups(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                               REACH_SURFACE_ID_DOCK);
 
     reach_context_menu_open_context ctx = {};
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
@@ -264,7 +253,7 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
                    host->layout.dock.power_button.width * 0.5f;
     ctx.dock_top_y = host->layout.dock.bounds.y;
     ctx.anchored = 1;
-    ctx.monitor = reach_host_primary_monitor_bounds(host, host->layout.dock.bounds);
+    ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
 
     reach_context_menu_open_power(host->context_menu_capsule, &ctx);
     reach_host_surface_transition_set(host, &host->context_menu_transition, 1);
@@ -281,7 +270,8 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_host_close_other_popups(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                               REACH_SURFACE_ID_DOCK);
 
     uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     size_t item_count = reach_dock_build_item_context_commands(
@@ -300,7 +290,7 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
         ctx.anchored = 1;
         ctx.anchor_x = slot.x + slot.width * 0.5f;
         ctx.dock_top_y = host->layout.dock.bounds.y;
-        ctx.monitor = reach_host_primary_monitor_bounds(host, host->layout.dock.bounds);
+        ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
     }
 
     reach_context_menu_open_for_item(host->context_menu_capsule, item_index, &ctx);

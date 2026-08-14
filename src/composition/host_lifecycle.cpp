@@ -2,7 +2,7 @@
 
 #include <new>
 
-static void reach_host_on_dock_reveal_edge(void *user, reach_dock_reveal_edge_event event)
+static void reach_host_on_dock_reveal_edge(void *user, reach_screen_hotspot_event event)
 {
     reach_host *host = static_cast<reach_host *>(user);
     if (host == nullptr)
@@ -14,7 +14,7 @@ static void reach_host_on_dock_reveal_edge(void *user, reach_dock_reveal_edge_ev
         return;
     }
 
-    if (event == REACH_DOCK_REVEAL_EDGE_ENTER)
+    if (event == REACH_SCREEN_HOTSPOT_ENTER)
     {
         reach_dock_begin_reveal_session(host->dock_capsule);
     }
@@ -190,13 +190,42 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->clipboard_surface.renderer.ops.destroy(host->clipboard_surface.renderer.backend);
     }
+    if (host->stage.window.ops.destroy != nullptr)
+    {
+        host->stage.window.ops.destroy(host->stage.window.window);
+    }
+    if (host->stage.renderer.ops.destroy != nullptr)
+    {
+        host->stage.renderer.ops.destroy(host->stage.renderer.backend);
+    }
+    if (host->window_thumbnails.ops.destroy != nullptr)
+    {
+        host->window_thumbnails.ops.destroy(host->window_thumbnails.thumbnails);
+    }
+    if (host->stage_reveal_corner.ops.hide != nullptr)
+    {
+        host->stage_reveal_corner.ops.hide(host->stage_reveal_corner.hotspot);
+    }
+    if (host->stage_reveal_corner.ops.destroy != nullptr)
+    {
+        host->stage_reveal_corner.ops.destroy(host->stage_reveal_corner.hotspot);
+    }
     if (host->dock_reveal_edge.ops.hide != nullptr)
     {
-        host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.edge);
+        host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.hotspot);
     }
     if (host->dock_reveal_edge.ops.destroy != nullptr)
     {
-        host->dock_reveal_edge.ops.destroy(host->dock_reveal_edge.edge);
+        host->dock_reveal_edge.ops.destroy(host->dock_reveal_edge.hotspot);
+    }
+    if (host->image_loader.ops.release != nullptr && host->wallpaper_image_id != 0)
+    {
+        host->image_loader.ops.release(host->image_loader.loader, host->wallpaper_image_id);
+    }
+    host->wallpaper_image_id = 0;
+    if (host->image_loader.ops.destroy != nullptr)
+    {
+        host->image_loader.ops.destroy(host->image_loader.loader);
     }
     if (host->input_source.ops.destroy != nullptr)
     {
@@ -226,6 +255,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_launcher_attach_icons(host->launcher_capsule, nullptr);
     reach_dock_attach_services(host->dock_capsule, nullptr, nullptr, nullptr);
     reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
+    reach_stage_attach_services(host->stage_capsule, nullptr, nullptr);
     reach_quick_settings_attach_status(host->quick_settings_capsule, nullptr);
     reach_search_service_destroy(host->search_service);
     host->search_service = nullptr;
@@ -253,6 +283,8 @@ static void reach_host_cleanup(reach_host *host)
     host->wallpaper = nullptr;
     reach_switcher_destroy(host->switcher_capsule);
     host->switcher_capsule = nullptr;
+    reach_stage_destroy(host->stage_capsule);
+    host->stage_capsule = nullptr;
     reach_quick_settings_destroy(host->quick_settings_capsule);
     host->quick_settings_capsule = nullptr;
     reach_clipboard_feature_destroy(host->clipboard_capsule);
@@ -310,10 +342,20 @@ static void reach_host_cleanup(reach_host *host)
     reach_surface_runtime_init(&host->dock);
     reach_surface_runtime_init(&host->tray);
     reach_surface_runtime_init(&host->switcher);
+    reach_surface_runtime_init(&host->stage);
     reach_surface_runtime_init(&host->context_menu);
     reach_surface_runtime_init(&host->quick_settings);
     reach_surface_runtime_init(&host->clipboard_surface);
     host->dock_reveal_edge = {};
+    host->image_loader = {};
+    host->wallpaper_image_id = 0;
+    host->wallpaper_image_path[0] = 0;
+    host->stage_reveal_corner = {};
+    host->window_thumbnails = {};
+    host->stage_reveal.corner_visible = 0;
+    host->stage_reveal.corner_bounds_valid = 0;
+    host->stage_reveal.corner_bounds = {};
+    host->stage_thumbnails_registered = 0;
     host->dock_reveal = {};
     host->input_source = {};
     host->window_manager = {};
@@ -329,6 +371,7 @@ static void reach_host_cleanup(reach_host *host)
     host->wallpaper_surface = {};
     host->wallpaper = nullptr;
     host->switcher_capsule = nullptr;
+    host->stage_capsule = nullptr;
     host->quick_settings_capsule = nullptr;
     host->clipboard_capsule = nullptr;
     host->dock_capsule = nullptr;
@@ -364,6 +407,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     host->switcher_capsule = nullptr;
     if (reach_switcher_create(&host->switcher_capsule) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
+    host->stage_capsule = nullptr;
+    if (reach_stage_create(&host->stage_capsule) != REACH_OK)
     {
         result = REACH_ERROR;
     }
@@ -403,6 +451,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_surface_runtime_init(&host->dock);
     reach_surface_runtime_init(&host->tray);
     reach_surface_runtime_init(&host->switcher);
+    reach_surface_runtime_init(&host->stage);
     reach_surface_runtime_init(&host->context_menu);
     reach_surface_runtime_init(&host->quick_settings);
     reach_surface_runtime_init(&host->clipboard_surface);
@@ -429,10 +478,15 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->dock.window = dependencies->dock_window;
     host->dock.renderer = dependencies->dock_renderer;
     host->dock_reveal_edge = dependencies->dock_reveal_edge;
+    host->image_loader = dependencies->image_loader;
     host->tray.window = dependencies->tray_window;
     host->tray.renderer = dependencies->tray_renderer;
     host->switcher.window = dependencies->switcher_window;
     host->switcher.renderer = dependencies->switcher_renderer;
+    host->stage.window = dependencies->stage_window;
+    host->stage.renderer = dependencies->stage_renderer;
+    host->stage_reveal_corner = dependencies->stage_reveal_corner;
+    host->window_thumbnails = dependencies->window_thumbnails;
     host->context_menu.window = dependencies->context_menu_window;
     host->context_menu.renderer = dependencies->context_menu_renderer;
     host->quick_settings.window = dependencies->quick_settings_window;
@@ -517,6 +571,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                host->now_playing_service);
     reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
                                    host->window_tracking);
+    reach_stage_attach_services(host->stage_capsule, host->icon_service, host->window_tracking);
     reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);
     host->clipboard = dependencies->clipboard;
     host->theme = reach_theme_default();
@@ -653,6 +708,15 @@ reach_result reach_host_start(reach_host *host)
             return result;
         }
     }
+    if (host->stage.window.ops.set_event_callback != nullptr)
+    {
+        result = host->stage.window.ops.set_event_callback(
+            host->stage.window.window, reach_host_on_stage_window_event, host);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
     if (host->context_menu.window.ops.set_event_callback != nullptr)
     {
         result = host->context_menu.window.ops.set_event_callback(
@@ -691,9 +755,18 @@ reach_result reach_host_start(reach_host *host)
         reach_clipboard_feature_request_refresh(host->clipboard_capsule);
     }
     reach_host_sync_pointer_move_subscriptions(host);
+    if (host->stage_reveal_corner.ops.set_callback != nullptr)
+    {
+        result = host->stage_reveal_corner.ops.set_callback(host->stage_reveal_corner.hotspot,
+                                                      reach_host_on_stage_reveal_corner, host);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
     if (host->dock_reveal_edge.ops.set_callback != nullptr)
     {
-        result = host->dock_reveal_edge.ops.set_callback(host->dock_reveal_edge.edge,
+        result = host->dock_reveal_edge.ops.set_callback(host->dock_reveal_edge.hotspot,
                                                          reach_host_on_dock_reveal_edge, host);
         if (result != REACH_OK)
         {
@@ -763,6 +836,7 @@ reach_result reach_host_stop(reach_host *host)
     host->running = 0;
     reach_runtime_policy_init(&host->runtime_policy);
     reach_switcher_force_close(host->switcher_capsule);
+    reach_stage_force_close(host->stage_capsule);
     reach_context_menu_force_close(host->context_menu_capsule);
     reach_host_set_tray_popup_open(host, 0);
     reach_host_set_quick_settings_open(host, 0);

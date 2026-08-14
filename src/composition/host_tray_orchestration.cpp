@@ -20,7 +20,8 @@ void reach_host_set_tray_popup_open(reach_host *host, int32_t open)
         {
             (void)host->tray.window.ops.set_topmost(host->tray.window.window, 1);
         }
-        reach_host_close_other_popups(host, REACH_SURFACE_ID_TRAY);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_TRAY,
+                                   REACH_SURFACE_ID_DOCK);
         (void)reach_host_refresh_tray_items(host);
     }
     else
