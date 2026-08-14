@@ -252,10 +252,15 @@ static void reach_host_register_stage_thumbnails(reach_host *host)
     (void)host->window_thumbnails.ops.set_target(host->window_thumbnails.thumbnails, target);
 
     size_t count = reach_stage_thumbnail_count(host->stage_capsule);
-    for (size_t index = 0; index < count && index < REACH_STAGE_MAX_TILES; ++index)
+    if (count > REACH_STAGE_MAX_TILES)
     {
+        count = REACH_STAGE_MAX_TILES;
+    }
+    for (size_t index = count; index > 0; --index)
+    {
+        size_t tile_index = index - 1;
         reach_stage_thumbnail_placement placement = {};
-        if (reach_stage_thumbnail_at(host->stage_capsule, index, &placement) != REACH_OK ||
+        if (reach_stage_thumbnail_at(host->stage_capsule, tile_index, &placement) != REACH_OK ||
             placement.desktop)
         {
             continue;
@@ -265,7 +270,7 @@ static void reach_host_register_stage_thumbnails(reach_host *host)
         if (host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails, placement.window,
                                                &id) == REACH_OK)
         {
-            host->stage_thumbnail_ids[index] = id;
+            host->stage_thumbnail_ids[tile_index] = id;
             host->stage_thumbnails_registered = 1;
         }
     }
