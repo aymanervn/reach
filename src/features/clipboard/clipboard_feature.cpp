@@ -465,7 +465,7 @@ static void reach_clipboard_capsule_handle_pointer(void *capsule, const reach_po
 
 const reach_ui_event_type *reach_clipboard_activation_events(size_t *out_count)
 {
-    static const reach_ui_event_type events[] = {REACH_UI_EVENT_WINDOWS_KEY};
+    static const reach_ui_event_type events[] = {REACH_UI_EVENT_CLIPBOARD_TOGGLE};
     if (out_count != nullptr)
     {
         *out_count = sizeof(events) / sizeof(events[0]);

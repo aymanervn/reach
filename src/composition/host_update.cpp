@@ -85,6 +85,7 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
     reach_host_surface_transition_finish(host, &host->switcher_transition);
     reach_host_surface_transition_finish(host, &host->context_menu_transition);
     reach_host_surface_transition_finish(host, &host->clipboard_transition);
+    reach_host_surface_transition_finish(host, &host->stage_transition);
 }
 
 reach_result reach_host_update(reach_host *host, double delta_seconds)
@@ -147,6 +148,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
             host->dock.dirty_flags = 1;
             host->switcher.dirty_flags = 1;
         }
+        reach_host_sync_stage_window_states(host);
         reach_host_apply_foreground_change(host);
     }
     (void)reach_host_update_game_mode(host);
@@ -226,7 +228,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 {
                     if (host->dock_reveal_edge.ops.hide != nullptr)
                     {
-                        (void)host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.edge);
+                        (void)host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.hotspot);
                     }
                     host->dock_reveal.edge_visible = 0;
                 }

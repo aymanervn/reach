@@ -51,7 +51,8 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
         entries[index].title = item_windows[index].title;
     }
 
-    reach_host_close_other_popups(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                               REACH_SURFACE_ID_DOCK);
 
     reach_rect_f32 slot =
         reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.app_slots[item_index]);

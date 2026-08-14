@@ -107,6 +107,11 @@ void reach_host_set_clipboard_open(reach_host *host, int32_t open)
     {
         return;
     }
+    if (next)
+    {
+        reach_host_surface_opening(host, REACH_SURFACE_ID_CLIPBOARD,
+                               REACH_SURFACE_ORIGIN_NONE);
+    }
     reach_host_surface_transition_set(host, &host->clipboard_transition, next);
     reach_host_sync_pointer_move_subscriptions(host);
     reach_host_sync_popup_mouse_hook(host);

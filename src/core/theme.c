@@ -31,6 +31,7 @@ const reach_theme *reach_theme_default(void)
         .launcher_search_background = {0.10f, 0.13f, 0.16f, 1.0f},
         .launcher_search_border = {0.10f, 0.13f, 0.16f, 0.88f},
         .launcher_search_text = {1.0f, 1.0f, 1.0f, 0.95f},
+        .stage_backdrop = {0.04f, 0.05f, 0.07f, 0.97f},
         .clipboard_background = {0.10f, 0.13f, 0.16f, 0.96f},
         .clipboard_border = {0.30f, 0.36f, 0.41f, 0.42f},
         .clipboard_primary_text = {1.0f, 1.0f, 1.0f, 0.88f},

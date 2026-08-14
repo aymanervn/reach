@@ -22,8 +22,10 @@
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
+#include "reach/ports/window_thumbnail.h"
 #include "reach/ports/audio_volume.h"
-#include "reach/ports/dock_reveal_edge.h"
+#include "reach/ports/image_loader.h"
+#include "reach/ports/screen_hotspot.h"
 #include "reach/ports/foreground_watcher.h"
 #include "reach/ports/clipboard.h"
 #include "reach/support/util.h"
@@ -46,11 +48,16 @@ extern "C"
         reach_render_backend_port launcher_renderer;
         reach_platform_window_port dock_window;
         reach_render_backend_port dock_renderer;
-        reach_dock_reveal_edge_port dock_reveal_edge;
+        reach_screen_hotspot_port dock_reveal_edge;
+        reach_image_loader_port image_loader;
         reach_platform_window_port tray_window;
         reach_render_backend_port tray_renderer;
         reach_platform_window_port switcher_window;
         reach_render_backend_port switcher_renderer;
+        reach_platform_window_port stage_window;
+        reach_render_backend_port stage_renderer;
+        reach_screen_hotspot_port stage_reveal_corner;
+        reach_window_thumbnail_port window_thumbnails;
         reach_platform_window_port context_menu_window;
         reach_render_backend_port context_menu_renderer;
         reach_platform_window_port quick_settings_window;

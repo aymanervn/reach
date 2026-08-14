@@ -137,6 +137,8 @@ static reach_result reach_config_store_load(reach_config_store *store,
         (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 0, path) != 0;
     out_snapshot->high_refresh_rate =
         (int32_t)GetPrivateProfileIntW(L"display", L"high_refresh_rate", 0, path) != 0;
+    out_snapshot->stage_animation_ms =
+        (int32_t)GetPrivateProfileIntW(L"stage", L"animation_ms", 280, path);
     GetPrivateProfileStringW(L"wallpaper", L"path", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->wallpaper_path), 260, path);
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)

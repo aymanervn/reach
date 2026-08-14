@@ -49,6 +49,7 @@ void reach_host_apply_foreground_change(reach_host *host)
 
     uintptr_t foreground =
         host->foreground_watcher.ops.foreground(host->foreground_watcher.watcher);
+
     if (foreground == 0 || foreground == reach_host_foreground_window(host) ||
         reach_window_tracking_window_by_id(host->window_tracking, foreground) == nullptr)
     {

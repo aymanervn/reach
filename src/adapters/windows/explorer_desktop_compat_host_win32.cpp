@@ -777,7 +777,12 @@ extern "C" reach_result reach_windows_create_explorer_desktop_compat_host(void)
     return REACH_OK;
 }
 
-extern "C" void reach_windows_destroy_explorer_desktop_compat_host(void)
+extern "C" reach_window_id reach_windows_desktop_compat_window(void)
+{
+    return reinterpret_cast<reach_window_id>(g_workerwHwnd);
+}
+
+void reach_windows_destroy_explorer_desktop_compat_host(void)
 {
     if (g_hostThread == nullptr)
     {

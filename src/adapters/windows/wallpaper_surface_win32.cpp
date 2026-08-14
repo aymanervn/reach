@@ -1087,6 +1087,13 @@ static void reach_wallpaper_surface_destroy(reach_wallpaper_surface *surface)
     delete surface;
 }
 
+static reach_window_id
+reach_wallpaper_surface_desktop_window(const reach_wallpaper_surface *surface)
+{
+    (void)surface;
+    return reach_windows_desktop_compat_window();
+}
+
 reach_result reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port *out_port)
 {
     if (out_port == nullptr)
@@ -1127,6 +1134,7 @@ reach_result reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port
     out_port->ops.set_monitor_wallpaper = reach_wallpaper_surface_set_monitor_wallpaper;
     out_port->ops.clear_monitor_wallpaper = reach_wallpaper_surface_clear_monitor_wallpaper;
     out_port->ops.clear = reach_wallpaper_surface_clear;
+    out_port->ops.desktop_window = reach_wallpaper_surface_desktop_window;
     out_port->ops.destroy = reach_wallpaper_surface_destroy;
     return REACH_OK;
 }

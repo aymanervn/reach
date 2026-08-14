@@ -117,7 +117,7 @@ static void reach_host_apply_reveal_edge(reach_host *host, int32_t mode,
                                          reach_rect_f32 shown_dock_bounds,
                                          reach_rect_f32 monitor_bounds)
 {
-    if (host == nullptr || host->dock_reveal_edge.edge == nullptr)
+    if (host == nullptr || host->dock_reveal_edge.hotspot == nullptr)
     {
         return;
     }
@@ -125,7 +125,7 @@ static void reach_host_apply_reveal_edge(reach_host *host, int32_t mode,
     if (mode == REACH_DOCK_REVEAL_EDGE_DISABLED)
     {
         if (host->dock_reveal.edge_visible && host->dock_reveal_edge.ops.hide != nullptr &&
-            host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.edge) == REACH_OK)
+            host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.hotspot) == REACH_OK)
         {
             host->dock_reveal.edge_visible = 0;
         }
@@ -138,7 +138,7 @@ static void reach_host_apply_reveal_edge(reach_host *host, int32_t mode,
         !reach_host_reveal_edge_rect_equal(host->dock_reveal.edge_bounds, edge_bounds))
     {
         if (host->dock_reveal_edge.ops.set_bounds != nullptr &&
-            host->dock_reveal_edge.ops.set_bounds(host->dock_reveal_edge.edge, edge_bounds) ==
+            host->dock_reveal_edge.ops.set_bounds(host->dock_reveal_edge.hotspot, edge_bounds) ==
                 REACH_OK)
         {
             host->dock_reveal.edge_bounds = edge_bounds;
@@ -147,7 +147,7 @@ static void reach_host_apply_reveal_edge(reach_host *host, int32_t mode,
     }
 
     if (!host->dock_reveal.edge_visible && host->dock_reveal_edge.ops.show != nullptr &&
-        host->dock_reveal_edge.ops.show(host->dock_reveal_edge.edge) == REACH_OK)
+        host->dock_reveal_edge.ops.show(host->dock_reveal_edge.hotspot) == REACH_OK)
     {
         host->dock_reveal.edge_visible = 1;
     }
@@ -157,7 +157,7 @@ static void reach_host_apply_reveal_edge(reach_host *host, int32_t mode,
         reach_window_id dock_id = host->dock.window.ops.native_id(host->dock.window.window);
         if (dock_id != 0)
         {
-            (void)host->dock_reveal_edge.ops.place_behind(host->dock_reveal_edge.edge, dock_id);
+            (void)host->dock_reveal_edge.ops.place_behind(host->dock_reveal_edge.hotspot, dock_id);
         }
     }
 }
@@ -287,7 +287,9 @@ int32_t reach_host_can_move_dock_without_redraw(const reach_host *host)
         reach_host_surface_transition_active(host, &host->tray_transition) ||
         reach_host_surface_transition_active(host, &host->quick_settings_transition) ||
         reach_host_surface_transition_active(host, &host->switcher_transition) ||
-        reach_host_surface_transition_active(host, &host->context_menu_transition))
+        reach_host_surface_transition_active(host, &host->context_menu_transition) ||
+        reach_host_surface_transition_active(host, &host->clipboard_transition) ||
+        reach_host_surface_transition_active(host, &host->stage_transition))
     {
         return 0;
     }
@@ -298,6 +300,7 @@ int32_t reach_host_can_move_dock_without_redraw(const reach_host *host)
            !host->dirty.render && !host->dock.dirty_flags && !host->launcher.dirty_flags &&
            !host->tray.dirty_flags && !host->switcher.dirty_flags &&
            !host->context_menu.dirty_flags && !host->quick_settings.dirty_flags &&
+           !host->clipboard_surface.dirty_flags && !host->stage.dirty_flags &&
            !reach_dock_slots_animating(host->dock_capsule) &&
            !reach_dock_state_ptr(host->dock_capsule)->drag.active &&
            !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),

@@ -124,6 +124,10 @@ add_library(reach_features STATIC
     src/features/quick_settings/quick_settings_feature.cpp
     src/features/quick_settings/quick_settings_interaction.cpp
     src/features/quick_settings/quick_settings_render.cpp
+    src/features/stage/stage_feature.cpp
+    src/features/stage/stage_interaction.cpp
+    src/features/stage/stage_layout.cpp
+    src/features/stage/stage_render.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
     src/features/tray/tray_feature.cpp
@@ -182,7 +186,9 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/audio_volume_win32.cpp
     src/adapters/windows/system_controls_network.cpp
     src/adapters/windows/system_controls_win32.cpp
-    src/adapters/windows/dock_reveal_edge_win32.cpp
+    src/adapters/windows/image_loader_win32.cpp
+    src/adapters/windows/screen_hotspot_win32.cpp
+    src/adapters/windows/window_thumbnail_dwm.cpp
     src/adapters/windows/foreground_watcher_win32.cpp
     src/adapters/windows/monitor_win32.cpp
     src/adapters/windows/startup_apps_win32.cpp
@@ -254,6 +260,7 @@ add_library(reach_composition STATIC
     src/composition/host_surface_frames.cpp
     src/composition/host_surfaces.cpp
     src/composition/host_system_actions.cpp
+    src/composition/host_stage_orchestration.cpp
     src/composition/host_switcher_input.cpp
     src/composition/host_tray_orchestration.cpp
     src/composition/host_update.cpp
@@ -680,6 +687,19 @@ reach_configure_common(reach_settings_feature_tests)
 target_compile_features(reach_settings_feature_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_settings_feature_tests PRIVATE reach_settings_feature)
 
+add_executable(reach_stage_feature_tests
+    tests/stage_feature_tests.cpp
+)
+
+reach_configure_common(reach_stage_feature_tests)
+target_compile_features(reach_stage_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_stage_feature_tests PRIVATE
+    reach_features
+    reach_support
+)
+
 add_executable(reach_launcher_feature_tests
     tests/launcher_feature_tests.cpp
 )
@@ -756,6 +776,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_idle_watch_tests COMMAND reach_idle_watch_tests)
     add_test(NAME reach_settings_feature_tests COMMAND reach_settings_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
+    add_test(NAME reach_stage_feature_tests COMMAND reach_stage_feature_tests)
     add_test(NAME reach_clipboard_feature_tests COMMAND reach_clipboard_feature_tests)
     add_test(NAME reach_text_edit_tests COMMAND reach_text_edit_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)

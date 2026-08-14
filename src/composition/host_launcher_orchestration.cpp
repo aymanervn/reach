@@ -83,6 +83,8 @@ void reach_host_toggle_launcher(reach_host *host)
     {
         host->launcher_restore_pending = 0;
         reach_host_remember_launcher_restore_window(host);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_LAUNCHER,
+                               REACH_SURFACE_ORIGIN_NONE);
     }
     (void)reach_launcher_toggle(host->launcher_capsule);
 }

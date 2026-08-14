@@ -40,6 +40,7 @@ extern "C"
         reach_color launcher_search_background;
         reach_color launcher_search_border;
         reach_color launcher_search_text;
+        reach_color stage_backdrop;
         reach_color clipboard_background;
         reach_color clipboard_border;
         reach_color clipboard_primary_text;

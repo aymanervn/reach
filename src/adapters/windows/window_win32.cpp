@@ -583,7 +583,8 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
 {
     return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU ||
            role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD;
+           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD ||
+           role == REACH_SURFACE_STAGE;
 }
 
 static int32_t reach_window_topmost_surface(reach_surface_role role)
@@ -594,13 +595,19 @@ static int32_t reach_window_topmost_surface(reach_surface_role role)
            role == REACH_SURFACE_CLIPBOARD;
 }
 
+static int32_t reach_window_self_ordered_surface(reach_surface_role role)
+{
+    return role == REACH_SURFACE_STAGE;
+}
+
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = role == REACH_SURFACE_SETTINGS ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW;
     if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
         role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
         role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS)
+        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
+        role == REACH_SURFACE_STAGE)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
@@ -666,6 +673,20 @@ static void reach_platform_window_focus(HWND hwnd)
     }
 }
 
+static reach_result reach_platform_window_place_behind(reach_platform_window *window,
+                                                      reach_window_id target_window)
+{
+    if (window == nullptr || window->hwnd == nullptr || target_window == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND target = reinterpret_cast<HWND>(target_window);
+    BOOL ok = SetWindowPos(window->hwnd, target, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    return ok ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_platform_window_show(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -677,6 +698,10 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     int show_command =
         no_activate ? SW_SHOWNOACTIVATE : (IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW);
     ShowWindow(window->hwnd, show_command);
+    if (reach_window_self_ordered_surface(window->role))
+    {
+        return REACH_OK;
+    }
     if (no_activate)
     {
         SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0,
@@ -776,7 +801,7 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
         window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
         window->role == REACH_SURFACE_CONTEXT_MENU ||
         window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
-        window->role == REACH_SURFACE_SETTINGS)
+        window->role == REACH_SURFACE_SETTINGS || window->role == REACH_SURFACE_STAGE)
     {
         return REACH_OK;
     }
@@ -818,7 +843,7 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
         window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
         window->role == REACH_SURFACE_CONTEXT_MENU ||
         window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
-        window->role == REACH_SURFACE_SETTINGS)
+        window->role == REACH_SURFACE_SETTINGS || window->role == REACH_SURFACE_STAGE)
     {
         return REACH_OK;
     }
@@ -1162,6 +1187,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.is_minimized = reach_platform_window_is_minimized;
     out_port->ops.is_active = reach_platform_window_is_active;
     out_port->ops.native_id = reach_platform_window_native_id;
+    out_port->ops.place_behind = reach_platform_window_place_behind;
     out_port->ops.post_event = reach_platform_window_post_event;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
