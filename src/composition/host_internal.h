@@ -290,6 +290,7 @@ struct reach_host
     reach_stage *stage_capsule;
     reach_host_stage_reveal_state stage_reveal;
     reach_window_thumbnail_id stage_thumbnail_ids[REACH_STAGE_MAX_TILES];
+    size_t stage_thumbnail_generation;
     int32_t stage_thumbnails_registered;
     int32_t stage_topmost;
     uint64_t wallpaper_image_id;

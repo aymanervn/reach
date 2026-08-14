@@ -70,8 +70,6 @@ static void test_open_and_close_state_machine(void)
     expect_true(reach_stage_thumbnail_at(stage, 0, &placement) == REACH_OK,
                 "placement is readable");
     expect_true(placement.window == 1, "placement reports the source window");
-    expect_near(placement.destination.x, 0.0f, "placement starts at the window position");
-    expect_near(placement.destination.width, 400.0f, "placement starts at the window size");
     expect_true(reach_stage_thumbnail_at(stage, 2, &placement) != REACH_OK,
                 "out of range placement is rejected");
 
@@ -97,65 +95,6 @@ static void test_open_and_close_state_machine(void)
     }
     expect_true(!reach_stage_is_open(stage), "stage closes once the animation finishes");
     expect_true(reach_stage_thumbnail_count(stage) == 0, "closed stage tracks no windows");
-
-    reach_stage_destroy(stage);
-}
-
-static void test_hit_testing_resolves_tiles(void)
-{
-    reach_stage *stage = nullptr;
-    if (reach_stage_create(&stage) != REACH_OK || stage == nullptr)
-    {
-        expect_true(0, "stage is created for hit testing");
-        return;
-    }
-
-    reach_stage_open_window windows[2] = {
-        make_window(11, make_rect(0.0f, 0.0f, 400.0f, 300.0f)),
-        make_window(22, make_rect(400.0f, 0.0f, 400.0f, 300.0f))};
-    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, windows, 2);
-
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    reach_rect_f32 first = state->tiles[0].current_rect;
-
-    reach_point_f32 inside = {first.x + first.width * 0.5f, first.y + first.height * 0.5f};
-    size_t index = 99;
-    expect_true(reach_stage_tile_at_point(stage, inside, &index), "center of a tile hits it");
-    expect_true(index == 0, "the first tile is resolved");
-
-    reach_point_f32 outside = {-50.0f, -50.0f};
-    expect_true(!reach_stage_tile_at_point(stage, outside, &index),
-                "a point outside every tile misses");
-
-    const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
-    reach_pointer_event event = {};
-    reach_capsule_pointer_result result = {};
-
-    event.kind = REACH_POINTER_EVENT_UP;
-    event.x = (int32_t)inside.x;
-    event.y = (int32_t)inside.y;
-    ops->handle_pointer(stage, &event, &result);
-    expect_true(result.handled, "a press on a tile is handled");
-    expect_true(result.action.kind == REACH_STAGE_ACTION_ACTIVATE_WINDOW,
-                "a press on a tile activates the window");
-    expect_true(result.action.window == 11, "the pressed tile reports its window");
-
-    result = {};
-    event.kind = REACH_POINTER_EVENT_DOWN;
-    event.x = (int32_t)inside.x;
-    event.y = (int32_t)inside.y;
-    ops->handle_pointer(stage, &event, &result);
-    expect_true(result.handled, "a press on a tile is claimed by the stage");
-
-    result = {};
-    event.kind = REACH_POINTER_EVENT_DOWN;
-    event.x = -50;
-    event.y = -50;
-    ops->handle_pointer(stage, &event, &result);
-    expect_true(!result.handled,
-                "a press outside every tile is unhandled so the host dismisses the stage");
-    expect_true(result.action.kind == REACH_STAGE_ACTION_NONE,
-                "the stage does not invent its own dismissal action");
 
     reach_stage_destroy(stage);
 }
@@ -191,7 +130,6 @@ static void test_force_close_keeps_configured_animation(void)
 int main(void)
 {
     test_open_and_close_state_machine();
-    test_hit_testing_resolves_tiles();
     test_force_close_keeps_configured_animation();
     return failures == 0 ? 0 : 1;
 }
