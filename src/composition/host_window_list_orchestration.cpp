@@ -1,7 +1,7 @@
 #include "host_internal.h"
 
-static const double REACH_HOST_WINDOW_LIST_DWELL_SECONDS = 0.35;
-static const double REACH_HOST_WINDOW_LIST_GRACE_SECONDS = 0.2;
+static const double REACH_HOST_WINDOW_LIST_DWELL_SECONDS = 0.0;
+static const double REACH_HOST_WINDOW_LIST_GRACE_SECONDS = 0.0;
 static const float REACH_HOST_WINDOW_LIST_MARGIN = 12.0f;
 
 static size_t reach_host_window_list_item_windows(reach_host *host, size_t item_index,
@@ -39,7 +39,7 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     reach_dock_item_window item_windows[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     size_t window_count = reach_host_window_list_item_windows(host, item_index, item_windows,
                                                               REACH_CONTEXT_MENU_MAX_ITEMS);
-    if (window_count < 2)
+    if (window_count == 0)
     {
         return REACH_OK;
     }
@@ -51,8 +51,7 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
         entries[index].title = item_windows[index].title;
     }
 
-    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU,
-                               REACH_SURFACE_ID_DOCK);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
 
     reach_rect_f32 slot =
         reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.app_slots[item_index]);
@@ -113,7 +112,7 @@ void reach_host_dock_item_hovered(reach_host *host, size_t item_index)
         }
         reach_dock_item_window item_windows[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
         if (reach_host_window_list_item_windows(host, item_index, item_windows,
-                                                REACH_CONTEXT_MENU_MAX_ITEMS) >= 2)
+                                                REACH_CONTEXT_MENU_MAX_ITEMS) > 0)
         {
             (void)reach_host_show_dock_window_list(host, item_index);
         }
@@ -128,7 +127,7 @@ void reach_host_dock_item_hovered(reach_host *host, size_t item_index)
 
     reach_dock_item_window item_windows[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     if (reach_host_window_list_item_windows(host, item_index, item_windows,
-                                            REACH_CONTEXT_MENU_MAX_ITEMS) < 2)
+                                            REACH_CONTEXT_MENU_MAX_ITEMS) == 0)
     {
         state->dwell_active = 0;
         return;
@@ -216,9 +215,33 @@ void reach_host_window_list_update(reach_host *host, double delta_seconds)
     }
 }
 
+reach_result reach_host_window_list_close_window(reach_host *host, uintptr_t window_id)
+{
+    if (host == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    size_t remaining = reach_context_menu_window_list_remove(host->context_menu_capsule, window_id);
+    if (remaining == 0 || !host->has_layout ||
+        host->window_list.open_item >= host->layout.dock.app_slot_count)
+    {
+        reach_host_close_context_menu(host);
+    }
+    else
+    {
+        reach_host_reanchor_context_menu(host);
+        host->context_menu.dirty_flags = 1;
+        host->dirty.render = 1;
+        host->window_list.grace_seconds = 0.0;
+        reach_host_request_update(host);
+    }
+
+    return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id);
+}
+
 int32_t reach_host_window_list_wants_frames(const reach_host *host)
 {
-    return host != nullptr &&
-           (host->window_list.dwell_active ||
-            reach_context_menu_window_list_is_open(host->context_menu_capsule));
+    return host != nullptr && (host->window_list.dwell_active ||
+                               reach_context_menu_window_list_is_open(host->context_menu_capsule));
 }

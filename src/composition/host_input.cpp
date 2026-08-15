@@ -220,6 +220,10 @@ reach_host_apply_context_menu_pointer_action(reach_host *host, const reach_ui_ev
     {
         return reach_host_execute_context_command(host, static_cast<uint32_t>(result->action.id));
     }
+    else if (result->action.kind == REACH_CONTEXT_MENU_POINTER_ACTION_CLOSE_WINDOW)
+    {
+        return reach_host_window_list_close_window(host, result->action.window);
+    }
     else if (result->action.kind == REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW)
     {
         uintptr_t window_id = result->action.window;

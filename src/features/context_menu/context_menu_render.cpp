@@ -79,6 +79,32 @@ static reach_context_menu_item_style reach_context_menu_style_for_command(uint32
     return style;
 }
 
+static void reach_context_menu_push_close_button(const reach_context_menu_render_input *input,
+                                                 reach_rect_f32 item, size_t index, float alpha,
+                                                 reach_render_command_buffer *out_commands)
+{
+    reach_rect_f32 button = reach_context_menu_close_button_rect(item, input->dpi_scale);
+    float hover = input->close_hovered_index == index ? input->close_hover : 0.0f;
+
+    reach_render_command backing = {};
+    backing.type = REACH_RENDER_COMMAND_RECT;
+    backing.rect = button;
+    backing.radius = button.height * 0.5f;
+    backing.color = reach_context_menu_rgb(217, 61, 61, (0.14f + 0.74f * hover) * alpha);
+    reach_render_command_buffer_push(out_commands, &backing);
+
+    float inset = button.width * 0.30f;
+    reach_render_command glyph = {};
+    glyph.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    glyph.icon_id = REACH_VECTOR_ICON_CLOSE;
+    glyph.rect.x = button.x + inset;
+    glyph.rect.y = button.y + inset;
+    glyph.rect.width = button.width - inset * 2.0f;
+    glyph.rect.height = button.height - inset * 2.0f;
+    glyph.color = reach_context_menu_rgb(255, 255, 255, (0.72f + 0.28f * hover) * alpha);
+    reach_render_command_buffer_push(out_commands, &glyph);
+}
+
 reach_result reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
                                                       reach_render_command_buffer *out_commands)
 {
@@ -166,9 +192,11 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             icon_command.icon_id = input->item_icon_ids[index];
             reach_render_command_buffer_push(out_commands, &icon_command);
         }
+        float text_right = input->window_list ? reach_context_menu_scale(input, 34.0f)
+                                              : reach_context_menu_scale(input, 14.0f);
         command.rect.x = item.x + text_left;
         command.rect.y = item.y;
-        command.rect.width = item.width - text_left - reach_context_menu_scale(input, 14.0f);
+        command.rect.width = item.width - text_left - text_right;
         command.rect.height = item.height;
         command.color = foreground;
         command.text_size = reach_context_menu_scale(input, 14.0f);
@@ -179,6 +207,11 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
                              ? input->item_titles[index]
                              : reach_context_menu_command_text(input->item_commands[index]));
         reach_render_command_buffer_push(out_commands, &command);
+
+        if (input->window_list && input->hovered_index == index && hover_opacity > 0.01f)
+        {
+            reach_context_menu_push_close_button(input, item, index, hover_opacity, out_commands);
+        }
     }
 
     return REACH_OK;
@@ -205,6 +238,8 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.item_titles = state->item_titles;
     input.window_list = state->window_list_open;
     input.hover_opacity = reach_context_menu_hover_opacity(menu);
+    input.close_hovered_index = state->close_hovered_index;
+    input.close_hover = reach_context_menu_close_hover(menu);
     input.item_count = state->item_count;
     input.hovered_index = state->hovered_index;
     input.target_index = state->target_index;

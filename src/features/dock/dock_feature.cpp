@@ -470,8 +470,7 @@ size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
                                        size_t pinned_app_count, reach_dock_item_window *out,
                                        size_t cap)
 {
-    if (dock == nullptr || out == nullptr || cap == 0 ||
-        item_index >= dock->state.model.item_count)
+    if (dock == nullptr || out == nullptr || cap == 0 || item_index >= dock->state.model.item_count)
     {
         return 0;
     }
@@ -493,8 +492,7 @@ size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
         if (representative != nullptr)
         {
             reach_copy_utf16(window_app.path, 260, representative->path);
-            reach_copy_utf16(window_app.app_user_model_id, 260,
-                             representative->app_user_model_id);
+            reach_copy_utf16(window_app.app_user_model_id, 260, representative->app_user_model_id);
             app = &window_app;
         }
     }
@@ -859,9 +857,10 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                 out->redraw = 1;
             }
 
-            size_t hovered_item = hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
-                                      ? hit.index
-                                      : REACH_MAX_DOCK_ITEMS;
+            size_t hovered_item =
+                hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
+                    ? hit.index
+                    : REACH_MAX_DOCK_ITEMS;
             if (hovered_item != state->hovered_item)
             {
                 state->hovered_item = hovered_item;
@@ -1463,7 +1462,12 @@ size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_inde
     }
     if (has_window && count < cap)
     {
-        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_CLOSE;
+        reach_dock_item_window item_windows[2] = {};
+        size_t item_window_count =
+            reach_dock_collect_item_windows(dock, item_index, dock->pointer_pinned_apps,
+                                            dock->pointer_pinned_app_count, item_windows, 2);
+        out_commands[count++] = item_window_count > 1 ? REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL
+                                                      : REACH_CONTEXT_MENU_COMMAND_CLOSE;
     }
     return count;
 }

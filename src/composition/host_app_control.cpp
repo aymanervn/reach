@@ -55,15 +55,16 @@ reach_result reach_host_schedule_window_control(reach_host *host,
     return result;
 }
 
-reach_result reach_host_schedule_minimize_windows(reach_host *host, const uintptr_t *window_ids,
-                                                  size_t window_count)
+reach_result reach_host_schedule_window_controls(reach_host *host,
+                                                 reach_window_control_action action,
+                                                 const uintptr_t *window_ids, size_t window_count)
 {
     if (host == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
     reach_result result =
-        reach_app_control_schedule_minimize(host->app_control, window_ids, window_count);
+        reach_app_control_schedule_windows(host->app_control, action, window_ids, window_count);
     if (result == REACH_OK)
     {
         reach_host_request_update(host);
@@ -87,7 +88,8 @@ reach_result reach_host_schedule_minimize_open_windows(reach_host *host)
     uintptr_t windows[REACH_MAX_OPEN_WINDOWS] = {};
     size_t window_count = reach_window_tracking_collect_unminimized(host->window_tracking, windows,
                                                                     REACH_MAX_OPEN_WINDOWS);
-    return window_count > 0 ? reach_host_schedule_minimize_windows(host, windows, window_count)
+    return window_count > 0 ? reach_host_schedule_window_controls(
+                                  host, REACH_WINDOW_CONTROL_MINIMIZE, windows, window_count)
                             : REACH_OK;
 }
 
