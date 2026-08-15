@@ -8,7 +8,7 @@
 #include <dcomp.h>
 #include <d3d11.h>
 #include <dwmapi.h>
-#include <dwrite.h>
+#include <dwrite_3.h>
 #include <dxgi1_2.h>
 #include <roapi.h>
 #include <wincodec.h>
@@ -62,6 +62,12 @@ struct reach_render_backend
     IDWriteFactory *text_factory;
     IWICImagingFactory *wic_factory;
 
+    wchar_t ui_font_family[LF_FACESIZE];
+    IDWriteFontCollection *bundled_font_collection;
+    IDWriteInMemoryFontFileLoader *bundled_font_loader;
+    int32_t bundled_font_attempted;
+    int32_t use_bundled_font;
+
     std::vector<reach_d2d_icon_cache_entry> icon_cache;
 
     UINT target_width;
@@ -69,6 +75,8 @@ struct reach_render_backend
 };
 
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
+void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_font);
+void reach_d2d_release_fonts(reach_render_backend *backend);
 D2D1_COLOR_F reach_d2d_color(reach_color color);
 void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr);
 

@@ -605,6 +605,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
             }
             reach_host_apply_power_config(host, &snapshot);
             host->high_refresh_rate = snapshot.high_refresh_rate ? 1 : 0;
+            reach_host_apply_ui_font(host, snapshot.bundled_font);
+            reach_host_apply_theme_mode(host, snapshot.light_theme);
         }
     }
     if (result != REACH_OK)

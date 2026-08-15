@@ -37,6 +37,8 @@ void reach_settings_model_init(reach_settings_model *model)
     model->pressed_button = REACH_SETTINGS_HIT_NONE;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;
     reach_animation_manager_init(&model->display_fps_animation, &model->display_fps_track, 1);
+    reach_animation_manager_init(&model->display_font_animation, &model->display_font_track, 1);
+    reach_animation_manager_init(&model->display_theme_animation, &model->display_theme_track, 1);
     reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
     {
@@ -211,6 +213,35 @@ static reach_rect_f32 reach_settings_rect(float x, float y, float width, float h
     rect.width = width > 0.0f ? width : 0.0f;
     rect.height = height > 0.0f ? height : 0.0f;
     return rect;
+}
+
+typedef struct reach_settings_toggle_card_rects
+{
+    reach_rect_f32 *card;
+    reach_rect_f32 *icon;
+    reach_rect_f32 *title;
+    reach_rect_f32 *subtitle;
+    reach_rect_f32 *toggle;
+} reach_settings_toggle_card_rects;
+
+static void reach_settings_layout_toggle_card(const reach_settings_toggle_card_rects *rects,
+                                              float x, float y, float width, float height,
+                                              float scale)
+{
+    float icon_box = 34.0f * scale;
+    float toggle_width = 40.0f * scale;
+    float toggle_height = 22.0f * scale;
+    float toggle_x = x + width - 18.0f * scale - toggle_width;
+    float text_x = x + 16.0f * scale + icon_box + 14.0f * scale;
+    float text_width = toggle_x - 14.0f * scale - text_x;
+
+    *rects->card = reach_settings_rect(x, y, width, height);
+    *rects->icon = reach_settings_rect(x + 16.0f * scale, y + (height - icon_box) * 0.5f, icon_box,
+                                       icon_box);
+    *rects->toggle = reach_settings_rect(toggle_x, y + (height - toggle_height) * 0.5f,
+                                         toggle_width, toggle_height);
+    *rects->title = reach_settings_rect(text_x, y + 15.0f * scale, text_width, 20.0f * scale);
+    *rects->subtitle = reach_settings_rect(text_x, y + 37.0f * scale, text_width, 16.0f * scale);
 }
 
 static int32_t reach_settings_update_in_select_section(reach_windows_update_state state)
@@ -512,23 +543,21 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         float area_width = layout.content.x + layout.content.width - 28.0f * scale - area_x;
 
         float card_height = 72.0f * scale;
-        layout.display_fps_card = reach_settings_rect(area_x, area_y, area_width, card_height);
-        float icon_box = 34.0f * scale;
-        layout.display_fps_icon = reach_settings_rect(
-            area_x + 16.0f * scale, area_y + (card_height - icon_box) * 0.5f, icon_box, icon_box);
-
-        float toggle_width = 40.0f * scale;
-        float toggle_height = 22.0f * scale;
-        float toggle_x = area_x + area_width - 18.0f * scale - toggle_width;
-        layout.display_fps_toggle = reach_settings_rect(
-            toggle_x, area_y + (card_height - toggle_height) * 0.5f, toggle_width, toggle_height);
-
-        float text_x = layout.display_fps_icon.x + icon_box + 14.0f * scale;
-        float text_width = toggle_x - 14.0f * scale - text_x;
-        layout.display_fps_title =
-            reach_settings_rect(text_x, area_y + 15.0f * scale, text_width, 20.0f * scale);
-        layout.display_fps_subtitle =
-            reach_settings_rect(text_x, area_y + 37.0f * scale, text_width, 16.0f * scale);
+        float card_spacing = 12.0f * scale;
+        reach_settings_toggle_card_rects cards[] = {
+            {&layout.display_fps_card, &layout.display_fps_icon, &layout.display_fps_title,
+             &layout.display_fps_subtitle, &layout.display_fps_toggle},
+            {&layout.display_font_card, &layout.display_font_icon, &layout.display_font_title,
+             &layout.display_font_subtitle, &layout.display_font_toggle},
+            {&layout.display_theme_card, &layout.display_theme_icon, &layout.display_theme_title,
+             &layout.display_theme_subtitle, &layout.display_theme_toggle},
+        };
+        for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
+        {
+            reach_settings_layout_toggle_card(&cards[index], area_x,
+                                              area_y + (float)index * (card_height + card_spacing),
+                                              area_width, card_height, scale);
+        }
     }
 
     if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
@@ -769,12 +798,28 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             }
         }
     }
-    if (layout->display_fps_toggle.width > 0.0f &&
-        (reach_settings_rect_contains(layout->display_fps_toggle, x, y) ||
-         reach_settings_rect_contains(layout->display_fps_card, x, y)))
+    const struct
     {
-        result.type = REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE;
-        return result;
+        reach_rect_f32 card;
+        reach_rect_f32 toggle;
+        reach_settings_hit_type type;
+    } display_cards[] = {
+        {layout->display_fps_card, layout->display_fps_toggle,
+         REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE},
+        {layout->display_font_card, layout->display_font_toggle,
+         REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE},
+        {layout->display_theme_card, layout->display_theme_toggle,
+         REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE},
+    };
+    for (size_t index = 0; index < sizeof(display_cards) / sizeof(display_cards[0]); ++index)
+    {
+        if (display_cards[index].toggle.width > 0.0f &&
+            (reach_settings_rect_contains(display_cards[index].toggle, x, y) ||
+             reach_settings_rect_contains(display_cards[index].card, x, y)))
+        {
+            result.type = display_cards[index].type;
+            return result;
+        }
     }
     if (layout->account_password_button.width > 0.0f &&
         reach_settings_rect_contains(layout->account_password_button, x, y))

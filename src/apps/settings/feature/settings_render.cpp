@@ -249,6 +249,7 @@ static void render_account_page(const reach_settings_render_input *input,
         (const uint16_t *)L"Current password", (const uint16_t *)L"New password",
         (const uint16_t *)L"Confirm password"};
     reach_ui_selection_item_style field_style = settings_pill_style(input, accent);
+    field_style.background = input->theme->settings_input_background;
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
     {
         const reach_text_edit *edit = &model->account_password_edits[field];
@@ -414,6 +415,37 @@ static void render_power_page(const reach_settings_render_input *input,
         reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_POWER_APPLY));
 }
 
+typedef struct display_toggle_card
+{
+    reach_rect_f32 card;
+    reach_rect_f32 icon;
+    reach_rect_f32 title;
+    reach_rect_f32 subtitle;
+    reach_rect_f32 toggle;
+    reach_vector_icon_id icon_id;
+    const wchar_t *title_text;
+    const wchar_t *subtitle_text;
+    float position;
+} display_toggle_card;
+
+static void render_display_toggle_card(const reach_settings_render_input *input,
+                                       reach_render_command_buffer *commands, reach_color accent,
+                                       const reach_ui_toggle_style *toggle_style,
+                                       const display_toggle_card *card)
+{
+    float radius = scale_value(input, input->theme->radius_small);
+    push_rect(commands, card->card, radius, input->theme->settings_card_background);
+    push_rect(commands, card->icon, radius, color_with_alpha(accent, 0.18f));
+    push_icon(commands, card->icon, accent, card->icon_id, 0.22f);
+    push_text(commands, card->title, (const uint16_t *)card->title_text,
+              scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+              input->theme->settings_text, 1);
+    push_text(commands, card->subtitle, (const uint16_t *)card->subtitle_text,
+              scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+              input->theme->settings_secondary_text, 1);
+    reach_ui_toggle_render(commands, card->toggle, toggle_style, card->position);
+}
+
 static void render_display_page(const reach_settings_render_input *input,
                                 reach_render_command_buffer *commands)
 {
@@ -421,24 +453,29 @@ static void render_display_page(const reach_settings_render_input *input,
     const reach_settings_layout *layout = input->layout;
     reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_CYAN);
 
-    push_rect(commands, layout->display_fps_card, scale_value(input, input->theme->radius_small),
-              input->theme->settings_card_background);
-    push_rect(commands, layout->display_fps_icon, scale_value(input, input->theme->radius_small),
-              color_with_alpha(accent, 0.18f));
-    push_icon(commands, layout->display_fps_icon, accent, REACH_VECTOR_ICON_ARROW_UP, 0.22f);
-    push_text(commands, layout->display_fps_title, (const uint16_t *)L"Smoother animations",
-              scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
-              input->theme->settings_text, 1);
-    push_text(commands, layout->display_fps_subtitle, (const uint16_t *)L"Run animations at 120fps",
-              scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
-              input->theme->settings_secondary_text, 1);
-
-    float t = reach_animation_manager_value(&model->display_fps_animation, 0);
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
     toggle_style.track_on = color_with_alpha(accent, 0.85f);
     toggle_style.knob = input->theme->settings_toggle_knob;
-    reach_ui_toggle_render(commands, layout->display_fps_toggle, &toggle_style, t);
+
+    const display_toggle_card cards[] = {
+        {layout->display_fps_card, layout->display_fps_icon, layout->display_fps_title,
+         layout->display_fps_subtitle, layout->display_fps_toggle, REACH_VECTOR_ICON_ARROW_UP,
+         L"Smoother animations", L"Run animations at 120fps",
+         reach_animation_manager_value(&model->display_fps_animation, 0)},
+        {layout->display_font_card, layout->display_font_icon, layout->display_font_title,
+         layout->display_font_subtitle, layout->display_font_toggle, REACH_VECTOR_ICON_DOCUMENT,
+         L"Use JetBrains Mono", L"Off uses the Windows system font",
+         reach_animation_manager_value(&model->display_font_animation, 0)},
+        {layout->display_theme_card, layout->display_theme_icon, layout->display_theme_title,
+         layout->display_theme_subtitle, layout->display_theme_toggle, REACH_VECTOR_ICON_BRIGHTNESS,
+         L"Light theme", L"Off uses the dark theme",
+         reach_animation_manager_value(&model->display_theme_animation, 0)},
+    };
+    for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
+    {
+        render_display_toggle_card(input, commands, accent, &toggle_style, &cards[index]);
+    }
 }
 
 static void push_app_icon(reach_render_command_buffer *commands, reach_rect_f32 rect,
@@ -501,7 +538,8 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
         return;
     }
 
-    reach_ui_selection_item_style badge_style = settings_pill_style(input, accent);
+    reach_ui_selection_item_style badge_style =
+        settings_pill_style(input, input->theme->settings_secondary_text);
     reach_render_command_buffer_set_scissor(commands, layout->startup_viewport);
     for (size_t index = 0; index < layout->startup_row_count; ++index)
     {
@@ -521,18 +559,18 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
                                    row.y + (row.height - icon_box_size) * 0.5f, icon_box_size,
                                    icon_box_size};
         push_rect(commands, icon_box, scale_value(input, input->theme->radius_small),
-                  color_with_alpha(accent, 0.10f + 0.10f * on));
+                  input->theme->settings_input_background);
         if (model->startup_icons[index] != 0)
         {
             float inset = scale_value(input, 6.0f);
             reach_rect_f32 image = {icon_box.x + inset, icon_box.y + inset,
                                     icon_box.width - inset * 2.0f, icon_box.height - inset * 2.0f};
-            push_app_icon(commands, image, model->startup_icons[index], 0.45f + 0.55f * on);
+            push_app_icon(commands, image, model->startup_icons[index], 1.0f);
         }
         else
         {
-            push_icon(commands, icon_box, color_with_alpha(accent, 0.55f + 0.45f * on),
-                      REACH_VECTOR_ICON_QUICK_SETTINGS, 0.26f);
+            push_icon(commands, icon_box, input->theme->settings_secondary_text,
+                      REACH_VECTOR_ICON_EXECUTABLE, 0.26f);
         }
 
         const reach_rect_f32 toggle = layout->startup_toggles[index];
@@ -552,21 +590,18 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
         {
             text_width = 0.0f;
         }
-        reach_color title_color = input->theme->settings_text;
-        title_color.a = 0.55f + 0.45f * on;
         push_text(
             commands,
             {text_x, row.y + scale_value(input, 12.0f), text_width, scale_value(input, 18.0f)},
             entry->display_name, scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD,
-            input->text_alignment_leading, title_color, 1);
+            input->text_alignment_leading, input->theme->settings_text, 1);
 
         const uint16_t *detail = entry->executable[0] != 0 ? entry->executable : entry->command;
         push_text(
             commands,
             {text_x, row.y + scale_value(input, 33.0f), text_width, scale_value(input, 15.0f)},
             detail, scale_value(input, 10.5f), REACH_TEXT_WEIGHT_NORMAL,
-            input->text_alignment_leading,
-            color_with_alpha(input->theme->settings_secondary_text, 0.55f + 0.35f * on), 1);
+            input->text_alignment_leading, input->theme->settings_secondary_text, 1);
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
@@ -845,7 +880,7 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         const reach_settings_nav_item *item = &items[index];
         const reach_color accent = reach_theme_accent_color(input->theme, item->accent);
         const reach_color accent_background =
-            color_with_alpha(accent, input->theme->settings_nav_accent_alpha);
+            color_with_alpha(accent, input->theme->accent_tint_alpha);
         if (input->model->selected_page == item->page)
             push_rect(commands, item_layout->bounds, scale_value(input, input->theme->radius_small),
                       accent_background);

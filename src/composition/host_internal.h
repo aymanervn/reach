@@ -308,6 +308,7 @@ struct reach_host
 
     double popup_hook_reassert_seconds;
     int32_t high_refresh_rate;
+    int32_t bundled_font;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_system_status *system_status;
     reach_quick_settings *quick_settings_capsule;
@@ -596,6 +597,10 @@ void reach_host_apply_power_config(reach_host *host, const reach_config_snapshot
 void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot *snapshot);
 
 void reach_host_reload_wallpaper(reach_host *host, int32_t force);
+
+void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font);
+
+void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme);
 
 reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_layout *layout);
 

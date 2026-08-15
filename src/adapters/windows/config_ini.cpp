@@ -137,6 +137,10 @@ static reach_result reach_config_store_load(reach_config_store *store,
         (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 0, path) != 0;
     out_snapshot->high_refresh_rate =
         (int32_t)GetPrivateProfileIntW(L"display", L"high_refresh_rate", 0, path) != 0;
+    out_snapshot->bundled_font =
+        (int32_t)GetPrivateProfileIntW(L"display", L"bundled_font", 0, path) != 0;
+    out_snapshot->light_theme =
+        (int32_t)GetPrivateProfileIntW(L"display", L"light_theme", 0, path) != 0;
     out_snapshot->stage_animation_ms =
         (int32_t)GetPrivateProfileIntW(L"stage", L"animation_ms", 280, path);
     GetPrivateProfileStringW(L"wallpaper", L"path", L"",
@@ -216,6 +220,10 @@ static reach_result reach_config_store_save(reach_config_store *store,
     WritePrivateProfileStringW(L"power", L"restart_wait_apps", value, path);
     swprintf_s(value, L"%d", snapshot->high_refresh_rate ? 1 : 0);
     WritePrivateProfileStringW(L"display", L"high_refresh_rate", value, path);
+    swprintf_s(value, L"%d", snapshot->bundled_font ? 1 : 0);
+    WritePrivateProfileStringW(L"display", L"bundled_font", value, path);
+    swprintf_s(value, L"%d", snapshot->light_theme ? 1 : 0);
+    WritePrivateProfileStringW(L"display", L"light_theme", value, path);
     WritePrivateProfileStringW(L"wallpaper", L"path",
                                reinterpret_cast<const wchar_t *>(snapshot->wallpaper_path), path);
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)

@@ -240,22 +240,27 @@ static void reach_quick_settings_network_label(const reach_network_state *state,
 
 static void reach_quick_settings_push_system_tile_commands(
     reach_render_command_buffer *commands, const reach_quick_settings_tile_layout *layout,
-    uint32_t icon_id, const uint16_t *label, int32_t active, const reach_theme *theme,
-    const reach_quick_settings_metrics *metrics, float dpi_scale)
+    uint32_t icon_id, const uint16_t *label, int32_t active, reach_theme_accent accent_id,
+    const reach_theme *theme, const reach_quick_settings_metrics *metrics, float dpi_scale)
 {
     if (commands == nullptr || layout == nullptr || theme == nullptr)
     {
         return;
     }
 
-    reach_color foreground =
-        active ? theme->quick_settings_tile_active_foreground : theme->primary_text;
-
     const reach_quick_settings_metrics *values =
         metrics != nullptr ? metrics : &reach_quick_settings_metrics_values;
-    reach_quick_settings_push_rounded_rect(
-        commands, layout->bounds, layout->bounds.height * 0.5f,
-        active ? theme->quick_settings_tile_active_background : theme->quick_settings_button_color);
+    const reach_color foreground = active ? reach_theme_accent_color(theme, accent_id)
+                                          : theme->quick_settings_secondary_text;
+    const reach_color icon_background =
+        reach_theme_color_alpha(foreground, theme->accent_tint_alpha);
+    const reach_color tile_background =
+        active ? icon_background : theme->quick_settings_button_color;
+    float radius = theme->radius_small * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+
+    reach_quick_settings_push_rounded_rect(commands, layout->bounds, radius, tile_background);
+    reach_quick_settings_push_rounded_rect(commands, layout->icon_background, radius,
+                                           icon_background);
 
     reach_render_command icon = {};
     icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
@@ -265,7 +270,9 @@ static void reach_quick_settings_push_system_tile_commands(
     (void)reach_render_command_buffer_push(commands, &icon);
 
     reach_quick_settings_push_text(commands, layout->label, label, values->system_tile_text_size,
-                                   REACH_TEXT_WEIGHT_SEMIBOLD, 0, foreground);
+                                   REACH_TEXT_WEIGHT_SEMIBOLD, 0,
+                                   active ? theme->primary_text
+                                          : theme->quick_settings_secondary_text);
 }
 
 static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *commands,
@@ -551,7 +558,8 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     reach_quick_settings_push_system_tile_commands(
         commands, &input->layout.network_tile,
         reach_quick_settings_network_icon_id(&input->model.network), network_label,
-        input->model.network.connected, &input->theme, &metrics, input->dpi_scale);
+        input->model.network.connected, REACH_THEME_ACCENT_GREEN, &input->theme, &metrics,
+        input->dpi_scale);
 
     static const uint16_t bluetooth_label[] = {'B', 'l', 'u', 'e', 't', 'o', 'o', 't', 'h', 0};
     int32_t bluetooth_enabled = input->model.bluetooth_pending
@@ -560,7 +568,8 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     reach_quick_settings_push_system_tile_commands(
         commands, &input->layout.bluetooth_tile,
         bluetooth_enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF,
-        bluetooth_label, bluetooth_enabled, &input->theme, &metrics, input->dpi_scale);
+        bluetooth_label, bluetooth_enabled, REACH_THEME_ACCENT_BLUE, &input->theme, &metrics,
+        input->dpi_scale);
 
     if (input->model.power.has_battery)
     {
@@ -568,14 +577,15 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
                                                        ' ', 's', 'a', 'v', 'e', 'r', 0};
         reach_quick_settings_push_system_tile_commands(
             commands, &input->layout.battery_saver_tile, REACH_VECTOR_ICON_BATTERY_SAVER,
-            battery_saver_label, input->model.power.battery_saver_on, &input->theme, &metrics,
-            input->dpi_scale);
+            battery_saver_label, input->model.power.battery_saver_on, REACH_THEME_ACCENT_ORANGE,
+            &input->theme, &metrics, input->dpi_scale);
     }
 
     static const uint16_t project_label[] = {'P', 'r', 'o', 'j', 'e', 'c', 't', 0};
     reach_quick_settings_push_system_tile_commands(commands, &input->layout.project_tile,
                                                    REACH_VECTOR_ICON_PROJECT, project_label, 0,
-                                                   &input->theme, &metrics, input->dpi_scale);
+                                                   REACH_THEME_ACCENT_YELLOW, &input->theme,
+                                                   &metrics, input->dpi_scale);
 
     if (input->model.brightness.available)
     {

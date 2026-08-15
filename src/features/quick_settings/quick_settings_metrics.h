@@ -11,6 +11,8 @@ struct reach_quick_settings_metrics
     float system_grid_tile_height;
     float system_grid_gap;
     float system_grid_bottom_gap;
+    float system_tile_icon_box;
+    float system_tile_icon_inset;
     float system_tile_icon_size;
     float system_tile_icon_gap;
 
@@ -86,8 +88,10 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.system_grid_tile_height = 46.0f;
     metrics.system_grid_gap = 8.0f;
     metrics.system_grid_bottom_gap = 10.0f;
-    metrics.system_tile_icon_size = 20.0f;
-    metrics.system_tile_icon_gap = 8.0f;
+    metrics.system_tile_icon_box = 28.0f;
+    metrics.system_tile_icon_inset = 8.0f;
+    metrics.system_tile_icon_size = 16.0f;
+    metrics.system_tile_icon_gap = 10.0f;
 
     metrics.pill_header_icon_size = 22.0f;
     metrics.pill_header_label_gap = 6.0f;
@@ -174,6 +178,10 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.system_grid_gap, dpi_scale);
     metrics.system_grid_bottom_gap =
         reach_quick_settings_metric_scale_value(metrics.system_grid_bottom_gap, dpi_scale);
+    metrics.system_tile_icon_box =
+        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_box, dpi_scale);
+    metrics.system_tile_icon_inset =
+        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_inset, dpi_scale);
     metrics.system_tile_icon_size =
         reach_quick_settings_metric_scale_value(metrics.system_tile_icon_size, dpi_scale);
     metrics.system_tile_icon_gap =
