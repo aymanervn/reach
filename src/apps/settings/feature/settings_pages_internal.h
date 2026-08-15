@@ -23,7 +23,7 @@ typedef struct reach_settings_power_row_style
     uint32_t icon_id;
     const uint16_t *title;
     const uint16_t *subtitle;
-    reach_color accent;
+    reach_theme_accent accent;
 } reach_settings_power_row_style;
 
 const reach_settings_power_row_style *reach_settings_power_row_styles(void);

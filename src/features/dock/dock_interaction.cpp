@@ -25,6 +25,12 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
         return result;
     }
 
+    if (reach_dock_rect_contains(layout->stage_button, x, y))
+    {
+        result.type = REACH_DOCK_HIT_STAGE_BUTTON;
+        return result;
+    }
+
     if (reach_dock_rect_contains(layout->tray_button, x, y))
     {
         result.type = REACH_DOCK_HIT_TRAY_BUTTON;

@@ -2,22 +2,6 @@
 
 #include "reach/support/util.h"
 
-static reach_color reach_ui_color_with_alpha(reach_color color, float alpha)
-{
-    color.a = alpha;
-    return color;
-}
-
-static reach_color reach_ui_color_mix(reach_color from, reach_color to, float t)
-{
-    reach_color mixed;
-    mixed.r = from.r + (to.r - from.r) * t;
-    mixed.g = from.g + (to.g - from.g) * t;
-    mixed.b = from.b + (to.b - from.b) * t;
-    mixed.a = from.a + (to.a - from.a) * t;
-    return mixed;
-}
-
 static void reach_ui_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                float radius, reach_color color)
 {
@@ -76,9 +60,10 @@ void reach_ui_button_render(reach_render_command_buffer *commands, reach_rect_f3
     reach_color background = enabled ? style->background : style->disabled_background;
     if (enabled && pressed > 0.0f)
     {
-        reach_color darkened = {background.r * 0.65f, background.g * 0.65f, background.b * 0.65f,
+        const float darken = style->pressed_darken > 0.0f ? style->pressed_darken : 1.0f;
+        reach_color darkened = {background.r * darken, background.g * darken, background.b * darken,
                                 background.a};
-        background = reach_ui_color_mix(background, darkened, pressed);
+        background = reach_theme_color_mix(background, darkened, pressed);
     }
     reach_ui_push_rect(commands, bounds, style->radius, background);
     reach_ui_push_text(commands, bounds, label, style->text_size, style->text_weight,
@@ -99,9 +84,9 @@ void reach_ui_selection_item_backdrop_render(reach_render_command_buffer *comman
     if (selection > 0.0f)
     {
         reach_ui_push_rect(commands, bounds, radius,
-                           reach_ui_color_with_alpha(style->accent, 0.22f * selection));
+                           reach_theme_color_alpha(style->accent, 0.22f * selection));
         reach_ui_push_stroke(commands, bounds, radius, style->stroke_width,
-                             reach_ui_color_with_alpha(style->accent, 0.85f * selection));
+                             reach_theme_color_alpha(style->accent, 0.85f * selection));
     }
 }
 
@@ -116,7 +101,7 @@ void reach_ui_selection_item_render(reach_render_command_buffer *commands, reach
     reach_ui_selection_item_backdrop_render(commands, bounds, style, selection);
     reach_ui_push_text(commands, bounds, label, style->text_size, style->text_weight,
                        REACH_TEXT_ALIGNMENT_CENTER,
-                       reach_ui_color_mix(style->text, style->accent, selection));
+                       reach_theme_color_mix(style->text, style->accent, selection));
 }
 
 void reach_ui_toggle_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
@@ -136,7 +121,7 @@ void reach_ui_toggle_render(reach_render_command_buffer *commands, reach_rect_f3
     }
     float radius = bounds.height * 0.5f;
     reach_ui_push_rect(commands, bounds, radius,
-                       reach_ui_color_mix(style->track_off, style->track_on, position));
+                       reach_theme_color_mix(style->track_off, style->track_on, position));
     float inset = bounds.height * 0.15f;
     float knob = bounds.height - inset * 2.0f;
     float knob_off_x = bounds.x + inset;
@@ -176,7 +161,7 @@ void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f
     command.text_size = style->text_size;
     command.text_weight = style->text_weight;
     command.text_alignment = state->text_alignment;
-    command.text_color = reach_ui_color_mix(state->text_color, style->accent, selection);
+    command.text_color = reach_theme_color_mix(state->text_color, style->accent, selection);
     command.placeholder_color = state->placeholder_color;
     command.selection_color = state->selection_color;
     command.caret_index = state->caret_index;

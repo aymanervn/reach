@@ -1471,6 +1471,11 @@ static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
            type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
 }
 
+static int32_t reach_settings_hit_is_window_button(reach_settings_hit_type type)
+{
+    return type == REACH_SETTINGS_HIT_CLOSE || type == REACH_SETTINGS_HIT_MINIMIZE;
+}
+
 static void reach_settings_handle_pointer_down(reach_settings_app *app, const reach_ui_event *event)
 {
     if (app == nullptr || event == nullptr)
@@ -1522,11 +1527,21 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
     {
         return;
     }
+    reach_settings_refresh_bounds(app);
+
+    reach_settings_hit_result hover = reach_settings_hit_test(
+        &app->layout, (float)event->x - app->bounds.x, (float)event->y - app->bounds.y);
+    int32_t hovered = reach_settings_hit_is_window_button(hover.type) ? (int32_t)hover.type
+                                                                      : REACH_SETTINGS_HIT_NONE;
+    if (reach_settings_model_set_hovered_button(&app->model, hovered))
+    {
+        app->dirty = 1;
+    }
+
     if (!app->update_scrollbar_drag.active && !app->startup_scrollbar_drag.active)
     {
         return;
     }
-    reach_settings_refresh_bounds(app);
     reach_settings_refresh_layout(app);
     float y = (float)event->y - app->bounds.y;
     if (app->update_scrollbar_drag.active)
@@ -1565,10 +1580,21 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     {
         reach_settings_handle_pointer_up(app, event);
     }
+    else if (event->type == REACH_UI_EVENT_POINTER_LEAVE)
+    {
+        if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
+        {
+            app->dirty = 1;
+        }
+    }
     else if (event->type == REACH_UI_EVENT_POINTER_CANCEL)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
         reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
+        if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
+        {
+            app->dirty = 1;
+        }
         if (app->model.pressed_button != REACH_SETTINGS_HIT_NONE)
         {
             reach_settings_model_release_button(&app->model);

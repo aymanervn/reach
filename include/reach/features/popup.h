@@ -17,8 +17,8 @@ extern "C"
         float dpi_scale;
     } reach_popup_background_input;
 
-    float reach_popup_radius(void);
-    float reach_popup_radius_scaled(float dpi_scale);
+    float reach_popup_radius(const reach_theme *theme);
+    float reach_popup_radius_scaled(const reach_theme *theme, float dpi_scale);
     float reach_popup_notch_width(void);
     float reach_popup_notch_width_scaled(float dpi_scale);
     float reach_popup_notch_height(void);

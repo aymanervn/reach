@@ -98,6 +98,7 @@ extern "C"
         size_t click_feedback_index;
         float click_feedback_opacity;
         size_t tray_feedback_index;
+        size_t stage_feedback_index;
         size_t quick_settings_feedback_index;
         size_t power_feedback_index;
         const uint16_t *time_text;
@@ -117,7 +118,8 @@ extern "C"
         REACH_DOCK_POINTER_REGION_ITEM = 1,
         REACH_DOCK_POINTER_REGION_TRAY_BUTTON = 2,
         REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON = 3,
-        REACH_DOCK_POINTER_REGION_POWER_BUTTON = 4
+        REACH_DOCK_POINTER_REGION_POWER_BUTTON = 4,
+        REACH_DOCK_POINTER_REGION_STAGE_BUTTON = 5
     } reach_dock_pointer_region;
 
     typedef enum reach_dock_pointer_action_kind
@@ -140,7 +142,9 @@ extern "C"
         REACH_DOCK_POINTER_ACTION_MEDIA_NEXT = 15,
         REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS = 16,
         REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17,
-        REACH_DOCK_POINTER_ACTION_HOVER_ITEM = 18
+        REACH_DOCK_POINTER_ACTION_HOVER_ITEM = 18,
+        REACH_DOCK_POINTER_ACTION_PRESS_STAGE = 19,
+        REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE = 20
     } reach_dock_pointer_action_kind;
 
     size_t reach_dock_reorder_target(const reach_dock_feature_model *model,
@@ -218,6 +222,7 @@ extern "C"
     {
         REACH_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON,
+        REACH_DOCK_FEEDBACK_STAGE_BUTTON,
         REACH_DOCK_FEEDBACK_POWER_BUTTON,
         REACH_DOCK_FEEDBACK_NONE
     };

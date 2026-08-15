@@ -16,6 +16,7 @@ extern "C"
         reach_color disabled_text;
         float radius;
         float text_size;
+        float pressed_darken;
         int32_t text_weight;
     } reach_ui_button_style;
 

@@ -319,6 +319,31 @@ int32_t reach_host_frame_interval_ms(const reach_host *host)
     return host != nullptr && host->high_refresh_rate ? 8 : 16;
 }
 
+reach_theme_mode reach_host_theme_mode(const reach_host *host)
+{
+    const reach_theme *theme =
+        host != nullptr && host->theme != nullptr ? host->theme : reach_theme_default();
+    return theme->mode;
+}
+
+void reach_host_set_theme_mode(reach_host *host, reach_theme_mode mode)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    const reach_theme *theme = reach_theme_for_mode(mode);
+    if (host->theme == theme)
+    {
+        return;
+    }
+
+    host->theme = theme;
+    host->dirty.layout = 1;
+    host->dirty.render = 1;
+}
+
 int32_t reach_host_needs_frame(const reach_host *host)
 {
     int32_t window_manager_needs_refresh = 0;

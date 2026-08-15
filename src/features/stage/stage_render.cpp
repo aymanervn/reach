@@ -26,7 +26,7 @@ static reach_result reach_stage_push_tile_placeholder(const reach_stage_render_c
     reach_render_command plate = {};
     plate.type = REACH_RENDER_COMMAND_RECT;
     plate.rect = rect;
-    plate.color = reach_stage_rgba(0.16f, 0.16f, 0.19f, alpha);
+    plate.color = reach_theme_color_alpha(ctx->theme->stage_tile_placeholder, alpha);
     reach_result result = reach_render_command_buffer_push(out_commands, &plate);
     if (result != REACH_OK || tile->icon_id == 0)
     {
@@ -81,8 +81,10 @@ static reach_result reach_stage_push_close_button(reach_stage *stage,
     backing.type = REACH_RENDER_COMMAND_RECT;
     backing.rect = button;
     backing.radius = button.height * 0.5f;
-    backing.color = reach_stage_rgba(0.85f * hover, 0.24f * hover, 0.24f * hover,
-                                     (0.45f + 0.55f * hover) * alpha);
+    const reach_theme *theme = ctx->theme;
+    backing.color = reach_theme_color_mix(theme->stage_close_background,
+                                          theme->stage_close_hover_background, hover);
+    backing.color.a *= alpha;
     reach_result result = reach_render_command_buffer_push(out_commands, &backing);
     if (result != REACH_OK)
     {
@@ -97,7 +99,9 @@ static reach_result reach_stage_push_close_button(reach_stage *stage,
     glyph.rect.y = button.y + inset;
     glyph.rect.width = button.width - inset * 2.0f;
     glyph.rect.height = button.height - inset * 2.0f;
-    glyph.color = reach_stage_rgba(1.0f, 1.0f, 1.0f, (0.80f + 0.20f * hover) * alpha);
+    glyph.color =
+        reach_theme_color_mix(theme->stage_close_glyph, theme->stage_close_hover_glyph, hover);
+    glyph.color.a *= alpha;
     return reach_render_command_buffer_push(out_commands, &glyph);
 }
 
@@ -202,7 +206,8 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
             highlight.rect.width = rect.width + border * 2.0f;
             highlight.rect.height = rect.height + border * 2.0f;
             highlight.stroke_width = border;
-            highlight.color = reach_stage_rgba(1.0f, 1.0f, 1.0f, 0.85f * alpha);
+            highlight.color = ctx->theme->stage_tile_highlight;
+            highlight.color.a *= alpha;
             result = reach_render_command_buffer_push(out_commands, &highlight);
             if (result != REACH_OK)
             {
@@ -223,7 +228,8 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
             label.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             label.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
             label.text_ellipsis = 1;
-            label.color = reach_stage_rgba(1.0f, 1.0f, 1.0f, 0.92f * alpha);
+            label.color = ctx->theme->stage_tile_label;
+            label.color.a *= alpha;
             label.text_color = label.color;
             (void)reach_copy_utf16(label.text, 260, tile->label);
             result = reach_render_command_buffer_push(out_commands, &label);

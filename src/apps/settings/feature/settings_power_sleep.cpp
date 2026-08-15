@@ -22,22 +22,14 @@ static const int32_t
 const reach_settings_power_row_style *reach_settings_power_row_styles(void)
 {
     static const reach_settings_power_row_style styles[REACH_SETTINGS_POWER_TIMER_COUNT] = {
-        {REACH_VECTOR_ICON_SLEEP,
-         (const uint16_t *)L"Sleep",
-         (const uint16_t *)L"Put the device to sleep when idle for",
-         {0.70f, 0.55f, 0.95f, 1.0f}},
-        {REACH_VECTOR_ICON_LOCK,
-         (const uint16_t *)L"Auto lock",
-         (const uint16_t *)L"Lock Windows when idle for",
-         {0.31f, 0.78f, 0.86f, 1.0f}},
-        {REACH_VECTOR_ICON_SHUTDOWN,
-         (const uint16_t *)L"Shutdown",
-         (const uint16_t *)L"Shut down the device when idle for",
-         {0.96f, 0.45f, 0.35f, 1.0f}},
-        {REACH_VECTOR_ICON_RESTART,
-         (const uint16_t *)L"Restart",
-         (const uint16_t *)L"Restart the device when idle for",
-         {0.20f, 0.72f, 0.96f, 1.0f}},
+        {REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Sleep",
+         (const uint16_t *)L"Put the device to sleep when idle for", REACH_THEME_ACCENT_LAVENDER},
+        {REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Auto lock",
+         (const uint16_t *)L"Lock Windows when idle for", REACH_THEME_ACCENT_TEAL},
+        {REACH_VECTOR_ICON_SHUTDOWN, (const uint16_t *)L"Shutdown",
+         (const uint16_t *)L"Shut down the device when idle for", REACH_THEME_ACCENT_RED},
+        {REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Restart",
+         (const uint16_t *)L"Restart the device when idle for", REACH_THEME_ACCENT_CYAN},
     };
     return styles;
 }
