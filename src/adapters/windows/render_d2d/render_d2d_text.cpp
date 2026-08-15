@@ -297,11 +297,10 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_rend
 
         (void)format->SetTextAlignment(alignment);
         (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 
         if (command->text_ellipsis)
         {
-            (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-
             IDWriteInlineObject *ellipsis = nullptr;
             HRESULT trim_hr = backend->text_factory->CreateEllipsisTrimmingSign(format, &ellipsis);
 

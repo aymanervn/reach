@@ -38,7 +38,7 @@ static size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
 static constexpr size_t REACH_CLIPBOARD_RENDER_ITEM_LIMIT = 5;
 static constexpr size_t REACH_CLIPBOARD_PREVIEW_LINE_LIMIT = 4;
 static constexpr float REACH_CLIPBOARD_PREVIEW_LINE_HEIGHT_RATIO = 1.25f;
-static constexpr float REACH_CLIPBOARD_PREVIEW_AVERAGE_GLYPH_WIDTH_RATIO = 0.58f;
+static constexpr float REACH_CLIPBOARD_PREVIEW_GLYPH_ADVANCE_RATIO = 0.60f;
 
 struct reach_clipboard_preview_slice
 {
@@ -205,8 +205,8 @@ static int32_t reach_clipboard_preview_has_visible_text(const reach_clipboard_it
 
 static size_t reach_clipboard_preview_line_capacity(float text_width, float text_size)
 {
-    const float glyph_width = reach_clipboard_max_float(
-        1.0f, text_size * REACH_CLIPBOARD_PREVIEW_AVERAGE_GLYPH_WIDTH_RATIO);
+    const float glyph_width =
+        reach_clipboard_max_float(1.0f, text_size * REACH_CLIPBOARD_PREVIEW_GLYPH_ADVANCE_RATIO);
     size_t capacity = (size_t)(text_width / glyph_width);
     if (capacity < 1)
     {
