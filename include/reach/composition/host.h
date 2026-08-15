@@ -49,6 +49,9 @@ extern "C"
         reach_platform_window_port dock_window;
         reach_render_backend_port dock_renderer;
         reach_screen_hotspot_port dock_reveal_edge;
+        reach_platform_window_port top_bar_window;
+        reach_render_backend_port top_bar_renderer;
+        reach_screen_hotspot_port top_bar_reveal_edge;
         reach_image_loader_port image_loader;
         reach_platform_window_port tray_window;
         reach_render_backend_port tray_renderer;

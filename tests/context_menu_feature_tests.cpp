@@ -72,7 +72,8 @@ static void test_window_list_remove(void)
     ctx.dpi_scale = 1.0f;
     ctx.anchored = 1;
     ctx.anchor_x = 400.0f;
-    ctx.dock_top_y = 1000.0f;
+    ctx.bar_edge_y = 1000.0f;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
     ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
     ctx.window_entries = entries;
     ctx.window_entry_count = 3;

@@ -29,7 +29,8 @@ extern "C"
         const reach_theme *theme;
         const reach_tray_model *model;
         reach_rect_f32 bounds;
-        float dock_height;
+        float bar_height;
+        int32_t notch_side;
         float dpi_scale;
         size_t click_feedback_index;
         float click_feedback_opacity;
@@ -47,7 +48,7 @@ extern "C"
     reach_result reach_tray_model_refresh(reach_tray_model *model,
                                           reach_tray_provider_port *provider);
     void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme *theme,
-                                         const reach_dock_layout *dock_layout, float dpi_scale,
+                                         const reach_popup_anchor *anchor, float dpi_scale,
                                          reach_rect_f32 *out_bounds);
     reach_result reach_tray_build_render_commands(const reach_tray_render_input *input,
                                                   reach_render_command_buffer *out_commands);
@@ -80,7 +81,7 @@ extern "C"
     int32_t reach_tray_set_popup_open(reach_tray *tray, int32_t open);
     reach_result reach_tray_refresh(reach_tray *tray, reach_tray_provider_port *provider);
     void reach_tray_layout_popup(reach_tray *tray, const reach_theme *theme,
-                                 const reach_dock_layout *dock_layout, float dpi_scale,
+                                 const reach_popup_anchor *anchor, float dpi_scale,
                                  reach_rect_f32 *out_bounds);
 
     const reach_tray_state *reach_tray_state_ptr(reach_tray *tray);
@@ -92,7 +93,6 @@ extern "C"
     {
         const reach_theme *theme;
         reach_rect_f32 bounds;
-        float dock_height;
         float dpi_scale;
     } reach_tray_render_context;
 

@@ -120,6 +120,11 @@ static HRESULT reach_d2d_draw_gradient_arc(ID2D1RenderTarget *target, D2D1_POINT
     return hr;
 }
 
+static float reach_d2d_notch_mirror_y(float value, float y, float h, int32_t mirrored)
+{
+    return mirrored ? (2.0f * y + h - value) : value;
+}
+
 reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command)
 {
@@ -193,34 +198,38 @@ reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
 
     if (SUCCEEDED(hr))
     {
-        sink->BeginFigure(D2D1::Point2F(x + r, y), D2D1_FIGURE_BEGIN_FILLED);
-        sink->AddLine(D2D1::Point2F(x + w - r, y));
+        const int32_t mirrored = command->notch_side == REACH_NOTCH_SIDE_TOP;
+        auto fy = [&](float value) { return reach_d2d_notch_mirror_y(value, y, h, mirrored); };
+
+        sink->BeginFigure(D2D1::Point2F(x + r, fy(y)), D2D1_FIGURE_BEGIN_FILLED);
+        sink->AddLine(D2D1::Point2F(x + w - r, fy(y)));
 
         D2D1_ARC_SEGMENT arc = {};
         arc.size = D2D1::SizeF(r, r);
         arc.rotationAngle = 0.0f;
-        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+        arc.sweepDirection = mirrored ? D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE
+                                      : D2D1_SWEEP_DIRECTION_CLOCKWISE;
         arc.arcSize = D2D1_ARC_SIZE_SMALL;
 
-        arc.point = D2D1::Point2F(x + w, y + r);
+        arc.point = D2D1::Point2F(x + w, fy(y + r));
         sink->AddArc(arc);
 
-        sink->AddLine(D2D1::Point2F(x + w, body_bottom - r));
+        sink->AddLine(D2D1::Point2F(x + w, fy(body_bottom - r)));
 
-        arc.point = D2D1::Point2F(x + w - r, body_bottom);
+        arc.point = D2D1::Point2F(x + w - r, fy(body_bottom));
         sink->AddArc(arc);
 
-        sink->AddLine(D2D1::Point2F(notch_right, body_bottom));
-        sink->AddLine(D2D1::Point2F(notch_center, body_bottom + notch_height));
-        sink->AddLine(D2D1::Point2F(notch_left, body_bottom));
-        sink->AddLine(D2D1::Point2F(x + r, body_bottom));
+        sink->AddLine(D2D1::Point2F(notch_right, fy(body_bottom)));
+        sink->AddLine(D2D1::Point2F(notch_center, fy(body_bottom + notch_height)));
+        sink->AddLine(D2D1::Point2F(notch_left, fy(body_bottom)));
+        sink->AddLine(D2D1::Point2F(x + r, fy(body_bottom)));
 
-        arc.point = D2D1::Point2F(x, body_bottom - r);
+        arc.point = D2D1::Point2F(x, fy(body_bottom - r));
         sink->AddArc(arc);
 
-        sink->AddLine(D2D1::Point2F(x, y + r));
+        sink->AddLine(D2D1::Point2F(x, fy(y + r)));
 
-        arc.point = D2D1::Point2F(x + r, y);
+        arc.point = D2D1::Point2F(x + r, fy(y));
         sink->AddArc(arc);
 
         sink->EndFigure(D2D1_FIGURE_END_CLOSED);

@@ -40,6 +40,12 @@ extern "C"
         REACH_RENDER_CORNER_ALL = 15
     } reach_render_corner_mask;
 
+    typedef enum reach_notch_side
+    {
+        REACH_NOTCH_SIDE_BOTTOM = 0,
+        REACH_NOTCH_SIDE_TOP = 1
+    } reach_notch_side;
+
     typedef enum reach_vector_icon_id
     {
         REACH_VECTOR_ICON_NONE = 0,
@@ -128,6 +134,7 @@ extern "C"
         float notch_center_x;
         float notch_width;
         float notch_height;
+        int32_t notch_side;
         int32_t text_alignment;
         int32_t text_ellipsis;
         uint16_t text[260];

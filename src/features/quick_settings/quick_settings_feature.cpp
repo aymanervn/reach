@@ -1241,7 +1241,8 @@ float reach_quick_settings_height_animation_value(const reach_quick_settings *qu
 }
 
 static reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bounds,
-                                                              float dpi_scale)
+                                                              float dpi_scale,
+                                                              int32_t drop_direction)
 {
     reach_rect_f32 bounds = surface_bounds;
 
@@ -1249,11 +1250,12 @@ static reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 sur
     const float horizontal_padding = 8.0f * scale;
     const float top_padding = 8.0f * scale;
     const float bottom_padding = 12.0f * scale;
+    const float notch_height = reach_popup_notch_height_scaled(scale);
 
     bounds.x += horizontal_padding;
-    bounds.y += top_padding;
+    bounds.y += top_padding + (drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
     bounds.width -= horizontal_padding * 2.0f;
-    bounds.height -= top_padding + bottom_padding + reach_popup_notch_height_scaled(scale);
+    bounds.height -= top_padding + bottom_padding + notch_height;
 
     if (bounds.width < 0.0f)
     {
@@ -1299,8 +1301,12 @@ reach_quick_settings_target_bounds(reach_quick_settings *quick_settings,
 
     bounds.width = width;
     bounds.height = height;
+    reach_popup_anchor anchor = {};
+    anchor.bar_edge_y = ctx->bar_edge_y;
+    anchor.direction = ctx->drop_direction;
+
     bounds.x = ctx->anchor_x - width * 0.5f;
-    bounds.y = ctx->dock_top - height - gap;
+    bounds.y = reach_popup_drop_y(&anchor, height, gap);
     return bounds;
 }
 
@@ -1330,11 +1336,13 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
         state->bounds = state->target_bounds;
     }
     state->notch_anchor_x = ctx->anchor_x;
+    state->drop_direction = ctx->drop_direction;
 
     reach_rect_f32 surface_bounds = {};
     surface_bounds.width = state->bounds.width;
     surface_bounds.height = state->bounds.height;
-    state->content_bounds = reach_quick_settings_content_bounds_for(surface_bounds, ctx->dpi_scale);
+    state->content_bounds =
+        reach_quick_settings_content_bounds_for(surface_bounds, ctx->dpi_scale, ctx->drop_direction);
     state->layout = reach_quick_settings_layout_for_content_bounds_scaled(
         state->content_bounds, ctx->theme, &state->model, ctx->dpi_scale);
 }
@@ -1388,9 +1396,12 @@ int32_t reach_quick_settings_update_open_animation(reach_quick_settings *quick_s
         reach_quick_settings_height_changed(state->bounds.height, state->target_bounds.height))
     {
         const float gap = 8.0f * ctx->dpi_scale;
+        reach_popup_anchor anchor = {};
+        anchor.bar_edge_y = ctx->bar_edge_y;
+        anchor.direction = ctx->drop_direction;
         reach_rect_f32 animated = state->target_bounds;
         animated.height = reach_quick_settings_height_animation_value(quick_settings);
-        animated.y = floorf(ctx->dock_top - animated.height - gap + 0.5f);
+        animated.y = floorf(reach_popup_drop_y(&anchor, animated.height, gap) + 0.5f);
 
         state->bounds = animated;
 

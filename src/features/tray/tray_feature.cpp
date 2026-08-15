@@ -12,6 +12,7 @@ struct reach_tray
     reach_tray_state state;
     reach_rect_f32 pointer_bounds;
     int32_t pointer_bounds_valid;
+    reach_popup_anchor anchor;
 };
 
 const reach_tray_state *reach_tray_state_ptr(reach_tray *tray)
@@ -112,13 +113,16 @@ reach_result reach_tray_refresh(reach_tray *tray, reach_tray_provider_port *prov
 }
 
 void reach_tray_layout_popup(reach_tray *tray, const reach_theme *theme,
-                             const reach_dock_layout *dock_layout, float dpi_scale,
+                             const reach_popup_anchor *anchor, float dpi_scale,
                              reach_rect_f32 *out_bounds)
 {
     if (tray != nullptr)
     {
-        reach_tray_compute_popup_layout(&tray->state.model, theme, dock_layout, dpi_scale,
-                                        out_bounds);
+        if (anchor != nullptr)
+        {
+            tray->anchor = *anchor;
+        }
+        reach_tray_compute_popup_layout(&tray->state.model, theme, anchor, dpi_scale, out_bounds);
         if (out_bounds != nullptr)
         {
             tray->pointer_bounds = *out_bounds;
@@ -298,15 +302,15 @@ static size_t reach_tray_min_size(size_t a, size_t b)
 }
 
 void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme *theme,
-                                     const reach_dock_layout *dock_layout, float dpi_scale,
+                                     const reach_popup_anchor *anchor, float dpi_scale,
                                      reach_rect_f32 *out_bounds)
 {
-    if (model == nullptr || theme == nullptr || dock_layout == nullptr || out_bounds == nullptr)
+    if (model == nullptr || theme == nullptr || anchor == nullptr || out_bounds == nullptr)
     {
         return;
     }
 
-    float slot_size = reach_theme_tray_slot_size(theme, dock_layout->bounds.height);
+    float slot_size = reach_theme_tray_slot_size(theme, anchor->bar_height);
     float gap = slot_size * 0.22f;
     float padding = slot_size * 0.58f;
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
@@ -319,12 +323,14 @@ void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme 
 
     out_bounds->width = ceilf(content_width);
     out_bounds->height = ceilf(content_height + notch_height);
-    out_bounds->x = dock_layout->tray_button.x + dock_layout->tray_button.width * 0.5f -
-                    out_bounds->width * 0.5f;
-    out_bounds->y = dock_layout->bounds.y - out_bounds->height - 8.0f * scale;
+    out_bounds->x =
+        anchor->button.x + anchor->button.width * 0.5f - out_bounds->width * 0.5f;
+    out_bounds->y = reach_popup_drop_y(anchor, out_bounds->height, 8.0f * scale);
 
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
-    float grid_y = out_bounds->y + (content_height - grid_height) * 0.5f;
+    float content_top =
+        out_bounds->y + (anchor->direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
+    float grid_y = content_top + (content_height - grid_height) * 0.5f;
     for (size_t index = 0; index < model->item_count; ++index)
     {
         size_t row = index / 5;
@@ -356,7 +362,8 @@ reach_result reach_tray_append_render_commands(reach_tray *tray,
     input.theme = ctx->theme;
     input.model = &state->model;
     input.bounds = ctx->bounds;
-    input.dock_height = ctx->dock_height;
+    input.bar_height = tray->anchor.bar_height;
+    input.notch_side = reach_popup_notch_side(tray->anchor.direction);
     input.dpi_scale = ctx->dpi_scale;
     input.click_feedback_index = state->feedback_index;
     input.click_feedback_opacity = reach_animation_manager_value(reach_tray_animation_manager(tray),

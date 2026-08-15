@@ -229,7 +229,8 @@ void reach_host_reanchor_context_menu(reach_host *host)
     reach_context_menu_open_context ctx = {};
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchored = 1;
-    ctx.dock_top_y = host->layout.dock.bounds.y;
+    ctx.bar_edge_y = host->layout.dock.bounds.y;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
     ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
     if (state->power_open)
     {
@@ -269,7 +270,8 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchor_x = host->layout.dock.bounds.x + host->layout.dock.power_button.x +
                    host->layout.dock.power_button.width * 0.5f;
-    ctx.dock_top_y = host->layout.dock.bounds.y;
+    ctx.bar_edge_y = host->layout.dock.bounds.y;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
     ctx.anchored = 1;
     ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
 
@@ -306,7 +308,8 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
             reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.app_slots[item_index]);
         ctx.anchored = 1;
         ctx.anchor_x = slot.x + slot.width * 0.5f;
-        ctx.dock_top_y = host->layout.dock.bounds.y;
+        ctx.bar_edge_y = host->layout.dock.bounds.y;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
         ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
     }
 

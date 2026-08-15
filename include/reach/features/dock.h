@@ -10,6 +10,7 @@
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/window_manager.h"
 #include "reach/core/theme.h"
+#include "reach/features/common/bar_visibility.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/now_playing.h"
@@ -271,10 +272,8 @@ extern "C"
     {
         reach_dock_feature_model model;
 
-        int32_t target_hidden;
-        int32_t reveal_session_active;
+        reach_bar_visibility_state visibility;
         int32_t pointer_sequence_active;
-        int32_t dock_animation_initialized;
 
         reach_dock_drag_state drag;
         size_t pressed_index;
@@ -329,38 +328,9 @@ extern "C"
     reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index);
     void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys, size_t count);
 
-    typedef enum reach_dock_reveal_edge_mode
-    {
-        REACH_DOCK_REVEAL_EDGE_DISABLED = 0,
-        REACH_DOCK_REVEAL_EDGE_THIN = 1,
-        REACH_DOCK_REVEAL_EDGE_BRIDGE = 2
-    } reach_dock_reveal_edge_mode;
-
-    typedef struct reach_dock_visibility_request
-    {
-        reach_rect_f32 shown_bounds;
-        reach_rect_f32 monitor_bounds;
-        reach_point_i32 pointer;
-        int32_t pointer_valid;
-        int32_t game_mode;
-        int32_t can_hide;
-        int32_t transient_open;
-        int32_t dock_sticky_feedback;
-    } reach_dock_visibility_request;
-
-    typedef struct reach_dock_visibility_result
-    {
-        reach_rect_f32 animated_bounds;
-        int32_t edge_mode;
-        int32_t visible;
-        int32_t clear_sticky_feedback;
-    } reach_dock_visibility_result;
-
-    reach_rect_f32 reach_dock_reveal_edge_bounds(int32_t mode, reach_rect_f32 shown_dock_bounds,
-                                                 reach_rect_f32 monitor_bounds);
-    reach_dock_visibility_result
+    reach_bar_visibility_result
     reach_dock_update_visibility(reach_dock *animations,
-                                 const reach_dock_visibility_request *request);
+                                 const reach_bar_visibility_request *request);
 
 #ifdef __cplusplus
 }

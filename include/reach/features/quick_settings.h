@@ -219,6 +219,7 @@ extern "C"
         reach_rect_f32 target_bounds;
         reach_rect_f32 content_bounds;
         float notch_anchor_x;
+        int32_t drop_direction;
         reach_quick_settings_drag_state drag;
     } reach_quick_settings_state;
 
@@ -248,7 +249,8 @@ extern "C"
         const reach_theme *theme;
         float dpi_scale;
         float anchor_x;
-        float dock_top;
+        float bar_edge_y;
+        int32_t drop_direction;
     } reach_quick_settings_layout_context;
 
     void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,

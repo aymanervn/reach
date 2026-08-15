@@ -198,6 +198,7 @@ static void reach_context_menu_place(reach_context_menu_state *state,
                                      float anchor_ratio, int32_t compact)
 {
     state->anchored = ctx->anchored;
+    state->drop_direction = ctx->drop_direction;
     state->anchor_popup_width = popup_width;
     state->anchor_ratio = anchor_ratio;
     state->dpi_scale = ctx->dpi_scale;
@@ -212,8 +213,12 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     float popup_y;
     if (ctx->anchored)
     {
+        reach_popup_anchor anchor = {};
+        anchor.bar_edge_y = ctx->bar_edge_y;
+        anchor.direction = ctx->drop_direction;
+
         popup_x = ctx->anchor_x - popup_width * anchor_ratio;
-        popup_y = ctx->dock_top_y - popup_height - 8.0f * scale;
+        popup_y = reach_popup_drop_y(&anchor, popup_height, 8.0f * scale);
         if (popup_x < ctx->monitor.x + 8.0f * scale)
         {
             popup_x = ctx->monitor.x + 8.0f * scale;
@@ -226,6 +231,11 @@ static void reach_context_menu_place(reach_context_menu_state *state,
         if (popup_y < ctx->monitor.y + 8.0f * scale)
         {
             popup_y = ctx->monitor.y + 8.0f * scale;
+        }
+        float max_y = ctx->monitor.y + ctx->monitor.height - popup_height - 8.0f * scale;
+        if (popup_y > max_y)
+        {
+            popup_y = max_y;
         }
     }
     else
@@ -370,8 +380,9 @@ size_t reach_context_menu_window_list_remove(reach_context_menu *menu, uintptr_t
 }
 
 int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
-                                                 reach_rect_f32 anchor_slot, float dock_top_y,
-                                                 float margin, float x, float y)
+                                                 reach_rect_f32 anchor_slot, float bar_edge_y,
+                                                 int32_t drop_direction, float margin, float x,
+                                                 float y)
 {
     if (x >= popup_bounds.x - margin && x <= popup_bounds.x + popup_bounds.width + margin &&
         y >= popup_bounds.y - margin && y <= popup_bounds.y + popup_bounds.height + margin)
@@ -389,9 +400,13 @@ int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
     float corridor_right = popup_bounds.x + popup_bounds.width > anchor_slot.x + anchor_slot.width
                                ? popup_bounds.x + popup_bounds.width
                                : anchor_slot.x + anchor_slot.width;
-    float corridor_top = popup_bounds.y + popup_bounds.height;
+    float corridor_top = drop_direction == REACH_POPUP_DROP_DOWN
+                             ? bar_edge_y
+                             : popup_bounds.y + popup_bounds.height;
+    float corridor_bottom =
+        drop_direction == REACH_POPUP_DROP_DOWN ? popup_bounds.y : bar_edge_y;
     return x >= corridor_left - margin && x <= corridor_right + margin &&
-           y >= corridor_top - margin && y <= dock_top_y + margin;
+           y >= corridor_top - margin && y <= corridor_bottom + margin;
 }
 
 void reach_context_menu_reanchor(reach_context_menu *menu,
