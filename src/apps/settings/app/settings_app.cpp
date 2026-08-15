@@ -21,7 +21,8 @@ enum reach_settings_update_work_type
     REACH_SETTINGS_UPDATE_WORK_NONE = 0,
     REACH_SETTINGS_UPDATE_WORK_SCAN,
     REACH_SETTINGS_UPDATE_WORK_INSTALL,
-    REACH_SETTINGS_UPDATE_WORK_VERIFY
+    REACH_SETTINGS_UPDATE_WORK_VERIFY,
+    REACH_SETTINGS_UPDATE_WORK_RESUME
 };
 
 enum reach_settings_reach_work_type
@@ -521,6 +522,36 @@ static void reach_settings_update_worker_main(reach_settings_app *app)
                 result = app->windows_update.verify(app->windows_update.userdata, selected.get(),
                                                     selected_count, operation.get());
             }
+            else if (work == REACH_SETTINGS_UPDATE_WORK_RESUME &&
+                     app->windows_update.wait_for_install != nullptr &&
+                     app->windows_update.verify != nullptr)
+            {
+                std::unique_ptr<reach_windows_update_journal> journal(
+                    new (std::nothrow) reach_windows_update_journal());
+                if (journal != nullptr &&
+                    app->windows_update.wait_for_install(app->windows_update.userdata,
+                                                         journal.get()) == REACH_OK)
+                {
+                    selected_count = journal->count < REACH_WINDOWS_UPDATE_MAX_UPDATES
+                                         ? journal->count
+                                         : REACH_WINDOWS_UPDATE_MAX_UPDATES;
+                    for (size_t index = 0; index < selected_count; ++index)
+                    {
+                        selected[index] = journal->updates[index];
+                    }
+
+                    result = selected_count > 0
+                                 ? app->windows_update.verify(app->windows_update.userdata,
+                                                              selected.get(), selected_count,
+                                                              operation.get())
+                                 : REACH_OK;
+
+                    if (app->windows_update.clear_journal != nullptr)
+                    {
+                        app->windows_update.clear_journal(app->windows_update.userdata);
+                    }
+                }
+            }
         }
 
         {
@@ -621,6 +652,37 @@ static void reach_settings_schedule_install(reach_settings_app *app)
     reach_settings_model_begin_update_install(&app->model);
     app->update_worker.cv.notify_one();
     app->dirty = 1;
+}
+
+static int32_t reach_settings_schedule_resume(reach_settings_app *app)
+{
+    if (app == nullptr || app->windows_update.load_journal == nullptr ||
+        app->windows_update.wait_for_install == nullptr || app->windows_update.verify == nullptr)
+    {
+        return 0;
+    }
+
+    std::unique_ptr<reach_windows_update_journal> journal(new (std::nothrow)
+                                                              reach_windows_update_journal());
+    if (journal == nullptr ||
+        app->windows_update.load_journal(app->windows_update.userdata, journal.get()) != REACH_OK ||
+        journal->state == REACH_WINDOWS_UPDATE_JOURNAL_IDLE || journal->count == 0 ||
+        reach_settings_ensure_worker(app) != REACH_OK)
+    {
+        return 0;
+    }
+
+    reach_settings_model_begin_update_resume(&app->model, journal.get());
+
+    {
+        std::lock_guard<std::mutex> lock(app->update_worker.mutex);
+        app->update_worker.selected_count = 0;
+        app->update_worker.pending_work = REACH_SETTINGS_UPDATE_WORK_RESUME;
+        app->update_worker.pending = 1;
+    }
+    app->update_worker.cv.notify_one();
+    app->dirty = 1;
+    return 1;
 }
 
 static void reach_settings_schedule_verification(reach_settings_app *app)
@@ -764,7 +826,8 @@ static void reach_settings_apply_result(reach_settings_app *app)
     }
     if (result != REACH_OK && operation->failure_class == REACH_WINDOWS_UPDATE_FAILURE_NONE)
     {
-        operation->failure_class = work == REACH_SETTINGS_UPDATE_WORK_VERIFY
+        operation->failure_class = work == REACH_SETTINGS_UPDATE_WORK_VERIFY ||
+                                           work == REACH_SETTINGS_UPDATE_WORK_RESUME
                                        ? REACH_WINDOWS_UPDATE_VERIFICATION_FAILED
                                        : REACH_WINDOWS_UPDATE_INSTALL_FAILED;
         if (operation->overall_install_hresult == 0)
@@ -1795,7 +1858,10 @@ reach_result reach_settings_app_start(reach_settings_app *app)
     }
     app->running = 1;
     app->dirty = 1;
-    reach_settings_schedule_verification(app);
+    if (!reach_settings_schedule_resume(app))
+    {
+        reach_settings_schedule_verification(app);
+    }
     reach_settings_schedule_reach_check(app);
     return REACH_OK;
 }
@@ -1812,6 +1878,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     reach_settings_apply_reach_result(app);
     reach_settings_apply_startup_result(app);
     if (reach_settings_model_update_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_update_loader(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -1940,7 +2010,6 @@ void reach_settings_app_destroy(reach_settings_app *app)
             app->windows_update.cancel(app->windows_update.userdata);
         }
         app->update_worker.cv.notify_one();
-        app->update_worker.thread.join();
     }
     if (app->reach_worker.thread_started)
     {
@@ -1954,7 +2023,6 @@ void reach_settings_app_destroy(reach_settings_app *app)
             app->app_update.cancel(app->app_update.userdata);
         }
         app->reach_worker.cv.notify_one();
-        app->reach_worker.thread.join();
     }
     if (app->startup_worker.thread_started)
     {
@@ -1964,6 +2032,29 @@ void reach_settings_app_destroy(reach_settings_app *app)
             app->startup_worker.pending = 0;
         }
         app->startup_worker.cv.notify_one();
+    }
+
+    if (app->renderer.ops.destroy != nullptr)
+    {
+        app->renderer.ops.destroy(app->renderer.backend);
+        app->renderer.ops.destroy = nullptr;
+    }
+    if (app->window.ops.destroy != nullptr)
+    {
+        app->window.ops.destroy(app->window.window);
+        app->window.ops.destroy = nullptr;
+    }
+
+    if (app->update_worker.thread_started)
+    {
+        app->update_worker.thread.join();
+    }
+    if (app->reach_worker.thread_started)
+    {
+        app->reach_worker.thread.join();
+    }
+    if (app->startup_worker.thread_started)
+    {
         app->startup_worker.thread.join();
     }
     reach_settings_release_startup_icons(app);

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/app_update.h"
+#include "reach/core/loader.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/scrollbar.h"
 #include "reach/core/startup_apps.h"
@@ -127,6 +128,7 @@ extern "C"
         int32_t update_scan_completed;
         reach_windows_update_list update_list;
         reach_scrollbar_model update_scrollbar;
+        reach_loader_model update_loader;
         reach_settings_reach_update_state reach_update_state;
         reach_app_update_info reach_update_info;
         uint16_t reach_current_version[REACH_APP_UPDATE_VERSION_CAPACITY];
@@ -302,6 +304,8 @@ extern "C"
                                                 const reach_windows_update_list *updates,
                                                 int32_t hresult);
     void reach_settings_model_begin_update_install(reach_settings_model *model);
+    void reach_settings_model_begin_update_resume(reach_settings_model *model,
+                                                  const reach_windows_update_journal *journal);
     void reach_settings_model_apply_update_operation(
         reach_settings_model *model, const reach_windows_update_operation_result *result);
     void reach_settings_model_toggle_update(reach_settings_model *model, size_t index);
@@ -310,6 +314,7 @@ extern "C"
     int32_t reach_settings_model_update_busy(const reach_settings_model *model);
     void reach_settings_model_scroll_updates(reach_settings_model *model, float delta);
     int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds);
+    int32_t reach_settings_model_update_loader(reach_settings_model *model, double delta_seconds);
 
     void reach_settings_model_set_current_version(reach_settings_model *model,
                                                   const uint16_t *version);
