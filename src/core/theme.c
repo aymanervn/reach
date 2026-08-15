@@ -51,8 +51,7 @@
     .border_thickness = 1.5f, .icon_box_height_ratio = 0.60f,                                      \
     .icon_max_box_ratio = 0.76f, .icon_box_corner_radius_ratio = 0.28f,                            \
     .icon_box_corner_radius_max = 14.0f, .tray_slot_size_ratio = 0.3f,                             \
-    .dock_system_separator_width = 0.75f, .dock_system_separator_height_ratio = 0.56f,             \
-    .dock_clock_width = 92.0f, .now_playing_width = 220.0f, .now_playing_left_margin = 4.0f,       \
+    .now_playing_width = 220.0f, .now_playing_left_margin = 4.0f,                                  \
     .now_playing_height_ratio = 0.85f, .now_playing_corner_radius_ratio = 0.5f,                    \
     .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,                                          \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
@@ -72,7 +71,6 @@ static const reach_theme reach_theme_dark = {
     .icon_box_background = REACH_PURE_WHITE(1.0f),
     .system_glyph = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .fallback_icon_text = REACH_DARK_BASE(0.92f),
-    .dock_system_separator = REACH_DARK_MID_CONTRAST_GRAY(0.45f),
     .dock_clock_time = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .dock_clock_date = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .dock_button_background = REACH_DARK_RAISED(1.0f),
@@ -199,7 +197,6 @@ static const reach_theme reach_theme_light = {
     .icon_box_background = REACH_LIGHT_RAISED(1.0f),
     .system_glyph = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
     .fallback_icon_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
-    .dock_system_separator = REACH_LIGHT_MID_CONTRAST_GRAY(0.45f),
     .dock_clock_time = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.94f),
     .dock_clock_date = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .dock_button_background = REACH_LIGHT_RAISED(1.0f),

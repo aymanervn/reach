@@ -9,7 +9,6 @@ typedef enum reach_dock_hit_type
     REACH_DOCK_HIT_ITEM = 1,
     REACH_DOCK_HIT_TRAY_BUTTON = 2,
     REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON = 3,
-    REACH_DOCK_HIT_POWER_BUTTON = 4,
     REACH_DOCK_HIT_STAGE_BUTTON = 5
 } reach_dock_hit_type;
 
@@ -60,8 +59,6 @@ int32_t reach_dock_feedback_press(reach_dock *dock, size_t slot);
 int32_t reach_dock_feedback_press_immediate(reach_dock *dock, size_t slot, float opacity);
 int32_t reach_dock_feedback_set_immediate(reach_dock *dock, size_t slot, float opacity);
 int32_t reach_dock_feedback_release(reach_dock *dock);
-int32_t reach_dock_take_power_release_suppressed(reach_dock *dock);
-void reach_dock_clear_power_release_suppressed(reach_dock *dock);
 
 void reach_dock_item_press(reach_dock *dock, size_t index, int32_t x, int32_t y,
                            const reach_dock_interaction_context *ctx,

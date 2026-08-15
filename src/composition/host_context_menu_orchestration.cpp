@@ -234,8 +234,13 @@ void reach_host_reanchor_context_menu(reach_host *host)
     ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
     if (state->power_open)
     {
-        ctx.anchor_x = host->layout.dock.bounds.x + host->layout.dock.power_button.x +
-                       host->layout.dock.power_button.width * 0.5f;
+        const reach_top_bar_layout *top_bar_layout =
+            &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
+        reach_rect_f32 power_button =
+            reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->power_button);
+        ctx.anchor_x = power_button.x + power_button.width * 0.5f;
+        ctx.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
+        ctx.drop_direction = REACH_POPUP_DROP_DOWN;
     }
     else if (state->target_index < host->layout.dock.app_slot_count)
     {
@@ -266,14 +271,18 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     }
     reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
 
+    const reach_top_bar_layout *top_bar_layout =
+        &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
+    reach_rect_f32 power_button =
+        reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->power_button);
+
     reach_context_menu_open_context ctx = {};
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.anchor_x = host->layout.dock.bounds.x + host->layout.dock.power_button.x +
-                   host->layout.dock.power_button.width * 0.5f;
-    ctx.bar_edge_y = host->layout.dock.bounds.y;
-    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.anchor_x = power_button.x + power_button.width * 0.5f;
+    ctx.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
+    ctx.drop_direction = REACH_POPUP_DROP_DOWN;
     ctx.anchored = 1;
-    ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
+    ctx.monitor = reach_host_context_menu_monitor(host, top_bar_layout->bounds);
 
     reach_context_menu_open_power(host->context_menu_capsule, &ctx);
     reach_host_surface_transition_set(host, &host->context_menu_transition, 1);

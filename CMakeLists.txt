@@ -133,6 +133,7 @@ add_library(reach_features STATIC
     src/features/stage/stage_layout.cpp
     src/features/stage/stage_render.cpp
     src/features/top_bar/top_bar_feature.cpp
+    src/features/top_bar/top_bar_interaction.cpp
     src/features/top_bar/top_bar_render.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp

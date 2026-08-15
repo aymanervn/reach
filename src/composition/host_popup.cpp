@@ -14,10 +14,12 @@ static int32_t reach_host_surface_contains_point(const reach_surface_desc *desc,
            (float)point.y >= bounds->y && (float)point.y <= bounds->y + bounds->height;
 }
 
-static int32_t reach_host_dock_cluster_holds_surface_open(reach_host *host,
-                                                          const reach_surface_desc *desc,
-                                                          reach_dock_pointer_region dock_region)
+static int32_t reach_host_bar_cluster_holds_surface_open(reach_host *host,
+                                                         const reach_surface_desc *desc,
+                                                         reach_dock_pointer_region dock_region,
+                                                         reach_top_bar_pointer_region top_bar_region)
 {
+    (void)host;
     switch (desc->id)
     {
     case REACH_SURFACE_ID_TRAY:
@@ -26,7 +28,7 @@ static int32_t reach_host_dock_cluster_holds_surface_open(reach_host *host,
         return dock_region == REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON;
     case REACH_SURFACE_ID_CONTEXT_MENU:
         return reach_context_menu_state_ptr(host->context_menu_capsule)->power_open &&
-               dock_region == REACH_DOCK_POINTER_REGION_POWER_BUTTON;
+               top_bar_region == REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
     case REACH_SURFACE_ID_LAUNCHER:
         return dock_region != REACH_DOCK_POINTER_REGION_NONE;
     case REACH_SURFACE_ID_STAGE:
@@ -51,6 +53,12 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
             ? reach_dock_pointer_region_at(host->dock_capsule, dock_point.x, dock_point.y)
             : REACH_DOCK_POINTER_REGION_NONE;
 
+    const reach_top_bar_state *top_bar_state = reach_top_bar_state_ptr(host->top_bar_capsule);
+    reach_point_i32 top_bar_point =
+        reach_top_bar_local_point(&top_bar_state->layout, point.x, point.y);
+    reach_top_bar_pointer_region top_bar_region =
+        reach_top_bar_pointer_region_at(host->top_bar_capsule, top_bar_point.x, top_bar_point.y);
+
     int32_t closed_any = 0;
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
@@ -61,7 +69,7 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
         }
         if (desc->force_close == nullptr || !reach_host_surface_is_open(desc) ||
             reach_host_surface_contains_point(desc, point) ||
-            reach_host_dock_cluster_holds_surface_open(host, desc, dock_region))
+            reach_host_bar_cluster_holds_surface_open(host, desc, dock_region, top_bar_region))
         {
             continue;
         }
