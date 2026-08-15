@@ -26,15 +26,6 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     render_ctx.dock_gap = host->dock_config.gap;
 
-    reach_power_state power = {};
-    if (host->system_controls.get_power_state != nullptr &&
-        host->system_controls.get_power_state(host->system_controls.userdata, &power) == REACH_OK &&
-        power.has_battery && power.battery_percent >= 0)
-    {
-        render_ctx.battery_valid = 1;
-        render_ctx.battery_percent = power.battery_percent;
-    }
-
     reach_result result =
         reach_dock_append_render_commands(host->dock_capsule, &render_ctx, &commands);
     if (result != REACH_OK)
@@ -63,6 +54,15 @@ reach_result reach_host_render_top_bar_surface(reach_host *host)
     reach_top_bar_render_context render_ctx = {};
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+
+    reach_power_state power = {};
+    if (host->system_controls.get_power_state != nullptr &&
+        host->system_controls.get_power_state(host->system_controls.userdata, &power) == REACH_OK &&
+        power.has_battery && power.battery_percent >= 0)
+    {
+        render_ctx.battery_valid = 1;
+        render_ctx.battery_percent = power.battery_percent;
+    }
 
     reach_result result =
         reach_top_bar_append_render_commands(host->top_bar_capsule, &render_ctx, &commands);
@@ -285,9 +285,12 @@ reach_result reach_host_render_context_menu_surface(reach_host *host)
     }
     if (host->has_layout && menu_state->power_open)
     {
+        const reach_top_bar_layout *top_bar_layout =
+            &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
+        reach_rect_f32 power_button =
+            reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->power_button);
         render_ctx.use_anchor_x = 1;
-        render_ctx.anchor_x =
-            screen_dock.power_button.x + screen_dock.power_button.width * 0.5f;
+        render_ctx.anchor_x = power_button.x + power_button.width * 0.5f;
     }
 
     reach_render_command_buffer commands = {};

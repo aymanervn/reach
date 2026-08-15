@@ -49,9 +49,6 @@ reach_result reach_dock_layout_compute(const reach_dock_model *dock,
 
     float icon_size = reach_scale(dock->icon_size, scale);
     float gap = reach_scale(dock->gap, scale);
-    float clock_width = reach_scale(92.0f, scale);
-    float separator_width = reach_scale(1.0f, scale);
-    float separator_height = dock_height * 0.56f;
     float top = (dock_height - icon_size) * 0.5f;
     float left = gap;
 
@@ -69,22 +66,7 @@ reach_result reach_dock_layout_compute(const reach_dock_model *dock,
     out_layout->quick_settings_button.width = icon_size;
     out_layout->quick_settings_button.height = icon_size;
 
-    out_layout->power_button.width = icon_size;
-    out_layout->power_button.height = icon_size;
-    out_layout->power_button.x = dock_width - icon_size - gap;
-    out_layout->power_button.y = top;
-
-    out_layout->clock.width = clock_width;
-    out_layout->clock.height = icon_size;
-    out_layout->clock.x = out_layout->power_button.x - gap - clock_width;
-    out_layout->clock.y = top;
-
-    out_layout->system_separator.width = separator_width;
-    out_layout->system_separator.height = separator_height;
-    out_layout->system_separator.x = out_layout->clock.x - gap - separator_width;
-    out_layout->system_separator.y = (dock_height - separator_height) * 0.5f;
-
-    out_layout->quick_settings_button.x = out_layout->system_separator.x - gap - icon_size;
+    out_layout->quick_settings_button.x = dock_width - icon_size - gap;
     out_layout->quick_settings_button.y = top;
 
     out_layout->tray_button.x = out_layout->quick_settings_button.x - icon_size;

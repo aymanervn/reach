@@ -43,12 +43,6 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
         return result;
     }
 
-    if (reach_dock_rect_contains(layout->power_button, x, y))
-    {
-        result.type = REACH_DOCK_HIT_POWER_BUTTON;
-        return result;
-    }
-
     for (size_t index = 0; index < layout->app_slot_count; ++index)
     {
         if (reach_dock_rect_contains(layout->app_slots[index], x, y))
@@ -133,7 +127,7 @@ float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layou
 
 static int32_t reach_dock_feedback_start(reach_dock *dock, size_t slot, float target_opacity)
 {
-    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_POWER_BUTTON)
+    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_STAGE_BUTTON)
     {
         return 0;
     }
@@ -172,7 +166,7 @@ int32_t reach_dock_feedback_press_immediate(reach_dock *dock, size_t slot, float
 
 int32_t reach_dock_feedback_set_immediate(reach_dock *dock, size_t slot, float opacity)
 {
-    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_POWER_BUTTON)
+    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_STAGE_BUTTON)
     {
         return 0;
     }

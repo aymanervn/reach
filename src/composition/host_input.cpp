@@ -301,8 +301,6 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
     case REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS:
         reach_host_toggle_quick_settings(host);
         return REACH_OK;
-    case REACH_DOCK_POINTER_ACTION_TOGGLE_POWER:
-        return reach_host_show_power_context_menu(host);
     case REACH_DOCK_POINTER_ACTION_MEDIA_PREVIOUS:
         return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_PREVIOUS);
     case REACH_DOCK_POINTER_ACTION_MEDIA_PLAY_PAUSE:
@@ -322,6 +320,24 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
     case REACH_DOCK_POINTER_ACTION_HOVER_ITEM:
         reach_host_dock_item_hovered(host, result->action.index);
         return REACH_OK;
+    default:
+        return REACH_OK;
+    }
+}
+
+reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const reach_ui_event *event,
+                                                     const reach_capsule_pointer_result *result)
+{
+    (void)event;
+    if (host == nullptr || result == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    switch ((reach_top_bar_pointer_action_kind)result->action.kind)
+    {
+    case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER:
+        return reach_host_show_power_context_menu(host);
     default:
         return REACH_OK;
     }
@@ -509,12 +525,18 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
             dock_down = reach_host_dispatch_pointer(host, REACH_SURFACE_ID_DOCK, event,
                                                     REACH_POINTER_EVENT_DOWN);
         }
+        reach_capsule_pointer_result top_bar_down = {};
+        if (source == REACH_SURFACE_TOP_BAR)
+        {
+            top_bar_down = reach_host_dispatch_pointer(host, REACH_SURFACE_ID_TOP_BAR, event,
+                                                       REACH_POINTER_EVENT_DOWN);
+        }
         if (reach_context_menu_state_ptr(host->context_menu_capsule)->power_open &&
-            dock_down.action.kind == REACH_DOCK_POINTER_ACTION_PRESS_POWER)
+            top_bar_down.action.kind == REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER)
         {
             reach_host_close_context_menu(host);
             reach_host_clear_sticky_dock_feedback(host);
-            reach_dock_suppress_power_release(host->dock_capsule);
+            reach_top_bar_suppress_power_release(host->top_bar_capsule);
             return REACH_OK;
         }
 

@@ -101,13 +101,7 @@ extern "C"
         size_t tray_feedback_index;
         size_t stage_feedback_index;
         size_t quick_settings_feedback_index;
-        size_t power_feedback_index;
-        const uint16_t *time_text;
-        const uint16_t *date_text;
         int32_t text_alignment_center;
-        int32_t battery_valid;
-        int32_t battery_percent;
-        float power_hover;
     } reach_dock_render_input;
 
     reach_result reach_dock_build_render_commands(const reach_dock_render_input *input,
@@ -119,7 +113,6 @@ extern "C"
         REACH_DOCK_POINTER_REGION_ITEM = 1,
         REACH_DOCK_POINTER_REGION_TRAY_BUTTON = 2,
         REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON = 3,
-        REACH_DOCK_POINTER_REGION_POWER_BUTTON = 4,
         REACH_DOCK_POINTER_REGION_STAGE_BUTTON = 5
     } reach_dock_pointer_region;
 
@@ -130,14 +123,12 @@ extern "C"
         REACH_DOCK_POINTER_ACTION_PRESS_ITEM = 2,
         REACH_DOCK_POINTER_ACTION_PRESS_TRAY = 3,
         REACH_DOCK_POINTER_ACTION_PRESS_QUICK_SETTINGS = 4,
-        REACH_DOCK_POINTER_ACTION_PRESS_POWER = 5,
         REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED = 6,
         REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW = 7,
         REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE = 8,
         REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT = 9,
         REACH_DOCK_POINTER_ACTION_TOGGLE_TRAY = 10,
         REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS = 11,
-        REACH_DOCK_POINTER_ACTION_TOGGLE_POWER = 12,
         REACH_DOCK_POINTER_ACTION_MEDIA_PREVIOUS = 13,
         REACH_DOCK_POINTER_ACTION_MEDIA_PLAY_PAUSE = 14,
         REACH_DOCK_POINTER_ACTION_MEDIA_NEXT = 15,
@@ -160,7 +151,6 @@ extern "C"
         REACH_DOCK_ANIM_DRAG_SNAP,
         REACH_DOCK_ANIM_FEEDBACK_OPACITY,
         REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
-        REACH_DOCK_ANIM_POWER_HOVER,
         REACH_DOCK_ANIM_ITEM_X_BASE,
         REACH_DOCK_ANIM_SLOT_BASE = REACH_DOCK_ANIM_ITEM_X_BASE + REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_ANIM_COUNT = REACH_DOCK_ANIM_SLOT_BASE + REACH_DOCK_SLOT_CAPACITY
@@ -224,16 +214,11 @@ extern "C"
         REACH_DOCK_FEEDBACK_TRAY_BUTTON = REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON,
         REACH_DOCK_FEEDBACK_STAGE_BUTTON,
-        REACH_DOCK_FEEDBACK_POWER_BUTTON,
         REACH_DOCK_FEEDBACK_NONE
     };
 
-    void reach_dock_suppress_power_release(reach_dock *dock);
-
     int32_t reach_dock_feedback_stick(reach_dock *dock);
     int32_t reach_dock_feedback_clear_sticky(reach_dock *dock);
-
-    int32_t reach_dock_update_clock(reach_dock *dock);
 
     typedef struct reach_dock_render_context
     {
@@ -245,8 +230,6 @@ extern "C"
         int32_t icon_size_px;
         float dpi_scale;
         float dock_gap;
-        int32_t battery_valid;
-        int32_t battery_percent;
     } reach_dock_render_context;
 
     reach_result reach_dock_append_render_commands(reach_dock *dock,
@@ -280,9 +263,6 @@ extern "C"
         int32_t pressed_control;
         size_t hovered_item;
 
-        int32_t power_release_suppressed;
-        int32_t power_hovered;
-
         size_t feedback_index;
         int32_t feedback_pressed;
         int32_t feedback_sticky;
@@ -290,11 +270,6 @@ extern "C"
         int32_t item_x_valid[REACH_MAX_DOCK_ITEMS];
         reach_dock_order_key item_x_keys[REACH_MAX_DOCK_ITEMS];
         int32_t items_changed;
-
-        uint16_t clock_time_text[32];
-        uint16_t clock_date_text[64];
-        int32_t clock_initialized;
-        int64_t clock_last_minute;
     } reach_dock_state;
 
     const reach_dock_state *reach_dock_state_ptr(reach_dock *animations);

@@ -51,7 +51,6 @@ extern "C"
         reach_color icon_box_background;
         reach_color system_glyph;
         reach_color fallback_icon_text;
-        reach_color dock_system_separator;
         reach_color dock_clock_time;
         reach_color dock_clock_date;
         reach_color dock_button_background;
@@ -163,9 +162,6 @@ extern "C"
         float icon_box_corner_radius_ratio;
         float icon_box_corner_radius_max;
         float tray_slot_size_ratio;
-        float dock_system_separator_width;
-        float dock_system_separator_height_ratio;
-        float dock_clock_width;
         float now_playing_width;
         float now_playing_left_margin;
         float now_playing_height_ratio;

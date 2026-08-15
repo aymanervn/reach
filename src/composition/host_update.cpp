@@ -36,9 +36,9 @@ void reach_host_request_update(reach_host *host)
 
 static void reach_host_update_clock_text(reach_host *host)
 {
-    if (host != nullptr && reach_dock_update_clock(host->dock_capsule))
+    if (host != nullptr && reach_top_bar_update_clock(host->top_bar_capsule))
     {
-        host->dock.dirty_flags = 1;
+        host->top_bar.dirty_flags = 1;
     }
 }
 

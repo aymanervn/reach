@@ -587,6 +587,8 @@ reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_
 
 reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_ui_event *event,
                                                   const reach_capsule_pointer_result *result);
+reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const reach_ui_event *event,
+                                                     const reach_capsule_pointer_result *result);
 reach_result reach_host_apply_launcher_pointer_action(reach_host *host, const reach_ui_event *event,
                                                       const reach_capsule_pointer_result *result);
 reach_result

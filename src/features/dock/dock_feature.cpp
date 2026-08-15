@@ -197,8 +197,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     int32_t feedback_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
-    int32_t power_hover_was_active =
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_POWER_HOVER);
     int32_t drag_snap_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP);
     int32_t item_was_active[REACH_MAX_DOCK_ITEMS] = {};
@@ -217,12 +215,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
     int32_t redraw = 0;
     if (feedback_was_active ||
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY))
-    {
-        redraw = 1;
-    }
-
-    if (power_hover_was_active ||
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_POWER_HOVER))
     {
         redraw = 1;
     }
@@ -364,8 +356,6 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
         return REACH_DOCK_POINTER_REGION_TRAY_BUTTON;
     case REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON:
         return REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON;
-    case REACH_DOCK_HIT_POWER_BUTTON:
-        return REACH_DOCK_POINTER_REGION_POWER_BUTTON;
     case REACH_DOCK_HIT_NONE:
     default:
         return REACH_DOCK_POINTER_REGION_NONE;
@@ -390,32 +380,6 @@ static int32_t reach_dock_end_pointer_sequence(reach_dock *dock)
     }
     dock->state.pointer_sequence_active = 0;
     return 1;
-}
-
-void reach_dock_suppress_power_release(reach_dock *dock)
-{
-    if (dock != nullptr)
-    {
-        dock->state.power_release_suppressed = 1;
-    }
-}
-
-int32_t reach_dock_take_power_release_suppressed(reach_dock *dock)
-{
-    if (dock == nullptr || !dock->state.power_release_suppressed)
-    {
-        return 0;
-    }
-    dock->state.power_release_suppressed = 0;
-    return 1;
-}
-
-void reach_dock_clear_power_release_suppressed(reach_dock *dock)
-{
-    if (dock != nullptr)
-    {
-        dock->state.power_release_suppressed = 0;
-    }
 }
 
 void reach_dock_begin_reveal_session(reach_dock *dock)
@@ -537,9 +501,7 @@ static void reach_dock_capsule_reset(void *capsule)
         reach_dock_now_playing_reset(dock->now_playing_subfeature);
         dock->pointer_layout_valid = 0;
         dock->state.pressed_control = REACH_DOCK_HIT_NONE;
-        dock->state.power_hovered = 0;
         dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
-        reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f);
 
         dock->slots_synced = 0;
     }
@@ -716,10 +678,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             return;
         }
 
-        if (hit.type != REACH_DOCK_HIT_POWER_BUTTON)
-        {
-            reach_dock_clear_power_release_suppressed(dock);
-        }
         state->pressed_control = hit.type;
         if (hit.type == REACH_DOCK_HIT_STAGE_BUTTON)
         {
@@ -743,14 +701,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                                              dock, REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON);
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_QUICK_SETTINGS;
-            return;
-        }
-        if (hit.type == REACH_DOCK_HIT_POWER_BUTTON)
-        {
-            out->redraw =
-                out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_POWER_BUTTON);
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_POWER;
             return;
         }
         if (hit.type == REACH_DOCK_HIT_ITEM)
@@ -820,14 +770,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
         }
-        else if (pressed == REACH_DOCK_HIT_POWER_BUTTON && hit.type == pressed)
-        {
-            out->handled = 1;
-            if (!reach_dock_take_power_release_suppressed(dock))
-            {
-                out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_POWER;
-            }
-        }
         else if (pressed == REACH_DOCK_HIT_ITEM && hit.type == pressed)
         {
             reach_dock_item_action item_action = {};
@@ -860,17 +802,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     {
         if (!state->drag.active)
         {
-            int32_t hovered = hit.type == REACH_DOCK_HIT_POWER_BUTTON;
-            if (hovered != state->power_hovered)
-            {
-                state->power_hovered = hovered;
-                reach_animation_manager_animate_to(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER,
-                                                   hovered ? 1.0f : 0.0f, 0.18,
-                                                   REACH_EASING_EASE_IN_OUT);
-                out->handled = 1;
-                out->redraw = 1;
-            }
-
             size_t hovered_item =
                 hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
                     ? hit.index
@@ -945,13 +876,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     {
         out->redraw =
             out->redraw || reach_dock_now_playing_pointer_cancel(dock->now_playing_subfeature);
-        if (state->power_hovered)
-        {
-            state->power_hovered = 0;
-            reach_animation_manager_animate_to(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f,
-                                               0.18, REACH_EASING_EASE_IN_OUT);
-            out->redraw = 1;
-        }
         if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
             state->hovered_item = REACH_MAX_DOCK_ITEMS;
@@ -995,104 +919,6 @@ reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_
 
     return reach_bar_update_visibility(&animations->state.visibility, &animations->manager,
                                        REACH_DOCK_ANIM_Y, &bar_request);
-}
-
-static void reach_dock_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)(unsigned char)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
-static int32_t reach_dock_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
-int32_t reach_dock_update_clock(reach_dock *dock)
-{
-    if (dock == nullptr)
-    {
-        return 0;
-    }
-
-    reach_dock_state *state = &dock->state;
-
-    time_t now = time(nullptr);
-    int64_t current_minute = (int64_t)(now / 60);
-    if (state->clock_initialized && state->clock_last_minute == current_minute)
-    {
-        return 0;
-    }
-
-    struct tm local = {};
-    if (now == (time_t)-1 || localtime_s(&local, &now) != 0)
-    {
-        return 0;
-    }
-
-    static const char *months[] = {"January",   "February", "March",    "April",
-                                   "May",       "June",     "July",     "August",
-                                   "September", "October",  "November", "December"};
-    static const char *days[] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
-                                 "Thursday", "Friday", "Saturday"};
-
-    int hour = local.tm_hour % 12;
-    if (hour == 0)
-    {
-        hour = 12;
-    }
-    const char *suffix = local.tm_hour >= 12 ? "PM" : "AM";
-
-    char time_text[32] = {};
-    char date_text[64] = {};
-    snprintf(time_text, sizeof(time_text), "%d:%02d %s", hour, local.tm_min, suffix);
-    if (local.tm_mon < 0 || local.tm_mon > 11 || local.tm_wday < 0 || local.tm_wday > 6)
-    {
-        return 0;
-    }
-    snprintf(date_text, sizeof(date_text), "%.3s %d, %.3s", months[local.tm_mon], local.tm_mday,
-             days[local.tm_wday]);
-
-    uint16_t next_time[32] = {};
-    uint16_t next_date[64] = {};
-    reach_dock_copy_ascii_to_utf16(next_time, 32, time_text);
-    reach_dock_copy_ascii_to_utf16(next_date, 64, date_text);
-    int32_t redraw = 0;
-    if (!state->clock_initialized || !reach_dock_utf16_equal(state->clock_time_text, next_time) ||
-        !reach_dock_utf16_equal(state->clock_date_text, next_date))
-    {
-        reach_copy_utf16(state->clock_time_text, 32, next_time);
-        reach_copy_utf16(state->clock_date_text, 64, next_date);
-        state->clock_initialized = 1;
-        redraw = 1;
-    }
-    state->clock_last_minute = current_minute;
-    return redraw;
 }
 
 static reach_dock_order_key reach_dock_order_key_for_item(const reach_dock_item_model *item)
@@ -1794,10 +1620,6 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     const float gap = ctx->gap * scale;
     const size_t count = dock->state.model.item_count;
     const reach_theme *theme = ctx->theme;
-    const float clock_width = theme->dock_clock_width * scale;
-    const float separator_width = theme->dock_system_separator_width * scale;
-    const float separator_height =
-        layout->bounds.height * theme->dock_system_separator_height_ratio;
     const float now_playing_height = reach_theme_now_playing_height(theme, layout->bounds.height);
     const float now_playing_render_width =
         reach_dock_now_playing_desired_width(dock->now_playing_subfeature, theme, scale);
@@ -1886,22 +1708,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     layout->quick_settings_button.x = layout->tray_button.x + icon_size;
     layout->quick_settings_button.y = top;
 
-    layout->system_separator.width = separator_width;
-    layout->system_separator.height = separator_height;
-    layout->system_separator.x = layout->quick_settings_button.x + icon_size + gap;
-    layout->system_separator.y = (layout->bounds.height - separator_height) * 0.5f;
-
-    layout->clock.width = clock_width;
-    layout->clock.height = icon_size;
-    layout->clock.x = layout->system_separator.x + separator_width + gap;
-    layout->clock.y = top;
-
-    layout->power_button.width = icon_size;
-    layout->power_button.height = icon_size;
-    layout->power_button.x = layout->clock.x + clock_width + gap;
-    layout->power_button.y = top;
-
-    const float dock_width = ceilf(layout->power_button.x + icon_size + gap);
+    const float dock_width = ceilf(layout->quick_settings_button.x + icon_size + gap);
     const float old_width = layout->bounds.width;
     if (dock_width != old_width)
     {
@@ -1949,9 +1756,6 @@ reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout)
     }
     layout.tray_button = reach_dock_rect_to_screen(&layout, layout.tray_button);
     layout.quick_settings_button = reach_dock_rect_to_screen(&layout, layout.quick_settings_button);
-    layout.system_separator = reach_dock_rect_to_screen(&layout, layout.system_separator);
-    layout.clock = reach_dock_rect_to_screen(&layout, layout.clock);
-    layout.power_button = reach_dock_rect_to_screen(&layout, layout.power_button);
     return layout;
 }
 

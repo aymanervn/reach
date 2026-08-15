@@ -348,6 +348,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
         reach_host_apply_quick_settings_pointer_action;
     descs[REACH_SURFACE_ID_TOP_BAR].role = REACH_SURFACE_TOP_BAR;
     descs[REACH_SURFACE_ID_TOP_BAR].pointer_priority = 80;
+    descs[REACH_SURFACE_ID_TOP_BAR].apply_pointer_action = reach_host_apply_top_bar_pointer_action;
     descs[REACH_SURFACE_ID_DOCK].role = REACH_SURFACE_DOCK;
     descs[REACH_SURFACE_ID_DOCK].pointer_priority = 90;
     descs[REACH_SURFACE_ID_DOCK].apply_pointer_action = reach_host_apply_dock_pointer_action;
