@@ -29,6 +29,8 @@ static int32_t reach_host_dock_cluster_holds_surface_open(reach_host *host,
                dock_region == REACH_DOCK_POINTER_REGION_POWER_BUTTON;
     case REACH_SURFACE_ID_LAUNCHER:
         return dock_region != REACH_DOCK_POINTER_REGION_NONE;
+    case REACH_SURFACE_ID_STAGE:
+        return dock_region == REACH_DOCK_POINTER_REGION_STAGE_BUTTON;
     default:
         return 0;
     }

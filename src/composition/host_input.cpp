@@ -293,7 +293,7 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
         return show_result;
     }
     case REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE:
-        reach_host_open_stage(host);
+        reach_host_toggle_stage(host);
         return REACH_OK;
     case REACH_DOCK_POINTER_ACTION_TOGGLE_TRAY:
         reach_host_toggle_tray_popup(host);

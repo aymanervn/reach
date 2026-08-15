@@ -94,7 +94,7 @@ static const reach_theme reach_theme_dark = {
     .quick_settings_app_volume_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.42f),
     .quick_settings_section_label = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
-    .now_playing_background = REACH_DARK_RAISED(0.66f),
+    .now_playing_background = REACH_DARK_DEEP(0.35f),
     .now_playing_title = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .now_playing_control_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .now_playing_artist_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
@@ -221,10 +221,10 @@ static const reach_theme reach_theme_light = {
     .quick_settings_app_volume_muted_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.38f),
     .quick_settings_section_label = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
 
-    .now_playing_background = REACH_LIGHT_RAISED(0.66f),
-    .now_playing_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.94f),
-    .now_playing_control_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
-    .now_playing_artist_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.70f),
+    .now_playing_background = REACH_LIGHT_RAISED(0.35f),
+    .now_playing_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
+    .now_playing_control_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
+    .now_playing_artist_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
 
     .launcher_search_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
     .launcher_search_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.95f),

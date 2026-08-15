@@ -251,19 +251,8 @@ reach_dock_now_playing_build_render_commands(const reach_dock_now_playing_render
         cover.color.a = 1.0f;
         (void)reach_render_command_buffer_push(out_commands, &cover);
 
-        reach_color overlay = theme->now_playing_background;
-        overlay.r *= 0.34f;
-        overlay.g *= 0.34f;
-        overlay.b *= 0.34f;
-        if (overlay.a < 0.44f)
-        {
-            overlay.a = 0.44f;
-        }
-        else if (overlay.a > 0.50f)
-        {
-            overlay.a = 0.50f;
-        }
-        reach_dock_now_playing_push_rect(out_commands, input->layout->bounds, overlay, radius);
+        reach_dock_now_playing_push_rect(out_commands, input->layout->bounds,
+                                         theme->now_playing_background, radius);
     }
     else
     {
