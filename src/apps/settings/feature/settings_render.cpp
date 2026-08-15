@@ -224,8 +224,10 @@ static void render_account_page(const reach_settings_render_input *input,
               scale_value(input, input->theme->radius_small),
               input->theme->settings_card_background);
     push_rect(commands, layout->account_password_icon,
-              scale_value(input, input->theme->radius_small), color_with_alpha(accent, 0.18f));
-    push_icon(commands, layout->account_password_icon, accent, REACH_VECTOR_ICON_LOCK, 0.22f);
+              scale_value(input, input->theme->radius_small),
+              input->theme->settings_input_background);
+    push_icon(commands, layout->account_password_icon, input->theme->settings_secondary_text,
+              REACH_VECTOR_ICON_LOCK, 0.22f);
     push_text(commands, layout->account_password_title, (const uint16_t *)L"Password",
               scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
               input->theme->settings_text, 1);
@@ -308,8 +310,9 @@ static void render_power_page(const reach_settings_render_input *input,
                   scale_value(input, input->theme->radius_small),
                   input->theme->settings_card_background);
         push_rect(commands, layout->power_icon_boxes[timer],
-                  scale_value(input, input->theme->radius_small), color_with_alpha(accent, 0.18f));
-        push_icon(commands, layout->power_icon_boxes[timer], accent,
+                  scale_value(input, input->theme->radius_small),
+                  input->theme->settings_input_background);
+        push_icon(commands, layout->power_icon_boxes[timer], input->theme->settings_secondary_text,
                   (reach_vector_icon_id)style->icon_id, 0.22f);
         push_text(commands, layout->power_titles[timer], style->title, scale_value(input, 13.5f),
                   REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
@@ -423,20 +426,31 @@ typedef struct display_toggle_card
     reach_rect_f32 subtitle;
     reach_rect_f32 toggle;
     reach_vector_icon_id icon_id;
+    const wchar_t *icon_text;
     const wchar_t *title_text;
     const wchar_t *subtitle_text;
     float position;
 } display_toggle_card;
 
 static void render_display_toggle_card(const reach_settings_render_input *input,
-                                       reach_render_command_buffer *commands, reach_color accent,
+                                       reach_render_command_buffer *commands,
                                        const reach_ui_toggle_style *toggle_style,
                                        const display_toggle_card *card)
 {
     float radius = scale_value(input, input->theme->radius_small);
     push_rect(commands, card->card, radius, input->theme->settings_card_background);
-    push_rect(commands, card->icon, radius, color_with_alpha(accent, 0.18f));
-    push_icon(commands, card->icon, accent, card->icon_id, 0.22f);
+    push_rect(commands, card->icon, radius, input->theme->settings_input_background);
+    if (card->icon_text != nullptr)
+    {
+        push_text(commands, card->icon, (const uint16_t *)card->icon_text,
+                  scale_value(input, 18.0f), REACH_TEXT_WEIGHT_EXTRABOLD,
+                  REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 0);
+    }
+    else
+    {
+        push_icon(commands, card->icon, input->theme->settings_secondary_text, card->icon_id,
+                  0.22f);
+    }
     push_text(commands, card->title, (const uint16_t *)card->title_text,
               scale_value(input, 13.5f), REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
               input->theme->settings_text, 1);
@@ -461,20 +475,20 @@ static void render_display_page(const reach_settings_render_input *input,
     const display_toggle_card cards[] = {
         {layout->display_fps_card, layout->display_fps_icon, layout->display_fps_title,
          layout->display_fps_subtitle, layout->display_fps_toggle, REACH_VECTOR_ICON_ARROW_UP,
-         L"Smoother animations", L"Run animations at 120fps",
+         nullptr, L"Smoother animations", L"Run animations at 120fps",
          reach_animation_manager_value(&model->display_fps_animation, 0)},
         {layout->display_font_card, layout->display_font_icon, layout->display_font_title,
-         layout->display_font_subtitle, layout->display_font_toggle, REACH_VECTOR_ICON_DOCUMENT,
+         layout->display_font_subtitle, layout->display_font_toggle, REACH_VECTOR_ICON_NONE, L"F",
          L"Use JetBrains Mono", L"Off uses the Windows system font",
          reach_animation_manager_value(&model->display_font_animation, 0)},
         {layout->display_theme_card, layout->display_theme_icon, layout->display_theme_title,
          layout->display_theme_subtitle, layout->display_theme_toggle, REACH_VECTOR_ICON_BRIGHTNESS,
-         L"Light theme", L"Off uses the dark theme",
+         nullptr, L"Light theme", L"Off uses the dark theme",
          reach_animation_manager_value(&model->display_theme_animation, 0)},
     };
     for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
     {
-        render_display_toggle_card(input, commands, accent, &toggle_style, &cards[index]);
+        render_display_toggle_card(input, commands, &toggle_style, &cards[index]);
     }
 }
 
@@ -656,8 +670,9 @@ static void render_reach_section(const reach_settings_render_input *input,
                                row.y + (row.height - scale_value(input, 34.0f)) * 0.5f,
                                scale_value(input, 34.0f), scale_value(input, 34.0f)};
     push_rect(commands, icon_box, scale_value(input, input->theme->radius_small),
-              color_with_alpha(accent, 0.18f));
-    push_icon(commands, icon_box, accent, REACH_VECTOR_ICON_RESTART, 0.22f);
+              input->theme->settings_input_background);
+    push_icon(commands, icon_box, input->theme->settings_secondary_text, REACH_VECTOR_ICON_RESTART,
+              0.22f);
 
     float left = icon_box.x + icon_box.width + scale_value(input, 12.0f);
     float width = layout->reach_update_button.x - left - scale_value(input, 12.0f);
@@ -862,11 +877,11 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
     push_rect(commands, input->layout->close_button, input->layout->close_button.width * 0.5f,
               input->model->hovered_button == REACH_SETTINGS_HIT_CLOSE
                   ? input->theme->settings_window_close_hover
-                  : input->theme->settings_window_button);
+                  : input->theme->settings_window_button_background);
     push_rect(commands, input->layout->minimize_button, input->layout->minimize_button.width * 0.5f,
               input->model->hovered_button == REACH_SETTINGS_HIT_MINIMIZE
                   ? input->theme->settings_window_minimize_hover
-                  : input->theme->settings_window_button);
+                  : input->theme->settings_window_button_background);
     push_icon(commands, input->layout->close_button, input->theme->inverse_text,
               REACH_VECTOR_ICON_CLOSE, 0.24f);
     push_icon(commands, input->layout->minimize_button, input->theme->inverse_text,

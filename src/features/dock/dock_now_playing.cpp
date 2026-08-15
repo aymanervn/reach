@@ -302,25 +302,23 @@ reach_dock_now_playing_build_render_commands(const reach_dock_now_playing_render
         reach_rect_f32 background = button;
         if (index == 1)
         {
-            float size = button.height * 1.1f;
+            float size = button.height * 1.25f;
             background =
                 reach_dock_now_playing_rect(button.x + (button.width - size) * 0.5f,
                                             button.y + (button.height - size) * 0.5f, size, size);
         }
-        reach_color button_color = theme->now_playing_control_background;
         if (index == 1 && input->model->cover_accent.a > 0.0f)
         {
-            button_color = input->model->cover_accent;
+            reach_color button_color = input->model->cover_accent;
             if (button_color.a < 0.78f)
             {
                 button_color.a = 0.78f;
             }
+            reach_dock_now_playing_push_rect(out_commands, background, button_color,
+                                             background.height * 0.5f);
         }
-        reach_dock_now_playing_push_rect(out_commands, background, button_color,
-                                         index == 1 ? background.height * 0.5f
-                                                    : background.height * 0.4f);
 
-        float icon_size = button.height * 0.70f;
+        float icon_size = button.height * (index == 1 ? 0.58f : 0.70f);
         reach_render_command icon = {};
         icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         icon.rect = reach_dock_now_playing_rect(button.x + (button.width - icon_size) * 0.5f,

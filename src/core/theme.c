@@ -6,11 +6,9 @@
 #define REACH_THEME_STAGE 0.99f
 
 #define REACH_PURE_WHITE(a) REACH_RGB8(255, 255, 255, a)
-#define REACH_PURE_BLACK(a) REACH_RGB8(0, 0, 0, a)
 #define REACH_CRITICAL_RED(a) REACH_RGB8(217, 61, 61, a)
 #define REACH_BUTTON_PRIMARY(a) REACH_RGB8(31, 110, 158, a)
 #define REACH_BUTTON_SUCCESS(a) REACH_RGB8(41, 148, 77, a)
-#define REACH_MIDTONE(a) REACH_RGB8(220, 220, 220, a)
 
 #define REACH_DARK_DEEP(a) REACH_RGB8(17, 18, 17, a)
 #define REACH_DARK_BASE(a) REACH_RGB8(30, 31, 42, a)
@@ -32,6 +30,7 @@
 #define REACH_LIGHT_BASE(a) REACH_RGB8(255, 255, 255, a)
 #define REACH_LIGHT_RAISED(a) REACH_RGB8(245, 245, 244, a)
 #define REACH_LIGHT_STRUCTURE(a) REACH_RGB8(239, 239, 238, a)
+#define REACH_LIGHT_MIDTONE(a) REACH_RGB8(220, 220, 220, a)
 #define REACH_LIGHT_MID_CONTRAST_GRAY(a) REACH_RGB8(110, 111, 109, a)
 #define REACH_LIGHT_HIGH_CONTRAST_BLACK(a) REACH_RGB8(18, 23, 31, a)
 
@@ -49,7 +48,7 @@
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
     .accent_tint_alpha = 0.20f, .now_playing_artist_text_size = 11.0f,                             \
     .now_playing_text_gap = 4.0f, .dock_corner_radius_ratio = 0.5f,                                \
-    .border_thickness = 1.0f, .icon_box_height_ratio = 0.60f,                                      \
+    .border_thickness = 1.5f, .icon_box_height_ratio = 0.60f,                                      \
     .icon_max_box_ratio = 0.76f, .icon_box_corner_radius_ratio = 0.28f,                            \
     .icon_box_corner_radius_max = 14.0f, .tray_slot_size_ratio = 0.3f,                             \
     .dock_system_separator_width = 0.75f, .dock_system_separator_height_ratio = 0.56f,             \
@@ -72,7 +71,7 @@ static const reach_theme reach_theme_dark = {
 
     .icon_box_background = REACH_PURE_WHITE(1.0f),
     .system_glyph = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
-    .fallback_icon_text = REACH_RGB8(31, 36, 43, 0.92f),
+    .fallback_icon_text = REACH_DARK_BASE(0.92f),
     .dock_system_separator = REACH_DARK_MID_CONTRAST_GRAY(0.45f),
     .dock_clock_time = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .dock_clock_date = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
@@ -84,21 +83,20 @@ static const reach_theme reach_theme_dark = {
 
     .tray_click_feedback = REACH_DARK_RAISED(1.0f),
 
-    .quick_settings_slider_track_color = REACH_DARK_STRUCTURE(1.0f),
-    .quick_settings_slider_fill_color = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
-    .quick_settings_slider_muted_fill_color = REACH_DARK_HIGH_CONTRAST_WHITE(0.38f),
-    .quick_settings_button_color = REACH_DARK_RAISED(1.0f),
+    .quick_settings_slider_track = REACH_DARK_STRUCTURE(1.0f),
+    .quick_settings_slider_fill = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
+    .quick_settings_slider_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.38f),
+    .quick_settings_button_background = REACH_DARK_STRUCTURE(1.0f),
     .quick_settings_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_separator = REACH_DARK_STRUCTURE(1.0f),
-    .quick_settings_slider_line = REACH_DARK_HIGH_CONTRAST_WHITE(0.32f),
-    .quick_settings_slider_level = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
-    .quick_settings_slider_level_muted = REACH_DARK_HIGH_CONTRAST_WHITE(0.42f),
+    .quick_settings_app_volume_track = REACH_DARK_HIGH_CONTRAST_WHITE(0.32f),
+    .quick_settings_app_volume_fill = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
+    .quick_settings_app_volume_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.42f),
     .quick_settings_section_label = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
     .now_playing_background = REACH_DARK_RAISED(0.66f),
     .now_playing_title = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .now_playing_control_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
-    .now_playing_control_background = REACH_DARK_STRUCTURE(0.0f),
     .now_playing_artist_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
     .launcher_search_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT),
@@ -166,7 +164,7 @@ static const reach_theme reach_theme_dark = {
     .settings_button_disabled_background = REACH_DARK_STRUCTURE(1.0f),
     .settings_status_success = REACH_DARK_ACCENT_GREEN(1.0f),
     .settings_status_error = REACH_DARK_ACCENT_RED(1.0f),
-    .settings_window_button = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
+    .settings_window_button_background = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .settings_window_close_hover = REACH_CRITICAL_RED(1.0f),
     .settings_window_minimize_hover = REACH_DARK_ACCENT_YELLOW(1.0f),
     .settings_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
@@ -191,9 +189,9 @@ static const reach_theme reach_theme_light = {
     .mode = REACH_THEME_MODE_LIGHT,
 
     .dock_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .dock_border = REACH_LIGHT_STRUCTURE(REACH_THEME_TRANSLUCENT),
+    .dock_border = REACH_LIGHT_MIDTONE(REACH_THEME_TRANSLUCENT),
     .popup_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .popup_border = REACH_LIGHT_STRUCTURE(REACH_THEME_TRANSLUCENT),
+    .popup_border = REACH_LIGHT_MIDTONE(REACH_THEME_TRANSLUCENT),
 
     .primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
     .inverse_text = REACH_PURE_WHITE(0.95f),
@@ -212,32 +210,31 @@ static const reach_theme reach_theme_light = {
 
     .tray_click_feedback = REACH_LIGHT_RAISED(1.0f),
 
-    .quick_settings_slider_track_color = REACH_LIGHT_STRUCTURE(1.0f),
-    .quick_settings_slider_fill_color = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
-    .quick_settings_slider_muted_fill_color = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.36f),
-    .quick_settings_button_color = REACH_LIGHT_RAISED(1.0f),
+    .quick_settings_slider_track = REACH_LIGHT_MIDTONE(1.0f),
+    .quick_settings_slider_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
+    .quick_settings_slider_muted_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.36f),
+    .quick_settings_button_background = REACH_LIGHT_MIDTONE(1.0f),
     .quick_settings_secondary_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_separator = REACH_LIGHT_STRUCTURE(1.0f),
-    .quick_settings_slider_line = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.26f),
-    .quick_settings_slider_level = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.88f),
-    .quick_settings_slider_level_muted = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.38f),
+    .quick_settings_app_volume_track = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.26f),
+    .quick_settings_app_volume_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.88f),
+    .quick_settings_app_volume_muted_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.38f),
     .quick_settings_section_label = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
 
     .now_playing_background = REACH_LIGHT_RAISED(0.66f),
     .now_playing_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.94f),
     .now_playing_control_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
-    .now_playing_control_background = REACH_LIGHT_STRUCTURE(0.0f),
-    .now_playing_artist_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
+    .now_playing_artist_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.70f),
 
     .launcher_search_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
     .launcher_search_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.95f),
     .launcher_placeholder_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_selection_highlight = REACH_LIGHT_ACCENT_BLUE(0.28f),
     .launcher_search_icon = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.36f),
-    .launcher_border = REACH_LIGHT_STRUCTURE(REACH_THEME_TRANSLUCENT),
-    .launcher_scrollbar_track = REACH_LIGHT_STRUCTURE(1.0f),
+    .launcher_border = REACH_LIGHT_MIDTONE(REACH_THEME_TRANSLUCENT),
+    .launcher_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .launcher_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
-    .launcher_row_selected_background = REACH_MIDTONE(1.0f),
+    .launcher_row_selected_background = REACH_LIGHT_MIDTONE(1.0f),
     .launcher_row_icon_background = REACH_LIGHT_RAISED(1.0f),
     .launcher_row_icon_glyph = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_row_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.86f),
@@ -245,7 +242,7 @@ static const reach_theme reach_theme_light = {
     .launcher_row_path = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_row_path_selected = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
 
-    .switcher_selection_background = REACH_MIDTONE(1.0f),
+    .switcher_selection_background = REACH_LIGHT_MIDTONE(1.0f),
     .switcher_label_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.96f),
 
     .context_menu_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.96f),
@@ -274,7 +271,7 @@ static const reach_theme reach_theme_light = {
     .clipboard_item_background = REACH_LIGHT_RAISED(1.0f),
     .clipboard_item_hover_background = REACH_LIGHT_STRUCTURE(1.0f),
     .clipboard_item_hover_border = REACH_LIGHT_MID_CONTRAST_GRAY(0.30f),
-    .clipboard_scrollbar_track = REACH_LIGHT_STRUCTURE(1.0f),
+    .clipboard_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .clipboard_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
 
     .settings_background = REACH_LIGHT_RAISED(1.0f),
@@ -294,10 +291,10 @@ static const reach_theme reach_theme_light = {
     .settings_button_disabled_background = REACH_LIGHT_STRUCTURE(1.0f),
     .settings_status_success = REACH_LIGHT_ACCENT_GREEN(1.0f),
     .settings_status_error = REACH_LIGHT_ACCENT_RED(1.0f),
-    .settings_window_button = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
+    .settings_window_button_background = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .settings_window_close_hover = REACH_CRITICAL_RED(1.0f),
     .settings_window_minimize_hover = REACH_LIGHT_ACCENT_YELLOW(1.0f),
-    .settings_scrollbar_track = REACH_LIGHT_STRUCTURE(1.0f),
+    .settings_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .settings_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .accents =
         {

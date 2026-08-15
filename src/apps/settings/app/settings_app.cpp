@@ -213,7 +213,7 @@ static reach_rect_f32 reach_settings_default_bounds(const reach_settings_app *ap
     }
 
     float width = 780.0f * scale;
-    float height = 520.0f * scale;
+    float height = 780.0f * scale;
     float minimum_width = 520.0f * scale;
     float minimum_height = 360.0f * scale;
     if (width > available_width)
