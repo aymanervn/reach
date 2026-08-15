@@ -195,15 +195,15 @@ int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
 
 static void reach_context_menu_place(reach_context_menu_state *state,
                                      const reach_context_menu_open_context *ctx, float popup_width,
-                                     float anchor_ratio)
+                                     float anchor_ratio, int32_t compact)
 {
     state->anchored = ctx->anchored;
     state->anchor_popup_width = popup_width;
     state->anchor_ratio = anchor_ratio;
     state->dpi_scale = ctx->dpi_scale;
     float scale = ctx->dpi_scale;
-    float item_height = 34.0f * scale;
-    float padding = 8.0f * scale;
+    float item_height = (compact ? 26.0f : 34.0f) * scale;
+    float padding = (compact ? 5.0f : 8.0f) * scale;
     float notch_height = reach_popup_notch_height_scaled(scale);
     float popup_body_height = padding * 2.0f + item_height * (float)state->item_count;
     float popup_height = popup_body_height + notch_height;
@@ -253,7 +253,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
     reach_context_menu_state *state = &menu->state;
     reach_context_menu_build_power_commands(state->item_commands, state->item_icon_ids,
                                             &state->item_count);
-    reach_context_menu_place(state, ctx, 176.0f * ctx->dpi_scale, 0.72f);
+    reach_context_menu_place(state, ctx, 176.0f * ctx->dpi_scale, 0.72f, 0);
     state->target_index = REACH_MAX_DOCK_ITEMS;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -282,7 +282,7 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     {
         state->item_icon_ids[index] = 0;
     }
-    reach_context_menu_place(state, ctx, 208.0f * ctx->dpi_scale, 0.30f);
+    reach_context_menu_place(state, ctx, 208.0f * ctx->dpi_scale, 0.30f, 0);
     state->target_index = target_index;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -320,7 +320,7 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
                                    ctx->window_entries[index].title);
         }
     }
-    reach_context_menu_place(state, ctx, 232.0f * ctx->dpi_scale, 0.5f);
+    reach_context_menu_place(state, ctx, 196.0f * ctx->dpi_scale, 0.5f, 1);
     state->target_index = target_index;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -403,7 +403,7 @@ void reach_context_menu_reanchor(reach_context_menu *menu,
         return;
     }
     reach_context_menu_place(&menu->state, ctx, menu->state.anchor_popup_width,
-                             menu->state.anchor_ratio);
+                             menu->state.anchor_ratio, menu->state.window_list_open);
 }
 
 static void reach_context_menu_capsule_reset(void *capsule)

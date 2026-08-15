@@ -140,7 +140,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             reach_context_menu_style_for_command(input->theme, input->item_commands[index]);
         reach_color foreground = style.foreground;
 
-        if (input->hovered_index == index && hover_opacity > 0.01f)
+        if (!input->window_list && input->hovered_index == index && hover_opacity > 0.01f)
         {
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
