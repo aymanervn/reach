@@ -1,15 +1,5 @@
 #include "reach/features/context_menu.h"
 
-static reach_color reach_context_menu_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
-{
-    reach_color color = {};
-    color.r = (float)r / 255.0f;
-    color.g = (float)g / 255.0f;
-    color.b = (float)b / 255.0f;
-    color.a = a;
-    return color;
-}
-
 static float reach_context_menu_scale(const reach_context_menu_render_input *input, float value)
 {
     float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
@@ -24,45 +14,34 @@ typedef struct reach_context_menu_item_style
     int32_t use_hover_foreground;
 } reach_context_menu_item_style;
 
-static reach_context_menu_item_style reach_context_menu_style_for_command(uint32_t command)
+static reach_context_menu_item_style reach_context_menu_style_for_command(const reach_theme *theme,
+                                                                          uint32_t command)
 {
     reach_context_menu_item_style style = {};
-    style.foreground = reach_context_menu_rgb(232, 229, 224, 0.96f);
-    style.hover_background = reach_context_menu_rgb(255, 255, 255, 0.12f);
+    style.foreground = theme->context_menu_text;
+    style.hover_background = theme->context_menu_hover_background;
     style.hover_foreground = style.foreground;
     style.use_hover_foreground = 0;
 
-    uint8_t r = 0;
-    uint8_t g = 0;
-    uint8_t b = 0;
+    reach_color accent = {};
     int32_t power_color = 1;
     switch (command)
     {
     case REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN:
-        r = 236;
-        g = 92;
-        b = 92;
+        accent = theme->menu_accent_shutdown;
         break;
     case REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP:
-        r = 176;
-        g = 132;
-        b = 232;
+        accent = theme->menu_accent_sleep;
         break;
     case REACH_CONTEXT_MENU_COMMAND_POWER_RESTART:
-        r = 98;
-        g = 210;
-        b = 132;
+        accent = theme->menu_accent_restart;
         break;
     case REACH_CONTEXT_MENU_COMMAND_POWER_LOCK:
     case REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT:
-        r = 236;
-        g = 202;
-        b = 92;
+        accent = theme->menu_accent_lock;
         break;
     case REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS:
-        r = 80;
-        g = 158;
-        b = 255;
+        accent = theme->menu_accent_settings;
         break;
     default:
         power_color = 0;
@@ -71,8 +50,8 @@ static reach_context_menu_item_style reach_context_menu_style_for_command(uint32
 
     if (power_color)
     {
-        style.hover_background = reach_context_menu_rgb(r, g, b, 0.12f);
-        style.hover_foreground = reach_context_menu_rgb(r, g, b, 1.0f);
+        style.hover_background = reach_theme_color_alpha(accent, 0.12f);
+        style.hover_foreground = accent;
         style.use_hover_foreground = 1;
     }
 
@@ -90,7 +69,8 @@ static void reach_context_menu_push_close_button(const reach_context_menu_render
     backing.type = REACH_RENDER_COMMAND_RECT;
     backing.rect = button;
     backing.radius = button.height * 0.5f;
-    backing.color = reach_context_menu_rgb(217, 61, 61, (0.14f + 0.74f * hover) * alpha);
+    backing.color = reach_theme_color_alpha(input->theme->context_menu_close_background,
+                                            (0.14f + 0.74f * hover) * alpha);
     reach_render_command_buffer_push(out_commands, &backing);
 
     float inset = button.width * 0.30f;
@@ -101,7 +81,8 @@ static void reach_context_menu_push_close_button(const reach_context_menu_render
     glyph.rect.y = button.y + inset;
     glyph.rect.width = button.width - inset * 2.0f;
     glyph.rect.height = button.height - inset * 2.0f;
-    glyph.color = reach_context_menu_rgb(255, 255, 255, (0.72f + 0.28f * hover) * alpha);
+    glyph.color = reach_theme_color_alpha(input->theme->context_menu_close_glyph,
+                                          (0.72f + 0.28f * hover) * alpha);
     reach_render_command_buffer_push(out_commands, &glyph);
 }
 
@@ -156,7 +137,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         item.x -= input->bounds.x;
         item.y -= input->bounds.y;
         reach_context_menu_item_style style =
-            reach_context_menu_style_for_command(input->item_commands[index]);
+            reach_context_menu_style_for_command(input->theme, input->item_commands[index]);
         reach_color foreground = style.foreground;
 
         if (input->hovered_index == index && hover_opacity > 0.01f)
@@ -166,7 +147,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             command.rect = item;
             command.color = style.hover_background;
             command.color.a *= hover_opacity;
-            command.radius = reach_context_menu_scale(input, 8.0f);
+            command.radius = reach_context_menu_scale(input, input->theme->radius_small);
             reach_render_command_buffer_push(out_commands, &command);
             if (style.use_hover_foreground)
             {

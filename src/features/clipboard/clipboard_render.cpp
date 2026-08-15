@@ -463,7 +463,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect = {0.0f, 0.0f, layout->bounds.width, layout->bounds.height};
     command.color = theme->clipboard_background;
-    command.radius = reach_clipboard_scale_value(theme->clipboard_panel_radius, input->dpi_scale);
+    command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
     reach_render_command_buffer_push(commands, &command);
 
     command = {};
@@ -471,7 +471,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     command.rect = {0.5f, 0.5f, reach_clipboard_max_float(0.0f, layout->bounds.width - 1.0f),
                     reach_clipboard_max_float(0.0f, layout->bounds.height - 1.0f)};
     command.color = theme->clipboard_border;
-    command.radius = reach_clipboard_scale_value(theme->clipboard_panel_radius, input->dpi_scale);
+    command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
     command.stroke_width = theme->border_thickness;
     reach_render_command_buffer_push(commands, &command);
 
@@ -598,8 +598,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command.color.g += (theme->clipboard_item_hover_background.g - command.color.g) * hover;
         command.color.b += (theme->clipboard_item_hover_background.b - command.color.b) * hover;
         command.color.a += (theme->clipboard_item_hover_background.a - command.color.a) * hover;
-        command.radius =
-            reach_clipboard_scale_value(theme->clipboard_item_radius, input->dpi_scale);
+        command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
         reach_render_command_buffer_push(commands, &command);
 
         command = {};
@@ -609,8 +608,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
                         reach_clipboard_max_float(0.0f, local_visible_item.height - 1.0f)};
         command.color = theme->clipboard_item_hover_border;
         command.color.a *= hover;
-        command.radius =
-            reach_clipboard_scale_value(theme->clipboard_item_radius, input->dpi_scale);
+        command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
         command.stroke_width = theme->border_thickness;
         reach_render_command_buffer_push(commands, &command);
 
@@ -625,7 +623,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command.rect = close_rect;
         command.color = theme->clipboard_secondary_text;
         command.color.a = metrics.close_button_hover_alpha * hover;
-        command.radius = reach_clipboard_scale_value(4.0f, input->dpi_scale);
+        command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
         if (reach_clipboard_clip_rect(&command.rect, local_visible_item))
         {
             reach_render_command_buffer_push(commands, &command);
@@ -668,7 +666,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             command.icon_id = item_data->thumbnail_id;
             command.icon_crop_to_fill = 1;
             command.color.a = 1.0f;
-            command.radius = metrics.item_radius;
+            command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
             if (reach_clipboard_clip_rect(&command.rect, local_visible_item))
             {
                 reach_render_command_buffer_push(commands, &command);

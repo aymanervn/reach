@@ -119,11 +119,12 @@ reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame
         reach_host_request_update(host);
     }
 
+    const reach_rect_f32 clipboard_bounds =
+        reach_clipboard_feature_state_ptr(host->clipboard_capsule)->layout.bounds;
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, &host->clipboard_surface, &host->clipboard_transition, game_mode,
-        reach_clipboard_feature_state_ptr(host->clipboard_capsule)->layout.bounds,
-        host->theme->clipboard_panel_radius * reach_host_layout_dpi_scale(host), &frame);
+        host, &host->clipboard_surface, &host->clipboard_transition, game_mode, clipboard_bounds,
+        host->theme->radius_large * reach_host_layout_dpi_scale(host), &frame);
     if (result != REACH_OK)
     {
         return result;
@@ -207,7 +208,7 @@ reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_cont
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
         host, &host->tray, &host->tray_transition, game_mode, tray_bounds,
-        reach_popup_radius_scaled(reach_host_layout_dpi_scale(host)), &frame);
+        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
     if (result != REACH_OK)
     {
         return result;
@@ -234,11 +235,13 @@ reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_
         reach_host_update_quick_settings_animation(host);
     }
 
+    const reach_rect_f32 quick_settings_bounds =
+        reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds;
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
         host, &host->quick_settings, &host->quick_settings_transition, game_mode,
-        reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds,
-        reach_popup_radius_scaled(reach_host_layout_dpi_scale(host)), &frame);
+        quick_settings_bounds,
+        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
     if (result != REACH_OK)
     {
         return result;
@@ -403,11 +406,12 @@ reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_fr
         reach_host_reanchor_context_menu(host);
     }
 
+    const reach_rect_f32 context_menu_bounds =
+        reach_context_menu_state_ptr(host->context_menu_capsule)->bounds;
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, &host->context_menu, &host->context_menu_transition, game_mode,
-        reach_context_menu_state_ptr(host->context_menu_capsule)->bounds,
-        reach_popup_radius_scaled(reach_host_layout_dpi_scale(host)), &frame);
+        host, &host->context_menu, &host->context_menu_transition, game_mode, context_menu_bounds,
+        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
     if (result != REACH_OK)
     {
         return result;

@@ -98,6 +98,8 @@ extern "C"
     reach_result reach_host_update(reach_host *host, double delta_seconds);
     int32_t reach_host_needs_frame(const reach_host *host);
     int32_t reach_host_frame_interval_ms(const reach_host *host);
+    reach_theme_mode reach_host_theme_mode(const reach_host *host);
+    void reach_host_set_theme_mode(reach_host *host, reach_theme_mode mode);
 
 #ifdef __cplusplus
 }

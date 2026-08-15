@@ -16,31 +16,109 @@ extern "C"
         float a;
     } reach_color;
 
+    typedef enum reach_theme_mode
+    {
+        REACH_THEME_MODE_DARK = 0,
+        REACH_THEME_MODE_LIGHT = 1,
+    } reach_theme_mode;
+
+    typedef enum reach_theme_accent
+    {
+        REACH_THEME_ACCENT_BLUE = 0,
+        REACH_THEME_ACCENT_CYAN,
+        REACH_THEME_ACCENT_TEAL,
+        REACH_THEME_ACCENT_GREEN,
+        REACH_THEME_ACCENT_PURPLE,
+        REACH_THEME_ACCENT_LAVENDER,
+        REACH_THEME_ACCENT_ORANGE,
+        REACH_THEME_ACCENT_YELLOW,
+        REACH_THEME_ACCENT_RED,
+        REACH_THEME_ACCENT_COUNT,
+    } reach_theme_accent;
+
     typedef struct reach_theme
     {
-        reach_color light_background;
-        reach_color dark_background;
-        reach_color light_border;
-        reach_color dark_border;
-        reach_color dock_shadow;
+        reach_theme_mode mode;
+
+        reach_color dock_background;
+        reach_color dock_border;
+        reach_color popup_background;
+        reach_color popup_border;
+
+        reach_color primary_text;
+        reach_color inverse_text;
+
         reach_color icon_box_background;
         reach_color system_glyph;
-        reach_color fallback_icon_background;
         reach_color fallback_icon_text;
         reach_color dock_system_separator;
         reach_color dock_clock_time;
         reach_color dock_clock_date;
         reach_color dock_button_background;
-        reach_color dock_power_glyph;
+        reach_color dock_power_hover_background;
+        reach_color dock_battery_low;
+        reach_color dock_running_indicator;
+        reach_color dock_click_feedback;
+
+        reach_color tray_click_feedback;
+
         reach_color quick_settings_slider_track_color;
         reach_color quick_settings_slider_fill_color;
         reach_color quick_settings_slider_muted_fill_color;
         reach_color quick_settings_button_color;
+        reach_color quick_settings_tile_active_background;
+        reach_color quick_settings_tile_active_foreground;
+        reach_color quick_settings_secondary_text;
+        reach_color quick_settings_separator;
+        reach_color quick_settings_slider_line;
+        reach_color quick_settings_slider_level;
+        reach_color quick_settings_slider_level_muted;
+        reach_color quick_settings_section_label;
+
         reach_color now_playing_background;
+        reach_color now_playing_title;
+        reach_color now_playing_control_text;
+        reach_color now_playing_control_background;
+        reach_color now_playing_artist_text;
+
         reach_color launcher_search_background;
-        reach_color launcher_search_border;
         reach_color launcher_search_text;
+        reach_color launcher_placeholder_text;
+        reach_color launcher_selection_highlight;
+        reach_color launcher_search_icon;
+        reach_color launcher_border;
+        reach_color launcher_scrollbar_track;
+        reach_color launcher_scrollbar_thumb;
+        reach_color launcher_row_selected_background;
+        reach_color launcher_row_icon_background;
+        reach_color launcher_row_icon_glyph;
+        reach_color launcher_row_title;
+        reach_color launcher_row_title_selected;
+        reach_color launcher_row_path;
+        reach_color launcher_row_path_selected;
+
+        reach_color switcher_selection_background;
+        reach_color switcher_label_text;
+
+        reach_color context_menu_text;
+        reach_color context_menu_hover_background;
+        reach_color context_menu_close_background;
+        reach_color context_menu_close_glyph;
+        reach_color menu_accent_shutdown;
+        reach_color menu_accent_sleep;
+        reach_color menu_accent_restart;
+        reach_color menu_accent_lock;
+        reach_color menu_accent_settings;
+
         reach_color stage_backdrop;
+        reach_color stage_tile_placeholder;
+        reach_color stage_tile_highlight;
+        reach_color stage_tile_label;
+        reach_color stage_close_background;
+        reach_color stage_close_hover_background;
+        reach_color stage_close_glyph;
+        reach_color stage_close_hover_glyph;
+
         reach_color clipboard_background;
         reach_color clipboard_border;
         reach_color clipboard_primary_text;
@@ -50,31 +128,43 @@ extern "C"
         reach_color clipboard_item_hover_border;
         reach_color clipboard_scrollbar_track;
         reach_color clipboard_scrollbar_thumb;
-        float clipboard_panel_radius;
-        float clipboard_item_radius;
-        float clipboard_title_text_size;
-        float clipboard_body_text_size;
-        reach_color now_playing_title;
-        reach_color now_playing_control_text;
-        reach_color now_playing_control_background;
-        reach_color now_playing_artist_text;
-        float now_playing_artist_text_size;
-        float now_playing_text_gap;
-        reach_color settings_selected_nav_background;
+
+        reach_color settings_background;
+        reach_color settings_nav_background;
         reach_color settings_text;
         reach_color settings_secondary_text;
+        reach_color settings_card_background;
+        reach_color settings_pill_background;
+        reach_color settings_divider;
+        reach_color settings_toggle_track_off;
+        reach_color settings_toggle_knob;
+        reach_color settings_button_text;
+        reach_color settings_button_primary;
+        reach_color settings_button_success;
+        reach_color settings_button_danger;
+        reach_color settings_button_disabled_background;
+        reach_color settings_status_success;
+        reach_color settings_status_error;
+        reach_color settings_window_button;
+        reach_color settings_window_close_hover;
+        reach_color settings_window_minimize_hover;
+        reach_color settings_scrollbar_track;
+        reach_color settings_scrollbar_thumb;
+        reach_color accents[REACH_THEME_ACCENT_COUNT];
+
+        float radius_small;
+        float radius_large;
+        float button_pressed_darken;
+        float settings_nav_accent_alpha;
+        float now_playing_artist_text_size;
+        float now_playing_text_gap;
         float dock_corner_radius_ratio;
-        reach_color light_text;
-        reach_color dark_text;
-        float dock_corner_radius_max;
         float border_thickness;
-        float dock_shadow_alpha;
         float icon_box_height_ratio;
         float icon_max_box_ratio;
         float icon_box_corner_radius_ratio;
         float icon_box_corner_radius_max;
         float tray_slot_size_ratio;
-        float dock_power_button_corner_radius;
         float dock_system_separator_width;
         float dock_system_separator_height_ratio;
         float dock_clock_width;
@@ -82,7 +172,6 @@ extern "C"
         float now_playing_left_margin;
         float now_playing_height_ratio;
         float now_playing_corner_radius_ratio;
-        float now_playing_corner_radius_max;
         float now_playing_padding;
         float now_playing_gap;
         float now_playing_control_gap;
@@ -92,6 +181,10 @@ extern "C"
     } reach_theme;
 
     const reach_theme *reach_theme_default(void);
+    const reach_theme *reach_theme_for_mode(reach_theme_mode mode);
+    reach_color reach_theme_accent_color(const reach_theme *theme, reach_theme_accent accent);
+    reach_color reach_theme_color_alpha(reach_color color, float alpha);
+    reach_color reach_theme_color_mix(reach_color from, reach_color to, float t);
     float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height);
     float reach_theme_icon_box_size(const reach_theme *theme, float dock_height);
     float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);

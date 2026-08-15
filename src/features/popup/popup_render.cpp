@@ -1,8 +1,8 @@
 #include "reach/features/popup.h"
 
-float reach_popup_radius(void)
+float reach_popup_radius(const reach_theme *theme)
 {
-    return 14.0f;
+    return theme != nullptr ? theme->radius_large : reach_theme_default()->radius_large;
 }
 
 static float reach_popup_scale(float value, float dpi_scale)
@@ -10,9 +10,9 @@ static float reach_popup_scale(float value, float dpi_scale)
     return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
-float reach_popup_radius_scaled(float dpi_scale)
+float reach_popup_radius_scaled(const reach_theme *theme, float dpi_scale)
 {
-    return reach_popup_scale(reach_popup_radius(), dpi_scale);
+    return reach_popup_scale(reach_popup_radius(theme), dpi_scale);
 }
 
 float reach_popup_notch_width(void)
@@ -42,7 +42,7 @@ float reach_popup_clamp_notch_center(float notch_center_x, float width)
 
 float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale)
 {
-    float radius = reach_popup_radius_scaled(dpi_scale);
+    float radius = reach_popup_radius_scaled(reach_theme_default(), dpi_scale);
     float notch_width = reach_popup_notch_width_scaled(dpi_scale);
     float min_center = radius + notch_width;
     float max_center = width - radius - notch_width;
@@ -71,12 +71,12 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
         return REACH_INVALID_ARGUMENT;
     }
 
-    float radius = reach_popup_radius_scaled(input->dpi_scale);
+    float radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
     float notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
     float notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
     float notch_center = reach_popup_clamp_notch_center_scaled(
         input->notch_center_x, input->bounds.width, input->dpi_scale);
-    reach_color border = input->theme->dark_border;
+    reach_color border = input->theme->popup_border;
     float border_thickness = input->theme->border_thickness;
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
@@ -84,7 +84,7 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     command.rect.y = 0.5f;
     command.rect.width = input->bounds.width - 1.0f;
     command.rect.height = input->bounds.height - 1.0f;
-    command.color = input->theme->dark_background;
+    command.color = input->theme->popup_background;
     command.radius = radius;
     command.notch_center_x = notch_center;
     command.notch_width = notch_width;

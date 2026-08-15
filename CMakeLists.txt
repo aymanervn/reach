@@ -101,6 +101,7 @@ target_compile_features(reach_core PUBLIC
 )
 
 add_library(reach_features STATIC
+    src/features/common/progress_bar/progress_bar_render.cpp
     src/features/common/scrollbar/scrollbar_render.cpp
     src/features/common/text_edit/text_edit.cpp
     src/features/common/ui_controls/ui_controls.cpp

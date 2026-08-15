@@ -5,13 +5,6 @@
 #include "dock_common.h"
 #include "dock_metrics.h"
 
-static reach_color reach_dock_black(float alpha)
-{
-    reach_color color = {};
-    color.a = alpha;
-    return color;
-}
-
 static reach_rect_f32 reach_dock_center_square(reach_rect_f32 outer, float size)
 {
     return reach_dock_rect(outer.x + (outer.width - size) * 0.5f,
@@ -86,17 +79,20 @@ static void reach_dock_push_text(reach_render_command_buffer *commands, reach_re
     reach_render_command_buffer_push(commands, &command);
 }
 
-static void reach_dock_push_click_feedback(reach_render_command_buffer *commands,
+static void reach_dock_push_click_feedback(const reach_theme *theme,
+                                           reach_render_command_buffer *commands,
                                            reach_rect_f32 rect, float radius, float opacity)
 {
     if (opacity <= reach_dock_metrics_values.click_feedback_min_opacity)
     {
         return;
     }
-    reach_dock_push_rect(commands, rect, reach_dock_black(opacity), radius);
+    reach_dock_push_rect(commands, rect,
+                         reach_theme_color_alpha(theme->dock_click_feedback, opacity), radius);
 }
 
-static void reach_dock_push_item_feedback(reach_render_command_buffer *commands,
+static void reach_dock_push_item_feedback(const reach_theme *theme,
+                                          reach_render_command_buffer *commands,
                                           reach_rect_f32 rect, float radius, reach_icon_handle icon,
                                           float opacity)
 {
@@ -111,12 +107,12 @@ static void reach_dock_push_item_feedback(reach_render_command_buffer *commands,
         command.type = REACH_RENDER_COMMAND_ICON_TINT;
         command.rect = rect;
         command.icon_id = icon.id;
-        command.color = reach_dock_black(opacity);
+        command.color = reach_theme_color_alpha(theme->dock_click_feedback, opacity);
         reach_render_command_buffer_push(commands, &command);
         return;
     }
 
-    reach_dock_push_click_feedback(commands, rect, radius, opacity);
+    reach_dock_push_click_feedback(theme, commands, rect, radius, opacity);
 }
 
 static void reach_dock_push_running_indicator(const reach_dock_render_input *input,
@@ -139,12 +135,9 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
         indicator_y = max_indicator_y;
     }
 
-    reach_color color = {};
-    color.r = 1.0f;
-    color.g = 1.0f;
-    color.b = 1.0f;
-    color.a = focused ? metrics.running_indicator_focused_alpha
-                      : metrics.running_indicator_unfocused_alpha;
+    reach_color color = reach_theme_color_alpha(
+        input->theme->dock_running_indicator, focused ? metrics.running_indicator_focused_alpha
+                                                      : metrics.running_indicator_unfocused_alpha);
 
     reach_dock_push_rect(
         commands,
@@ -229,7 +222,7 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
 
     if (input->click_feedback_index == index)
     {
-        reach_dock_push_item_feedback(commands, icon_box, icon_box_radius, icon,
+        reach_dock_push_item_feedback(theme, commands, icon_box, icon_box_radius, icon,
                                       input->click_feedback_opacity);
     }
 }
@@ -239,9 +232,9 @@ static void reach_dock_push_background(const reach_theme *theme, const reach_doc
 {
     reach_dock_push_rect(commands,
                          reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height),
-                         theme->light_background, dock_radius);
+                         theme->dock_background, dock_radius);
 
-    if (theme->border_thickness <= 0.0f || theme->light_border.a <= 0.0f)
+    if (theme->border_thickness <= 0.0f || theme->dock_border.a <= 0.0f)
     {
         return;
     }
@@ -251,10 +244,28 @@ static void reach_dock_push_background(const reach_theme *theme, const reach_doc
     command.rect = reach_dock_rect(theme->border_thickness * 0.5f, theme->border_thickness * 0.5f,
                                    layout->bounds.width - theme->border_thickness,
                                    layout->bounds.height - theme->border_thickness);
-    command.color = theme->light_border;
+    command.color = theme->dock_border;
     command.radius = dock_radius;
     command.stroke_width = theme->border_thickness;
     reach_render_command_buffer_push(commands, &command);
+}
+
+static void reach_dock_push_stage_button(const reach_dock_render_input *input,
+                                         reach_render_command_buffer *commands, float icon_box_size)
+{
+    const reach_theme *theme = input->theme;
+    reach_rect_f32 stage_box =
+        reach_dock_icon_box_for_slot(input->layout->stage_button, icon_box_size);
+
+    reach_color glyph = theme->system_glyph;
+    if (input->click_feedback_index == input->stage_feedback_index &&
+        input->click_feedback_opacity > reach_dock_metrics_values.click_feedback_min_opacity)
+    {
+        glyph =
+            reach_theme_color_mix(glyph, theme->dock_click_feedback, input->click_feedback_opacity);
+    }
+
+    reach_dock_push_vector_icon(commands, stage_box, REACH_VECTOR_ICON_MENU, glyph);
 }
 
 static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
@@ -279,12 +290,12 @@ static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
 
     if (input->click_feedback_index == input->tray_feedback_index)
     {
-        reach_dock_push_click_feedback(commands, tray_box, icon_box_radius,
+        reach_dock_push_click_feedback(theme, commands, tray_box, icon_box_radius,
                                        input->click_feedback_opacity);
     }
     if (input->click_feedback_index == input->quick_settings_feedback_index)
     {
-        reach_dock_push_click_feedback(commands, quick_settings_box, icon_box_radius,
+        reach_dock_push_click_feedback(theme, commands, quick_settings_box, icon_box_radius,
                                        input->click_feedback_opacity);
     }
 }
@@ -310,26 +321,6 @@ static void reach_dock_push_clock(const reach_dock_render_input *input,
         input->theme->dock_clock_date);
 }
 
-static reach_color reach_dock_rgba(float r, float g, float b, float a)
-{
-    reach_color color = {};
-    color.r = r;
-    color.g = g;
-    color.b = b;
-    color.a = a;
-    return color;
-}
-
-static reach_color reach_dock_lerp_color(reach_color from, reach_color to, float t)
-{
-    reach_color color = {};
-    color.r = from.r + (to.r - from.r) * t;
-    color.g = from.g + (to.g - from.g) * t;
-    color.b = from.b + (to.b - from.b) * t;
-    color.a = from.a + (to.a - from.a) * t;
-    return color;
-}
-
 static int32_t reach_dock_battery_low(int32_t percent)
 {
     return percent <= 15;
@@ -337,7 +328,7 @@ static int32_t reach_dock_battery_low(int32_t percent)
 
 static reach_color reach_dock_battery_accent(const reach_dock_render_input *input, int32_t percent)
 {
-    return reach_dock_battery_low(percent) ? reach_dock_rgba(1.0f, 0.27f, 0.23f, 1.0f)
+    return reach_dock_battery_low(percent) ? input->theme->dock_battery_low
                                            : input->theme->system_glyph;
 }
 
@@ -443,11 +434,11 @@ static void reach_dock_push_power_button(const reach_dock_render_input *input,
     if (input->battery_valid)
     {
         glyph_color.a *= 1.0f - input->power_hover;
-        background = reach_dock_lerp_color(background, reach_dock_rgba(0.09f, 0.11f, 0.13f, 0.85f),
+        background = reach_theme_color_mix(background, theme->dock_power_hover_background,
                                            input->power_hover);
     }
 
-    reach_dock_push_rect(commands, power_box, background, theme->dock_power_button_corner_radius);
+    reach_dock_push_rect(commands, power_box, background, power_box.height * 0.5f);
     reach_dock_push_vector_icon(commands, reach_dock_center_square(power_box, system_icon_size),
                                 REACH_VECTOR_ICON_POWER, glyph_color);
 
@@ -459,7 +450,7 @@ static void reach_dock_push_power_button(const reach_dock_render_input *input,
 
     if (input->click_feedback_index == input->power_feedback_index)
     {
-        reach_dock_push_click_feedback(commands, power_box, theme->dock_power_button_corner_radius,
+        reach_dock_push_click_feedback(theme, commands, power_box, power_box.height * 0.5f,
                                        input->click_feedback_opacity);
     }
 }
@@ -482,6 +473,7 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
 
     reach_dock_push_background(theme, layout, out_commands, dock_radius);
+    reach_dock_push_stage_button(input, out_commands, icon_box_size);
 
     for (size_t index = 0; index < layout->app_slot_count; ++index)
     {
@@ -626,6 +618,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.click_feedback_opacity =
         reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
     input.tray_feedback_index = REACH_DOCK_FEEDBACK_TRAY_BUTTON;
+    input.stage_feedback_index = REACH_DOCK_FEEDBACK_STAGE_BUTTON;
     input.quick_settings_feedback_index = REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON;
     input.power_feedback_index = REACH_DOCK_FEEDBACK_POWER_BUTTON;
     input.time_text = state->clock_time_text;

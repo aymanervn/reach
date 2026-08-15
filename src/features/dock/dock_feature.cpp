@@ -358,6 +358,8 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
     {
     case REACH_DOCK_HIT_ITEM:
         return REACH_DOCK_POINTER_REGION_ITEM;
+    case REACH_DOCK_HIT_STAGE_BUTTON:
+        return REACH_DOCK_POINTER_REGION_STAGE_BUTTON;
     case REACH_DOCK_HIT_TRAY_BUTTON:
         return REACH_DOCK_POINTER_REGION_TRAY_BUTTON;
     case REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON:
@@ -720,6 +722,14 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             reach_dock_clear_power_release_suppressed(dock);
         }
         state->pressed_control = hit.type;
+        if (hit.type == REACH_DOCK_HIT_STAGE_BUTTON)
+        {
+            out->redraw =
+                out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_STAGE_BUTTON);
+            out->handled = 1;
+            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_STAGE;
+            return;
+        }
         if (hit.type == REACH_DOCK_HIT_TRAY_BUTTON)
         {
             out->redraw =
@@ -796,7 +806,12 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 
         reach_dock_hit_type pressed = static_cast<reach_dock_hit_type>(state->pressed_control);
         state->pressed_control = REACH_DOCK_HIT_NONE;
-        if (pressed == REACH_DOCK_HIT_TRAY_BUTTON && hit.type == pressed)
+        if (pressed == REACH_DOCK_HIT_STAGE_BUTTON && hit.type == pressed)
+        {
+            out->handled = 1;
+            out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE;
+        }
+        else if (pressed == REACH_DOCK_HIT_TRAY_BUTTON && hit.type == pressed)
         {
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_TRAY;
@@ -1928,6 +1943,12 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
         }
     }
     x += np_width_now;
+
+    layout->stage_button.width = icon_size;
+    layout->stage_button.height = icon_size;
+    layout->stage_button.x = x;
+    layout->stage_button.y = top;
+    x += app_slot_width;
 
     size_t item_index = 0;
     for (size_t at = 0; at < dock->slot_order_count; ++at)

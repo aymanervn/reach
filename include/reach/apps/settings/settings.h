@@ -167,6 +167,7 @@ extern "C"
         reach_animation_track display_fps_track;
         reach_animation_manager display_fps_animation;
         int32_t pressed_button;
+        int32_t hovered_button;
         reach_animation_track button_press_track;
         reach_animation_manager button_press_animation;
     } reach_settings_model;
@@ -176,8 +177,7 @@ extern "C"
         reach_settings_page page;
         uint32_t icon_id;
         const uint16_t *label;
-        reach_color accent;
-        reach_color accent_background;
+        reach_theme_accent accent;
     } reach_settings_nav_item;
 
     typedef struct reach_settings_nav_item_layout
@@ -377,6 +377,7 @@ extern "C"
     int32_t reach_settings_model_tick_button_press(reach_settings_model *model,
                                                    double delta_seconds);
     int32_t reach_settings_model_button_press_active(const reach_settings_model *model);
+    int32_t reach_settings_model_set_hovered_button(reach_settings_model *model, int32_t hit_type);
 
     int32_t
     reach_windows_update_matches_security_maintenance(const reach_windows_update_item *update);

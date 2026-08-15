@@ -35,6 +35,7 @@ void reach_settings_model_init(reach_settings_model *model)
     model->power_focused_timer = -1;
     model->account_focused_field = -1;
     model->pressed_button = REACH_SETTINGS_HIT_NONE;
+    model->hovered_button = REACH_SETTINGS_HIT_NONE;
     reach_animation_manager_init(&model->display_fps_animation, &model->display_fps_track, 1);
     reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
@@ -120,44 +121,33 @@ int32_t reach_settings_model_button_press_active(const reach_settings_model *mod
     return model != nullptr && reach_animation_manager_any_active(&model->button_press_animation);
 }
 
+int32_t reach_settings_model_set_hovered_button(reach_settings_model *model, int32_t hit_type)
+{
+    if (model == nullptr || model->hovered_button == hit_type)
+    {
+        return 0;
+    }
+    model->hovered_button = hit_type;
+    return 1;
+}
+
 const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
 {
     static const reach_settings_nav_item items[REACH_SETTINGS_NAV_ITEM_COUNT] = {
-        {REACH_SETTINGS_PAGE_WIFI,
-         REACH_VECTOR_ICON_WIFI_HIGH,
-         (const uint16_t *)L"Wi-Fi",
-         {0.22f, 0.82f, 0.43f, 1.0f},
-         {0.22f, 0.82f, 0.43f, 0.20f}},
-        {REACH_SETTINGS_PAGE_BLUETOOTH,
-         REACH_VECTOR_ICON_BLUETOOTH_ON,
-         (const uint16_t *)L"Bluetooth",
-         {0.24f, 0.58f, 1.0f, 1.0f},
-         {0.24f, 0.58f, 1.0f, 0.20f}},
-        {REACH_SETTINGS_PAGE_ACCOUNT,
-         REACH_VECTOR_ICON_LOCK,
-         (const uint16_t *)L"Account",
-         {0.31f, 0.78f, 0.86f, 1.0f},
-         {0.31f, 0.78f, 0.86f, 0.20f}},
-        {REACH_SETTINGS_PAGE_STARTUP_APPS,
-         REACH_VECTOR_ICON_QUICK_SETTINGS,
-         (const uint16_t *)L"Startup Apps",
-         {0.70f, 0.38f, 0.95f, 1.0f},
-         {0.70f, 0.38f, 0.95f, 0.20f}},
-        {REACH_SETTINGS_PAGE_POWER_SLEEP,
-         REACH_VECTOR_ICON_SLEEP,
-         (const uint16_t *)L"Power and Sleep",
-         {0.95f, 0.55f, 0.22f, 1.0f},
-         {0.95f, 0.55f, 0.22f, 0.20f}},
-        {REACH_SETTINGS_PAGE_DISPLAY,
-         REACH_VECTOR_ICON_RESIZE,
-         (const uint16_t *)L"Display",
-         {0.97f, 0.75f, 0.22f, 1.0f},
-         {0.97f, 0.75f, 0.22f, 0.20f}},
-        {REACH_SETTINGS_PAGE_UPDATE,
-         REACH_VECTOR_ICON_RESTART,
-         (const uint16_t *)L"Updates",
-         {0.20f, 0.72f, 0.96f, 1.0f},
-         {0.20f, 0.72f, 0.96f, 0.20f}},
+        {REACH_SETTINGS_PAGE_WIFI, REACH_VECTOR_ICON_WIFI_HIGH, (const uint16_t *)L"Wi-Fi",
+         REACH_THEME_ACCENT_GREEN},
+        {REACH_SETTINGS_PAGE_BLUETOOTH, REACH_VECTOR_ICON_BLUETOOTH_ON,
+         (const uint16_t *)L"Bluetooth", REACH_THEME_ACCENT_BLUE},
+        {REACH_SETTINGS_PAGE_ACCOUNT, REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Account",
+         REACH_THEME_ACCENT_TEAL},
+        {REACH_SETTINGS_PAGE_STARTUP_APPS, REACH_VECTOR_ICON_QUICK_SETTINGS,
+         (const uint16_t *)L"Startup Apps", REACH_THEME_ACCENT_PURPLE},
+        {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP,
+         (const uint16_t *)L"Power and Sleep", REACH_THEME_ACCENT_ORANGE},
+        {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
+         REACH_THEME_ACCENT_YELLOW},
+        {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates",
+         REACH_THEME_ACCENT_CYAN},
     };
 
     if (out_count != nullptr)

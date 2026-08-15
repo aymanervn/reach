@@ -2,16 +2,6 @@
 
 #include "switcher_common.h"
 
-static reach_color reach_switcher_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
-{
-    reach_color color = {};
-    color.r = (float)r / 255.0f;
-    color.g = (float)g / 255.0f;
-    color.b = (float)b / 255.0f;
-    color.a = a;
-    return color;
-}
-
 static float reach_switcher_input_scale(const reach_switcher_render_input *input, float value)
 {
     float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
@@ -137,7 +127,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     reach_render_command_buffer_clear(out_commands);
 
     reach_render_command command = {};
-    float radius = reach_switcher_input_scale(input, 20.0f);
+    float radius = reach_switcher_input_scale(input, input->theme->radius_large);
     float padding = reach_switcher_input_scale(input, 24.0f);
     float item_size = reach_switcher_input_scale(input, 112.0f);
     float icon_box_size = reach_switcher_input_scale(input, 88.0f);
@@ -157,7 +147,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     command.rect.y = 0.5f;
     command.rect.width = input->bounds.width - 1.0f;
     command.rect.height = input->bounds.height - 1.0f;
-    command.color = theme->dark_background;
+    command.color = theme->dock_background;
     command.radius = radius;
     reach_render_command_buffer_push(out_commands, &command);
 
@@ -167,7 +157,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     command.rect.y = 0.5f;
     command.rect.width = input->bounds.width - 1.0f;
     command.rect.height = input->bounds.height - 1.0f;
-    command.color = theme->dark_border;
+    command.color = theme->dock_border;
     command.radius = radius;
     command.stroke_width = reach_switcher_input_scale(input, 1.0f);
     reach_render_command_buffer_push(out_commands, &command);
@@ -203,7 +193,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
                 command.rect.y = box_y - selected_inset;
                 command.rect.width = icon_box_size + selected_inset * 2.0f;
                 command.rect.height = icon_box_size + selected_inset * 2.0f;
-                command.color = reach_switcher_rgb(255, 255, 255, 0.34f);
+                command.color = theme->switcher_selection_background;
                 command.radius = icon_box_radius + selected_inset;
                 reach_render_command_buffer_push(out_commands, &command);
             }
@@ -230,7 +220,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
                 command.rect.y = item.y + label_top;
                 command.rect.width = item.width;
                 command.rect.height = label_height;
-                command.color = reach_switcher_rgb(242, 240, 236, 0.96f);
+                command.color = theme->switcher_label_text;
                 command.text_weight = input->text_weight_demi_bold;
                 command.text_alignment = input->text_alignment_center;
                 command.text_size = label_text_size;

@@ -2,16 +2,6 @@
 
 #include <math.h>
 
-static reach_color reach_tray_rgb(uint8_t r, uint8_t g, uint8_t b, float a)
-{
-    reach_color color = {};
-    color.r = (float)r / 255.0f;
-    color.g = (float)g / 255.0f;
-    color.b = (float)b / 255.0f;
-    color.a = a;
-    return color;
-}
-
 reach_result reach_tray_build_render_commands(const reach_tray_render_input *input,
                                               reach_render_command_buffer *out_commands)
 {
@@ -83,10 +73,8 @@ reach_result reach_tray_build_render_commands(const reach_tray_render_input *inp
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = slot;
-            command.color.r = 0.0f;
-            command.color.g = 0.0f;
-            command.color.b = 0.0f;
-            command.color.a = input->click_feedback_opacity;
+            command.color =
+                reach_theme_color_alpha(theme->tray_click_feedback, input->click_feedback_opacity);
             command.radius = icon_box_radius;
             reach_render_command_buffer_push(out_commands, &command);
         }
