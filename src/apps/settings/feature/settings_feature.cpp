@@ -145,7 +145,7 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
         {REACH_SETTINGS_PAGE_STARTUP_APPS, REACH_VECTOR_ICON_QUICK_SETTINGS,
          (const uint16_t *)L"Startup Apps", REACH_THEME_ACCENT_PURPLE},
         {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP,
-         (const uint16_t *)L"Power and Sleep", REACH_THEME_ACCENT_ORANGE},
+         (const uint16_t *)L"Energy", REACH_THEME_ACCENT_ORANGE},
         {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
          REACH_THEME_ACCENT_YELLOW},
         {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates",

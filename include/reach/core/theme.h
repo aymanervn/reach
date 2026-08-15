@@ -62,21 +62,20 @@ extern "C"
 
         reach_color tray_click_feedback;
 
-        reach_color quick_settings_slider_track_color;
-        reach_color quick_settings_slider_fill_color;
-        reach_color quick_settings_slider_muted_fill_color;
-        reach_color quick_settings_button_color;
+        reach_color quick_settings_slider_track;
+        reach_color quick_settings_slider_fill;
+        reach_color quick_settings_slider_muted_fill;
+        reach_color quick_settings_button_background;
         reach_color quick_settings_secondary_text;
         reach_color quick_settings_separator;
-        reach_color quick_settings_slider_line;
-        reach_color quick_settings_slider_level;
-        reach_color quick_settings_slider_level_muted;
+        reach_color quick_settings_app_volume_track;
+        reach_color quick_settings_app_volume_fill;
+        reach_color quick_settings_app_volume_muted_fill;
         reach_color quick_settings_section_label;
 
         reach_color now_playing_background;
         reach_color now_playing_title;
         reach_color now_playing_control_text;
-        reach_color now_playing_control_background;
         reach_color now_playing_artist_text;
 
         reach_color launcher_search_background;
@@ -144,7 +143,7 @@ extern "C"
         reach_color settings_button_disabled_background;
         reach_color settings_status_success;
         reach_color settings_status_error;
-        reach_color settings_window_button;
+        reach_color settings_window_button_background;
         reach_color settings_window_close_hover;
         reach_color settings_window_minimize_hover;
         reach_color settings_scrollbar_track;

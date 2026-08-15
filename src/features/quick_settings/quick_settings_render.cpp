@@ -255,7 +255,7 @@ static void reach_quick_settings_push_system_tile_commands(
     const reach_color icon_background =
         reach_theme_color_alpha(foreground, theme->accent_tint_alpha);
     const reach_color tile_background =
-        active ? icon_background : theme->quick_settings_button_color;
+        active ? icon_background : theme->quick_settings_button_background;
     float radius = theme->radius_small * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 
     reach_quick_settings_push_rounded_rect(commands, layout->bounds, radius, tile_background);
@@ -392,12 +392,12 @@ static reach_result reach_quick_settings_push_volume_pill_commands_with_label(
     reach_quick_settings_push_text(commands, label_rect, model->label, label_text_size,
                                    values->pill_label_text_weight, 0, theme->primary_text);
 
-    reach_color slider_fill_color = model->muted ? theme->quick_settings_slider_muted_fill_color
-                                                 : theme->quick_settings_slider_fill_color;
+    reach_color slider_fill_color = model->muted ? theme->quick_settings_slider_muted_fill
+                                                 : theme->quick_settings_slider_fill;
     reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
 
     return reach_progress_bar_build_render_commands(pill.slider_track, pill.slider_fill, origin,
-                                                    theme->quick_settings_slider_track_color,
+                                                    theme->quick_settings_slider_track,
                                                     slider_fill_color, commands);
 }
 
@@ -502,9 +502,9 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
                                               values->app_row_text_size, REACH_TEXT_WEIGHT_NORMAL,
                                               0, theme->primary_text);
 
-    reach_color line_color = theme->quick_settings_slider_line;
-    reach_color level_color = session->muted ? theme->quick_settings_slider_level_muted
-                                             : theme->quick_settings_slider_level;
+    reach_color line_color = theme->quick_settings_app_volume_track;
+    reach_color level_color = session->muted ? theme->quick_settings_app_volume_muted_fill
+                                             : theme->quick_settings_app_volume_fill;
 
     reach_quick_settings_push_rounded_rect(
         commands, layout->slider_full_range_line,
@@ -630,7 +630,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         reach_quick_settings_push_rounded_rect(
             commands, input->layout.output_device_button,
             reach_quick_settings_pill_radius(input->layout.output_device_button, &input->theme),
-            input->theme.quick_settings_button_color);
+            input->theme.quick_settings_button_background);
 
         reach_quick_settings_push_output_icon(
             commands, input->layout.output_device_button_icon,
@@ -685,7 +685,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         reach_quick_settings_push_rounded_rect(
             commands, input->layout.output_devices_panel,
             reach_quick_settings_pill_radius(input->layout.output_devices_panel, &input->theme),
-            input->theme.quick_settings_button_color);
+            input->theme.quick_settings_button_background);
 
         for (size_t index = 0; index < input->layout.output_device_row_count &&
                                index < input->model.output_devices.count;
@@ -713,7 +713,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         reach_quick_settings_push_rounded_rect(
             commands, input->layout.app_volumes_panel,
             reach_quick_settings_pill_radius(input->layout.app_volumes_panel, &input->theme),
-            input->theme.quick_settings_button_color);
+            input->theme.quick_settings_button_background);
 
         for (size_t index = 0;
              index < input->layout.app_volume_row_count && index < input->model.sessions.count;
@@ -734,7 +734,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         reach_quick_settings_push_rounded_rect(
             commands, input->layout.expand_button,
             reach_quick_settings_pill_radius(input->layout.expand_button, &input->theme),
-            input->theme.quick_settings_button_color);
+            input->theme.quick_settings_button_background);
     }
 
     static const uint16_t expand_label[] = {'A', 'l', 'l', ' ', 'v', 'o', 'l', 'u', 'm', 'e',
