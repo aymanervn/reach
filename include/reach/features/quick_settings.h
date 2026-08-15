@@ -75,6 +75,7 @@ extern "C"
     typedef struct reach_quick_settings_tile_layout
     {
         reach_rect_f32 bounds;
+        reach_rect_f32 icon_background;
         reach_rect_f32 icon;
         reach_rect_f32 label;
     } reach_quick_settings_tile_layout;

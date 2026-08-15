@@ -151,6 +151,7 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     }
 
     float search_results_top_padding = reach_scale(8.0f, scale);
+    float search_results_bottom_padding = reach_scale(8.0f, scale);
     out_layout->search_results.x = out_layout->search_box.x;
     out_layout->search_results.y = out_layout->search_box.y + out_layout->search_box.height;
     out_layout->search_results.width = out_layout->search_box.width;
@@ -158,16 +159,15 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     size_t visible_row_count =
         visible_result_count > 0 ? visible_result_count
                                  : (reach_launcher_error_row_visible(launcher) ? 1 : 0);
+    float search_results_items_height =
+        visible_row_count > 0 ? reach_scale(56.0f * (float)visible_row_count, scale) : 0.0f;
     out_layout->search_results.height =
-        visible_row_count > 0
-            ? search_results_top_padding + reach_scale(56.0f * (float)visible_row_count, scale)
-            : 0.0f;
+        visible_row_count > 0 ? search_results_top_padding + search_results_items_height +
+                                    search_results_bottom_padding
+                              : 0.0f;
     out_layout->search_result_items = out_layout->search_results;
     out_layout->search_result_items.y += search_results_top_padding;
-    out_layout->search_result_items.height =
-        out_layout->search_results.height > search_results_top_padding
-            ? out_layout->search_results.height - search_results_top_padding
-            : 0.0f;
+    out_layout->search_result_items.height = search_results_items_height;
     out_layout->search_result_scrollbar_track = (reach_rect_f32){0};
     out_layout->search_result_scrollbar_thumb = (reach_rect_f32){0};
 

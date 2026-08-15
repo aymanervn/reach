@@ -44,6 +44,8 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 239 RCDATA "launcher/executable.svg"
 240 RCDATA "dock/menu.svg"
 
+#include "fonts.rc"
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0
  PRODUCTVERSION 0,1,0,0

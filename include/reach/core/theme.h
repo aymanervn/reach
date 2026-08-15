@@ -66,8 +66,6 @@ extern "C"
         reach_color quick_settings_slider_fill_color;
         reach_color quick_settings_slider_muted_fill_color;
         reach_color quick_settings_button_color;
-        reach_color quick_settings_tile_active_background;
-        reach_color quick_settings_tile_active_foreground;
         reach_color quick_settings_secondary_text;
         reach_color quick_settings_separator;
         reach_color quick_settings_slider_line;
@@ -135,6 +133,7 @@ extern "C"
         reach_color settings_secondary_text;
         reach_color settings_card_background;
         reach_color settings_pill_background;
+        reach_color settings_input_background;
         reach_color settings_divider;
         reach_color settings_toggle_track_off;
         reach_color settings_toggle_knob;
@@ -155,7 +154,7 @@ extern "C"
         float radius_small;
         float radius_large;
         float button_pressed_darken;
-        float settings_nav_accent_alpha;
+        float accent_tint_alpha;
         float now_playing_artist_text_size;
         float now_playing_text_gap;
         float dock_corner_radius_ratio;

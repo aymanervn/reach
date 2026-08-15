@@ -315,11 +315,8 @@ static reach_result reach_settings_render(reach_settings_app *app)
         return REACH_ERROR;
     }
     result = app->renderer.ops.execute(app->renderer.backend, &app->render_commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    return app->renderer.ops.end_frame(app->renderer.backend);
+    reach_result end_result = app->renderer.ops.end_frame(app->renderer.backend);
+    return result != REACH_OK ? result : end_result;
 }
 
 static void reach_settings_load_power_config(reach_settings_app *app)
@@ -384,6 +381,30 @@ static void reach_settings_save_power_config(reach_settings_app *app)
     }
 }
 
+static void reach_settings_apply_ui_font(reach_settings_app *app)
+{
+    if (app == nullptr || app->renderer.ops.set_ui_font == nullptr)
+    {
+        return;
+    }
+    app->renderer.ops.set_ui_font(app->renderer.backend,
+                                  reach_settings_model_bundled_font(&app->model));
+    app->dirty = 1;
+}
+
+static void reach_settings_apply_theme(reach_settings_app *app)
+{
+    if (app == nullptr)
+    {
+        return;
+    }
+    app->theme = reach_theme_for_mode(reach_settings_model_light_theme(&app->model)
+                                          ? REACH_THEME_MODE_LIGHT
+                                          : REACH_THEME_MODE_DARK);
+    reach_settings_refresh_layout(app);
+    app->dirty = 1;
+}
+
 static void reach_settings_load_display_config(reach_settings_app *app)
 {
     if (app == nullptr || app->config_store.ops.load == nullptr)
@@ -397,6 +418,10 @@ static void reach_settings_load_display_config(reach_settings_app *app)
         return;
     }
     reach_settings_model_set_high_refresh_rate(&app->model, snapshot->high_refresh_rate);
+    reach_settings_model_set_bundled_font(&app->model, snapshot->bundled_font);
+    reach_settings_apply_ui_font(app);
+    reach_settings_model_set_light_theme(&app->model, snapshot->light_theme);
+    reach_settings_apply_theme(app);
 }
 
 static void reach_settings_save_display_config(reach_settings_app *app)
@@ -413,6 +438,8 @@ static void reach_settings_save_display_config(reach_settings_app *app)
         return;
     }
     snapshot->high_refresh_rate = reach_settings_model_high_refresh_rate(&app->model);
+    snapshot->bundled_font = reach_settings_model_bundled_font(&app->model);
+    snapshot->light_theme = reach_settings_model_light_theme(&app->model);
     if (app->config_store.ops.save(app->config_store.store, snapshot.get()) == REACH_OK)
     {
         (void)reach_windows_notify_config_changed();
@@ -1380,6 +1407,18 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             (void)reach_settings_model_toggle_high_refresh_rate(&app->model);
             reach_settings_save_display_config(app);
             app->dirty = 1;
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE)
+        {
+            (void)reach_settings_model_toggle_bundled_font(&app->model);
+            reach_settings_save_display_config(app);
+            reach_settings_apply_ui_font(app);
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE)
+        {
+            (void)reach_settings_model_toggle_light_theme(&app->model);
+            reach_settings_save_display_config(app);
+            reach_settings_apply_theme(app);
         }
     }
 }

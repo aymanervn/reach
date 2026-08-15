@@ -348,15 +348,21 @@ static void reach_quick_settings_place_system_tile(reach_quick_settings_tile_lay
             (float)tile_row * (values->system_grid_tile_height + values->system_grid_gap),
         tile_width, values->system_grid_tile_height);
 
+    tile->icon_background = reach_quick_settings_rect(
+        tile->bounds.x + values->system_tile_icon_inset,
+        tile->bounds.y + (tile->bounds.height - values->system_tile_icon_box) * 0.5f,
+        values->system_tile_icon_box, values->system_tile_icon_box);
+
     tile->icon = reach_quick_settings_rect(
-        tile->bounds.x + values->text_padding,
-        tile->bounds.y + (tile->bounds.height - values->system_tile_icon_size) * 0.5f,
+        tile->icon_background.x + (values->system_tile_icon_box - values->system_tile_icon_size) * 0.5f,
+        tile->icon_background.y + (values->system_tile_icon_box - values->system_tile_icon_size) * 0.5f,
         values->system_tile_icon_size, values->system_tile_icon_size);
 
+    float label_x =
+        tile->icon_background.x + values->system_tile_icon_box + values->system_tile_icon_gap;
     tile->label = reach_quick_settings_rect(
-        tile->icon.x + values->system_tile_icon_size + values->system_tile_icon_gap, tile->bounds.y,
-        tile->bounds.x + tile->bounds.width - values->content_padding -
-            (tile->icon.x + values->system_tile_icon_size + values->system_tile_icon_gap),
+        label_x, tile->bounds.y,
+        tile->bounds.x + tile->bounds.width - values->content_padding - label_x,
         tile->bounds.height);
 }
 

@@ -374,12 +374,64 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
     }
     reach_host_apply_power_config(host, snapshot);
     host->high_refresh_rate = snapshot->high_refresh_rate ? 1 : 0;
+    reach_host_apply_ui_font(host, snapshot->bundled_font);
+    reach_host_apply_theme_mode(host, snapshot->light_theme);
     if (snapshot->stage_animation_ms > 0)
     {
         reach_stage_set_animation_seconds(host->stage_capsule,
                                           (float)snapshot->stage_animation_ms / 1000.0f);
     }
     return REACH_OK;
+}
+
+void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    int32_t enabled = bundled_font ? 1 : 0;
+    if (host->bundled_font == enabled)
+    {
+        return;
+    }
+    host->bundled_font = enabled;
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        if (surface == nullptr || surface->renderer.ops.set_ui_font == nullptr)
+        {
+            continue;
+        }
+        surface->renderer.ops.set_ui_font(surface->renderer.backend, enabled);
+        reach_surface_runtime_mark_dirty(surface, 1);
+    }
+    host->dirty.render = 1;
+    reach_host_request_update(host);
+}
+
+void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    const reach_theme *previous = host->theme;
+    reach_host_set_theme_mode(host, light_theme ? REACH_THEME_MODE_LIGHT : REACH_THEME_MODE_DARK);
+    if (host->theme == previous)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        if (surface != nullptr)
+        {
+            reach_surface_runtime_mark_dirty(surface, 1);
+        }
+    }
+    reach_host_request_update(host);
 }
 
 void reach_host_reload_wallpaper(reach_host *host, int32_t force)

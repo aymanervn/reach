@@ -75,6 +75,7 @@ void reach_d2d_destroy(reach_render_backend *backend)
     {
         backend->target->Release();
     }
+    reach_d2d_release_fonts(backend);
     if (backend->text_factory != nullptr)
     {
         backend->text_factory->Release();
@@ -205,6 +206,7 @@ reach_result reach_windows_create_d2d_render_backend(reach_platform_window *wind
     out_port->ops.end_frame = reach_d2d_end_frame;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
+    out_port->ops.set_ui_font = reach_d2d_set_ui_font;
     out_port->ops.destroy = reach_d2d_destroy;
 
     return REACH_OK;
@@ -272,6 +274,7 @@ reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *wi
     out_port->ops.end_frame = reach_d2d_end_frame;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
+    out_port->ops.set_ui_font = reach_d2d_set_ui_font;
     out_port->ops.destroy = reach_d2d_destroy;
 
     return REACH_OK;

@@ -11,11 +11,16 @@ IDI_SETTINGS_ICON ICON DISCARDABLE "settings.ico"
 206 RCDATA "dock/arrow_up.svg"
 207 RCDATA "dock/settings.svg"
 212 RCDATA "quick_settings/check.svg"
+228 RCDATA "launcher/document.svg"
 216 RCDATA "quick_settings/wifi_high.svg"
+220 RCDATA "quick_settings/brightness.svg"
+239 RCDATA "launcher/executable.svg"
 221 RCDATA "quick_settings/bluetooth_on.svg"
 234 RCDATA "extra/minimize.svg"
 235 RCDATA "extra/close.svg"
 236 RCDATA "extra/resize.svg"
+
+#include "fonts.rc"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,1,0,0
