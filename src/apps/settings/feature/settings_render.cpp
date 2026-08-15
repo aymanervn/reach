@@ -1,5 +1,6 @@
 #include "reach/core/render_commands.h"
 #include "reach/apps/settings/settings.h"
+#include "reach/features/common/loader_render.h"
 #include "reach/features/common/scrollbar_render.h"
 #include "reach/features/common/ui_controls.h"
 
@@ -737,11 +738,10 @@ static void render_update_page(const reach_settings_render_input *input,
     const uint16_t *scan_button_text =
         model->update_scan_completed ? (const uint16_t *)u"Refresh" : (const uint16_t *)u"Search";
     if (model->update_page_state == REACH_SETTINGS_UPDATE_SCANNING)
-        scan_button_text = model->update_scan_completed ? (const uint16_t *)u"Refreshing..."
-                                                        : (const uint16_t *)u"Searching...";
+        scan_button_text = model->update_scan_completed ? (const uint16_t *)u"Refreshing\u2026"
+                                                        : (const uint16_t *)u"Searching\u2026";
     reach_ui_button_style refresh_style =
         settings_button_style(input, input->theme->settings_button_success);
-    refresh_style.disabled_text = input->theme->settings_text;
     reach_ui_button_render(
         commands, layout->update_refresh_button, scan_button_text, &refresh_style, !busy,
         reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_UPDATE_REFRESH));
@@ -768,9 +768,26 @@ static void render_update_page(const reach_settings_render_input *input,
 
     if (model->update_page_state == REACH_SETTINGS_UPDATE_SCANNING)
     {
-        push_text(commands, update_status_message, (const uint16_t *)u"Searching for updates...",
+        push_text(commands, update_status_message, (const uint16_t *)u"Searching for updates\u2026",
                   scale_value(input, 14.0f), REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_CENTER,
                   input->theme->settings_secondary_text, 1);
+
+        float loader_width = scale_value(input, 220.0f);
+        float loader_height = scale_value(input, 4.0f);
+        if (loader_width > update_status_message.width)
+            loader_width = update_status_message.width;
+
+        reach_rect_f32 loader_container = {
+            update_status_message.x + (update_status_message.width - loader_width) * 0.5f,
+            update_status_message.y + update_status_message.height * 0.5f +
+                scale_value(input, 18.0f),
+            loader_width, loader_height};
+
+        reach_rect_f32 loader_bar =
+            reach_loader_bar_rect(&model->update_loader, loader_container);
+        reach_rect_f32 loader_origin = {0.0f, 0.0f, 0.0f, 0.0f};
+        (void)reach_loader_build_render_commands(loader_container, loader_bar, loader_origin,
+                                                 accent, commands);
         return;
     }
     else if (model->update_page_state == REACH_SETTINGS_UPDATE_ERROR &&

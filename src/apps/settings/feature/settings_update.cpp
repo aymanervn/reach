@@ -128,6 +128,14 @@ void reach_settings_model_begin_update_scan(reach_settings_model *model)
         return;
     model->update_page_state = REACH_SETTINGS_UPDATE_SCANNING;
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_loader_model_reset(&model->update_loader);
+}
+
+int32_t reach_settings_model_update_loader(reach_settings_model *model, double delta_seconds)
+{
+    if (model == nullptr || model->update_page_state != REACH_SETTINGS_UPDATE_SCANNING)
+        return 0;
+    return reach_loader_update(&model->update_loader, delta_seconds);
 }
 
 void reach_settings_model_apply_update_scan(reach_settings_model *model,
@@ -200,6 +208,32 @@ void reach_settings_model_begin_update_install(reach_settings_model *model)
     model->update_page_state = REACH_SETTINGS_UPDATE_PREPARING;
 }
 
+void reach_settings_model_begin_update_resume(reach_settings_model *model,
+                                              const reach_windows_update_journal *journal)
+{
+    if (model == nullptr || journal == nullptr ||
+        journal->state == REACH_WINDOWS_UPDATE_JOURNAL_IDLE || journal->count == 0)
+        return;
+
+    model->update_list.count = journal->count < REACH_WINDOWS_UPDATE_MAX_UPDATES
+                                   ? journal->count
+                                   : REACH_WINDOWS_UPDATE_MAX_UPDATES;
+    for (size_t index = 0; index < model->update_list.count; ++index)
+    {
+        reach_windows_update_item *update = &model->update_list.updates[index];
+        *update = {};
+        update->identity = journal->updates[index];
+        update->selected = 1;
+        update->state = REACH_WINDOWS_UPDATE_INSTALLING;
+        reach_copy_utf16(update->selected_reason, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
+                         (const uint16_t *)u"Resumed");
+    }
+
+    model->update_page_state = journal->helper_running ? REACH_SETTINGS_UPDATE_INSTALLING
+                                                       : REACH_SETTINGS_UPDATE_VERIFYING;
+    reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+}
+
 static int identity_equal(const reach_windows_update_identity *left,
                           const reach_windows_update_identity *right)
 {
@@ -244,7 +278,11 @@ void reach_settings_model_apply_update_operation(
                                      REACH_WINDOWS_UPDATE_TEXT_CAPACITY, selected_reason);
             }
     }
-    if (result->failure_class != REACH_WINDOWS_UPDATE_FAILURE_NONE)
+    if (result->failure_class == REACH_WINDOWS_UPDATE_USER_CANCELLED)
+        model->update_page_state = model->update_scan_completed
+                                       ? REACH_SETTINGS_UPDATE_AVAILABLE
+                                       : REACH_SETTINGS_UPDATE_NOT_SCANNED;
+    else if (result->failure_class != REACH_WINDOWS_UPDATE_FAILURE_NONE)
         model->update_page_state = REACH_SETTINGS_UPDATE_ERROR;
     else
         model->update_page_state = REACH_SETTINGS_UPDATE_COMPLETE;

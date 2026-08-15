@@ -26,6 +26,7 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->startup_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_loader_model_init(&model->update_loader, 0.7f);
     reach_animation_manager_init(&model->startup_animations, model->startup_tracks,
                                  REACH_STARTUP_APP_MAX_ENTRIES);
     reach_animation_manager_init(&model->power_animations, model->power_tracks,
@@ -250,7 +251,8 @@ static int32_t reach_settings_update_in_select_section(reach_windows_update_stat
            state == REACH_WINDOWS_UPDATE_DOWNLOADING || state == REACH_WINDOWS_UPDATE_DOWNLOADED ||
            state == REACH_WINDOWS_UPDATE_INSTALLING ||
            state == REACH_WINDOWS_UPDATE_INSTALLED_NO_REBOOT_REQUIRED ||
-           state == REACH_WINDOWS_UPDATE_REBOOT_OBSERVED;
+           state == REACH_WINDOWS_UPDATE_REBOOT_OBSERVED ||
+           state == REACH_WINDOWS_UPDATE_VERIFIED_INSTALLED;
 }
 
 static int32_t reach_settings_update_in_restart_section(reach_windows_update_state state)
