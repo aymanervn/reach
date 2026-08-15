@@ -9,8 +9,11 @@
 enum
 {
     REACH_CONTEXT_MENU_ANIM_HOVER = 0,
+    REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER,
     REACH_CONTEXT_MENU_ANIM_COUNT
 };
+
+static const double REACH_CONTEXT_MENU_CLOSE_HOVER_SECONDS = 0.14;
 
 void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                              size_t *out_count)
@@ -59,6 +62,10 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
     if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE)
     {
         return (const uint16_t *)L"Close app";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL)
+    {
+        return (const uint16_t *)L"Close all";
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_POWER_LOCK)
     {
@@ -123,6 +130,7 @@ void reach_context_menu_reset(reach_context_menu *menu)
     menu->state.window_list_open = 0;
     menu->state.target_index = REACH_MAX_DOCK_ITEMS;
     menu->state.hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    menu->state.close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     menu->state.item_count = 0;
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
     {
@@ -131,6 +139,7 @@ void reach_context_menu_reset(reach_context_menu *menu)
         menu->state.item_titles[index][0] = 0;
     }
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER, 0.0f);
 }
 
 int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu)
@@ -143,6 +152,27 @@ float reach_context_menu_hover_opacity(const reach_context_menu *menu)
     return menu != nullptr
                ? reach_animation_manager_value(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER)
                : 0.0f;
+}
+
+float reach_context_menu_close_hover(const reach_context_menu *menu)
+{
+    return menu != nullptr ? reach_animation_manager_value(&menu->animations,
+                                                           REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER)
+                           : 0.0f;
+}
+
+int32_t reach_context_menu_set_close_hovered(reach_context_menu *menu, size_t index)
+{
+    if (menu == nullptr || menu->state.close_hovered_index == index)
+    {
+        return 0;
+    }
+    menu->state.close_hovered_index = index;
+    reach_animation_manager_animate_to(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER,
+                                       index < REACH_CONTEXT_MENU_MAX_ITEMS ? 1.0f : 0.0f,
+                                       REACH_CONTEXT_MENU_CLOSE_HOVER_SECONDS,
+                                       REACH_EASING_EASE_OUT);
+    return 1;
 }
 
 int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
@@ -170,6 +200,7 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     state->anchored = ctx->anchored;
     state->anchor_popup_width = popup_width;
     state->anchor_ratio = anchor_ratio;
+    state->dpi_scale = ctx->dpi_scale;
     float scale = ctx->dpi_scale;
     float item_height = 34.0f * scale;
     float padding = 8.0f * scale;
@@ -225,6 +256,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
     reach_context_menu_place(state, ctx, 176.0f * ctx->dpi_scale, 0.72f);
     state->target_index = REACH_MAX_DOCK_ITEMS;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->power_open = 1;
     state->window_list_open = 0;
     state->open = 1;
@@ -253,6 +285,7 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     reach_context_menu_place(state, ctx, 208.0f * ctx->dpi_scale, 0.30f);
     state->target_index = target_index;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->power_open = 0;
     state->window_list_open = 0;
     state->open = 1;
@@ -290,10 +323,50 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
     reach_context_menu_place(state, ctx, 232.0f * ctx->dpi_scale, 0.5f);
     state->target_index = target_index;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->power_open = 0;
     state->window_list_open = 1;
     state->open = 1;
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER, 0.0f);
+}
+
+size_t reach_context_menu_window_list_remove(reach_context_menu *menu, uintptr_t window)
+{
+    if (menu == nullptr || !menu->state.window_list_open || window == 0)
+    {
+        return menu != nullptr ? menu->state.item_count : 0;
+    }
+
+    reach_context_menu_state *state = &menu->state;
+    size_t target = state->item_count;
+    for (size_t index = 0; index < state->item_count; ++index)
+    {
+        if (state->item_windows[index] == window)
+        {
+            target = index;
+            break;
+        }
+    }
+    if (target >= state->item_count)
+    {
+        return state->item_count;
+    }
+
+    for (size_t index = target + 1; index < state->item_count; ++index)
+    {
+        state->item_windows[index - 1] = state->item_windows[index];
+        (void)reach_copy_utf16(state->item_titles[index - 1], 260, state->item_titles[index]);
+    }
+    --state->item_count;
+    state->item_windows[state->item_count] = 0;
+    state->item_titles[state->item_count][0] = 0;
+
+    state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER, 0.0f);
+    return state->item_count;
 }
 
 int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
@@ -390,6 +463,14 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         out->handled = 1;
         if (menu->state.window_list_open)
         {
+            reach_context_menu_hit_result close_hit =
+                reach_context_menu_hit_test_close_buttons(&menu->state, event->x, event->y);
+            if (close_hit.hit)
+            {
+                out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_CLOSE_WINDOW;
+                out->action.window = menu->state.item_windows[close_hit.index];
+                break;
+            }
             if (hit.hit && menu->state.item_windows[hit.index] != 0)
             {
                 out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW;
@@ -420,8 +501,12 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         reach_context_menu_hit_result hit = reach_context_menu_hit_test_items(
             menu->state.item_slots, menu->state.item_count, event->x, event->y);
         size_t hovered = hit.hit ? hit.index : REACH_CONTEXT_MENU_MAX_ITEMS;
+        reach_context_menu_hit_result close_hit =
+            reach_context_menu_hit_test_close_buttons(&menu->state, event->x, event->y);
         out->handled = 1;
         out->redraw = reach_context_menu_set_hovered(menu, hovered);
+        out->redraw |= reach_context_menu_set_close_hovered(
+            menu, close_hit.hit ? close_hit.index : REACH_CONTEXT_MENU_MAX_ITEMS);
         break;
     }
 
@@ -429,6 +514,7 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     case REACH_POINTER_EVENT_CANCEL:
         out->handled = 1;
         out->redraw = reach_context_menu_set_hovered(menu, REACH_CONTEXT_MENU_MAX_ITEMS);
+        out->redraw |= reach_context_menu_set_close_hovered(menu, REACH_CONTEXT_MENU_MAX_ITEMS);
         break;
 
     case REACH_POINTER_EVENT_CONTEXT:

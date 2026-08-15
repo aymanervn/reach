@@ -38,6 +38,8 @@
 #include <mutex>
 #include <thread>
 
+#define REACH_HOST_MAX_ITEM_WINDOWS 16
+
 typedef enum reach_host_animation_id
 {
     REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y = 0,
@@ -500,6 +502,7 @@ void reach_host_dock_item_hovered(reach_host *host, size_t item_index);
 void reach_host_window_list_update(reach_host *host, double delta_seconds);
 int32_t reach_host_window_list_wants_frames(const reach_host *host);
 reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_index);
+reach_result reach_host_window_list_close_window(reach_host *host, uintptr_t window_id);
 
 int32_t reach_host_dock_icon_size_px(const reach_host *host);
 
@@ -519,8 +522,9 @@ reach_result reach_host_schedule_window_control(reach_host *host,
                                                 uintptr_t window_id);
 reach_result reach_host_schedule_minimize_open_windows(reach_host *host);
 reach_result reach_host_schedule_open_terminal(reach_host *host);
-reach_result reach_host_schedule_minimize_windows(reach_host *host, const uintptr_t *window_ids,
-                                                  size_t window_count);
+reach_result reach_host_schedule_window_controls(reach_host *host,
+                                                 reach_window_control_action action,
+                                                 const uintptr_t *window_ids, size_t window_count);
 void reach_host_apply_window_control_result(reach_host *host);
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host);

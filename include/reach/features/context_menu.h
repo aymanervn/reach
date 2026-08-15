@@ -34,6 +34,8 @@ extern "C"
         int32_t text_alignment_leading;
         int32_t window_list;
         float hover_opacity;
+        size_t close_hovered_index;
+        float close_hover;
     } reach_context_menu_render_input;
 
     typedef enum reach_context_menu_pointer_action_kind
@@ -41,7 +43,8 @@ extern "C"
         REACH_CONTEXT_MENU_POINTER_ACTION_NONE = 0,
         REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS = 1,
         REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE = 2,
-        REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW = 3
+        REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW = 3,
+        REACH_CONTEXT_MENU_POINTER_ACTION_CLOSE_WINDOW = 4
     } reach_context_menu_pointer_action_kind;
 
     void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
@@ -65,6 +68,8 @@ extern "C"
         uint16_t item_titles[REACH_CONTEXT_MENU_MAX_ITEMS][260];
         size_t item_count;
         size_t hovered_index;
+        size_t close_hovered_index;
+        float dpi_scale;
 
         int32_t anchored;
         float anchor_popup_width;
@@ -115,6 +120,10 @@ extern "C"
 
     int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu);
     float reach_context_menu_hover_opacity(const reach_context_menu *menu);
+    float reach_context_menu_close_hover(const reach_context_menu *menu);
+
+    reach_rect_f32 reach_context_menu_close_button_rect(reach_rect_f32 item_slot, float dpi_scale);
+    size_t reach_context_menu_window_list_remove(reach_context_menu *menu, uintptr_t window);
 
     int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
                                                      reach_rect_f32 anchor_slot, float dock_top_y,

@@ -184,6 +184,25 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
     {
         return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id);
     }
+    if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL)
+    {
+        reach_dock_item_window item_windows[REACH_HOST_MAX_ITEM_WINDOWS] = {};
+        size_t item_window_count = reach_dock_collect_item_windows(
+            host->dock_capsule, item_index, host->pinned_apps, host->pinned_app_count, item_windows,
+            REACH_HOST_MAX_ITEM_WINDOWS);
+        if (item_window_count == 0)
+        {
+            return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id);
+        }
+
+        uintptr_t windows[REACH_HOST_MAX_ITEM_WINDOWS] = {};
+        for (size_t index = 0; index < item_window_count; ++index)
+        {
+            windows[index] = item_windows[index].window;
+        }
+        return reach_host_schedule_window_controls(host, REACH_WINDOW_CONTROL_CLOSE, windows,
+                                                   item_window_count);
+    }
 
     return REACH_OK;
 }
@@ -244,8 +263,7 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU,
-                               REACH_SURFACE_ID_DOCK);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
 
     reach_context_menu_open_context ctx = {};
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
@@ -270,8 +288,7 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU,
-                               REACH_SURFACE_ID_DOCK);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
 
     uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     size_t item_count = reach_dock_build_item_context_commands(

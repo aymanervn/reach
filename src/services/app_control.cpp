@@ -546,8 +546,9 @@ reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr
     return REACH_OK;
 }
 
-reach_result reach_app_control_schedule_minimize(reach_app_control *service,
-                                                 const uintptr_t *window_ids, size_t window_count)
+reach_result reach_app_control_schedule_windows(reach_app_control *service,
+                                                reach_window_control_action action,
+                                                const uintptr_t *window_ids, size_t window_count)
 {
     if (service == nullptr || window_ids == nullptr || window_count == 0)
     {
@@ -567,7 +568,7 @@ reach_result reach_app_control_schedule_minimize(reach_app_control *service,
 
     {
         std::lock_guard<std::mutex> lock(service->window_mutex);
-        service->window_pending_action = REACH_WINDOW_CONTROL_MINIMIZE;
+        service->window_pending_action = action;
         service->window_pending_is_snap = 0;
         service->window_pending_window_count = window_count;
         for (size_t index = 0; index < window_count; ++index)

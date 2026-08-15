@@ -50,8 +50,54 @@ static void test_power_commands_and_text(void)
                 "unknown command text is empty");
 }
 
+static void test_window_list_remove(void)
+{
+    reach_context_menu *menu = nullptr;
+    if (reach_context_menu_create(&menu) != REACH_OK || menu == nullptr)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: context menu creation\n");
+        return;
+    }
+
+    reach_context_menu_window_entry entries[3] = {};
+    entries[0].window = 11;
+    entries[0].title = (const uint16_t *)L"one";
+    entries[1].window = 22;
+    entries[1].title = (const uint16_t *)L"two";
+    entries[2].window = 33;
+    entries[2].title = (const uint16_t *)L"three";
+
+    reach_context_menu_open_context ctx = {};
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = 1;
+    ctx.anchor_x = 400.0f;
+    ctx.dock_top_y = 1000.0f;
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    ctx.window_entries = entries;
+    ctx.window_entry_count = 3;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+
+    const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
+    expect_true(state->item_count == 3, "window list opens with every entry");
+
+    size_t remaining = reach_context_menu_window_list_remove(menu, 22);
+    expect_true(remaining == 2, "removing an entry drops the item count");
+    expect_true(state->item_windows[0] == 11 && state->item_windows[1] == 33,
+                "remaining entries keep their order");
+    expect_true(text_equals_ascii(state->item_titles[1], "three"),
+                "titles shift with their windows");
+    expect_true(state->item_windows[2] == 0, "trailing entry is cleared");
+
+    expect_true(reach_context_menu_window_list_remove(menu, 99) == 2,
+                "removing an unknown window changes nothing");
+
+    reach_context_menu_destroy(menu);
+}
+
 int main(void)
 {
     test_power_commands_and_text();
+    test_window_list_remove();
     return failures == 0 ? 0 : 1;
 }
