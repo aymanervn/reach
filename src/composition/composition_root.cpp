@@ -68,6 +68,20 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_platform_window(REACH_SURFACE_TOP_BAR,
+                                                      &dependencies.top_bar_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.top_bar_window.window,
+                                                           &dependencies.top_bar_renderer);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_screen_hotspot(&dependencies.top_bar_reveal_edge);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_platform_window(REACH_SURFACE_TRAY_MENU,
                                                       &dependencies.tray_window);
     }
@@ -249,6 +263,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         {
             dependencies.dock_window.ops.destroy(dependencies.dock_window.window);
         }
+        if (dependencies.top_bar_window.ops.destroy != nullptr)
+        {
+            dependencies.top_bar_window.ops.destroy(dependencies.top_bar_window.window);
+        }
         if (dependencies.clipboard_window.ops.destroy != nullptr)
         {
             dependencies.clipboard_window.ops.destroy(dependencies.clipboard_window.window);
@@ -264,6 +282,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.dock_renderer.ops.destroy != nullptr)
         {
             dependencies.dock_renderer.ops.destroy(dependencies.dock_renderer.backend);
+        }
+        if (dependencies.top_bar_renderer.ops.destroy != nullptr)
+        {
+            dependencies.top_bar_renderer.ops.destroy(dependencies.top_bar_renderer.backend);
         }
         if (dependencies.tray_window.ops.destroy != nullptr)
         {

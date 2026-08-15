@@ -15,11 +15,12 @@ reach_result reach_tray_build_render_commands(const reach_tray_render_input *inp
     const reach_theme *theme = input->theme;
     reach_render_command command = {};
     float icon_box_radius = reach_theme_icon_box_corner_radius(
-        theme, reach_theme_tray_slot_size(theme, input->dock_height));
+        theme, reach_theme_tray_slot_size(theme, input->bar_height));
     reach_popup_background_input popup = {};
     popup.theme = theme;
     popup.bounds = input->bounds;
     popup.notch_center_x = input->bounds.width * 0.5f;
+    popup.notch_side = input->notch_side;
     popup.dpi_scale = input->dpi_scale;
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
     if (popup_result != REACH_OK)

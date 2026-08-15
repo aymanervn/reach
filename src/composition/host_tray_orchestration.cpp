@@ -47,16 +47,23 @@ reach_result reach_host_refresh_tray_items(reach_host *host)
                            : REACH_OK;
 }
 
-void reach_host_compute_tray_popup_layout(reach_host *host, const reach_dock_layout *dock_layout,
-                                          reach_rect_f32 *out_bounds)
+void reach_host_compute_tray_popup_layout(reach_host *host, reach_rect_f32 *out_bounds)
 {
-    if (host == nullptr || dock_layout == nullptr || out_bounds == nullptr)
+    if (host == nullptr || out_bounds == nullptr)
     {
         return;
     }
 
     const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    reach_tray_layout_popup(host->tray_capsule, theme, dock_layout,
+    reach_dock_layout screen_dock = reach_dock_layout_to_screen(host->layout.dock);
+
+    reach_popup_anchor anchor = {};
+    anchor.button = screen_dock.tray_button;
+    anchor.bar_edge_y = screen_dock.bounds.y;
+    anchor.bar_height = screen_dock.bounds.height;
+    anchor.direction = REACH_POPUP_DROP_UP;
+
+    reach_tray_layout_popup(host->tray_capsule, theme, &anchor,
                             reach_host_layout_dpi_scale(host), out_bounds);
 }
 

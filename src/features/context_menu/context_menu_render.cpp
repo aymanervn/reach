@@ -103,17 +103,17 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     {
         notch_center = input->anchor_x - input->bounds.x;
     }
-    else if (input->has_layout && input->dock_layout != nullptr &&
-             input->target_index < input->dock_layout->app_slot_count)
+    else if (input->has_anchor_slot)
     {
-        reach_rect_f32 slot = input->dock_layout->app_slots[input->target_index];
-        notch_center = slot.x + slot.width * 0.5f - input->bounds.x;
+        notch_center =
+            input->anchor_slot.x + input->anchor_slot.width * 0.5f - input->bounds.x;
     }
 
     reach_popup_background_input popup = {};
     popup.theme = input->theme;
     popup.bounds = input->bounds;
     popup.notch_center_x = notch_center;
+    popup.notch_side = input->notch_side;
     popup.dpi_scale = input->dpi_scale;
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
     if (popup_result != REACH_OK)
@@ -202,8 +202,7 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
                                                        const reach_context_menu_render_context *ctx,
                                                        reach_render_command_buffer *out_commands)
 {
-    if (menu == nullptr || ctx == nullptr || ctx->theme == nullptr || ctx->dock_layout == nullptr ||
-        out_commands == nullptr)
+    if (menu == nullptr || ctx == nullptr || ctx->theme == nullptr || out_commands == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -224,10 +223,11 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.item_count = state->item_count;
     input.hovered_index = state->hovered_index;
     input.target_index = state->target_index;
-    input.dock_layout = ctx->dock_layout;
-    input.has_layout = ctx->has_layout;
-    input.use_anchor_x = state->power_open && ctx->has_layout;
-    input.anchor_x = ctx->dock_layout->power_button.x + ctx->dock_layout->power_button.width * 0.5f;
+    input.anchor_slot = ctx->anchor_slot;
+    input.has_anchor_slot = ctx->has_anchor_slot;
+    input.use_anchor_x = ctx->use_anchor_x;
+    input.anchor_x = ctx->anchor_x;
+    input.notch_side = reach_popup_notch_side(state->drop_direction);
     input.dpi_scale = ctx->dpi_scale;
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 

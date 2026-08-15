@@ -15,6 +15,21 @@ float reach_popup_radius_scaled(const reach_theme *theme, float dpi_scale)
     return reach_popup_scale(reach_popup_radius(theme), dpi_scale);
 }
 
+int32_t reach_popup_notch_side(int32_t direction)
+{
+    return direction == REACH_POPUP_DROP_DOWN ? REACH_NOTCH_SIDE_TOP : REACH_NOTCH_SIDE_BOTTOM;
+}
+
+float reach_popup_drop_y(const reach_popup_anchor *anchor, float popup_height, float gap)
+{
+    if (anchor == nullptr)
+    {
+        return 0.0f;
+    }
+    return anchor->direction == REACH_POPUP_DROP_DOWN ? anchor->bar_edge_y + gap
+                                                      : anchor->bar_edge_y - popup_height - gap;
+}
+
 float reach_popup_notch_width(void)
 {
     return 18.0f;
@@ -89,6 +104,7 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     command.notch_center_x = notch_center;
     command.notch_width = notch_width;
     command.notch_height = notch_height;
+    command.notch_side = input->notch_side;
     reach_render_command_buffer_push(out_commands, &command);
 
     command = {};
@@ -103,5 +119,6 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     command.notch_center_x = notch_center;
     command.notch_width = notch_width;
     command.notch_height = notch_height;
+    command.notch_side = input->notch_side;
     return reach_render_command_buffer_push(out_commands, &command);
 }

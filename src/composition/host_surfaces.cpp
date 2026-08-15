@@ -256,6 +256,15 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                     reach_dock_capsule_ops(),
                                     REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY |
                                         REACH_SURFACE_POINTER_SOURCE_GATED};
+    descs[REACH_SURFACE_ID_TOP_BAR] = {REACH_SURFACE_ID_TOP_BAR,
+                                       REACH_SURFACE_CLASS_PERSISTENT,
+                                       &host->top_bar,
+                                       nullptr,
+                                       nullptr,
+                                       host->top_bar_capsule,
+                                       reach_top_bar_capsule_ops(),
+                                       REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY |
+                                           REACH_SURFACE_POINTER_SOURCE_GATED};
     descs[REACH_SURFACE_ID_LAUNCHER] = {REACH_SURFACE_ID_LAUNCHER,
                                         REACH_SURFACE_CLASS_TRANSIENT,
                                         &host->launcher,
@@ -337,6 +346,8 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].pointer_priority = 50;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
         reach_host_apply_quick_settings_pointer_action;
+    descs[REACH_SURFACE_ID_TOP_BAR].role = REACH_SURFACE_TOP_BAR;
+    descs[REACH_SURFACE_ID_TOP_BAR].pointer_priority = 80;
     descs[REACH_SURFACE_ID_DOCK].role = REACH_SURFACE_DOCK;
     descs[REACH_SURFACE_ID_DOCK].pointer_priority = 90;
     descs[REACH_SURFACE_ID_DOCK].apply_pointer_action = reach_host_apply_dock_pointer_action;
@@ -355,6 +366,8 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_CLIPBOARD].frame_priority = 20;
     descs[REACH_SURFACE_ID_DOCK].frame = reach_host_frame_dock;
     descs[REACH_SURFACE_ID_DOCK].frame_priority = 30;
+    descs[REACH_SURFACE_ID_TOP_BAR].frame = reach_host_frame_top_bar;
+    descs[REACH_SURFACE_ID_TOP_BAR].frame_priority = 35;
     descs[REACH_SURFACE_ID_TRAY].frame = reach_host_frame_tray;
     descs[REACH_SURFACE_ID_TRAY].frame_priority = 40;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame = reach_host_frame_quick_settings;

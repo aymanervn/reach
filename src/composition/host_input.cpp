@@ -775,6 +775,11 @@ void reach_host_on_dock_window_event(void *user, const reach_ui_event *event)
     reach_host_on_surface_event(user, event, REACH_SURFACE_DOCK);
 }
 
+void reach_host_on_top_bar_window_event(void *user, const reach_ui_event *event)
+{
+    reach_host_on_surface_event(user, event, REACH_SURFACE_TOP_BAR);
+}
+
 void reach_host_on_tray_window_event(void *user, const reach_ui_event *event)
 {
     reach_host_on_surface_event(user, event, REACH_SURFACE_TRAY_MENU);

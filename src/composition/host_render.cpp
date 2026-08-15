@@ -52,6 +52,34 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
     return result != REACH_OK ? result : end_result;
 }
 
+reach_result reach_host_render_top_bar_surface(reach_host *host)
+{
+    if (host == nullptr || host->top_bar.renderer.ops.begin_frame == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    reach_render_command_buffer commands = {};
+    reach_top_bar_render_context render_ctx = {};
+    render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+
+    reach_result result =
+        reach_top_bar_append_render_commands(host->top_bar_capsule, &render_ctx, &commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    if (host->top_bar.renderer.ops.begin_frame(host->top_bar.renderer.backend) != REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+
+    (void)host->top_bar.renderer.ops.execute(host->top_bar.renderer.backend, &commands);
+    return host->top_bar.renderer.ops.end_frame(host->top_bar.renderer.backend);
+}
+
 reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bounds)
 {
     if (host == nullptr || host->tray.renderer.ops.begin_frame == nullptr)
@@ -63,7 +91,6 @@ reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bou
     reach_tray_render_context render_ctx = {};
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.bounds = bounds;
-    render_ctx.dock_height = host->layout.dock.bounds.height;
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
     reach_result result =
@@ -98,10 +125,12 @@ reach_result reach_host_render_quick_settings_surface(reach_host *host)
         return result;
     }
 
+    const reach_quick_settings_state *quick_settings_state =
+        reach_quick_settings_state_ptr(host->quick_settings_capsule);
     return reach_host_render_popup_surface(
-        host, &host->quick_settings,
-        reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds,
-        reach_quick_settings_state_ptr(host->quick_settings_capsule)->notch_anchor_x, &commands);
+        host, &host->quick_settings, quick_settings_state->bounds,
+        quick_settings_state->notch_anchor_x,
+        reach_popup_notch_side(quick_settings_state->drop_direction), &commands);
 }
 
 size_t reach_host_switcher_visible_count(const reach_host *host)
@@ -243,12 +272,23 @@ reach_result reach_host_render_context_menu_surface(reach_host *host)
     }
 
     reach_dock_layout screen_dock = reach_dock_layout_to_screen(host->layout.dock);
+    const reach_context_menu_state *menu_state =
+        reach_context_menu_state_ptr(host->context_menu_capsule);
 
     reach_context_menu_render_context render_ctx = {};
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    render_ctx.dock_layout = &screen_dock;
-    render_ctx.has_layout = host->has_layout;
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+    if (host->has_layout && menu_state->target_index < screen_dock.app_slot_count)
+    {
+        render_ctx.anchor_slot = screen_dock.app_slots[menu_state->target_index];
+        render_ctx.has_anchor_slot = 1;
+    }
+    if (host->has_layout && menu_state->power_open)
+    {
+        render_ctx.use_anchor_x = 1;
+        render_ctx.anchor_x =
+            screen_dock.power_button.x + screen_dock.power_button.width * 0.5f;
+    }
 
     reach_render_command_buffer commands = {};
     reach_result build_result = reach_context_menu_append_render_commands(

@@ -24,10 +24,12 @@ extern "C"
         REACH_SURFACE_QUICK_SETTINGS = 5,
         REACH_SURFACE_SETTINGS = 6,
         REACH_SURFACE_CLIPBOARD = 7,
-        REACH_SURFACE_STAGE = 8
+        REACH_SURFACE_STAGE = 8,
+        REACH_SURFACE_TOP_BAR = 9
     } reach_surface_role;
 
 #define REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS 4
+#define REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS 16
 
     typedef struct reach_platform_window reach_platform_window;
     typedef void (*reach_platform_window_event_callback)(void *user, const reach_ui_event *event);
@@ -65,6 +67,8 @@ extern "C"
         reach_window_id (*native_id)(const reach_platform_window *window);
         reach_result (*place_behind)(reach_platform_window *window, reach_window_id target);
         reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);
+        reach_result (*set_input_regions)(reach_platform_window *window,
+                                          const reach_rect_f32 *regions, size_t region_count);
         void (*destroy)(reach_platform_window *window);
     } reach_platform_window_ops;
 

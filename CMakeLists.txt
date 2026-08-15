@@ -102,6 +102,7 @@ target_compile_features(reach_core PUBLIC
 )
 
 add_library(reach_features STATIC
+    src/features/common/bar_visibility/bar_visibility.cpp
     src/features/common/loader/loader_render.cpp
     src/features/common/progress_bar/progress_bar_render.cpp
     src/features/common/scrollbar/scrollbar_render.cpp
@@ -131,6 +132,8 @@ add_library(reach_features STATIC
     src/features/stage/stage_interaction.cpp
     src/features/stage/stage_layout.cpp
     src/features/stage/stage_render.cpp
+    src/features/top_bar/top_bar_feature.cpp
+    src/features/top_bar/top_bar_render.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
     src/features/tray/tray_feature.cpp

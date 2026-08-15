@@ -34,6 +34,9 @@ struct reach_platform_window
     int topmost_enabled;
     int suppress_capture_changed;
     int shell_hook_registered;
+    reach_rect_f32 input_regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS];
+    size_t input_region_count;
+    int input_regions_active;
 };
 
 static int32_t reach_platform_window_rect_contains(reach_rect_f32 rect, float x, float y)
@@ -182,6 +185,22 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
     switch (message)
     {
+    case WM_NCHITTEST:
+        if (window != nullptr && window->input_regions_active)
+        {
+            POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            ScreenToClient(hwnd, &point);
+            for (size_t index = 0; index < window->input_region_count; ++index)
+            {
+                if (reach_platform_window_rect_contains(window->input_regions[index],
+                                                        (float)point.x, (float)point.y))
+                {
+                    return HTCLIENT;
+                }
+            }
+            return HTTRANSPARENT;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR:
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
         return TRUE;
@@ -581,18 +600,18 @@ static reach_result reach_register_platform_class()
 
 static int32_t reach_window_no_activate_surface(reach_surface_role role)
 {
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU ||
-           role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD ||
-           role == REACH_SURFACE_STAGE;
+    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
+           role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
+           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
+           role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_STAGE;
 }
 
 static int32_t reach_window_topmost_surface(reach_surface_role role)
 {
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
-           role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-           role == REACH_SURFACE_CLIPBOARD;
+    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
+           role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
+           role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
+           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD;
 }
 
 static int32_t reach_window_self_ordered_surface(reach_surface_role role)
@@ -603,11 +622,11 @@ static int32_t reach_window_self_ordered_surface(reach_surface_role role)
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = role == REACH_SURFACE_SETTINGS ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW;
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
-        role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-        role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
-        role == REACH_SURFACE_STAGE)
+    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
+        role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
+        role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
+        role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD ||
+        role == REACH_SURFACE_SETTINGS || role == REACH_SURFACE_STAGE)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
@@ -797,9 +816,9 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
 
     window->corner_radius = radius;
 
-    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
-        window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
-        window->role == REACH_SURFACE_CONTEXT_MENU ||
+    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TOP_BAR ||
+        window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_TRAY_MENU ||
+        window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
         window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
         window->role == REACH_SURFACE_SETTINGS || window->role == REACH_SURFACE_STAGE)
     {
@@ -839,9 +858,9 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
     {
         return REACH_INVALID_ARGUMENT;
     }
-    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
-        window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
-        window->role == REACH_SURFACE_CONTEXT_MENU ||
+    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TOP_BAR ||
+        window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_TRAY_MENU ||
+        window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
         window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
         window->role == REACH_SURFACE_SETTINGS || window->role == REACH_SURFACE_STAGE)
     {
@@ -1067,6 +1086,36 @@ static reach_window_id reach_platform_window_native_id(const reach_platform_wind
     return window == nullptr ? 0 : reinterpret_cast<reach_window_id>(window->hwnd);
 }
 
+static reach_result reach_platform_window_set_input_regions(reach_platform_window *window,
+                                                            const reach_rect_f32 *regions,
+                                                            size_t region_count)
+{
+    if (window == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (regions == nullptr || region_count == 0)
+    {
+        window->input_region_count = 0;
+        window->input_regions_active = 0;
+        return REACH_OK;
+    }
+
+    if (region_count > REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS)
+    {
+        region_count = REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS;
+    }
+
+    for (size_t index = 0; index < region_count; ++index)
+    {
+        window->input_regions[index] = regions[index];
+    }
+    window->input_region_count = region_count;
+    window->input_regions_active = 1;
+    return REACH_OK;
+}
+
 static reach_result reach_platform_window_post_event(reach_platform_window *window,
                                                      reach_ui_event_type type)
 {
@@ -1189,6 +1238,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.native_id = reach_platform_window_native_id;
     out_port->ops.place_behind = reach_platform_window_place_behind;
     out_port->ops.post_event = reach_platform_window_post_event;
+    out_port->ops.set_input_regions = reach_platform_window_set_input_regions;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
 }

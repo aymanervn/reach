@@ -24,7 +24,8 @@ reach_host_quick_settings_layout_context(reach_host *host)
     reach_rect_f32 button =
         reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.quick_settings_button);
     ctx.anchor_x = button.x + button.width * 0.5f;
-    ctx.dock_top = host->layout.dock.bounds.y;
+    ctx.bar_edge_y = host->layout.dock.bounds.y;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
     return ctx;
 }
 

@@ -26,10 +26,11 @@ extern "C"
         size_t item_count;
         size_t hovered_index;
         size_t target_index;
-        const reach_dock_layout *dock_layout;
-        int32_t has_layout;
+        reach_rect_f32 anchor_slot;
+        int32_t has_anchor_slot;
         int32_t use_anchor_x;
         float anchor_x;
+        int32_t notch_side;
         float dpi_scale;
         int32_t text_alignment_leading;
         int32_t window_list;
@@ -72,6 +73,7 @@ extern "C"
         float dpi_scale;
 
         int32_t anchored;
+        int32_t drop_direction;
         float anchor_popup_width;
         float anchor_ratio;
     } reach_context_menu_state;
@@ -98,7 +100,8 @@ extern "C"
         reach_rect_f32 monitor;
         float dpi_scale;
         float anchor_x;
-        float dock_top_y;
+        float bar_edge_y;
+        int32_t drop_direction;
         int32_t anchored;
         float pointer_x;
         float pointer_y;
@@ -126,16 +129,19 @@ extern "C"
     size_t reach_context_menu_window_list_remove(reach_context_menu *menu, uintptr_t window);
 
     int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
-                                                     reach_rect_f32 anchor_slot, float dock_top_y,
-                                                     float margin, float x, float y);
+                                                     reach_rect_f32 anchor_slot, float bar_edge_y,
+                                                     int32_t drop_direction, float margin, float x,
+                                                     float y);
 
     const reach_context_menu_state *reach_context_menu_state_ptr(reach_context_menu *menu);
 
     typedef struct reach_context_menu_render_context
     {
         const reach_theme *theme;
-        const reach_dock_layout *dock_layout;
-        int32_t has_layout;
+        reach_rect_f32 anchor_slot;
+        int32_t has_anchor_slot;
+        int32_t use_anchor_x;
+        float anchor_x;
         float dpi_scale;
     } reach_context_menu_render_context;
 

@@ -422,7 +422,7 @@ void reach_dock_begin_reveal_session(reach_dock *dock)
 {
     if (dock != nullptr)
     {
-        dock->state.reveal_session_active = 1;
+        reach_bar_begin_reveal_session(&dock->state.visibility);
     }
 }
 
@@ -432,8 +432,7 @@ static void reach_dock_reset_reveal_state(reach_dock *dock)
     {
         return;
     }
-    dock->state.dock_animation_initialized = 0;
-    dock->state.reveal_session_active = 0;
+    reach_bar_visibility_reset(&dock->state.visibility);
     dock->state.pointer_sequence_active = 0;
 }
 
@@ -982,126 +981,20 @@ reach_animation_manager *reach_dock_manager(reach_dock *animations)
     return animations != nullptr ? &animations->manager : nullptr;
 }
 
-reach_rect_f32 reach_dock_reveal_edge_bounds(int32_t mode, reach_rect_f32 shown_dock_bounds,
-                                             reach_rect_f32 monitor_bounds)
+reach_bar_visibility_result
+reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_request *request)
 {
-    float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
-    reach_rect_f32 bounds = {};
-    bounds.x = shown_dock_bounds.x;
-    bounds.width = shown_dock_bounds.width;
-    if (mode == REACH_DOCK_REVEAL_EDGE_BRIDGE)
-    {
-        bounds.y = shown_dock_bounds.y;
-        bounds.height = monitor_bottom - shown_dock_bounds.y;
-    }
-    else
-    {
-        bounds.y = monitor_bottom - 2.0f;
-        bounds.height = 3.0f;
-    }
-    return bounds;
-}
-
-static int32_t reach_dock_point_in_rect(reach_point_i32 point, reach_rect_f32 rect)
-{
-    return (float)point.x >= rect.x && (float)point.x < rect.x + rect.width &&
-           (float)point.y >= rect.y && (float)point.y < rect.y + rect.height;
-}
-
-reach_dock_visibility_result
-reach_dock_update_visibility(reach_dock *animations, const reach_dock_visibility_request *request)
-{
-    reach_dock_visibility_result result = {};
     if (animations == nullptr || request == nullptr)
     {
-        return result;
+        return reach_bar_visibility_result{};
     }
 
-    reach_dock_state *state = &animations->state;
-    reach_animation_manager *manager = &animations->manager;
+    reach_bar_visibility_request bar_request = *request;
+    bar_request.edge = REACH_BAR_EDGE_BOTTOM;
+    bar_request.pointer_sequence_active = animations->state.pointer_sequence_active;
 
-    float hidden_y = request->monitor_bounds.y + request->monitor_bounds.height + 4.0f;
-    reach_rect_f32 current_dock_bounds = request->shown_bounds;
-    if (state->dock_animation_initialized)
-    {
-        current_dock_bounds.y = reach_animation_manager_value(manager, REACH_DOCK_ANIM_Y);
-    }
-    reach_rect_f32 bridge_bounds = reach_dock_reveal_edge_bounds(
-        REACH_DOCK_REVEAL_EDGE_BRIDGE, request->shown_bounds, request->monitor_bounds);
-    int32_t pointer_over_dock =
-        request->pointer_valid && reach_dock_point_in_rect(request->pointer, current_dock_bounds);
-    int32_t pointer_in_bridge =
-        request->pointer_valid && reach_dock_point_in_rect(request->pointer, bridge_bounds);
-
-    int32_t target_hidden = 0;
-    int32_t edge_mode = REACH_DOCK_REVEAL_EDGE_DISABLED;
-
-    if (request->game_mode)
-    {
-        state->reveal_session_active = 0;
-        target_hidden = 1;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_DISABLED;
-    }
-    else if (!request->can_hide)
-    {
-        state->reveal_session_active = 0;
-        target_hidden = 0;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_BRIDGE;
-    }
-    else if (state->pointer_sequence_active || request->transient_open)
-    {
-        target_hidden = 0;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_BRIDGE;
-    }
-    else if (state->reveal_session_active)
-    {
-        if (pointer_in_bridge || pointer_over_dock)
-        {
-            edge_mode = REACH_DOCK_REVEAL_EDGE_BRIDGE;
-        }
-        else
-        {
-            state->reveal_session_active = 0;
-            target_hidden = 1;
-            edge_mode = REACH_DOCK_REVEAL_EDGE_THIN;
-        }
-    }
-    else if (pointer_over_dock)
-    {
-        target_hidden = 0;
-    }
-    else
-    {
-        target_hidden = 1;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_THIN;
-    }
-
-    float target_y = target_hidden ? hidden_y : request->shown_bounds.y;
-    if (target_hidden && request->dock_sticky_feedback)
-    {
-        result.clear_sticky_feedback = 1;
-    }
-
-    if (!state->dock_animation_initialized)
-    {
-        state->dock_animation_initialized = 1;
-        state->target_hidden = target_hidden;
-        reach_animation_manager_set(manager, REACH_DOCK_ANIM_Y, target_y);
-    }
-
-    if (state->target_hidden != target_hidden)
-    {
-        state->target_hidden = target_hidden;
-        reach_animation_manager_animate_to(manager, REACH_DOCK_ANIM_Y, target_y, 0.25,
-                                           REACH_EASING_EASE_IN_OUT);
-    }
-
-    reach_rect_f32 animated = request->shown_bounds;
-    animated.y = reach_animation_manager_value(manager, REACH_DOCK_ANIM_Y);
-    result.animated_bounds = animated;
-    result.edge_mode = edge_mode;
-    result.visible = target_hidden ? 0 : 1;
-    return result;
+    return reach_bar_update_visibility(&animations->state.visibility, &animations->manager,
+                                       REACH_DOCK_ANIM_Y, &bar_request);
 }
 
 static void reach_dock_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src)

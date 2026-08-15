@@ -193,6 +193,67 @@ reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_cont
     return REACH_OK;
 }
 
+reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_context *ctx)
+{
+    if (host->top_bar.window.ops.set_bounds == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    if (ctx->game_mode)
+    {
+        if (host->top_bar.window.ops.hide != nullptr)
+        {
+            (void)host->top_bar.window.ops.hide(host->top_bar.window.window);
+        }
+        return REACH_OK;
+    }
+
+    reach_host_build_top_bar_layout(host, ctx->monitor_bounds);
+
+    const reach_top_bar_state *state = reach_top_bar_state_ptr(host->top_bar_capsule);
+    reach_rect_f32 shown_bounds = state->layout.bounds;
+    reach_rect_f32 bounds =
+        reach_host_reconcile_top_bar_visibility(host, shown_bounds, ctx->monitor_bounds);
+
+    if (host->top_bar.window.ops.show != nullptr)
+    {
+        (void)host->top_bar.window.ops.show(host->top_bar.window.window);
+    }
+
+    int32_t window_changed = 0;
+    reach_result result = reach_host_apply_window_state(
+        &host->top_bar.window, bounds, 1.0f, &host->top_bar.last_bounds,
+        &host->top_bar.last_opacity, &host->top_bar.bounds_valid, &host->top_bar.opacity_valid,
+        &window_changed);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    if (host->top_bar.window.ops.set_input_regions != nullptr)
+    {
+        reach_rect_f32 regions[REACH_TOP_BAR_PILL_COUNT] = {};
+        size_t region_count = reach_top_bar_input_region_count(host->top_bar_capsule);
+        if (region_count > REACH_TOP_BAR_PILL_COUNT)
+        {
+            region_count = REACH_TOP_BAR_PILL_COUNT;
+        }
+        for (size_t index = 0; index < region_count; ++index)
+        {
+            regions[index] = reach_top_bar_input_region_at(host->top_bar_capsule, index);
+        }
+        (void)host->top_bar.window.ops.set_input_regions(host->top_bar.window.window, regions,
+                                                         region_count);
+    }
+
+    if (host->dirty.render || host->top_bar.dirty_flags || window_changed)
+    {
+        (void)reach_host_render_top_bar_surface(host);
+    }
+    return REACH_OK;
+}
+
 reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_context *ctx)
 {
     const int32_t game_mode = ctx->game_mode;
@@ -202,8 +263,7 @@ reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_cont
     }
 
     reach_rect_f32 tray_bounds = {};
-    reach_dock_layout screen_dock = reach_dock_layout_to_screen(host->layout.dock);
-    reach_host_compute_tray_popup_layout(host, &screen_dock, &tray_bounds);
+    reach_host_compute_tray_popup_layout(host, &tray_bounds);
 
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(

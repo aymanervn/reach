@@ -60,7 +60,8 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchored = 1;
     ctx.anchor_x = slot.x + slot.width * 0.5f;
-    ctx.dock_top_y = host->layout.dock.bounds.y;
+    ctx.bar_edge_y = host->layout.dock.bounds.y;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
     ctx.monitor = host->layout.dock.bounds;
     const reach_monitor_info *primary_monitor =
         host->monitors.list != nullptr && host->monitors.ops.primary != nullptr
@@ -159,9 +160,9 @@ static int32_t reach_host_window_list_pointer_inside(reach_host *host)
     reach_rect_f32 slot =
         reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.app_slots[open_item]);
     float margin = REACH_HOST_WINDOW_LIST_MARGIN * reach_host_layout_dpi_scale(host);
-    return reach_context_menu_hover_region_contains(menu_state->bounds, slot,
-                                                    host->layout.dock.bounds.y, margin,
-                                                    (float)pointer.x, (float)pointer.y);
+    return reach_context_menu_hover_region_contains(
+        menu_state->bounds, slot, host->layout.dock.bounds.y, menu_state->drop_direction, margin,
+        (float)pointer.x, (float)pointer.y);
 }
 
 void reach_host_window_list_update(reach_host *host, double delta_seconds)
