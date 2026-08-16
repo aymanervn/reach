@@ -98,14 +98,22 @@ Quick Settings owns tile, slider, output-device, expansion, drag/capture, releas
 and cancellation behavior through the same hook. Composition translates its
 semantic actions into audio and system-control calls and retains popup policy.
 Quick Settings also attaches the system-status service directly (the
-launcher→search precedent): refresh requests, snapshot take/apply, and the
-bluetooth-pending grace timers run inside the capsule
-(`reach_quick_settings_process_changes`); its pending service work folds into
-`needs_frame`. The system-controls watcher fires on a port thread, so
-composition keeps the atomic change-flag accumulator and passes the drained
-flags in — capsule state is never written off-thread. GPU lifetime stays in
+launcher→search precedent): snapshot take/apply and the bluetooth-pending grace
+timers run inside the capsule (`reach_quick_settings_process_changes`); its
+pending service work folds into `needs_frame`. The system-controls watcher fires
+on a port thread, so composition keeps the atomic change-flag accumulator and —
+because the top bar's network readout needs fresh state whether or not the panel
+is open — composition, not the capsule, turns the drained flags into the
+`reach_system_status_refresh_system` request. Capsule state is never written
+off-thread. GPU lifetime stays in
 composition: audio applies retire the replaced session/device render icons
 and the host drains and releases them.
+The system-status snapshot therefore has two readers with different needs, so
+the service offers both: `take_system` consumes a published generation (Quick
+Settings applies each one exactly once) and `read_system` copies the latest
+without consuming it (the top bar polls it from `tick` and diffs the values it
+renders). A second consumer must never be added on `take_system`; it would steal
+generations from the first.
 Tray owns popup item hit resolution, press/release feedback, left/right activation
 semantics, and cancellation. Composition retains provider activation, topmost
 window handling, and popup lifecycle.
@@ -141,7 +149,19 @@ take the top bar layout directly (e.g. `reach_tray_layout_popup(…, top_bar_lay
 …)`); no anchor indirection is wanted between them. Now Playing is not a
 separate feature: its private UI subfeature lives inside the top bar and consumes
 the shared Now Playing service, leaving room for a future standalone music feature
-to consume the same stable service independently.
+to consume the same stable service independently. It renders one bold line and
+scrolls it with the shared `features/common/marquee` clock when the text
+overruns its slot; the scroll is gated on the bar being shown, so a hidden or
+game-mode bar never asks for a frame.
+
+Every popup gets its bounds and its notch from one place —
+`reach_popup_place(anchor, width, height, margin)` in `features/popup`. It
+centres the popup on the anchoring control, clamps it into the monitor on both
+axes, and returns the notch anchor in screen space, so the notch keeps pointing
+at the button that opened it after the clamp moves the popup. Quick settings,
+the tray popup and the context menu all place through it; a popup that clamps
+its own bounds or re-derives its notch at render time has reintroduced the bug
+this helper exists to prevent.
 
 Dock and top bar are both bars: each owns a `reach_bar_visibility_state` driven
 by the shared `features/common/bar_visibility` state machine, and composition
