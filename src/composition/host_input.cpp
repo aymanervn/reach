@@ -360,6 +360,8 @@ reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const rea
         return REACH_OK;
     case REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE:
         return reach_host_cycle_input_language(host);
+    case REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS:
+        return reach_host_launch_settings_app(host);
     case REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT:
         return reach_host_activate_tray_item(host, static_cast<uint32_t>(result->action.id),
                                              REACH_TRAY_ACTION_LEFT_CLICK);
