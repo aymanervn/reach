@@ -20,21 +20,44 @@ static int32_t reach_host_surface_has_pending_events(const reach_surface_runtime
            surface->window.ops.has_pending_events(surface->window.window);
 }
 
+static int32_t reach_host_hotspot_has_pending_events(const reach_screen_hotspot_port *hotspot)
+{
+    return hotspot != nullptr && hotspot->ops.has_pending_events != nullptr &&
+           hotspot->ops.has_pending_events(hotspot->hotspot);
+}
+
+static void reach_host_dispatch_hotspot_events(reach_screen_hotspot_port *hotspot)
+{
+    if (hotspot == nullptr || hotspot->ops.dispatch_events == nullptr)
+    {
+        return;
+    }
+    if (hotspot->ops.has_pending_events != nullptr &&
+        !hotspot->ops.has_pending_events(hotspot->hotspot))
+    {
+        return;
+    }
+    (void)hotspot->ops.dispatch_events(hotspot->hotspot);
+}
+
 int32_t reach_host_has_pending_events(const reach_host *host)
 {
-    return host != nullptr &&
-           (reach_host_surface_has_pending_events(&host->launcher) ||
-            reach_host_surface_has_pending_events(&host->dock) ||
-            reach_host_surface_has_pending_events(&host->tray) ||
-            reach_host_surface_has_pending_events(&host->switcher) ||
-            reach_host_surface_has_pending_events(&host->stage) ||
-            (host->stage_reveal_corner.ops.has_pending_events != nullptr &&
-             host->stage_reveal_corner.ops.has_pending_events(host->stage_reveal_corner.hotspot)) ||
-            reach_host_surface_has_pending_events(&host->context_menu) ||
-            reach_host_surface_has_pending_events(&host->quick_settings) ||
-            reach_host_surface_has_pending_events(&host->clipboard_surface) ||
-            (host->dock_reveal_edge.ops.has_pending_events != nullptr &&
-             host->dock_reveal_edge.ops.has_pending_events(host->dock_reveal_edge.hotspot)));
+    if (host == nullptr)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        if (reach_host_surface_has_pending_events(host->surface_descs[index].surface))
+        {
+            return 1;
+        }
+    }
+
+    return reach_host_hotspot_has_pending_events(&host->dock_reveal_edge) ||
+           reach_host_hotspot_has_pending_events(&host->top_bar_reveal_edge) ||
+           reach_host_hotspot_has_pending_events(&host->stage_reveal_corner);
 }
 
 reach_result reach_host_dispatch_events(reach_host *host)
@@ -44,26 +67,15 @@ reach_result reach_host_dispatch_events(reach_host *host)
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_host_dispatch_surface_events(&host->launcher);
-    reach_host_dispatch_surface_events(&host->dock);
-    reach_host_dispatch_surface_events(&host->tray);
-    reach_host_dispatch_surface_events(&host->switcher);
-    reach_host_dispatch_surface_events(&host->stage);
-    reach_host_dispatch_surface_events(&host->context_menu);
-    reach_host_dispatch_surface_events(&host->quick_settings);
-    reach_host_dispatch_surface_events(&host->clipboard_surface);
-    if (host->stage_reveal_corner.ops.dispatch_events != nullptr &&
-        (host->stage_reveal_corner.ops.has_pending_events == nullptr ||
-         host->stage_reveal_corner.ops.has_pending_events(host->stage_reveal_corner.hotspot)))
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        (void)host->stage_reveal_corner.ops.dispatch_events(host->stage_reveal_corner.hotspot);
+        reach_host_dispatch_surface_events(host->surface_descs[index].surface);
     }
-    if (host->dock_reveal_edge.ops.dispatch_events != nullptr &&
-        (host->dock_reveal_edge.ops.has_pending_events == nullptr ||
-         host->dock_reveal_edge.ops.has_pending_events(host->dock_reveal_edge.hotspot)))
-    {
-        (void)host->dock_reveal_edge.ops.dispatch_events(host->dock_reveal_edge.hotspot);
-    }
+
+    reach_host_dispatch_hotspot_events(&host->dock_reveal_edge);
+    reach_host_dispatch_hotspot_events(&host->top_bar_reveal_edge);
+    reach_host_dispatch_hotspot_events(&host->stage_reveal_corner);
+
     host->dirty.events_dispatched_this_cycle = 1;
     return REACH_OK;
 }
