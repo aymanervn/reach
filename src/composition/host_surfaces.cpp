@@ -378,6 +378,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_CLIPBOARD].pointer_priority = 20;
     descs[REACH_SURFACE_ID_CLIPBOARD].apply_pointer_action =
         reach_host_apply_clipboard_pointer_action;
+    descs[REACH_SURFACE_ID_CLIPBOARD].bar_shown_while_open = 1;
     descs[REACH_SURFACE_ID_LAUNCHER].role = REACH_SURFACE_LAUNCHER;
     descs[REACH_SURFACE_ID_LAUNCHER].pointer_priority = 30;
     descs[REACH_SURFACE_ID_LAUNCHER].apply_pointer_action =
@@ -393,7 +394,6 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
         reach_host_apply_quick_settings_pointer_action;
     descs[REACH_SURFACE_ID_DOCK].update_visibility = reach_host_dock_update_visibility;
-    descs[REACH_SURFACE_ID_DOCK].bar_shown_while_transient_open = 1;
     descs[REACH_SURFACE_ID_DOCK].reveal_edge = &host->dock_reveal_edge;
     descs[REACH_SURFACE_ID_DOCK].reveal = &host->dock_reveal;
     descs[REACH_SURFACE_ID_DOCK].reveal_animation = reach_host_dock_reveal_animation;
@@ -416,6 +416,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_STAGE].pointer_priority = 60;
     descs[REACH_SURFACE_ID_STAGE].apply_pointer_action = reach_host_apply_stage_pointer_action;
     descs[REACH_SURFACE_ID_STAGE].dismiss = reach_host_close_stage;
+    descs[REACH_SURFACE_ID_STAGE].bar_shown_while_open = 1;
     descs[REACH_SURFACE_ID_STAGE].behavior_flags = REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
 
     descs[REACH_SURFACE_ID_LAUNCHER].frame = reach_host_frame_launcher;

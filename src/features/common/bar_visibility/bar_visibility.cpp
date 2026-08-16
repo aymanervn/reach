@@ -122,7 +122,12 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
         target_hidden = 0;
         edge_mode = REACH_BAR_REVEAL_EDGE_BRIDGE;
     }
-    else if (request->pointer_sequence_active || request->transient_open)
+    else if (request->pointer_sequence_active || request->force_shown)
+    {
+        target_hidden = 0;
+        edge_mode = REACH_BAR_REVEAL_EDGE_BRIDGE;
+    }
+    else if (request->hold_open && !state->target_hidden)
     {
         target_hidden = 0;
         edge_mode = REACH_BAR_REVEAL_EDGE_BRIDGE;

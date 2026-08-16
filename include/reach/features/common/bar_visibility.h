@@ -42,7 +42,8 @@ extern "C"
         int32_t game_mode;
         int32_t can_hide;
         int32_t pointer_sequence_active;
-        int32_t transient_open;
+        int32_t force_shown;
+        int32_t hold_open;
         float reveal_span_inset;
         float reveal_seconds;
     } reach_bar_visibility_request;
