@@ -662,6 +662,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
                                    host->window_tracking);
     reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);
+    reach_top_bar_attach_status(host->top_bar_capsule, host->system_status);
+    reach_system_status_refresh_system(host->system_status, 0);
     host->clipboard = dependencies->clipboard;
     host->theme = reach_theme_default();
 

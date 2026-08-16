@@ -1102,11 +1102,6 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
 
     if (state->open)
     {
-        if (change_flags != 0)
-        {
-            reach_quick_settings_refresh_system(quick_settings, change_flags);
-        }
-
         if (state->model.bluetooth_pending && quick_settings->bluetooth_pending_active)
         {
             if (delta_seconds < 0.0)

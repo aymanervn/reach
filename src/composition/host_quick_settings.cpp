@@ -349,6 +349,10 @@ void reach_host_process_quick_settings_changes(reach_host *host, double delta_se
     }
 
     uint32_t change_flags = host->quick_settings_system_change_flags.exchange(0);
+    if (change_flags != 0)
+    {
+        reach_system_status_refresh_system(host->system_status, change_flags);
+    }
     reach_feature_tick_result changes = {};
     reach_quick_settings_process_changes(host->quick_settings_capsule, change_flags, delta_seconds,
                                          &changes);
