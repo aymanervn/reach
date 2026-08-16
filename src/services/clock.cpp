@@ -35,15 +35,50 @@ void reach_clock_destroy(reach_clock *service)
     delete service;
 }
 
-int32_t reach_clock_tick(reach_clock *service)
+static int32_t reach_clock_sample_now(reach_clock *service, reach_clock_sample *out_sample)
 {
-    if (service == nullptr || service->source.ops.sample_local == nullptr)
+    return service != nullptr && service->source.ops.sample_local != nullptr &&
+           service->source.ops.sample_local(service->source.source, out_sample) == REACH_OK;
+}
+
+static int32_t reach_clock_sample_differs(const reach_clock_snapshot *snapshot,
+                                          const reach_clock_sample *sample)
+{
+    return !snapshot->valid || sample->minute != snapshot->minute ||
+           sample->hour != snapshot->hour || sample->day != snapshot->day ||
+           sample->month != snapshot->month || sample->year != snapshot->year;
+}
+
+int32_t reach_clock_minute_elapsed(reach_clock *service)
+{
+    reach_clock_sample sample = {};
+    if (!reach_clock_sample_now(service, &sample))
     {
         return 0;
     }
+    return reach_clock_sample_differs(&service->snapshot, &sample);
+}
 
+uint32_t reach_clock_next_minute_delay_ms(reach_clock *service)
+{
     reach_clock_sample sample = {};
-    if (service->source.ops.sample_local(service->source.source, &sample) != REACH_OK)
+    if (!reach_clock_sample_now(service, &sample))
+    {
+        return REACH_CLOCK_WAIT_FOREVER;
+    }
+
+    int32_t into_minute = sample.second * 1000 + sample.millisecond;
+    if (into_minute < 0 || into_minute >= 60000)
+    {
+        return 1;
+    }
+    return (uint32_t)(60000 - into_minute);
+}
+
+int32_t reach_clock_tick(reach_clock *service)
+{
+    reach_clock_sample sample = {};
+    if (!reach_clock_sample_now(service, &sample))
     {
         return 0;
     }
@@ -57,9 +92,7 @@ int32_t reach_clock_tick(reach_clock *service)
     next.minute = sample.minute;
     next.valid = 1;
 
-    int32_t changed = !service->snapshot.valid || next.minute != service->snapshot.minute ||
-                      next.hour != service->snapshot.hour || next.day != service->snapshot.day ||
-                      next.month != service->snapshot.month || next.year != service->snapshot.year;
+    int32_t changed = reach_clock_sample_differs(&service->snapshot, &sample);
     service->snapshot = next;
     return changed;
 }

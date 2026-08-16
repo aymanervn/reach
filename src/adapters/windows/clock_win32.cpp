@@ -28,6 +28,8 @@ static reach_result reach_clock_sample_local(reach_clock_source *source,
     out_sample->weekday = local.wDayOfWeek;
     out_sample->hour = local.wHour;
     out_sample->minute = local.wMinute;
+    out_sample->second = local.wSecond;
+    out_sample->millisecond = local.wMilliseconds;
     return REACH_OK;
 }
 

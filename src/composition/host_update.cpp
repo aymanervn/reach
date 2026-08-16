@@ -379,7 +379,7 @@ int32_t reach_host_needs_frame(const reach_host *host)
         reach_host_any_surface_dirty(host) || reach_icon_service_work_pending(host->icon_service) ||
         reach_host_config_reload_work_pending(host) ||
         reach_animation_manager_any_active(&host->animations) ||
-        reach_host_window_list_wants_frames(host))
+        reach_host_window_list_wants_frames(host) || reach_clock_minute_elapsed(host->clock))
     {
         return 1;
     }
@@ -394,4 +394,10 @@ int32_t reach_host_needs_frame(const reach_host *host)
         }
     }
     return 0;
+}
+
+uint32_t reach_host_idle_wait_ms(const reach_host *host)
+{
+    return host != nullptr ? reach_clock_next_minute_delay_ms(host->clock)
+                           : REACH_CLOCK_WAIT_FOREVER;
 }

@@ -8,6 +8,8 @@ extern "C"
 {
 #endif
 
+#define REACH_APP_WAIT_FOREVER 0xFFFFFFFFu
+
     typedef struct reach_app
     {
         reach_host *host;
@@ -22,6 +24,7 @@ extern "C"
     reach_result reach_app_update(reach_app *app, double delta_seconds);
     int32_t reach_app_needs_frame(const reach_app *app);
     int32_t reach_app_frame_interval_ms(const reach_app *app);
+    uint32_t reach_app_idle_wait_ms(const reach_app *app);
     void reach_app_destroy(reach_app *app);
 
 #ifdef __cplusplus
