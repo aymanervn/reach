@@ -11,6 +11,8 @@
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/now_playing.h"
+#include "reach/services/clock.h"
+#include "reach/services/input_language.h"
 #include "reach/services/system_stats.h"
 #include "reach/services/window_tracking.h"
 #include "reach/support/animation.h"
@@ -121,7 +123,6 @@ extern "C"
         uint16_t clock_time_text[32];
         uint16_t clock_date_text[64];
         int32_t clock_initialized;
-        int64_t clock_last_minute;
 
         uint16_t current_app_name[260];
         uint16_t current_app_title[260];
@@ -150,7 +151,8 @@ extern "C"
     void reach_top_bar_attach_services(reach_top_bar *top_bar,
                                        reach_now_playing_service *now_playing,
                                        reach_icon_service *icons, reach_window_tracking *windows,
-                                       reach_system_stats *stats);
+                                       reach_system_stats *stats, reach_clock *clock,
+                                       reach_input_language_service *input_language);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);
@@ -170,7 +172,6 @@ extern "C"
         const reach_top_bar_tray_item *tray_items;
         size_t tray_item_count;
         int32_t tray_popup_open;
-        const uint16_t *language_code;
     } reach_top_bar_build_context;
 
     void reach_top_bar_build_layout(reach_top_bar *top_bar,
@@ -187,8 +188,6 @@ extern "C"
     reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar *top_bar,
                                                                  int32_t local_x, int32_t local_y);
     void reach_top_bar_suppress_power_release(reach_top_bar *top_bar);
-
-    int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);
 
     size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar);
 

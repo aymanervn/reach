@@ -70,6 +70,8 @@ add_library(reach_services STATIC
     src/services/now_playing.cpp
     src/services/pin_config.cpp
     src/services/search.cpp
+    src/services/clock.cpp
+    src/services/input_language.cpp
     src/services/system_stats.cpp
     src/services/system_status.cpp
     src/services/window_tracking.cpp
@@ -195,6 +197,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/audio_volume_win32.cpp
     src/adapters/windows/system_controls_network.cpp
     src/adapters/windows/system_controls_win32.cpp
+    src/adapters/windows/clock_win32.cpp
     src/adapters/windows/system_stats_win32.cpp
     src/adapters/windows/image_loader_win32.cpp
     src/adapters/windows/screen_hotspot_win32.cpp

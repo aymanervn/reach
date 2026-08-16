@@ -15,6 +15,8 @@ struct reach_top_bar
     reach_icon_service *icons;
     reach_window_tracking *windows;
     reach_system_stats *stats;
+    reach_clock *clock;
+    reach_input_language_service *input_language;
     float now_playing_target_width;
 };
 

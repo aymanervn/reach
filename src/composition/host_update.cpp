@@ -34,14 +34,6 @@ void reach_host_request_update(reach_host *host)
     }
 }
 
-static void reach_host_update_clock_text(reach_host *host)
-{
-    if (host != nullptr && reach_top_bar_update_clock(host->top_bar_capsule))
-    {
-        host->top_bar.dirty_flags = 1;
-    }
-}
-
 static void reach_host_tick_animations(reach_host *host, double delta_seconds)
 {
     reach_animation_manager_tick(&host->animations, delta_seconds);
@@ -131,8 +123,12 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         reach_host_sync_popup_mouse_hook(host);
     }
     reach_host_drain_icon_evictions(host);
-    reach_host_update_clock_text(host);
-    if (reach_host_refresh_input_language(host))
+    if (reach_clock_tick(host->clock))
+    {
+        host->top_bar.dirty_flags = 1;
+    }
+    if (reach_input_language_service_tick(host->input_language, delta_seconds,
+                                          reach_host_foreground_window(host)))
     {
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
