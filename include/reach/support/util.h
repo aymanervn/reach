@@ -24,6 +24,7 @@ extern "C"
     void reach_log_error(const char *message);
     size_t reach_strlen_utf16(const uint16_t *text);
     reach_result reach_copy_utf16(uint16_t *dst, size_t dst_count, const uint16_t *src);
+    void reach_copy_path_stem_utf16(uint16_t *dst, size_t dst_count, const uint16_t *path);
 
 #ifdef __cplusplus
 }

@@ -202,6 +202,27 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
                                                 window->app_user_model_id);
 }
 
+void reach_window_tracking_app_display_name(const reach_window_snapshot *window,
+                                            uint16_t *out_name, size_t out_name_count)
+{
+    if (out_name == nullptr || out_name_count == 0)
+    {
+        return;
+    }
+
+    out_name[0] = 0;
+    if (window == nullptr)
+    {
+        return;
+    }
+
+    reach_copy_path_stem_utf16(out_name, out_name_count, window->path);
+    if (out_name[0] == 0)
+    {
+        (void)reach_copy_utf16(out_name, out_name_count, window->title);
+    }
+}
+
 int32_t reach_window_tracking_windows_same_app(const reach_window_snapshot *a,
                                                const reach_window_snapshot *b)
 {

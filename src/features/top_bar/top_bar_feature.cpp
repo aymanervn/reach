@@ -226,51 +226,7 @@ reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar)
     return top_bar != nullptr ? top_bar->icons : nullptr;
 }
 
-static const uint16_t *reach_top_bar_path_stem(const uint16_t *path)
-{
-    if (path == nullptr)
-    {
-        return nullptr;
-    }
-    const uint16_t *stem = path;
-    for (const uint16_t *cursor = path; *cursor != 0; ++cursor)
-    {
-        if (*cursor == '\\' || *cursor == '/')
-        {
-            stem = cursor + 1;
-        }
-    }
-    return stem;
-}
-
-static void reach_top_bar_copy_stem_without_extension(uint16_t *dst, size_t dst_count,
-                                                      const uint16_t *path)
-{
-    const uint16_t *stem = reach_top_bar_path_stem(path);
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    size_t length = 0;
-    size_t last_dot = 0;
-    while (stem != nullptr && stem[length] != 0 && length + 1 < dst_count)
-    {
-        if (stem[length] == '.')
-        {
-            last_dot = length;
-        }
-        dst[length] = stem[length];
-        ++length;
-    }
-    if (last_dot > 0)
-    {
-        length = last_dot;
-    }
-    dst[length] = 0;
-}
-
-static void reach_top_bar_update_current_app(reach_top_bar *top_bar,
-                                             const reach_top_bar_build_context *ctx)
+static void reach_top_bar_update_current_app(reach_top_bar *top_bar)
 {
     reach_top_bar_state *state = &top_bar->state;
     state->current_app_name[0] = 0;
@@ -289,22 +245,7 @@ static void reach_top_bar_update_current_app(reach_top_bar *top_bar,
 
     reach_copy_utf16(state->current_app_icon_ref, 260,
                      window->icon_ref[0] != 0 ? window->icon_ref : window->path);
-
-    for (size_t index = 0; index < ctx->pinned_app_count; ++index)
-    {
-        const reach_pinned_app_model *app = &ctx->pinned_apps[index];
-        if (reach_window_tracking_window_matches_app(app, window) && app->title[0] != 0)
-        {
-            reach_copy_utf16(state->current_app_name, 260, app->title);
-            return;
-        }
-    }
-
-    reach_top_bar_copy_stem_without_extension(state->current_app_name, 260, window->path);
-    if (state->current_app_name[0] == 0)
-    {
-        reach_copy_utf16(state->current_app_name, 260, window->title);
-    }
+    reach_window_tracking_app_display_name(window, state->current_app_name, 260);
 }
 
 reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *top_bar)
@@ -573,7 +514,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         top_bar->state.tray_overflow ? reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot)
                                      : reach_rect_f32{};
 
-    reach_top_bar_update_current_app(top_bar, ctx);
+    reach_top_bar_update_current_app(top_bar);
 
     const float current_app_gap = metrics.current_app_gap * scale;
     const float name_size = metrics.current_app_name_text_size * scale;

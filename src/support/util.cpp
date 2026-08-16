@@ -58,3 +58,49 @@ reach_result reach_copy_utf16(uint16_t *dst, size_t dst_count, const uint16_t *s
     dst[index] = 0;
     return src[index] == 0 ? REACH_OK : REACH_ERROR;
 }
+
+void reach_copy_path_stem_utf16(uint16_t *dst, size_t dst_count, const uint16_t *path)
+{
+    if (dst == nullptr || dst_count == 0)
+    {
+        return;
+    }
+
+    dst[0] = 0;
+    if (path == nullptr)
+    {
+        return;
+    }
+
+    const uint16_t *name = path;
+    for (const uint16_t *cursor = path; *cursor != 0; ++cursor)
+    {
+        if (*cursor == '\\' || *cursor == '/')
+        {
+            name = cursor + 1;
+        }
+    }
+
+    size_t name_length = reach_strlen_utf16(name);
+    size_t end = name_length;
+    for (size_t index = name_length; index > 0; --index)
+    {
+        if (name[index - 1] == '.')
+        {
+            end = index - 1;
+            break;
+        }
+    }
+    if (end == 0)
+    {
+        end = name_length;
+    }
+
+    size_t write = 0;
+    while (write + 1 < dst_count && write < end)
+    {
+        dst[write] = name[write];
+        ++write;
+    }
+    dst[write] = 0;
+}
