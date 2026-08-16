@@ -188,6 +188,8 @@ struct reach_host_frame_context
 };
 typedef struct reach_host_frame_context reach_host_frame_context;
 
+void reach_host_sync_surface_input_regions(const reach_surface_desc *desc);
+
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_context *ctx);

@@ -27,6 +27,22 @@ static void reach_host_apply_surface_activation(const reach_surface_desc *desc, 
     }
 }
 
+void reach_host_sync_surface_input_regions(const reach_surface_desc *desc)
+{
+    if (desc->surface == nullptr || desc->capsule_ops == nullptr ||
+        desc->capsule_ops->input_regions == nullptr ||
+        desc->surface->window.ops.set_input_regions == nullptr)
+    {
+        return;
+    }
+
+    reach_rect_f32 regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS] = {};
+    size_t region_count = desc->capsule_ops->input_regions(desc->capsule, regions,
+                                                           REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS);
+    (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window, regions,
+                                                      region_count);
+}
+
 static reach_result reach_host_apply_transient_frame(
     reach_host *host, reach_surface_runtime *surface, reach_host_surface_transition *transition,
     int32_t game_mode, reach_rect_f32 target_bounds, float radius, reach_host_frame_state *out)
@@ -229,22 +245,6 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
     if (result != REACH_OK)
     {
         return result;
-    }
-
-    if (host->top_bar.window.ops.set_input_regions != nullptr)
-    {
-        reach_rect_f32 regions[REACH_TOP_BAR_PILL_COUNT] = {};
-        size_t region_count = reach_top_bar_input_region_count(host->top_bar_capsule);
-        if (region_count > REACH_TOP_BAR_PILL_COUNT)
-        {
-            region_count = REACH_TOP_BAR_PILL_COUNT;
-        }
-        for (size_t index = 0; index < region_count; ++index)
-        {
-            regions[index] = reach_top_bar_input_region_at(host->top_bar_capsule, index);
-        }
-        (void)host->top_bar.window.ops.set_input_regions(host->top_bar.window.window, regions,
-                                                         region_count);
     }
 
     if (host->dirty.render || host->top_bar.dirty_flags || window_changed)

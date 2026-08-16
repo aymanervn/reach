@@ -300,11 +300,13 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 }
                 for (size_t index = 0; index < frame_count; ++index)
                 {
-                    result = host->surface_descs[frame_order[index]].frame(host, &frame_ctx);
+                    const reach_surface_desc *desc = &host->surface_descs[frame_order[index]];
+                    result = desc->frame(host, &frame_ctx);
                     if (result != REACH_OK)
                     {
                         return result;
                     }
+                    reach_host_sync_surface_input_regions(desc);
                 }
             }
         }

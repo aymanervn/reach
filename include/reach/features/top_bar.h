@@ -166,7 +166,6 @@ extern "C"
         reach_rect_f32 monitor_bounds;
         float dpi_scale;
         float dock_height;
-        uintptr_t foreground_window;
         const reach_pinned_app_model *pinned_apps;
         size_t pinned_app_count;
         const reach_top_bar_tray_item *tray_items;
@@ -181,9 +180,6 @@ extern "C"
                                               int32_t y);
     reach_rect_f32 reach_top_bar_rect_to_screen(const reach_top_bar_layout *layout,
                                                 reach_rect_f32 rect);
-
-    size_t reach_top_bar_input_region_count(const reach_top_bar *top_bar);
-    reach_rect_f32 reach_top_bar_input_region_at(const reach_top_bar *top_bar, size_t index);
 
     reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar *top_bar,
                                                                  int32_t local_x, int32_t local_y);
