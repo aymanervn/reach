@@ -260,7 +260,7 @@ size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar)
     return top_bar != nullptr && top_bar->state.tray_overflow ? top_bar->state.tray_item_count : 0;
 }
 
-static int32_t state_has_current_app_icon(const reach_top_bar *top_bar)
+static int32_t reach_top_bar_has_current_app_icon(const reach_top_bar *top_bar)
 {
     return top_bar->state.current_app_icon_ref[0] != 0;
 }
@@ -423,7 +423,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     reach_rect_f32 current_app = layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP];
     float current_app_gap = metrics.current_app_gap * scale;
-    if (state_has_current_app_icon(top_bar))
+    if (reach_top_bar_has_current_app_icon(top_bar))
     {
         float icon_size = height * metrics.current_app_icon_scale;
         layout->current_app_icon =
