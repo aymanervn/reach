@@ -153,17 +153,10 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
             host->window_tracking, reach_dock_item_at(host->dock_capsule, item_index)->window);
         if (window != nullptr)
         {
-            if (host->window_manager.ops.pin_app_for_window != nullptr &&
+            if (host->window_manager.ops.pin_app_for_window == nullptr ||
                 host->window_manager.ops.pin_app_for_window(host->window_manager.manager,
-                                                            window->id, window, &app) == REACH_OK)
+                                                            window->id, window, &app) != REACH_OK)
             {
-            }
-            else
-            {
-                if (window->title[0] != 0)
-                {
-                    (void)reach_copy_utf16(app.title, 128, window->title);
-                }
                 (void)reach_copy_utf16(app.path, 260, window->path);
                 (void)reach_copy_utf16(app.icon_ref, 260,
                                        window->icon_ref[0] != 0 ? window->icon_ref : window->path);

@@ -851,8 +851,6 @@ static reach_result reach_window_manager_pin_app_for_window(reach_window_manager
     *out_app = {};
     (void)reach_copy_utf16(out_app->path, 260,
                            reinterpret_cast<const uint16_t *>(helper->process_path));
-    reach_copy_path_stem_utf16(out_app->title, 128,
-                               reinterpret_cast<const uint16_t *>(helper->process_path));
     reach_window_manager_icon_ref_for_helper(*helper, out_app->icon_ref, 260);
     (void)reach_copy_utf16(out_app->app_user_model_id, 260,
                            reinterpret_cast<const uint16_t *>(helper->app_user_model_id));
