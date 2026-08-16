@@ -24,7 +24,6 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
     render_ctx.pinned_app_count = host->pinned_app_count;
     render_ctx.icon_size_px = reach_host_dock_icon_size_px(host);
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    render_ctx.dock_gap = host->dock_config.gap;
 
     reach_result result =
         reach_dock_append_render_commands(host->dock_capsule, &render_ctx, &commands);

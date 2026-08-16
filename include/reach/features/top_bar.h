@@ -9,6 +9,7 @@
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
 #include "reach/features/feature_capsule.h"
+#include "reach/services/now_playing.h"
 #include "reach/support/animation.h"
 
 #ifdef __cplusplus
@@ -40,6 +41,7 @@ extern "C"
         REACH_TOP_BAR_ANIM_Y = 0,
         REACH_TOP_BAR_ANIM_POWER_HOVER,
         REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY,
+        REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
         REACH_TOP_BAR_ANIM_COUNT
     };
 
@@ -52,14 +54,19 @@ extern "C"
     typedef enum reach_top_bar_pointer_region
     {
         REACH_TOP_BAR_POINTER_REGION_NONE = 0,
-        REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON = 1
+        REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON = 1,
+        REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING = 2
     } reach_top_bar_pointer_region;
 
     typedef enum reach_top_bar_pointer_action_kind
     {
         REACH_TOP_BAR_POINTER_ACTION_NONE = 0,
         REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER = 1,
-        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER = 2
+        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER = 2,
+        REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING = 3,
+        REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS = 4,
+        REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE = 5,
+        REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT = 6
     } reach_top_bar_pointer_action_kind;
 
     typedef struct reach_top_bar_state
@@ -84,6 +91,9 @@ extern "C"
 
     reach_result reach_top_bar_create(reach_top_bar **out_top_bar);
     void reach_top_bar_destroy(reach_top_bar *top_bar);
+
+    void reach_top_bar_attach_services(reach_top_bar *top_bar,
+                                       reach_now_playing_service *now_playing);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);

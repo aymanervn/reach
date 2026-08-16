@@ -13,7 +13,6 @@
 #include "reach/features/common/bar_visibility.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
-#include "reach/services/now_playing.h"
 #include "reach/services/window_tracking.h"
 #include "reach/support/animation.h"
 #include "reach/support/util.h"
@@ -119,7 +118,6 @@ extern "C"
     typedef enum reach_dock_pointer_action_kind
     {
         REACH_DOCK_POINTER_ACTION_NONE = 0,
-        REACH_DOCK_POINTER_ACTION_PRESS_NOW_PLAYING = 1,
         REACH_DOCK_POINTER_ACTION_PRESS_ITEM = 2,
         REACH_DOCK_POINTER_ACTION_PRESS_TRAY = 3,
         REACH_DOCK_POINTER_ACTION_PRESS_QUICK_SETTINGS = 4,
@@ -129,9 +127,6 @@ extern "C"
         REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT = 9,
         REACH_DOCK_POINTER_ACTION_TOGGLE_TRAY = 10,
         REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS = 11,
-        REACH_DOCK_POINTER_ACTION_MEDIA_PREVIOUS = 13,
-        REACH_DOCK_POINTER_ACTION_MEDIA_PLAY_PAUSE = 14,
-        REACH_DOCK_POINTER_ACTION_MEDIA_NEXT = 15,
         REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS = 16,
         REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17,
         REACH_DOCK_POINTER_ACTION_HOVER_ITEM = 18,
@@ -143,14 +138,13 @@ extern "C"
                                      const reach_dock_layout *layout, size_t current_index,
                                      float dragged_box_x);
 
-#define REACH_DOCK_SLOT_CAPACITY (REACH_MAX_DOCK_ITEMS + 2)
+#define REACH_DOCK_SLOT_CAPACITY (REACH_MAX_DOCK_ITEMS + 1)
 
     enum reach_dock_animation_id
     {
         REACH_DOCK_ANIM_Y = 0,
         REACH_DOCK_ANIM_DRAG_SNAP,
         REACH_DOCK_ANIM_FEEDBACK_OPACITY,
-        REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
         REACH_DOCK_ANIM_ITEM_X_BASE,
         REACH_DOCK_ANIM_SLOT_BASE = REACH_DOCK_ANIM_ITEM_X_BASE + REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_ANIM_COUNT = REACH_DOCK_ANIM_SLOT_BASE + REACH_DOCK_SLOT_CAPACITY
@@ -167,8 +161,7 @@ extern "C"
     void reach_dock_destroy(reach_dock *animations);
 
     void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
-                                    reach_window_tracking *windows,
-                                    reach_now_playing_service *now_playing);
+                                    reach_window_tracking *windows);
 
     reach_animation_manager *reach_dock_manager(reach_dock *animations);
 
@@ -229,7 +222,6 @@ extern "C"
         size_t pinned_app_count;
         int32_t icon_size_px;
         float dpi_scale;
-        float dock_gap;
     } reach_dock_render_context;
 
     reach_result reach_dock_append_render_commands(reach_dock *dock,

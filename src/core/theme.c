@@ -51,8 +51,7 @@
     .border_thickness = 1.5f, .icon_box_height_ratio = 0.60f,                                      \
     .icon_max_box_ratio = 0.76f, .icon_box_corner_radius_ratio = 0.28f,                            \
     .icon_box_corner_radius_max = 14.0f, .tray_slot_size_ratio = 0.3f,                             \
-    .now_playing_width = 220.0f, .now_playing_left_margin = 4.0f,                                  \
-    .now_playing_height_ratio = 0.85f, .now_playing_corner_radius_ratio = 0.5f,                    \
+    .now_playing_width = 220.0f,                                                                   \
     .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,                                          \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
     .now_playing_prev_next_button_width = 13.2f, .now_playing_title_text_size = 15.0f
@@ -381,14 +380,3 @@ float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height)
     return dock_height * actual->tray_slot_size_ratio;
 }
 
-float reach_theme_now_playing_height(const reach_theme *theme, float dock_height)
-{
-    const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
-    return dock_height * actual->now_playing_height_ratio;
-}
-
-float reach_theme_now_playing_corner_radius(const reach_theme *theme, float widget_height)
-{
-    const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
-    return widget_height * actual->now_playing_corner_radius_ratio;
-}

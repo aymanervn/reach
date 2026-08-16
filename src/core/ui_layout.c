@@ -42,10 +42,6 @@ reach_result reach_dock_layout_compute(const reach_dock_model *dock,
     out_layout->bounds.width = dock_width;
     out_layout->bounds.height = dock_height;
     out_layout->app_slot_count = input->pinned_app_count;
-    out_layout->now_playing.x = 0.0f;
-    out_layout->now_playing.y = 0.0f;
-    out_layout->now_playing.width = 0.0f;
-    out_layout->now_playing.height = 0.0f;
 
     float icon_size = reach_scale(dock->icon_size, scale);
     float gap = reach_scale(dock->gap, scale);
