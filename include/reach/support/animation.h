@@ -18,6 +18,8 @@ extern "C"
         REACH_EASING_EASE_IN_OUT = 2
     } reach_easing;
 
+    float reach_easing_apply(float value, reach_easing easing);
+
     typedef struct reach_animation_track
     {
         float from;

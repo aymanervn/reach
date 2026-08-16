@@ -46,8 +46,7 @@
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
-    .accent_tint_alpha = 0.20f, .now_playing_artist_text_size = 11.0f,                             \
-    .now_playing_text_gap = 4.0f, .dock_corner_radius_ratio = 0.5f,                                \
+    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f,                                  \
     .border_thickness = 1.5f, .icon_box_height_ratio = 0.60f,                                      \
     .icon_max_box_ratio = 0.76f, .icon_box_corner_radius_ratio = 0.28f,                            \
     .icon_box_corner_radius_max = 14.0f, .tray_slot_size_ratio = 0.3f,                             \
@@ -103,7 +102,6 @@ static const reach_theme reach_theme_dark = {
     .now_playing_background = REACH_DARK_DEEP(0.35f),
     .now_playing_title = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .now_playing_control_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
-    .now_playing_artist_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
     .launcher_search_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT),
     .launcher_search_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -234,7 +232,6 @@ static const reach_theme reach_theme_light = {
     .now_playing_background = REACH_LIGHT_RAISED(0.35f),
     .now_playing_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
     .now_playing_control_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
-    .now_playing_artist_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
 
     .launcher_search_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
     .launcher_search_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.95f),
