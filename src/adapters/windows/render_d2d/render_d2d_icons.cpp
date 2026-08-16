@@ -82,9 +82,9 @@ static float reach_d2d_clamp_radius(D2D1_RECT_F rect, float radius)
     return radius > max_radius ? max_radius : radius;
 }
 
-static reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RECT_F rect,
-                                                     float radius, int32_t corner_mask,
-                                                     ID2D1Geometry **out_geometry)
+reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RECT_F rect,
+                                              float radius, int32_t corner_mask,
+                                              ID2D1Geometry **out_geometry)
 {
     if (target == nullptr || out_geometry == nullptr)
     {

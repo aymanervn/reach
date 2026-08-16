@@ -108,6 +108,10 @@ reach_result reach_d2d_draw_icon_tint(reach_render_backend *backend,
 reach_result reach_d2d_draw_vector_icon(reach_render_backend *backend,
                                         const reach_render_command *command);
 
+reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RECT_F rect,
+                                              float radius, int32_t corner_mask,
+                                              ID2D1Geometry **out_geometry);
+
 reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target,
