@@ -46,7 +46,8 @@ extern "C"
         reach_rect_f32 pills[REACH_TOP_BAR_PILL_COUNT];
         int32_t pill_visible[REACH_TOP_BAR_PILL_COUNT];
         reach_rect_f32 power_button;
-        reach_rect_f32 clock;
+        reach_rect_f32 clock_time;
+        reach_rect_f32 clock_date;
         reach_rect_f32 current_app_icon;
         reach_rect_f32 current_app_text;
         reach_rect_f32 tray_icons[REACH_TOP_BAR_MAX_TRAY_ICONS];
@@ -54,8 +55,10 @@ extern "C"
         reach_rect_f32 tray_overflow_button;
         reach_rect_f32 quick_settings_button;
         reach_rect_f32 language_button;
-        reach_rect_f32 stats_usage;
-        reach_rect_f32 stats_network;
+        reach_rect_f32 stats_cpu;
+        reach_rect_f32 stats_memory;
+        reach_rect_f32 stats_download;
+        reach_rect_f32 stats_upload;
     } reach_top_bar_layout;
 
     enum reach_top_bar_animation_id
@@ -64,6 +67,8 @@ extern "C"
         REACH_TOP_BAR_ANIM_POWER_HOVER,
         REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY,
         REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
+        REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH,
+        REACH_TOP_BAR_ANIM_TRAY_WIDTH,
         REACH_TOP_BAR_ANIM_COUNT
     };
 
@@ -125,7 +130,6 @@ extern "C"
         int32_t clock_initialized;
 
         uint16_t current_app_name[260];
-        uint16_t current_app_title[260];
         uint16_t current_app_icon_ref[260];
 
         uint16_t language_code[8];
