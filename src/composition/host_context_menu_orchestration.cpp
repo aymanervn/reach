@@ -13,7 +13,7 @@ void reach_host_close_context_menu(reach_host *host)
     reach_host_sync_pointer_move_subscriptions(host);
     if (was_open)
     {
-        reach_host_request_dock_visibility_update(host);
+        reach_host_request_bar_visibility_update(host);
     }
     reach_host_sync_popup_mouse_hook(host);
 }

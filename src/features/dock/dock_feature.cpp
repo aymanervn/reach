@@ -245,11 +245,6 @@ int32_t reach_dock_take_items_changed(reach_dock *dock)
     return 1;
 }
 
-int32_t reach_dock_pointer_sequence_active(const reach_dock *dock)
-{
-    return dock != nullptr && dock->state.pointer_sequence_active;
-}
-
 reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
                                                        int32_t local_y)
 {
@@ -442,9 +437,15 @@ static int32_t reach_dock_capsule_needs_frame(const void *capsule)
            (reach_animation_manager_any_active(&dock->manager) || dock->state.drag.active);
 }
 
+static int32_t reach_dock_capsule_pointer_sequence_active(const void *capsule)
+{
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    return dock != nullptr && dock->state.pointer_sequence_active;
+}
+
 static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
 {
-    return reach_dock_pointer_sequence_active(static_cast<const reach_dock *>(capsule));
+    return reach_dock_capsule_pointer_sequence_active(capsule);
 }
 
 static void reach_dock_capsule_begin_pointer_sequence(reach_dock *dock,
@@ -726,6 +727,7 @@ const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
         reach_dock_capsule_needs_frame,
         reach_dock_capsule_wants_pointer_move,
         reach_dock_capsule_handle_pointer,
+        reach_dock_capsule_pointer_sequence_active,
     };
     return &ops;
 }
@@ -746,6 +748,7 @@ reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_BAR_EDGE_BOTTOM;
     bar_request.pointer_sequence_active = animations->state.pointer_sequence_active;
+    bar_request.sticky_feedback = animations->state.feedback_sticky;
 
     return reach_bar_update_visibility(&animations->state.visibility, &animations->manager,
                                        REACH_DOCK_ANIM_Y, &bar_request);

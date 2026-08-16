@@ -85,7 +85,7 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     host->window_list.dwell_active = 0;
     reach_host_sync_pointer_move_subscriptions(host);
     reach_host_sync_popup_mouse_hook(host);
-    reach_host_request_dock_visibility_update(host);
+    reach_host_request_bar_visibility_update(host);
     return REACH_OK;
 }
 

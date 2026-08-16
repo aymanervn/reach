@@ -235,7 +235,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 reach_rect_f32 animated_dock_bounds =
                     game_mode
                         ? shown_dock_bounds
-                        : reach_host_reconcile_dock_visibility(host, shown_dock_bounds, bounds);
+                        : reach_host_reconcile_bar_visibility(host, REACH_SURFACE_ID_DOCK,
+                                                              shown_dock_bounds, bounds);
                 if (game_mode)
                 {
                     if (host->dock_reveal_edge.ops.hide != nullptr)

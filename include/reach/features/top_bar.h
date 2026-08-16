@@ -186,7 +186,6 @@ extern "C"
 
     reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar *top_bar,
                                                                  int32_t local_x, int32_t local_y);
-    int32_t reach_top_bar_pointer_sequence_active(const reach_top_bar *top_bar);
     void reach_top_bar_suppress_power_release(reach_top_bar *top_bar);
 
     int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);

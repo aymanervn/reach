@@ -73,6 +73,8 @@ extern "C"
 
         void (*handle_pointer)(void *capsule, const reach_pointer_event *event,
                                reach_capsule_pointer_result *out);
+
+        int32_t (*pointer_sequence_active)(const void *capsule);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

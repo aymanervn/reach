@@ -36,7 +36,7 @@ int32_t reach_host_dock_can_hide(const reach_host *host)
     return 0;
 }
 
-void reach_host_request_dock_visibility_update(reach_host *host)
+void reach_host_request_bar_visibility_update(reach_host *host)
 {
     if (host == nullptr)
     {
@@ -163,10 +163,17 @@ static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
     }
 }
 
-reach_rect_f32 reach_host_reconcile_dock_visibility(reach_host *host, reach_rect_f32 shown_bounds,
-                                                    reach_rect_f32 monitor_bounds)
+reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
+                                                   reach_rect_f32 shown_bounds,
+                                                   reach_rect_f32 monitor_bounds)
 {
     REACH_ASSERT(host != nullptr);
+
+    const reach_surface_desc *desc = &host->surface_descs[id];
+    if (desc->update_visibility == nullptr)
+    {
+        return shown_bounds;
+    }
 
     reach_bar_visibility_request request = {};
     request.shown_bounds = shown_bounds;
@@ -175,44 +182,17 @@ reach_rect_f32 reach_host_reconcile_dock_visibility(reach_host *host, reach_rect
     request.game_mode = reach_host_game_mode_enabled(host);
     request.can_hide = reach_host_dock_can_hide(host);
     request.transient_open = reach_host_transient_open(host);
-    request.sticky_feedback = reach_dock_state_ptr(host->dock_capsule)->feedback_sticky;
 
-    reach_bar_visibility_result result =
-        reach_dock_update_visibility(host->dock_capsule, &request);
+    reach_bar_visibility_result result = desc->update_visibility(desc->capsule, &request);
 
     if (result.clear_sticky_feedback)
     {
         reach_host_clear_sticky_dock_feedback(host);
     }
 
-    reach_host_apply_reveal_edge(&host->dock_reveal_edge, &host->dock_reveal, &host->dock,
-                                 REACH_BAR_EDGE_BOTTOM, result.edge_mode, shown_bounds,
-                                 monitor_bounds);
+    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, desc->surface, desc->bar_edge,
+                                 result.edge_mode, shown_bounds, monitor_bounds);
     reach_host_sync_pointer_move_subscriptions(host);
-
-    return result.animated_bounds;
-}
-
-reach_rect_f32 reach_host_reconcile_top_bar_visibility(reach_host *host,
-                                                       reach_rect_f32 shown_bounds,
-                                                       reach_rect_f32 monitor_bounds)
-{
-    REACH_ASSERT(host != nullptr);
-
-    reach_bar_visibility_request request = {};
-    request.shown_bounds = shown_bounds;
-    request.monitor_bounds = monitor_bounds;
-    request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
-    request.game_mode = reach_host_game_mode_enabled(host);
-    request.can_hide = reach_host_dock_can_hide(host);
-    request.transient_open = reach_host_transient_open(host);
-
-    reach_bar_visibility_result result =
-        reach_top_bar_update_visibility(host->top_bar_capsule, &request);
-
-    reach_host_apply_reveal_edge(&host->top_bar_reveal_edge, &host->top_bar_reveal, &host->top_bar,
-                                 REACH_BAR_EDGE_TOP, result.edge_mode, shown_bounds,
-                                 monitor_bounds);
 
     return result.animated_bounds;
 }
@@ -235,59 +215,22 @@ void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bo
 
     reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS] = {};
     size_t tray_item_count = reach_tray_item_count(host->tray_capsule);
-    if (tray_item_count > REACH_TOP_BAR_MAX_TRAY_ICONS)
-    {
-        tray_item_count = REACH_TOP_BAR_MAX_TRAY_ICONS;
-    }
-    for (size_t index = 0; index < tray_item_count; ++index)
+    size_t copied_count = tray_item_count < REACH_TOP_BAR_MAX_TRAY_ICONS
+                              ? tray_item_count
+                              : REACH_TOP_BAR_MAX_TRAY_ICONS;
+    for (size_t index = 0; index < copied_count; ++index)
     {
         tray_items[index].id = reach_tray_item_id(host->tray_capsule, index);
         tray_items[index].icon_id = reach_tray_item_icon_id(host->tray_capsule, index);
     }
     ctx.tray_items = tray_items;
-    ctx.tray_item_count = reach_tray_item_count(host->tray_capsule);
+    ctx.tray_item_count = tray_item_count;
     ctx.tray_popup_open = reach_tray_popup_is_open(host->tray_capsule);
     ctx.language_code = host->input_language_code;
 
     reach_top_bar_build_layout(host->top_bar_capsule, &ctx);
     reach_tray_set_overflow_start(host->tray_capsule,
                                   reach_top_bar_tray_overflow_start(host->top_bar_capsule));
-}
-
-int32_t reach_host_refresh_input_language(reach_host *host)
-{
-    if (host == nullptr || host->input_language.ops.get_state == nullptr)
-    {
-        return 0;
-    }
-
-    reach_input_language_state state = {};
-    if (host->input_language.ops.get_state(host->input_language.language,
-                                           reach_host_foreground_window(host),
-                                           &state) != REACH_OK)
-    {
-        return 0;
-    }
-
-    for (size_t index = 0; index < 8; ++index)
-    {
-        if (host->input_language_code[index] != state.code[index])
-        {
-            reach_copy_utf16(host->input_language_code, 8, state.code);
-            return 1;
-        }
-    }
-    return 0;
-}
-
-reach_result reach_host_cycle_input_language(reach_host *host)
-{
-    if (host == nullptr || host->input_language.ops.cycle_next == nullptr)
-    {
-        return REACH_OK;
-    }
-    return host->input_language.ops.cycle_next(host->input_language.language,
-                                               reach_host_foreground_window(host));
 }
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host)
