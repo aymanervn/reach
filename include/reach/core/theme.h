@@ -62,6 +62,7 @@ extern "C"
         reach_color bar_stats_upload;
         reach_color dock_running_indicator;
         reach_color bar_click_feedback;
+        reach_color bar_separator_dot;
 
         reach_color tray_click_feedback;
 
@@ -166,6 +167,8 @@ extern "C"
         float icon_box_corner_radius_ratio;
         float icon_box_corner_radius_max;
         float tray_slot_size_ratio;
+        float bar_separator_dot_size;
+        float bar_separator_dot_gap;
         float now_playing_width;
         float now_playing_padding;
         float now_playing_gap;

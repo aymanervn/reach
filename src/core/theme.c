@@ -51,6 +51,7 @@
     .border_thickness = 1.5f, .icon_box_height_ratio = 0.60f,                                      \
     .icon_max_box_ratio = 0.76f, .icon_box_corner_radius_ratio = 0.28f,                            \
     .icon_box_corner_radius_max = 14.0f, .tray_slot_size_ratio = 0.3f,                             \
+    .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,                                 \
     .now_playing_width = 220.0f,                                                                   \
     .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,                                          \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
@@ -84,6 +85,7 @@ static const reach_theme reach_theme_dark = {
     .bar_stats_upload = REACH_DARK_ACCENT_ORANGE(1.0f),
     .dock_running_indicator = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .bar_click_feedback = REACH_DARK_RAISED(1.0f),
+    .bar_separator_dot = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
     .tray_click_feedback = REACH_DARK_RAISED(1.0f),
 
@@ -214,6 +216,7 @@ static const reach_theme reach_theme_light = {
     .bar_stats_upload = REACH_LIGHT_ACCENT_ORANGE(1.0f),
     .dock_running_indicator = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .bar_click_feedback = REACH_LIGHT_RAISED(1.0f),
+    .bar_separator_dot = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
 
     .tray_click_feedback = REACH_LIGHT_RAISED(1.0f),
 

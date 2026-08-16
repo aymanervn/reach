@@ -326,7 +326,16 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float date_advance = reach_top_bar_text_advance(top_bar->state.clock_date_text, date_size);
     float clock_width = time_advance + clock_gap + date_advance;
 
-    float power_clock_width = padding * 2.0f + power_button_size + clock_gap + clock_width;
+    const float dot_size = ctx->theme->bar_separator_dot_size * scale;
+    const float dot_gap = ctx->theme->bar_separator_dot_gap * scale;
+
+    float now_playing_width = reach_top_bar_resolve_animated_width(
+        top_bar, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH, &top_bar->now_playing_target_width,
+        reach_top_bar_now_playing_desired_width(top_bar->now_playing_subfeature, ctx->theme,
+                                                scale));
+
+    float power_clock_width = padding + power_button_size + clock_gap + clock_width + dot_gap +
+                              dot_size + dot_gap + now_playing_width;
     float left = edge_inset;
     layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK] =
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
@@ -339,13 +348,12 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->clock_date = reach_top_bar_text_run(clock_x + time_advance + clock_gap, height,
                                                 date_advance, date_size);
 
-    left += power_clock_width + pill_gap;
-    float now_playing_width = reach_top_bar_resolve_animated_width(
-        top_bar, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH, &top_bar->now_playing_target_width,
-        reach_top_bar_now_playing_desired_width(top_bar->now_playing_subfeature, ctx->theme,
-                                                scale));
-    layout->pills[REACH_TOP_BAR_PILL_NOW_PLAYING] =
-        reach_top_bar_rect(left, 0.0f, now_playing_width, height);
+    layout->now_playing =
+        reach_top_bar_rect(left + power_clock_width - now_playing_width, 0.0f, now_playing_width,
+                           height);
+    layout->now_playing_separator =
+        reach_top_bar_rect(layout->now_playing.x - dot_gap - dot_size, (height - dot_size) * 0.5f,
+                           dot_size, dot_size);
 
     reach_top_bar_update_language(top_bar);
     reach_top_bar_update_stats(top_bar);
@@ -484,7 +492,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     }
 
     reach_top_bar_now_playing_relayout(top_bar->now_playing_subfeature, ctx->theme,
-                                       layout->pills[REACH_TOP_BAR_PILL_NOW_PLAYING], scale);
+                                       layout->now_playing, scale);
 }
 
 reach_point_i32 reach_top_bar_local_point(const reach_top_bar_layout *layout, int32_t x, int32_t y)

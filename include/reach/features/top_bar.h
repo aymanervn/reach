@@ -25,11 +25,10 @@ extern "C"
     typedef enum reach_top_bar_pill
     {
         REACH_TOP_BAR_PILL_POWER_CLOCK = 0,
-        REACH_TOP_BAR_PILL_NOW_PLAYING = 1,
-        REACH_TOP_BAR_PILL_CURRENT_APP = 2,
-        REACH_TOP_BAR_PILL_TRAY = 3,
-        REACH_TOP_BAR_PILL_QUICK_SETTINGS = 4,
-        REACH_TOP_BAR_PILL_COUNT = 5
+        REACH_TOP_BAR_PILL_CURRENT_APP = 1,
+        REACH_TOP_BAR_PILL_TRAY = 2,
+        REACH_TOP_BAR_PILL_QUICK_SETTINGS = 3,
+        REACH_TOP_BAR_PILL_COUNT = 4
     } reach_top_bar_pill;
 
 #define REACH_TOP_BAR_MAX_TRAY_ICONS 11
@@ -48,6 +47,8 @@ extern "C"
         reach_rect_f32 power_button;
         reach_rect_f32 clock_time;
         reach_rect_f32 clock_date;
+        reach_rect_f32 now_playing_separator;
+        reach_rect_f32 now_playing;
         reach_rect_f32 current_app_icon;
         reach_rect_f32 current_app_text;
         reach_rect_f32 tray_icons[REACH_TOP_BAR_MAX_TRAY_ICONS];

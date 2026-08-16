@@ -245,6 +245,17 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
                             input->theme->bar_text_secondary);
 }
 
+static void reach_top_bar_push_separator_dot(const reach_top_bar_render_input *input,
+                                             reach_render_command_buffer *commands,
+                                             reach_rect_f32 dot)
+{
+    if (dot.width <= 0.0f)
+    {
+        return;
+    }
+    reach_top_bar_push_rect(commands, dot, input->theme->bar_separator_dot, dot.height * 0.5f);
+}
+
 static void reach_top_bar_push_current_app(const reach_top_bar_render_input *input,
                                            reach_render_command_buffer *commands)
 {
@@ -426,7 +437,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
 
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
     {
-        if (!layout->pill_visible[index] || index == REACH_TOP_BAR_PILL_NOW_PLAYING)
+        if (!layout->pill_visible[index])
         {
             continue;
         }
@@ -465,6 +476,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
 
     reach_top_bar_push_power_button(&input, out_commands);
     reach_top_bar_push_clock(&input, out_commands);
+    reach_top_bar_push_separator_dot(&input, out_commands, layout->now_playing_separator);
     reach_top_bar_push_current_app(&input, out_commands);
     reach_top_bar_push_tray(&input, out_commands);
     reach_top_bar_push_stats(&input, out_commands);
