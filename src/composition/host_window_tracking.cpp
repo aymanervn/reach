@@ -59,6 +59,7 @@ void reach_host_apply_foreground_change(reach_host *host)
     reach_host_note_foreground_window(host, foreground);
     reach_host_refresh_switcher_windows(host);
     host->dock.dirty_flags = 1;
+    host->top_bar.dirty_flags = 1;
     host->switcher.dirty_flags = 1;
 
     reach_host_close_activating_surfaces_on_focus_loss(host);

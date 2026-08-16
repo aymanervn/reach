@@ -229,6 +229,9 @@ void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bo
     ctx.monitor_bounds = monitor_bounds;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.dock_height = host->layout.dock.bounds.height;
+    ctx.foreground_window = reach_host_foreground_window(host);
+    ctx.pinned_apps = host->pinned_apps;
+    ctx.pinned_app_count = host->pinned_app_count;
     reach_top_bar_build_layout(host->top_bar_capsule, &ctx);
 }
 

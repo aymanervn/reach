@@ -15,6 +15,13 @@ struct reach_top_bar_metrics
     float now_playing_collapsed_width;
     float now_playing_collapsed_glyph_scale;
     float current_app_width;
+    float current_app_icon_scale;
+    float current_app_gap;
+    float current_app_name_height_ratio;
+    float current_app_name_text_size;
+    int32_t current_app_name_text_weight;
+    float current_app_title_text_size;
+    int32_t current_app_title_text_weight;
     float current_app_max_width_ratio;
     float tray_width;
     float quick_settings_width;
@@ -52,6 +59,13 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.now_playing_collapsed_width = 44.0f;
     metrics.now_playing_collapsed_glyph_scale = 0.46f;
     metrics.current_app_width = 220.0f;
+    metrics.current_app_icon_scale = 0.60f;
+    metrics.current_app_gap = 8.0f;
+    metrics.current_app_name_height_ratio = 0.52f;
+    metrics.current_app_name_text_size = 14.0f;
+    metrics.current_app_name_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+    metrics.current_app_title_text_size = 11.0f;
+    metrics.current_app_title_text_weight = REACH_TEXT_WEIGHT_NORMAL;
     metrics.current_app_max_width_ratio = 0.28f;
     metrics.tray_width = 96.0f;
     metrics.quick_settings_width = 84.0f;

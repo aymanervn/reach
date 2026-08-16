@@ -11,6 +11,9 @@ typedef struct reach_top_bar_render_input
     const uint16_t *time_text;
     const uint16_t *date_text;
     float dpi_scale;
+    uint64_t current_app_icon_id;
+    const uint16_t *current_app_name;
+    const uint16_t *current_app_title;
     int32_t battery_valid;
     int32_t battery_percent;
     float power_hover;
@@ -240,6 +243,50 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
         REACH_TEXT_ALIGNMENT_LEADING, input->theme->dock_clock_date);
 }
 
+static void reach_top_bar_push_current_app(const reach_top_bar_render_input *input,
+                                           reach_render_command_buffer *commands)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    reach_rect_f32 text = input->layout->current_app_text;
+    if (text.width <= 0.0f)
+    {
+        return;
+    }
+
+    if (input->current_app_icon_id != 0 && input->layout->current_app_icon.width > 0.0f)
+    {
+        reach_render_command icon = {};
+        icon.type = REACH_RENDER_COMMAND_ICON;
+        icon.rect = input->layout->current_app_icon;
+        icon.icon_id = input->current_app_icon_id;
+        icon.color.a = 1.0f;
+        reach_render_command_buffer_push(commands, &icon);
+    }
+
+    int32_t has_title = input->current_app_title != nullptr && input->current_app_title[0] != 0;
+    if (!has_title)
+    {
+        reach_top_bar_push_text(commands, text, input->current_app_name,
+                                metrics.current_app_name_text_size,
+                                metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+                                input->theme->dock_clock_time);
+        return;
+    }
+
+    float name_height = text.height * metrics.current_app_name_height_ratio;
+    reach_top_bar_push_text(commands,
+                            reach_top_bar_rect(text.x, text.y, text.width, name_height),
+                            input->current_app_name, metrics.current_app_name_text_size,
+                            metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+                            input->theme->dock_clock_time);
+    reach_top_bar_push_text(
+        commands,
+        reach_top_bar_rect(text.x, text.y + name_height, text.width, text.height - name_height),
+        input->current_app_title, metrics.current_app_title_text_size,
+        metrics.current_app_title_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+        input->theme->dock_clock_date);
+}
+
 reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
                                                   const reach_top_bar_render_context *ctx,
                                                   reach_render_command_buffer *out_commands)
@@ -276,9 +323,18 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.click_feedback_index = state->feedback_index;
     input.click_feedback_opacity =
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
+    input.current_app_name = state->current_app_name;
+    input.current_app_title = state->current_app_title;
+    if (state->current_app_icon_ref[0] != 0)
+    {
+        input.current_app_icon_id = reach_icon_service_get(reach_top_bar_icons(top_bar),
+                                                           state->current_app_icon_ref,
+                                                           ctx->icon_size_px);
+    }
 
     reach_top_bar_push_power_button(&input, out_commands);
     reach_top_bar_push_clock(&input, out_commands);
+    reach_top_bar_push_current_app(&input, out_commands);
 
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;

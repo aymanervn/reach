@@ -53,6 +53,7 @@ reach_result reach_host_render_top_bar_surface(reach_host *host)
     reach_top_bar_render_context render_ctx = {};
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+    render_ctx.icon_size_px = reach_host_dock_icon_size_px(host);
 
     reach_power_state power = {};
     if (host->system_controls.get_power_state != nullptr &&

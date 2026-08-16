@@ -12,6 +12,8 @@ struct reach_top_bar
     reach_top_bar_state state;
     reach_top_bar_now_playing *now_playing_subfeature;
     reach_now_playing_service *now_playing;
+    reach_icon_service *icons;
+    reach_window_tracking *windows;
     float now_playing_target_width;
 };
 
@@ -19,6 +21,7 @@ struct reach_top_bar
 
 reach_top_bar_state *reach_top_bar_state_mut(reach_top_bar *top_bar);
 reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *top_bar);
+reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar);
 
 reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *layout,
                                                     int32_t local_x, int32_t local_y);

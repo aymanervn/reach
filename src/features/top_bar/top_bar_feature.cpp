@@ -58,17 +58,113 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
     delete top_bar;
 }
 
-void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_service *now_playing)
+void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_service *now_playing,
+                                   reach_icon_service *icons, reach_window_tracking *windows)
 {
     if (top_bar != nullptr)
     {
         top_bar->now_playing = now_playing;
+        top_bar->icons = icons;
+        top_bar->windows = windows;
+    }
+}
+
+reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar)
+{
+    return top_bar != nullptr ? top_bar->icons : nullptr;
+}
+
+static const uint16_t *reach_top_bar_path_stem(const uint16_t *path)
+{
+    if (path == nullptr)
+    {
+        return nullptr;
+    }
+    const uint16_t *stem = path;
+    for (const uint16_t *cursor = path; *cursor != 0; ++cursor)
+    {
+        if (*cursor == '\\' || *cursor == '/')
+        {
+            stem = cursor + 1;
+        }
+    }
+    return stem;
+}
+
+static void reach_top_bar_copy_stem_without_extension(uint16_t *dst, size_t dst_count,
+                                                      const uint16_t *path)
+{
+    const uint16_t *stem = reach_top_bar_path_stem(path);
+    if (dst == nullptr || dst_count == 0)
+    {
+        return;
+    }
+    size_t length = 0;
+    size_t last_dot = 0;
+    while (stem != nullptr && stem[length] != 0 && length + 1 < dst_count)
+    {
+        if (stem[length] == '.')
+        {
+            last_dot = length;
+        }
+        dst[length] = stem[length];
+        ++length;
+    }
+    if (last_dot > 0)
+    {
+        length = last_dot;
+    }
+    dst[length] = 0;
+}
+
+static void reach_top_bar_update_current_app(reach_top_bar *top_bar,
+                                             const reach_top_bar_build_context *ctx)
+{
+    reach_top_bar_state *state = &top_bar->state;
+    state->current_app_name[0] = 0;
+    state->current_app_title[0] = 0;
+    state->current_app_icon_ref[0] = 0;
+
+    const reach_window_snapshot *window =
+        ctx->foreground_window != 0 && top_bar->windows != nullptr
+            ? reach_window_tracking_window_by_id(top_bar->windows, ctx->foreground_window)
+            : nullptr;
+    if (window == nullptr)
+    {
+        reach_copy_utf16(state->current_app_name, 260, (const uint16_t *)L"Desktop");
+        return;
+    }
+
+    reach_copy_utf16(state->current_app_title, 260, window->title);
+    reach_copy_utf16(state->current_app_icon_ref, 260,
+                     window->icon_ref[0] != 0 ? window->icon_ref : window->path);
+
+    for (size_t index = 0; index < ctx->pinned_app_count; ++index)
+    {
+        const reach_pinned_app_model *app = &ctx->pinned_apps[index];
+        if (reach_window_tracking_window_matches_app(app, window) && app->title[0] != 0)
+        {
+            reach_copy_utf16(state->current_app_name, 260, app->title);
+            return;
+        }
+    }
+
+    reach_top_bar_copy_stem_without_extension(state->current_app_name, 260, window->path);
+    if (state->current_app_name[0] == 0)
+    {
+        reach_copy_utf16(state->current_app_name, 260, window->title);
+        state->current_app_title[0] = 0;
     }
 }
 
 reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *top_bar)
 {
     return top_bar != nullptr ? top_bar->now_playing_subfeature : nullptr;
+}
+
+static int32_t state_has_current_app_icon(const reach_top_bar *top_bar)
+{
+    return top_bar->state.current_app_icon_ref[0] != 0;
 }
 
 float reach_top_bar_height(const reach_theme *theme, float dock_height)
@@ -161,6 +257,29 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     }
     layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP] = reach_top_bar_rect(
         (layout->bounds.width - current_app_width) * 0.5f, 0.0f, current_app_width, height);
+
+    reach_top_bar_update_current_app(top_bar, ctx);
+
+    reach_rect_f32 current_app = layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP];
+    float current_app_gap = metrics.current_app_gap * scale;
+    if (state_has_current_app_icon(top_bar))
+    {
+        float icon_size = height * metrics.current_app_icon_scale;
+        layout->current_app_icon =
+            reach_top_bar_rect(current_app.x + padding, (height - icon_size) * 0.5f, icon_size,
+                               icon_size);
+        layout->current_app_text = reach_top_bar_rect(
+            layout->current_app_icon.x + icon_size + current_app_gap, 0.0f,
+            current_app.x + current_app.width - padding -
+                (layout->current_app_icon.x + icon_size + current_app_gap),
+            height);
+    }
+    else
+    {
+        layout->current_app_icon = {};
+        layout->current_app_text = reach_top_bar_rect(current_app.x + padding, 0.0f,
+                                                      current_app.width - padding * 2.0f, height);
+    }
 
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
     {
