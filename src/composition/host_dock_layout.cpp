@@ -397,10 +397,7 @@ int32_t reach_host_can_move_dock_without_redraw(const reach_host *host)
     return reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
                                           REACH_DOCK_ANIM_Y) &&
            host->has_layout && !host->dirty.update_requested && !host->dirty.layout &&
-           !host->dirty.render && !host->dock.dirty_flags && !host->launcher.dirty_flags &&
-           !host->tray.dirty_flags && !host->switcher.dirty_flags &&
-           !host->context_menu.dirty_flags && !host->quick_settings.dirty_flags &&
-           !host->clipboard_surface.dirty_flags && !host->stage.dirty_flags &&
+           !host->dirty.render && !reach_host_any_surface_dirty(host) &&
            !reach_dock_slots_animating(host->dock_capsule) &&
            !reach_dock_state_ptr(host->dock_capsule)->drag.active &&
            !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
