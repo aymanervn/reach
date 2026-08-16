@@ -809,7 +809,8 @@ reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *t
     animation.content_animating =
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
-        reach_top_bar_width_animation_active(top_bar);
+        reach_top_bar_width_animation_active(top_bar) ||
+        reach_top_bar_now_playing_scrolling(top_bar->now_playing_subfeature);
     return animation;
 }
 
@@ -878,6 +879,11 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     {
         out->relayout = 1;
     }
+    if (reach_top_bar_now_playing_tick(top_bar->now_playing_subfeature, delta_seconds) &&
+        out != nullptr)
+    {
+        out->redraw = 1;
+    }
 
     reach_animation_manager *manager = &top_bar->manager;
     int32_t feedback_was_active =
@@ -935,7 +941,8 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
     return reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_Y) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
-           reach_top_bar_width_animation_active(top_bar);
+           reach_top_bar_width_animation_active(top_bar) ||
+           reach_top_bar_now_playing_scrolling(top_bar->now_playing_subfeature);
 }
 
 static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule)

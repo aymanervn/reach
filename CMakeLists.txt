@@ -107,6 +107,7 @@ target_compile_features(reach_core PUBLIC
 add_library(reach_features STATIC
     src/features/common/bar_visibility/bar_visibility.cpp
     src/features/common/loader/loader_render.cpp
+    src/features/common/marquee/marquee.cpp
     src/features/common/progress_bar/progress_bar_render.cpp
     src/features/common/scrollbar/scrollbar_render.cpp
     src/features/common/text_edit/text_edit.cpp

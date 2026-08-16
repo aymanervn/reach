@@ -80,7 +80,6 @@ extern "C"
         reach_color now_playing_background;
         reach_color now_playing_title;
         reach_color now_playing_control_text;
-        reach_color now_playing_artist_text;
 
         reach_color launcher_search_background;
         reach_color launcher_search_text;
@@ -158,8 +157,6 @@ extern "C"
         float radius_large;
         float button_pressed_darken;
         float accent_tint_alpha;
-        float now_playing_artist_text_size;
-        float now_playing_text_gap;
         float dock_corner_radius_ratio;
         float border_thickness;
         float icon_box_height_ratio;

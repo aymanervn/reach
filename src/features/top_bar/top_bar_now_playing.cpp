@@ -14,6 +14,8 @@ struct reach_top_bar_now_playing
 {
     reach_top_bar_now_playing_model model;
     reach_top_bar_now_playing_layout layout;
+    reach_marquee_state marquee;
+    float text_offset_x;
     reach_now_playing_action pressed_action;
     uint64_t observed_generation;
 };
@@ -42,7 +44,8 @@ static void reach_top_bar_now_playing_push_rect(reach_render_command_buffer *com
 
 static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *commands,
                                              reach_rect_f32 rect, const uint16_t *value, float size,
-                                             int32_t weight, int32_t alignment, reach_color color)
+                                             int32_t weight, int32_t alignment, reach_color color,
+                                             reach_rect_f32 clip)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
@@ -51,9 +54,64 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
     command.text_size = size;
     command.text_weight = weight;
     command.text_alignment = alignment;
-    command.text_ellipsis = 1;
+    command.has_scissor = 1;
+    command.scissor_rect = clip;
     reach_copy_utf16(command.text, 260, value);
     (void)reach_render_command_buffer_push(commands, &command);
+}
+
+static float reach_top_bar_now_playing_text_advance(const uint16_t *text, float text_size)
+{
+    if (text == nullptr || text_size <= 0.0f)
+    {
+        return 0.0f;
+    }
+    size_t length = 0;
+    while (text[length] != 0)
+    {
+        ++length;
+    }
+    return (float)length * text_size * reach_top_bar_metrics_values.glyph_advance_ratio;
+}
+
+static int32_t reach_top_bar_now_playing_utf16_equal(const uint16_t *a, const uint16_t *b)
+{
+    size_t index = 0;
+    while (a[index] != 0 || b[index] != 0)
+    {
+        if (a[index] != b[index])
+        {
+            return 0;
+        }
+        ++index;
+    }
+    return 1;
+}
+
+static void reach_top_bar_now_playing_compose_line(reach_top_bar_now_playing_model *model)
+{
+    static const uint16_t separator[] = {' ', 0x2022, ' ', 0};
+
+    size_t length = 0;
+    for (size_t index = 0; model->title[index] != 0 && length + 1 < 260; ++index)
+    {
+        model->line[length++] = model->title[index];
+    }
+    if (length > 0 && model->artist[0] != 0)
+    {
+        for (size_t index = 0; separator[index] != 0 && length + 1 < 260; ++index)
+        {
+            model->line[length++] = separator[index];
+        }
+    }
+    if (length > 0 || model->title[0] == 0)
+    {
+        for (size_t index = 0; model->artist[index] != 0 && length + 1 < 260; ++index)
+        {
+            model->line[length++] = model->artist[index];
+        }
+    }
+    model->line[length] = 0;
 }
 
 void reach_top_bar_now_playing_model_init(reach_top_bar_now_playing_model *model)
@@ -100,7 +158,6 @@ reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *
     const reach_theme *actual = theme != nullptr ? theme : reach_theme_default();
     float padding = actual->now_playing_padding * dpi_scale;
     float cover_gap = actual->now_playing_gap * dpi_scale;
-    float text_gap = actual->now_playing_text_gap * dpi_scale;
     float button_gap = actual->now_playing_control_gap * dpi_scale;
     float play_size = actual->now_playing_play_button_width * dpi_scale;
     float skip_size = actual->now_playing_prev_next_button_width * dpi_scale;
@@ -120,16 +177,9 @@ reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *
     layout.cover = reach_top_bar_now_playing_rect(
         bounds.x, bounds.y, bounds.width * REACH_TOP_BAR_NOW_PLAYING_COVER_WIDTH, bounds.height);
 
-    float title_height = actual->now_playing_title_text_size * dpi_scale;
-    float artist_height = actual->now_playing_artist_text_size * dpi_scale;
-    float text_y = bounds.y + (bounds.height - title_height - artist_height - text_gap) * 0.5f;
-    if (text_y < bounds.y + padding)
-    {
-        text_y = bounds.y + padding;
-    }
-    layout.title = reach_top_bar_now_playing_rect(text_x, text_y, text_width, title_height);
-    layout.artist = reach_top_bar_now_playing_rect(text_x, text_y + title_height + text_gap,
-                                                text_width, artist_height);
+    float text_size = actual->now_playing_title_text_size * dpi_scale;
+    layout.text = reach_top_bar_now_playing_rect(text_x, bounds.y, text_width, bounds.height);
+    layout.text_advance = reach_top_bar_now_playing_text_advance(model->line, text_size);
     layout.previous_button = reach_top_bar_now_playing_rect(
         previous_x, bounds.y + (bounds.height - skip_size) * 0.5f, skip_size, skip_size);
     layout.play_pause_button = reach_top_bar_now_playing_rect(
@@ -236,17 +286,18 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
                                          theme->bar_button_background, radius);
     }
 
-    if (input->layout->title.height <= 0.0f || input->layout->play_pause_button.width <= 0.0f)
+    if (input->layout->text.width <= 0.0f || input->layout->play_pause_button.width <= 0.0f)
     {
         return REACH_OK;
     }
 
-    reach_top_bar_now_playing_push_text(out_commands, input->layout->title, input->model->title,
-                                     theme->now_playing_title_text_size, REACH_TEXT_WEIGHT_DEMIBOLD,
-                                     REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title);
-    reach_top_bar_now_playing_push_text(out_commands, input->layout->artist, input->model->artist,
-                                     theme->now_playing_artist_text_size, REACH_TEXT_WEIGHT_NORMAL,
-                                     REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_artist_text);
+    reach_rect_f32 text = input->layout->text;
+    text.x += input->text_offset_x;
+    text.width = input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
+    reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
+                                     theme->now_playing_title_text_size, REACH_TEXT_WEIGHT_BOLD,
+                                     REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title,
+                                     input->layout->text);
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
                                      input->model->playback == REACH_MEDIA_PLAYBACK_PLAYING
@@ -330,6 +381,8 @@ void reach_top_bar_now_playing_reset(reach_top_bar_now_playing *now_playing)
     }
     reach_top_bar_now_playing_model_init(&now_playing->model);
     now_playing->layout = {};
+    reach_marquee_reset(&now_playing->marquee);
+    now_playing->text_offset_x = 0.0f;
     now_playing->pressed_action = REACH_NOW_PLAYING_ACTION_NONE;
     now_playing->observed_generation = 0;
 }
@@ -358,12 +411,18 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     next.visible = snapshot.has_session;
     reach_copy_utf16(next.title, 260, snapshot.title);
     reach_copy_utf16(next.artist, 260, snapshot.artist);
+    reach_top_bar_now_playing_compose_line(&next);
     next.cover_image_id = snapshot.cover_image_id;
     next.cover_accent = snapshot.cover_accent;
     next.playback = snapshot.playback;
     next.previous_enabled = snapshot.previous_enabled;
     next.play_pause_enabled = snapshot.play_pause_enabled;
     next.next_enabled = snapshot.next_enabled;
+    if (!reach_top_bar_now_playing_utf16_equal(now_playing->model.line, next.line))
+    {
+        reach_marquee_reset(&now_playing->marquee);
+        now_playing->text_offset_x = 0.0f;
+    }
     now_playing->model = next;
     now_playing->observed_generation = snapshot.generation;
     if (now_playing->pressed_action != REACH_NOW_PLAYING_ACTION_NONE && snapshot.transport_pending)
@@ -372,6 +431,41 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     }
     out->changed = 1;
     out->visibility_changed = was_visible != next.visible;
+}
+
+int32_t reach_top_bar_now_playing_tick(reach_top_bar_now_playing *now_playing,
+                                       double delta_seconds)
+{
+    if (now_playing == nullptr || !now_playing->model.visible)
+    {
+        return 0;
+    }
+
+    reach_marquee_request request = {};
+    request.content_width = now_playing->layout.text_advance;
+    request.viewport_width = now_playing->layout.text.width;
+    request.delta_seconds = delta_seconds;
+
+    float offset = reach_marquee_advance(&now_playing->marquee, &request);
+    if (offset == now_playing->text_offset_x)
+    {
+        return 0;
+    }
+    now_playing->text_offset_x = offset;
+    return 1;
+}
+
+int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now_playing)
+{
+    if (now_playing == nullptr || !now_playing->model.visible)
+    {
+        return 0;
+    }
+
+    reach_marquee_request request = {};
+    request.content_width = now_playing->layout.text_advance;
+    request.viewport_width = now_playing->layout.text.width;
+    return reach_marquee_scrolls(&request);
 }
 
 int32_t reach_top_bar_now_playing_visible(const reach_top_bar_now_playing *now_playing)
@@ -474,5 +568,6 @@ reach_top_bar_now_playing_append_render_commands(reach_top_bar_now_playing *now_
     input.theme = ctx->theme;
     input.model = &model;
     input.layout = &now_playing->layout;
+    input.text_offset_x = now_playing->text_offset_x;
     return reach_top_bar_now_playing_build_render_commands(&input, out_commands);
 }
