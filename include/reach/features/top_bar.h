@@ -54,6 +54,7 @@ extern "C"
         reach_rect_f32 tray_icons[REACH_TOP_BAR_MAX_TRAY_ICONS];
         size_t tray_icon_count;
         reach_rect_f32 tray_overflow_button;
+        reach_rect_f32 tray_separator;
         reach_rect_f32 quick_settings_button;
         reach_rect_f32 language_button;
         reach_rect_f32 stats_cpu;

@@ -97,19 +97,23 @@ static void reach_top_bar_format_percent(uint16_t *dst, size_t dst_count, const 
 static void reach_top_bar_format_rate(uint16_t *dst, size_t dst_count, uint16_t prefix,
                                       uint64_t bytes_per_second)
 {
+    static const char *units[] = {"B", "KB", "MB", "GB"};
+    const size_t unit_count = sizeof(units) / sizeof(units[0]);
+
+    uint64_t value = bytes_per_second;
+    size_t unit = 0;
+    while (value >= 1000ull && unit + 1 < unit_count)
+    {
+        value = (value + 512ull) / 1024ull;
+        ++unit;
+    }
+    if (value > 999ull)
+    {
+        value = 999ull;
+    }
+
     char text[16] = {};
-    if (bytes_per_second >= 1024ull * 1024ull)
-    {
-        snprintf(text, sizeof(text), " %.1fM", (double)bytes_per_second / (1024.0 * 1024.0));
-    }
-    else if (bytes_per_second >= 1024ull)
-    {
-        snprintf(text, sizeof(text), " %lluK", (unsigned long long)(bytes_per_second / 1024ull));
-    }
-    else
-    {
-        snprintf(text, sizeof(text), " %lluB", (unsigned long long)bytes_per_second);
-    }
+    snprintf(text, sizeof(text), " %llu%s", (unsigned long long)value, units[unit]);
 
     if (dst == nullptr || dst_count < 2)
     {
@@ -271,6 +275,14 @@ static float reach_top_bar_height(float dpi_scale)
     return reach_top_bar_metrics_values.height * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
+static float reach_top_bar_stats_slot_advance(const uint16_t *text, const uint16_t *widest,
+                                              float text_size)
+{
+    float advance = reach_top_bar_text_advance(text, text_size);
+    float minimum = reach_top_bar_text_advance(widest, text_size);
+    return advance > minimum ? advance : minimum;
+}
+
 static float reach_top_bar_resolve_animated_width(reach_top_bar *top_bar, size_t track,
                                                   float *target_store, float target)
 {
@@ -374,21 +386,28 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float stats_width = 0.0f;
     if (top_bar->state.stats_valid)
     {
-        cpu_advance = reach_top_bar_text_advance(top_bar->state.stats_cpu_text, stats_size);
-        memory_advance = reach_top_bar_text_advance(top_bar->state.stats_memory_text, stats_size);
-        download_advance =
-            reach_top_bar_text_advance(top_bar->state.stats_download_text, stats_size);
-        upload_advance = reach_top_bar_text_advance(top_bar->state.stats_upload_text, stats_size);
+        cpu_advance = reach_top_bar_stats_slot_advance(top_bar->state.stats_cpu_text,
+                                                       (const uint16_t *)L"CPU 100%", stats_size);
+        memory_advance = reach_top_bar_stats_slot_advance(
+            top_bar->state.stats_memory_text, (const uint16_t *)L"RAM 100%", stats_size);
+        download_advance = reach_top_bar_stats_slot_advance(
+            top_bar->state.stats_download_text, (const uint16_t *)L"\u2193 999KB", stats_size);
+        upload_advance = reach_top_bar_stats_slot_advance(
+            top_bar->state.stats_upload_text, (const uint16_t *)L"\u2191 999KB", stats_size);
         stats_width = cpu_advance + stats_gap + memory_advance + stats_group_gap +
                       download_advance + stats_gap + upload_advance + stats_group_gap;
     }
 
-    float quick_settings_width = padding * 2.0f + stats_width + language_width + language_gap +
-                                 quick_settings_button;
+    float quick_settings_width = dot_size * 0.5f + dot_gap + stats_width + language_width +
+                                 language_gap + quick_settings_button + padding;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
+    layout->tray_separator = reach_top_bar_rect(
+        layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x - dot_size * 0.5f,
+        (height - dot_size) * 0.5f, dot_size, dot_size);
 
-    float cluster_x = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + padding;
+    float cluster_x =
+        layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + dot_size * 0.5f + dot_gap;
     if (top_bar->state.stats_valid)
     {
         layout->stats_cpu = reach_top_bar_text_run(cluster_x, height, cpu_advance, stats_size);
@@ -411,14 +430,14 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->quick_settings_button =
         reach_top_bar_rect(cluster_x, (height - quick_settings_button) * 0.5f,
                            quick_settings_button, quick_settings_button);
-    right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x - pill_gap;
+    right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x;
 
     reach_top_bar_update_tray_items(top_bar, ctx);
     const float tray_slot = height * metrics.tray_icon_scale;
     const float tray_gap = metrics.tray_icon_gap * scale;
     const size_t tray_count = top_bar->state.tray_item_count;
     const size_t tray_cells = tray_count + (top_bar->state.tray_overflow ? 1u : 0u);
-    float tray_target_width = padding * 2.0f;
+    float tray_target_width = padding + dot_gap + dot_size * 0.5f;
     if (tray_cells > 0)
     {
         tray_target_width += (float)tray_cells * tray_slot + (float)(tray_cells - 1) * tray_gap;
