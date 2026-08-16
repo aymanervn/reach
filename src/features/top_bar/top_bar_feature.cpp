@@ -617,7 +617,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         current_app_text_advance = 0.0f;
     }
     layout->current_app_text =
-        reach_top_bar_text_run(current_app_text_x, height, current_app_text_advance, name_size);
+        reach_top_bar_rect(current_app_text_x, 0.0f, current_app_text_advance, height);
 
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
     {
