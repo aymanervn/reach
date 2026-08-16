@@ -59,7 +59,8 @@ extern "C"
         REACH_UI_EVENT_WINDOW_FOCUS_LOST = 52,
         REACH_UI_EVENT_FOREGROUND_CHANGED = 53,
         REACH_UI_EVENT_STAGE_TOGGLE = 54,
-        REACH_UI_EVENT_CLIPBOARD_TOGGLE = 55
+        REACH_UI_EVENT_CLIPBOARD_TOGGLE = 55,
+        REACH_UI_EVENT_SYSTEM_STATS_CHANGED = 56
     } reach_ui_event_type;
 
     typedef enum reach_ui_edit_key

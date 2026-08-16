@@ -84,7 +84,13 @@ static void reach_host_on_system_status_ready(void *user)
 
 static void reach_host_on_system_stats_ready(void *user)
 {
-    reach_host_request_update(static_cast<reach_host *>(user));
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr || host->top_bar.window.ops.post_event == nullptr)
+    {
+        return;
+    }
+    (void)host->top_bar.window.ops.post_event(host->top_bar.window.window,
+                                              REACH_UI_EVENT_SYSTEM_STATS_CHANGED);
 }
 
 static void reach_host_on_search_service_ready(void *user)

@@ -876,7 +876,8 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return REACH_OK;
     }
 
-    if (event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED)
+    if (event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED ||
+        event->type == REACH_UI_EVENT_SYSTEM_STATS_CHANGED)
     {
         reach_host_request_update(host);
         return REACH_OK;
