@@ -89,11 +89,6 @@ float reach_popup_notch_height_scaled(float dpi_scale)
     return reach_popup_scale(reach_popup_notch_height(), dpi_scale);
 }
 
-float reach_popup_clamp_notch_center(float notch_center_x, float width)
-{
-    return reach_popup_clamp_notch_center_scaled(notch_center_x, width, 1.0f);
-}
-
 float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale)
 {
     float radius = reach_popup_radius_scaled(reach_theme_default(), dpi_scale);
