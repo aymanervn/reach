@@ -8,60 +8,18 @@ static float reach_switcher_input_scale(const reach_switcher_render_input *input
     return value * scale;
 }
 
-static void reach_switcher_label_from_path(uint16_t *out_label, size_t out_count,
-                                           const uint16_t *path)
+static void reach_switcher_label_for_window(uint16_t *out_label, size_t out_count,
+                                            const reach_window_snapshot *window)
 {
     if (out_label == nullptr || out_count == 0)
     {
         return;
     }
 
-    out_label[0] = 0;
-    const uint16_t fallback[] = {'A', 'p', 'p', 0};
-    if (path == nullptr || path[0] == 0)
-    {
-        (void)reach_copy_utf16(out_label, out_count, fallback);
-        return;
-    }
-
-    const uint16_t *name = path;
-    for (const uint16_t *cursor = path; *cursor != 0; ++cursor)
-    {
-        if (*cursor == '\\' || *cursor == '/')
-        {
-            name = cursor + 1;
-        }
-    }
-
-    size_t name_length = 0;
-    while (name[name_length] != 0)
-    {
-        ++name_length;
-    }
-
-    size_t end = name_length;
-    for (size_t index = name_length; index > 0; --index)
-    {
-        if (name[index - 1] == '.')
-        {
-            end = index - 1;
-            break;
-        }
-    }
-    if (end == 0)
-    {
-        end = name_length;
-    }
-
-    size_t write = 0;
-    while (write + 1 < out_count && write < end)
-    {
-        out_label[write] = name[write];
-        ++write;
-    }
-    out_label[write] = 0;
+    reach_window_tracking_app_display_name(window, out_label, out_count);
     if (out_label[0] == 0)
     {
+        const uint16_t fallback[] = {'A', 'p', 'p', 0};
         (void)reach_copy_utf16(out_label, out_count, fallback);
     }
 }
@@ -99,7 +57,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
             items[index].icon_id = reach_icon_service_get(reach_switcher_icons(switcher), icon_path,
                                                           ctx->icon_size_px);
         }
-        reach_switcher_label_from_path(items[index].label, 260, window->path);
+        reach_switcher_label_for_window(items[index].label, 260, window);
     }
 
     reach_switcher_render_input input = {};
