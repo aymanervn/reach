@@ -438,6 +438,18 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
         }
     }
 
+    if (source == REACH_SURFACE_TOP_BAR ||
+        reach_top_bar_pointer_sequence_active(host->top_bar_capsule))
+    {
+        reach_capsule_pointer_result top_bar_up = reach_host_dispatch_pointer(
+            host, REACH_SURFACE_ID_TOP_BAR, event, REACH_POINTER_EVENT_UP);
+        if (top_bar_up.handled ||
+            top_bar_up.action.kind != REACH_TOP_BAR_POINTER_ACTION_NONE)
+        {
+            return reach_host_apply_top_bar_pointer_action(host, event, &top_bar_up);
+        }
+    }
+
     if (source == REACH_SURFACE_DOCK || reach_dock_pointer_sequence_active(host->dock_capsule))
     {
         reach_capsule_pointer_result dock_up =
@@ -570,6 +582,20 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
 
         reach_host_close_context_menu(host);
         return REACH_OK;
+    }
+
+    if (source == REACH_SURFACE_TOP_BAR)
+    {
+        reach_capsule_pointer_result top_bar_down = reach_host_dispatch_pointer(
+            host, REACH_SURFACE_ID_TOP_BAR, event, REACH_POINTER_EVENT_DOWN);
+        if (top_bar_down.handled)
+        {
+            if (reach_launcher_is_open(host->launcher_capsule))
+            {
+                reach_host_close_launcher_without_focus_restore(host);
+            }
+            return reach_host_apply_top_bar_pointer_action(host, event, &top_bar_down);
+        }
     }
 
     reach_capsule_pointer_result dock_down = {};
