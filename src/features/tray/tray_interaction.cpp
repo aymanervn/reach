@@ -19,7 +19,7 @@ reach_tray_hit_result reach_tray_hit_test_popup(const reach_tray_model *model,
         return hit;
     }
 
-    for (size_t index = 0; index < model->item_count; ++index)
+    for (size_t index = model->overflow_start; index < model->item_count; ++index)
     {
         if (reach_tray_rect_contains(model->item_slots[index], x, y))
         {

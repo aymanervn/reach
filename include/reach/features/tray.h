@@ -22,6 +22,7 @@ extern "C"
         reach_tray_item items[REACH_MAX_TRAY_ITEMS];
         reach_rect_f32 item_slots[REACH_MAX_TRAY_ITEMS];
         size_t item_count;
+        size_t overflow_start;
     } reach_tray_model;
 
     typedef struct reach_tray_render_input
@@ -80,6 +81,8 @@ extern "C"
     int32_t reach_tray_popup_is_open(const reach_tray *tray);
     int32_t reach_tray_set_popup_open(reach_tray *tray, int32_t open);
     reach_result reach_tray_refresh(reach_tray *tray, reach_tray_provider_port *provider);
+    void reach_tray_set_overflow_start(reach_tray *tray, size_t overflow_start);
+    uint32_t reach_tray_item_id(reach_tray *tray, size_t index);
     void reach_tray_layout_popup(reach_tray *tray, const reach_theme *theme,
                                  const reach_popup_anchor *anchor, float dpi_scale,
                                  reach_rect_f32 *out_bounds);

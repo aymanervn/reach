@@ -7,7 +7,6 @@ typedef enum reach_dock_hit_type
 {
     REACH_DOCK_HIT_NONE = 0,
     REACH_DOCK_HIT_ITEM = 1,
-    REACH_DOCK_HIT_TRAY_BUTTON = 2,
     REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON = 3,
     REACH_DOCK_HIT_STAGE_BUTTON = 5
 } reach_dock_hit_type;

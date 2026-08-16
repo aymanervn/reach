@@ -498,6 +498,8 @@ reach_result reach_host_render_clipboard_surface(reach_host *host);
 void reach_host_set_tray_popup_open(reach_host *host, int32_t open);
 void reach_host_toggle_tray_popup(reach_host *host);
 reach_result reach_host_refresh_tray_items(reach_host *host);
+reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,
+                                           reach_tray_action action);
 
 void reach_host_compute_tray_popup_layout(reach_host *host, reach_rect_f32 *out_bounds);
 

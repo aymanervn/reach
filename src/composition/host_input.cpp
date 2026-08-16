@@ -295,9 +295,6 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
     case REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE:
         reach_host_toggle_stage(host);
         return REACH_OK;
-    case REACH_DOCK_POINTER_ACTION_TOGGLE_TRAY:
-        reach_host_toggle_tray_popup(host);
-        return REACH_OK;
     case REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS:
         reach_host_toggle_quick_settings(host);
         return REACH_OK;
@@ -338,6 +335,15 @@ reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const rea
         return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_PLAY_PAUSE);
     case REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT:
         return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_NEXT);
+    case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW:
+        reach_host_toggle_tray_popup(host);
+        return REACH_OK;
+    case REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT:
+        return reach_host_activate_tray_item(host, static_cast<uint32_t>(result->action.id),
+                                             REACH_TRAY_ACTION_LEFT_CLICK);
+    case REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT:
+        return reach_host_activate_tray_item(host, static_cast<uint32_t>(result->action.id),
+                                             REACH_TRAY_ACTION_RIGHT_CLICK);
     default:
         return REACH_OK;
     }

@@ -28,7 +28,7 @@ reach_result reach_tray_build_render_commands(const reach_tray_render_input *inp
         return popup_result;
     }
 
-    for (size_t index = 0; index < input->model->item_count; ++index)
+    for (size_t index = input->model->overflow_start; index < input->model->item_count; ++index)
     {
         reach_rect_f32 slot = input->model->item_slots[index];
         slot.x -= input->bounds.x;

@@ -232,7 +232,25 @@ void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bo
     ctx.foreground_window = reach_host_foreground_window(host);
     ctx.pinned_apps = host->pinned_apps;
     ctx.pinned_app_count = host->pinned_app_count;
+
+    reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS] = {};
+    size_t tray_item_count = reach_tray_item_count(host->tray_capsule);
+    if (tray_item_count > REACH_TOP_BAR_MAX_TRAY_ICONS)
+    {
+        tray_item_count = REACH_TOP_BAR_MAX_TRAY_ICONS;
+    }
+    for (size_t index = 0; index < tray_item_count; ++index)
+    {
+        tray_items[index].id = reach_tray_item_id(host->tray_capsule, index);
+        tray_items[index].icon_id = reach_tray_item_icon_id(host->tray_capsule, index);
+    }
+    ctx.tray_items = tray_items;
+    ctx.tray_item_count = reach_tray_item_count(host->tray_capsule);
+    ctx.tray_popup_open = reach_tray_popup_is_open(host->tray_capsule);
+
     reach_top_bar_build_layout(host->top_bar_capsule, &ctx);
+    reach_tray_set_overflow_start(host->tray_capsule,
+                                  reach_top_bar_tray_overflow_start(host->top_bar_capsule));
 }
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host)

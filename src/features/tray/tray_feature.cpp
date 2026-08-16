@@ -109,7 +109,29 @@ static void reach_tray_reset(reach_tray *tray)
 
 reach_result reach_tray_refresh(reach_tray *tray, reach_tray_provider_port *provider)
 {
-    return tray != nullptr ? reach_tray_model_refresh(&tray->state.model, provider) : REACH_OK;
+    if (tray == nullptr)
+    {
+        return REACH_OK;
+    }
+    size_t overflow_start = tray->state.model.overflow_start;
+    reach_result result = reach_tray_model_refresh(&tray->state.model, provider);
+    tray->state.model.overflow_start = overflow_start;
+    return result;
+}
+
+void reach_tray_set_overflow_start(reach_tray *tray, size_t overflow_start)
+{
+    if (tray != nullptr)
+    {
+        tray->state.model.overflow_start = overflow_start;
+    }
+}
+
+uint32_t reach_tray_item_id(reach_tray *tray, size_t index)
+{
+    return tray != nullptr && index < tray->state.model.item_count
+               ? tray->state.model.items[index].id
+               : 0;
 }
 
 void reach_tray_layout_popup(reach_tray *tray, const reach_theme *theme,
@@ -315,7 +337,9 @@ void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme 
     float padding = slot_size * 0.58f;
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     float notch_height = reach_popup_notch_height_scaled(scale);
-    size_t visual_count = model->item_count > 0 ? model->item_count : 1;
+    size_t overflow_count =
+        model->item_count > model->overflow_start ? model->item_count - model->overflow_start : 0;
+    size_t visual_count = overflow_count > 0 ? overflow_count : 1;
     size_t columns = reach_tray_min_size(visual_count, 5);
     size_t rows = (visual_count + 4) / 5;
     float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
@@ -333,10 +357,16 @@ void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme 
     float grid_y = content_top + (content_height - grid_height) * 0.5f;
     for (size_t index = 0; index < model->item_count; ++index)
     {
-        size_t row = index / 5;
-        size_t column = index % 5;
+        if (index < model->overflow_start)
+        {
+            model->item_slots[index] = {};
+            continue;
+        }
+        size_t shown = index - model->overflow_start;
+        size_t row = shown / 5;
+        size_t column = shown % 5;
         size_t row_start = row * 5;
-        size_t row_remaining = model->item_count - row_start;
+        size_t row_remaining = overflow_count - row_start;
         size_t row_columns = reach_tray_min_size(row_remaining, 5);
         float row_width = (float)row_columns * slot_size + (float)(row_columns - 1) * gap;
         float row_x = out_bounds->x + (out_bounds->width - row_width) * 0.5f;

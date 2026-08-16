@@ -162,6 +162,29 @@ reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *t
     return top_bar != nullptr ? top_bar->now_playing_subfeature : nullptr;
 }
 
+static void reach_top_bar_update_tray_items(reach_top_bar *top_bar,
+                                            const reach_top_bar_build_context *ctx)
+{
+    reach_top_bar_state *state = &top_bar->state;
+    size_t count = ctx->tray_item_count;
+    state->tray_overflow = count > REACH_TOP_BAR_MAX_TRAY_ICONS;
+    if (count > REACH_TOP_BAR_MAX_TRAY_ICONS)
+    {
+        count = REACH_TOP_BAR_MAX_TRAY_ICONS;
+    }
+    state->tray_item_count = count;
+    state->tray_popup_open = ctx->tray_popup_open;
+    for (size_t index = 0; index < count; ++index)
+    {
+        state->tray_items[index] = ctx->tray_items[index];
+    }
+}
+
+size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar)
+{
+    return top_bar != nullptr && top_bar->state.tray_overflow ? top_bar->state.tray_item_count : 0;
+}
+
 static int32_t state_has_current_app_icon(const reach_top_bar *top_bar)
 {
     return top_bar->state.current_app_icon_ref[0] != 0;
@@ -245,9 +268,31 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x - pill_gap;
-    float tray_width = metrics.tray_width * scale;
+
+    reach_top_bar_update_tray_items(top_bar, ctx);
+    const float tray_slot = height * metrics.tray_icon_scale;
+    const float tray_gap = metrics.tray_icon_gap * scale;
+    const size_t tray_count = top_bar->state.tray_item_count;
+    const size_t tray_cells = tray_count + (top_bar->state.tray_overflow ? 1u : 0u);
+    float tray_width = padding * 2.0f;
+    if (tray_cells > 0)
+    {
+        tray_width += (float)tray_cells * tray_slot + (float)(tray_cells - 1) * tray_gap;
+    }
     layout->pills[REACH_TOP_BAR_PILL_TRAY] =
         reach_top_bar_rect(right - tray_width, 0.0f, tray_width, height);
+
+    float tray_x = layout->pills[REACH_TOP_BAR_PILL_TRAY].x + padding;
+    float tray_y = (height - tray_slot) * 0.5f;
+    layout->tray_icon_count = tray_count;
+    for (size_t index = 0; index < tray_count; ++index)
+    {
+        layout->tray_icons[index] = reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot);
+        tray_x += tray_slot + tray_gap;
+    }
+    layout->tray_overflow_button =
+        top_bar->state.tray_overflow ? reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot)
+                                     : reach_rect_f32{};
 
     float current_app_width = metrics.current_app_width * scale;
     float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
@@ -541,6 +586,7 @@ static void reach_top_bar_capsule_reset(void *capsule)
     top_bar->state.pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
     top_bar->state.feedback_index = REACH_TOP_BAR_FEEDBACK_NONE;
     top_bar->state.feedback_pressed = 0;
+    top_bar->state.pressed_tray_index = REACH_TOP_BAR_MAX_TRAY_ICONS;
     top_bar->state.power_hovered = 0;
     top_bar->state.power_release_suppressed = 0;
 }
@@ -684,6 +730,20 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
             out->handled = 1;
             out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER;
         }
+        else if (hit == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON)
+        {
+            state->pressed_tray_index = reach_top_bar_tray_icon_at(&state->layout, local.x, local.y);
+            out->redraw = reach_top_bar_feedback_press(
+                top_bar, REACH_TOP_BAR_FEEDBACK_TRAY_BASE + state->pressed_tray_index);
+            out->handled = 1;
+        }
+        else if (hit == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW)
+        {
+            out->redraw =
+                reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW);
+            out->handled = 1;
+            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_TRAY_OVERFLOW;
+        }
         return;
     }
 
@@ -718,6 +778,20 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
                 out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER;
             }
         }
+        else if (pressed == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON && hit == pressed &&
+                 reach_top_bar_tray_icon_at(&state->layout, local.x, local.y) ==
+                     state->pressed_tray_index &&
+                 state->pressed_tray_index < state->tray_item_count)
+        {
+            out->handled = 1;
+            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT;
+            out->action.id = state->tray_items[state->pressed_tray_index].id;
+        }
+        else if (pressed == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW && hit == pressed)
+        {
+            out->handled = 1;
+            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW;
+        }
         if (state->pointer_sequence_active)
         {
             state->pointer_sequence_active = 0;
@@ -750,6 +824,21 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
         {
             state->pointer_sequence_active = 0;
             out->sync_pointer_subscriptions = 1;
+        }
+        return;
+    }
+
+    if (event->kind == REACH_POINTER_EVENT_CONTEXT)
+    {
+        if (hit == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON)
+        {
+            size_t index = reach_top_bar_tray_icon_at(&state->layout, local.x, local.y);
+            if (index < state->tray_item_count)
+            {
+                out->handled = 1;
+                out->action.kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT;
+                out->action.id = state->tray_items[index].id;
+            }
         }
         return;
     }

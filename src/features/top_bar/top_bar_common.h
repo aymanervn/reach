@@ -25,6 +25,8 @@ reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar);
 
 reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *layout,
                                                     int32_t local_x, int32_t local_y);
+size_t reach_top_bar_tray_icon_at(const reach_top_bar_layout *layout, int32_t local_x,
+                                  int32_t local_y);
 int32_t reach_top_bar_feedback_press(reach_top_bar *top_bar, size_t slot);
 int32_t reach_top_bar_feedback_release(reach_top_bar *top_bar);
 

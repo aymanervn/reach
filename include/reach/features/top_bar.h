@@ -29,6 +29,14 @@ extern "C"
         REACH_TOP_BAR_PILL_COUNT = 5
     } reach_top_bar_pill;
 
+#define REACH_TOP_BAR_MAX_TRAY_ICONS 11
+
+    typedef struct reach_top_bar_tray_item
+    {
+        uint32_t id;
+        uint64_t icon_id;
+    } reach_top_bar_tray_item;
+
     typedef struct reach_top_bar_layout
     {
         reach_rect_f32 bounds;
@@ -38,6 +46,9 @@ extern "C"
         reach_rect_f32 clock;
         reach_rect_f32 current_app_icon;
         reach_rect_f32 current_app_text;
+        reach_rect_f32 tray_icons[REACH_TOP_BAR_MAX_TRAY_ICONS];
+        size_t tray_icon_count;
+        reach_rect_f32 tray_overflow_button;
     } reach_top_bar_layout;
 
     enum reach_top_bar_animation_id
@@ -52,6 +63,9 @@ extern "C"
     enum reach_top_bar_feedback_slot
     {
         REACH_TOP_BAR_FEEDBACK_POWER_BUTTON = 0,
+        REACH_TOP_BAR_FEEDBACK_TRAY_BASE,
+        REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW =
+            REACH_TOP_BAR_FEEDBACK_TRAY_BASE + REACH_TOP_BAR_MAX_TRAY_ICONS,
         REACH_TOP_BAR_FEEDBACK_NONE
     };
 
@@ -59,7 +73,9 @@ extern "C"
     {
         REACH_TOP_BAR_POINTER_REGION_NONE = 0,
         REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON = 1,
-        REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING = 2
+        REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING = 2,
+        REACH_TOP_BAR_POINTER_REGION_TRAY_ICON = 3,
+        REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW = 4
     } reach_top_bar_pointer_region;
 
     typedef enum reach_top_bar_pointer_action_kind
@@ -70,7 +86,11 @@ extern "C"
         REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING = 3,
         REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS = 4,
         REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE = 5,
-        REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT = 6
+        REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT = 6,
+        REACH_TOP_BAR_POINTER_ACTION_PRESS_TRAY_OVERFLOW = 7,
+        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW = 8,
+        REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT = 9,
+        REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT = 10
     } reach_top_bar_pointer_action_kind;
 
     typedef struct reach_top_bar_state
@@ -93,6 +113,12 @@ extern "C"
         uint16_t current_app_name[260];
         uint16_t current_app_title[260];
         uint16_t current_app_icon_ref[260];
+
+        reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS];
+        size_t tray_item_count;
+        int32_t tray_overflow;
+        int32_t tray_popup_open;
+        size_t pressed_tray_index;
     } reach_top_bar_state;
 
     typedef struct reach_top_bar reach_top_bar;
@@ -119,6 +145,9 @@ extern "C"
         uintptr_t foreground_window;
         const reach_pinned_app_model *pinned_apps;
         size_t pinned_app_count;
+        const reach_top_bar_tray_item *tray_items;
+        size_t tray_item_count;
+        int32_t tray_popup_open;
     } reach_top_bar_build_context;
 
     void reach_top_bar_build_layout(reach_top_bar *top_bar,
@@ -138,6 +167,8 @@ extern "C"
     void reach_top_bar_suppress_power_release(reach_top_bar *top_bar);
 
     int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);
+
+    size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar);
 
     void reach_top_bar_begin_reveal_session(reach_top_bar *top_bar);
     reach_bar_visibility_result

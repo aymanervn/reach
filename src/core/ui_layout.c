@@ -56,17 +56,11 @@ reach_result reach_dock_layout_compute(const reach_dock_model *dock,
         out_layout->app_slots[index].height = icon_size;
     }
 
-    out_layout->tray_button.width = icon_size;
-    out_layout->tray_button.height = icon_size;
-
     out_layout->quick_settings_button.width = icon_size;
     out_layout->quick_settings_button.height = icon_size;
 
     out_layout->quick_settings_button.x = dock_width - icon_size - gap;
     out_layout->quick_settings_button.y = top;
-
-    out_layout->tray_button.x = out_layout->quick_settings_button.x - icon_size;
-    out_layout->tray_button.y = top;
 
     return REACH_OK;
 }
