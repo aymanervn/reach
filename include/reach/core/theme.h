@@ -163,9 +163,6 @@ extern "C"
         float icon_box_corner_radius_max;
         float tray_slot_size_ratio;
         float now_playing_width;
-        float now_playing_left_margin;
-        float now_playing_height_ratio;
-        float now_playing_corner_radius_ratio;
         float now_playing_padding;
         float now_playing_gap;
         float now_playing_control_gap;
@@ -184,8 +181,6 @@ extern "C"
     float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);
     float reach_theme_icon_box_corner_radius(const reach_theme *theme, float icon_box_size);
     float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height);
-    float reach_theme_now_playing_height(const reach_theme *theme, float dock_height);
-    float reach_theme_now_playing_corner_radius(const reach_theme *theme, float widget_height);
 
 #ifdef __cplusplus
 }

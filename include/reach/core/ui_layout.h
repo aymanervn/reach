@@ -20,7 +20,6 @@ extern "C"
     typedef struct reach_dock_layout
     {
         reach_rect_f32 bounds;
-        reach_rect_f32 now_playing;
         reach_rect_f32 stage_button;
         reach_rect_f32 app_slots[REACH_MAX_DOCK_ITEMS];
         reach_rect_f32 tray_button;

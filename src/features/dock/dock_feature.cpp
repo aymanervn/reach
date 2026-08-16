@@ -2,7 +2,6 @@
 
 #include "dock_common_state.h"
 #include "dock_interaction.h"
-#include "dock_now_playing.h"
 
 #include <math.h>
 #include <new>
@@ -43,12 +42,8 @@ struct reach_dock
     size_t slot_order_count;
     int32_t slots_synced;
 
-    int32_t np_content_armed;
-    double np_content_delay;
     reach_icon_service *icons;
     reach_window_tracking *windows;
-    reach_now_playing_service *now_playing;
-    reach_dock_now_playing *now_playing_subfeature;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
     int32_t pointer_layout_valid;
@@ -57,20 +52,13 @@ struct reach_dock
 };
 
 void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
-                                reach_window_tracking *windows,
-                                reach_now_playing_service *now_playing)
+                                reach_window_tracking *windows)
 {
     if (dock != nullptr)
     {
         dock->icons = icons;
         dock->windows = windows;
-        dock->now_playing = now_playing;
     }
-}
-
-reach_dock_now_playing *reach_dock_now_playing_subfeature(reach_dock *dock)
-{
-    return dock != nullptr ? dock->now_playing_subfeature : nullptr;
 }
 
 reach_icon_service *reach_dock_icons(reach_dock *dock)
@@ -141,11 +129,6 @@ reach_result reach_dock_create(reach_dock **out_animations)
         return REACH_ERROR;
     }
     reach_animation_manager_init(&animations->manager, animations->tracks, REACH_DOCK_ANIM_COUNT);
-    if (reach_dock_now_playing_create(&animations->now_playing_subfeature) != REACH_OK)
-    {
-        delete animations;
-        return REACH_ERROR;
-    }
     animations->state.drag.source_index = REACH_MAX_DOCK_ITEMS;
     animations->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
     animations->state.pressed_index = REACH_MAX_DOCK_ITEMS;
@@ -158,10 +141,6 @@ reach_result reach_dock_create(reach_dock **out_animations)
 
 void reach_dock_destroy(reach_dock *animations)
 {
-    if (animations != nullptr)
-    {
-        reach_dock_now_playing_destroy(animations->now_playing_subfeature);
-    }
     delete animations;
 }
 
@@ -179,22 +158,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
     reach_dock_state *state = &animations->state;
     reach_animation_manager *manager = &animations->manager;
 
-    reach_dock_now_playing_update_result now_playing = {};
-    reach_dock_now_playing_sync(animations->now_playing_subfeature, animations->now_playing,
-                                &now_playing);
-    if (now_playing.changed && out != nullptr)
-    {
-        out->redraw = 1;
-    }
-    if (now_playing.visibility_changed)
-    {
-        state->items_changed = 1;
-        if (out != nullptr)
-        {
-            out->relayout = 1;
-        }
-    }
-
     int32_t feedback_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
     int32_t drag_snap_was_active =
@@ -207,8 +170,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
     }
 
     int32_t slots_were_animating = reach_dock_slots_animating(animations);
-    int32_t content_was_active =
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
 
     reach_animation_manager_tick(manager, delta_seconds);
 
@@ -257,54 +218,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
         if (out != nullptr)
         {
             out->relayout = 1;
-        }
-    }
-
-    {
-        const reach_animation_track *np_track = &animations->tracks[REACH_DOCK_ANIM_SLOT_BASE];
-        const float np_target = animations->slots[0].target_width;
-        const int32_t content_active =
-            reach_animation_manager_active(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
-        const float content_value =
-            reach_animation_manager_value(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
-        if (np_target > 0.0f && !content_active && content_value < 1.0f)
-        {
-            if (np_track->active)
-            {
-                if (!animations->np_content_armed)
-                {
-                    animations->np_content_delay = reach_animation_track_time_to_value(
-                        np_track, np_target * REACH_DOCK_SLOT_REVEAL_THRESHOLD);
-                    animations->np_content_armed = 1;
-                }
-                else
-                {
-                    animations->np_content_delay -= delta_seconds;
-                }
-                if (animations->np_content_delay <= 0.0)
-                {
-                    double land_seconds = reach_animation_track_time_to_value(np_track, np_target);
-                    if (land_seconds < 0.05)
-                    {
-                        land_seconds = 0.05;
-                    }
-                    reach_animation_manager_start(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
-                                                  0.0f, 1.0f, land_seconds, REACH_EASING_EASE_OUT);
-                    animations->np_content_armed = 0;
-                }
-            }
-            else
-            {
-
-                animations->np_content_armed = 0;
-                reach_animation_manager_start(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT, 0.0f,
-                                              1.0f, 0.1, REACH_EASING_EASE_OUT);
-            }
-        }
-        if (content_was_active ||
-            reach_animation_manager_active(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT))
-        {
-            redraw = 1;
         }
     }
 
@@ -498,7 +411,6 @@ static void reach_dock_capsule_reset(void *capsule)
     reach_dock_reset_model(dock);
     if (dock != nullptr)
     {
-        reach_dock_now_playing_reset(dock->now_playing_subfeature);
         dock->pointer_layout_valid = 0;
         dock->state.pressed_control = REACH_DOCK_HIT_NONE;
         dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
@@ -607,21 +519,6 @@ reach_dock_capsule_apply_interaction_result(const reach_dock_interaction_result 
     }
 }
 
-static uint32_t reach_dock_capsule_media_action(reach_now_playing_action action)
-{
-    switch (action)
-    {
-    case REACH_NOW_PLAYING_ACTION_PREVIOUS:
-        return REACH_DOCK_POINTER_ACTION_MEDIA_PREVIOUS;
-    case REACH_NOW_PLAYING_ACTION_PLAY_PAUSE:
-        return REACH_DOCK_POINTER_ACTION_MEDIA_PLAY_PAUSE;
-    case REACH_NOW_PLAYING_ACTION_NEXT:
-        return REACH_DOCK_POINTER_ACTION_MEDIA_NEXT;
-    default:
-        return REACH_DOCK_POINTER_ACTION_NONE;
-    }
-}
-
 static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
                                               reach_capsule_pointer_result *out)
 {
@@ -643,18 +540,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         local_event.y = local.y;
     }
     event = &local_event;
-    reach_dock_now_playing_update_result update = {};
-    reach_dock_now_playing_sync(dock->now_playing_subfeature, dock->now_playing, &update);
-    if (update.changed)
-    {
-        out->redraw = 1;
-    }
-    if (update.visibility_changed)
-    {
-        dock->state.items_changed = 1;
-        out->relayout = 1;
-    }
-
     reach_dock_state *state = &dock->state;
     reach_dock_interaction_context interaction_ctx = reach_dock_capsule_interaction_context(dock);
     reach_dock_hit_result hit = {};
@@ -669,15 +554,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     if (event->kind == REACH_POINTER_EVENT_DOWN)
     {
         reach_dock_capsule_begin_pointer_sequence(dock, out);
-        if (!reach_dock_slots_animating(dock) &&
-            reach_dock_now_playing_pointer_down(dock->now_playing_subfeature, event->x, event->y))
-        {
-            out->handled = 1;
-            out->redraw = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_NOW_PLAYING;
-            return;
-        }
-
         state->pressed_control = hit.type;
         if (hit.type == REACH_DOCK_HIT_STAGE_BUTTON)
         {
@@ -739,18 +615,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         else
         {
             out->redraw = out->redraw || reach_dock_feedback_release(dock);
-        }
-
-        reach_now_playing_action action = REACH_NOW_PLAYING_ACTION_NONE;
-        if (reach_dock_now_playing_pointer_up(dock->now_playing_subfeature, event->x, event->y,
-                                              &action))
-        {
-            out->handled = 1;
-            out->redraw = 1;
-            out->action.kind = reach_dock_capsule_media_action(action);
-            state->pressed_control = REACH_DOCK_HIT_NONE;
-            reach_dock_capsule_end_pointer_sequence(dock, out);
-            return;
         }
 
         reach_dock_hit_type pressed = static_cast<reach_dock_hit_type>(state->pressed_control);
@@ -852,8 +716,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     }
     if (event->kind == REACH_POINTER_EVENT_CANCEL)
     {
-        out->redraw =
-            out->redraw || reach_dock_now_playing_pointer_cancel(dock->now_playing_subfeature);
         if (state->drag.active)
         {
             reach_dock_interaction_result interaction = {};
@@ -874,8 +736,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     }
     if (event->kind == REACH_POINTER_EVENT_LEAVE)
     {
-        out->redraw =
-            out->redraw || reach_dock_now_playing_pointer_cancel(dock->now_playing_subfeature);
         if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
             state->hovered_item = REACH_MAX_DOCK_ITEMS;
@@ -1296,7 +1156,7 @@ static void reach_dock_slot_free(reach_dock *dock, size_t pool_index)
 
 static size_t reach_dock_slot_alloc(reach_dock *dock)
 {
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_EMPTY)
         {
@@ -1306,7 +1166,7 @@ static size_t reach_dock_slot_alloc(reach_dock *dock)
     for (size_t at = 0; at < dock->slot_order_count; ++at)
     {
         size_t pool = dock->slot_order[at];
-        if (pool != 0 && dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING)
+        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING)
         {
             reach_dock_slot_free(dock, pool);
             return pool;
@@ -1318,7 +1178,7 @@ static size_t reach_dock_slot_alloc(reach_dock *dock)
 
 static size_t reach_dock_slot_find(reach_dock *dock, reach_dock_order_key key)
 {
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_EMPTY &&
             reach_dock_key_equal(&dock->slots[pool].key, &key))
@@ -1343,14 +1203,14 @@ static void reach_dock_settle_slots(reach_dock *dock)
         {
             slot->lifecycle = REACH_DOCK_SLOT_STEADY;
         }
-        else if (slot->lifecycle == REACH_DOCK_SLOT_DYING && pool != 0)
+        else if (slot->lifecycle == REACH_DOCK_SLOT_DYING)
         {
             reach_dock_slot_free(dock, pool);
         }
     }
 }
 
-static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float np_slot_width)
+static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
 {
     reach_dock_state *state = &dock->state;
     size_t item_count = state->model.item_count;
@@ -1367,16 +1227,9 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
             reach_animation_manager_reset(&dock->manager, reach_dock_slot_track(pool));
         }
         dock->slot_order_count = 0;
-        dock->slots[0].lifecycle = REACH_DOCK_SLOT_STEADY;
-        dock->slots[0].target_width = np_slot_width;
-        reach_animation_manager_set(&dock->manager, reach_dock_slot_track(0), np_slot_width);
-        reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
-                                    np_slot_width > 0.0f ? 1.0f : 0.0f);
-        dock->np_content_armed = 0;
-        dock->slot_order[dock->slot_order_count++] = 0;
         for (size_t index = 0; index < item_count; ++index)
         {
-            size_t pool = index + 1;
+            size_t pool = index;
             dock->slots[pool].lifecycle = REACH_DOCK_SLOT_STEADY;
             dock->slots[pool].key = reach_dock_item_key_at(&state->model, index);
             dock->slots[pool].target_width = app_slot_width;
@@ -1388,20 +1241,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
         return;
     }
 
-    if (dock->slots[0].target_width != np_slot_width)
-    {
-        dock->slots[0].target_width = np_slot_width;
-        reach_animation_manager_animate_to(&dock->manager, reach_dock_slot_track(0), np_slot_width,
-                                           REACH_DOCK_SLOT_ANIMATION_SECONDS,
-                                           REACH_EASING_EASE_IN_OUT);
-        if (np_slot_width <= 0.0f)
-        {
-            reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT, 0.0f);
-        }
-        dock->np_content_armed = 0;
-    }
-
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         reach_dock_slot *slot = &dock->slots[pool];
         if (slot->lifecycle != REACH_DOCK_SLOT_APPEARING &&
@@ -1433,7 +1273,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
     for (size_t at = 0; at < dock->slot_order_count; ++at)
     {
         size_t pool = dock->slot_order[at];
-        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING && pool != 0)
+        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING)
         {
             dying_anchor[pool] = (uint8_t)last_live;
         }
@@ -1445,14 +1285,6 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
 
     uint8_t new_order[REACH_DOCK_SLOT_CAPACITY] = {};
     size_t new_count = 0;
-    new_order[new_count++] = 0;
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
-    {
-        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING && dying_anchor[pool] == 0)
-        {
-            new_order[new_count++] = (uint8_t)pool;
-        }
-    }
     for (size_t index = 0; index < item_count; ++index)
     {
         reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
@@ -1499,7 +1331,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
                                           REACH_EASING_EASE_IN_OUT);
         }
         new_order[new_count++] = (uint8_t)pool;
-        for (size_t dying = 1; dying < REACH_DOCK_SLOT_CAPACITY; ++dying)
+        for (size_t dying = 0; dying < REACH_DOCK_SLOT_CAPACITY; ++dying)
         {
             if (dock->slots[dying].lifecycle == REACH_DOCK_SLOT_DYING &&
                 dying_anchor[dying] == pool && dying != pool)
@@ -1509,7 +1341,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
         }
     }
 
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_DYING)
         {
@@ -1538,9 +1370,6 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
 
 static void reach_dock_snap_slots(reach_dock *dock)
 {
-    reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
-                                dock->slots[0].target_width > 0.0f ? 1.0f : 0.0f);
-    dock->np_content_armed = 0;
     for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         reach_dock_slot *slot = &dock->slots[pool];
@@ -1548,7 +1377,7 @@ static void reach_dock_snap_slots(reach_dock *dock)
         {
             continue;
         }
-        if (slot->lifecycle == REACH_DOCK_SLOT_DYING && pool != 0)
+        if (slot->lifecycle == REACH_DOCK_SLOT_DYING)
         {
             reach_dock_slot_free(dock, pool);
             continue;
@@ -1590,16 +1419,6 @@ float reach_dock_item_reveal(reach_dock *dock, size_t item_index)
     return reveal > 1.0f ? 1.0f : reveal;
 }
 
-float reach_dock_now_playing_reveal_width(reach_dock *dock, float scaled_gap)
-{
-    if (dock == nullptr)
-    {
-        return 0.0f;
-    }
-    const float width = reach_dock_slot_width(dock, 0) - scaled_gap;
-    return width > 0.0f ? width : 0.0f;
-}
-
 void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *ctx,
                              reach_dock_layout *layout)
 {
@@ -1620,45 +1439,12 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     const float gap = ctx->gap * scale;
     const size_t count = dock->state.model.item_count;
     const reach_theme *theme = ctx->theme;
-    const float now_playing_height = reach_theme_now_playing_height(theme, layout->bounds.height);
-    const float now_playing_render_width =
-        reach_dock_now_playing_desired_width(dock->now_playing_subfeature, theme, scale);
-    const float now_playing_reserved_width =
-        reach_dock_now_playing_visible(dock->now_playing_subfeature) ? now_playing_render_width
-                                                                     : 0.0f;
-
     const float app_slot_width = icon_size + gap;
-    const float np_slot_width =
-        now_playing_reserved_width > 0.0f ? ceilf(now_playing_reserved_width) + gap : 0.0f;
-    reach_dock_sync_slots(dock, app_slot_width, np_slot_width);
+    reach_dock_sync_slots(dock, app_slot_width);
 
-    const float now_playing_left = theme->now_playing_left_margin * scale;
     const float top = (layout->bounds.height - icon_size) * 0.5f;
 
     float x = gap;
-    layout->now_playing = {};
-    const float np_width_now = reach_dock_slot_width(dock, 0);
-    const float np_content =
-        reach_animation_manager_value(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
-    if (now_playing_render_width > 0.0f && np_width_now > 0.0f && np_content > 0.0f)
-    {
-        layout->now_playing.x = now_playing_left;
-        layout->now_playing.y = (layout->bounds.height - now_playing_height) * 0.5f;
-        layout->now_playing.width = now_playing_render_width;
-        layout->now_playing.height = now_playing_height;
-        if (np_content < 1.0f)
-        {
-
-            const float inset_x = layout->now_playing.width * (1.0f - np_content) * 0.5f;
-            const float inset_y = layout->now_playing.height * (1.0f - np_content) * 0.5f;
-            layout->now_playing.x += inset_x;
-            layout->now_playing.y += inset_y;
-            layout->now_playing.width -= inset_x * 2.0f;
-            layout->now_playing.height -= inset_y * 2.0f;
-        }
-    }
-    x += np_width_now;
-
     layout->stage_button.width = icon_size;
     layout->stage_button.height = icon_size;
     layout->stage_button.x = x;
@@ -1669,10 +1455,6 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     for (size_t at = 0; at < dock->slot_order_count; ++at)
     {
         size_t pool = dock->slot_order[at];
-        if (pool == 0)
-        {
-            continue;
-        }
         const reach_dock_slot *slot = &dock->slots[pool];
         if (slot->lifecycle == REACH_DOCK_SLOT_APPEARING ||
             slot->lifecycle == REACH_DOCK_SLOT_STEADY)
@@ -1716,8 +1498,6 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
         layout->bounds.width = dock_width;
     }
 
-    reach_dock_now_playing_relayout(dock->now_playing_subfeature, theme, layout->now_playing,
-                                    scale);
     dock->pointer_layout = *layout;
     dock->pointer_layout_valid = 1;
 }
@@ -1749,7 +1529,6 @@ reach_rect_f32 reach_dock_rect_to_screen(const reach_dock_layout *layout, reach_
 
 reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout)
 {
-    layout.now_playing = reach_dock_rect_to_screen(&layout, layout.now_playing);
     for (size_t index = 0; index < layout.app_slot_count; ++index)
     {
         layout.app_slots[index] = reach_dock_rect_to_screen(&layout, layout.app_slots[index]);

@@ -460,17 +460,5 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.quick_settings_feedback_index = REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
-    reach_result result = reach_dock_build_render_commands(&input, out_commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    reach_dock_now_playing_render_context now_playing = {};
-    now_playing.theme = ctx->theme;
-    now_playing.dpi_scale = ctx->dpi_scale;
-    now_playing.reveal_width =
-        reach_dock_now_playing_reveal_width(dock, ctx->dock_gap * ctx->dpi_scale);
-    return reach_dock_now_playing_append_render_commands(reach_dock_now_playing_subfeature(dock),
-                                                         &now_playing, out_commands);
+    return reach_dock_build_render_commands(&input, out_commands);
 }

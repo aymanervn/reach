@@ -2,6 +2,7 @@
 
 #include "top_bar_common.h"
 #include "top_bar_metrics.h"
+#include "top_bar_now_playing.h"
 
 typedef struct reach_top_bar_render_input
 {
@@ -255,7 +256,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
 
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
     {
-        if (!layout->pill_visible[index])
+        if (!layout->pill_visible[index] || index == REACH_TOP_BAR_PILL_NOW_PLAYING)
         {
             continue;
         }
@@ -279,5 +280,9 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_power_button(&input, out_commands);
     reach_top_bar_push_clock(&input, out_commands);
 
-    return REACH_OK;
+    reach_top_bar_now_playing_render_context now_playing = {};
+    now_playing.theme = ctx->theme;
+    now_playing.dpi_scale = ctx->dpi_scale;
+    return reach_top_bar_now_playing_append_render_commands(
+        reach_top_bar_now_playing_subfeature(top_bar), &now_playing, out_commands);
 }

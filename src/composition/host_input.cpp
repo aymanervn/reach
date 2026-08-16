@@ -301,12 +301,6 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
     case REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS:
         reach_host_toggle_quick_settings(host);
         return REACH_OK;
-    case REACH_DOCK_POINTER_ACTION_MEDIA_PREVIOUS:
-        return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_PREVIOUS);
-    case REACH_DOCK_POINTER_ACTION_MEDIA_PLAY_PAUSE:
-        return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_PLAY_PAUSE);
-    case REACH_DOCK_POINTER_ACTION_MEDIA_NEXT:
-        return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_NEXT);
     case REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS:
     {
         reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
@@ -338,6 +332,12 @@ reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const rea
     {
     case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER:
         return reach_host_show_power_context_menu(host);
+    case REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS:
+        return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_PREVIOUS);
+    case REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE:
+        return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_PLAY_PAUSE);
+    case REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT:
+        return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_NEXT);
     default:
         return REACH_OK;
     }
@@ -573,8 +573,7 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
                 (void)reach_host_apply_dock_pointer_action(host, nullptr, &dock_cancel);
                 return REACH_OK;
             }
-            if (reach_launcher_is_open(host->launcher_capsule) &&
-                dock_down.action.kind != REACH_DOCK_POINTER_ACTION_PRESS_NOW_PLAYING)
+            if (reach_launcher_is_open(host->launcher_capsule))
             {
                 reach_host_close_launcher_without_focus_restore(host);
             }

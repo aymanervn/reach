@@ -13,6 +13,7 @@ struct reach_top_bar_metrics
 
     float clock_width;
     float now_playing_collapsed_width;
+    float now_playing_collapsed_glyph_scale;
     float current_app_width;
     float current_app_max_width_ratio;
     float tray_width;
@@ -49,6 +50,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 
     metrics.clock_width = 92.0f;
     metrics.now_playing_collapsed_width = 44.0f;
+    metrics.now_playing_collapsed_glyph_scale = 0.46f;
     metrics.current_app_width = 220.0f;
     metrics.current_app_max_width_ratio = 0.28f;
     metrics.tray_width = 96.0f;

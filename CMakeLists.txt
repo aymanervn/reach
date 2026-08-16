@@ -118,7 +118,6 @@ add_library(reach_features STATIC
     src/features/dock/dock_feature.cpp
     src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
-    src/features/dock/dock_now_playing.cpp
     src/features/dock/dock_render.cpp
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp
@@ -133,6 +132,7 @@ add_library(reach_features STATIC
     src/features/stage/stage_layout.cpp
     src/features/stage/stage_render.cpp
     src/features/top_bar/top_bar_feature.cpp
+    src/features/top_bar/top_bar_now_playing.cpp
     src/features/top_bar/top_bar_interaction.cpp
     src/features/top_bar/top_bar_render.cpp
     src/features/switcher/switcher_feature.cpp
