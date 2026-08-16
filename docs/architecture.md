@@ -66,16 +66,19 @@ never another feature's internals.
 
 Every capsule also implements the uniform hooks in
 `reach/features/feature_capsule.h` (`reset`, `tick`, `is_open`, `force_close`,
-`on_game_mode`, `needs_frame`, `wants_pointer_move`, `handle_pointer`);
+`on_game_mode`, `needs_frame`, `wants_pointer_move`, `handle_pointer`,
+`pointer_sequence_active`);
 composition orchestrates through these, so adding a feature costs no
 feature-specific composition code. `handle_pointer` carries the complete
 down/up/move/wheel/leave/cancel/context/middle stream so cleanup semantics do
 not fall back to feature-specific host branches.
-The Dock is fully migrated to this contract: it owns press/release, hosted-button
-feedback, drag/reorder, middle/context actions, cancellation, and its private Now
-Playing input. Composition translates only its semantic actions and cross-feature
-popup policy. Raw hit types and row/index results are feature-private; the Dock
-exposes only a semantic pointer-region query for the global popup mouse hook.
+The Dock is fully migrated to this contract: it owns press/release, item
+feedback, drag/reorder, middle/context actions, and cancellation. The Top Bar
+owns the same for its hosted buttons — power, tray icons, tray overflow, quick
+settings, language — plus its private Now Playing input. Composition translates
+only their semantic actions and cross-feature popup policy. Raw hit types and
+row/index results are feature-private; both bars expose only a semantic
+pointer-region query for the global popup mouse hook.
 The Dock also owns its geometry (`reach_dock_local_point` /
 `reach_dock_rect_to_screen` / `reach_dock_layout_to_screen`), converts the
 screen-space pointer stream to dock-local coordinates itself, performs the
@@ -132,13 +135,18 @@ owns its text input end-to-end (`reach_launcher_handle_text_event` drives the
 edit model, query, and attached search; composition only routes the raw
 TEXT_CHAR/TEXT_EDIT events and applies the reported redraw/relayout).
 
-**Accepted coupling (by design — do not “fix”):** the dock cluster. The dock
-hosts the tray / quick-settings / power buttons, so those popup features may
-take the dock layout directly (e.g. `reach_tray_layout_popup(…, dock_layout,
+**Accepted coupling (by design — do not “fix”):** the top bar cluster. The top
+bar hosts the tray / quick-settings / power buttons, so those popup features may
+take the top bar layout directly (e.g. `reach_tray_layout_popup(…, top_bar_layout,
 …)`); no anchor indirection is wanted between them. Now Playing is not a
-separate feature: its private UI subfeature lives inside dock and consumes the
-shared Now Playing service, leaving room for a future standalone music feature
+separate feature: its private UI subfeature lives inside the top bar and consumes
+the shared Now Playing service, leaving room for a future standalone music feature
 to consume the same stable service independently.
+
+Dock and top bar are both bars: each owns a `reach_bar_visibility_state` driven
+by the shared `features/common/bar_visibility` state machine, and composition
+reconciles both through one `reach_host_reconcile_bar_visibility` over the
+descriptor's `update_visibility` / `bar_edge` / reveal-edge fields.
 
 ## composition
 
@@ -156,7 +164,10 @@ runs as a generic loop over the table in `pointer_priority` order (popups →
 transients → persistent, first handled result wins), with the descriptor's
 `role` resolving source-gated delivery, its `apply_pointer_action` translating
 handled results, and its flags declaring the outside-press policy
-(SOURCE_GATED / DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED). Dock-cluster
+(SOURCE_GATED / DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED). Source-gated rows are delivered to first — press and release go to the row whose
+`role` matches the event source (or whose `pointer_sequence_active` hook reports
+an in-flight sequence) before the rest of the table sees them — so no surface
+needs a hand-written branch to receive its own input. Top-bar-cluster
 pairwise policy (QS-button pass-through, power-press dismissal, tray/launcher
 close rules) and true capture pre-emption (dock drag, QS slider, launcher
 scrollbar) stay as named, commented exceptions ahead of the loops. Hotkey and

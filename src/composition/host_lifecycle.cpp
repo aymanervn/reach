@@ -18,7 +18,7 @@ static void reach_host_on_dock_reveal_edge(void *user, reach_screen_hotspot_even
     {
         reach_dock_begin_reveal_session(host->dock_capsule);
     }
-    reach_host_request_dock_visibility_update(host);
+    reach_host_request_bar_visibility_update(host);
 }
 
 static void reach_host_on_top_bar_reveal_edge(void *user, reach_screen_hotspot_event event)
@@ -37,7 +37,7 @@ static void reach_host_on_top_bar_reveal_edge(void *user, reach_screen_hotspot_e
     {
         reach_top_bar_begin_reveal_session(host->top_bar_capsule);
     }
-    reach_host_request_dock_visibility_update(host);
+    reach_host_request_bar_visibility_update(host);
 }
 
 static void reach_host_on_config_service_ready(void *user)

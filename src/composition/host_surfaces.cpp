@@ -238,6 +238,18 @@ static void reach_host_surface_switcher_close(reach_host *host)
     host->switcher.dirty_flags = 1;
 }
 
+static reach_bar_visibility_result
+reach_host_dock_update_visibility(void *capsule, const reach_bar_visibility_request *request)
+{
+    return reach_dock_update_visibility(static_cast<reach_dock *>(capsule), request);
+}
+
+static reach_bar_visibility_result
+reach_host_top_bar_update_visibility(void *capsule, const reach_bar_visibility_request *request)
+{
+    return reach_top_bar_update_visibility(static_cast<reach_top_bar *>(capsule), request);
+}
+
 void reach_host_init_surface_descriptors(reach_host *host)
 {
     if (host == nullptr)
@@ -254,7 +266,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                     nullptr,
                                     host->dock_capsule,
                                     reach_dock_capsule_ops(),
-                                    REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY |
+                                    REACH_SURFACE_POINTER_UPDATES_BAR_VISIBILITY |
                                         REACH_SURFACE_POINTER_SOURCE_GATED};
     descs[REACH_SURFACE_ID_TOP_BAR] = {REACH_SURFACE_ID_TOP_BAR,
                                        REACH_SURFACE_CLASS_PERSISTENT,
@@ -263,7 +275,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                        nullptr,
                                        host->top_bar_capsule,
                                        reach_top_bar_capsule_ops(),
-                                       REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY |
+                                       REACH_SURFACE_POINTER_UPDATES_BAR_VISIBILITY |
                                            REACH_SURFACE_POINTER_SOURCE_GATED};
     descs[REACH_SURFACE_ID_LAUNCHER] = {REACH_SURFACE_ID_LAUNCHER,
                                         REACH_SURFACE_CLASS_TRANSIENT,
@@ -346,6 +358,14 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].pointer_priority = 50;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
         reach_host_apply_quick_settings_pointer_action;
+    descs[REACH_SURFACE_ID_DOCK].update_visibility = reach_host_dock_update_visibility;
+    descs[REACH_SURFACE_ID_DOCK].bar_edge = REACH_BAR_EDGE_BOTTOM;
+    descs[REACH_SURFACE_ID_DOCK].reveal_edge = &host->dock_reveal_edge;
+    descs[REACH_SURFACE_ID_DOCK].reveal = &host->dock_reveal;
+    descs[REACH_SURFACE_ID_TOP_BAR].update_visibility = reach_host_top_bar_update_visibility;
+    descs[REACH_SURFACE_ID_TOP_BAR].bar_edge = REACH_BAR_EDGE_TOP;
+    descs[REACH_SURFACE_ID_TOP_BAR].reveal_edge = &host->top_bar_reveal_edge;
+    descs[REACH_SURFACE_ID_TOP_BAR].reveal = &host->top_bar_reveal;
     descs[REACH_SURFACE_ID_TOP_BAR].role = REACH_SURFACE_TOP_BAR;
     descs[REACH_SURFACE_ID_TOP_BAR].pointer_priority = 80;
     descs[REACH_SURFACE_ID_TOP_BAR].apply_pointer_action = reach_host_apply_top_bar_pointer_action;

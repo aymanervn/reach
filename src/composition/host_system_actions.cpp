@@ -166,3 +166,39 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
 
     return REACH_OK;
 }
+
+int32_t reach_host_refresh_input_language(reach_host *host)
+{
+    if (host == nullptr || host->input_language.ops.get_state == nullptr)
+    {
+        return 0;
+    }
+
+    reach_input_language_state state = {};
+    if (host->input_language.ops.get_state(host->input_language.language,
+                                           reach_host_foreground_window(host),
+                                           &state) != REACH_OK)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < 8; ++index)
+    {
+        if (host->input_language_code[index] != state.code[index])
+        {
+            reach_copy_utf16(host->input_language_code, 8, state.code);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+reach_result reach_host_cycle_input_language(reach_host *host)
+{
+    if (host == nullptr || host->input_language.ops.cycle_next == nullptr)
+    {
+        return REACH_OK;
+    }
+    return host->input_language.ops.cycle_next(host->input_language.language,
+                                               reach_host_foreground_window(host));
+}

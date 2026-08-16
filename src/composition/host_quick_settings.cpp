@@ -101,7 +101,7 @@ void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
     }
     else
     {
-        reach_host_request_dock_visibility_update(host);
+        reach_host_request_bar_visibility_update(host);
     }
 
     reach_host_sync_popup_mouse_hook(host);

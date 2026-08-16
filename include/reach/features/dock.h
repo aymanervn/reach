@@ -162,7 +162,6 @@ extern "C"
     void reach_dock_mark_items_changed(reach_dock *dock);
     int32_t reach_dock_take_items_changed(reach_dock *dock);
 
-    int32_t reach_dock_pointer_sequence_active(const reach_dock *dock);
 
     reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
                                                            int32_t local_y);

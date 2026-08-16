@@ -524,11 +524,6 @@ reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar
     return reach_top_bar_hit_test(&top_bar->state.layout, local_x, local_y);
 }
 
-int32_t reach_top_bar_pointer_sequence_active(const reach_top_bar *top_bar)
-{
-    return top_bar != nullptr && top_bar->state.pointer_sequence_active;
-}
-
 void reach_top_bar_suppress_power_release(reach_top_bar *top_bar)
 {
     if (top_bar != nullptr)
@@ -791,10 +786,15 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
 }
 
+static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule)
+{
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    return top_bar != nullptr && top_bar->state.pointer_sequence_active;
+}
+
 static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
 {
-    (void)capsule;
-    return 1;
+    return reach_top_bar_capsule_pointer_sequence_active(capsule);
 }
 
 static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
@@ -1004,6 +1004,7 @@ const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
         reach_top_bar_capsule_needs_frame,
         reach_top_bar_capsule_wants_pointer_move,
         reach_top_bar_capsule_handle_pointer,
+        reach_top_bar_capsule_pointer_sequence_active,
     };
     return &ops;
 }

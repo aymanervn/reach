@@ -213,8 +213,8 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
 
     const reach_top_bar_state *state = reach_top_bar_state_ptr(host->top_bar_capsule);
     reach_rect_f32 shown_bounds = state->layout.bounds;
-    reach_rect_f32 bounds =
-        reach_host_reconcile_top_bar_visibility(host, shown_bounds, ctx->monitor_bounds);
+    reach_rect_f32 bounds = reach_host_reconcile_bar_visibility(host, REACH_SURFACE_ID_TOP_BAR,
+                                                                shown_bounds, ctx->monitor_bounds);
 
     if (host->top_bar.window.ops.show != nullptr)
     {

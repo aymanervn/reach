@@ -97,7 +97,7 @@ typedef enum reach_surface_pointer_flags
 {
     REACH_SURFACE_POINTER_NONE = 0,
     REACH_SURFACE_POINTER_RELAYOUT_REDRAWS = 1u << 0,
-    REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY = 1u << 1,
+    REACH_SURFACE_POINTER_UPDATES_BAR_VISIBILITY = 1u << 1,
 
     REACH_SURFACE_POINTER_SOURCE_GATED = 1u << 2,
 
@@ -114,6 +114,13 @@ typedef enum reach_surface_behavior_flags
 
     REACH_SURFACE_BEHAVIOR_EXCLUSIVE = 1u << 1
 } reach_surface_behavior_flags;
+
+typedef struct reach_host_bar_reveal_state
+{
+    int32_t edge_visible;
+    int32_t edge_bounds_valid;
+    reach_rect_f32 edge_bounds;
+} reach_host_bar_reveal_state;
 
 typedef struct reach_surface_desc
 {
@@ -150,6 +157,12 @@ typedef struct reach_surface_desc
     const reach_ui_event_type *routed_events;
     size_t routed_event_count;
     reach_result (*handle_routed)(reach_host *host, const reach_ui_event *event);
+
+    reach_bar_visibility_result (*update_visibility)(void *capsule,
+                                                     const reach_bar_visibility_request *request);
+    reach_bar_edge bar_edge;
+    reach_screen_hotspot_port *reveal_edge;
+    reach_host_bar_reveal_state *reveal;
 } reach_surface_desc;
 
 void reach_host_init_surface_descriptors(reach_host *host);
@@ -218,13 +231,6 @@ typedef struct reach_host_stage_reveal_state
     int32_t corner_bounds_valid;
     reach_rect_f32 corner_bounds;
 } reach_host_stage_reveal_state;
-
-typedef struct reach_host_bar_reveal_state
-{
-    int32_t edge_visible;
-    int32_t edge_bounds_valid;
-    reach_rect_f32 edge_bounds;
-} reach_host_bar_reveal_state;
 
 typedef struct reach_host_pointer_move_state
 {
@@ -551,13 +557,11 @@ reach_dock_build_context reach_host_dock_build_context(reach_host *host);
 
 int32_t reach_host_dock_can_hide(const reach_host *host);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
-void reach_host_request_dock_visibility_update(reach_host *host);
+void reach_host_request_bar_visibility_update(reach_host *host);
 
-reach_rect_f32 reach_host_reconcile_dock_visibility(reach_host *host, reach_rect_f32 shown_bounds,
-                                                    reach_rect_f32 monitor_bounds);
-reach_rect_f32 reach_host_reconcile_top_bar_visibility(reach_host *host,
-                                                       reach_rect_f32 shown_bounds,
-                                                       reach_rect_f32 monitor_bounds);
+reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
+                                                   reach_rect_f32 shown_bounds,
+                                                   reach_rect_f32 monitor_bounds);
 void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bounds);
 int32_t reach_host_refresh_input_language(reach_host *host);
 reach_result reach_host_cycle_input_language(reach_host *host);
