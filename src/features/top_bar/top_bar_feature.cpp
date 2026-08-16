@@ -35,8 +35,10 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
         return REACH_ERROR;
     }
 
-    if (reach_top_bar_now_playing_create(&top_bar->now_playing_subfeature) != REACH_OK)
+    if (reach_top_bar_now_playing_create(&top_bar->now_playing_subfeature) != REACH_OK ||
+        reach_top_bar_window_push_create(&top_bar->window_push) != REACH_OK)
     {
+        reach_top_bar_now_playing_destroy(top_bar->now_playing_subfeature);
         delete top_bar;
         return REACH_ERROR;
     }
@@ -52,6 +54,8 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
 {
     if (top_bar != nullptr)
     {
+        reach_top_bar_window_push_release(top_bar->window_push);
+        reach_top_bar_window_push_destroy(top_bar->window_push);
         reach_top_bar_now_playing_destroy(top_bar->now_playing_subfeature);
     }
     delete top_bar;
@@ -70,6 +74,16 @@ void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_ser
         top_bar->stats = stats;
         top_bar->clock = clock;
         top_bar->input_language = input_language;
+        reach_top_bar_window_push_attach(top_bar->window_push, top_bar->apps, top_bar->windows);
+    }
+}
+
+void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control *apps)
+{
+    if (top_bar != nullptr)
+    {
+        top_bar->apps = apps;
+        reach_top_bar_window_push_attach(top_bar->window_push, top_bar->apps, top_bar->windows);
     }
 }
 
@@ -722,8 +736,17 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
     bar_request.edge = REACH_BAR_EDGE_TOP;
     bar_request.pointer_sequence_active = top_bar->state.pointer_sequence_active;
 
-    return reach_bar_update_visibility(&top_bar->state.visibility, &top_bar->manager,
-                                       REACH_TOP_BAR_ANIM_Y, &bar_request);
+    reach_bar_visibility_result result = reach_bar_update_visibility(
+        &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);
+
+    reach_top_bar_window_push_request push_request = {};
+    push_request.monitor_bounds = bar_request.monitor_bounds;
+    push_request.shown_bounds = bar_request.shown_bounds;
+    push_request.animated_bounds = result.animated_bounds;
+    push_request.bar_can_hide = bar_request.can_hide;
+    reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
+
+    return result;
 }
 
 static int32_t reach_top_bar_now_playing_scroll_active(const reach_top_bar *top_bar)
@@ -769,6 +792,7 @@ static void reach_top_bar_capsule_reset(void *capsule)
         return;
     }
     reach_bar_visibility_reset(&top_bar->state.visibility);
+    reach_top_bar_window_push_release(top_bar->window_push);
     reach_top_bar_now_playing_reset(top_bar->now_playing_subfeature);
     top_bar->state.pointer_sequence_active = 0;
     top_bar->state.pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
@@ -787,6 +811,7 @@ static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
         return;
     }
     reach_bar_visibility_reset(&top_bar->state.visibility);
+    reach_top_bar_window_push_release(top_bar->window_push);
     top_bar->state.pointer_sequence_active = 0;
 }
 

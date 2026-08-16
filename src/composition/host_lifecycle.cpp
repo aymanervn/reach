@@ -301,6 +301,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_launcher_attach_search(host->launcher_capsule, nullptr);
     reach_launcher_attach_icons(host->launcher_capsule, nullptr);
     reach_dock_attach_services(host->dock_capsule, nullptr, nullptr);
+    reach_top_bar_attach_app_control(host->top_bar_capsule, nullptr);
     reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr, nullptr, nullptr,
                                   nullptr);
     reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
@@ -659,6 +660,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_top_bar_attach_services(host->top_bar_capsule, host->now_playing_service,
                                   host->icon_service, host->window_tracking, host->system_stats,
                                   host->clock, host->input_language);
+    reach_top_bar_attach_app_control(host->top_bar_capsule, host->app_control);
     reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
                                    host->window_tracking);
     reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);

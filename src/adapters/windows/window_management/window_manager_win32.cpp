@@ -767,6 +767,67 @@ static reach_result reach_window_manager_frame_bounds(const reach_window_manager
     return REACH_OK;
 }
 
+static reach_result reach_window_manager_outer_bounds(const reach_window_manager *manager,
+                                                      reach_window_id window_id,
+                                                      reach_rect_f32 *out_bounds)
+{
+    if (manager == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_bounds = {};
+
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    RECT rect = {};
+    if (!IsWindow(hwnd) || IsIconic(hwnd) || !GetWindowRect(hwnd, &rect))
+    {
+        return REACH_ERROR;
+    }
+
+    out_bounds->x = (float)rect.left;
+    out_bounds->y = (float)rect.top;
+    out_bounds->width = (float)(rect.right - rect.left);
+    out_bounds->height = (float)(rect.bottom - rect.top);
+    return REACH_OK;
+}
+
+static reach_result reach_window_manager_set_outer_bounds(reach_window_manager *manager,
+                                                          const reach_window_outer_bounds *windows,
+                                                          size_t count)
+{
+    if (manager == nullptr || windows == nullptr || count == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HDWP defer = BeginDeferWindowPos((int)count);
+    if (defer == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    for (size_t index = 0; index < count; ++index)
+    {
+        HWND hwnd = reinterpret_cast<HWND>(windows[index].window);
+        if (!IsWindow(hwnd))
+        {
+            continue;
+        }
+        const reach_rect_f32 *bounds = &windows[index].bounds;
+        HDWP next = DeferWindowPos(defer, hwnd, nullptr, (int)bounds->x, (int)bounds->y,
+                                   (int)bounds->width, (int)bounds->height,
+                                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+        if (next == nullptr)
+        {
+            return REACH_ERROR;
+        }
+        defer = next;
+    }
+
+    return EndDeferWindowPos(defer) ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_window_manager_pin_app_for_window(reach_window_manager *manager,
                                                             uintptr_t window_id,
                                                             const reach_window_snapshot *snapshot,
@@ -866,6 +927,8 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;
     out_port->ops.frame_bounds = reach_window_manager_frame_bounds;
+    out_port->ops.outer_bounds = reach_window_manager_outer_bounds;
+    out_port->ops.set_outer_bounds = reach_window_manager_set_outer_bounds;
     out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
     out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;

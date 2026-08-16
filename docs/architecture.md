@@ -159,6 +159,18 @@ scrolls it with the shared `features/common/marquee` clock when the text
 overruns its slot; the scroll is gated on the bar being shown, so a hidden or
 game-mode bar never asks for a frame.
 
+The window push is the top bar's second private subfeature: while the bar can
+hide and is sliding in, it moves the windows the bar would cover down by the
+bar's own animated overlap, so they track the bar edge on one clock. It stores
+each window's original outer rect at capture and animates back onto it — Windows
+never grows a window back on its own — and drives the motion through
+`app_control`'s generic window geometry ops (`reach_app_control_window_bounds` /
+`reach_app_control_set_window_bounds`, one `BeginDeferWindowPos` batch per frame
+in the adapter). Those ops work in the outer window rect the OS repositions,
+never the DWM `frame_bounds` the rest of the shell measures with; mixing the two
+drifts by the invisible resize border. The work area is deliberately left alone:
+changing it costs ~37 ms per call, which no per-frame path can afford.
+
 Every popup gets its bounds and its notch from one place —
 `reach_popup_place(anchor, width, height, margin)` in `features/popup`. It
 centres the popup on the anchoring control, clamps it into the monitor on both
