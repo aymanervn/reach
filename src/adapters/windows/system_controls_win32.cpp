@@ -505,13 +505,17 @@ static void reach_system_controls_copy_ssid(uint16_t *dst, size_t dst_count, con
         source_count = sizeof(ssid->ucSSID);
     }
 
-    size_t index = 0;
-    while (index + 1 < dst_count && index < source_count)
+    int converted =
+        MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char *>(ssid->ucSSID),
+                            (int)source_count, reinterpret_cast<wchar_t *>(dst),
+                            (int)(dst_count - 1));
+    if (converted <= 0)
     {
-        dst[index] = (uint16_t)ssid->ucSSID[index];
-        ++index;
+        converted = MultiByteToWideChar(CP_ACP, 0, reinterpret_cast<const char *>(ssid->ucSSID),
+                                        (int)source_count, reinterpret_cast<wchar_t *>(dst),
+                                        (int)(dst_count - 1));
     }
-    dst[index] = 0;
+    dst[converted > 0 ? (size_t)converted : 0] = 0;
 }
 
 static void reach_system_controls_set_disconnected_network(reach_network_state *state)
