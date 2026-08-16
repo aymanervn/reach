@@ -80,9 +80,9 @@ static void reach_top_bar_push_pill(const reach_theme *theme,
 {
     float radius = pill.height * 0.5f;
 
-    reach_top_bar_push_rect(commands, pill, theme->dock_background, radius);
+    reach_top_bar_push_rect(commands, pill, theme->bar_background, radius);
 
-    if (theme->border_thickness <= 0.0f || theme->dock_border.a <= 0.0f)
+    if (theme->border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {
         return;
     }
@@ -93,7 +93,7 @@ static void reach_top_bar_push_pill(const reach_theme *theme,
                                      pill.y + theme->border_thickness * 0.5f,
                                      pill.width - theme->border_thickness,
                                      pill.height - theme->border_thickness);
-    border.color = theme->dock_border;
+    border.color = theme->bar_border;
     border.radius = radius;
     border.stroke_width = theme->border_thickness;
     reach_render_command_buffer_push(commands, &border);
@@ -116,7 +116,7 @@ static int32_t reach_top_bar_battery_percent_clamped(const reach_top_bar_render_
 static reach_color reach_top_bar_battery_accent(const reach_top_bar_render_input *input,
                                                 int32_t percent)
 {
-    return percent <= 15 ? input->theme->dock_battery_low : input->theme->system_glyph;
+    return percent <= 15 ? input->theme->bar_battery_low : input->theme->system_glyph;
 }
 
 static void reach_top_bar_push_battery_ring(const reach_top_bar_render_input *input,
@@ -200,11 +200,11 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
     int32_t percent = reach_top_bar_battery_percent_clamped(input);
 
     reach_color glyph_color = theme->system_glyph;
-    reach_color background = theme->dock_button_background;
+    reach_color background = theme->bar_button_background;
     if (input->battery_valid)
     {
         glyph_color.a *= 1.0f - input->power_hover;
-        background = reach_theme_color_mix(background, theme->dock_power_hover_background,
+        background = reach_theme_color_mix(background, theme->bar_power_hover_background,
                                            input->power_hover);
     }
 
@@ -224,7 +224,7 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
     {
         reach_top_bar_push_rect(
             commands, power_box,
-            reach_theme_color_alpha(theme->dock_click_feedback, input->click_feedback_opacity),
+            reach_theme_color_alpha(theme->bar_click_feedback, input->click_feedback_opacity),
             power_box.height * 0.5f);
     }
 }
@@ -243,13 +243,13 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
     reach_top_bar_push_text(commands, reach_top_bar_rect(clock.x, clock.y, clock.width, time_height),
                             input->time_text, metrics.clock_time_text_size,
                             metrics.clock_time_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->dock_clock_time);
+                            input->theme->bar_text_primary);
 
     reach_top_bar_push_text(
         commands,
         reach_top_bar_rect(clock.x, clock.y + time_height, clock.width, clock.height - time_height),
         input->date_text, metrics.clock_date_text_size, metrics.clock_date_text_weight,
-        REACH_TEXT_ALIGNMENT_LEADING, input->theme->dock_clock_date);
+        REACH_TEXT_ALIGNMENT_LEADING, input->theme->bar_text_secondary);
 }
 
 static void reach_top_bar_push_current_app(const reach_top_bar_render_input *input,
@@ -278,7 +278,7 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
         reach_top_bar_push_text(commands, text, input->current_app_name,
                                 metrics.current_app_name_text_size,
                                 metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->theme->dock_clock_time);
+                                input->theme->bar_text_primary);
         return;
     }
 
@@ -287,13 +287,13 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
                             reach_top_bar_rect(text.x, text.y, text.width, name_height),
                             input->current_app_name, metrics.current_app_name_text_size,
                             metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->dock_clock_time);
+                            input->theme->bar_text_primary);
     reach_top_bar_push_text(
         commands,
         reach_top_bar_rect(text.x, text.y + name_height, text.width, text.height - name_height),
         input->current_app_title, metrics.current_app_title_text_size,
         metrics.current_app_title_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-        input->theme->dock_clock_date);
+        input->theme->bar_text_secondary);
 }
 
 static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
@@ -333,7 +333,7 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     }
 
     reach_rect_f32 overflow = layout->tray_overflow_button;
-    reach_top_bar_push_rect(commands, overflow, input->theme->dock_button_background,
+    reach_top_bar_push_rect(commands, overflow, input->theme->bar_button_background,
                             overflow.height * 0.5f);
     reach_top_bar_push_vector_icon(
         commands, reach_top_bar_center_square(overflow, overflow.height * 0.50f),
@@ -344,7 +344,7 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
         input->click_feedback_opacity > metrics.click_feedback_min_opacity)
     {
         reach_top_bar_push_rect(commands, overflow,
-                                reach_theme_color_alpha(input->theme->dock_click_feedback,
+                                reach_theme_color_alpha(input->theme->bar_click_feedback,
                                                         input->click_feedback_opacity),
                                 overflow.height * 0.5f);
     }
@@ -364,11 +364,11 @@ static void reach_top_bar_push_stats_column(const reach_top_bar_render_input *in
     float line = column.height * metrics.stats_line_height_ratio;
     reach_top_bar_push_text(commands, reach_top_bar_rect(column.x, column.y, column.width, line),
                             top_text, metrics.stats_text_size, metrics.stats_text_weight,
-                            REACH_TEXT_ALIGNMENT_LEADING, input->theme->dock_clock_time);
+                            REACH_TEXT_ALIGNMENT_LEADING, input->theme->bar_text_primary);
     reach_top_bar_push_text(
         commands, reach_top_bar_rect(column.x, column.y + line, column.width, column.height - line),
         bottom_text, metrics.stats_text_size, metrics.stats_text_weight,
-        REACH_TEXT_ALIGNMENT_LEADING, input->theme->dock_clock_date);
+        REACH_TEXT_ALIGNMENT_LEADING, input->theme->bar_text_secondary);
 }
 
 static void reach_top_bar_push_stats(const reach_top_bar_render_input *input,
@@ -390,17 +390,17 @@ static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
         return;
     }
 
-    reach_top_bar_push_rect(commands, button, input->theme->dock_button_background,
+    reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
                             button.height * 0.5f);
     reach_top_bar_push_text(commands, button, input->language_code, metrics.language_text_size,
                             metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
-                            input->theme->dock_clock_time);
+                            input->theme->bar_text_primary);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON &&
         input->click_feedback_opacity > metrics.click_feedback_min_opacity)
     {
         reach_top_bar_push_rect(commands, button,
-                                reach_theme_color_alpha(input->theme->dock_click_feedback,
+                                reach_theme_color_alpha(input->theme->bar_click_feedback,
                                                         input->click_feedback_opacity),
                                 button.height * 0.5f);
     }
@@ -416,7 +416,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         return;
     }
 
-    reach_top_bar_push_rect(commands, button, input->theme->dock_button_background,
+    reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
                             button.height * 0.5f);
     reach_top_bar_push_vector_icon(commands,
                                    reach_top_bar_center_square(button, button.height * 0.55f),
@@ -426,7 +426,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         input->click_feedback_opacity > metrics.click_feedback_min_opacity)
     {
         reach_top_bar_push_rect(commands, button,
-                                reach_theme_color_alpha(input->theme->dock_click_feedback,
+                                reach_theme_color_alpha(input->theme->bar_click_feedback,
                                                         input->click_feedback_opacity),
                                 button.height * 0.5f);
     }
@@ -461,8 +461,8 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.time_text = state->clock_time_text;
     input.date_text = state->clock_date_text;
     input.dpi_scale = ctx->dpi_scale;
-    input.battery_valid = ctx->battery_valid;
-    input.battery_percent = ctx->battery_percent;
+    input.battery_valid = state->battery_valid;
+    input.battery_percent = state->battery_percent;
     input.power_hover =
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
     input.click_feedback_index = state->feedback_index;

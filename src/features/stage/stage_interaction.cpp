@@ -142,7 +142,7 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
 
         reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER,
                                            close_hit ? 1.0f : 0.0f,
-                                           REACH_STAGE_CLOSE_HOVER_SECONDS, REACH_EASING_EASE_OUT);
+                                           reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
 
         out->handled = 1;
         out->redraw = changed;
@@ -174,7 +174,7 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
             reach_stage_depart_tile(stage, index);
             reach_animation_manager_animate_to(&stage->animations,
                                                REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f,
-                                               REACH_STAGE_CLOSE_HOVER_SECONDS,
+                                               reach_stage_close_hover_seconds(),
                                                REACH_EASING_EASE_OUT);
             return;
         }
@@ -202,7 +202,7 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
         out->redraw = state->has_hover;
         state->has_hover = 0;
         reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER,
-                                           0.0f, REACH_STAGE_CLOSE_HOVER_SECONDS,
+                                           0.0f, reach_stage_close_hover_seconds(),
                                            REACH_EASING_EASE_OUT);
         return;
 

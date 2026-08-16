@@ -27,12 +27,7 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
                                  REACH_HOST_ANIMATION_COUNT);
     reach_host_surface_transitions_init(host);
     reach_dock_clear_item_x_animations(host->dock_capsule);
-    host->dock_reveal.edge_visible = 0;
-    host->dock_reveal.edge_bounds_valid = 0;
-    if (host->dock_reveal_edge.ops.hide != nullptr)
-    {
-        (void)host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.hotspot);
-    }
+    reach_host_hide_bar_reveal_edges(host);
     host->stage_reveal.corner_visible = 0;
     host->stage_reveal.corner_bounds_valid = 0;
     if (host->stage_reveal_corner.ops.hide != nullptr)
@@ -40,13 +35,7 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
         (void)host->stage_reveal_corner.ops.hide(host->stage_reveal_corner.hotspot);
     }
 
-    host->launcher.dirty_flags = 1;
-    host->tray.dirty_flags = 1;
-    host->switcher.dirty_flags = 1;
-    host->context_menu.dirty_flags = 1;
-    host->quick_settings.dirty_flags = 1;
-    host->clipboard_surface.dirty_flags = 1;
-    host->dock.dirty_flags = 1;
+    reach_host_mark_all_surfaces_dirty(host);
     host->dirty.render = 1;
 }
 
@@ -70,6 +59,7 @@ reach_result reach_host_update_game_mode(reach_host *host)
         return REACH_OK;
     }
     reach_runtime_policy_set_game_mode(&host->runtime_policy, next_active);
+    reach_system_stats_set_enabled(host->system_stats, !next_active);
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
@@ -88,13 +78,7 @@ reach_result reach_host_update_game_mode(reach_host *host)
     {
         host->dirty.layout = 1;
         host->dirty.render = 1;
-        host->dock.dirty_flags = 1;
-        host->launcher.dirty_flags = 1;
-        host->tray.dirty_flags = 1;
-        host->switcher.dirty_flags = 1;
-        host->context_menu.dirty_flags = 1;
-        host->quick_settings.dirty_flags = 1;
-        host->clipboard_surface.dirty_flags = 1;
+        reach_host_mark_all_surfaces_dirty(host);
     }
     reach_host_sync_pointer_move_subscriptions(host);
 

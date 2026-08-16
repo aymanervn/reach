@@ -185,7 +185,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     if (!input->model->visible)
     {
         reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                            theme->dock_button_background, radius);
+                                            theme->bar_button_background, radius);
         reach_render_command glyph = {};
         glyph.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         glyph.rect = input->layout->cover;
@@ -233,7 +233,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     else
     {
         reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                         theme->dock_button_background, radius);
+                                         theme->bar_button_background, radius);
     }
 
     if (input->layout->title.height <= 0.0f || input->layout->play_pause_button.width <= 0.0f)

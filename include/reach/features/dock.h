@@ -288,6 +288,8 @@ extern "C"
     reach_dock_update_visibility(reach_dock *animations,
                                  const reach_bar_visibility_request *request);
 
+    reach_bar_reveal_animation reach_dock_reveal_animation(const reach_dock *dock);
+
 #ifdef __cplusplus
 }
 #endif

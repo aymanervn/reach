@@ -135,6 +135,8 @@ extern "C"
         uint16_t stats_download_text[16];
         uint16_t stats_upload_text[16];
         int32_t stats_valid;
+        int32_t battery_valid;
+        int32_t battery_percent;
 
         reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS];
         size_t tray_item_count;
@@ -158,14 +160,11 @@ extern "C"
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);
     reach_animation_manager *reach_top_bar_manager(reach_top_bar *top_bar);
 
-    float reach_top_bar_height(const reach_theme *theme, float dock_height);
-
     typedef struct reach_top_bar_build_context
     {
         const reach_theme *theme;
         reach_rect_f32 monitor_bounds;
         float dpi_scale;
-        float dock_height;
         const reach_pinned_app_model *pinned_apps;
         size_t pinned_app_count;
         const reach_top_bar_tray_item *tray_items;
@@ -192,13 +191,13 @@ extern "C"
     reach_top_bar_update_visibility(reach_top_bar *top_bar,
                                     const reach_bar_visibility_request *request);
 
+    reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *top_bar);
+
     typedef struct reach_top_bar_render_context
     {
         const reach_theme *theme;
         float dpi_scale;
         int32_t icon_size_px;
-        int32_t battery_valid;
-        int32_t battery_percent;
     } reach_top_bar_render_context;
 
     reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,

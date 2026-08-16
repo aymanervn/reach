@@ -16,13 +16,25 @@ static float reach_bar_hidden_y(reach_bar_edge edge, reach_rect_f32 shown_bounds
     return monitor_bounds.y + monitor_bounds.height + 4.0f;
 }
 
-reach_rect_f32 reach_bar_reveal_edge_bounds(reach_bar_edge edge, int32_t mode,
-                                            reach_rect_f32 shown_bounds,
-                                            reach_rect_f32 monitor_bounds)
+static float reach_bar_reveal_span_inset(float inset, float width)
 {
+    if (!(inset > 0.0f) || !(inset < width))
+    {
+        return 0.0f;
+    }
+    return inset;
+}
+
+static reach_rect_f32 reach_bar_reveal_edge_bounds(reach_bar_edge edge, int32_t mode,
+                                                   float span_start_inset,
+                                                   reach_rect_f32 shown_bounds,
+                                                   reach_rect_f32 monitor_bounds)
+{
+    float inset = reach_bar_reveal_span_inset(span_start_inset, shown_bounds.width);
+
     reach_rect_f32 bounds = {};
-    bounds.x = shown_bounds.x;
-    bounds.width = shown_bounds.width;
+    bounds.x = shown_bounds.x + inset;
+    bounds.width = shown_bounds.width - inset;
 
     if (edge == REACH_BAR_EDGE_TOP)
     {
@@ -87,9 +99,9 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     {
         current_bounds.y = reach_animation_manager_value(manager, y_track);
     }
-    reach_rect_f32 bridge_bounds =
-        reach_bar_reveal_edge_bounds(request->edge, REACH_BAR_REVEAL_EDGE_BRIDGE,
-                                     request->shown_bounds, request->monitor_bounds);
+    reach_rect_f32 bridge_bounds = reach_bar_reveal_edge_bounds(
+        request->edge, REACH_BAR_REVEAL_EDGE_BRIDGE, request->reveal_span_inset,
+        request->shown_bounds, request->monitor_bounds);
     int32_t pointer_over_bar =
         request->pointer_valid && reach_bar_point_in_rect(request->pointer, current_bounds);
     int32_t pointer_in_bridge =
@@ -139,10 +151,6 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     }
 
     float target_y = target_hidden ? hidden_y : request->shown_bounds.y;
-    if (target_hidden && request->sticky_feedback)
-    {
-        result.clear_sticky_feedback = 1;
-    }
 
     if (!state->animation_initialized)
     {
@@ -154,13 +162,21 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     if (state->target_hidden != target_hidden)
     {
         state->target_hidden = target_hidden;
-        reach_animation_manager_animate_to(manager, y_track, target_y, 0.25,
+        double reveal_seconds =
+            request->reveal_seconds > 0.0f ? (double)request->reveal_seconds : 0.25;
+        reach_animation_manager_animate_to(manager, y_track, target_y, reveal_seconds,
                                            REACH_EASING_EASE_IN_OUT);
     }
 
     reach_rect_f32 animated = request->shown_bounds;
     animated.y = reach_animation_manager_value(manager, y_track);
     result.animated_bounds = animated;
+    if (edge_mode != REACH_BAR_REVEAL_EDGE_DISABLED)
+    {
+        result.reveal_bounds = reach_bar_reveal_edge_bounds(
+            request->edge, edge_mode, request->reveal_span_inset, request->shown_bounds,
+            request->monitor_bounds);
+    }
     result.edge_mode = edge_mode;
     result.visible = target_hidden ? 0 : 1;
     return result;

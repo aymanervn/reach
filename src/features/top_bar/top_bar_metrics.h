@@ -5,7 +5,7 @@
 
 struct reach_top_bar_metrics
 {
-    float height_scale;
+    float height;
     float screen_gap;
     float edge_inset;
     float pill_gap;
@@ -59,7 +59,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 {
     reach_top_bar_metrics metrics = {};
 
-    metrics.height_scale = 0.9f;
+    metrics.height = 34.5f;
     metrics.screen_gap = 6.0f;
     metrics.edge_inset = 8.0f;
     metrics.pill_gap = 6.0f;

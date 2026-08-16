@@ -6,8 +6,11 @@
 
 struct reach_system_stats_source
 {
-    int32_t placeholder;
+    MIB_IFTABLE *if_table;
+    ULONG if_table_size;
 };
+
+#define REACH_SYSTEM_STATS_IF_TABLE_INITIAL_BYTES (64u * 1024u)
 
 static reach_system_stats_source reach_system_stats_instance = {};
 
@@ -48,35 +51,56 @@ static void reach_system_stats_sample_memory(reach_system_stats_sample *out_samp
         status.ullTotalPhys > status.ullAvailPhys ? status.ullTotalPhys - status.ullAvailPhys : 0;
 }
 
-static void reach_system_stats_sample_network(reach_system_stats_sample *out_sample)
+static int32_t reach_system_stats_reserve_if_table(reach_system_stats_source *source, ULONG size)
 {
-    ULONG size = 0;
-    if (GetIfTable(nullptr, &size, FALSE) != ERROR_INSUFFICIENT_BUFFER || size == 0)
+    if (source->if_table != nullptr && source->if_table_size >= size)
+    {
+        return 1;
+    }
+    if (source->if_table != nullptr)
+    {
+        HeapFree(GetProcessHeap(), 0, source->if_table);
+    }
+    source->if_table = (MIB_IFTABLE *)HeapAlloc(GetProcessHeap(), 0, size);
+    source->if_table_size = source->if_table != nullptr ? size : 0;
+    return source->if_table != nullptr;
+}
+
+static void reach_system_stats_sample_network(reach_system_stats_source *source,
+                                              reach_system_stats_sample *out_sample)
+{
+    if (!reach_system_stats_reserve_if_table(source,
+                                             REACH_SYSTEM_STATS_IF_TABLE_INITIAL_BYTES))
     {
         return;
     }
 
-    MIB_IFTABLE *table = (MIB_IFTABLE *)HeapAlloc(GetProcessHeap(), 0, size);
-    if (table == nullptr)
+    ULONG size = source->if_table_size;
+    DWORD result = GetIfTable(source->if_table, &size, FALSE);
+    if (result == ERROR_INSUFFICIENT_BUFFER)
     {
-        return;
-    }
-
-    if (GetIfTable(table, &size, FALSE) == NO_ERROR)
-    {
-        for (DWORD index = 0; index < table->dwNumEntries; ++index)
+        if (!reach_system_stats_reserve_if_table(source, size))
         {
-            const MIB_IFROW *row = &table->table[index];
-            if (row->dwType == IF_TYPE_SOFTWARE_LOOPBACK)
-            {
-                continue;
-            }
-            out_sample->network_received_bytes += row->dwInOctets;
-            out_sample->network_sent_bytes += row->dwOutOctets;
+            return;
         }
+        size = source->if_table_size;
+        result = GetIfTable(source->if_table, &size, FALSE);
+    }
+    if (result != NO_ERROR)
+    {
+        return;
     }
 
-    HeapFree(GetProcessHeap(), 0, table);
+    for (DWORD index = 0; index < source->if_table->dwNumEntries; ++index)
+    {
+        const MIB_IFROW *row = &source->if_table->table[index];
+        if (row->dwType == IF_TYPE_SOFTWARE_LOOPBACK)
+        {
+            continue;
+        }
+        out_sample->network_received_bytes += row->dwInOctets;
+        out_sample->network_sent_bytes += row->dwOutOctets;
+    }
 }
 
 static reach_result reach_system_stats_sample_source(reach_system_stats_source *source,
@@ -90,13 +114,19 @@ static reach_result reach_system_stats_sample_source(reach_system_stats_source *
     *out_sample = {};
     reach_system_stats_sample_cpu(out_sample);
     reach_system_stats_sample_memory(out_sample);
-    reach_system_stats_sample_network(out_sample);
+    reach_system_stats_sample_network(source, out_sample);
     return REACH_OK;
 }
 
 static void reach_system_stats_destroy(reach_system_stats_source *source)
 {
-    (void)source;
+    if (source == nullptr || source->if_table == nullptr)
+    {
+        return;
+    }
+    HeapFree(GetProcessHeap(), 0, source->if_table);
+    source->if_table = nullptr;
+    source->if_table_size = 0;
 }
 
 reach_result reach_windows_create_system_stats(reach_system_stats_port *out_port)
