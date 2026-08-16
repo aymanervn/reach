@@ -494,6 +494,17 @@ int32_t reach_app_frame_interval_ms(const reach_app *app)
     return app != nullptr && app->host != nullptr ? reach_host_frame_interval_ms(app->host) : 16;
 }
 
+uint32_t reach_app_idle_wait_ms(const reach_app *app)
+{
+    if (app == nullptr || app->host == nullptr)
+    {
+        return REACH_APP_WAIT_FOREVER;
+    }
+
+    uint32_t wait_ms = reach_host_idle_wait_ms(app->host);
+    return wait_ms == REACH_CLOCK_WAIT_FOREVER ? REACH_APP_WAIT_FOREVER : wait_ms;
+}
+
 void reach_app_destroy(reach_app *app)
 {
     if (app == nullptr)

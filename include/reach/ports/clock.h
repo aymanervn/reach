@@ -20,6 +20,8 @@ extern "C"
         int32_t weekday;
         int32_t hour;
         int32_t minute;
+        int32_t second;
+        int32_t millisecond;
     } reach_clock_sample;
 
     typedef struct reach_clock_ops
