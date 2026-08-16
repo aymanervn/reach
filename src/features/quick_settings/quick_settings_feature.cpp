@@ -1088,8 +1088,7 @@ size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quic
 }
 
 void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
-                                          uint32_t change_flags, double delta_seconds,
-                                          reach_feature_tick_result *out)
+                                          double delta_seconds, reach_feature_tick_result *out)
 {
     if (out != nullptr)
     {
