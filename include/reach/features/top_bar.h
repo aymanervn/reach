@@ -9,6 +9,7 @@
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
 #include "reach/features/feature_capsule.h"
+#include "reach/services/app_control.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/now_playing.h"
 #include "reach/services/clock.h"
@@ -175,6 +176,8 @@ extern "C"
                                        reach_icon_service *icons, reach_window_tracking *windows,
                                        reach_system_stats *stats, reach_clock *clock,
                                        reach_input_language_service *input_language);
+
+    void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control *apps);
 
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);
 

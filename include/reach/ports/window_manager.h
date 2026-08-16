@@ -28,6 +28,12 @@ extern "C"
         int32_t minimized;
     } reach_window_snapshot;
 
+    typedef struct reach_window_outer_bounds
+    {
+        reach_window_id window;
+        reach_rect_f32 bounds;
+    } reach_window_outer_bounds;
+
     typedef struct reach_window_manager_ops
     {
         reach_result (*start)(reach_window_manager *manager);
@@ -47,6 +53,10 @@ extern "C"
                                   reach_window_snapshot *out_window);
         reach_result (*frame_bounds)(const reach_window_manager *manager,
                                      reach_window_id window_id, reach_rect_f32 *out_bounds);
+        reach_result (*outer_bounds)(const reach_window_manager *manager,
+                                     reach_window_id window_id, reach_rect_f32 *out_bounds);
+        reach_result (*set_outer_bounds)(reach_window_manager *manager,
+                                         const reach_window_outer_bounds *windows, size_t count);
         reach_result (*pin_app_for_window)(reach_window_manager *manager, reach_window_id window_id,
                                            const reach_window_snapshot *snapshot,
                                            reach_pinned_app_model *out_app);

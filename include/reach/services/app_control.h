@@ -48,6 +48,12 @@ extern "C"
                                                     size_t window_count);
     reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
                                                  reach_split_mode mode);
+
+    reach_result reach_app_control_window_bounds(const reach_app_control *service,
+                                                 uintptr_t window_id, reach_rect_f32 *out_bounds);
+    reach_result reach_app_control_set_window_bounds(reach_app_control *service,
+                                                     const reach_window_outer_bounds *windows,
+                                                     size_t count);
     int32_t reach_app_control_take_window_completed(reach_app_control *service,
                                                     reach_result *out_result);
 
