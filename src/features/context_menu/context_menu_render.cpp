@@ -40,9 +40,6 @@ static reach_context_menu_item_style reach_context_menu_style_for_command(const 
     case REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT:
         accent = theme->menu_accent_lock;
         break;
-    case REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS:
-        accent = theme->menu_accent_settings;
-        break;
     default:
         power_color = 0;
         break;

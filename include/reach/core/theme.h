@@ -108,7 +108,6 @@ extern "C"
         reach_color menu_accent_sleep;
         reach_color menu_accent_restart;
         reach_color menu_accent_lock;
-        reach_color menu_accent_settings;
 
         reach_color stage_backdrop;
         reach_color stage_tile_placeholder;

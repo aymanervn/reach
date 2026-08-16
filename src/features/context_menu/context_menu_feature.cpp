@@ -26,7 +26,6 @@ void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *o
     out_commands[2] = REACH_CONTEXT_MENU_COMMAND_POWER_RESTART;
     out_commands[3] = REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN;
     out_commands[4] = REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT;
-    out_commands[5] = REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS;
     if (out_icon_ids != nullptr)
     {
         out_icon_ids[0] = REACH_VECTOR_ICON_LOCK;
@@ -34,9 +33,8 @@ void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *o
         out_icon_ids[2] = REACH_VECTOR_ICON_RESTART;
         out_icon_ids[3] = REACH_VECTOR_ICON_SHUTDOWN;
         out_icon_ids[4] = REACH_VECTOR_ICON_SIGN_OUT;
-        out_icon_ids[5] = REACH_VECTOR_ICON_SETTINGS;
     }
-    *out_count = 6;
+    *out_count = 5;
 }
 
 const uint16_t *reach_context_menu_command_text(uint32_t command)
@@ -84,10 +82,6 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
     if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT)
     {
         return (const uint16_t *)L"Sign out";
-    }
-    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS)
-    {
-        return (const uint16_t *)L"Settings";
     }
     return (const uint16_t *)L"";
 }
@@ -234,10 +228,11 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     }
 
     state->bounds = {popup_x, popup_y, popup_width, popup_height};
+    float items_y =
+        popup_y + padding + (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
     for (size_t index = 0; index < state->item_count; ++index)
     {
-        state->item_slots[index] = {popup_x + padding,
-                                    popup_y + padding + item_height * (float)index,
+        state->item_slots[index] = {popup_x + padding, items_y + item_height * (float)index,
                                     popup_width - padding * 2.0f, item_height};
     }
 }
