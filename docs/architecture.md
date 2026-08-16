@@ -185,6 +185,16 @@ by the shared `features/common/bar_visibility` state machine, and composition
 reconciles both through one `reach_host_reconcile_bar_visibility` over the
 descriptor's `update_visibility` / `bar_edge` / reveal-edge fields.
 
+Two separate inputs decide how another open surface affects the bars, and both
+apply to both bars identically. A surface that declares `bar_shown_while_open`
+(stage, clipboard) *forces* them shown for as long as it is open. Any open popup
+instead only *holds* them: a bar already shown stays shown, but opening a popup
+never summons a hidden bar, and the hold lifts the frame the last popup closes.
+Everything else — the launcher, and the switcher as the sole `OVERLAY` — leaves
+the bars to hide on their own rules. The switcher exclusion is deliberate and
+differs from `reach_host_window_list_blocked`, which does count `OVERLAY`: the
+dock hover menu is suppressed during alt-tab while the bars still hide.
+
 ## composition
 
 The host (`reach_host`): wires adapters into ports, constructs services and features,

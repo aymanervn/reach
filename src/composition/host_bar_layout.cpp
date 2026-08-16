@@ -2,12 +2,24 @@
 
 #include <math.h>
 
-static int32_t reach_host_transient_open(const reach_host *host)
+static int32_t reach_host_bar_forced_shown(const reach_host *host)
 {
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_desc *desc = &host->surface_descs[index];
+        if (desc->bar_shown_while_open && desc->capsule_ops != nullptr &&
+            desc->capsule_ops->is_open != nullptr && desc->capsule_ops->is_open(desc->capsule))
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
 
+static int32_t reach_host_popup_open(const reach_host *host)
+{
     return reach_host_any_surface_open(const_cast<reach_host *>(host),
-                                       reach_surface_class_bit(REACH_SURFACE_CLASS_TRANSIENT) |
-                                           reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
+                                       reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
 }
 
 int32_t reach_host_bars_can_hide(const reach_host *host)
@@ -197,8 +209,8 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
     request.game_mode = reach_host_game_mode_enabled(host);
     request.can_hide = reach_host_bars_can_hide(host);
-    request.transient_open =
-        desc->bar_shown_while_transient_open && reach_host_transient_open(host);
+    request.force_shown = reach_host_bar_forced_shown(host);
+    request.hold_open = reach_host_popup_open(host);
     request.reveal_seconds =
         (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
     request.reveal_span_inset =
