@@ -265,8 +265,6 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
         return REACH_DOCK_POINTER_REGION_ITEM;
     case REACH_DOCK_HIT_STAGE_BUTTON:
         return REACH_DOCK_POINTER_REGION_STAGE_BUTTON;
-    case REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON:
-        return REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON;
     case REACH_DOCK_HIT_NONE:
     default:
         return REACH_DOCK_POINTER_REGION_NONE;
@@ -561,14 +559,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_STAGE;
             return;
         }
-        if (hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON)
-        {
-            out->redraw = out->redraw || reach_dock_feedback_press(
-                                             dock, REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON);
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_QUICK_SETTINGS;
-            return;
-        }
         if (hit.type == REACH_DOCK_HIT_ITEM)
         {
             reach_dock_interaction_result interaction = {};
@@ -613,11 +603,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         {
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE;
-        }
-        else if (pressed == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON && hit.type == pressed)
-        {
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
         }
         else if (pressed == REACH_DOCK_HIT_ITEM && hit.type == pressed)
         {
@@ -1465,12 +1450,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
         x += app_slot_width;
     }
 
-    layout->quick_settings_button.width = icon_size;
-    layout->quick_settings_button.height = icon_size;
-    layout->quick_settings_button.x = x;
-    layout->quick_settings_button.y = top;
-
-    const float dock_width = ceilf(layout->quick_settings_button.x + icon_size + gap);
+    const float dock_width = ceilf(x + gap);
     const float old_width = layout->bounds.width;
     if (dock_width != old_width)
     {
@@ -1513,7 +1493,6 @@ reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout)
     {
         layout.app_slots[index] = reach_dock_rect_to_screen(&layout, layout.app_slots[index]);
     }
-    layout.quick_settings_button = reach_dock_rect_to_screen(&layout, layout.quick_settings_button);
     return layout;
 }
 

@@ -295,9 +295,6 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
     case REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE:
         reach_host_toggle_stage(host);
         return REACH_OK;
-    case REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS:
-        reach_host_toggle_quick_settings(host);
-        return REACH_OK;
     case REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS:
     {
         reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
@@ -337,6 +334,9 @@ reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const rea
         return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_NEXT);
     case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW:
         reach_host_toggle_tray_popup(host);
+        return REACH_OK;
+    case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS:
+        reach_host_toggle_quick_settings(host);
         return REACH_OK;
     case REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT:
         return reach_host_activate_tray_item(host, static_cast<uint32_t>(result->action.id),
@@ -490,14 +490,20 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
 
     if (reach_quick_settings_state_ptr(host->quick_settings_capsule)->open)
     {
-        if (source == REACH_SURFACE_DOCK)
+        if (source == REACH_SURFACE_TOP_BAR)
         {
-            reach_capsule_pointer_result dock_down = reach_host_dispatch_pointer(
-                host, REACH_SURFACE_ID_DOCK, event, REACH_POINTER_EVENT_DOWN);
-            if (dock_down.action.kind == REACH_DOCK_POINTER_ACTION_PRESS_QUICK_SETTINGS)
+            reach_capsule_pointer_result top_bar_down = reach_host_dispatch_pointer(
+                host, REACH_SURFACE_ID_TOP_BAR, event, REACH_POINTER_EVENT_DOWN);
+            if (top_bar_down.action.kind == REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS)
             {
                 return REACH_OK;
             }
+            reach_capsule_pointer_result top_bar_cancel = reach_host_dispatch_pointer(
+                host, REACH_SURFACE_ID_TOP_BAR, nullptr, REACH_POINTER_EVENT_CANCEL);
+            (void)reach_host_apply_top_bar_pointer_action(host, nullptr, &top_bar_cancel);
+        }
+        if (source == REACH_SURFACE_DOCK)
+        {
             reach_capsule_pointer_result dock_cancel = reach_host_dispatch_pointer(
                 host, REACH_SURFACE_ID_DOCK, nullptr, REACH_POINTER_EVENT_CANCEL);
             (void)reach_host_apply_dock_pointer_action(host, nullptr, &dock_cancel);

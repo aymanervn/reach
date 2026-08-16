@@ -21,11 +21,13 @@ reach_host_quick_settings_layout_context(reach_host *host)
     reach_quick_settings_layout_context ctx = {};
     ctx.theme = host->theme;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+    const reach_top_bar_layout *top_bar_layout =
+        &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
     reach_rect_f32 button =
-        reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.quick_settings_button);
+        reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->quick_settings_button);
     ctx.anchor_x = button.x + button.width * 0.5f;
-    ctx.bar_edge_y = host->layout.dock.bounds.y;
-    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
+    ctx.drop_direction = REACH_POPUP_DROP_DOWN;
     return ctx;
 }
 
@@ -82,7 +84,7 @@ void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
     if (next_open)
     {
         reach_host_surface_opening(host, REACH_SURFACE_ID_QUICK_SETTINGS,
-                                   REACH_SURFACE_ID_DOCK);
+                                   REACH_SURFACE_ID_TOP_BAR);
     }
 
     (void)reach_quick_settings_set_open(host->quick_settings_capsule, next_open);
