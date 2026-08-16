@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/geometry.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -75,6 +77,9 @@ extern "C"
                                reach_capsule_pointer_result *out);
 
         int32_t (*pointer_sequence_active)(const void *capsule);
+
+        size_t (*input_regions)(const void *capsule, reach_rect_f32 *out_regions,
+                                size_t max_regions);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

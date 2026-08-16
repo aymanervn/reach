@@ -199,10 +199,11 @@ static void reach_top_bar_update_current_app(reach_top_bar *top_bar,
     state->current_app_title[0] = 0;
     state->current_app_icon_ref[0] = 0;
 
+    uintptr_t foreground =
+        top_bar->windows != nullptr ? reach_window_tracking_foreground(top_bar->windows) : 0;
     const reach_window_snapshot *window =
-        ctx->foreground_window != 0 && top_bar->windows != nullptr
-            ? reach_window_tracking_window_by_id(top_bar->windows, ctx->foreground_window)
-            : nullptr;
+        foreground != 0 ? reach_window_tracking_window_by_id(top_bar->windows, foreground)
+                        : nullptr;
     if (window == nullptr)
     {
         reach_copy_utf16(state->current_app_name, 260, (const uint16_t *)L"Desktop");
@@ -475,47 +476,6 @@ reach_rect_f32 reach_top_bar_rect_to_screen(const reach_top_bar_layout *layout, 
     return rect;
 }
 
-size_t reach_top_bar_input_region_count(const reach_top_bar *top_bar)
-{
-    if (top_bar == nullptr)
-    {
-        return 0;
-    }
-
-    size_t count = 0;
-    for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
-    {
-        if (top_bar->state.layout.pill_visible[index])
-        {
-            ++count;
-        }
-    }
-    return count;
-}
-
-reach_rect_f32 reach_top_bar_input_region_at(const reach_top_bar *top_bar, size_t index)
-{
-    if (top_bar == nullptr)
-    {
-        return reach_rect_f32{};
-    }
-
-    size_t visible = 0;
-    for (size_t pill = 0; pill < REACH_TOP_BAR_PILL_COUNT; ++pill)
-    {
-        if (!top_bar->state.layout.pill_visible[pill])
-        {
-            continue;
-        }
-        if (visible == index)
-        {
-            return top_bar->state.layout.pills[pill];
-        }
-        ++visible;
-    }
-    return reach_rect_f32{};
-}
-
 reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar *top_bar,
                                                              int32_t local_x, int32_t local_y)
 {
@@ -769,6 +729,27 @@ static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
     return reach_top_bar_capsule_pointer_sequence_active(capsule);
 }
 
+static size_t reach_top_bar_capsule_input_regions(const void *capsule, reach_rect_f32 *out_regions,
+                                                  size_t max_regions)
+{
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    if (top_bar == nullptr || out_regions == nullptr)
+    {
+        return 0;
+    }
+
+    size_t count = 0;
+    for (size_t pill = 0; pill < REACH_TOP_BAR_PILL_COUNT && count < max_regions; ++pill)
+    {
+        if (top_bar->state.layout.pill_visible[pill])
+        {
+            out_regions[count] = top_bar->state.layout.pills[pill];
+            ++count;
+        }
+    }
+    return count;
+}
+
 static void reach_top_bar_capsule_apply_event_result(const reach_top_bar_event_result *event_result,
                                                      reach_capsule_pointer_result *out)
 {
@@ -834,6 +815,7 @@ const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
         reach_top_bar_capsule_wants_pointer_move,
         reach_top_bar_capsule_handle_pointer,
         reach_top_bar_capsule_pointer_sequence_active,
+        reach_top_bar_capsule_input_regions,
     };
     return &ops;
 }
