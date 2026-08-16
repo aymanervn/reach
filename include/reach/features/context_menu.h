@@ -49,6 +49,7 @@ extern "C"
         int32_t drop_direction;
         float anchor_popup_width;
         float anchor_ratio;
+        float notch_anchor_x;
     } reach_context_menu_state;
 
     typedef struct reach_context_menu_window_entry
@@ -72,7 +73,7 @@ extern "C"
     {
         reach_rect_f32 monitor;
         float dpi_scale;
-        float anchor_x;
+        reach_rect_f32 anchor_button;
         float bar_edge_y;
         int32_t drop_direction;
         int32_t anchored;
@@ -110,10 +111,6 @@ extern "C"
     typedef struct reach_context_menu_render_context
     {
         const reach_theme *theme;
-        reach_rect_f32 anchor_slot;
-        int32_t has_anchor_slot;
-        int32_t use_anchor_x;
-        float anchor_x;
         float dpi_scale;
     } reach_context_menu_render_context;
 

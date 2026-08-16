@@ -14,10 +14,7 @@ typedef struct reach_context_menu_render_input
     const uint16_t (*item_titles)[260];
     size_t item_count;
     size_t hovered_index;
-    reach_rect_f32 anchor_slot;
-    int32_t has_anchor_slot;
-    int32_t use_anchor_x;
-    float anchor_x;
+    float notch_center_x;
     int32_t notch_side;
     float dpi_scale;
     int32_t text_alignment_leading;

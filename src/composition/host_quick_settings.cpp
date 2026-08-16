@@ -23,9 +23,13 @@ reach_host_quick_settings_layout_context(reach_host *host)
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     const reach_top_bar_layout *top_bar_layout =
         &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
-    reach_rect_f32 button =
+    ctx.anchor_button =
         reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->quick_settings_button);
-    ctx.anchor_x = button.x + button.width * 0.5f;
+    reach_rect_f32 monitor = {};
+    if (reach_host_primary_monitor_bounds(host, &monitor))
+    {
+        ctx.monitor = monitor;
+    }
     ctx.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
     ctx.drop_direction = REACH_POPUP_DROP_DOWN;
     return ctx;

@@ -215,34 +215,22 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     if (ctx->anchored)
     {
         reach_popup_anchor anchor = {};
+        anchor.button = ctx->anchor_button;
+        anchor.monitor = ctx->monitor;
         anchor.bar_edge_y = ctx->bar_edge_y;
         anchor.direction = ctx->drop_direction;
 
-        popup_x = ctx->anchor_x - popup_width * anchor_ratio;
-        popup_y = reach_popup_drop_y(&anchor, popup_height, margin);
-        if (popup_x < ctx->monitor.x + margin)
-        {
-            popup_x = ctx->monitor.x + margin;
-        }
-        float max_x = ctx->monitor.x + ctx->monitor.width - popup_width - margin;
-        if (popup_x > max_x)
-        {
-            popup_x = max_x;
-        }
-        if (popup_y < ctx->monitor.y + margin)
-        {
-            popup_y = ctx->monitor.y + margin;
-        }
-        float max_y = ctx->monitor.y + ctx->monitor.height - popup_height - margin;
-        if (popup_y > max_y)
-        {
-            popup_y = max_y;
-        }
+        reach_popup_placement placement =
+            reach_popup_place(&anchor, popup_width, popup_height, margin);
+        popup_x = placement.bounds.x;
+        popup_y = placement.bounds.y;
+        state->notch_anchor_x = placement.notch_anchor_x;
     }
     else
     {
         popup_x = ctx->pointer_x - popup_width * anchor_ratio;
         popup_y = ctx->pointer_y - popup_height;
+        state->notch_anchor_x = ctx->pointer_x;
     }
 
     state->bounds = {popup_x, popup_y, popup_width, popup_height};

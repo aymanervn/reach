@@ -71,7 +71,7 @@ static void test_window_list_remove(void)
     reach_context_menu_open_context ctx = {};
     ctx.dpi_scale = 1.0f;
     ctx.anchored = 1;
-    ctx.anchor_x = 400.0f;
+    ctx.anchor_button = {380.0f, 960.0f, 40.0f, 40.0f};
     ctx.bar_edge_y = 1000.0f;
     ctx.drop_direction = REACH_POPUP_DROP_UP;
     ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};

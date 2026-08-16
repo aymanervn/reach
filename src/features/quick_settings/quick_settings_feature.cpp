@@ -688,6 +688,7 @@ enum
     REACH_QUICK_SETTINGS_ANIMATION_COUNT
 };
 
+static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
 static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_REFRESH_SECONDS = 0.35;
 static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_TIMEOUT_SECONDS = 8.0;
 
@@ -1282,27 +1283,28 @@ static void reach_quick_settings_target_size(reach_quick_settings *quick_setting
     }
 }
 
-static reach_rect_f32
-reach_quick_settings_target_bounds(reach_quick_settings *quick_settings,
-                                   const reach_quick_settings_layout_context *ctx)
+static reach_popup_anchor
+reach_quick_settings_popup_anchor(const reach_quick_settings_layout_context *ctx)
 {
-    reach_rect_f32 bounds = {};
-
-    float width = 280.0f;
-    float height = 140.0f;
-    reach_quick_settings_target_size(quick_settings, ctx->dpi_scale, &width, &height);
-
-    const float gap = 8.0f * ctx->dpi_scale;
-
-    bounds.width = width;
-    bounds.height = height;
     reach_popup_anchor anchor = {};
+    anchor.button = ctx->anchor_button;
+    anchor.monitor = ctx->monitor;
     anchor.bar_edge_y = ctx->bar_edge_y;
     anchor.direction = ctx->drop_direction;
+    return anchor;
+}
 
-    bounds.x = ctx->anchor_x - width * 0.5f;
-    bounds.y = reach_popup_drop_y(&anchor, height, gap);
-    return bounds;
+static reach_popup_placement
+reach_quick_settings_placement(reach_quick_settings *quick_settings,
+                               const reach_quick_settings_layout_context *ctx, float height)
+{
+    float width = 280.0f;
+    float target_height = 140.0f;
+    reach_quick_settings_target_size(quick_settings, ctx->dpi_scale, &width, &target_height);
+
+    reach_popup_anchor anchor = reach_quick_settings_popup_anchor(ctx);
+    return reach_popup_place(&anchor, width, height > 0.0f ? height : target_height,
+                             REACH_QUICK_SETTINGS_POPUP_MARGIN * ctx->dpi_scale);
 }
 
 static int32_t reach_quick_settings_height_changed(float a, float b)
@@ -1325,12 +1327,13 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
 
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
 
-    state->target_bounds = reach_quick_settings_target_bounds(quick_settings, ctx);
+    reach_popup_placement placement = reach_quick_settings_placement(quick_settings, ctx, 0.0f);
+    state->target_bounds = placement.bounds;
     if (!reach_quick_settings_height_animation_active(quick_settings))
     {
         state->bounds = state->target_bounds;
     }
-    state->notch_anchor_x = ctx->anchor_x;
+    state->notch_anchor_x = placement.notch_anchor_x;
     state->drop_direction = ctx->drop_direction;
 
     reach_rect_f32 surface_bounds = {};
@@ -1355,7 +1358,7 @@ void reach_quick_settings_relayout(reach_quick_settings *quick_settings,
 
     reach_rect_f32 old_target = state->target_bounds;
     reach_rect_f32 current_bounds = state->bounds;
-    reach_rect_f32 new_target = reach_quick_settings_target_bounds(quick_settings, ctx);
+    reach_rect_f32 new_target = reach_quick_settings_placement(quick_settings, ctx, 0.0f).bounds;
 
     state->target_bounds = new_target;
 
@@ -1390,15 +1393,11 @@ int32_t reach_quick_settings_update_open_animation(reach_quick_settings *quick_s
     if (reach_quick_settings_height_animation_active(quick_settings) ||
         reach_quick_settings_height_changed(state->bounds.height, state->target_bounds.height))
     {
-        const float gap = 8.0f * ctx->dpi_scale;
-        reach_popup_anchor anchor = {};
-        anchor.bar_edge_y = ctx->bar_edge_y;
-        anchor.direction = ctx->drop_direction;
-        reach_rect_f32 animated = state->target_bounds;
-        animated.height = reach_quick_settings_height_animation_value(quick_settings);
-        animated.y = floorf(reach_popup_drop_y(&anchor, animated.height, gap) + 0.5f);
+        reach_popup_placement animated = reach_quick_settings_placement(
+            quick_settings, ctx, reach_quick_settings_height_animation_value(quick_settings));
+        animated.bounds.y = floorf(animated.bounds.y + 0.5f);
 
-        state->bounds = animated;
+        state->bounds = animated.bounds;
 
         reach_quick_settings_refresh_layout(quick_settings, ctx);
         return 1;
