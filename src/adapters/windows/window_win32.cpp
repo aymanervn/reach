@@ -253,6 +253,14 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
+    case REACH_WM_SYSTEM_STATS_CHANGED:
+        if (window != nullptr)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_SYSTEM_STATS_CHANGED;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return 0;
     case WM_DISPLAYCHANGE:
         reach_windows_request_desktop_environment_sync();
 
@@ -1141,6 +1149,9 @@ static reach_result reach_platform_window_post_event(reach_platform_window *wind
         break;
     case REACH_UI_EVENT_NOW_PLAYING_CHANGED:
         message = REACH_WM_NOW_PLAYING_CHANGED;
+        break;
+    case REACH_UI_EVENT_SYSTEM_STATS_CHANGED:
+        message = REACH_WM_SYSTEM_STATS_CHANGED;
         break;
     default:
         return REACH_INVALID_ARGUMENT;
