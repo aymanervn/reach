@@ -128,6 +128,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_system_stats(&dependencies.system_stats);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_platform_window(REACH_SURFACE_CONTEXT_MENU,
                                                       &dependencies.context_menu_window);
     }

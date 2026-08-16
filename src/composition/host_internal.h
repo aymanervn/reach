@@ -30,6 +30,7 @@
 #include "reach/services/idle_watch.h"
 #include "reach/services/now_playing.h"
 #include "reach/services/search.h"
+#include "reach/services/system_stats.h"
 #include "reach/services/system_status.h"
 #include "reach/services/window_tracking.h"
 #include "reach/support/animation.h"
@@ -325,6 +326,7 @@ struct reach_host
     int32_t bundled_font;
     std::atomic<uint32_t> quick_settings_system_change_flags;
     reach_system_status *system_status;
+    reach_system_stats *system_stats;
     reach_quick_settings *quick_settings_capsule;
     reach_popup_capture_port popup_capture;
 };

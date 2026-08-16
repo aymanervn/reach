@@ -137,6 +137,11 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
     }
+    if (reach_system_stats_tick(host->system_stats, delta_seconds))
+    {
+        host->top_bar.dirty_flags = 1;
+        reach_host_request_update(host);
+    }
     int32_t window_manager_dirty =
         host->window_manager.ops.needs_refresh != nullptr &&
         host->window_manager.ops.needs_refresh(host->window_manager.manager);

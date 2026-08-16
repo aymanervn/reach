@@ -59,14 +59,84 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
 }
 
 void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_service *now_playing,
-                                   reach_icon_service *icons, reach_window_tracking *windows)
+                                   reach_icon_service *icons, reach_window_tracking *windows,
+                                   reach_system_stats *stats)
 {
     if (top_bar != nullptr)
     {
         top_bar->now_playing = now_playing;
         top_bar->icons = icons;
         top_bar->windows = windows;
+        top_bar->stats = stats;
     }
+}
+
+static void reach_top_bar_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src);
+
+static void reach_top_bar_format_percent(uint16_t *dst, size_t dst_count, const char *label,
+                                         float percent)
+{
+    char text[16] = {};
+    int32_t value = (int32_t)(percent + 0.5f);
+    if (value < 0)
+    {
+        value = 0;
+    }
+    if (value > 100)
+    {
+        value = 100;
+    }
+    snprintf(text, sizeof(text), "%s %d%%", label, value);
+    reach_top_bar_copy_ascii_to_utf16(dst, dst_count, text);
+}
+
+static void reach_top_bar_format_rate(uint16_t *dst, size_t dst_count, uint16_t prefix,
+                                      uint64_t bytes_per_second)
+{
+    char text[16] = {};
+    if (bytes_per_second >= 1024ull * 1024ull)
+    {
+        snprintf(text, sizeof(text), " %.1fM", (double)bytes_per_second / (1024.0 * 1024.0));
+    }
+    else if (bytes_per_second >= 1024ull)
+    {
+        snprintf(text, sizeof(text), " %lluK", (unsigned long long)(bytes_per_second / 1024ull));
+    }
+    else
+    {
+        snprintf(text, sizeof(text), " %lluB", (unsigned long long)bytes_per_second);
+    }
+
+    if (dst == nullptr || dst_count < 2)
+    {
+        return;
+    }
+    dst[0] = prefix;
+    reach_top_bar_copy_ascii_to_utf16(dst + 1, dst_count - 1, text);
+}
+
+static void reach_top_bar_update_stats(reach_top_bar *top_bar)
+{
+    reach_top_bar_state *state = &top_bar->state;
+    reach_system_stats_snapshot snapshot = {};
+    reach_system_stats_snapshot_take(top_bar->stats, &snapshot);
+
+    state->stats_valid = snapshot.valid;
+    if (!snapshot.valid)
+    {
+        state->stats_cpu_text[0] = 0;
+        state->stats_memory_text[0] = 0;
+        state->stats_download_text[0] = 0;
+        state->stats_upload_text[0] = 0;
+        return;
+    }
+
+    reach_top_bar_format_percent(state->stats_cpu_text, 16, "CPU", snapshot.cpu_percent);
+    reach_top_bar_format_percent(state->stats_memory_text, 16, "RAM", snapshot.memory_percent);
+    reach_top_bar_format_rate(state->stats_download_text, 16, 0x2193,
+                              snapshot.network_received_bytes_per_second);
+    reach_top_bar_format_rate(state->stats_upload_text, 16, 0x2191,
+                              snapshot.network_sent_bytes_per_second);
 }
 
 reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar)
@@ -266,17 +336,36 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     reach_copy_utf16(top_bar->state.language_code, 8,
                      ctx->language_code != nullptr ? ctx->language_code : (const uint16_t *)L"");
 
+    reach_top_bar_update_stats(top_bar);
+
     float right = layout->bounds.width - edge_inset;
     float quick_settings_button = height * metrics.quick_settings_button_scale;
     float language_width =
         top_bar->state.language_code[0] != 0 ? metrics.language_width * scale : 0.0f;
     float language_gap = language_width > 0.0f ? pill_gap : 0.0f;
-    float quick_settings_width =
-        padding * 2.0f + language_width + language_gap + quick_settings_button;
+    float stats_usage_width = top_bar->state.stats_valid ? metrics.stats_usage_width * scale : 0.0f;
+    float stats_network_width =
+        top_bar->state.stats_valid ? metrics.stats_network_width * scale : 0.0f;
+    float stats_gap = top_bar->state.stats_valid ? metrics.stats_gap * scale : 0.0f;
+    float quick_settings_width = padding * 2.0f + stats_usage_width + stats_network_width +
+                                 stats_gap * 2.0f + language_width + language_gap +
+                                 quick_settings_button;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
 
     float cluster_x = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + padding;
+    if (top_bar->state.stats_valid)
+    {
+        layout->stats_usage = reach_top_bar_rect(cluster_x, 0.0f, stats_usage_width, height);
+        cluster_x += stats_usage_width + stats_gap;
+        layout->stats_network = reach_top_bar_rect(cluster_x, 0.0f, stats_network_width, height);
+        cluster_x += stats_network_width + stats_gap;
+    }
+    else
+    {
+        layout->stats_usage = {};
+        layout->stats_network = {};
+    }
     if (language_width > 0.0f)
     {
         layout->language_button = reach_top_bar_rect(

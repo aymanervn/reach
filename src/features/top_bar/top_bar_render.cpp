@@ -19,6 +19,10 @@ typedef struct reach_top_bar_render_input
     int32_t tray_overflow;
     int32_t tray_popup_open;
     const uint16_t *language_code;
+    const uint16_t *stats_cpu_text;
+    const uint16_t *stats_memory_text;
+    const uint16_t *stats_download_text;
+    const uint16_t *stats_upload_text;
     int32_t battery_valid;
     int32_t battery_percent;
     float power_hover;
@@ -346,6 +350,36 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     }
 }
 
+static void reach_top_bar_push_stats_column(const reach_top_bar_render_input *input,
+                                            reach_render_command_buffer *commands,
+                                            reach_rect_f32 column, const uint16_t *top_text,
+                                            const uint16_t *bottom_text)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    if (column.width <= 0.0f)
+    {
+        return;
+    }
+
+    float line = column.height * metrics.stats_line_height_ratio;
+    reach_top_bar_push_text(commands, reach_top_bar_rect(column.x, column.y, column.width, line),
+                            top_text, metrics.stats_text_size, metrics.stats_text_weight,
+                            REACH_TEXT_ALIGNMENT_LEADING, input->theme->dock_clock_time);
+    reach_top_bar_push_text(
+        commands, reach_top_bar_rect(column.x, column.y + line, column.width, column.height - line),
+        bottom_text, metrics.stats_text_size, metrics.stats_text_weight,
+        REACH_TEXT_ALIGNMENT_LEADING, input->theme->dock_clock_date);
+}
+
+static void reach_top_bar_push_stats(const reach_top_bar_render_input *input,
+                                     reach_render_command_buffer *commands)
+{
+    reach_top_bar_push_stats_column(input, commands, input->layout->stats_usage,
+                                    input->stats_cpu_text, input->stats_memory_text);
+    reach_top_bar_push_stats_column(input, commands, input->layout->stats_network,
+                                    input->stats_download_text, input->stats_upload_text);
+}
+
 static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
                                         reach_render_command_buffer *commands)
 {
@@ -441,6 +475,10 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.tray_overflow = state->tray_overflow;
     input.tray_popup_open = state->tray_popup_open;
     input.language_code = state->language_code;
+    input.stats_cpu_text = state->stats_cpu_text;
+    input.stats_memory_text = state->stats_memory_text;
+    input.stats_download_text = state->stats_download_text;
+    input.stats_upload_text = state->stats_upload_text;
     if (state->current_app_icon_ref[0] != 0)
     {
         input.current_app_icon_id = reach_icon_service_get(reach_top_bar_icons(top_bar),
@@ -452,6 +490,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_clock(&input, out_commands);
     reach_top_bar_push_current_app(&input, out_commands);
     reach_top_bar_push_tray(&input, out_commands);
+    reach_top_bar_push_stats(&input, out_commands);
     reach_top_bar_push_language(&input, out_commands);
     reach_top_bar_push_quick_settings(&input, out_commands);
 
