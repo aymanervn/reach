@@ -785,6 +785,12 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
                                        REACH_TOP_BAR_ANIM_Y, &bar_request);
 }
 
+static int32_t reach_top_bar_now_playing_scroll_active(const reach_top_bar *top_bar)
+{
+    return !top_bar->state.visibility.target_hidden &&
+           reach_top_bar_now_playing_scrolling(top_bar->now_playing_subfeature);
+}
+
 static int32_t reach_top_bar_width_animation_active(const reach_top_bar *top_bar)
 {
     return reach_animation_manager_active(&top_bar->manager,
@@ -810,7 +816,7 @@ reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *t
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
         reach_top_bar_width_animation_active(top_bar) ||
-        reach_top_bar_now_playing_scrolling(top_bar->now_playing_subfeature);
+        reach_top_bar_now_playing_scroll_active(top_bar);
     return animation;
 }
 
@@ -879,7 +885,8 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     {
         out->relayout = 1;
     }
-    if (reach_top_bar_now_playing_tick(top_bar->now_playing_subfeature, delta_seconds) &&
+    if (!top_bar->state.visibility.target_hidden &&
+        reach_top_bar_now_playing_tick(top_bar->now_playing_subfeature, delta_seconds) &&
         out != nullptr)
     {
         out->redraw = 1;
@@ -942,7 +949,7 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
            reach_top_bar_width_animation_active(top_bar) ||
-           reach_top_bar_now_playing_scrolling(top_bar->now_playing_subfeature);
+           reach_top_bar_now_playing_scroll_active(top_bar);
 }
 
 static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule)
