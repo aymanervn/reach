@@ -13,49 +13,105 @@
 #define REACH_CONFIG_VERSION_WIDE_INNER(text) L##text
 #define REACH_CONFIG_VERSION_WIDE(text) REACH_CONFIG_VERSION_WIDE_INNER(text)
 
+static const wchar_t reach_config_byte_order_mark = 0xFEFF;
+
+static std::string reach_config_read_bytes(const wchar_t *path)
+{
+    std::string bytes;
+    HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        return bytes;
+    }
+
+    char buffer[4096];
+    DWORD read = 0;
+    while (ReadFile(file, buffer, sizeof(buffer), &read, nullptr) && read > 0)
+    {
+        bytes.append(buffer, read);
+    }
+    CloseHandle(file);
+    return bytes;
+}
+
+static void reach_config_write_utf16_file(const wchar_t *path, const std::wstring &text)
+{
+    HANDLE out = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+                             nullptr);
+    if (out == INVALID_HANDLE_VALUE)
+    {
+        return;
+    }
+
+    std::wstring output;
+    output.push_back(reach_config_byte_order_mark);
+    output.append(text);
+
+    DWORD written = 0;
+    WriteFile(out, output.data(), (DWORD)(output.size() * sizeof(wchar_t)), &written, nullptr);
+    CloseHandle(out);
+}
+
+static int32_t reach_config_is_utf16(const std::string &bytes)
+{
+    return bytes.size() >= 2 && (unsigned char)bytes[0] == 0xFF && (unsigned char)bytes[1] == 0xFE;
+}
+
+static std::wstring reach_config_decode(const std::string &bytes)
+{
+    if (reach_config_is_utf16(bytes))
+    {
+        return std::wstring(reinterpret_cast<const wchar_t *>(bytes.data() + 2),
+                            (bytes.size() - 2) / sizeof(wchar_t));
+    }
+    if (bytes.empty())
+    {
+        return std::wstring();
+    }
+
+    int needed = MultiByteToWideChar(CP_ACP, 0, bytes.data(), (int)bytes.size(), nullptr, 0);
+    if (needed <= 0)
+    {
+        return std::wstring();
+    }
+    std::wstring text((size_t)needed, L'\0');
+    MultiByteToWideChar(CP_ACP, 0, bytes.data(), (int)bytes.size(), &text[0], needed);
+    return text;
+}
+
+// The Win32 profile APIs only read and write Unicode when the file already carries a UTF-16
+// byte order mark; without one they fall back to the ANSI code page and drop every character
+// it cannot represent. Converting the file up front keeps titles and paths intact.
+static void reach_config_ensure_utf16_file(const wchar_t *path)
+{
+    std::string bytes = reach_config_read_bytes(path);
+    if (bytes.empty() || reach_config_is_utf16(bytes))
+    {
+        return;
+    }
+    reach_config_write_utf16_file(path, reach_config_decode(bytes));
+}
+
 static void reach_config_write_version_header(const wchar_t *path, const wchar_t *version)
 {
     wchar_t comment[64] = {};
     swprintf_s(comment, L"; reach v%s", version);
 
-    HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-                              FILE_ATTRIBUTE_NORMAL, nullptr);
-    std::string existing;
-    if (file != INVALID_HANDLE_VALUE)
-    {
-        char buffer[4096];
-        DWORD read = 0;
-        while (ReadFile(file, buffer, sizeof(buffer), &read, nullptr) && read > 0)
-        {
-            existing.append(buffer, read);
-        }
-        CloseHandle(file);
-    }
-
-    char comment_utf8[128] = {};
-    WideCharToMultiByte(CP_UTF8, 0, comment, -1, comment_utf8, sizeof(comment_utf8), nullptr,
-                        nullptr);
-    std::string header(comment_utf8);
+    std::wstring existing = reach_config_decode(reach_config_read_bytes(path));
 
     size_t body_start = 0;
-    if (!existing.empty() && (existing[0] == ';' || existing[0] == '#'))
+    if (!existing.empty() && (existing[0] == L';' || existing[0] == L'#'))
     {
-        size_t line_end = existing.find('\n');
-        if (line_end != std::string::npos && existing.find("reach", 0) < line_end)
+        size_t line_end = existing.find(L'\n');
+        if (line_end != std::wstring::npos && existing.find(L"reach", 0) < line_end)
         {
             body_start = line_end + 1;
         }
     }
 
-    std::string output = header + "\r\n" + existing.substr(body_start);
-    HANDLE out = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
-                             nullptr);
-    if (out != INVALID_HANDLE_VALUE)
-    {
-        DWORD written = 0;
-        WriteFile(out, output.data(), (DWORD)output.size(), &written, nullptr);
-        CloseHandle(out);
-    }
+    reach_config_write_utf16_file(path, std::wstring(comment) + L"\r\n" +
+                                            existing.substr(body_start));
 }
 
 struct reach_config_store
@@ -195,6 +251,7 @@ static reach_result reach_config_store_save(reach_config_store *store,
     }
 
     const wchar_t *path = reinterpret_cast<const wchar_t *>(store->path);
+    reach_config_ensure_utf16_file(path);
     WritePrivateProfileStringW(L"reach", L"version",
                                REACH_CONFIG_VERSION_WIDE(REACH_VERSION_STRING), path);
     wchar_t value[32] = {};
