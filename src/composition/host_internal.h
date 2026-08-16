@@ -162,6 +162,7 @@ typedef struct reach_surface_desc
 
     reach_bar_visibility_result (*update_visibility)(void *capsule,
                                                      const reach_bar_visibility_request *request);
+    int32_t bar_shown_while_transient_open;
     reach_screen_hotspot_port *reveal_edge;
     reach_host_bar_reveal_state *reveal;
     reach_bar_reveal_animation (*reveal_animation)(const void *capsule);
