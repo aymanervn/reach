@@ -14,6 +14,7 @@ struct reach_top_bar
     reach_now_playing_service *now_playing;
     reach_icon_service *icons;
     reach_window_tracking *windows;
+    reach_system_stats *stats;
     float now_playing_target_width;
 };
 

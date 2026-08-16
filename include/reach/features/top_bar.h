@@ -11,6 +11,7 @@
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/now_playing.h"
+#include "reach/services/system_stats.h"
 #include "reach/services/window_tracking.h"
 #include "reach/support/animation.h"
 
@@ -51,6 +52,8 @@ extern "C"
         reach_rect_f32 tray_overflow_button;
         reach_rect_f32 quick_settings_button;
         reach_rect_f32 language_button;
+        reach_rect_f32 stats_usage;
+        reach_rect_f32 stats_network;
     } reach_top_bar_layout;
 
     enum reach_top_bar_animation_id
@@ -126,6 +129,12 @@ extern "C"
 
         uint16_t language_code[8];
 
+        uint16_t stats_cpu_text[16];
+        uint16_t stats_memory_text[16];
+        uint16_t stats_download_text[16];
+        uint16_t stats_upload_text[16];
+        int32_t stats_valid;
+
         reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS];
         size_t tray_item_count;
         int32_t tray_overflow;
@@ -140,7 +149,8 @@ extern "C"
 
     void reach_top_bar_attach_services(reach_top_bar *top_bar,
                                        reach_now_playing_service *now_playing,
-                                       reach_icon_service *icons, reach_window_tracking *windows);
+                                       reach_icon_service *icons, reach_window_tracking *windows,
+                                       reach_system_stats *stats);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);

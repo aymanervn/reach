@@ -293,13 +293,15 @@ static void reach_host_cleanup(reach_host *host)
     reach_launcher_attach_search(host->launcher_capsule, nullptr);
     reach_launcher_attach_icons(host->launcher_capsule, nullptr);
     reach_dock_attach_services(host->dock_capsule, nullptr, nullptr);
-    reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr);
+    reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr, nullptr);
     reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
     reach_quick_settings_attach_status(host->quick_settings_capsule, nullptr);
     reach_search_service_destroy(host->search_service);
     host->search_service = nullptr;
     reach_system_status_destroy(host->system_status);
     host->system_status = nullptr;
+    reach_system_stats_destroy(host->system_stats);
+    host->system_stats = nullptr;
     reach_now_playing_service_destroy(host->now_playing_service);
     host->now_playing_service = nullptr;
     if (host->search_provider.ops.destroy != nullptr)
@@ -615,6 +617,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
+    host->system_stats = nullptr;
+    if (reach_system_stats_create(dependencies->system_stats, &host->system_stats) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
     host->media_controls = dependencies->media_controls;
     host->now_playing_service = nullptr;
     if (reach_now_playing_service_create(host->media_controls, reach_host_on_now_playing_ready,
@@ -626,7 +633,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_launcher_attach_icons(host->launcher_capsule, host->icon_service);
     reach_dock_attach_services(host->dock_capsule, host->icon_service, host->window_tracking);
     reach_top_bar_attach_services(host->top_bar_capsule, host->now_playing_service,
-                                  host->icon_service, host->window_tracking);
+                                  host->icon_service, host->window_tracking, host->system_stats);
     reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
                                    host->window_tracking);
     reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);
