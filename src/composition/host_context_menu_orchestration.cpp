@@ -242,7 +242,7 @@ void reach_host_reanchor_context_menu(reach_host *host)
             &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
         reach_rect_f32 power_button =
             reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->power_button);
-        ctx.anchor_x = power_button.x + power_button.width * 0.5f;
+        ctx.anchor_button = power_button;
         ctx.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
         ctx.drop_direction = REACH_POPUP_DROP_DOWN;
     }
@@ -250,7 +250,7 @@ void reach_host_reanchor_context_menu(reach_host *host)
     {
         reach_rect_f32 slot = reach_dock_rect_to_screen(
             &host->layout.dock, host->layout.dock.app_slots[state->target_index]);
-        ctx.anchor_x = slot.x + slot.width * 0.5f;
+        ctx.anchor_button = slot;
     }
     else
     {
@@ -282,7 +282,7 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
 
     reach_context_menu_open_context ctx = {};
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.anchor_x = power_button.x + power_button.width * 0.5f;
+    ctx.anchor_button = power_button;
     ctx.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
     ctx.drop_direction = REACH_POPUP_DROP_DOWN;
     ctx.anchored = 1;
@@ -320,7 +320,7 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
         reach_rect_f32 slot =
             reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.app_slots[item_index]);
         ctx.anchored = 1;
-        ctx.anchor_x = slot.x + slot.width * 0.5f;
+        ctx.anchor_button = slot;
         ctx.bar_edge_y = host->layout.dock.bounds.y;
     ctx.drop_direction = REACH_POPUP_DROP_UP;
         ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);

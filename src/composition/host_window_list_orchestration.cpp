@@ -59,7 +59,7 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     reach_context_menu_open_context ctx = {};
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchored = 1;
-    ctx.anchor_x = slot.x + slot.width * 0.5f;
+    ctx.anchor_button = slot;
     ctx.bar_edge_y = host->layout.dock.bounds.y;
     ctx.drop_direction = REACH_POPUP_DROP_UP;
     ctx.monitor = host->layout.dock.bounds;

@@ -101,21 +101,11 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     reach_render_command_buffer_clear(out_commands);
     reach_render_command command = {};
     float width = input->bounds.width;
-    float notch_center = width * 0.30f;
-    if (input->use_anchor_x)
-    {
-        notch_center = input->anchor_x - input->bounds.x;
-    }
-    else if (input->has_anchor_slot)
-    {
-        notch_center =
-            input->anchor_slot.x + input->anchor_slot.width * 0.5f - input->bounds.x;
-    }
 
     reach_popup_background_input popup = {};
     popup.theme = input->theme;
     popup.bounds = input->bounds;
-    popup.notch_center_x = notch_center;
+    popup.notch_center_x = input->notch_center_x;
     popup.notch_side = input->notch_side;
     popup.dpi_scale = input->dpi_scale;
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
@@ -227,10 +217,7 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.close_hover = reach_context_menu_close_hover(menu);
     input.item_count = state->item_count;
     input.hovered_index = state->hovered_index;
-    input.anchor_slot = ctx->anchor_slot;
-    input.has_anchor_slot = ctx->has_anchor_slot;
-    input.use_anchor_x = ctx->use_anchor_x;
-    input.anchor_x = ctx->anchor_x;
+    input.notch_center_x = state->notch_anchor_x - state->bounds.x;
     input.notch_side = reach_popup_notch_side(state->drop_direction);
     input.dpi_scale = ctx->dpi_scale;
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;

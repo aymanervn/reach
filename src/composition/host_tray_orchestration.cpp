@@ -60,6 +60,11 @@ void reach_host_compute_tray_popup_layout(reach_host *host, reach_rect_f32 *out_
     reach_popup_anchor anchor = {};
     anchor.button =
         reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->tray_overflow_button);
+    reach_rect_f32 monitor = {};
+    if (reach_host_primary_monitor_bounds(host, &monitor))
+    {
+        anchor.monitor = monitor;
+    }
     anchor.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
     anchor.bar_height = host->layout.dock.bounds.height;
     anchor.direction = REACH_POPUP_DROP_DOWN;

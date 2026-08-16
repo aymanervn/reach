@@ -18,13 +18,23 @@ extern "C"
     typedef struct reach_popup_anchor
     {
         reach_rect_f32 button;
+        reach_rect_f32 monitor;
         float bar_edge_y;
         float bar_height;
         int32_t direction;
     } reach_popup_anchor;
 
+    typedef struct reach_popup_placement
+    {
+        reach_rect_f32 bounds;
+        float notch_anchor_x;
+        int32_t notch_side;
+    } reach_popup_placement;
+
     int32_t reach_popup_notch_side(int32_t direction);
-    float reach_popup_drop_y(const reach_popup_anchor *anchor, float popup_height, float gap);
+
+    reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float width,
+                                            float height, float margin);
 
     typedef struct reach_popup_background_input
     {

@@ -248,7 +248,8 @@ extern "C"
     {
         const reach_theme *theme;
         float dpi_scale;
-        float anchor_x;
+        reach_rect_f32 anchor_button;
+        reach_rect_f32 monitor;
         float bar_edge_y;
         int32_t drop_direction;
     } reach_quick_settings_layout_context;

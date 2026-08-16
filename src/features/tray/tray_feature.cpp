@@ -13,6 +13,7 @@ struct reach_tray
     reach_rect_f32 pointer_bounds;
     int32_t pointer_bounds_valid;
     reach_popup_anchor anchor;
+    reach_popup_placement placement;
 };
 
 const reach_tray_state *reach_tray_state_ptr(reach_tray *tray)
@@ -144,9 +145,11 @@ void reach_tray_layout_popup(reach_tray *tray, const reach_theme *theme,
         {
             tray->anchor = *anchor;
         }
-        reach_tray_compute_popup_layout(&tray->state.model, theme, anchor, dpi_scale, out_bounds);
+        tray->placement =
+            reach_tray_compute_popup_layout(&tray->state.model, theme, anchor, dpi_scale);
         if (out_bounds != nullptr)
         {
+            *out_bounds = tray->placement.bounds;
             tray->pointer_bounds = *out_bounds;
             tray->pointer_bounds_valid = 1;
         }
@@ -318,18 +321,22 @@ reach_animation_manager *reach_tray_animation_manager(reach_tray *animations)
     return animations != nullptr ? &animations->manager : nullptr;
 }
 
+static const float REACH_TRAY_POPUP_MARGIN = 8.0f;
+
 static size_t reach_tray_min_size(size_t a, size_t b)
 {
     return a < b ? a : b;
 }
 
-void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme *theme,
-                                     const reach_popup_anchor *anchor, float dpi_scale,
-                                     reach_rect_f32 *out_bounds)
+reach_popup_placement reach_tray_compute_popup_layout(reach_tray_model *model,
+                                                      const reach_theme *theme,
+                                                      const reach_popup_anchor *anchor,
+                                                      float dpi_scale)
 {
-    if (model == nullptr || theme == nullptr || anchor == nullptr || out_bounds == nullptr)
+    reach_popup_placement placement = {};
+    if (model == nullptr || theme == nullptr || anchor == nullptr)
     {
-        return;
+        return placement;
     }
 
     float slot_size = reach_theme_tray_slot_size(theme, anchor->bar_height);
@@ -345,11 +352,9 @@ void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme 
     float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
     float content_height = padding * 2.0f + (float)rows * slot_size + (float)(rows - 1) * gap;
 
-    out_bounds->width = ceilf(content_width);
-    out_bounds->height = ceilf(content_height + notch_height);
-    out_bounds->x =
-        anchor->button.x + anchor->button.width * 0.5f - out_bounds->width * 0.5f;
-    out_bounds->y = reach_popup_drop_y(anchor, out_bounds->height, 8.0f * scale);
+    placement = reach_popup_place(anchor, ceilf(content_width), ceilf(content_height + notch_height),
+                                  REACH_TRAY_POPUP_MARGIN * scale);
+    reach_rect_f32 *out_bounds = &placement.bounds;
 
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
     float content_top =
@@ -375,6 +380,8 @@ void reach_tray_compute_popup_layout(reach_tray_model *model, const reach_theme 
         model->item_slots[index].width = slot_size;
         model->item_slots[index].height = slot_size;
     }
+
+    return placement;
 }
 
 reach_result reach_tray_append_render_commands(reach_tray *tray,
@@ -393,7 +400,8 @@ reach_result reach_tray_append_render_commands(reach_tray *tray,
     input.model = &state->model;
     input.bounds = ctx->bounds;
     input.bar_height = tray->anchor.bar_height;
-    input.notch_side = reach_popup_notch_side(tray->anchor.direction);
+    input.notch_center_x = tray->placement.notch_anchor_x - ctx->bounds.x;
+    input.notch_side = tray->placement.notch_side;
     input.dpi_scale = ctx->dpi_scale;
     input.click_feedback_index = state->feedback_index;
     input.click_feedback_opacity = reach_animation_manager_value(reach_tray_animation_manager(tray),

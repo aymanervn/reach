@@ -20,14 +20,53 @@ int32_t reach_popup_notch_side(int32_t direction)
     return direction == REACH_POPUP_DROP_DOWN ? REACH_NOTCH_SIDE_TOP : REACH_NOTCH_SIDE_BOTTOM;
 }
 
-float reach_popup_drop_y(const reach_popup_anchor *anchor, float popup_height, float gap)
+static float reach_popup_clamp(float value, float min_value, float max_value)
 {
+    if (max_value < min_value)
+    {
+        return min_value;
+    }
+    if (value < min_value)
+    {
+        return min_value;
+    }
+    return value > max_value ? max_value : value;
+}
+
+static float reach_popup_clamp_to_monitor(float value, float extent, float monitor_origin,
+                                          float monitor_extent, float margin)
+{
+    if (monitor_extent <= 0.0f)
+    {
+        return value;
+    }
+    return reach_popup_clamp(value, monitor_origin + margin,
+                             monitor_origin + monitor_extent - extent - margin);
+}
+
+reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float width, float height,
+                                        float margin)
+{
+    reach_popup_placement placement = {};
     if (anchor == nullptr)
     {
-        return 0.0f;
+        return placement;
     }
-    return anchor->direction == REACH_POPUP_DROP_DOWN ? anchor->bar_edge_y + gap
-                                                      : anchor->bar_edge_y - popup_height - gap;
+
+    float drop_y = anchor->direction == REACH_POPUP_DROP_DOWN
+                       ? anchor->bar_edge_y + margin
+                       : anchor->bar_edge_y - height - margin;
+
+    placement.bounds.width = width;
+    placement.bounds.height = height;
+    placement.bounds.x = reach_popup_clamp_to_monitor(
+        anchor->button.x + anchor->button.width * 0.5f - width * 0.5f, width, anchor->monitor.x,
+        anchor->monitor.width, margin);
+    placement.bounds.y = reach_popup_clamp_to_monitor(drop_y, height, anchor->monitor.y,
+                                                      anchor->monitor.height, margin);
+    placement.notch_anchor_x = anchor->button.x + anchor->button.width * 0.5f;
+    placement.notch_side = reach_popup_notch_side(anchor->direction);
+    return placement;
 }
 
 float reach_popup_notch_width(void)
