@@ -20,8 +20,7 @@ void reach_host_set_tray_popup_open(reach_host *host, int32_t open)
         {
             (void)host->tray.window.ops.set_topmost(host->tray.window.window, 1);
         }
-        reach_host_surface_opening(host, REACH_SURFACE_ID_TRAY,
-                                   REACH_SURFACE_ID_DOCK);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_ID_TOP_BAR);
         (void)reach_host_refresh_tray_items(host);
     }
     else
@@ -29,7 +28,7 @@ void reach_host_set_tray_popup_open(reach_host *host, int32_t open)
         reach_host_request_dock_visibility_update(host);
     }
     reach_host_sync_popup_mouse_hook(host);
-    host->dock.dirty_flags = 1;
+    host->top_bar.dirty_flags = 1;
     host->tray.dirty_flags = 1;
 }
 
@@ -55,16 +54,33 @@ void reach_host_compute_tray_popup_layout(reach_host *host, reach_rect_f32 *out_
     }
 
     const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    reach_dock_layout screen_dock = reach_dock_layout_to_screen(host->layout.dock);
+    const reach_top_bar_layout *top_bar_layout =
+        &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
 
     reach_popup_anchor anchor = {};
-    anchor.button = screen_dock.tray_button;
-    anchor.bar_edge_y = screen_dock.bounds.y;
-    anchor.bar_height = screen_dock.bounds.height;
-    anchor.direction = REACH_POPUP_DROP_UP;
+    anchor.button =
+        reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->tray_overflow_button);
+    anchor.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
+    anchor.bar_height = host->layout.dock.bounds.height;
+    anchor.direction = REACH_POPUP_DROP_DOWN;
 
     reach_tray_layout_popup(host->tray_capsule, theme, &anchor,
                             reach_host_layout_dpi_scale(host), out_bounds);
+}
+
+reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,
+                                           reach_tray_action action)
+{
+    if (host == nullptr || host->tray_provider.ops.activate == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    if (host->tray.window.ops.set_topmost != nullptr)
+    {
+        (void)host->tray.window.ops.set_topmost(host->tray.window.window, 0);
+    }
+    return host->tray_provider.ops.activate(host->tray_provider.provider, item_id, action);
 }
 
 reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_ui_event *event,
@@ -86,15 +102,6 @@ reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_
         return REACH_OK;
     }
 
-    if (host->tray_provider.ops.activate == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    if (host->tray.window.ops.set_topmost != nullptr)
-    {
-        (void)host->tray.window.ops.set_topmost(host->tray.window.window, 0);
-    }
-    return host->tray_provider.ops.activate(
-        host->tray_provider.provider, static_cast<uint32_t>(result->action.id), provider_action);
+    return reach_host_activate_tray_item(host, static_cast<uint32_t>(result->action.id),
+                                        provider_action);
 }

@@ -23,7 +23,7 @@ static int32_t reach_host_bar_cluster_holds_surface_open(reach_host *host,
     switch (desc->id)
     {
     case REACH_SURFACE_ID_TRAY:
-        return dock_region == REACH_DOCK_POINTER_REGION_TRAY_BUTTON;
+        return top_bar_region == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW;
     case REACH_SURFACE_ID_QUICK_SETTINGS:
         return dock_region == REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON;
     case REACH_SURFACE_ID_CONTEXT_MENU:

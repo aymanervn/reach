@@ -154,12 +154,13 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     }
     (void)reach_host_update_game_mode(host);
     int32_t game_mode = reach_host_game_mode_enabled(host);
-    if (!game_mode && reach_tray_state_ptr(host->tray_capsule)->popup_open &&
-        host->tray_provider.ops.needs_refresh != nullptr &&
+    if (!game_mode && host->tray_provider.ops.needs_refresh != nullptr &&
         host->tray_provider.ops.needs_refresh(host->tray_provider.provider))
     {
         (void)reach_host_refresh_tray_items(host);
         host->tray.dirty_flags = 1;
+        host->top_bar.dirty_flags = 1;
+        host->dirty.layout = 1;
     }
 
     reach_result monitor_result = reach_host_refresh_monitor_layout(host);

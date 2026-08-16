@@ -11,25 +11,6 @@ static reach_rect_f32 reach_dock_center_square(reach_rect_f32 outer, float size)
                            outer.y + (outer.height - size) * 0.5f, size, size);
 }
 
-static reach_rect_f32 reach_dock_union_rect(reach_rect_f32 a, reach_rect_f32 b)
-{
-    float left = a.x < b.x ? a.x : b.x;
-    float top = a.y < b.y ? a.y : b.y;
-    float right = a.x + a.width;
-    float other_right = b.x + b.width;
-    float bottom = a.y + a.height;
-    float other_bottom = b.y + b.height;
-    if (other_right > right)
-    {
-        right = other_right;
-    }
-    if (other_bottom > bottom)
-    {
-        bottom = other_bottom;
-    }
-    return reach_dock_rect(left, top, right - left, bottom - top);
-}
-
 static void reach_dock_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                  reach_color color, float radius)
 {
@@ -276,23 +257,15 @@ static void reach_dock_push_system_buttons(const reach_dock_render_input *input,
     const reach_dock_layout *layout = input->layout;
     float system_icon_size = icon_box_size * reach_dock_metrics_values.system_icon_box_scale;
 
-    reach_rect_f32 tray_box = reach_dock_icon_box_for_slot(layout->tray_button, icon_box_size);
     reach_rect_f32 quick_settings_box =
         reach_dock_icon_box_for_slot(layout->quick_settings_button, icon_box_size);
 
-    reach_dock_push_rect(commands, reach_dock_union_rect(tray_box, quick_settings_box),
-                         theme->dock_button_background, icon_box_radius);
-    reach_dock_push_vector_icon(commands, reach_dock_center_square(tray_box, system_icon_size),
-                                REACH_VECTOR_ICON_ARROW_UP, theme->system_glyph);
+    reach_dock_push_rect(commands, quick_settings_box, theme->dock_button_background,
+                         icon_box_radius);
     reach_dock_push_vector_icon(commands,
                                 reach_dock_center_square(quick_settings_box, system_icon_size),
                                 REACH_VECTOR_ICON_QUICK_SETTINGS, theme->system_glyph);
 
-    if (input->click_feedback_index == input->tray_feedback_index)
-    {
-        reach_dock_push_click_feedback(theme, commands, tray_box, icon_box_radius,
-                                       input->click_feedback_opacity);
-    }
     if (input->click_feedback_index == input->quick_settings_feedback_index)
     {
         reach_dock_push_click_feedback(theme, commands, quick_settings_box, icon_box_radius,
@@ -455,7 +428,6 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.click_feedback_index = state->feedback_index;
     input.click_feedback_opacity =
         reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
-    input.tray_feedback_index = REACH_DOCK_FEEDBACK_TRAY_BUTTON;
     input.stage_feedback_index = REACH_DOCK_FEEDBACK_STAGE_BUTTON;
     input.quick_settings_feedback_index = REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;

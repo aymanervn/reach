@@ -20,13 +20,38 @@ reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *
     {
         return REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
     }
+    if (reach_top_bar_tray_icon_at(layout, local_x, local_y) < layout->tray_icon_count)
+    {
+        return REACH_TOP_BAR_POINTER_REGION_TRAY_ICON;
+    }
+    if (reach_top_bar_rect_contains(layout->tray_overflow_button, local_x, local_y))
+    {
+        return REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW;
+    }
     return REACH_TOP_BAR_POINTER_REGION_NONE;
+}
+
+size_t reach_top_bar_tray_icon_at(const reach_top_bar_layout *layout, int32_t local_x,
+                                  int32_t local_y)
+{
+    if (layout == nullptr)
+    {
+        return REACH_TOP_BAR_MAX_TRAY_ICONS;
+    }
+    for (size_t index = 0; index < layout->tray_icon_count; ++index)
+    {
+        if (reach_top_bar_rect_contains(layout->tray_icons[index], local_x, local_y))
+        {
+            return index;
+        }
+    }
+    return REACH_TOP_BAR_MAX_TRAY_ICONS;
 }
 
 static int32_t reach_top_bar_feedback_start(reach_top_bar *top_bar, size_t slot,
                                             float target_opacity)
 {
-    if (top_bar == nullptr || slot > REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
+    if (top_bar == nullptr || slot >= REACH_TOP_BAR_FEEDBACK_NONE)
     {
         return 0;
     }

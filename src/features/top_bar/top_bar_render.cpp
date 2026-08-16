@@ -14,6 +14,10 @@ typedef struct reach_top_bar_render_input
     uint64_t current_app_icon_id;
     const uint16_t *current_app_name;
     const uint16_t *current_app_title;
+    const reach_top_bar_tray_item *tray_items;
+    size_t tray_item_count;
+    int32_t tray_overflow;
+    int32_t tray_popup_open;
     int32_t battery_valid;
     int32_t battery_percent;
     float power_hover;
@@ -287,6 +291,60 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
         input->theme->dock_clock_date);
 }
 
+static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
+                                    reach_render_command_buffer *commands)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    const reach_top_bar_layout *layout = input->layout;
+
+    for (size_t index = 0; index < layout->tray_icon_count && index < input->tray_item_count;
+         ++index)
+    {
+        reach_rect_f32 slot = layout->tray_icons[index];
+        if (input->tray_items[index].icon_id != 0)
+        {
+            reach_render_command icon = {};
+            icon.type = REACH_RENDER_COMMAND_ICON;
+            icon.rect = slot;
+            icon.icon_id = input->tray_items[index].icon_id;
+            icon.color.a = 1.0f;
+            reach_render_command_buffer_push(commands, &icon);
+        }
+
+        if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index &&
+            input->click_feedback_opacity > metrics.click_feedback_min_opacity)
+        {
+            reach_top_bar_push_rect(
+                commands, slot,
+                reach_theme_color_alpha(input->theme->tray_click_feedback,
+                                        input->click_feedback_opacity),
+                slot.height * 0.5f);
+        }
+    }
+
+    if (!input->tray_overflow || layout->tray_overflow_button.width <= 0.0f)
+    {
+        return;
+    }
+
+    reach_rect_f32 overflow = layout->tray_overflow_button;
+    reach_top_bar_push_rect(commands, overflow, input->theme->dock_button_background,
+                            overflow.height * 0.5f);
+    reach_top_bar_push_vector_icon(
+        commands, reach_top_bar_center_square(overflow, overflow.height * 0.50f),
+        input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP : REACH_VECTOR_ICON_ARROW_DOWN,
+        input->theme->system_glyph);
+
+    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW &&
+        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
+    {
+        reach_top_bar_push_rect(commands, overflow,
+                                reach_theme_color_alpha(input->theme->dock_click_feedback,
+                                                        input->click_feedback_opacity),
+                                overflow.height * 0.5f);
+    }
+}
+
 reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
                                                   const reach_top_bar_render_context *ctx,
                                                   reach_render_command_buffer *out_commands)
@@ -325,6 +383,10 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
     input.current_app_name = state->current_app_name;
     input.current_app_title = state->current_app_title;
+    input.tray_items = state->tray_items;
+    input.tray_item_count = state->tray_item_count;
+    input.tray_overflow = state->tray_overflow;
+    input.tray_popup_open = state->tray_popup_open;
     if (state->current_app_icon_ref[0] != 0)
     {
         input.current_app_icon_id = reach_icon_service_get(reach_top_bar_icons(top_bar),
@@ -335,6 +397,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_power_button(&input, out_commands);
     reach_top_bar_push_clock(&input, out_commands);
     reach_top_bar_push_current_app(&input, out_commands);
+    reach_top_bar_push_tray(&input, out_commands);
 
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;
