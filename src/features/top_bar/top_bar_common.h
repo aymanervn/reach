@@ -33,6 +33,26 @@ size_t reach_top_bar_tray_icon_at(const reach_top_bar_layout *layout, int32_t lo
 int32_t reach_top_bar_feedback_press(reach_top_bar *top_bar, size_t slot);
 int32_t reach_top_bar_feedback_release(reach_top_bar *top_bar);
 
+typedef struct reach_top_bar_event_result
+{
+    int32_t handled;
+    int32_t redraw;
+    int32_t sync_pointer_subscriptions;
+    uint32_t action_kind;
+    uint64_t action_id;
+} reach_top_bar_event_result;
+
+void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
+                                reach_top_bar_event_result *out);
+void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
+                              reach_top_bar_event_result *out);
+void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
+                                reach_top_bar_event_result *out);
+void reach_top_bar_pointer_context(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
+                                   reach_top_bar_event_result *out);
+void reach_top_bar_pointer_cancel(reach_top_bar *top_bar, reach_top_bar_event_result *out);
+void reach_top_bar_pointer_leave(reach_top_bar *top_bar, reach_top_bar_event_result *out);
+
 static inline reach_rect_f32 reach_top_bar_rect(float x, float y, float width, float height)
 {
     reach_rect_f32 rect = {};

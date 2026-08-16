@@ -534,16 +534,6 @@ void reach_top_bar_suppress_power_release(reach_top_bar *top_bar)
     }
 }
 
-static int32_t reach_top_bar_take_power_release_suppressed(reach_top_bar *top_bar)
-{
-    if (top_bar == nullptr || !top_bar->state.power_release_suppressed)
-    {
-        return 0;
-    }
-    top_bar->state.power_release_suppressed = 0;
-    return 1;
-}
-
 static void reach_top_bar_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src)
 {
     if (dst == nullptr || dst_count == 0)
@@ -656,21 +646,6 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
 
     return reach_bar_update_visibility(&top_bar->state.visibility, &top_bar->manager,
                                        REACH_TOP_BAR_ANIM_Y, &bar_request);
-}
-
-static uint32_t reach_top_bar_media_action(reach_now_playing_action action)
-{
-    switch (action)
-    {
-    case REACH_NOW_PLAYING_ACTION_PREVIOUS:
-        return REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS;
-    case REACH_NOW_PLAYING_ACTION_PLAY_PAUSE:
-        return REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE;
-    case REACH_NOW_PLAYING_ACTION_NEXT:
-        return REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT;
-    default:
-        return REACH_TOP_BAR_POINTER_ACTION_NONE;
-    }
 }
 
 static void reach_top_bar_capsule_reset(void *capsule)
@@ -794,6 +769,16 @@ static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
     return reach_top_bar_capsule_pointer_sequence_active(capsule);
 }
 
+static void reach_top_bar_capsule_apply_event_result(const reach_top_bar_event_result *event_result,
+                                                     reach_capsule_pointer_result *out)
+{
+    out->handled = event_result->handled;
+    out->redraw = event_result->redraw;
+    out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
+    out->action.kind = event_result->action_kind;
+    out->action.id = event_result->action_id;
+}
+
 static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
                                                  reach_capsule_pointer_result *out)
 {
@@ -807,187 +792,34 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
         return;
     }
 
-    reach_top_bar_state *state = &top_bar->state;
-    reach_point_i32 local = reach_top_bar_local_point(&state->layout, event->x, event->y);
-    reach_top_bar_pointer_region hit =
-        reach_top_bar_hit_test(&state->layout, local.x, local.y);
-
-    if (event->kind == REACH_POINTER_EVENT_DOWN)
+    reach_point_i32 local = reach_top_bar_local_point(&top_bar->state.layout, event->x, event->y);
+    reach_top_bar_event_result event_result = {};
+    switch (event->kind)
     {
-        if (!state->pointer_sequence_active)
-        {
-            state->pointer_sequence_active = 1;
-            out->sync_pointer_subscriptions = 1;
-        }
-        if (hit != REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON)
-        {
-            state->power_release_suppressed = 0;
-        }
-        if (reach_top_bar_now_playing_pointer_down(top_bar->now_playing_subfeature, local.x,
-                                                   local.y))
-        {
-            state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING;
-            out->handled = 1;
-            out->redraw = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING;
-            return;
-        }
-        state->pressed_control = hit;
-        if (hit == REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON)
-        {
-            out->redraw = reach_top_bar_feedback_press(top_bar,
-                                                       REACH_TOP_BAR_FEEDBACK_POWER_BUTTON);
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER;
-        }
-        else if (hit == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON)
-        {
-            state->pressed_tray_index = reach_top_bar_tray_icon_at(&state->layout, local.x, local.y);
-            out->redraw = reach_top_bar_feedback_press(
-                top_bar, REACH_TOP_BAR_FEEDBACK_TRAY_BASE + state->pressed_tray_index);
-            out->handled = 1;
-        }
-        else if (hit == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW)
-        {
-            out->redraw =
-                reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW);
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_TRAY_OVERFLOW;
-        }
-        else if (hit == REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON)
-        {
-            out->redraw = reach_top_bar_feedback_press(
-                top_bar, REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS;
-        }
-        else if (hit == REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON)
-        {
-            out->redraw =
-                reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON);
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE;
-        }
+    case REACH_POINTER_EVENT_DOWN:
+        reach_top_bar_pointer_down(top_bar, local.x, local.y, &event_result);
+        break;
+    case REACH_POINTER_EVENT_UP:
+        reach_top_bar_pointer_up(top_bar, local.x, local.y, &event_result);
+        break;
+    case REACH_POINTER_EVENT_MOVE:
+        reach_top_bar_pointer_move(top_bar, local.x, local.y, &event_result);
+        break;
+    case REACH_POINTER_EVENT_CONTEXT:
+        reach_top_bar_pointer_context(top_bar, local.x, local.y, &event_result);
+        break;
+    case REACH_POINTER_EVENT_CANCEL:
+        reach_top_bar_pointer_cancel(top_bar, &event_result);
+        break;
+    case REACH_POINTER_EVENT_LEAVE:
+        reach_top_bar_pointer_leave(top_bar, &event_result);
+        break;
+    case REACH_POINTER_EVENT_WHEEL:
+    case REACH_POINTER_EVENT_MIDDLE:
+    default:
         return;
     }
-
-    if (event->kind == REACH_POINTER_EVENT_UP)
-    {
-        out->redraw = reach_top_bar_feedback_release(top_bar);
-
-        reach_now_playing_action media = REACH_NOW_PLAYING_ACTION_NONE;
-        if (reach_top_bar_now_playing_pointer_up(top_bar->now_playing_subfeature, local.x, local.y,
-                                                 &media))
-        {
-            state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
-            out->handled = 1;
-            out->redraw = 1;
-            out->action.kind = reach_top_bar_media_action(media);
-            if (state->pointer_sequence_active)
-            {
-                state->pointer_sequence_active = 0;
-                out->sync_pointer_subscriptions = 1;
-            }
-            return;
-        }
-
-        reach_top_bar_pointer_region pressed =
-            static_cast<reach_top_bar_pointer_region>(state->pressed_control);
-        state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
-        if (pressed == REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON && hit == pressed)
-        {
-            out->handled = 1;
-            if (!reach_top_bar_take_power_release_suppressed(top_bar))
-            {
-                out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER;
-            }
-        }
-        else if (pressed == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON && hit == pressed &&
-                 reach_top_bar_tray_icon_at(&state->layout, local.x, local.y) ==
-                     state->pressed_tray_index &&
-                 state->pressed_tray_index < state->tray_item_count)
-        {
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT;
-            out->action.id = state->tray_items[state->pressed_tray_index].id;
-        }
-        else if (pressed == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW && hit == pressed)
-        {
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW;
-        }
-        else if (pressed == REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON && hit == pressed)
-        {
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
-        }
-        else if (pressed == REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON && hit == pressed)
-        {
-            out->handled = 1;
-            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE;
-        }
-        if (state->pointer_sequence_active)
-        {
-            state->pointer_sequence_active = 0;
-            out->sync_pointer_subscriptions = 1;
-        }
-        return;
-    }
-
-    if (event->kind == REACH_POINTER_EVENT_MOVE)
-    {
-        int32_t hovered = hit == REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
-        if (hovered != state->power_hovered)
-        {
-            state->power_hovered = hovered;
-            reach_animation_manager_animate_to(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER,
-                                               hovered ? 1.0f : 0.0f, 0.18,
-                                               REACH_EASING_EASE_IN_OUT);
-            out->handled = 1;
-            out->redraw = 1;
-        }
-        return;
-    }
-
-    if (event->kind == REACH_POINTER_EVENT_CANCEL)
-    {
-        out->redraw = reach_top_bar_now_playing_pointer_cancel(top_bar->now_playing_subfeature);
-        out->redraw = reach_top_bar_feedback_release(top_bar) || out->redraw;
-        state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
-        if (state->pointer_sequence_active)
-        {
-            state->pointer_sequence_active = 0;
-            out->sync_pointer_subscriptions = 1;
-        }
-        return;
-    }
-
-    if (event->kind == REACH_POINTER_EVENT_CONTEXT)
-    {
-        if (hit == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON)
-        {
-            size_t index = reach_top_bar_tray_icon_at(&state->layout, local.x, local.y);
-            if (index < state->tray_item_count)
-            {
-                out->handled = 1;
-                out->action.kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT;
-                out->action.id = state->tray_items[index].id;
-            }
-        }
-        return;
-    }
-
-    if (event->kind == REACH_POINTER_EVENT_LEAVE)
-    {
-        out->redraw = reach_top_bar_now_playing_pointer_cancel(top_bar->now_playing_subfeature);
-        if (state->power_hovered)
-        {
-            state->power_hovered = 0;
-            reach_animation_manager_animate_to(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER,
-                                               0.0f, 0.18, REACH_EASING_EASE_IN_OUT);
-            out->redraw = 1;
-        }
-    }
+    reach_top_bar_capsule_apply_event_result(&event_result, out);
 }
 
 const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
