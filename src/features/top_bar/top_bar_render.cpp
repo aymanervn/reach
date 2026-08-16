@@ -18,6 +18,9 @@ typedef struct reach_top_bar_render_input
     int32_t tray_overflow;
     int32_t tray_popup_open;
     const uint16_t *language_code;
+    const uint16_t *network_name;
+    uint32_t network_icon_id;
+    uint32_t bluetooth_icon_id;
     const uint16_t *stats_cpu_text;
     const uint16_t *stats_memory_text;
     const uint16_t *stats_download_text;
@@ -420,6 +423,37 @@ static void reach_top_bar_push_glyph_button(const reach_top_bar_render_input *in
     reach_top_bar_push_button_feedback(input, commands, button, feedback_slot);
 }
 
+static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
+                                              reach_render_command_buffer *commands)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    const reach_top_bar_layout *layout = input->layout;
+    reach_rect_f32 button = layout->quick_settings_button;
+    if (button.width <= 0.0f)
+    {
+        return;
+    }
+
+    reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
+                            button.height * 0.5f);
+    reach_top_bar_push_vector_icon(commands, layout->network_icon, input->network_icon_id,
+                                   input->theme->system_glyph);
+    if (layout->network_label.width > 0.0f)
+    {
+        reach_top_bar_push_text(commands, layout->network_label, input->network_name,
+                                metrics.network_name_text_size * input->dpi_scale,
+                                metrics.network_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+                                input->theme->bar_text_primary);
+    }
+    if (input->bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
+    {
+        reach_top_bar_push_vector_icon(commands, layout->bluetooth_icon, input->bluetooth_icon_id,
+                                       input->theme->system_glyph);
+    }
+    reach_top_bar_push_button_feedback(input, commands, button,
+                                       REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
+}
+
 reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
                                                   const reach_top_bar_render_context *ctx,
                                                   reach_render_command_buffer *out_commands)
@@ -468,6 +502,9 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.tray_overflow = state->tray_overflow;
     input.tray_popup_open = state->tray_popup_open;
     input.language_code = state->language_code;
+    input.network_name = state->network_name;
+    input.network_icon_id = state->network_icon_id;
+    input.bluetooth_icon_id = state->bluetooth_icon_id;
     input.stats_cpu_text = state->stats_cpu_text;
     input.stats_memory_text = state->stats_memory_text;
     input.stats_download_text = state->stats_download_text;
@@ -487,9 +524,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_tray(&input, out_commands);
     reach_top_bar_push_stats(&input, out_commands);
     reach_top_bar_push_language(&input, out_commands);
-    reach_top_bar_push_glyph_button(&input, out_commands, layout->quick_settings_button,
-                                    REACH_VECTOR_ICON_QUICK_SETTINGS,
-                                    REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
+    reach_top_bar_push_quick_settings(&input, out_commands);
     reach_top_bar_push_glyph_button(&input, out_commands, layout->settings_button,
                                     REACH_VECTOR_ICON_SETTINGS,
                                     REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON);

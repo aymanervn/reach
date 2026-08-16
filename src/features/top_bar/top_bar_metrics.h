@@ -36,6 +36,11 @@ struct reach_top_bar_metrics
 
     float bar_button_scale;
     float bar_button_glyph_scale;
+    float quick_settings_padding;
+    float quick_settings_content_gap;
+    float network_name_text_size;
+    int32_t network_name_text_weight;
+    float network_name_max_width;
     float language_width;
     float language_text_size;
     int32_t language_text_weight;
@@ -91,6 +96,11 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 
     metrics.bar_button_scale = 0.62f;
     metrics.bar_button_glyph_scale = 0.52f;
+    metrics.quick_settings_padding = 8.0f;
+    metrics.quick_settings_content_gap = 6.0f;
+    metrics.network_name_text_size = 11.0f;
+    metrics.network_name_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+    metrics.network_name_max_width = 96.0f;
     metrics.language_width = 32.0f;
     metrics.language_text_size = 11.0f;
     metrics.language_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;

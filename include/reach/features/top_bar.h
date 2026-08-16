@@ -14,6 +14,7 @@
 #include "reach/services/clock.h"
 #include "reach/services/input_language.h"
 #include "reach/services/system_stats.h"
+#include "reach/services/system_status.h"
 #include "reach/services/window_tracking.h"
 #include "reach/support/animation.h"
 
@@ -56,6 +57,9 @@ extern "C"
         reach_rect_f32 tray_overflow_button;
         reach_rect_f32 tray_separator;
         reach_rect_f32 quick_settings_button;
+        reach_rect_f32 network_icon;
+        reach_rect_f32 network_label;
+        reach_rect_f32 bluetooth_icon;
         reach_rect_f32 settings_button;
         reach_rect_f32 language_button;
         reach_rect_f32 stats_cpu;
@@ -72,6 +76,7 @@ extern "C"
         REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
         REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH,
         REACH_TOP_BAR_ANIM_TRAY_WIDTH,
+        REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
         REACH_TOP_BAR_ANIM_COUNT
     };
 
@@ -141,6 +146,10 @@ extern "C"
 
         uint16_t language_code[8];
 
+        uint32_t network_icon_id;
+        uint32_t bluetooth_icon_id;
+        uint16_t network_name[REACH_SYSTEM_NETWORK_LABEL_CAPACITY];
+
         uint16_t stats_cpu_text[16];
         uint16_t stats_memory_text[16];
         uint16_t stats_download_text[16];
@@ -166,6 +175,8 @@ extern "C"
                                        reach_icon_service *icons, reach_window_tracking *windows,
                                        reach_system_stats *stats, reach_clock *clock,
                                        reach_input_language_service *input_language);
+
+    void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);

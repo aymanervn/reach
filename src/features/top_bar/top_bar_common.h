@@ -18,9 +18,11 @@ struct reach_top_bar
     reach_system_stats *stats;
     reach_clock *clock;
     reach_input_language_service *input_language;
+    reach_system_status *status;
     float now_playing_target_width;
     float current_app_target_width;
     float tray_target_width;
+    float quick_settings_target_width;
 };
 
 reach_top_bar_state *reach_top_bar_state_mut(reach_top_bar *top_bar);

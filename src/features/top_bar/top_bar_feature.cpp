@@ -73,7 +73,16 @@ void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_ser
     }
 }
 
+void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status)
+{
+    if (top_bar != nullptr)
+    {
+        top_bar->status = status;
+    }
+}
+
 static void reach_top_bar_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src);
+static int32_t reach_top_bar_utf16_equal(const uint16_t *a, const uint16_t *b);
 static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);
 static void reach_top_bar_update_language(reach_top_bar *top_bar);
 
@@ -149,6 +158,67 @@ static void reach_top_bar_update_stats(reach_top_bar *top_bar)
                               snapshot.network_received_bytes_per_second);
     reach_top_bar_format_rate(state->stats_upload_text, 16, 0x2191,
                               snapshot.network_sent_bytes_per_second);
+}
+
+static uint32_t reach_top_bar_network_icon_id(const reach_network_state *network, int32_t valid)
+{
+    if (!valid || !network->connected)
+    {
+        return REACH_VECTOR_ICON_NO_INTERNET;
+    }
+    if (network->kind == REACH_NETWORK_KIND_ETHERNET)
+    {
+        return REACH_VECTOR_ICON_ETHERNET;
+    }
+    if (network->signal_strength < 34)
+    {
+        return REACH_VECTOR_ICON_WIFI_LOW;
+    }
+    if (network->signal_strength < 67)
+    {
+        return REACH_VECTOR_ICON_WIFI_MEDIUM;
+    }
+    return REACH_VECTOR_ICON_WIFI_HIGH;
+}
+
+static uint32_t reach_top_bar_bluetooth_icon_id(const reach_bluetooth_state *bluetooth,
+                                                int32_t valid)
+{
+    if (!valid || !bluetooth->available)
+    {
+        return REACH_VECTOR_ICON_NONE;
+    }
+    return bluetooth->enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF;
+}
+
+static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
+{
+    reach_top_bar_state *state = &top_bar->state;
+    reach_system_status_system_snapshot snapshot = {};
+    reach_system_status_read_system(top_bar->status, &snapshot);
+
+    uint32_t network_icon =
+        reach_top_bar_network_icon_id(&snapshot.network, snapshot.network_valid);
+    uint32_t bluetooth_icon =
+        reach_top_bar_bluetooth_icon_id(&snapshot.bluetooth, snapshot.bluetooth_valid);
+
+    uint16_t name[REACH_SYSTEM_NETWORK_LABEL_CAPACITY] = {};
+    if (snapshot.network_valid && snapshot.network.connected &&
+        snapshot.network.kind == REACH_NETWORK_KIND_WIFI)
+    {
+        reach_copy_utf16(name, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, snapshot.network.label);
+    }
+
+    if (state->network_icon_id == network_icon && state->bluetooth_icon_id == bluetooth_icon &&
+        reach_top_bar_utf16_equal(state->network_name, name))
+    {
+        return 0;
+    }
+
+    state->network_icon_id = network_icon;
+    state->bluetooth_icon_id = bluetooth_icon;
+    reach_copy_utf16(state->network_name, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, name);
+    return 1;
 }
 
 reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar)
@@ -398,8 +468,33 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                       download_advance + stats_gap + upload_advance + stats_group_gap;
     }
 
+    const float glyph_size = button_size * metrics.bar_button_glyph_scale;
+    const float quick_settings_padding = metrics.quick_settings_padding * scale;
+    const float quick_settings_content_gap = metrics.quick_settings_content_gap * scale;
+    const float network_name_size = metrics.network_name_text_size * scale;
+    float network_name_advance =
+        reach_top_bar_text_advance(top_bar->state.network_name, network_name_size);
+    if (network_name_advance > metrics.network_name_max_width * scale)
+    {
+        network_name_advance = metrics.network_name_max_width * scale;
+    }
+
+    float quick_settings_content = glyph_size;
+    if (network_name_advance > 0.0f)
+    {
+        quick_settings_content += quick_settings_content_gap + network_name_advance;
+    }
+    if (top_bar->state.bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
+    {
+        quick_settings_content += quick_settings_content_gap + glyph_size;
+    }
+    float quick_settings_button_width = reach_top_bar_resolve_animated_width(
+        top_bar, REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH, &top_bar->quick_settings_target_width,
+        quick_settings_padding * 2.0f + quick_settings_content);
+
     float quick_settings_width = dot_size * 0.5f + dot_gap + stats_width + language_width +
-                                 language_gap + button_size + pill_gap + button_size + padding;
+                                 language_gap + quick_settings_button_width + pill_gap +
+                                 button_size + padding;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
     layout->tray_separator = reach_top_bar_rect(
@@ -427,8 +522,26 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         cluster_x += language_width + language_gap;
     }
     layout->quick_settings_button = reach_top_bar_rect(
-        cluster_x, (height - button_size) * 0.5f, button_size, button_size);
-    cluster_x += button_size + pill_gap;
+        cluster_x, (height - button_size) * 0.5f, quick_settings_button_width, button_size);
+
+    float glyph_y = (height - glyph_size) * 0.5f;
+    float content_x = cluster_x + quick_settings_padding;
+    layout->network_icon = reach_top_bar_rect(content_x, glyph_y, glyph_size, glyph_size);
+    content_x += glyph_size;
+    if (network_name_advance > 0.0f)
+    {
+        content_x += quick_settings_content_gap;
+        layout->network_label =
+            reach_top_bar_text_run(content_x, height, network_name_advance, network_name_size);
+        content_x += network_name_advance;
+    }
+    if (top_bar->state.bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
+    {
+        content_x += quick_settings_content_gap;
+        layout->bluetooth_icon = reach_top_bar_rect(content_x, glyph_y, glyph_size, glyph_size);
+    }
+
+    cluster_x += quick_settings_button_width + pill_gap;
     layout->settings_button =
         reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f, button_size, button_size);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x;
@@ -678,7 +791,9 @@ static int32_t reach_top_bar_width_animation_active(const reach_top_bar *top_bar
                                           REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH) ||
            reach_animation_manager_active(&top_bar->manager,
                                           REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH) ||
-           reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_WIDTH);
+           reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_WIDTH) ||
+           reach_animation_manager_active(&top_bar->manager,
+                                          REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH);
 }
 
 reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *top_bar)
@@ -741,6 +856,12 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     }
 
     if (reach_top_bar_update_clock(top_bar) && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+    }
+
+    if (reach_top_bar_update_system_status(top_bar) && out != nullptr)
     {
         out->redraw = 1;
         out->relayout = 1;
