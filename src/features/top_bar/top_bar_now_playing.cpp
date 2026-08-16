@@ -468,11 +468,6 @@ int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now
     return reach_marquee_scrolls(&request);
 }
 
-int32_t reach_top_bar_now_playing_visible(const reach_top_bar_now_playing *now_playing)
-{
-    return now_playing != nullptr && now_playing->model.visible;
-}
-
 float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *now_playing,
                                            const reach_theme *theme, float dpi_scale)
 {

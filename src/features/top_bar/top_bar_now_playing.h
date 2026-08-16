@@ -76,7 +76,6 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
 int32_t reach_top_bar_now_playing_tick(reach_top_bar_now_playing *now_playing,
                                        double delta_seconds);
 int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now_playing);
-int32_t reach_top_bar_now_playing_visible(const reach_top_bar_now_playing *now_playing);
 float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *now_playing,
                                            const reach_theme *theme, float dpi_scale);
 void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, const reach_theme *theme,
