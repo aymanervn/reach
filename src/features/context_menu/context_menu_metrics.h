@@ -12,6 +12,7 @@ struct reach_context_menu_metrics
     float text_size;
     float text_leading_inset;
     float text_trailing_inset;
+    float text_trailing_inset_with_close;
 
     float icon_size;
     float icon_inset;
@@ -33,6 +34,7 @@ static constexpr reach_context_menu_metrics reach_context_menu_make_large_metric
     metrics.text_size = 14.0f;
     metrics.text_leading_inset = 14.0f;
     metrics.text_trailing_inset = 14.0f;
+    metrics.text_trailing_inset_with_close = 14.0f;
 
     metrics.icon_size = 16.0f;
     metrics.icon_inset = 13.0f;
@@ -54,7 +56,8 @@ static constexpr reach_context_menu_metrics reach_context_menu_make_small_metric
 
     metrics.text_size = 11.0f;
     metrics.text_leading_inset = 10.0f;
-    metrics.text_trailing_inset = 24.0f;
+    metrics.text_trailing_inset = 10.0f;
+    metrics.text_trailing_inset_with_close = 24.0f;
 
     metrics.close_button_size = 15.0f;
     metrics.close_button_inset = 5.0f;
