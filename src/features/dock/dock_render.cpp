@@ -5,12 +5,6 @@
 #include "dock_common.h"
 #include "dock_metrics.h"
 
-static reach_rect_f32 reach_dock_center_square(reach_rect_f32 outer, float size)
-{
-    return reach_dock_rect(outer.x + (outer.width - size) * 0.5f,
-                           outer.y + (outer.height - size) * 0.5f, size, size);
-}
-
 static void reach_dock_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                  reach_color color, float radius)
 {
@@ -41,22 +35,6 @@ static void reach_dock_push_icon(reach_render_command_buffer *commands, reach_re
     command.rect = rect;
     command.icon_id = icon_id;
     command.color = color;
-    reach_render_command_buffer_push(commands, &command);
-}
-
-static void reach_dock_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                                 const uint16_t *text, float text_size, int32_t text_weight,
-                                 int32_t text_alignment, reach_color color)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_TEXT;
-    command.rect = rect;
-    command.text_size = text_size;
-    command.text_weight = text_weight;
-    command.text_alignment = text_alignment;
-    command.text_ellipsis = 1;
-    command.color = color;
-    reach_copy_utf16(command.text, 260, text != nullptr ? text : (const uint16_t *)L"");
     reach_render_command_buffer_push(commands, &command);
 }
 
