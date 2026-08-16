@@ -250,6 +250,21 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
                             input->theme->bar_text_secondary);
 }
 
+static void reach_top_bar_push_button_feedback(const reach_top_bar_render_input *input,
+                                               reach_render_command_buffer *commands,
+                                               reach_rect_f32 button, size_t feedback_slot)
+{
+    if (input->click_feedback_index != feedback_slot ||
+        input->click_feedback_opacity <= reach_top_bar_metrics_values.click_feedback_min_opacity)
+    {
+        return;
+    }
+    reach_top_bar_push_rect(
+        commands, button,
+        reach_theme_color_alpha(input->theme->bar_click_feedback, input->click_feedback_opacity),
+        button.height * 0.5f);
+}
+
 static void reach_top_bar_push_separator_dot(const reach_top_bar_render_input *input,
                                              reach_render_command_buffer *commands,
                                              reach_rect_f32 dot)
@@ -331,15 +346,8 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
         reach_top_bar_center_square(overflow, overflow.height * metrics.tray_overflow_glyph_scale),
         input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP : REACH_VECTOR_ICON_ARROW_DOWN,
         input->theme->system_glyph);
-
-    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW &&
-        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
-    {
-        reach_top_bar_push_rect(commands, overflow,
-                                reach_theme_color_alpha(input->theme->bar_click_feedback,
-                                                        input->click_feedback_opacity),
-                                overflow.height * 0.5f);
-    }
+    reach_top_bar_push_button_feedback(input, commands, overflow,
+                                       REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW);
 }
 
 static void reach_top_bar_push_stat(const reach_top_bar_render_input *input,
@@ -388,22 +396,16 @@ static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
                             metrics.language_text_size * input->dpi_scale,
                             metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
                             input->theme->bar_text_primary);
-
-    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON &&
-        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
-    {
-        reach_top_bar_push_rect(commands, button,
-                                reach_theme_color_alpha(input->theme->bar_click_feedback,
-                                                        input->click_feedback_opacity),
-                                button.height * 0.5f);
-    }
+    reach_top_bar_push_button_feedback(input, commands, button,
+                                       REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON);
 }
 
-static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
-                                              reach_render_command_buffer *commands)
+static void reach_top_bar_push_glyph_button(const reach_top_bar_render_input *input,
+                                            reach_render_command_buffer *commands,
+                                            reach_rect_f32 button, uint32_t icon_id,
+                                            size_t feedback_slot)
 {
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
-    reach_rect_f32 button = input->layout->quick_settings_button;
     if (button.width <= 0.0f)
     {
         return;
@@ -413,17 +415,9 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
                             button.height * 0.5f);
     reach_top_bar_push_vector_icon(
         commands,
-        reach_top_bar_center_square(button, button.height * metrics.quick_settings_glyph_scale),
-        REACH_VECTOR_ICON_QUICK_SETTINGS, input->theme->system_glyph);
-
-    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON &&
-        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
-    {
-        reach_top_bar_push_rect(commands, button,
-                                reach_theme_color_alpha(input->theme->bar_click_feedback,
-                                                        input->click_feedback_opacity),
-                                button.height * 0.5f);
-    }
+        reach_top_bar_center_square(button, button.height * metrics.bar_button_glyph_scale),
+        icon_id, input->theme->system_glyph);
+    reach_top_bar_push_button_feedback(input, commands, button, feedback_slot);
 }
 
 reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
@@ -493,7 +487,12 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_tray(&input, out_commands);
     reach_top_bar_push_stats(&input, out_commands);
     reach_top_bar_push_language(&input, out_commands);
-    reach_top_bar_push_quick_settings(&input, out_commands);
+    reach_top_bar_push_glyph_button(&input, out_commands, layout->quick_settings_button,
+                                    REACH_VECTOR_ICON_QUICK_SETTINGS,
+                                    REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
+    reach_top_bar_push_glyph_button(&input, out_commands, layout->settings_button,
+                                    REACH_VECTOR_ICON_SETTINGS,
+                                    REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON);
 
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;

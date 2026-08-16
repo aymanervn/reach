@@ -34,8 +34,8 @@ struct reach_top_bar_metrics
     float tray_icon_gap;
     float tray_overflow_glyph_scale;
 
-    float quick_settings_button_scale;
-    float quick_settings_glyph_scale;
+    float bar_button_scale;
+    float bar_button_glyph_scale;
     float language_width;
     float language_text_size;
     int32_t language_text_weight;
@@ -89,8 +89,8 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.tray_icon_gap = 7.0f;
     metrics.tray_overflow_glyph_scale = 0.46f;
 
-    metrics.quick_settings_button_scale = 0.62f;
-    metrics.quick_settings_glyph_scale = 0.52f;
+    metrics.bar_button_scale = 0.62f;
+    metrics.bar_button_glyph_scale = 0.52f;
     metrics.language_width = 32.0f;
     metrics.language_text_size = 11.0f;
     metrics.language_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;

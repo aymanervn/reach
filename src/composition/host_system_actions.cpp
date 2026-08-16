@@ -20,6 +20,23 @@ static void reach_host_mark_quick_settings_changed(reach_host *host)
     reach_host_request_update(host);
 }
 
+reach_result reach_host_launch_settings_app(reach_host *host)
+{
+    if (host == nullptr || host->settings_launcher.ops.resolve == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_app_launch_request request = {};
+    reach_result resolved = host->settings_launcher.ops.resolve(
+        host->settings_launcher.launcher, request.path, 260, request.arguments, 260);
+    if (resolved != REACH_OK)
+    {
+        return resolved;
+    }
+    return reach_host_schedule_app_launch(host, &request);
+}
+
 reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing_action action)
 {
     if (host == nullptr)

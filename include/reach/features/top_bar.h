@@ -56,6 +56,7 @@ extern "C"
         reach_rect_f32 tray_overflow_button;
         reach_rect_f32 tray_separator;
         reach_rect_f32 quick_settings_button;
+        reach_rect_f32 settings_button;
         reach_rect_f32 language_button;
         reach_rect_f32 stats_cpu;
         reach_rect_f32 stats_memory;
@@ -81,6 +82,7 @@ extern "C"
         REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW =
             REACH_TOP_BAR_FEEDBACK_TRAY_BASE + REACH_TOP_BAR_MAX_TRAY_ICONS,
         REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON,
+        REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON,
         REACH_TOP_BAR_FEEDBACK_NONE
     };
@@ -93,7 +95,8 @@ extern "C"
         REACH_TOP_BAR_POINTER_REGION_TRAY_ICON = 3,
         REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW = 4,
         REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON = 5,
-        REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON = 6
+        REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON = 6,
+        REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON = 7
     } reach_top_bar_pointer_region;
 
     typedef enum reach_top_bar_pointer_action_kind
@@ -112,7 +115,9 @@ extern "C"
         REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS = 11,
         REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS = 12,
         REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE = 13,
-        REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE = 14
+        REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE = 14,
+        REACH_TOP_BAR_POINTER_ACTION_PRESS_SETTINGS = 15,
+        REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS = 16
     } reach_top_bar_pointer_action_kind;
 
     typedef struct reach_top_bar_state

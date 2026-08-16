@@ -112,19 +112,7 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
     if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS)
     {
         reach_host_close_context_menu(host);
-        if (host->settings_launcher.ops.resolve == nullptr)
-        {
-            return REACH_ERROR;
-        }
-        reach_app_launch_request settings_request = {};
-        reach_result resolve_result = host->settings_launcher.ops.resolve(
-            host->settings_launcher.launcher, settings_request.path, 260,
-            settings_request.arguments, 260);
-        if (resolve_result != REACH_OK)
-        {
-            return resolve_result;
-        }
-        return reach_host_schedule_app_launch(host, &settings_request);
+        return reach_host_launch_settings_app(host);
     }
 
     if (reach_context_menu_state_ptr(host->context_menu_capsule)->target_index >=

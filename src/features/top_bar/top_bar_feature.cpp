@@ -371,7 +371,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     reach_top_bar_update_stats(top_bar);
 
     float right = layout->bounds.width - edge_inset;
-    float quick_settings_button = height * metrics.quick_settings_button_scale;
+    float button_size = height * metrics.bar_button_scale;
     float language_width =
         top_bar->state.language_code[0] != 0 ? metrics.language_width * scale : 0.0f;
     float language_gap = language_width > 0.0f ? pill_gap : 0.0f;
@@ -399,7 +399,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     }
 
     float quick_settings_width = dot_size * 0.5f + dot_gap + stats_width + language_width +
-                                 language_gap + quick_settings_button + padding;
+                                 language_gap + button_size + pill_gap + button_size + padding;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
     layout->tray_separator = reach_top_bar_rect(
@@ -423,13 +423,14 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     if (language_width > 0.0f)
     {
         layout->language_button = reach_top_bar_rect(
-            cluster_x, (height - quick_settings_button) * 0.5f, language_width,
-            quick_settings_button);
+            cluster_x, (height - button_size) * 0.5f, language_width, button_size);
         cluster_x += language_width + language_gap;
     }
-    layout->quick_settings_button =
-        reach_top_bar_rect(cluster_x, (height - quick_settings_button) * 0.5f,
-                           quick_settings_button, quick_settings_button);
+    layout->quick_settings_button = reach_top_bar_rect(
+        cluster_x, (height - button_size) * 0.5f, button_size, button_size);
+    cluster_x += button_size + pill_gap;
+    layout->settings_button =
+        reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f, button_size, button_size);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x;
 
     reach_top_bar_update_tray_items(top_bar, ctx);
