@@ -469,9 +469,14 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                current_app_icon_size, current_app_icon_size);
         current_app_text_x += current_app_icon_size + current_app_icon_gap;
     }
-    layout->current_app_text = reach_top_bar_text_run(
-        current_app_text_x, height, current_app.x + current_app.width - padding - current_app_text_x,
-        name_size);
+    float current_app_text_advance =
+        current_app.x + current_app.width - padding - current_app_text_x;
+    if (current_app_text_advance < 0.0f)
+    {
+        current_app_text_advance = 0.0f;
+    }
+    layout->current_app_text =
+        reach_top_bar_text_run(current_app_text_x, height, current_app_text_advance, name_size);
 
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
     {
