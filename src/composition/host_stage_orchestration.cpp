@@ -1,6 +1,6 @@
 #include "host_internal.h"
 
-static float reach_host_stage_reveal_corner_size(reach_host *host)
+float reach_host_stage_reveal_corner_size(reach_host *host)
 {
     float scale = reach_host_layout_dpi_scale(host);
     return 4.0f * (scale > 0.0f ? scale : 1.0f);
@@ -175,7 +175,7 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
             reach_host_stage_monitor_for(host, frame, &entry->monitor_index);
         entry->monitor_portrait = reach_host_stage_monitor_is_portrait(monitor);
         entry->icon_id = reach_icon_service_get(host->icon_service, snapshot->icon_ref,
-                                                reach_host_dock_icon_size_px(host));
+                                                reach_host_icon_size_px(host));
         collected++;
     }
 

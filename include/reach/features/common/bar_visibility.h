@@ -43,20 +43,24 @@ extern "C"
         int32_t can_hide;
         int32_t pointer_sequence_active;
         int32_t transient_open;
-        int32_t sticky_feedback;
+        float reveal_span_inset;
+        float reveal_seconds;
     } reach_bar_visibility_request;
 
     typedef struct reach_bar_visibility_result
     {
         reach_rect_f32 animated_bounds;
+        reach_rect_f32 reveal_bounds;
         int32_t edge_mode;
         int32_t visible;
-        int32_t clear_sticky_feedback;
+        int32_t redraw;
     } reach_bar_visibility_result;
 
-    reach_rect_f32 reach_bar_reveal_edge_bounds(reach_bar_edge edge, int32_t mode,
-                                                reach_rect_f32 shown_bounds,
-                                                reach_rect_f32 monitor_bounds);
+    typedef struct reach_bar_reveal_animation
+    {
+        int32_t position_animating;
+        int32_t content_animating;
+    } reach_bar_reveal_animation;
 
     void reach_bar_visibility_reset(reach_bar_visibility_state *state);
     void reach_bar_begin_reveal_session(reach_bar_visibility_state *state);

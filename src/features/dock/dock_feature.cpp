@@ -748,10 +748,30 @@ reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_BAR_EDGE_BOTTOM;
     bar_request.pointer_sequence_active = animations->state.pointer_sequence_active;
-    bar_request.sticky_feedback = animations->state.feedback_sticky;
 
-    return reach_bar_update_visibility(&animations->state.visibility, &animations->manager,
-                                       REACH_DOCK_ANIM_Y, &bar_request);
+    reach_bar_visibility_result result = reach_bar_update_visibility(
+        &animations->state.visibility, &animations->manager, REACH_DOCK_ANIM_Y, &bar_request);
+    if (!result.visible && reach_dock_feedback_clear_sticky(animations))
+    {
+        result.redraw = 1;
+    }
+    return result;
+}
+
+reach_bar_reveal_animation reach_dock_reveal_animation(const reach_dock *dock)
+{
+    reach_bar_reveal_animation animation = {};
+    if (dock == nullptr)
+    {
+        return animation;
+    }
+
+    animation.position_animating = reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
+    animation.content_animating =
+        reach_dock_slots_animating(dock) || dock->state.drag.active ||
+        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP) ||
+        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
+    return animation;
 }
 
 static reach_dock_order_key reach_dock_order_key_for_item(const reach_dock_item_model *item)

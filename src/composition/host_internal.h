@@ -162,9 +162,10 @@ typedef struct reach_surface_desc
 
     reach_bar_visibility_result (*update_visibility)(void *capsule,
                                                      const reach_bar_visibility_request *request);
-    reach_bar_edge bar_edge;
     reach_screen_hotspot_port *reveal_edge;
     reach_host_bar_reveal_state *reveal;
+    reach_bar_reveal_animation (*reveal_animation)(const void *capsule);
+    reach_result (*reveal_frame)(reach_host *host);
 } reach_surface_desc;
 
 void reach_host_init_surface_descriptors(reach_host *host);
@@ -173,6 +174,7 @@ int32_t reach_host_surface_is_open(const reach_surface_desc *desc);
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
 int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask);
 int32_t reach_host_any_surface_dirty(const reach_host *host);
+void reach_host_mark_all_surfaces_dirty(reach_host *host);
 
 #define REACH_SURFACE_ORIGIN_NONE REACH_HOST_SURFACE_COUNT
 
@@ -461,6 +463,7 @@ void reach_host_on_stage_reveal_corner(void *user, reach_screen_hotspot_event ev
 void reach_host_close_stage(reach_host *host);
 void reach_host_toggle_stage(reach_host *host);
 void reach_host_sync_stage_reveal_corner(reach_host *host, reach_rect_f32 monitor_bounds);
+float reach_host_stage_reveal_corner_size(reach_host *host);
 reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach_ui_event *event,
                                                    const reach_capsule_pointer_result *result);
 reach_result reach_host_render_stage_surface(reach_host *host, reach_rect_f32 bounds);
@@ -534,7 +537,7 @@ int32_t reach_host_window_list_wants_frames(const reach_host *host);
 reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_index);
 reach_result reach_host_window_list_close_window(reach_host *host, uintptr_t window_id);
 
-int32_t reach_host_dock_icon_size_px(const reach_host *host);
+int32_t reach_host_icon_size_px(const reach_host *host);
 
 void reach_host_release_render_icon(reach_host *host, uint64_t icon_id);
 
@@ -559,9 +562,10 @@ void reach_host_apply_window_control_result(reach_host *host);
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host);
 
-int32_t reach_host_dock_can_hide(const reach_host *host);
+int32_t reach_host_bars_can_hide(const reach_host *host);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);
+void reach_host_hide_bar_reveal_edges(reach_host *host);
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
                                                    reach_rect_f32 shown_bounds,
@@ -571,8 +575,10 @@ reach_result reach_host_cycle_input_language(reach_host *host);
 reach_result reach_host_render_top_bar_surface(reach_host *host);
 
 reach_result reach_host_refresh_monitor_layout(reach_host *host);
-int32_t reach_host_can_move_dock_without_redraw(const reach_host *host);
-reach_result reach_host_move_dock_animation_frame(reach_host *host);
+int32_t reach_host_can_move_bars_without_redraw(const reach_host *host);
+reach_result reach_host_move_bar_animation_frame(reach_host *host);
+reach_result reach_host_move_dock_reveal_frame(reach_host *host);
+reach_result reach_host_move_top_bar_reveal_frame(reach_host *host);
 
 const uint16_t *reach_host_dock_item_path(const reach_host *host, size_t item_index);
 

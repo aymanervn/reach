@@ -4,9 +4,6 @@
 
 #include <new>
 
-#define REACH_STAGE_DEFAULT_ANIMATION_SECONDS 0.28f
-#define REACH_STAGE_REFLOW_SECONDS 0.34
-
 reach_result reach_stage_create(reach_stage **out_stage)
 {
     REACH_ASSERT(out_stage != nullptr);
@@ -22,7 +19,7 @@ reach_result reach_stage_create(reach_stage **out_stage)
         return REACH_ERROR;
     }
 
-    stage->state.animation_seconds = REACH_STAGE_DEFAULT_ANIMATION_SECONDS;
+    stage->state.animation_seconds = reach_stage_animation_seconds_default();
     reach_animation_manager_init(&stage->animations, stage->animation_tracks,
                                  REACH_STAGE_ANIMATION_COUNT);
     *out_stage = stage;
@@ -75,7 +72,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     reach_stage_state *state = &stage->state;
     float animation_seconds = state->animation_seconds > 0.0f
                                   ? state->animation_seconds
-                                  : REACH_STAGE_DEFAULT_ANIMATION_SECONDS;
+                                  : reach_stage_animation_seconds_default();
     *state = {};
     state->animation_seconds = animation_seconds;
     state->bounds = monitor_bounds;
@@ -152,7 +149,7 @@ void reach_stage_start_reflow(reach_stage *stage)
 
     state->reflow = 0.0f;
     reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_REFLOW, 0.0f, 1.0f,
-                                  REACH_STAGE_REFLOW_SECONDS, REACH_EASING_EASE_IN_OUT);
+                                  reach_stage_reflow_seconds(), REACH_EASING_EASE_IN_OUT);
     reach_stage_apply_progress(stage);
 }
 
@@ -234,9 +231,8 @@ void reach_stage_begin_close(reach_stage *stage)
 
     stage->state.closing = 1;
     stage->state.has_hover = 0;
-    stage->closing_settled = 0;
     reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f,
-                                       REACH_STAGE_CLOSE_HOVER_SECONDS, REACH_EASING_EASE_OUT);
+                                       reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
     reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
                                        (double)stage->state.animation_seconds,
                                        REACH_EASING_EASE_OUT);
@@ -253,7 +249,6 @@ void reach_stage_force_close(reach_stage *stage)
     float animation_seconds = state->animation_seconds;
     *state = {};
     state->animation_seconds = animation_seconds;
-    stage->closing_settled = 0;
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER);
@@ -442,14 +437,7 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     if (state->closing &&
         !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS))
     {
-        if (stage->closing_settled)
-        {
-            reach_stage_force_close(stage);
-        }
-        else
-        {
-            stage->closing_settled = 1;
-        }
+        reach_stage_force_close(stage);
     }
 
     if (out != nullptr)
@@ -459,9 +447,15 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     }
 }
 
+static int32_t reach_stage_is_closing(const reach_stage *stage)
+{
+    return stage != nullptr && stage->state.open && stage->state.closing ? 1 : 0;
+}
+
 static int32_t reach_stage_capsule_is_open(const void *capsule)
 {
-    return reach_stage_is_open(static_cast<const reach_stage *>(capsule));
+    const reach_stage *stage = static_cast<const reach_stage *>(capsule);
+    return reach_stage_is_open(stage) && !reach_stage_is_closing(stage);
 }
 
 static void reach_stage_capsule_force_close(void *capsule)
@@ -479,7 +473,8 @@ static void reach_stage_capsule_on_game_mode(void *capsule, int32_t enabled)
 
 static int32_t reach_stage_capsule_needs_frame(const void *capsule)
 {
-    return reach_stage_animation_active(static_cast<const reach_stage *>(capsule));
+    const reach_stage *stage = static_cast<const reach_stage *>(capsule);
+    return reach_stage_animation_active(stage) || reach_stage_is_closing(stage);
 }
 
 static int32_t reach_stage_capsule_wants_pointer_move(const void *capsule)

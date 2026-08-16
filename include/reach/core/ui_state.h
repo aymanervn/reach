@@ -24,7 +24,6 @@ extern "C"
         float icon_size;
         float gap;
         int32_t visible;
-        int32_t auto_hide;
     } reach_dock_model;
 
     typedef struct reach_launcher_model

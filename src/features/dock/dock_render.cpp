@@ -47,7 +47,7 @@ static void reach_dock_push_click_feedback(const reach_theme *theme,
         return;
     }
     reach_dock_push_rect(commands, rect,
-                         reach_theme_color_alpha(theme->dock_click_feedback, opacity), radius);
+                         reach_theme_color_alpha(theme->bar_click_feedback, opacity), radius);
 }
 
 static void reach_dock_push_item_feedback(const reach_theme *theme,
@@ -66,7 +66,7 @@ static void reach_dock_push_item_feedback(const reach_theme *theme,
         command.type = REACH_RENDER_COMMAND_ICON_TINT;
         command.rect = rect;
         command.icon_id = icon.id;
-        command.color = reach_theme_color_alpha(theme->dock_click_feedback, opacity);
+        command.color = reach_theme_color_alpha(theme->bar_click_feedback, opacity);
         reach_render_command_buffer_push(commands, &command);
         return;
     }
@@ -191,9 +191,9 @@ static void reach_dock_push_background(const reach_theme *theme, const reach_doc
 {
     reach_dock_push_rect(commands,
                          reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height),
-                         theme->dock_background, dock_radius);
+                         theme->bar_background, dock_radius);
 
-    if (theme->border_thickness <= 0.0f || theme->dock_border.a <= 0.0f)
+    if (theme->border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {
         return;
     }
@@ -203,7 +203,7 @@ static void reach_dock_push_background(const reach_theme *theme, const reach_doc
     command.rect = reach_dock_rect(theme->border_thickness * 0.5f, theme->border_thickness * 0.5f,
                                    layout->bounds.width - theme->border_thickness,
                                    layout->bounds.height - theme->border_thickness);
-    command.color = theme->dock_border;
+    command.color = theme->bar_border;
     command.radius = dock_radius;
     command.stroke_width = theme->border_thickness;
     reach_render_command_buffer_push(commands, &command);
@@ -221,7 +221,7 @@ static void reach_dock_push_stage_button(const reach_dock_render_input *input,
         input->click_feedback_opacity > reach_dock_metrics_values.click_feedback_min_opacity)
     {
         glyph =
-            reach_theme_color_mix(glyph, theme->dock_click_feedback, input->click_feedback_opacity);
+            reach_theme_color_mix(glyph, theme->bar_click_feedback, input->click_feedback_opacity);
     }
 
     reach_dock_push_vector_icon(commands, stage_box, REACH_VECTOR_ICON_MENU, glyph);

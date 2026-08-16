@@ -3,9 +3,23 @@
 
 #include "reach/features/stage.h"
 
+#include "reach/core/theme.h"
 #include "reach/support/animation.h"
 
-#define REACH_STAGE_CLOSE_HOVER_SECONDS 0.14
+static inline float reach_stage_animation_seconds_default(void)
+{
+    return reach_theme_default()->stage_animation_seconds;
+}
+
+static inline double reach_stage_close_hover_seconds(void)
+{
+    return (double)reach_theme_default()->stage_close_hover_seconds;
+}
+
+static inline double reach_stage_reflow_seconds(void)
+{
+    return (double)reach_theme_default()->stage_reflow_seconds;
+}
 
 enum
 {
@@ -20,7 +34,6 @@ struct reach_stage
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_STAGE_ANIMATION_COUNT];
     reach_stage_state state;
-    int32_t closing_settled;
 };
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);

@@ -125,6 +125,10 @@ static void reach_top_bar_update_stats(reach_top_bar *top_bar)
     reach_system_stats_snapshot snapshot = {};
     reach_system_stats_snapshot_take(top_bar->stats, &snapshot);
 
+    state->battery_valid =
+        snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
+    state->battery_percent = state->battery_valid ? snapshot.power.battery_percent : 0;
+
     state->stats_valid = snapshot.valid;
     if (!snapshot.valid)
     {
@@ -265,14 +269,9 @@ static int32_t reach_top_bar_has_current_app_icon(const reach_top_bar *top_bar)
     return top_bar->state.current_app_icon_ref[0] != 0;
 }
 
-float reach_top_bar_height(const reach_theme *theme, float dock_height)
+static float reach_top_bar_height(float dpi_scale)
 {
-    if (theme == nullptr || dock_height <= 0.0f)
-    {
-        return 0.0f;
-    }
-    return reach_theme_icon_box_size(theme, dock_height) *
-           reach_top_bar_metrics_values.height_scale;
+    return reach_top_bar_metrics_values.height * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
 void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_build_context *ctx)
@@ -284,7 +283,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
     const float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
-    const float height = reach_top_bar_height(ctx->theme, ctx->dock_height);
+    const float height = reach_top_bar_height(scale);
     reach_top_bar_layout *layout = &top_bar->state.layout;
 
     *layout = {};
@@ -608,6 +607,23 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
                                        REACH_TOP_BAR_ANIM_Y, &bar_request);
 }
 
+reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *top_bar)
+{
+    reach_bar_reveal_animation animation = {};
+    if (top_bar == nullptr)
+    {
+        return animation;
+    }
+
+    animation.position_animating =
+        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
+    animation.content_animating =
+        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
+        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
+        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH);
+    return animation;
+}
+
 static void reach_top_bar_capsule_reset(void *capsule)
 {
     reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
@@ -624,6 +640,17 @@ static void reach_top_bar_capsule_reset(void *capsule)
     top_bar->state.pressed_tray_index = REACH_TOP_BAR_MAX_TRAY_ICONS;
     top_bar->state.power_hovered = 0;
     top_bar->state.power_release_suppressed = 0;
+}
+
+static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
+{
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
+    if (!enabled || top_bar == nullptr)
+    {
+        return;
+    }
+    reach_bar_visibility_reset(&top_bar->state.visibility);
+    top_bar->state.pointer_sequence_active = 0;
 }
 
 static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
@@ -810,7 +837,7 @@ const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
         reach_top_bar_capsule_tick,
         reach_top_bar_capsule_is_open,
         nullptr,
-        nullptr,
+        reach_top_bar_capsule_on_game_mode,
         reach_top_bar_capsule_needs_frame,
         reach_top_bar_capsule_wants_pointer_move,
         reach_top_bar_capsule_handle_pointer,

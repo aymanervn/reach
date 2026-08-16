@@ -127,9 +127,83 @@ static void test_force_close_keeps_configured_animation(void)
     reach_stage_destroy(stage);
 }
 
+static void test_closing_stage_finishes_without_external_wake_ups(void)
+{
+    reach_stage *stage = nullptr;
+    if (reach_stage_create(&stage) != REACH_OK || stage == nullptr)
+    {
+        expect_true(0, "stage is created for the closing lifecycle");
+        return;
+    }
+
+    reach_stage_open_window window = make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f));
+    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, &window, 1);
+
+    const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
+    reach_feature_tick_result tick = {};
+    for (int step = 0; step < 40; ++step)
+    {
+        ops->tick(stage, 0.016, &tick);
+    }
+    expect_true(ops->is_open(stage), "a settled open stage reports open");
+
+    reach_stage_begin_close(stage);
+    expect_true(reach_stage_is_open(stage), "a closing stage stays visible");
+    expect_true(!ops->is_open(stage), "a closing stage stops holding transient surfaces open");
+
+    int32_t always_requested_frames = 1;
+    int guard = 0;
+    while (reach_stage_is_open(stage) && guard < 200)
+    {
+        always_requested_frames = always_requested_frames && ops->needs_frame(stage);
+        ops->tick(stage, 0.016, &tick);
+        ++guard;
+    }
+
+    expect_true(always_requested_frames,
+                "a closing stage never stops requesting frames before it closes");
+    expect_true(!reach_stage_is_open(stage), "the close completes without external wake ups");
+    expect_true(!ops->needs_frame(stage), "a closed stage stops requesting frames");
+
+    reach_stage_destroy(stage);
+}
+
+static void test_close_before_the_first_tick_completes(void)
+{
+    reach_stage *stage = nullptr;
+    if (reach_stage_create(&stage) != REACH_OK || stage == nullptr)
+    {
+        expect_true(0, "stage is created for the immediate close");
+        return;
+    }
+
+    reach_stage_open_window window = make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f));
+    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, &window, 1);
+    reach_stage_begin_close(stage);
+
+    const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
+    expect_true(!reach_stage_animation_active(stage),
+                "closing at progress zero leaves no animation to run");
+    expect_true(ops->needs_frame(stage),
+                "a stage closed before its first tick still requests a frame");
+
+    reach_feature_tick_result tick = {};
+    int guard = 0;
+    while (reach_stage_is_open(stage) && guard < 200)
+    {
+        ops->tick(stage, 0.016, &tick);
+        ++guard;
+    }
+    expect_true(!reach_stage_is_open(stage), "an immediate close still completes");
+
+    reach_stage_destroy(stage);
+}
+
 int main(void)
 {
     test_open_and_close_state_machine();
     test_force_close_keeps_configured_animation();
+    test_closing_stage_finishes_without_external_wake_ups();
+    test_close_before_the_first_tick_completes();
     return failures == 0 ? 0 : 1;
 }

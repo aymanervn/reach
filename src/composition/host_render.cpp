@@ -22,7 +22,7 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
     render_ctx.focused_window = focused_window;
     render_ctx.pinned_apps = host->pinned_apps;
     render_ctx.pinned_app_count = host->pinned_app_count;
-    render_ctx.icon_size_px = reach_host_dock_icon_size_px(host);
+    render_ctx.icon_size_px = reach_host_icon_size_px(host);
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
     reach_result result =
@@ -53,16 +53,7 @@ reach_result reach_host_render_top_bar_surface(reach_host *host)
     reach_top_bar_render_context render_ctx = {};
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    render_ctx.icon_size_px = reach_host_dock_icon_size_px(host);
-
-    reach_power_state power = {};
-    if (host->system_controls.get_power_state != nullptr &&
-        host->system_controls.get_power_state(host->system_controls.userdata, &power) == REACH_OK &&
-        power.has_battery && power.battery_percent >= 0)
-    {
-        render_ctx.battery_valid = 1;
-        render_ctx.battery_percent = power.battery_percent;
-    }
+    render_ctx.icon_size_px = reach_host_icon_size_px(host);
 
     reach_result result =
         reach_top_bar_append_render_commands(host->top_bar_capsule, &render_ctx, &commands);
@@ -156,7 +147,7 @@ reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32
     ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.bounds = bounds;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.icon_size_px = reach_host_dock_icon_size_px(host);
+    ctx.icon_size_px = reach_host_icon_size_px(host);
 
     reach_render_command_buffer commands = {};
     reach_result build_result =

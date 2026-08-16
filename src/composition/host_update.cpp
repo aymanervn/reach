@@ -4,16 +4,12 @@
 #include <stdio.h>
 #include <time.h>
 
-int32_t reach_host_dock_icon_size_px(const reach_host *host)
+static const float REACH_HOST_ICON_BASE_SIZE_PX = 154.0f;
+
+int32_t reach_host_icon_size_px(const reach_host *host)
 {
-    const reach_theme *theme =
-        host != nullptr && host->theme != nullptr ? host->theme : reach_theme_default();
-
-    float dock_height = host != nullptr ? host->dock_config.height : 48.0f;
-    float dpi_scale = reach_host_layout_dpi_scale(host);
-    float icon_box_size = reach_theme_icon_box_size(theme, dock_height) * dpi_scale;
-
-    int32_t requested = (int32_t)ceilf(icon_box_size * 4.0f);
+    int32_t requested =
+        (int32_t)ceilf(REACH_HOST_ICON_BASE_SIZE_PX * reach_host_layout_dpi_scale(host));
     if (requested < 128)
     {
         requested = 128;
@@ -109,9 +105,9 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         reach_host_request_update(host);
     }
 
-    if (reach_host_can_move_dock_without_redraw(host))
+    if (reach_host_can_move_bars_without_redraw(host))
     {
-        return reach_host_move_dock_animation_frame(host);
+        return reach_host_move_bar_animation_frame(host);
     }
 
     reach_host_process_quick_settings_changes(host, delta_seconds);
@@ -133,10 +129,10 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
     }
-    if (reach_system_stats_tick(host->system_stats, delta_seconds))
+    if (reach_system_stats_take_changed(host->system_stats))
     {
         host->top_bar.dirty_flags = 1;
-        reach_host_request_update(host);
+        host->dirty.layout = 1;
     }
     int32_t window_manager_dirty =
         host->window_manager.ops.needs_refresh != nullptr &&
@@ -235,11 +231,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                                                               shown_dock_bounds, bounds);
                 if (game_mode)
                 {
-                    if (host->dock_reveal_edge.ops.hide != nullptr)
-                    {
-                        (void)host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.hotspot);
-                    }
-                    host->dock_reveal.edge_visible = 0;
+                    reach_host_hide_bar_reveal_edges(host);
                 }
 
                 layout.dock.bounds = animated_dock_bounds;
@@ -311,6 +303,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
             }
         }
     }
+    reach_host_sync_pointer_move_subscriptions(host);
+
     host->dirty.layout = 0;
     host->dirty.render = 0;
     host->dirty.update_requested = 0;

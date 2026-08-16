@@ -12,5 +12,4 @@ void reach_dock_model_defaults(reach_dock_model *dock)
     dock->icon_size = 40.0f;
     dock->gap = 12.0f;
     dock->visible = 1;
-    dock->auto_hide = 1;
 }

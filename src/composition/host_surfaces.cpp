@@ -3,8 +3,6 @@
 #include <math.h>
 
 static const float REACH_HOST_TRANSITION_OFFSET = 8.0f;
-static const double REACH_HOST_TRANSITION_OPEN_SECONDS = 0.16;
-static const double REACH_HOST_TRANSITION_CLOSE_SECONDS = 0.12;
 
 int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 {
@@ -122,11 +120,14 @@ void reach_host_surface_transition_set(reach_host *host, reach_host_surface_tran
         return;
     }
 
+    const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
+
     transition->target_open = target_open;
     if (target_open)
     {
-        double open_seconds = transition->open_seconds > 0.0 ? transition->open_seconds
-                                                            : REACH_HOST_TRANSITION_OPEN_SECONDS;
+        double open_seconds = transition->open_seconds > 0.0
+                                  ? transition->open_seconds
+                                  : (double)theme->surface_open_seconds;
         if (!transition->visible)
         {
             transition->visible = 1;
@@ -141,8 +142,9 @@ void reach_host_surface_transition_set(reach_host *host, reach_host_surface_tran
     }
     else if (transition->visible)
     {
-        double close_seconds = transition->close_seconds > 0.0 ? transition->close_seconds
-                                                               : REACH_HOST_TRANSITION_CLOSE_SECONDS;
+        double close_seconds = transition->close_seconds > 0.0
+                                   ? transition->close_seconds
+                                   : (double)theme->surface_close_seconds;
         reach_animation_manager_animate_to(&host->animations, transition->y_track,
                                            REACH_HOST_TRANSITION_OFFSET, close_seconds,
                                            REACH_EASING_EASE_IN);
@@ -248,6 +250,16 @@ static reach_bar_visibility_result
 reach_host_top_bar_update_visibility(void *capsule, const reach_bar_visibility_request *request)
 {
     return reach_top_bar_update_visibility(static_cast<reach_top_bar *>(capsule), request);
+}
+
+static reach_bar_reveal_animation reach_host_dock_reveal_animation(const void *capsule)
+{
+    return reach_dock_reveal_animation(static_cast<const reach_dock *>(capsule));
+}
+
+static reach_bar_reveal_animation reach_host_top_bar_reveal_animation(const void *capsule)
+{
+    return reach_top_bar_reveal_animation(static_cast<const reach_top_bar *>(capsule));
 }
 
 void reach_host_init_surface_descriptors(reach_host *host)
@@ -359,13 +371,15 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
         reach_host_apply_quick_settings_pointer_action;
     descs[REACH_SURFACE_ID_DOCK].update_visibility = reach_host_dock_update_visibility;
-    descs[REACH_SURFACE_ID_DOCK].bar_edge = REACH_BAR_EDGE_BOTTOM;
     descs[REACH_SURFACE_ID_DOCK].reveal_edge = &host->dock_reveal_edge;
     descs[REACH_SURFACE_ID_DOCK].reveal = &host->dock_reveal;
+    descs[REACH_SURFACE_ID_DOCK].reveal_animation = reach_host_dock_reveal_animation;
+    descs[REACH_SURFACE_ID_DOCK].reveal_frame = reach_host_move_dock_reveal_frame;
     descs[REACH_SURFACE_ID_TOP_BAR].update_visibility = reach_host_top_bar_update_visibility;
-    descs[REACH_SURFACE_ID_TOP_BAR].bar_edge = REACH_BAR_EDGE_TOP;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal_edge = &host->top_bar_reveal_edge;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal = &host->top_bar_reveal;
+    descs[REACH_SURFACE_ID_TOP_BAR].reveal_animation = reach_host_top_bar_reveal_animation;
+    descs[REACH_SURFACE_ID_TOP_BAR].reveal_frame = reach_host_move_top_bar_reveal_frame;
     descs[REACH_SURFACE_ID_TOP_BAR].role = REACH_SURFACE_TOP_BAR;
     descs[REACH_SURFACE_ID_TOP_BAR].pointer_priority = 80;
     descs[REACH_SURFACE_ID_TOP_BAR].apply_pointer_action = reach_host_apply_top_bar_pointer_action;
@@ -502,6 +516,22 @@ int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask)
         }
     }
     return 0;
+}
+
+void reach_host_mark_all_surfaces_dirty(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        if (surface != nullptr)
+        {
+            surface->dirty_flags = 1;
+        }
+    }
 }
 
 int32_t reach_host_any_surface_dirty(const reach_host *host)

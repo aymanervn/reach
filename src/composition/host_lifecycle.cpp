@@ -82,6 +82,11 @@ static void reach_host_on_system_status_ready(void *user)
     reach_host_request_update(static_cast<reach_host *>(user));
 }
 
+static void reach_host_on_system_stats_ready(void *user)
+{
+    reach_host_request_update(static_cast<reach_host *>(user));
+}
+
 static void reach_host_on_search_service_ready(void *user)
 {
     reach_host_notify_launcher_search_ready(static_cast<reach_host *>(user));
@@ -147,6 +152,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_host_release_tray_render_icons(host);
     reach_idle_watch_stop(host->idle_watch);
     reach_system_status_stop(host->system_status);
+    reach_system_stats_stop(host->system_stats);
     reach_host_release_quick_settings_audio_render_icons(host);
     reach_host_release_clipboard_items(host);
     if (host->monitors.ops.destroy != nullptr)
@@ -616,10 +622,13 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         result = REACH_ERROR;
     }
     host->system_stats = nullptr;
-    if (reach_system_stats_create(dependencies->system_stats, &host->system_stats) != REACH_OK)
+    if (reach_system_stats_create(dependencies->system_stats, host->system_controls,
+                                  reach_host_on_system_stats_ready, host,
+                                  &host->system_stats) != REACH_OK)
     {
         result = REACH_ERROR;
     }
+    reach_system_stats_set_enabled(host->system_stats, 1);
     host->clock = nullptr;
     if (reach_clock_create(dependencies->clock, &host->clock) != REACH_OK)
     {

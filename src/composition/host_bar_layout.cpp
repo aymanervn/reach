@@ -10,14 +10,10 @@ static int32_t reach_host_transient_open(const reach_host *host)
                                            reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
 }
 
-int32_t reach_host_dock_can_hide(const reach_host *host)
+int32_t reach_host_bars_can_hide(const reach_host *host)
 {
     REACH_ASSERT(host != nullptr);
     if (host == nullptr)
-    {
-        return 0;
-    }
-    if (!host->dock_config.auto_hide)
     {
         return 0;
     }
@@ -86,7 +82,7 @@ void reach_host_sync_pointer_move_subscriptions(reach_host *host)
             desc->capsule_ops != nullptr && desc->capsule_ops->wants_pointer_move != nullptr
                 ? desc->capsule_ops->wants_pointer_move(desc->capsule)
                 : 0;
-        if (desc->id == REACH_SURFACE_ID_DOCK || desc->id == REACH_SURFACE_ID_TOP_BAR)
+        if (desc->update_visibility != nullptr)
         {
             wants = 1;
         }
@@ -115,9 +111,8 @@ static int32_t reach_host_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f3
 
 static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
                                          reach_host_bar_reveal_state *reveal,
-                                         reach_surface_runtime *surface, reach_bar_edge edge,
-                                         int32_t mode, reach_rect_f32 shown_bounds,
-                                         reach_rect_f32 monitor_bounds)
+                                         reach_surface_runtime *surface, int32_t mode,
+                                         reach_rect_f32 edge_bounds)
 {
     if (hotspot == nullptr || hotspot->hotspot == nullptr || reveal == nullptr)
     {
@@ -134,8 +129,6 @@ static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
         return;
     }
 
-    reach_rect_f32 edge_bounds =
-        reach_bar_reveal_edge_bounds(edge, mode, shown_bounds, monitor_bounds);
     if (!reveal->edge_bounds_valid ||
         !reach_host_reveal_edge_rect_equal(reveal->edge_bounds, edge_bounds))
     {
@@ -163,6 +156,29 @@ static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
     }
 }
 
+void reach_host_hide_bar_reveal_edges(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_desc *desc = &host->surface_descs[index];
+        if (desc->reveal_edge == nullptr || desc->reveal == nullptr)
+        {
+            continue;
+        }
+        if (desc->reveal_edge->ops.hide != nullptr)
+        {
+            (void)desc->reveal_edge->ops.hide(desc->reveal_edge->hotspot);
+        }
+        desc->reveal->edge_visible = 0;
+        desc->reveal->edge_bounds_valid = 0;
+    }
+}
+
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
                                                    reach_rect_f32 shown_bounds,
                                                    reach_rect_f32 monitor_bounds)
@@ -180,19 +196,22 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.monitor_bounds = monitor_bounds;
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
     request.game_mode = reach_host_game_mode_enabled(host);
-    request.can_hide = reach_host_dock_can_hide(host);
+    request.can_hide = reach_host_bars_can_hide(host);
     request.transient_open = reach_host_transient_open(host);
+    request.reveal_seconds =
+        (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
+    request.reveal_span_inset =
+        id == REACH_SURFACE_ID_TOP_BAR ? reach_host_stage_reveal_corner_size(host) : 0.0f;
 
     reach_bar_visibility_result result = desc->update_visibility(desc->capsule, &request);
 
-    if (result.clear_sticky_feedback)
+    if (result.redraw && desc->surface != nullptr)
     {
-        reach_host_clear_sticky_dock_feedback(host);
+        desc->surface->dirty_flags = 1;
     }
 
-    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, desc->surface, desc->bar_edge,
-                                 result.edge_mode, shown_bounds, monitor_bounds);
-    reach_host_sync_pointer_move_subscriptions(host);
+    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, desc->surface, result.edge_mode,
+                                 result.reveal_bounds);
 
     return result.animated_bounds;
 }
@@ -208,7 +227,6 @@ void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bo
     ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.monitor_bounds = monitor_bounds;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.dock_height = host->layout.dock.bounds.height;
     ctx.pinned_apps = host->pinned_apps;
     ctx.pinned_app_count = host->pinned_app_count;
 
@@ -314,7 +332,7 @@ reach_result reach_host_refresh_monitor_layout(reach_host *host)
     return REACH_OK;
 }
 
-int32_t reach_host_can_move_dock_without_redraw(const reach_host *host)
+int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
 {
     if (host == nullptr)
     {
@@ -324,53 +342,88 @@ int32_t reach_host_can_move_dock_without_redraw(const reach_host *host)
     {
         return 0;
     }
-    if (reach_host_surface_transition_active(host, &host->launcher_transition) ||
-        reach_host_surface_transition_active(host, &host->tray_transition) ||
-        reach_host_surface_transition_active(host, &host->quick_settings_transition) ||
-        reach_host_surface_transition_active(host, &host->switcher_transition) ||
-        reach_host_surface_transition_active(host, &host->context_menu_transition) ||
-        reach_host_surface_transition_active(host, &host->clipboard_transition) ||
-        reach_host_surface_transition_active(host, &host->stage_transition))
+
+    int32_t position_animating = 0;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        return 0;
+        const reach_surface_desc *desc = &host->surface_descs[index];
+        if (desc->transition != nullptr &&
+            reach_host_surface_transition_active(host, desc->transition))
+        {
+            return 0;
+        }
+        if (desc->reveal_animation == nullptr)
+        {
+            continue;
+        }
+        reach_bar_reveal_animation animation = desc->reveal_animation(desc->capsule);
+        if (animation.content_animating)
+        {
+            return 0;
+        }
+        position_animating = position_animating || animation.position_animating;
     }
 
-    return reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
-                                          REACH_DOCK_ANIM_Y) &&
-           host->has_layout && !host->dirty.update_requested && !host->dirty.layout &&
-           !host->dirty.render && !reach_host_any_surface_dirty(host) &&
-           !reach_dock_slots_animating(host->dock_capsule) &&
-           !reach_dock_state_ptr(host->dock_capsule)->drag.active &&
-           !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
-                                           REACH_DOCK_ANIM_DRAG_SNAP) &&
-           !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
-                                           REACH_DOCK_ANIM_FEEDBACK_OPACITY) &&
+    return position_animating && host->has_layout && !host->dirty.update_requested &&
+           !host->dirty.layout && !host->dirty.render && !reach_host_any_surface_dirty(host) &&
            !reach_animation_manager_active(reach_tray_animation_manager(host->tray_capsule),
                                            REACH_TRAY_ANIM_FEEDBACK_OPACITY) &&
            !reach_quick_settings_height_animation_active(host->quick_settings_capsule);
 }
 
-reach_result reach_host_move_dock_animation_frame(reach_host *host)
+reach_result reach_host_move_dock_reveal_frame(reach_host *host)
+{
+    reach_rect_f32 bounds = host->layout.dock.bounds;
+    bounds.y =
+        reach_animation_manager_value(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y);
+
+    int32_t window_changed = 0;
+    reach_result result = reach_host_apply_window_state(
+        &host->dock.window, bounds, 1.0f, &host->dock.last_bounds, &host->dock.last_opacity,
+        &host->dock.bounds_valid, &host->dock.opacity_valid, &window_changed);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    host->layout.dock.bounds = bounds;
+    return REACH_OK;
+}
+
+reach_result reach_host_move_top_bar_reveal_frame(reach_host *host)
+{
+    reach_rect_f32 bounds = reach_top_bar_state_ptr(host->top_bar_capsule)->layout.bounds;
+    bounds.y = reach_animation_manager_value(reach_top_bar_manager(host->top_bar_capsule),
+                                             REACH_TOP_BAR_ANIM_Y);
+
+    int32_t window_changed = 0;
+    return reach_host_apply_window_state(&host->top_bar.window, bounds, 1.0f,
+                                         &host->top_bar.last_bounds, &host->top_bar.last_opacity,
+                                         &host->top_bar.bounds_valid, &host->top_bar.opacity_valid,
+                                         &window_changed);
+}
+
+reach_result reach_host_move_bar_animation_frame(reach_host *host)
 {
     if (host == nullptr || !host->has_layout)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_rect_f32 dock_bounds = host->layout.dock.bounds;
-    dock_bounds.y =
-        reach_animation_manager_value(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y);
-
-    int32_t dock_window_changed = 0;
-    reach_result result = reach_host_apply_window_state(
-        &host->dock.window, dock_bounds, 1.0f, &host->dock.last_bounds, &host->dock.last_opacity,
-        &host->dock.bounds_valid, &host->dock.opacity_valid, &dock_window_changed);
-    if (result != REACH_OK)
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        return result;
+        const reach_surface_desc *desc = &host->surface_descs[index];
+        if (desc->reveal_animation == nullptr || desc->reveal_frame == nullptr ||
+            !desc->reveal_animation(desc->capsule).position_animating)
+        {
+            continue;
+        }
+        reach_result result = desc->reveal_frame(host);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
     }
-
-    host->layout.dock.bounds = dock_bounds;
 
     host->dirty.update_requested = 0;
     return REACH_OK;

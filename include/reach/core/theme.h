@@ -40,8 +40,8 @@ extern "C"
     {
         reach_theme_mode mode;
 
-        reach_color dock_background;
-        reach_color dock_border;
+        reach_color bar_background;
+        reach_color bar_border;
         reach_color popup_background;
         reach_color popup_border;
 
@@ -51,13 +51,13 @@ extern "C"
         reach_color icon_box_background;
         reach_color system_glyph;
         reach_color fallback_icon_text;
-        reach_color dock_clock_time;
-        reach_color dock_clock_date;
-        reach_color dock_button_background;
-        reach_color dock_power_hover_background;
-        reach_color dock_battery_low;
+        reach_color bar_text_primary;
+        reach_color bar_text_secondary;
+        reach_color bar_button_background;
+        reach_color bar_power_hover_background;
+        reach_color bar_battery_low;
         reach_color dock_running_indicator;
-        reach_color dock_click_feedback;
+        reach_color bar_click_feedback;
 
         reach_color tray_click_feedback;
 
@@ -169,6 +169,13 @@ extern "C"
         float now_playing_play_button_width;
         float now_playing_prev_next_button_width;
         float now_playing_title_text_size;
+
+        float surface_open_seconds;
+        float surface_close_seconds;
+        float bar_reveal_seconds;
+        float stage_animation_seconds;
+        float stage_close_hover_seconds;
+        float stage_reflow_seconds;
     } reach_theme;
 
     const reach_theme *reach_theme_default(void);
