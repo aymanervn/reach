@@ -74,6 +74,11 @@ static void reach_top_bar_push_text(reach_render_command_buffer *commands, reach
     reach_render_command_buffer_push(commands, &command);
 }
 
+static reach_rect_f32 reach_top_bar_rect_union(reach_rect_f32 left, reach_rect_f32 right)
+{
+    return reach_top_bar_rect(left.x, left.y, right.x + right.width - left.x, left.height);
+}
+
 static void reach_top_bar_push_pill(const reach_theme *theme,
                                     reach_render_command_buffer *commands, reach_rect_f32 pill)
 {
@@ -437,11 +442,17 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
 
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
     {
-        if (!layout->pill_visible[index])
+        if (!layout->pill_visible[index] || index == REACH_TOP_BAR_PILL_TRAY)
         {
             continue;
         }
-        reach_top_bar_push_pill(ctx->theme, out_commands, layout->pills[index]);
+        reach_rect_f32 pill = layout->pills[index];
+        if (index == REACH_TOP_BAR_PILL_QUICK_SETTINGS &&
+            layout->pill_visible[REACH_TOP_BAR_PILL_TRAY])
+        {
+            pill = reach_top_bar_rect_union(layout->pills[REACH_TOP_BAR_PILL_TRAY], pill);
+        }
+        reach_top_bar_push_pill(ctx->theme, out_commands, pill);
     }
 
     reach_top_bar_render_input input = {};
@@ -477,6 +488,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_power_button(&input, out_commands);
     reach_top_bar_push_clock(&input, out_commands);
     reach_top_bar_push_separator_dot(&input, out_commands, layout->now_playing_separator);
+    reach_top_bar_push_separator_dot(&input, out_commands, layout->tray_separator);
     reach_top_bar_push_current_app(&input, out_commands);
     reach_top_bar_push_tray(&input, out_commands);
     reach_top_bar_push_stats(&input, out_commands);
