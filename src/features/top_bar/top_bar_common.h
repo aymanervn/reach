@@ -3,6 +3,7 @@
 
 #include "reach/features/top_bar.h"
 
+#include "top_bar_metrics.h"
 #include "top_bar_now_playing.h"
 
 struct reach_top_bar
@@ -18,9 +19,9 @@ struct reach_top_bar
     reach_clock *clock;
     reach_input_language_service *input_language;
     float now_playing_target_width;
+    float current_app_target_width;
+    float tray_target_width;
 };
-
-#define REACH_TOP_BAR_NOW_PLAYING_WIDTH_SECONDS 0.22
 
 reach_top_bar_state *reach_top_bar_state_mut(reach_top_bar *top_bar);
 reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *top_bar);
@@ -61,6 +62,26 @@ static inline reach_rect_f32 reach_top_bar_rect(float x, float y, float width, f
     rect.width = width;
     rect.height = height;
     return rect;
+}
+
+static inline float reach_top_bar_text_advance(const uint16_t *text, float text_size)
+{
+    if (text == nullptr || text_size <= 0.0f)
+    {
+        return 0.0f;
+    }
+    size_t length = 0;
+    while (text[length] != 0)
+    {
+        ++length;
+    }
+    return (float)length * text_size * reach_top_bar_metrics_values.glyph_advance_ratio;
+}
+
+static inline reach_rect_f32 reach_top_bar_text_run(float left, float height, float advance,
+                                                    float text_size)
+{
+    return reach_top_bar_rect(left - text_size * 0.5f, 0.0f, advance + text_size, height);
 }
 
 #endif

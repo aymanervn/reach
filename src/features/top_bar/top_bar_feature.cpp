@@ -200,7 +200,6 @@ static void reach_top_bar_update_current_app(reach_top_bar *top_bar,
 {
     reach_top_bar_state *state = &top_bar->state;
     state->current_app_name[0] = 0;
-    state->current_app_title[0] = 0;
     state->current_app_icon_ref[0] = 0;
 
     uintptr_t foreground =
@@ -214,7 +213,6 @@ static void reach_top_bar_update_current_app(reach_top_bar *top_bar,
         return;
     }
 
-    reach_copy_utf16(state->current_app_title, 260, window->title);
     reach_copy_utf16(state->current_app_icon_ref, 260,
                      window->icon_ref[0] != 0 ? window->icon_ref : window->path);
 
@@ -232,7 +230,6 @@ static void reach_top_bar_update_current_app(reach_top_bar *top_bar,
     if (state->current_app_name[0] == 0)
     {
         reach_copy_utf16(state->current_app_name, 260, window->title);
-        state->current_app_title[0] = 0;
     }
 }
 
@@ -274,6 +271,26 @@ static float reach_top_bar_height(float dpi_scale)
     return reach_top_bar_metrics_values.height * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
+static float reach_top_bar_resolve_animated_width(reach_top_bar *top_bar, size_t track,
+                                                  float *target_store, float target)
+{
+    if (*target_store != target)
+    {
+        *target_store = target;
+        reach_animation_manager_animate_to(&top_bar->manager, track, target,
+                                           reach_top_bar_metrics_values.width_animation_seconds,
+                                           REACH_EASING_EASE_IN_OUT);
+    }
+
+    float width = reach_animation_manager_value(&top_bar->manager, track);
+    if (width <= 0.0f)
+    {
+        width = target;
+        reach_animation_manager_set(&top_bar->manager, track, target);
+    }
+    return width;
+}
+
 void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_build_context *ctx)
 {
     if (top_bar == nullptr || ctx == nullptr || ctx->theme == nullptr)
@@ -302,38 +319,31 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float padding = metrics.pill_padding * scale;
     const float power_button_size = height * metrics.power_button_scale;
     const float clock_gap = metrics.clock_gap * scale;
-    const float clock_width = metrics.clock_width * scale;
+    const float time_size = metrics.clock_time_text_size * scale;
+    const float date_size = metrics.clock_date_text_size * scale;
 
-    float power_clock_width =
-        padding * 2.0f + power_button_size + clock_gap + clock_width;
+    float time_advance = reach_top_bar_text_advance(top_bar->state.clock_time_text, time_size);
+    float date_advance = reach_top_bar_text_advance(top_bar->state.clock_date_text, date_size);
+    float clock_width = time_advance + clock_gap + date_advance;
+
+    float power_clock_width = padding * 2.0f + power_button_size + clock_gap + clock_width;
     float left = edge_inset;
     layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK] =
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
     layout->power_button =
         reach_top_bar_rect(left + padding, (height - power_button_size) * 0.5f, power_button_size,
                            power_button_size);
-    layout->clock = reach_top_bar_rect(layout->power_button.x + power_button_size + clock_gap,
-                                       0.0f, clock_width, height);
+
+    float clock_x = layout->power_button.x + power_button_size + clock_gap;
+    layout->clock_time = reach_top_bar_text_run(clock_x, height, time_advance, time_size);
+    layout->clock_date = reach_top_bar_text_run(clock_x + time_advance + clock_gap, height,
+                                                date_advance, date_size);
 
     left += power_clock_width + pill_gap;
-    float now_playing_target = reach_top_bar_now_playing_desired_width(
-        top_bar->now_playing_subfeature, ctx->theme, scale);
-    if (top_bar->now_playing_target_width != now_playing_target)
-    {
-        top_bar->now_playing_target_width = now_playing_target;
-        reach_animation_manager_animate_to(&top_bar->manager,
-                                           REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH, now_playing_target,
-                                           REACH_TOP_BAR_NOW_PLAYING_WIDTH_SECONDS,
-                                           REACH_EASING_EASE_IN_OUT);
-    }
-    float now_playing_width =
-        reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH);
-    if (now_playing_width <= 0.0f)
-    {
-        now_playing_width = now_playing_target;
-        reach_animation_manager_set(&top_bar->manager, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
-                                    now_playing_target);
-    }
+    float now_playing_width = reach_top_bar_resolve_animated_width(
+        top_bar, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH, &top_bar->now_playing_target_width,
+        reach_top_bar_now_playing_desired_width(top_bar->now_playing_subfeature, ctx->theme,
+                                                scale));
     layout->pills[REACH_TOP_BAR_PILL_NOW_PLAYING] =
         reach_top_bar_rect(left, 0.0f, now_playing_width, height);
 
@@ -345,12 +355,27 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float language_width =
         top_bar->state.language_code[0] != 0 ? metrics.language_width * scale : 0.0f;
     float language_gap = language_width > 0.0f ? pill_gap : 0.0f;
-    float stats_usage_width = top_bar->state.stats_valid ? metrics.stats_usage_width * scale : 0.0f;
-    float stats_network_width =
-        top_bar->state.stats_valid ? metrics.stats_network_width * scale : 0.0f;
-    float stats_gap = top_bar->state.stats_valid ? metrics.stats_gap * scale : 0.0f;
-    float quick_settings_width = padding * 2.0f + stats_usage_width + stats_network_width +
-                                 stats_gap * 2.0f + language_width + language_gap +
+
+    const float stats_size = metrics.stats_text_size * scale;
+    const float stats_gap = metrics.stats_gap * scale;
+    const float stats_group_gap = metrics.stats_group_gap * scale;
+    float cpu_advance = 0.0f;
+    float memory_advance = 0.0f;
+    float download_advance = 0.0f;
+    float upload_advance = 0.0f;
+    float stats_width = 0.0f;
+    if (top_bar->state.stats_valid)
+    {
+        cpu_advance = reach_top_bar_text_advance(top_bar->state.stats_cpu_text, stats_size);
+        memory_advance = reach_top_bar_text_advance(top_bar->state.stats_memory_text, stats_size);
+        download_advance =
+            reach_top_bar_text_advance(top_bar->state.stats_download_text, stats_size);
+        upload_advance = reach_top_bar_text_advance(top_bar->state.stats_upload_text, stats_size);
+        stats_width = cpu_advance + stats_gap + memory_advance + stats_group_gap +
+                      download_advance + stats_gap + upload_advance + stats_group_gap;
+    }
+
+    float quick_settings_width = padding * 2.0f + stats_width + language_width + language_gap +
                                  quick_settings_button;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
@@ -358,15 +383,15 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float cluster_x = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + padding;
     if (top_bar->state.stats_valid)
     {
-        layout->stats_usage = reach_top_bar_rect(cluster_x, 0.0f, stats_usage_width, height);
-        cluster_x += stats_usage_width + stats_gap;
-        layout->stats_network = reach_top_bar_rect(cluster_x, 0.0f, stats_network_width, height);
-        cluster_x += stats_network_width + stats_gap;
-    }
-    else
-    {
-        layout->stats_usage = {};
-        layout->stats_network = {};
+        layout->stats_cpu = reach_top_bar_text_run(cluster_x, height, cpu_advance, stats_size);
+        cluster_x += cpu_advance + stats_gap;
+        layout->stats_memory = reach_top_bar_text_run(cluster_x, height, memory_advance, stats_size);
+        cluster_x += memory_advance + stats_group_gap;
+        layout->stats_download =
+            reach_top_bar_text_run(cluster_x, height, download_advance, stats_size);
+        cluster_x += download_advance + stats_gap;
+        layout->stats_upload = reach_top_bar_text_run(cluster_x, height, upload_advance, stats_size);
+        cluster_x += upload_advance + stats_group_gap;
     }
     if (language_width > 0.0f)
     {
@@ -374,10 +399,6 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
             cluster_x, (height - quick_settings_button) * 0.5f, language_width,
             quick_settings_button);
         cluster_x += language_width + language_gap;
-    }
-    else
-    {
-        layout->language_button = {};
     }
     layout->quick_settings_button =
         reach_top_bar_rect(cluster_x, (height - quick_settings_button) * 0.5f,
@@ -389,11 +410,13 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float tray_gap = metrics.tray_icon_gap * scale;
     const size_t tray_count = top_bar->state.tray_item_count;
     const size_t tray_cells = tray_count + (top_bar->state.tray_overflow ? 1u : 0u);
-    float tray_width = padding * 2.0f;
+    float tray_target_width = padding * 2.0f;
     if (tray_cells > 0)
     {
-        tray_width += (float)tray_cells * tray_slot + (float)(tray_cells - 1) * tray_gap;
+        tray_target_width += (float)tray_cells * tray_slot + (float)(tray_cells - 1) * tray_gap;
     }
+    float tray_width = reach_top_bar_resolve_animated_width(
+        top_bar, REACH_TOP_BAR_ANIM_TRAY_WIDTH, &top_bar->tray_target_width, tray_target_width);
     layout->pills[REACH_TOP_BAR_PILL_TRAY] =
         reach_top_bar_rect(right - tray_width, 0.0f, tray_width, height);
 
@@ -409,37 +432,46 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         top_bar->state.tray_overflow ? reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot)
                                      : reach_rect_f32{};
 
-    float current_app_width = metrics.current_app_width * scale;
-    float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
-    if (current_app_width > current_app_max_width)
+    reach_top_bar_update_current_app(top_bar, ctx);
+
+    const float current_app_gap = metrics.current_app_gap * scale;
+    const float name_size = metrics.current_app_name_text_size * scale;
+    float current_app_icon_size =
+        reach_top_bar_has_current_app_icon(top_bar) ? height * metrics.current_app_icon_scale : 0.0f;
+    float current_app_icon_gap = current_app_icon_size > 0.0f ? current_app_gap : 0.0f;
+    float name_advance = reach_top_bar_text_advance(top_bar->state.current_app_name, name_size);
+    float current_app_min_text = metrics.current_app_min_text_width * scale;
+    if (name_advance < current_app_min_text)
     {
-        current_app_width = current_app_max_width;
+        name_advance = current_app_min_text;
     }
+    float current_app_chrome =
+        padding * 2.0f + current_app_icon_size + current_app_icon_gap;
+    float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
+    float current_app_target = current_app_chrome + name_advance;
+    if (current_app_target > current_app_max_width)
+    {
+        current_app_target = current_app_max_width;
+    }
+    float current_app_width = reach_top_bar_resolve_animated_width(
+        top_bar, REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH, &top_bar->current_app_target_width,
+        current_app_target);
+
     layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP] = reach_top_bar_rect(
         (layout->bounds.width - current_app_width) * 0.5f, 0.0f, current_app_width, height);
 
-    reach_top_bar_update_current_app(top_bar, ctx);
-
     reach_rect_f32 current_app = layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP];
-    float current_app_gap = metrics.current_app_gap * scale;
-    if (reach_top_bar_has_current_app_icon(top_bar))
+    float current_app_text_x = current_app.x + padding;
+    if (current_app_icon_size > 0.0f)
     {
-        float icon_size = height * metrics.current_app_icon_scale;
         layout->current_app_icon =
-            reach_top_bar_rect(current_app.x + padding, (height - icon_size) * 0.5f, icon_size,
-                               icon_size);
-        layout->current_app_text = reach_top_bar_rect(
-            layout->current_app_icon.x + icon_size + current_app_gap, 0.0f,
-            current_app.x + current_app.width - padding -
-                (layout->current_app_icon.x + icon_size + current_app_gap),
-            height);
+            reach_top_bar_rect(current_app_text_x, (height - current_app_icon_size) * 0.5f,
+                               current_app_icon_size, current_app_icon_size);
+        current_app_text_x += current_app_icon_size + current_app_icon_gap;
     }
-    else
-    {
-        layout->current_app_icon = {};
-        layout->current_app_text = reach_top_bar_rect(current_app.x + padding, 0.0f,
-                                                      current_app.width - padding * 2.0f, height);
-    }
+    layout->current_app_text = reach_top_bar_text_run(
+        current_app_text_x, height, current_app.x + current_app.width - padding - current_app_text_x,
+        name_size);
 
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
     {
@@ -555,8 +587,8 @@ static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
     char time_text[32] = {};
     char date_text[64] = {};
     snprintf(time_text, sizeof(time_text), "%d:%02d %s", hour, now.minute, suffix);
-    snprintf(date_text, sizeof(date_text), "%.3s %d, %.3s", months[now.month - 1], now.day,
-             days[now.weekday]);
+    snprintf(date_text, sizeof(date_text), "%.3s, %.3s %d", days[now.weekday],
+             months[now.month - 1], now.day);
 
     uint16_t next_time[32] = {};
     uint16_t next_date[64] = {};
@@ -607,6 +639,15 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
                                        REACH_TOP_BAR_ANIM_Y, &bar_request);
 }
 
+static int32_t reach_top_bar_width_animation_active(const reach_top_bar *top_bar)
+{
+    return reach_animation_manager_active(&top_bar->manager,
+                                          REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH) ||
+           reach_animation_manager_active(&top_bar->manager,
+                                          REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH) ||
+           reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_WIDTH);
+}
+
 reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *top_bar)
 {
     reach_bar_reveal_animation animation = {};
@@ -620,7 +661,7 @@ reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *t
     animation.content_animating =
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
-        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH);
+        reach_top_bar_width_animation_active(top_bar);
     return animation;
 }
 
@@ -669,6 +710,7 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     if (reach_top_bar_update_clock(top_bar) && out != nullptr)
     {
         out->redraw = 1;
+        out->relayout = 1;
     }
 
     reach_top_bar_now_playing_update_result now_playing = {};
@@ -689,10 +731,9 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     int32_t power_hover_was_active =
         reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
 
-    reach_animation_manager_tick(manager, delta_seconds);
+    int32_t width_was_active = reach_top_bar_width_animation_active(top_bar);
 
-    int32_t now_playing_width_was_active =
-        reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH);
+    reach_animation_manager_tick(manager, delta_seconds);
 
     int32_t redraw =
         feedback_was_active ||
@@ -700,8 +741,7 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         power_hover_was_active ||
         reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
 
-    if (now_playing_width_was_active ||
-        reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH))
+    if (width_was_active || reach_top_bar_width_animation_active(top_bar))
     {
         redraw = 1;
         if (out != nullptr)
@@ -740,9 +780,8 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
     }
     return reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_Y) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
-           reach_animation_manager_active(&top_bar->manager,
-                                          REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH) ||
-           reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
+           reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
+           reach_top_bar_width_animation_active(top_bar);
 }
 
 static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule)

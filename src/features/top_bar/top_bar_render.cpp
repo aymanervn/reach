@@ -13,7 +13,6 @@ typedef struct reach_top_bar_render_input
     float dpi_scale;
     uint64_t current_app_icon_id;
     const uint16_t *current_app_name;
-    const uint16_t *current_app_title;
     const reach_top_bar_tray_item *tray_items;
     size_t tray_item_count;
     int32_t tray_overflow;
@@ -181,7 +180,8 @@ static void reach_top_bar_push_battery_percent(const reach_top_bar_render_input 
     reach_color text_color = reach_top_bar_battery_accent(input, percent);
     text_color.a *= hover;
 
-    reach_top_bar_push_text(commands, power_box, percent_text, metrics.power_percent_text_size,
+    reach_top_bar_push_text(commands, power_box, percent_text,
+                            metrics.power_percent_text_size * input->dpi_scale,
                             metrics.power_percent_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
                             text_color);
 }
@@ -233,23 +233,16 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
                                      reach_render_command_buffer *commands)
 {
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
-    reach_rect_f32 clock = input->layout->clock;
-    if (clock.width <= 0.0f)
-    {
-        return;
-    }
+    const reach_top_bar_layout *layout = input->layout;
 
-    float time_height = clock.height * metrics.clock_time_height_ratio;
-    reach_top_bar_push_text(commands, reach_top_bar_rect(clock.x, clock.y, clock.width, time_height),
-                            input->time_text, metrics.clock_time_text_size,
+    reach_top_bar_push_text(commands, layout->clock_time, input->time_text,
+                            metrics.clock_time_text_size * input->dpi_scale,
                             metrics.clock_time_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
                             input->theme->bar_text_primary);
-
-    reach_top_bar_push_text(
-        commands,
-        reach_top_bar_rect(clock.x, clock.y + time_height, clock.width, clock.height - time_height),
-        input->date_text, metrics.clock_date_text_size, metrics.clock_date_text_weight,
-        REACH_TEXT_ALIGNMENT_LEADING, input->theme->bar_text_secondary);
+    reach_top_bar_push_text(commands, layout->clock_date, input->date_text,
+                            metrics.clock_date_text_size * input->dpi_scale,
+                            metrics.clock_date_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+                            input->theme->bar_text_secondary);
 }
 
 static void reach_top_bar_push_current_app(const reach_top_bar_render_input *input,
@@ -272,28 +265,10 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
         reach_render_command_buffer_push(commands, &icon);
     }
 
-    int32_t has_title = input->current_app_title != nullptr && input->current_app_title[0] != 0;
-    if (!has_title)
-    {
-        reach_top_bar_push_text(commands, text, input->current_app_name,
-                                metrics.current_app_name_text_size,
-                                metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->theme->bar_text_primary);
-        return;
-    }
-
-    float name_height = text.height * metrics.current_app_name_height_ratio;
-    reach_top_bar_push_text(commands,
-                            reach_top_bar_rect(text.x, text.y, text.width, name_height),
-                            input->current_app_name, metrics.current_app_name_text_size,
+    reach_top_bar_push_text(commands, text, input->current_app_name,
+                            metrics.current_app_name_text_size * input->dpi_scale,
                             metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
                             input->theme->bar_text_primary);
-    reach_top_bar_push_text(
-        commands,
-        reach_top_bar_rect(text.x, text.y + name_height, text.width, text.height - name_height),
-        input->current_app_title, metrics.current_app_title_text_size,
-        metrics.current_app_title_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-        input->theme->bar_text_secondary);
 }
 
 static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
@@ -336,7 +311,8 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     reach_top_bar_push_rect(commands, overflow, input->theme->bar_button_background,
                             overflow.height * 0.5f);
     reach_top_bar_push_vector_icon(
-        commands, reach_top_bar_center_square(overflow, overflow.height * 0.50f),
+        commands,
+        reach_top_bar_center_square(overflow, overflow.height * metrics.tray_overflow_glyph_scale),
         input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP : REACH_VECTOR_ICON_ARROW_DOWN,
         input->theme->system_glyph);
 
@@ -350,34 +326,34 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     }
 }
 
-static void reach_top_bar_push_stats_column(const reach_top_bar_render_input *input,
-                                            reach_render_command_buffer *commands,
-                                            reach_rect_f32 column, const uint16_t *top_text,
-                                            const uint16_t *bottom_text)
+static void reach_top_bar_push_stat(const reach_top_bar_render_input *input,
+                                    reach_render_command_buffer *commands, reach_rect_f32 slot,
+                                    const uint16_t *text, reach_color color)
 {
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
-    if (column.width <= 0.0f)
+    if (slot.width <= 0.0f)
     {
         return;
     }
 
-    float line = column.height * metrics.stats_line_height_ratio;
-    reach_top_bar_push_text(commands, reach_top_bar_rect(column.x, column.y, column.width, line),
-                            top_text, metrics.stats_text_size, metrics.stats_text_weight,
-                            REACH_TEXT_ALIGNMENT_LEADING, input->theme->bar_text_primary);
-    reach_top_bar_push_text(
-        commands, reach_top_bar_rect(column.x, column.y + line, column.width, column.height - line),
-        bottom_text, metrics.stats_text_size, metrics.stats_text_weight,
-        REACH_TEXT_ALIGNMENT_LEADING, input->theme->bar_text_secondary);
+    reach_top_bar_push_text(commands, slot, text, metrics.stats_text_size * input->dpi_scale,
+                            metrics.stats_text_weight, REACH_TEXT_ALIGNMENT_LEADING, color);
 }
 
 static void reach_top_bar_push_stats(const reach_top_bar_render_input *input,
                                      reach_render_command_buffer *commands)
 {
-    reach_top_bar_push_stats_column(input, commands, input->layout->stats_usage,
-                                    input->stats_cpu_text, input->stats_memory_text);
-    reach_top_bar_push_stats_column(input, commands, input->layout->stats_network,
-                                    input->stats_download_text, input->stats_upload_text);
+    const reach_top_bar_layout *layout = input->layout;
+    const reach_theme *theme = input->theme;
+
+    reach_top_bar_push_stat(input, commands, layout->stats_cpu, input->stats_cpu_text,
+                            theme->bar_stats_cpu);
+    reach_top_bar_push_stat(input, commands, layout->stats_memory, input->stats_memory_text,
+                            theme->bar_stats_memory);
+    reach_top_bar_push_stat(input, commands, layout->stats_download, input->stats_download_text,
+                            theme->bar_stats_download);
+    reach_top_bar_push_stat(input, commands, layout->stats_upload, input->stats_upload_text,
+                            theme->bar_stats_upload);
 }
 
 static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
@@ -392,7 +368,8 @@ static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
 
     reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
                             button.height * 0.5f);
-    reach_top_bar_push_text(commands, button, input->language_code, metrics.language_text_size,
+    reach_top_bar_push_text(commands, button, input->language_code,
+                            metrics.language_text_size * input->dpi_scale,
                             metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
                             input->theme->bar_text_primary);
 
@@ -418,9 +395,10 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
 
     reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
                             button.height * 0.5f);
-    reach_top_bar_push_vector_icon(commands,
-                                   reach_top_bar_center_square(button, button.height * 0.55f),
-                                   REACH_VECTOR_ICON_QUICK_SETTINGS, input->theme->system_glyph);
+    reach_top_bar_push_vector_icon(
+        commands,
+        reach_top_bar_center_square(button, button.height * metrics.quick_settings_glyph_scale),
+        REACH_VECTOR_ICON_QUICK_SETTINGS, input->theme->system_glyph);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON &&
         input->click_feedback_opacity > metrics.click_feedback_min_opacity)
@@ -460,7 +438,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.layout = layout;
     input.time_text = state->clock_time_text;
     input.date_text = state->clock_date_text;
-    input.dpi_scale = ctx->dpi_scale;
+    input.dpi_scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
     input.battery_valid = state->battery_valid;
     input.battery_percent = state->battery_percent;
     input.power_hover =
@@ -469,7 +447,6 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.click_feedback_opacity =
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
     input.current_app_name = state->current_app_name;
-    input.current_app_title = state->current_app_title;
     input.tray_items = state->tray_items;
     input.tray_item_count = state->tray_item_count;
     input.tray_overflow = state->tray_overflow;
