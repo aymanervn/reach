@@ -384,15 +384,36 @@ reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
         return REACH_ERROR;
     }
 
-    D2D1_ROUNDED_RECT rect = D2D1::RoundedRect(D2D1::RectF(command->rect.x, command->rect.y,
-                                                           command->rect.x + command->rect.width,
-                                                           command->rect.y + command->rect.height),
-                                               command->radius, command->radius);
+    D2D1_RECT_F bounds =
+        D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width,
+                    command->rect.y + command->rect.height);
+    float stroke_width = command->stroke_width > 0.0f ? command->stroke_width : 1.0f;
+    int32_t stroke = command->type == REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
 
-    if (command->type == REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE)
+    if (command->corner_mask != 0 && command->corner_mask != REACH_RENDER_CORNER_ALL)
     {
-        float stroke_width = command->stroke_width > 0.0f ? command->stroke_width : 1.0f;
+        ID2D1Geometry *geometry = nullptr;
+        reach_d2d_create_corner_geometry(target, bounds, command->radius, command->corner_mask,
+                                         &geometry);
+        if (geometry != nullptr)
+        {
+            if (stroke)
+            {
+                target->DrawGeometry(geometry, brush, stroke_width);
+            }
+            else
+            {
+                target->FillGeometry(geometry, brush);
+            }
+            geometry->Release();
+            brush->Release();
+            return REACH_OK;
+        }
+    }
 
+    D2D1_ROUNDED_RECT rect = D2D1::RoundedRect(bounds, command->radius, command->radius);
+    if (stroke)
+    {
         target->DrawRoundedRectangle(rect, brush, stroke_width);
     }
     else
