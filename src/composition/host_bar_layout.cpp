@@ -197,7 +197,8 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
     request.game_mode = reach_host_game_mode_enabled(host);
     request.can_hide = reach_host_bars_can_hide(host);
-    request.transient_open = reach_host_transient_open(host);
+    request.transient_open =
+        desc->bar_shown_while_transient_open && reach_host_transient_open(host);
     request.reveal_seconds =
         (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
     request.reveal_span_inset =

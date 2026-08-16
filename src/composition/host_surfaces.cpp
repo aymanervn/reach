@@ -371,6 +371,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
         reach_host_apply_quick_settings_pointer_action;
     descs[REACH_SURFACE_ID_DOCK].update_visibility = reach_host_dock_update_visibility;
+    descs[REACH_SURFACE_ID_DOCK].bar_shown_while_transient_open = 1;
     descs[REACH_SURFACE_ID_DOCK].reveal_edge = &host->dock_reveal_edge;
     descs[REACH_SURFACE_ID_DOCK].reveal = &host->dock_reveal;
     descs[REACH_SURFACE_ID_DOCK].reveal_animation = reach_host_dock_reveal_animation;
