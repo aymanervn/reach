@@ -9,7 +9,9 @@
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
 #include "reach/features/feature_capsule.h"
+#include "reach/services/icon_service.h"
 #include "reach/services/now_playing.h"
+#include "reach/services/window_tracking.h"
 #include "reach/support/animation.h"
 
 #ifdef __cplusplus
@@ -34,6 +36,8 @@ extern "C"
         int32_t pill_visible[REACH_TOP_BAR_PILL_COUNT];
         reach_rect_f32 power_button;
         reach_rect_f32 clock;
+        reach_rect_f32 current_app_icon;
+        reach_rect_f32 current_app_text;
     } reach_top_bar_layout;
 
     enum reach_top_bar_animation_id
@@ -85,6 +89,10 @@ extern "C"
         uint16_t clock_date_text[64];
         int32_t clock_initialized;
         int64_t clock_last_minute;
+
+        uint16_t current_app_name[260];
+        uint16_t current_app_title[260];
+        uint16_t current_app_icon_ref[260];
     } reach_top_bar_state;
 
     typedef struct reach_top_bar reach_top_bar;
@@ -93,7 +101,8 @@ extern "C"
     void reach_top_bar_destroy(reach_top_bar *top_bar);
 
     void reach_top_bar_attach_services(reach_top_bar *top_bar,
-                                       reach_now_playing_service *now_playing);
+                                       reach_now_playing_service *now_playing,
+                                       reach_icon_service *icons, reach_window_tracking *windows);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);
@@ -107,6 +116,9 @@ extern "C"
         reach_rect_f32 monitor_bounds;
         float dpi_scale;
         float dock_height;
+        uintptr_t foreground_window;
+        const reach_pinned_app_model *pinned_apps;
+        size_t pinned_app_count;
     } reach_top_bar_build_context;
 
     void reach_top_bar_build_layout(reach_top_bar *top_bar,
@@ -136,6 +148,7 @@ extern "C"
     {
         const reach_theme *theme;
         float dpi_scale;
+        int32_t icon_size_px;
         int32_t battery_valid;
         int32_t battery_percent;
     } reach_top_bar_render_context;

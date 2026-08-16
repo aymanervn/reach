@@ -146,6 +146,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         {
             reach_host_refresh_switcher_windows(host);
             host->dock.dirty_flags = 1;
+            host->top_bar.dirty_flags = 1;
             host->switcher.dirty_flags = 1;
         }
         reach_host_sync_stage_window_states(host);
