@@ -8,11 +8,12 @@ static int32_t reach_context_menu_rect_contains(reach_rect_f32 rect, int32_t x, 
            (float)y <= rect.y + rect.height;
 }
 
-reach_rect_f32 reach_context_menu_close_button_rect(reach_rect_f32 item_slot, float dpi_scale)
+reach_rect_f32 reach_context_menu_close_button_rect(const reach_context_menu_metrics *metrics,
+                                                    reach_rect_f32 item_slot, float dpi_scale)
 {
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    float size = 20.0f * scale;
-    float inset = 7.0f * scale;
+    float size = metrics->close_button_size * scale;
+    float inset = metrics->close_button_inset * scale;
     reach_rect_f32 button = {};
     button.width = size;
     button.height = size;
@@ -36,8 +37,10 @@ reach_context_menu_hit_test_close_buttons(const reach_context_menu_state *state,
     {
         if (state->item_windows[index] != 0 &&
             reach_context_menu_rect_contains(
-                reach_context_menu_close_button_rect(state->item_slots[index], state->dpi_scale), x,
-                y))
+                reach_context_menu_close_button_rect(
+                    reach_context_menu_metrics_for(state->window_list_open),
+                    state->item_slots[index], state->dpi_scale),
+                x, y))
         {
             hit.hit = 1;
             hit.index = index;

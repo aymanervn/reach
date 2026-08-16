@@ -15,30 +15,6 @@ extern "C"
 {
 #endif
 
-    typedef struct reach_context_menu_render_input
-    {
-        const reach_theme *theme;
-        reach_rect_f32 bounds;
-        const reach_rect_f32 *item_slots;
-        const uint32_t *item_commands;
-        const uint32_t *item_icon_ids;
-        const uint16_t (*item_titles)[260];
-        size_t item_count;
-        size_t hovered_index;
-        size_t target_index;
-        reach_rect_f32 anchor_slot;
-        int32_t has_anchor_slot;
-        int32_t use_anchor_x;
-        float anchor_x;
-        int32_t notch_side;
-        float dpi_scale;
-        int32_t text_alignment_leading;
-        int32_t window_list;
-        float hover_opacity;
-        size_t close_hovered_index;
-        float close_hover;
-    } reach_context_menu_render_input;
-
     typedef enum reach_context_menu_pointer_action_kind
     {
         REACH_CONTEXT_MENU_POINTER_ACTION_NONE = 0,
@@ -51,9 +27,6 @@ extern "C"
     void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                                  size_t *out_count);
     const uint16_t *reach_context_menu_command_text(uint32_t command);
-    reach_result
-    reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
-                                             reach_render_command_buffer *out_commands);
 
     typedef struct reach_context_menu_state
     {
@@ -125,7 +98,6 @@ extern "C"
     float reach_context_menu_hover_opacity(const reach_context_menu *menu);
     float reach_context_menu_close_hover(const reach_context_menu *menu);
 
-    reach_rect_f32 reach_context_menu_close_button_rect(reach_rect_f32 item_slot, float dpi_scale);
     size_t reach_context_menu_window_list_remove(reach_context_menu *menu, uintptr_t window);
 
     int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
