@@ -130,7 +130,6 @@ static const reach_theme reach_theme_dark = {
     .menu_accent_sleep = REACH_DARK_ACCENT_LAVENDER(1.0f),
     .menu_accent_restart = REACH_DARK_ACCENT_GREEN(1.0f),
     .menu_accent_lock = REACH_DARK_ACCENT_YELLOW(1.0f),
-    .menu_accent_settings = REACH_DARK_ACCENT_BLUE(1.0f),
 
     .stage_backdrop = REACH_DARK_DEEP(REACH_THEME_STAGE),
     .stage_tile_placeholder = REACH_DARK_RAISED(1.0f),
@@ -260,7 +259,6 @@ static const reach_theme reach_theme_light = {
     .menu_accent_sleep = REACH_LIGHT_ACCENT_LAVENDER(1.0f),
     .menu_accent_restart = REACH_LIGHT_ACCENT_GREEN(1.0f),
     .menu_accent_lock = REACH_LIGHT_ACCENT_YELLOW(1.0f),
-    .menu_accent_settings = REACH_LIGHT_ACCENT_BLUE(1.0f),
 
     .stage_backdrop = REACH_LIGHT_BASE(REACH_THEME_STAGE),
     .stage_tile_placeholder = REACH_LIGHT_RAISED(1.0f),

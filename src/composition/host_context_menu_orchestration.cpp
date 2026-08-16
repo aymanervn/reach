@@ -109,12 +109,6 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
                    ? host->power_session.ops.sign_out(host->power_session.session)
                    : REACH_ERROR;
     }
-    if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SETTINGS)
-    {
-        reach_host_close_context_menu(host);
-        return reach_host_launch_settings_app(host);
-    }
-
     if (reach_context_menu_state_ptr(host->context_menu_capsule)->target_index >=
         reach_dock_item_count(host->dock_capsule))
     {
