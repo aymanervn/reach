@@ -162,7 +162,13 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
 
         float text_left = reach_context_menu_scale(
             input, has_icon ? metrics->icon_text_inset : metrics->text_leading_inset);
-        float text_right = reach_context_menu_scale(input, metrics->text_trailing_inset);
+        float trailing_inset = metrics->text_trailing_inset;
+        if (input->window_list && input->hovered_index == index)
+        {
+            trailing_inset += (metrics->text_trailing_inset_with_close - trailing_inset) *
+                              hover_opacity;
+        }
+        float text_right = reach_context_menu_scale(input, trailing_inset);
 
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
