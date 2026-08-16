@@ -358,8 +358,7 @@ void reach_host_process_quick_settings_changes(reach_host *host, double delta_se
         reach_system_status_refresh_system(host->system_status, change_flags);
     }
     reach_feature_tick_result changes = {};
-    reach_quick_settings_process_changes(host->quick_settings_capsule, change_flags, delta_seconds,
-                                         &changes);
+    reach_quick_settings_process_changes(host->quick_settings_capsule, delta_seconds, &changes);
 
     uint64_t retired[REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     size_t retired_count = reach_quick_settings_take_retired_render_icons(
