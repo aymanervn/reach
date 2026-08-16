@@ -315,13 +315,14 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     host->dirty.layout = 0;
     host->dirty.render = 0;
     host->dirty.update_requested = 0;
-    host->dock.dirty_flags = 0;
-    host->launcher.dirty_flags = 0;
-    host->tray.dirty_flags = 0;
-    host->switcher.dirty_flags = 0;
-    host->context_menu.dirty_flags = 0;
-    host->quick_settings.dirty_flags = 0;
-    host->clipboard_surface.dirty_flags = 0;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        if (surface != nullptr)
+        {
+            surface->dirty_flags = 0;
+        }
+    }
 
     return REACH_OK;
 }
