@@ -264,9 +264,13 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         reach_top_bar_rect(left, 0.0f, now_playing_width, height);
 
     float right = layout->bounds.width - edge_inset;
-    float quick_settings_width = metrics.quick_settings_width * scale;
+    float quick_settings_button = height * metrics.quick_settings_button_scale;
+    float quick_settings_width = padding * 2.0f + quick_settings_button;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
+    layout->quick_settings_button = reach_top_bar_rect(
+        layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + padding,
+        (height - quick_settings_button) * 0.5f, quick_settings_button, quick_settings_button);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x - pill_gap;
 
     reach_top_bar_update_tray_items(top_bar, ctx);
@@ -744,6 +748,13 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
             out->handled = 1;
             out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_TRAY_OVERFLOW;
         }
+        else if (hit == REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON)
+        {
+            out->redraw = reach_top_bar_feedback_press(
+                top_bar, REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
+            out->handled = 1;
+            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS;
+        }
         return;
     }
 
@@ -791,6 +802,11 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
         {
             out->handled = 1;
             out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW;
+        }
+        else if (pressed == REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON && hit == pressed)
+        {
+            out->handled = 1;
+            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
         }
         if (state->pointer_sequence_active)
         {

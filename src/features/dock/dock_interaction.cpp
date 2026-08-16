@@ -31,12 +31,6 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
         return result;
     }
 
-    if (reach_dock_rect_contains(layout->quick_settings_button, x, y))
-    {
-        result.type = REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON;
-        return result;
-    }
-
     for (size_t index = 0; index < layout->app_slot_count; ++index)
     {
         if (reach_dock_rect_contains(layout->app_slots[index], x, y))

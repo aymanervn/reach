@@ -25,7 +25,7 @@ struct reach_top_bar_metrics
     float current_app_max_width_ratio;
     float tray_icon_scale;
     float tray_icon_gap;
-    float quick_settings_width;
+    float quick_settings_button_scale;
 
     float pill_padding;
     float power_button_scale;
@@ -50,7 +50,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 {
     reach_top_bar_metrics metrics = {};
 
-    metrics.height_scale = 1.125f;
+    metrics.height_scale = 0.9f;
     metrics.screen_gap = 6.0f;
     metrics.edge_inset = 8.0f;
     metrics.pill_gap = 6.0f;
@@ -70,7 +70,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.current_app_max_width_ratio = 0.28f;
     metrics.tray_icon_scale = 0.58f;
     metrics.tray_icon_gap = 6.0f;
-    metrics.quick_settings_width = 84.0f;
+    metrics.quick_settings_button_scale = 0.58f;
 
     metrics.pill_padding = 6.0f;
     metrics.power_button_scale = 0.72f;

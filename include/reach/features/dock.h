@@ -98,7 +98,6 @@ extern "C"
         size_t click_feedback_index;
         float click_feedback_opacity;
         size_t stage_feedback_index;
-        size_t quick_settings_feedback_index;
         int32_t text_alignment_center;
     } reach_dock_render_input;
 
@@ -109,7 +108,6 @@ extern "C"
     {
         REACH_DOCK_POINTER_REGION_NONE = 0,
         REACH_DOCK_POINTER_REGION_ITEM = 1,
-        REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON = 3,
         REACH_DOCK_POINTER_REGION_STAGE_BUTTON = 5
     } reach_dock_pointer_region;
 
@@ -117,12 +115,10 @@ extern "C"
     {
         REACH_DOCK_POINTER_ACTION_NONE = 0,
         REACH_DOCK_POINTER_ACTION_PRESS_ITEM = 2,
-        REACH_DOCK_POINTER_ACTION_PRESS_QUICK_SETTINGS = 4,
         REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED = 6,
         REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW = 7,
         REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE = 8,
         REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT = 9,
-        REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS = 11,
         REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS = 16,
         REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17,
         REACH_DOCK_POINTER_ACTION_HOVER_ITEM = 18,
@@ -200,8 +196,7 @@ extern "C"
 
     enum
     {
-        REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON = REACH_MAX_DOCK_ITEMS,
-        REACH_DOCK_FEEDBACK_STAGE_BUTTON,
+        REACH_DOCK_FEEDBACK_STAGE_BUTTON = REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_FEEDBACK_NONE
     };
 

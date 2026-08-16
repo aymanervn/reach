@@ -345,6 +345,32 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     }
 }
 
+static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
+                                              reach_render_command_buffer *commands)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    reach_rect_f32 button = input->layout->quick_settings_button;
+    if (button.width <= 0.0f)
+    {
+        return;
+    }
+
+    reach_top_bar_push_rect(commands, button, input->theme->dock_button_background,
+                            button.height * 0.5f);
+    reach_top_bar_push_vector_icon(commands,
+                                   reach_top_bar_center_square(button, button.height * 0.55f),
+                                   REACH_VECTOR_ICON_QUICK_SETTINGS, input->theme->system_glyph);
+
+    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON &&
+        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
+    {
+        reach_top_bar_push_rect(commands, button,
+                                reach_theme_color_alpha(input->theme->dock_click_feedback,
+                                                        input->click_feedback_opacity),
+                                button.height * 0.5f);
+    }
+}
+
 reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
                                                   const reach_top_bar_render_context *ctx,
                                                   reach_render_command_buffer *out_commands)
@@ -398,6 +424,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_clock(&input, out_commands);
     reach_top_bar_push_current_app(&input, out_commands);
     reach_top_bar_push_tray(&input, out_commands);
+    reach_top_bar_push_quick_settings(&input, out_commands);
 
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;

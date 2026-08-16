@@ -28,6 +28,10 @@ reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *
     {
         return REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW;
     }
+    if (reach_top_bar_rect_contains(layout->quick_settings_button, local_x, local_y))
+    {
+        return REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON;
+    }
     return REACH_TOP_BAR_POINTER_REGION_NONE;
 }
 
