@@ -1,5 +1,21 @@
 #include "host_internal.h"
 
+void reach_host_open_context_menu_transition(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    const reach_context_menu_state *state =
+        reach_context_menu_state_ptr(host->context_menu_capsule);
+    reach_host_surface_transition_set_settle_offset(
+        host, &host->context_menu_transition,
+        state != nullptr && state->drop_direction == REACH_POPUP_DROP_DOWN
+            ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE
+            : REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
+    reach_host_surface_transition_set(host, &host->context_menu_transition, 1);
+}
+
 void reach_host_close_context_menu(reach_host *host)
 {
     if (host == nullptr)
@@ -285,7 +301,7 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     ctx.monitor = reach_host_context_menu_monitor(host, top_bar_layout->bounds);
 
     reach_context_menu_open_power(host->context_menu_capsule, &ctx);
-    reach_host_surface_transition_set(host, &host->context_menu_transition, 1);
+    reach_host_open_context_menu_transition(host);
     host->context_menu.dirty_flags = 1;
     reach_host_sync_pointer_move_subscriptions(host);
     reach_host_sync_popup_mouse_hook(host);
@@ -323,7 +339,7 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
     }
 
     reach_context_menu_open_for_item(host->context_menu_capsule, item_index, &ctx);
-    reach_host_surface_transition_set(host, &host->context_menu_transition, 1);
+    reach_host_open_context_menu_transition(host);
     host->context_menu.dirty_flags = 1;
     reach_host_sync_pointer_move_subscriptions(host);
     reach_host_sync_popup_mouse_hook(host);

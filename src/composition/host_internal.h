@@ -63,12 +63,16 @@ typedef enum reach_host_animation_id
     REACH_HOST_ANIMATION_COUNT
 } reach_host_animation_id;
 
+static const float REACH_HOST_TRANSITION_SETTLE_FROM_BELOW = 8.0f;
+static const float REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE = -8.0f;
+
 typedef struct reach_host_surface_transition
 {
     int32_t visible;
     int32_t target_open;
     size_t y_track;
     size_t opacity_track;
+    float settle_offset;
     double open_seconds;
     double close_seconds;
 } reach_host_surface_transition;
@@ -413,7 +417,12 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
                                            int32_t *bounds_valid, int32_t *opacity_valid,
                                            int32_t *out_changed);
 void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
-                                        size_t y_track, size_t opacity_track);
+                                        size_t y_track, size_t opacity_track,
+                                        float settle_offset);
+void reach_host_surface_transition_set_settle_offset(reach_host *host,
+                                                     reach_host_surface_transition *transition,
+                                                     float settle_offset);
+void reach_host_open_context_menu_transition(reach_host *host);
 void reach_host_surface_transitions_init(reach_host *host);
 void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
                                        int32_t open);

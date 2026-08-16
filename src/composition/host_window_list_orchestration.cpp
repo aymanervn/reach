@@ -78,7 +78,7 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     ctx.window_entry_count = window_count;
 
     reach_context_menu_open_window_list(host->context_menu_capsule, item_index, &ctx);
-    reach_host_surface_transition_set(host, &host->context_menu_transition, 1);
+    reach_host_open_context_menu_transition(host);
     host->context_menu.dirty_flags = 1;
     host->window_list.open_item = item_index;
     host->window_list.grace_seconds = 0.0;

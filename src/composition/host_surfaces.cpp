@@ -2,7 +2,6 @@
 
 #include <math.h>
 
-static const float REACH_HOST_TRANSITION_OFFSET = 8.0f;
 
 int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 {
@@ -64,7 +63,7 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
 }
 
 void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
-                                        size_t y_track, size_t opacity_track)
+                                        size_t y_track, size_t opacity_track, float settle_offset)
 {
     if (host == nullptr || transition == nullptr)
     {
@@ -73,8 +72,24 @@ void reach_host_surface_transition_init(reach_host *host, reach_host_surface_tra
     *transition = {};
     transition->y_track = y_track;
     transition->opacity_track = opacity_track;
-    reach_animation_manager_set(&host->animations, y_track, REACH_HOST_TRANSITION_OFFSET);
+    transition->settle_offset = settle_offset;
+    reach_animation_manager_set(&host->animations, y_track, settle_offset);
     reach_animation_manager_set(&host->animations, opacity_track, 0.0f);
+}
+
+void reach_host_surface_transition_set_settle_offset(reach_host *host,
+                                                     reach_host_surface_transition *transition,
+                                                     float settle_offset)
+{
+    if (host == nullptr || transition == nullptr || transition->settle_offset == settle_offset)
+    {
+        return;
+    }
+    transition->settle_offset = settle_offset;
+    if (!transition->visible)
+    {
+        reach_animation_manager_set(&host->animations, transition->y_track, settle_offset);
+    }
 }
 
 void reach_host_surface_transitions_init(reach_host *host)
@@ -85,25 +100,32 @@ void reach_host_surface_transitions_init(reach_host *host)
     }
     reach_host_surface_transition_init(host, &host->launcher_transition,
                                        REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
     reach_host_surface_transition_init(host, &host->tray_transition,
                                        REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE);
     reach_host_surface_transition_init(host, &host->quick_settings_transition,
                                        REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE);
     reach_host_surface_transition_init(host, &host->switcher_transition,
                                        REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
     reach_host_surface_transition_init(host, &host->context_menu_transition,
                                        REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
     reach_host_surface_transition_init(host, &host->clipboard_transition,
                                        REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
     reach_host_surface_transition_init(host, &host->stage_transition,
                                        REACH_HOST_ANIMATION_STAGE_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_STAGE_TRANSITION_OPACITY);
+                                       REACH_HOST_ANIMATION_STAGE_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
 }
 
 void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
@@ -132,7 +154,7 @@ void reach_host_surface_transition_set(reach_host *host, reach_host_surface_tran
         {
             transition->visible = 1;
             reach_animation_manager_set(&host->animations, transition->y_track,
-                                        REACH_HOST_TRANSITION_OFFSET);
+                                        transition->settle_offset);
             reach_animation_manager_set(&host->animations, transition->opacity_track, 0.0f);
         }
         reach_animation_manager_animate_to(&host->animations, transition->y_track, 0.0f,
@@ -146,7 +168,7 @@ void reach_host_surface_transition_set(reach_host *host, reach_host_surface_tran
                                    ? transition->close_seconds
                                    : (double)theme->surface_close_seconds;
         reach_animation_manager_animate_to(&host->animations, transition->y_track,
-                                           REACH_HOST_TRANSITION_OFFSET, close_seconds,
+                                           transition->settle_offset, close_seconds,
                                            REACH_EASING_EASE_IN);
         reach_animation_manager_animate_to(&host->animations, transition->opacity_track, 0.0f,
                                            close_seconds, REACH_EASING_EASE_IN);
@@ -198,7 +220,7 @@ void reach_host_surface_transition_finish(reach_host *host,
 
     transition->visible = 0;
     reach_animation_manager_set(&host->animations, transition->y_track,
-                                REACH_HOST_TRANSITION_OFFSET);
+                                transition->settle_offset);
     reach_animation_manager_set(&host->animations, transition->opacity_track, 0.0f);
     reach_host_request_update(host);
 }
