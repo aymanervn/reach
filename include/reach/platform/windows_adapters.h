@@ -6,6 +6,7 @@
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/image_loader.h"
+#include "reach/ports/clock.h"
 #include "reach/ports/input_language.h"
 #include "reach/ports/screen_hotspot.h"
 #include "reach/ports/foreground_watcher.h"
@@ -67,6 +68,7 @@ extern "C"
     reach_result reach_windows_create_image_loader(reach_image_loader_port *out_port);
     reach_result reach_windows_create_input_language(reach_input_language_port *out_port);
     reach_result reach_windows_create_system_stats(reach_system_stats_port *out_port);
+    reach_result reach_windows_create_clock(reach_clock_port *out_port);
     reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_port);
     reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port *out_port);
     reach_result reach_windows_create_foreground_watcher(reach_foreground_watcher_port *out_port);

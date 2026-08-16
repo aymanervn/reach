@@ -124,6 +124,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_clock(&dependencies.clock);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_input_language(&dependencies.input_language);
     }
     if (result == REACH_OK)

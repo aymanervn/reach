@@ -226,7 +226,6 @@ void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bo
     ctx.tray_items = tray_items;
     ctx.tray_item_count = tray_item_count;
     ctx.tray_popup_open = reach_tray_popup_is_open(host->tray_capsule);
-    ctx.language_code = host->input_language_code;
 
     reach_top_bar_build_layout(host->top_bar_capsule, &ctx);
     reach_tray_set_overflow_start(host->tray_capsule,

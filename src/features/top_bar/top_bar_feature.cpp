@@ -6,7 +6,6 @@
 
 #include <new>
 #include <stdio.h>
-#include <time.h>
 
 const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar)
 {
@@ -60,7 +59,8 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
 
 void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_service *now_playing,
                                    reach_icon_service *icons, reach_window_tracking *windows,
-                                   reach_system_stats *stats)
+                                   reach_system_stats *stats, reach_clock *clock,
+                                   reach_input_language_service *input_language)
 {
     if (top_bar != nullptr)
     {
@@ -68,10 +68,14 @@ void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_ser
         top_bar->icons = icons;
         top_bar->windows = windows;
         top_bar->stats = stats;
+        top_bar->clock = clock;
+        top_bar->input_language = input_language;
     }
 }
 
 static void reach_top_bar_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src);
+static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);
+static void reach_top_bar_update_language(reach_top_bar *top_bar);
 
 static void reach_top_bar_format_percent(uint16_t *dst, size_t dst_count, const char *label,
                                          float percent)
@@ -333,9 +337,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->pills[REACH_TOP_BAR_PILL_NOW_PLAYING] =
         reach_top_bar_rect(left, 0.0f, now_playing_width, height);
 
-    reach_copy_utf16(top_bar->state.language_code, 8,
-                     ctx->language_code != nullptr ? ctx->language_code : (const uint16_t *)L"");
-
+    reach_top_bar_update_language(top_bar);
     reach_top_bar_update_stats(top_bar);
 
     float right = layout->bounds.width - edge_inset;
@@ -578,24 +580,12 @@ static int32_t reach_top_bar_utf16_equal(const uint16_t *a, const uint16_t *b)
     return 1;
 }
 
-int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
+static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
 {
-    if (top_bar == nullptr)
-    {
-        return 0;
-    }
-
     reach_top_bar_state *state = &top_bar->state;
-
-    time_t now = time(nullptr);
-    int64_t current_minute = (int64_t)(now / 60);
-    if (state->clock_initialized && state->clock_last_minute == current_minute)
-    {
-        return 0;
-    }
-
-    struct tm local = {};
-    if (now == (time_t)-1 || localtime_s(&local, &now) != 0)
+    reach_clock_snapshot now = {};
+    reach_clock_snapshot_take(top_bar->clock, &now);
+    if (!now.valid || now.month < 1 || now.month > 12 || now.weekday < 0 || now.weekday > 6)
     {
         return 0;
     }
@@ -606,39 +596,41 @@ int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
     static const char *days[] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
                                  "Thursday", "Friday", "Saturday"};
 
-    int hour = local.tm_hour % 12;
+    int32_t hour = now.hour % 12;
     if (hour == 0)
     {
         hour = 12;
     }
-    const char *suffix = local.tm_hour >= 12 ? "PM" : "AM";
+    const char *suffix = now.hour >= 12 ? "PM" : "AM";
 
     char time_text[32] = {};
     char date_text[64] = {};
-    snprintf(time_text, sizeof(time_text), "%d:%02d %s", hour, local.tm_min, suffix);
-    if (local.tm_mon < 0 || local.tm_mon > 11 || local.tm_wday < 0 || local.tm_wday > 6)
-    {
-        return 0;
-    }
-    snprintf(date_text, sizeof(date_text), "%.3s %d, %.3s", months[local.tm_mon], local.tm_mday,
-             days[local.tm_wday]);
+    snprintf(time_text, sizeof(time_text), "%d:%02d %s", hour, now.minute, suffix);
+    snprintf(date_text, sizeof(date_text), "%.3s %d, %.3s", months[now.month - 1], now.day,
+             days[now.weekday]);
 
     uint16_t next_time[32] = {};
     uint16_t next_date[64] = {};
     reach_top_bar_copy_ascii_to_utf16(next_time, 32, time_text);
     reach_top_bar_copy_ascii_to_utf16(next_date, 64, date_text);
-    int32_t redraw = 0;
-    if (!state->clock_initialized ||
-        !reach_top_bar_utf16_equal(state->clock_time_text, next_time) ||
-        !reach_top_bar_utf16_equal(state->clock_date_text, next_date))
+    if (state->clock_initialized &&
+        reach_top_bar_utf16_equal(state->clock_time_text, next_time) &&
+        reach_top_bar_utf16_equal(state->clock_date_text, next_date))
     {
-        reach_copy_utf16(state->clock_time_text, 32, next_time);
-        reach_copy_utf16(state->clock_date_text, 64, next_date);
-        state->clock_initialized = 1;
-        redraw = 1;
+        return 0;
     }
-    state->clock_last_minute = current_minute;
-    return redraw;
+
+    reach_copy_utf16(state->clock_time_text, 32, next_time);
+    reach_copy_utf16(state->clock_date_text, 64, next_date);
+    state->clock_initialized = 1;
+    return 1;
+}
+
+static void reach_top_bar_update_language(reach_top_bar *top_bar)
+{
+    reach_input_language_snapshot language = {};
+    reach_input_language_service_snapshot_take(top_bar->input_language, &language);
+    reach_copy_utf16(top_bar->state.language_code, 8, language.code);
 }
 
 void reach_top_bar_begin_reveal_session(reach_top_bar *top_bar)
@@ -710,6 +702,11 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     if (top_bar == nullptr)
     {
         return;
+    }
+
+    if (reach_top_bar_update_clock(top_bar) && out != nullptr)
+    {
+        out->redraw = 1;
     }
 
     reach_top_bar_now_playing_update_result now_playing = {};

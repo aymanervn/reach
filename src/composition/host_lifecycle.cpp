@@ -266,10 +266,6 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->input_source.ops.destroy(host->input_source.source);
     }
-    if (host->input_language.ops.destroy != nullptr)
-    {
-        host->input_language.ops.destroy(host->input_language.language);
-    }
     reach_window_tracking_destroy(host->window_tracking);
     host->window_tracking = nullptr;
     if (host->foreground_watcher.ops.destroy != nullptr)
@@ -293,7 +289,8 @@ static void reach_host_cleanup(reach_host *host)
     reach_launcher_attach_search(host->launcher_capsule, nullptr);
     reach_launcher_attach_icons(host->launcher_capsule, nullptr);
     reach_dock_attach_services(host->dock_capsule, nullptr, nullptr);
-    reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr, nullptr);
+    reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                  nullptr);
     reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
     reach_quick_settings_attach_status(host->quick_settings_capsule, nullptr);
     reach_search_service_destroy(host->search_service);
@@ -302,6 +299,10 @@ static void reach_host_cleanup(reach_host *host)
     host->system_status = nullptr;
     reach_system_stats_destroy(host->system_stats);
     host->system_stats = nullptr;
+    reach_clock_destroy(host->clock);
+    host->clock = nullptr;
+    reach_input_language_service_destroy(host->input_language);
+    host->input_language = nullptr;
     reach_now_playing_service_destroy(host->now_playing_service);
     host->now_playing_service = nullptr;
     if (host->search_provider.ops.destroy != nullptr)
@@ -405,8 +406,6 @@ static void reach_host_cleanup(reach_host *host)
     host->top_bar_reveal = {};
     host->pointer_move = {};
     host->input_source = {};
-    host->input_language = {};
-    host->input_language_code[0] = 0;
     host->window_manager = {};
     host->foreground_watcher = {};
     host->config_store = {};
@@ -552,7 +551,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->clipboard_surface.window = dependencies->clipboard_window;
     host->clipboard_surface.renderer = dependencies->clipboard_renderer;
     host->input_source = dependencies->input_source;
-    host->input_language = dependencies->input_language;
     host->monitors = dependencies->monitors;
     host->window_manager = dependencies->window_manager;
     host->foreground_watcher = dependencies->foreground_watcher;
@@ -622,6 +620,17 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
+    host->clock = nullptr;
+    if (reach_clock_create(dependencies->clock, &host->clock) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
+    host->input_language = nullptr;
+    if (reach_input_language_service_create(dependencies->input_language,
+                                            &host->input_language) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
     host->media_controls = dependencies->media_controls;
     host->now_playing_service = nullptr;
     if (reach_now_playing_service_create(host->media_controls, reach_host_on_now_playing_ready,
@@ -633,7 +642,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_launcher_attach_icons(host->launcher_capsule, host->icon_service);
     reach_dock_attach_services(host->dock_capsule, host->icon_service, host->window_tracking);
     reach_top_bar_attach_services(host->top_bar_capsule, host->now_playing_service,
-                                  host->icon_service, host->window_tracking, host->system_stats);
+                                  host->icon_service, host->window_tracking, host->system_stats,
+                                  host->clock, host->input_language);
     reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
                                    host->window_tracking);
     reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);
