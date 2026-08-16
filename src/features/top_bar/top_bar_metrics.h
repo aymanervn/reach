@@ -26,6 +26,9 @@ struct reach_top_bar_metrics
     float tray_icon_scale;
     float tray_icon_gap;
     float quick_settings_button_scale;
+    float language_width;
+    float language_text_size;
+    int32_t language_text_weight;
 
     float pill_padding;
     float power_button_scale;
@@ -71,6 +74,9 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.tray_icon_scale = 0.58f;
     metrics.tray_icon_gap = 6.0f;
     metrics.quick_settings_button_scale = 0.58f;
+    metrics.language_width = 34.0f;
+    metrics.language_text_size = 12.0f;
+    metrics.language_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
 
     metrics.pill_padding = 6.0f;
     metrics.power_button_scale = 0.72f;

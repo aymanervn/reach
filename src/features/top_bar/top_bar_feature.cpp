@@ -263,14 +263,34 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->pills[REACH_TOP_BAR_PILL_NOW_PLAYING] =
         reach_top_bar_rect(left, 0.0f, now_playing_width, height);
 
+    reach_copy_utf16(top_bar->state.language_code, 8,
+                     ctx->language_code != nullptr ? ctx->language_code : (const uint16_t *)L"");
+
     float right = layout->bounds.width - edge_inset;
     float quick_settings_button = height * metrics.quick_settings_button_scale;
-    float quick_settings_width = padding * 2.0f + quick_settings_button;
+    float language_width =
+        top_bar->state.language_code[0] != 0 ? metrics.language_width * scale : 0.0f;
+    float language_gap = language_width > 0.0f ? pill_gap : 0.0f;
+    float quick_settings_width =
+        padding * 2.0f + language_width + language_gap + quick_settings_button;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
-    layout->quick_settings_button = reach_top_bar_rect(
-        layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + padding,
-        (height - quick_settings_button) * 0.5f, quick_settings_button, quick_settings_button);
+
+    float cluster_x = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + padding;
+    if (language_width > 0.0f)
+    {
+        layout->language_button = reach_top_bar_rect(
+            cluster_x, (height - quick_settings_button) * 0.5f, language_width,
+            quick_settings_button);
+        cluster_x += language_width + language_gap;
+    }
+    else
+    {
+        layout->language_button = {};
+    }
+    layout->quick_settings_button =
+        reach_top_bar_rect(cluster_x, (height - quick_settings_button) * 0.5f,
+                           quick_settings_button, quick_settings_button);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x - pill_gap;
 
     reach_top_bar_update_tray_items(top_bar, ctx);
@@ -755,6 +775,13 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
             out->handled = 1;
             out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS;
         }
+        else if (hit == REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON)
+        {
+            out->redraw =
+                reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON);
+            out->handled = 1;
+            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE;
+        }
         return;
     }
 
@@ -807,6 +834,11 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
         {
             out->handled = 1;
             out->action.kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
+        }
+        else if (pressed == REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON && hit == pressed)
+        {
+            out->handled = 1;
+            out->action.kind = REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE;
         }
         if (state->pointer_sequence_active)
         {

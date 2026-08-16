@@ -10,6 +10,7 @@
 #include "reach/ports/foreground_watcher.h"
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
+#include "reach/ports/input_language.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/media_controls.h"
 #include "reach/ports/monitor.h"
@@ -100,6 +101,7 @@ extern "C"
     reach_result reach_windows_create_system_controls(reach_system_controls_port *out_port);
     reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_port);
     reach_result reach_windows_create_image_loader(reach_image_loader_port *out_port);
+    reach_result reach_windows_create_input_language(reach_input_language_port *out_port);
     reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_port);
     reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port *out_port);
     reach_result reach_windows_create_foreground_watcher(reach_foreground_watcher_port *out_port);
