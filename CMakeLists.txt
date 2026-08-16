@@ -175,6 +175,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
     src/adapters/windows/windows_icon_handle.cpp
+    src/adapters/windows/input_language_win32.cpp
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/media_controls_win32.cpp
     src/adapters/windows/config_ini.cpp

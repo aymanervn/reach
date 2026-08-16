@@ -50,6 +50,7 @@ extern "C"
         size_t tray_icon_count;
         reach_rect_f32 tray_overflow_button;
         reach_rect_f32 quick_settings_button;
+        reach_rect_f32 language_button;
     } reach_top_bar_layout;
 
     enum reach_top_bar_animation_id
@@ -68,6 +69,7 @@ extern "C"
         REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW =
             REACH_TOP_BAR_FEEDBACK_TRAY_BASE + REACH_TOP_BAR_MAX_TRAY_ICONS,
         REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON,
+        REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON,
         REACH_TOP_BAR_FEEDBACK_NONE
     };
 
@@ -78,7 +80,8 @@ extern "C"
         REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING = 2,
         REACH_TOP_BAR_POINTER_REGION_TRAY_ICON = 3,
         REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW = 4,
-        REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON = 5
+        REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON = 5,
+        REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON = 6
     } reach_top_bar_pointer_region;
 
     typedef enum reach_top_bar_pointer_action_kind
@@ -95,7 +98,9 @@ extern "C"
         REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT = 9,
         REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT = 10,
         REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS = 11,
-        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS = 12
+        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS = 12,
+        REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE = 13,
+        REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE = 14
     } reach_top_bar_pointer_action_kind;
 
     typedef struct reach_top_bar_state
@@ -118,6 +123,8 @@ extern "C"
         uint16_t current_app_name[260];
         uint16_t current_app_title[260];
         uint16_t current_app_icon_ref[260];
+
+        uint16_t language_code[8];
 
         reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS];
         size_t tray_item_count;
@@ -153,6 +160,7 @@ extern "C"
         const reach_top_bar_tray_item *tray_items;
         size_t tray_item_count;
         int32_t tray_popup_open;
+        const uint16_t *language_code;
     } reach_top_bar_build_context;
 
     void reach_top_bar_build_layout(reach_top_bar *top_bar,

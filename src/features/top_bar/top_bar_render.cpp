@@ -18,6 +18,7 @@ typedef struct reach_top_bar_render_input
     size_t tray_item_count;
     int32_t tray_overflow;
     int32_t tray_popup_open;
+    const uint16_t *language_code;
     int32_t battery_valid;
     int32_t battery_percent;
     float power_hover;
@@ -345,6 +346,32 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     }
 }
 
+static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
+                                        reach_render_command_buffer *commands)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    reach_rect_f32 button = input->layout->language_button;
+    if (button.width <= 0.0f)
+    {
+        return;
+    }
+
+    reach_top_bar_push_rect(commands, button, input->theme->dock_button_background,
+                            button.height * 0.5f);
+    reach_top_bar_push_text(commands, button, input->language_code, metrics.language_text_size,
+                            metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
+                            input->theme->dock_clock_time);
+
+    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON &&
+        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
+    {
+        reach_top_bar_push_rect(commands, button,
+                                reach_theme_color_alpha(input->theme->dock_click_feedback,
+                                                        input->click_feedback_opacity),
+                                button.height * 0.5f);
+    }
+}
+
 static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
                                               reach_render_command_buffer *commands)
 {
@@ -413,6 +440,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.tray_item_count = state->tray_item_count;
     input.tray_overflow = state->tray_overflow;
     input.tray_popup_open = state->tray_popup_open;
+    input.language_code = state->language_code;
     if (state->current_app_icon_ref[0] != 0)
     {
         input.current_app_icon_id = reach_icon_service_get(reach_top_bar_icons(top_bar),
@@ -424,6 +452,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_clock(&input, out_commands);
     reach_top_bar_push_current_app(&input, out_commands);
     reach_top_bar_push_tray(&input, out_commands);
+    reach_top_bar_push_language(&input, out_commands);
     reach_top_bar_push_quick_settings(&input, out_commands);
 
     reach_top_bar_now_playing_render_context now_playing = {};

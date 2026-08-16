@@ -266,6 +266,10 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->input_source.ops.destroy(host->input_source.source);
     }
+    if (host->input_language.ops.destroy != nullptr)
+    {
+        host->input_language.ops.destroy(host->input_language.language);
+    }
     reach_window_tracking_destroy(host->window_tracking);
     host->window_tracking = nullptr;
     if (host->foreground_watcher.ops.destroy != nullptr)
@@ -399,6 +403,8 @@ static void reach_host_cleanup(reach_host *host)
     host->top_bar_reveal = {};
     host->pointer_move = {};
     host->input_source = {};
+    host->input_language = {};
+    host->input_language_code[0] = 0;
     host->window_manager = {};
     host->foreground_watcher = {};
     host->config_store = {};
@@ -544,6 +550,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->clipboard_surface.window = dependencies->clipboard_window;
     host->clipboard_surface.renderer = dependencies->clipboard_renderer;
     host->input_source = dependencies->input_source;
+    host->input_language = dependencies->input_language;
     host->monitors = dependencies->monitors;
     host->window_manager = dependencies->window_manager;
     host->foreground_watcher = dependencies->foreground_watcher;

@@ -8,6 +8,7 @@
 #include "reach/ports/config_store.h"
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
+#include "reach/ports/input_language.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/media_controls.h"
 #include "reach/ports/monitor.h"
@@ -68,6 +69,7 @@ extern "C"
         reach_platform_window_port clipboard_window;
         reach_render_backend_port clipboard_renderer;
         reach_input_source_port input_source;
+        reach_input_language_port input_language;
         reach_monitor_port monitors;
         reach_window_manager_port window_manager;
         reach_foreground_watcher_port foreground_watcher;

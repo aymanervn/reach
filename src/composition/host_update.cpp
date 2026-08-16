@@ -132,6 +132,11 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     }
     reach_host_drain_icon_evictions(host);
     reach_host_update_clock_text(host);
+    if (reach_host_refresh_input_language(host))
+    {
+        host->top_bar.dirty_flags = 1;
+        host->dirty.layout = 1;
+    }
     int32_t window_manager_dirty =
         host->window_manager.ops.needs_refresh != nullptr &&
         host->window_manager.ops.needs_refresh(host->window_manager.manager);

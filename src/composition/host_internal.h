@@ -264,6 +264,8 @@ struct reach_host
 
     reach_surface_desc surface_descs[REACH_HOST_SURFACE_COUNT];
     reach_input_source_port input_source;
+    reach_input_language_port input_language;
+    uint16_t input_language_code[8];
     reach_window_manager_port window_manager;
     reach_foreground_watcher_port foreground_watcher;
     reach_config_store_port config_store;
@@ -555,6 +557,8 @@ reach_rect_f32 reach_host_reconcile_top_bar_visibility(reach_host *host,
                                                        reach_rect_f32 shown_bounds,
                                                        reach_rect_f32 monitor_bounds);
 void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bounds);
+int32_t reach_host_refresh_input_language(reach_host *host);
+reach_result reach_host_cycle_input_language(reach_host *host);
 reach_result reach_host_render_top_bar_surface(reach_host *host);
 
 reach_result reach_host_refresh_monitor_layout(reach_host *host);
