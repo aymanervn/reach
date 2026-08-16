@@ -228,8 +228,6 @@ void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bo
     ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.monitor_bounds = monitor_bounds;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.pinned_apps = host->pinned_apps;
-    ctx.pinned_app_count = host->pinned_app_count;
 
     reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS] = {};
     size_t tray_item_count = reach_tray_item_count(host->tray_capsule);

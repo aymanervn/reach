@@ -36,6 +36,8 @@ extern "C"
 
     int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
                                                      const reach_window_snapshot *window);
+    void reach_window_tracking_app_display_name(const reach_window_snapshot *window,
+                                                uint16_t *out_name, size_t out_name_count);
     int32_t reach_window_tracking_identity_equal(const uint16_t *path_a, const uint16_t *aumid_a,
                                                  const uint16_t *path_b, const uint16_t *aumid_b);
     int32_t reach_window_tracking_windows_same_app(const reach_window_snapshot *a,

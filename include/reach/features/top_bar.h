@@ -187,8 +187,6 @@ extern "C"
         const reach_theme *theme;
         reach_rect_f32 monitor_bounds;
         float dpi_scale;
-        const reach_pinned_app_model *pinned_apps;
-        size_t pinned_app_count;
         const reach_top_bar_tray_item *tray_items;
         size_t tray_item_count;
         int32_t tray_popup_open;

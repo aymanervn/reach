@@ -113,56 +113,6 @@ static reach_result reach_pin_save(reach_config_store_port *store, reach_config_
     return store->ops.save(store->store, snapshot);
 }
 
-static void reach_pin_title_from_path(uint16_t *title, size_t title_count, const uint16_t *path)
-{
-    if (title == nullptr || title_count == 0)
-    {
-        return;
-    }
-    title[0] = 0;
-    if (path == nullptr || path[0] == 0)
-    {
-        return;
-    }
-
-    const uint16_t *name = path;
-    for (const uint16_t *cursor = path; *cursor != 0; ++cursor)
-    {
-        if (*cursor == '\\' || *cursor == '/')
-        {
-            name = cursor + 1;
-        }
-    }
-
-    size_t name_length = 0;
-    while (name[name_length] != 0)
-    {
-        ++name_length;
-    }
-
-    size_t end = name_length;
-    for (size_t index = name_length; index > 0; --index)
-    {
-        if (name[index - 1] == '.')
-        {
-            end = index - 1;
-            break;
-        }
-    }
-    if (end == 0)
-    {
-        end = name_length;
-    }
-
-    size_t write = 0;
-    while (write + 1 < title_count && write < end)
-    {
-        title[write] = name[write];
-        ++write;
-    }
-    title[write] = 0;
-}
-
 static reach_result reach_pin_add_default_explorer(reach_config_snapshot *snapshot)
 {
     if (snapshot == nullptr || snapshot->pinned_app_count >= REACH_MAX_PINNED_APPS)
@@ -244,7 +194,7 @@ reach_result reach_pin_config_pin_path(reach_config_store_port *store, const uin
     reach_pinned_app_model *app = &snapshot.pinned_apps[snapshot.pinned_app_count];
     *app = {};
     app->id = (uint32_t)(snapshot.pinned_app_count + 1);
-    reach_pin_title_from_path(app->title, 128, path);
+    reach_copy_path_stem_utf16(app->title, 128, path);
     (void)reach_copy_utf16(app->path, 260, path);
     (void)reach_copy_utf16(app->icon_ref, 260, path);
     snapshot.pinned_app_count += 1;
@@ -315,7 +265,7 @@ reach_result reach_pin_config_pin_app(reach_config_store_port *store,
     }
     else
     {
-        reach_pin_title_from_path(pinned->title, 128, app->path);
+        reach_copy_path_stem_utf16(pinned->title, 128, app->path);
     }
 
     (void)reach_copy_utf16(pinned->path, 260, app->path);

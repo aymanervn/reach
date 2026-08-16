@@ -45,7 +45,12 @@ Includes `ports`, `protocol`, `core`, and platform SDKs.
 ## services
 
 Shared in-process capabilities with state/cache/policy — config, icons, search,
-system status, Now Playing, … Includes `ports`, `protocol`, `core`. Now Playing
+system status, Now Playing, … Includes `ports`, `protocol`, `core`. Window
+tracking owns the one naming policy for a running app
+(`reach_window_tracking_app_display_name`: executable stem, window title as
+fallback); every surface that labels an app — the top bar's current-app pill, the
+switcher — reads it from there. A pinned app's stored title is a config record,
+not a live label, so nothing renders it as one. Now Playing
 publishes atomic core media generations immediately, enriches them with the latest
 generation's cover asynchronously, owns transport serialization and cover lifetime,
 and masks every transport control while a command is settling. A new core generation
