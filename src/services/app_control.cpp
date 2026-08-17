@@ -601,20 +601,33 @@ reach_result reach_app_control_window_bounds(const reach_app_control *service, u
                                                     out_bounds);
 }
 
-reach_result reach_app_control_set_window_bounds(reach_app_control *service,
-                                                 const reach_window_outer_bounds *windows,
-                                                 size_t count)
+reach_result reach_app_control_window_frame_bounds(const reach_app_control *service,
+                                                   uintptr_t window_id, reach_rect_f32 *out_bounds)
+{
+    if (service == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->window_manager.ops.frame_bounds == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->window_manager.ops.frame_bounds(service->window_manager.manager, window_id,
+                                                    out_bounds);
+}
+
+reach_result reach_app_control_move_windows(reach_app_control *service,
+                                            const reach_window_move *windows, size_t count)
 {
     if (service == nullptr || windows == nullptr || count == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    if (service->window_manager.ops.set_outer_bounds == nullptr)
+    if (service->window_manager.ops.move_windows == nullptr)
     {
         return REACH_NOT_IMPLEMENTED;
     }
-    return service->window_manager.ops.set_outer_bounds(service->window_manager.manager, windows,
-                                                        count);
+    return service->window_manager.ops.move_windows(service->window_manager.manager, windows, count);
 }
 
 int32_t reach_app_control_take_window_completed(reach_app_control *service,

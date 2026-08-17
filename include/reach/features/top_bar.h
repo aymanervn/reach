@@ -189,6 +189,8 @@ extern "C"
 
     void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control *apps);
 
+    void reach_top_bar_move_window_push_frame(reach_top_bar *top_bar);
+
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
