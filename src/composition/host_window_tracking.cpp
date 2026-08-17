@@ -58,6 +58,11 @@ void reach_host_apply_foreground_change(reach_host *host)
 
     reach_host_note_foreground_window(host, foreground);
     reach_host_refresh_switcher_windows(host);
+    if (reach_input_language_service_refresh(host->input_language, foreground))
+    {
+        host->top_bar.dirty_flags = 1;
+        host->dirty.layout = 1;
+    }
     host->dock.dirty_flags = 1;
     host->top_bar.dirty_flags = 1;
     host->switcher.dirty_flags = 1;
