@@ -904,6 +904,8 @@ reach_result reach_host_start(reach_host *host)
                                                 reach_host_on_audio_volume_changed, host);
     }
     reach_system_status_refresh_audio(host->system_status);
+    (void)reach_input_language_service_refresh(host->input_language,
+                                               reach_host_foreground_window(host));
     result = reach_now_playing_service_start(host->now_playing_service);
     if (result != REACH_OK)
     {

@@ -123,8 +123,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     {
         host->top_bar.dirty_flags = 1;
     }
-    if (reach_input_language_service_tick(host->input_language, delta_seconds,
-                                          reach_host_foreground_window(host)))
+    if (reach_input_language_service_tick_settle(host->input_language, delta_seconds,
+                                                 reach_host_foreground_window(host)))
     {
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
@@ -373,7 +373,8 @@ int32_t reach_host_needs_frame(const reach_host *host)
         reach_host_any_surface_dirty(host) || reach_icon_service_work_pending(host->icon_service) ||
         reach_host_config_reload_work_pending(host) ||
         reach_animation_manager_any_active(&host->animations) ||
-        reach_host_window_list_wants_frames(host) || reach_clock_minute_elapsed(host->clock))
+        reach_host_window_list_wants_frames(host) || reach_clock_minute_elapsed(host->clock) ||
+        reach_input_language_service_settling(host->input_language))
     {
         return 1;
     }
