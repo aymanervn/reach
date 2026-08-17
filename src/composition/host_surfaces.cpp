@@ -378,7 +378,6 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_CLIPBOARD].pointer_priority = 20;
     descs[REACH_SURFACE_ID_CLIPBOARD].apply_pointer_action =
         reach_host_apply_clipboard_pointer_action;
-    descs[REACH_SURFACE_ID_CLIPBOARD].bar_shown_while_open = 1;
     descs[REACH_SURFACE_ID_LAUNCHER].role = REACH_SURFACE_LAUNCHER;
     descs[REACH_SURFACE_ID_LAUNCHER].pointer_priority = 30;
     descs[REACH_SURFACE_ID_LAUNCHER].apply_pointer_action =
