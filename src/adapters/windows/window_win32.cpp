@@ -616,10 +616,10 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
 
 static int32_t reach_window_topmost_surface(reach_surface_role role)
 {
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
-           role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
-           role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD;
+    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
+           role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
+           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
+           role == REACH_SURFACE_CLIPBOARD;
 }
 
 static int32_t reach_window_self_ordered_surface(reach_surface_role role)
@@ -722,6 +722,11 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     }
 
     int32_t no_activate = reach_window_no_activate_surface(window->role);
+    if (no_activate && IsWindowVisible(window->hwnd))
+    {
+        return REACH_OK;
+    }
+
     int show_command =
         no_activate ? SW_SHOWNOACTIVATE : (IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW);
     ShowWindow(window->hwnd, show_command);
@@ -765,8 +770,8 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
     int width = (int)bounds.width;
     int height = (int)bounds.height;
 
-    BOOL ok = SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST,
-                           (int)bounds.x, (int)bounds.y, width, height, SWP_NOACTIVATE);
+    BOOL ok = SetWindowPos(window->hwnd, nullptr, (int)bounds.x, (int)bounds.y, width, height,
+                           SWP_NOACTIVATE | SWP_NOZORDER);
     return ok ? REACH_OK : REACH_ERROR;
 }
 
