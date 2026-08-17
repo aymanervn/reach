@@ -554,6 +554,7 @@ int32_t reach_host_icon_size_px(const reach_host *host);
 void reach_host_release_render_icon(reach_host *host, uint64_t icon_id);
 
 void reach_host_drain_icon_evictions(reach_host *host);
+void reach_host_drain_tray_retired_icons(reach_host *host);
 void reach_host_release_tray_render_icons(reach_host *host);
 void reach_host_release_quick_settings_audio_render_icons(reach_host *host);
 void reach_host_drain_now_playing_retired_covers(reach_host *host);

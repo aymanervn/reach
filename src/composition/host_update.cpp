@@ -164,6 +164,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
     }
+    reach_host_drain_tray_retired_icons(host);
 
     reach_result monitor_result = reach_host_refresh_monitor_layout(host);
     if (monitor_result != REACH_OK)

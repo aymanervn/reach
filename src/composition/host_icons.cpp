@@ -53,6 +53,22 @@ void reach_host_drain_icon_evictions(reach_host *host)
     }
 }
 
+void reach_host_drain_tray_retired_icons(reach_host *host)
+{
+    if (host == nullptr || host->tray_provider.ops.take_retired_icon == nullptr ||
+        host->tray_provider.ops.release_retired_icon == nullptr)
+    {
+        return;
+    }
+
+    uint64_t icon_id = 0;
+    while (host->tray_provider.ops.take_retired_icon(host->tray_provider.provider, &icon_id))
+    {
+        reach_host_release_render_icon(host, icon_id);
+        host->tray_provider.ops.release_retired_icon(host->tray_provider.provider, icon_id);
+    }
+}
+
 void reach_host_release_tray_render_icons(reach_host *host)
 {
     if (host == nullptr)
