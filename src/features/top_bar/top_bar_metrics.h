@@ -52,11 +52,14 @@ struct reach_top_bar_metrics
 
     float power_button_scale;
     float power_glyph_scale;
-    float power_ring_stroke_width;
-    float power_ring_inset;
-    float power_ring_track_alpha;
-    float power_percent_text_size;
-    int32_t power_percent_text_weight;
+
+    float battery_width;
+    float battery_height;
+    float battery_cap_width;
+    float battery_cap_height;
+    float battery_cap_gap;
+    float battery_fill_inset;
+    float battery_low_percent;
 
     float click_feedback_min_opacity;
 };
@@ -112,11 +115,14 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 
     metrics.power_button_scale = 0.72f;
     metrics.power_glyph_scale = 0.50f;
-    metrics.power_ring_stroke_width = 2.25f;
-    metrics.power_ring_inset = 0.5f;
-    metrics.power_ring_track_alpha = 0.16f;
-    metrics.power_percent_text_size = 12.0f;
-    metrics.power_percent_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+
+    metrics.battery_width = 22.0f;
+    metrics.battery_height = 11.0f;
+    metrics.battery_cap_width = 2.0f;
+    metrics.battery_cap_height = 5.0f;
+    metrics.battery_cap_gap = 1.5f;
+    metrics.battery_fill_inset = 1.75f;
+    metrics.battery_low_percent = 15.0f;
 
     metrics.click_feedback_min_opacity = 0.001f;
 
