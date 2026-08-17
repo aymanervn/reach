@@ -195,6 +195,14 @@ static uint32_t reach_top_bar_network_icon_id(const reach_network_state *network
     return REACH_VECTOR_ICON_WIFI_HIGH;
 }
 
+static int32_t reach_top_bar_bluetooth_holding(const reach_top_bar_state *state)
+{
+    return state->bluetooth_icon_id != REACH_VECTOR_ICON_NONE &&
+           state->bluetooth_absent_seconds > 0.0 &&
+           state->bluetooth_absent_seconds <
+               reach_top_bar_metrics_values.bluetooth_absence_grace_seconds;
+}
+
 // Enabling the radio makes it briefly unenumerable, so a bare availability read would blink the
 // glyph out and back on every enable. Hold the last known glyph until absence outlasts the grace.
 static void reach_top_bar_resolve_bluetooth(reach_top_bar_state *state,
@@ -211,10 +219,14 @@ static void reach_top_bar_resolve_bluetooth(reach_top_bar_state *state,
         return;
     }
 
+    const double grace = reach_top_bar_metrics_values.bluetooth_absence_grace_seconds;
     state->bluetooth_absent_seconds += delta_seconds;
-    if (state->bluetooth_icon_id != REACH_VECTOR_ICON_NONE &&
-        state->bluetooth_absent_seconds <
-            reach_top_bar_metrics_values.bluetooth_absence_grace_seconds)
+    if (state->bluetooth_absent_seconds > grace)
+    {
+        state->bluetooth_absent_seconds = grace;
+    }
+
+    if (reach_top_bar_bluetooth_holding(state))
     {
         *out_icon_id = state->bluetooth_icon_id;
         *out_enabled = state->bluetooth_enabled;
@@ -227,10 +239,7 @@ static void reach_top_bar_resolve_bluetooth(reach_top_bar_state *state,
 
 int32_t reach_top_bar_bluetooth_absence_pending(const reach_top_bar *top_bar)
 {
-    return top_bar != nullptr && top_bar->state.bluetooth_icon_id != REACH_VECTOR_ICON_NONE &&
-           top_bar->state.bluetooth_absent_seconds > 0.0 &&
-           top_bar->state.bluetooth_absent_seconds <
-               reach_top_bar_metrics_values.bluetooth_absence_grace_seconds;
+    return top_bar != nullptr && reach_top_bar_bluetooth_holding(&top_bar->state);
 }
 
 static void reach_top_bar_format_volume(uint16_t *dst, size_t dst_count, float level)
@@ -921,6 +930,7 @@ static void reach_top_bar_capsule_reset(void *capsule)
     top_bar->state.pressed_tray_index = REACH_TOP_BAR_MAX_TRAY_ICONS;
     top_bar->state.power_hovered = 0;
     top_bar->state.power_release_suppressed = 0;
+    top_bar->state.bluetooth_absent_seconds = 0.0;
 }
 
 static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
