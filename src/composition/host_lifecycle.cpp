@@ -153,6 +153,10 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->system_controls.stop_watching(host->system_controls.userdata);
     }
+    if (host->audio_volume.stop_watching != nullptr)
+    {
+        host->audio_volume.stop_watching(host->audio_volume.userdata);
+    }
     reach_host_close_context_menu(host);
     reach_host_sync_popup_mouse_hook(host);
     reach_host_release_tray_render_icons(host);
@@ -444,6 +448,7 @@ static void reach_host_cleanup(reach_host *host)
     host->now_playing_service = nullptr;
     host->clipboard = {};
     host->quick_settings_system_change_flags.store(0);
+    host->audio_volume_changed.store(0);
 }
 
 reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
@@ -539,6 +544,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     host->system_controls = {};
     host->quick_settings_system_change_flags.store(0);
+    host->audio_volume_changed.store(0);
 
     host->launcher.window = dependencies->launcher_window;
     host->launcher.renderer = dependencies->launcher_renderer;
@@ -892,6 +898,12 @@ reach_result reach_host_start(reach_host *host)
         (void)host->system_controls.start_watching(host->system_controls.userdata,
                                                    reach_host_on_system_controls_changed, host);
     }
+    if (host->audio_volume.start_watching != nullptr)
+    {
+        (void)host->audio_volume.start_watching(host->audio_volume.userdata,
+                                                reach_host_on_audio_volume_changed, host);
+    }
+    reach_system_status_refresh_audio(host->system_status);
     result = reach_now_playing_service_start(host->now_playing_service);
     if (result != REACH_OK)
     {
@@ -965,6 +977,10 @@ reach_result reach_host_stop(reach_host *host)
     if (host->system_controls.stop_watching != nullptr)
     {
         host->system_controls.stop_watching(host->system_controls.userdata);
+    }
+    if (host->audio_volume.stop_watching != nullptr)
+    {
+        host->audio_volume.stop_watching(host->audio_volume.userdata);
     }
     if (host->foreground_watcher.ops.stop != nullptr)
     {

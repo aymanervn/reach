@@ -118,7 +118,14 @@ the service offers both: `take_system` consumes a published generation (Quick
 Settings applies each one exactly once) and `read_system` copies the latest
 without consuming it (the top bar polls it from `tick` and diffs the values it
 renders). A second consumer must never be added on `take_system`; it would steal
-generations from the first.
+generations from the first. The audio snapshot splits the same way and for the
+same reason — `take_audio` for Quick Settings, `read_audio` for the top bar's
+volume glyph. Neither snapshot is polled into existence: audio refreshes are
+driven by the `audio_volume` port's watcher, which registers an endpoint-volume
+notification on the current default render device (and re-registers when that
+device changes), fires on a COM thread, and lands in the same
+composition-owned atomic-flag → drain → `refresh_*` path the system-controls
+watcher uses.
 Tray owns popup item hit resolution, press/release feedback, left/right activation
 semantics, and cancellation. Composition retains provider activation, topmost
 window handling, and popup lifecycle.

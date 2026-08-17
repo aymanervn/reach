@@ -205,16 +205,29 @@ static uint32_t reach_top_bar_bluetooth_icon_id(const reach_bluetooth_state *blu
     return bluetooth->enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF;
 }
 
+static uint32_t reach_top_bar_volume_icon_id(const reach_system_status_audio_snapshot *audio)
+{
+    if (!audio->state_valid)
+    {
+        return REACH_VECTOR_ICON_NONE;
+    }
+    return reach_volume_vector_icon_id(audio->state.level, audio->state.muted);
+}
+
 static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
 {
     reach_top_bar_state *state = &top_bar->state;
     reach_system_status_system_snapshot snapshot = {};
     reach_system_status_read_system(top_bar->status, &snapshot);
 
+    reach_system_status_audio_snapshot audio = {};
+    reach_system_status_read_audio(top_bar->status, &audio);
+
     uint32_t network_icon =
         reach_top_bar_network_icon_id(&snapshot.network, snapshot.network_valid);
     uint32_t bluetooth_icon =
         reach_top_bar_bluetooth_icon_id(&snapshot.bluetooth, snapshot.bluetooth_valid);
+    uint32_t volume_icon = reach_top_bar_volume_icon_id(&audio);
 
     uint16_t name[REACH_SYSTEM_NETWORK_LABEL_CAPACITY] = {};
     if (snapshot.network_valid && snapshot.network.connected &&
@@ -224,6 +237,7 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
     }
 
     if (state->network_icon_id == network_icon && state->bluetooth_icon_id == bluetooth_icon &&
+        state->volume_icon_id == volume_icon &&
         reach_top_bar_utf16_equal(state->network_name, name))
     {
         return 0;
@@ -231,6 +245,7 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
 
     state->network_icon_id = network_icon;
     state->bluetooth_icon_id = bluetooth_icon;
+    state->volume_icon_id = volume_icon;
     reach_copy_utf16(state->network_name, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, name);
     return 1;
 }
@@ -448,6 +463,10 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     {
         quick_settings_content += quick_settings_content_gap + glyph_size;
     }
+    if (top_bar->state.volume_icon_id != REACH_VECTOR_ICON_NONE)
+    {
+        quick_settings_content += quick_settings_content_gap + glyph_size;
+    }
     float quick_settings_button_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH, &top_bar->quick_settings_target_width,
         quick_settings_padding * 2.0f + quick_settings_content);
@@ -512,6 +531,12 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     {
         content_x += quick_settings_content_gap;
         layout->bluetooth_icon = reach_top_bar_rect(content_x, glyph_y, glyph_size, glyph_size);
+        content_x += glyph_size;
+    }
+    if (top_bar->state.volume_icon_id != REACH_VECTOR_ICON_NONE)
+    {
+        content_x += quick_settings_content_gap;
+        layout->volume_icon = reach_top_bar_rect(content_x, glyph_y, glyph_size, glyph_size);
     }
 
     cluster_x += quick_settings_button_width + pill_gap;

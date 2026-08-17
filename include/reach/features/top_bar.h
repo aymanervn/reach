@@ -61,6 +61,7 @@ extern "C"
         reach_rect_f32 network_icon;
         reach_rect_f32 network_label;
         reach_rect_f32 bluetooth_icon;
+        reach_rect_f32 volume_icon;
         reach_rect_f32 settings_button;
         reach_rect_f32 language_button;
         reach_rect_f32 battery_shell;
@@ -151,6 +152,7 @@ extern "C"
 
         uint32_t network_icon_id;
         uint32_t bluetooth_icon_id;
+        uint32_t volume_icon_id;
         uint16_t network_name[REACH_SYSTEM_NETWORK_LABEL_CAPACITY];
 
         uint16_t stats_cpu_text[16];

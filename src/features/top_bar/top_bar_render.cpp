@@ -17,6 +17,7 @@ typedef struct reach_top_bar_render_input
     size_t tray_item_count;
     int32_t tray_overflow;
     int32_t tray_popup_open;
+    uint32_t volume_icon_id;
     const uint16_t *language_code;
     const uint16_t *network_name;
     uint32_t network_icon_id;
@@ -398,6 +399,11 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         reach_top_bar_push_vector_icon(commands, layout->bluetooth_icon, input->bluetooth_icon_id,
                                        input->theme->system_glyph);
     }
+    if (input->volume_icon_id != REACH_VECTOR_ICON_NONE)
+    {
+        reach_top_bar_push_vector_icon(commands, layout->volume_icon, input->volume_icon_id,
+                                       input->theme->system_glyph);
+    }
     reach_top_bar_push_button_feedback(input, commands, button,
                                        REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
 }
@@ -453,6 +459,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.network_name = state->network_name;
     input.network_icon_id = state->network_icon_id;
     input.bluetooth_icon_id = state->bluetooth_icon_id;
+    input.volume_icon_id = state->volume_icon_id;
     input.stats_cpu_text = state->stats_cpu_text;
     input.stats_memory_text = state->stats_memory_text;
     input.stats_download_text = state->stats_download_text;

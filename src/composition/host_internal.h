@@ -342,6 +342,7 @@ struct reach_host
     int32_t high_refresh_rate;
     int32_t bundled_font;
     std::atomic<uint32_t> quick_settings_system_change_flags;
+    std::atomic<uint32_t> audio_volume_changed;
     reach_system_status *system_status;
     reach_system_stats *system_stats;
     reach_quick_settings *quick_settings_capsule;
@@ -628,6 +629,7 @@ reach_host_apply_context_menu_pointer_action(reach_host *host, const reach_ui_ev
                                              const reach_capsule_pointer_result *result);
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags);
+void reach_host_on_audio_volume_changed(void *user);
 
 size_t reach_host_switcher_visible_count(const reach_host *host);
 void reach_host_refresh_switcher_windows(reach_host *host);
