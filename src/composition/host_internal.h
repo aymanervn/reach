@@ -327,6 +327,7 @@ struct reach_host
     size_t stage_thumbnail_generation;
     int32_t stage_thumbnails_registered;
     int32_t stage_topmost;
+    int32_t top_bar_topmost;
     uint64_t wallpaper_image_id;
     uint16_t wallpaper_image_path[260];
     reach_context_menu *context_menu_capsule;

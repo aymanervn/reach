@@ -176,6 +176,11 @@ static reach_result reach_screen_hotspot_place_behind(reach_screen_hotspot *hots
     }
 
     HWND target = reinterpret_cast<HWND>(window);
+    if ((GetWindowLongPtrW(target, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)
+    {
+        return REACH_OK;
+    }
+
     BOOL ok = SetWindowPos(hotspot->hwnd, target, 0, 0, 0, 0,
                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
     return ok ? REACH_OK : REACH_ERROR;
