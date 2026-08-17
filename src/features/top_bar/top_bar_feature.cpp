@@ -571,6 +571,18 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         top_bar->state.tray_overflow ? reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot)
                                      : reach_rect_f32{};
 
+    if (tray_cells > 0)
+    {
+        const float tray_background_padding = metrics.tray_background_padding * scale;
+        const float tray_background_height = height * metrics.tray_background_scale;
+        float cells_left = layout->pills[REACH_TOP_BAR_PILL_TRAY].x + padding;
+        float cells_right = cells_left + (float)tray_cells * tray_slot +
+                            (float)(tray_cells - 1) * tray_gap;
+        layout->tray_background = reach_top_bar_rect(
+            cells_left - tray_background_padding, (height - tray_background_height) * 0.5f,
+            cells_right - cells_left + tray_background_padding * 2.0f, tray_background_height);
+    }
+
     reach_top_bar_update_current_app(top_bar);
 
     const float current_app_gap = metrics.current_app_gap * scale;

@@ -53,6 +53,7 @@ extern "C"
         reach_rect_f32 now_playing;
         reach_rect_f32 current_app_icon;
         reach_rect_f32 current_app_text;
+        reach_rect_f32 tray_background;
         reach_rect_f32 tray_icons[REACH_TOP_BAR_MAX_TRAY_ICONS];
         size_t tray_icon_count;
         reach_rect_f32 tray_overflow_button;

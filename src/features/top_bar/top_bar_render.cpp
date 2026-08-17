@@ -210,6 +210,13 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
     const reach_top_bar_layout *layout = input->layout;
 
+    if (layout->tray_background.width > 0.0f)
+    {
+        reach_top_bar_push_rect(commands, layout->tray_background,
+                                input->theme->bar_button_background,
+                                layout->tray_background.height * 0.5f);
+    }
+
     for (size_t index = 0; index < layout->tray_icon_count && index < input->tray_item_count;
          ++index)
     {
