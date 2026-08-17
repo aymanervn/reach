@@ -63,6 +63,8 @@ extern "C"
         reach_rect_f32 bluetooth_icon;
         reach_rect_f32 settings_button;
         reach_rect_f32 language_button;
+        reach_rect_f32 battery_shell;
+        reach_rect_f32 battery_cap;
         reach_rect_f32 stats_cpu;
         reach_rect_f32 stats_memory;
         reach_rect_f32 stats_download;

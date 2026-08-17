@@ -106,94 +106,6 @@ static void reach_top_bar_push_pill(const reach_theme *theme,
     reach_render_command_buffer_push(commands, &border);
 }
 
-static int32_t reach_top_bar_battery_percent_clamped(const reach_top_bar_render_input *input)
-{
-    int32_t percent = input->battery_percent;
-    if (percent < 0)
-    {
-        percent = 0;
-    }
-    if (percent > 100)
-    {
-        percent = 100;
-    }
-    return percent;
-}
-
-static reach_color reach_top_bar_battery_accent(const reach_top_bar_render_input *input,
-                                                int32_t percent)
-{
-    return percent <= 15 ? input->theme->bar_battery_low : input->theme->system_glyph;
-}
-
-static void reach_top_bar_push_battery_ring(const reach_top_bar_render_input *input,
-                                            reach_render_command_buffer *commands,
-                                            reach_rect_f32 power_box, int32_t percent)
-{
-    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
-
-    float inset = metrics.power_ring_inset + metrics.power_ring_stroke_width * 0.5f;
-    reach_rect_f32 ring_box =
-        reach_top_bar_rect(power_box.x + inset, power_box.y + inset, power_box.width - inset * 2.0f,
-                           power_box.height - inset * 2.0f);
-
-    reach_render_command track = {};
-    track.type = REACH_RENDER_COMMAND_ARC_STROKE;
-    track.rect = ring_box;
-    track.color = input->theme->system_glyph;
-    track.color.a *= metrics.power_ring_track_alpha;
-    track.stroke_width = metrics.power_ring_stroke_width;
-    track.arc_sweep = 1.0f;
-    reach_render_command_buffer_push(commands, &track);
-
-    reach_render_command arc = {};
-    arc.type = REACH_RENDER_COMMAND_ARC_STROKE;
-    arc.rect = ring_box;
-    arc.color = reach_top_bar_battery_accent(input, percent);
-    arc.stroke_width = metrics.power_ring_stroke_width;
-    arc.arc_sweep = (float)percent / 100.0f;
-    reach_render_command_buffer_push(commands, &arc);
-}
-
-static void reach_top_bar_push_battery_percent(const reach_top_bar_render_input *input,
-                                               reach_render_command_buffer *commands,
-                                               reach_rect_f32 power_box, int32_t percent)
-{
-    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
-    float hover = input->power_hover;
-    if (hover <= 0.001f)
-    {
-        return;
-    }
-
-    uint16_t percent_text[8] = {};
-    size_t length = 0;
-    if (percent >= 100)
-    {
-        percent_text[length++] = '1';
-        percent_text[length++] = '0';
-        percent_text[length++] = '0';
-    }
-    else
-    {
-        if (percent >= 10)
-        {
-            percent_text[length++] = (uint16_t)('0' + percent / 10);
-        }
-        percent_text[length++] = (uint16_t)('0' + percent % 10);
-    }
-    percent_text[length++] = '%';
-    percent_text[length] = 0;
-
-    reach_color text_color = reach_top_bar_battery_accent(input, percent);
-    text_color.a *= hover;
-
-    reach_top_bar_push_text(commands, power_box, percent_text,
-                            metrics.power_percent_text_size * input->dpi_scale,
-                            metrics.power_percent_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
-                            text_color);
-}
-
 static void reach_top_bar_push_power_button(const reach_top_bar_render_input *input,
                                             reach_render_command_buffer *commands)
 {
@@ -205,27 +117,13 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
         return;
     }
 
-    int32_t percent = reach_top_bar_battery_percent_clamped(input);
-
-    reach_color glyph_color = theme->system_glyph;
-    reach_color background = theme->bar_button_background;
-    if (input->battery_valid)
-    {
-        glyph_color.a *= 1.0f - input->power_hover;
-        background = reach_theme_color_mix(background, theme->bar_power_hover_background,
-                                           input->power_hover);
-    }
+    reach_color background = reach_theme_color_mix(
+        theme->bar_button_background, theme->bar_power_hover_background, input->power_hover);
 
     reach_top_bar_push_rect(commands, power_box, background, power_box.height * 0.5f);
     reach_top_bar_push_vector_icon(
         commands, reach_top_bar_center_square(power_box, power_box.height * metrics.power_glyph_scale),
-        REACH_VECTOR_ICON_POWER, glyph_color);
-
-    if (input->battery_valid)
-    {
-        reach_top_bar_push_battery_percent(input, commands, power_box, percent);
-        reach_top_bar_push_battery_ring(input, commands, power_box, percent);
-    }
+        REACH_VECTOR_ICON_POWER, theme->system_glyph);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON &&
         input->click_feedback_opacity > metrics.click_feedback_min_opacity)
@@ -403,6 +301,56 @@ static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
                                        REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON);
 }
 
+static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
+                                       reach_render_command_buffer *commands)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    const reach_theme *theme = input->theme;
+    reach_rect_f32 shell = input->layout->battery_shell;
+    if (!input->battery_valid || shell.width <= 0.0f)
+    {
+        return;
+    }
+
+    int32_t percent = input->battery_percent;
+    if (percent < 0)
+    {
+        percent = 0;
+    }
+    if (percent > 100)
+    {
+        percent = 100;
+    }
+
+    float shell_radius = shell.height * 0.35f;
+    reach_top_bar_push_rect(commands, shell, theme->bar_battery_shell, shell_radius);
+
+    reach_rect_f32 cap = input->layout->battery_cap;
+    reach_top_bar_push_rect(commands, cap, theme->bar_battery_shell, cap.height * 0.35f);
+
+    float inset = metrics.battery_fill_inset * input->dpi_scale;
+    float track_width = shell.width - inset * 2.0f;
+    float fill_height = shell.height - inset * 2.0f;
+    if (track_width <= 0.0f || fill_height <= 0.0f)
+    {
+        return;
+    }
+
+    float fill_width = track_width * (float)percent / 100.0f;
+    if (fill_width < fill_height)
+    {
+        fill_width = fill_height;
+    }
+
+    reach_color fill_color = (float)percent <= metrics.battery_low_percent
+                                 ? theme->bar_battery_low
+                                 : theme->bar_battery_fill;
+    reach_top_bar_push_rect(commands,
+                            reach_top_bar_rect(shell.x + inset, shell.y + inset, fill_width,
+                                               fill_height),
+                            fill_color, fill_height * 0.5f);
+}
+
 static void reach_top_bar_push_glyph_button(const reach_top_bar_render_input *input,
                                             reach_render_command_buffer *commands,
                                             reach_rect_f32 button, uint32_t icon_id,
@@ -524,6 +472,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_push_tray(&input, out_commands);
     reach_top_bar_push_stats(&input, out_commands);
     reach_top_bar_push_language(&input, out_commands);
+    reach_top_bar_push_battery(&input, out_commands);
     reach_top_bar_push_quick_settings(&input, out_commands);
     reach_top_bar_push_glyph_button(&input, out_commands, layout->settings_button,
                                     REACH_VECTOR_ICON_SETTINGS,

@@ -401,6 +401,11 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         top_bar->state.language_code[0] != 0 ? metrics.language_width * scale : 0.0f;
     float language_gap = language_width > 0.0f ? pill_gap : 0.0f;
 
+    const float battery_cap_advance = (metrics.battery_cap_gap + metrics.battery_cap_width) * scale;
+    float battery_width =
+        top_bar->state.battery_valid ? metrics.battery_width * scale + battery_cap_advance : 0.0f;
+    float battery_gap = battery_width > 0.0f ? pill_gap : 0.0f;
+
     const float stats_size = metrics.stats_text_size * scale;
     const float stats_gap = metrics.stats_gap * scale;
     const float stats_group_gap = metrics.stats_group_gap * scale;
@@ -448,8 +453,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         quick_settings_padding * 2.0f + quick_settings_content);
 
     float quick_settings_width = dot_size * 0.5f + dot_gap + stats_width + language_width +
-                                 language_gap + quick_settings_button_width + pill_gap +
-                                 button_size + padding;
+                                 language_gap + battery_width + battery_gap +
+                                 quick_settings_button_width + pill_gap + button_size + padding;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
     layout->tray_separator = reach_top_bar_rect(
@@ -475,6 +480,19 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->language_button = reach_top_bar_rect(
             cluster_x, (height - button_size) * 0.5f, language_width, button_size);
         cluster_x += language_width + language_gap;
+    }
+    if (battery_width > 0.0f)
+    {
+        const float shell_width = metrics.battery_width * scale;
+        const float shell_height = metrics.battery_height * scale;
+        const float cap_width = metrics.battery_cap_width * scale;
+        const float cap_height = metrics.battery_cap_height * scale;
+        layout->battery_shell = reach_top_bar_rect(cluster_x, (height - shell_height) * 0.5f,
+                                                   shell_width, shell_height);
+        layout->battery_cap =
+            reach_top_bar_rect(cluster_x + shell_width + metrics.battery_cap_gap * scale,
+                               (height - cap_height) * 0.5f, cap_width, cap_height);
+        cluster_x += battery_width + battery_gap;
     }
     layout->quick_settings_button = reach_top_bar_rect(
         cluster_x, (height - button_size) * 0.5f, quick_settings_button_width, button_size);
