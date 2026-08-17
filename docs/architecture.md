@@ -166,10 +166,13 @@ each window's original outer rect at capture and animates back onto it — Windo
 never grows a window back on its own — and drives the motion through
 `app_control`'s generic window geometry ops (`reach_app_control_window_bounds` /
 `reach_app_control_set_window_bounds`, one `BeginDeferWindowPos` batch per frame
-in the adapter). Those ops work in the outer window rect the OS repositions,
-never the DWM `frame_bounds` the rest of the shell measures with; mixing the two
-drifts by the invisible resize border. The work area is deliberately left alone:
-changing it costs ~37 ms per call, which no per-frame path can afford.
+in the adapter). They are the only synchronous window ops on that service — the
+`schedule_*` ones go to its worker thread because activate/minimize/close can
+block on another process, while a push that misses its frame is worse than
+useless. They also work in the outer window rect the OS repositions, never the
+DWM `frame_bounds` the rest of the shell measures with; mixing the two drifts by
+the invisible resize border. The work area is deliberately left alone: changing
+it costs ~37 ms per call, which no per-frame path can afford.
 
 Every popup gets its bounds and its notch from one place —
 `reach_popup_place(anchor, width, height, margin)` in `features/popup`. It

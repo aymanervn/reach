@@ -586,8 +586,8 @@ reach_result reach_app_control_schedule_windows(reach_app_control *service,
     return REACH_OK;
 }
 
-reach_result reach_app_control_window_bounds(const reach_app_control *service,
-                                             uintptr_t window_id, reach_rect_f32 *out_bounds)
+reach_result reach_app_control_window_bounds(const reach_app_control *service, uintptr_t window_id,
+                                             reach_rect_f32 *out_bounds)
 {
     if (service == nullptr || out_bounds == nullptr || window_id == 0)
     {
