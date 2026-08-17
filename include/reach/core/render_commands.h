@@ -165,8 +165,6 @@ extern "C"
                                                  reach_rect_f32 scissor_rect);
     void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buffer);
 
-    uint32_t reach_volume_vector_icon_id(float level, int32_t muted);
-
 #ifdef __cplusplus
 }
 #endif

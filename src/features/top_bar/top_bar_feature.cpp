@@ -205,13 +205,21 @@ static uint32_t reach_top_bar_bluetooth_icon_id(const reach_bluetooth_state *blu
     return bluetooth->enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF;
 }
 
-static uint32_t reach_top_bar_volume_icon_id(const reach_system_status_audio_snapshot *audio)
+static void reach_top_bar_format_volume(uint16_t *dst, size_t dst_count, float level)
 {
-    if (!audio->state_valid)
+    int32_t percent = (int32_t)(level * 100.0f + 0.5f);
+    if (percent < 0)
     {
-        return REACH_VECTOR_ICON_NONE;
+        percent = 0;
     }
-    return reach_volume_vector_icon_id(audio->state.level, audio->state.muted);
+    if (percent > 100)
+    {
+        percent = 100;
+    }
+
+    char text[8] = {};
+    snprintf(text, sizeof(text), "%d%%", percent);
+    reach_top_bar_copy_ascii_to_utf16(dst, dst_count, text);
 }
 
 static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
@@ -227,7 +235,15 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
         reach_top_bar_network_icon_id(&snapshot.network, snapshot.network_valid);
     uint32_t bluetooth_icon =
         reach_top_bar_bluetooth_icon_id(&snapshot.bluetooth, snapshot.bluetooth_valid);
-    uint32_t volume_icon = reach_top_bar_volume_icon_id(&audio);
+    int32_t network_connected = snapshot.network_valid && snapshot.network.connected;
+    int32_t bluetooth_enabled = snapshot.bluetooth_valid && snapshot.bluetooth.enabled;
+
+    uint16_t volume_text[8] = {};
+    if (audio.state_valid)
+    {
+        reach_top_bar_format_volume(volume_text, 8, audio.state.level);
+    }
+    int32_t volume_muted = audio.state_valid && audio.state.muted;
 
     uint16_t name[REACH_SYSTEM_NETWORK_LABEL_CAPACITY] = {};
     if (snapshot.network_valid && snapshot.network.connected &&
@@ -237,7 +253,10 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
     }
 
     if (state->network_icon_id == network_icon && state->bluetooth_icon_id == bluetooth_icon &&
-        state->volume_icon_id == volume_icon &&
+        state->network_connected == network_connected &&
+        state->bluetooth_enabled == bluetooth_enabled &&
+        state->volume_valid == audio.state_valid && state->volume_muted == volume_muted &&
+        reach_top_bar_utf16_equal(state->volume_text, volume_text) &&
         reach_top_bar_utf16_equal(state->network_name, name))
     {
         return 0;
@@ -245,7 +264,11 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
 
     state->network_icon_id = network_icon;
     state->bluetooth_icon_id = bluetooth_icon;
-    state->volume_icon_id = volume_icon;
+    state->network_connected = network_connected;
+    state->bluetooth_enabled = bluetooth_enabled;
+    state->volume_valid = audio.state_valid;
+    state->volume_muted = volume_muted;
+    reach_copy_utf16(state->volume_text, 8, volume_text);
     reach_copy_utf16(state->network_name, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, name);
     return 1;
 }
@@ -463,9 +486,15 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     {
         quick_settings_content += quick_settings_content_gap + glyph_size;
     }
-    if (top_bar->state.volume_icon_id != REACH_VECTOR_ICON_NONE)
+    const float volume_text_size = metrics.volume_text_size * scale;
+    float volume_advance =
+        top_bar->state.volume_valid
+            ? reach_top_bar_stats_slot_advance(top_bar->state.volume_text,
+                                               (const uint16_t *)L"100%", volume_text_size)
+            : 0.0f;
+    if (volume_advance > 0.0f)
     {
-        quick_settings_content += quick_settings_content_gap + glyph_size;
+        quick_settings_content += quick_settings_content_gap + volume_advance;
     }
     float quick_settings_button_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH, &top_bar->quick_settings_target_width,
@@ -533,10 +562,11 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->bluetooth_icon = reach_top_bar_rect(content_x, glyph_y, glyph_size, glyph_size);
         content_x += glyph_size;
     }
-    if (top_bar->state.volume_icon_id != REACH_VECTOR_ICON_NONE)
+    if (volume_advance > 0.0f)
     {
         content_x += quick_settings_content_gap;
-        layout->volume_icon = reach_top_bar_rect(content_x, glyph_y, glyph_size, glyph_size);
+        layout->volume_label =
+            reach_top_bar_text_run(content_x, height, volume_advance, volume_text_size);
     }
 
     cluster_x += quick_settings_button_width + pill_gap;

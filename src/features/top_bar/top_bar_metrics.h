@@ -43,6 +43,8 @@ struct reach_top_bar_metrics
     float network_name_text_size;
     int32_t network_name_text_weight;
     float network_name_max_width;
+    float volume_text_size;
+    int32_t volume_text_weight;
     float language_width;
     float language_text_size;
     int32_t language_text_weight;
@@ -108,6 +110,8 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.network_name_text_size = 11.0f;
     metrics.network_name_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     metrics.network_name_max_width = 96.0f;
+    metrics.volume_text_size = 11.0f;
+    metrics.volume_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     metrics.language_width = 32.0f;
     metrics.language_text_size = 11.0f;
     metrics.language_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;

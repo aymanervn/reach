@@ -17,11 +17,14 @@ typedef struct reach_top_bar_render_input
     size_t tray_item_count;
     int32_t tray_overflow;
     int32_t tray_popup_open;
-    uint32_t volume_icon_id;
+    const uint16_t *volume_text;
+    int32_t volume_muted;
     const uint16_t *language_code;
     const uint16_t *network_name;
     uint32_t network_icon_id;
     uint32_t bluetooth_icon_id;
+    int32_t network_connected;
+    int32_t bluetooth_enabled;
     const uint16_t *stats_cpu_text;
     const uint16_t *stats_memory_text;
     const uint16_t *stats_download_text;
@@ -379,6 +382,12 @@ static void reach_top_bar_push_glyph_button(const reach_top_bar_render_input *in
     reach_top_bar_push_button_feedback(input, commands, button, feedback_slot);
 }
 
+static reach_color reach_top_bar_status_glyph_color(const reach_top_bar_render_input *input,
+                                                    int32_t active, reach_theme_accent accent)
+{
+    return active ? reach_theme_accent_color(input->theme, accent) : input->theme->system_glyph;
+}
+
 static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
                                               reach_render_command_buffer *commands)
 {
@@ -392,8 +401,10 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
 
     reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
                             button.height * 0.5f);
-    reach_top_bar_push_vector_icon(commands, layout->network_icon, input->network_icon_id,
-                                   input->theme->system_glyph);
+    reach_top_bar_push_vector_icon(
+        commands, layout->network_icon, input->network_icon_id,
+        reach_top_bar_status_glyph_color(input, input->network_connected,
+                                         REACH_THEME_ACCENT_GREEN));
     if (layout->network_label.width > 0.0f)
     {
         reach_top_bar_push_text(commands, layout->network_label, input->network_name,
@@ -403,13 +414,18 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
     }
     if (input->bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
     {
-        reach_top_bar_push_vector_icon(commands, layout->bluetooth_icon, input->bluetooth_icon_id,
-                                       input->theme->system_glyph);
+        reach_top_bar_push_vector_icon(
+            commands, layout->bluetooth_icon, input->bluetooth_icon_id,
+            reach_top_bar_status_glyph_color(input, input->bluetooth_enabled,
+                                             REACH_THEME_ACCENT_BLUE));
     }
-    if (input->volume_icon_id != REACH_VECTOR_ICON_NONE)
+    if (layout->volume_label.width > 0.0f)
     {
-        reach_top_bar_push_vector_icon(commands, layout->volume_icon, input->volume_icon_id,
-                                       input->theme->system_glyph);
+        reach_top_bar_push_text(commands, layout->volume_label, input->volume_text,
+                                metrics.volume_text_size * input->dpi_scale,
+                                metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+                                input->volume_muted ? input->theme->bar_text_secondary
+                                                    : input->theme->bar_text_primary);
     }
     reach_top_bar_push_button_feedback(input, commands, button,
                                        REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
@@ -466,7 +482,10 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.network_name = state->network_name;
     input.network_icon_id = state->network_icon_id;
     input.bluetooth_icon_id = state->bluetooth_icon_id;
-    input.volume_icon_id = state->volume_icon_id;
+    input.network_connected = state->network_connected;
+    input.bluetooth_enabled = state->bluetooth_enabled;
+    input.volume_text = state->volume_text;
+    input.volume_muted = state->volume_muted;
     input.stats_cpu_text = state->stats_cpu_text;
     input.stats_memory_text = state->stats_memory_text;
     input.stats_download_text = state->stats_download_text;
