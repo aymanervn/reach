@@ -195,14 +195,42 @@ static uint32_t reach_top_bar_network_icon_id(const reach_network_state *network
     return REACH_VECTOR_ICON_WIFI_HIGH;
 }
 
-static uint32_t reach_top_bar_bluetooth_icon_id(const reach_bluetooth_state *bluetooth,
-                                                int32_t valid)
+// Enabling the radio makes it briefly unenumerable, so a bare availability read would blink the
+// glyph out and back on every enable. Hold the last known glyph until absence outlasts the grace.
+static void reach_top_bar_resolve_bluetooth(reach_top_bar_state *state,
+                                            const reach_system_status_system_snapshot *snapshot,
+                                            double delta_seconds, uint32_t *out_icon_id,
+                                            int32_t *out_enabled)
 {
-    if (!valid || !bluetooth->available)
+    if (snapshot->bluetooth_valid && snapshot->bluetooth.available)
     {
-        return REACH_VECTOR_ICON_NONE;
+        state->bluetooth_absent_seconds = 0.0;
+        *out_enabled = snapshot->bluetooth.enabled ? 1 : 0;
+        *out_icon_id = *out_enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON
+                                    : REACH_VECTOR_ICON_BLUETOOTH_OFF;
+        return;
     }
-    return bluetooth->enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF;
+
+    state->bluetooth_absent_seconds += delta_seconds;
+    if (state->bluetooth_icon_id != REACH_VECTOR_ICON_NONE &&
+        state->bluetooth_absent_seconds <
+            reach_top_bar_metrics_values.bluetooth_absence_grace_seconds)
+    {
+        *out_icon_id = state->bluetooth_icon_id;
+        *out_enabled = state->bluetooth_enabled;
+        return;
+    }
+
+    *out_icon_id = REACH_VECTOR_ICON_NONE;
+    *out_enabled = 0;
+}
+
+int32_t reach_top_bar_bluetooth_absence_pending(const reach_top_bar *top_bar)
+{
+    return top_bar != nullptr && top_bar->state.bluetooth_icon_id != REACH_VECTOR_ICON_NONE &&
+           top_bar->state.bluetooth_absent_seconds > 0.0 &&
+           top_bar->state.bluetooth_absent_seconds <
+               reach_top_bar_metrics_values.bluetooth_absence_grace_seconds;
 }
 
 static void reach_top_bar_format_volume(uint16_t *dst, size_t dst_count, float level)
@@ -222,7 +250,7 @@ static void reach_top_bar_format_volume(uint16_t *dst, size_t dst_count, float l
     reach_top_bar_copy_ascii_to_utf16(dst, dst_count, text);
 }
 
-static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
+static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double delta_seconds)
 {
     reach_top_bar_state *state = &top_bar->state;
     reach_system_status_system_snapshot snapshot = {};
@@ -233,10 +261,11 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar)
 
     uint32_t network_icon =
         reach_top_bar_network_icon_id(&snapshot.network, snapshot.network_valid);
-    uint32_t bluetooth_icon =
-        reach_top_bar_bluetooth_icon_id(&snapshot.bluetooth, snapshot.bluetooth_valid);
+    uint32_t bluetooth_icon = REACH_VECTOR_ICON_NONE;
+    int32_t bluetooth_enabled = 0;
+    reach_top_bar_resolve_bluetooth(state, &snapshot, delta_seconds, &bluetooth_icon,
+                                    &bluetooth_enabled);
     int32_t network_connected = snapshot.network_valid && snapshot.network.connected;
-    int32_t bluetooth_enabled = snapshot.bluetooth_valid && snapshot.bluetooth.enabled;
 
     uint16_t volume_text[8] = {};
     if (audio.state_valid)
@@ -392,7 +421,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float edge_inset = metrics.edge_inset * scale;
     const float pill_gap = metrics.pill_gap * scale;
     const float padding = metrics.pill_padding * scale;
-    const float power_button_size = height * metrics.power_button_scale;
+    const float power_button_size = height * metrics.bar_button_scale;
     const float clock_gap = metrics.clock_gap * scale;
     const float time_size = metrics.clock_time_text_size * scale;
     const float date_size = metrics.clock_date_text_size * scale;
@@ -463,7 +492,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         upload_advance = reach_top_bar_stats_slot_advance(
             top_bar->state.stats_upload_text, (const uint16_t *)L"\u2191 999KB", stats_size);
         stats_width = cpu_advance + stats_gap + memory_advance + stats_group_gap +
-                      download_advance + stats_gap + upload_advance + stats_group_gap;
+                      download_advance + stats_gap + upload_advance + pill_gap;
     }
 
     const float glyph_size = button_size * metrics.bar_button_glyph_scale;
@@ -521,7 +550,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
             reach_top_bar_text_run(cluster_x, height, download_advance, stats_size);
         cluster_x += download_advance + stats_gap;
         layout->stats_upload = reach_top_bar_text_run(cluster_x, height, upload_advance, stats_size);
-        cluster_x += upload_advance + stats_group_gap;
+        cluster_x += upload_advance + pill_gap;
     }
     if (language_width > 0.0f)
     {
@@ -565,8 +594,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     if (volume_advance > 0.0f)
     {
         content_x += quick_settings_content_gap;
-        layout->volume_label =
-            reach_top_bar_text_run(content_x, height, volume_advance, volume_text_size);
+        layout->volume_label = reach_top_bar_rect(content_x, 0.0f, volume_advance, height);
     }
 
     cluster_x += quick_settings_button_width + pill_gap;
@@ -919,7 +947,7 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         out->relayout = 1;
     }
 
-    if (reach_top_bar_update_system_status(top_bar) && out != nullptr)
+    if (reach_top_bar_update_system_status(top_bar, delta_seconds) && out != nullptr)
     {
         out->redraw = 1;
         out->relayout = 1;
@@ -1000,6 +1028,7 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
            reach_top_bar_width_animation_active(top_bar) ||
+           reach_top_bar_bluetooth_absence_pending(top_bar) ||
            reach_top_bar_now_playing_scroll_active(top_bar);
 }
 

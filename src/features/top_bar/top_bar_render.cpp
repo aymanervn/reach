@@ -215,8 +215,7 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
 
     if (layout->tray_background.width > 0.0f)
     {
-        reach_top_bar_push_rect(commands, layout->tray_background,
-                                input->theme->bar_button_background,
+        reach_top_bar_push_rect(commands, layout->tray_background, input->theme->bar_tray_background,
                                 layout->tray_background.height * 0.5f);
     }
 
@@ -423,7 +422,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
     {
         reach_top_bar_push_text(commands, layout->volume_label, input->volume_text,
                                 metrics.volume_text_size * input->dpi_scale,
-                                metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+                                metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_TRAILING,
                                 input->volume_muted ? input->theme->bar_text_secondary
                                                     : input->theme->bar_text_primary);
     }

@@ -54,8 +54,8 @@ struct reach_top_bar_metrics
     float stats_text_size;
     int32_t stats_text_weight;
 
-    float power_button_scale;
     float power_glyph_scale;
+    double bluetooth_absence_grace_seconds;
 
     float battery_width;
     float battery_height;
@@ -121,8 +121,8 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.stats_text_size = 11.0f;
     metrics.stats_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
 
-    metrics.power_button_scale = 0.72f;
     metrics.power_glyph_scale = 0.50f;
+    metrics.bluetooth_absence_grace_seconds = 2.0;
 
     metrics.battery_width = 22.0f;
     metrics.battery_height = 11.0f;
