@@ -256,7 +256,7 @@ static const reach_theme reach_theme_light = {
     .switcher_label_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.96f),
 
     .context_menu_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.96f),
-    .context_menu_hover_background = REACH_LIGHT_STRUCTURE(1.0f),
+    .context_menu_hover_background = REACH_LIGHT_MIDTONE(1.0f),
     .context_menu_close_background = REACH_CRITICAL_RED(1.0f),
     .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
     .menu_accent_shutdown = REACH_LIGHT_ACCENT_RED(1.0f),
