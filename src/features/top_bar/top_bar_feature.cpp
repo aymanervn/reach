@@ -518,8 +518,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float volume_text_size = metrics.volume_text_size * scale;
     float volume_advance =
         top_bar->state.volume_valid
-            ? reach_top_bar_stats_slot_advance(top_bar->state.volume_text,
-                                               (const uint16_t *)L"100%", volume_text_size)
+            ? reach_top_bar_text_advance(top_bar->state.volume_text, volume_text_size)
             : 0.0f;
     if (volume_advance > 0.0f)
     {
@@ -607,17 +606,20 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float tray_gap = metrics.tray_icon_gap * scale;
     const size_t tray_count = top_bar->state.tray_item_count;
     const size_t tray_cells = tray_count + (top_bar->state.tray_overflow ? 1u : 0u);
-    float tray_target_width = padding + dot_gap + dot_size * 0.5f;
-    if (tray_cells > 0)
-    {
-        tray_target_width += (float)tray_cells * tray_slot + (float)(tray_cells - 1) * tray_gap;
-    }
+    const float tray_background_padding =
+        tray_cells > 0 ? metrics.tray_background_padding * scale : 0.0f;
+    float tray_cells_span =
+        tray_cells > 0 ? (float)tray_cells * tray_slot + (float)(tray_cells - 1) * tray_gap : 0.0f;
+    float tray_target_width = padding + tray_background_padding * 2.0f + tray_cells_span + dot_gap +
+                              dot_size * 0.5f;
     float tray_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_TRAY_WIDTH, &top_bar->tray_target_width, tray_target_width);
     layout->pills[REACH_TOP_BAR_PILL_TRAY] =
         reach_top_bar_rect(right - tray_width, 0.0f, tray_width, height);
 
-    float tray_x = layout->pills[REACH_TOP_BAR_PILL_TRAY].x + padding;
+    float cells_left =
+        layout->pills[REACH_TOP_BAR_PILL_TRAY].x + padding + tray_background_padding;
+    float tray_x = cells_left;
     float tray_y = (height - tray_slot) * 0.5f;
     layout->tray_icon_count = tray_count;
     for (size_t index = 0; index < tray_count; ++index)
@@ -631,14 +633,10 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     if (tray_cells > 0)
     {
-        const float tray_background_padding = metrics.tray_background_padding * scale;
         const float tray_background_height = height * metrics.tray_background_scale;
-        float cells_left = layout->pills[REACH_TOP_BAR_PILL_TRAY].x + padding;
-        float cells_right = cells_left + (float)tray_cells * tray_slot +
-                            (float)(tray_cells - 1) * tray_gap;
         layout->tray_background = reach_top_bar_rect(
             cells_left - tray_background_padding, (height - tray_background_height) * 0.5f,
-            cells_right - cells_left + tray_background_padding * 2.0f, tray_background_height);
+            tray_cells_span + tray_background_padding * 2.0f, tray_background_height);
     }
 
     reach_top_bar_update_current_app(top_bar);
