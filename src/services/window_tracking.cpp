@@ -202,8 +202,8 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
                                                 window->app_user_model_id);
 }
 
-void reach_window_tracking_app_display_name(const reach_window_snapshot *window,
-                                            uint16_t *out_name, size_t out_name_count)
+void reach_window_tracking_app_display_name(const reach_window_snapshot *window, uint16_t *out_name,
+                                            size_t out_name_count)
 {
     if (out_name == nullptr || out_name_count == 0)
     {

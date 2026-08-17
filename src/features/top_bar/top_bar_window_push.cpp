@@ -19,6 +19,7 @@ struct reach_top_bar_window_push
     reach_window_tracking *windows;
     reach_top_bar_pushed_window pushed[REACH_TOP_BAR_PUSH_MAX_WINDOWS];
     size_t pushed_count;
+    int32_t captured;
     float applied_offset;
 };
 
@@ -109,22 +110,17 @@ static void reach_top_bar_push_collect(reach_top_bar_window_push *push, reach_re
 static void reach_top_bar_push_write(reach_top_bar_window_push *push, float offset)
 {
     reach_window_outer_bounds requests[REACH_TOP_BAR_PUSH_MAX_WINDOWS] = {};
-    size_t count = 0;
 
     for (size_t index = 0; index < push->pushed_count; ++index)
     {
         const reach_top_bar_pushed_window *pushed = &push->pushed[index];
-        requests[count].window = pushed->window;
-        requests[count].bounds = pushed->original;
-        requests[count].bounds.y += offset;
-        requests[count].bounds.height -= offset;
-        ++count;
+        requests[index].window = pushed->window;
+        requests[index].bounds = pushed->original;
+        requests[index].bounds.y += offset;
+        requests[index].bounds.height -= offset;
     }
 
-    if (count > 0)
-    {
-        (void)reach_app_control_set_window_bounds(push->apps, requests, count);
-    }
+    (void)reach_app_control_set_window_bounds(push->apps, requests, push->pushed_count);
     push->applied_offset = offset;
 }
 
@@ -138,8 +134,8 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
 
     float shown_overlap =
         reach_top_bar_push_bar_overlap(request->shown_bounds, request->monitor_bounds);
-    float overlap = reach_top_bar_push_bar_overlap(request->animated_bounds,
-                                                   request->monitor_bounds);
+    float overlap =
+        reach_top_bar_push_bar_overlap(request->animated_bounds, request->monitor_bounds);
     if (overlap > shown_overlap)
     {
         overlap = shown_overlap;
@@ -151,16 +147,13 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
         return;
     }
 
-    if (push->pushed_count == 0)
+    if (!push->captured)
     {
         reach_top_bar_push_collect(push, request->monitor_bounds, shown_overlap);
-        if (push->pushed_count == 0)
-        {
-            return;
-        }
+        push->captured = 1;
     }
 
-    if (overlap == push->applied_offset)
+    if (push->pushed_count == 0 || overlap == push->applied_offset)
     {
         return;
     }
@@ -169,11 +162,15 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
 
 void reach_top_bar_window_push_release(reach_top_bar_window_push *push)
 {
-    if (push == nullptr || push->pushed_count == 0)
+    if (push == nullptr || !push->captured)
     {
         return;
     }
-    reach_top_bar_push_write(push, 0.0f);
+    if (push->pushed_count > 0)
+    {
+        reach_top_bar_push_write(push, 0.0f);
+    }
+    push->captured = 0;
     push->pushed_count = 0;
     push->applied_offset = 0.0f;
 }

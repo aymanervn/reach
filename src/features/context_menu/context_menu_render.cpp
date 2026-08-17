@@ -165,8 +165,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         float trailing_inset = metrics->text_trailing_inset;
         if (input->window_list && input->hovered_index == index)
         {
-            trailing_inset += (metrics->text_trailing_inset_with_close - trailing_inset) *
-                              hover_opacity;
+            trailing_inset +=
+                (metrics->text_trailing_inset_with_close - trailing_inset) * hover_opacity;
         }
         float text_right = reach_context_menu_scale(input, trailing_inset);
 
