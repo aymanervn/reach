@@ -46,18 +46,16 @@
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
-    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f,                                  \
-    .border_thickness = 1.5f, .icon_box_height_ratio = 0.60f,                                      \
-    .icon_max_box_ratio = 0.76f, .icon_box_corner_radius_ratio = 0.28f,                            \
-    .icon_box_corner_radius_max = 14.0f, .tray_slot_size_ratio = 0.3f,                             \
-    .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,                                 \
-    .now_playing_width = 220.0f,                                                                   \
-    .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,                                          \
+    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 1.5f,        \
+    .icon_box_height_ratio = 0.60f, .icon_max_box_ratio = 0.76f,                                   \
+    .icon_box_corner_radius_ratio = 0.28f, .icon_box_corner_radius_max = 14.0f,                    \
+    .tray_slot_size_ratio = 0.3f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,   \
+    .now_playing_width = 220.0f, .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,             \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
     .now_playing_prev_next_button_width = 13.2f, .now_playing_title_text_size = 15.0f,             \
-    .surface_open_seconds = 0.16f, .surface_close_seconds = 0.12f,                                 \
-    .bar_reveal_seconds = 0.25f, .stage_animation_seconds = 0.28f,                                 \
-    .stage_close_hover_seconds = 0.14f, .stage_reflow_seconds = 0.34f
+    .surface_open_seconds = 0.16f, .surface_close_seconds = 0.12f, .bar_reveal_seconds = 0.25f,    \
+    .stage_animation_seconds = 0.28f, .stage_close_hover_seconds = 0.14f,                          \
+    .stage_reflow_seconds = 0.34f
 
 static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
@@ -394,4 +392,3 @@ float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height)
     const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
     return dock_height * actual->tray_slot_size_ratio;
 }
-

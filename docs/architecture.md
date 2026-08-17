@@ -168,18 +168,59 @@ game-mode bar never asks for a frame.
 
 The window push is the top bar's second private subfeature: while the bar can
 hide and is sliding in, it moves the windows the bar would cover down by the
-bar's own animated overlap, so they track the bar edge on one clock. It stores
-each window's original outer rect at capture and animates back onto it — Windows
-never grows a window back on its own — and drives the motion through
-`app_control`'s generic window geometry ops (`reach_app_control_window_bounds` /
-`reach_app_control_set_window_bounds`, one `BeginDeferWindowPos` batch per frame
-in the adapter). They are the only synchronous window ops on that service — the
-`schedule_*` ones go to its worker thread because activate/minimize/close can
-block on another process, while a push that misses its frame is worse than
-useless. They also work in the outer window rect the OS repositions, never the
-DWM `frame_bounds` the rest of the shell measures with; mixing the two drifts by
-the invisible resize border. The work area is deliberately left alone: changing
-it costs ~37 ms per call, which no per-frame path can afford.
+bar's own reveal progress, so they track the bar edge on one clock. That
+progress is `reach_bar_visibility_result.reveal_progress` — the fraction of the
+bar's full travel between its hidden and shown positions, produced where the
+hidden position is known. Deriving it instead from how far the bar's bottom edge
+has crossed the screen edge leaves the windows parked for the first ~80% of the
+reveal and then racing to catch up. Both the full frame path and the
+`reach_host_move_bar_animation_frame` fast path feed it: that fast path slides a
+bar without a redraw and so never reaches `reconcile_bar_visibility`, which is
+exactly the state a hide settles into, so it calls
+`reach_top_bar_move_window_push_frame` to keep the push on the same clock.
+
+It **moves** windows and never resizes them. A resize makes the app relayout its
+whole client area on every frame, cross-process, which is the one cost this path
+cannot afford — the apps could not keep up with it (10–13 ms per step against the
+bar's 5–9 ms). A move costs the app nothing; the window keeps its size and its
+bottom simply runs past the screen edge until the bar hides again. Nothing is
+clipped permanently and nothing reflows. Moving a maximized window is allowed and
+exact: it stays flagged maximized (`WINDOWPLACEMENT.showCmd == 3`), does not snap
+back, and lands on the requested position to the pixel on every frame.
+
+Each window animates onto the band's lower edge, which is where its **outer** top
+edge lands — a maximized window's rect overhangs the monitor by its invisible
+resize border and the app paints that overhang, so aligning anything else puts
+that painted border against the bar and eats the gap. The depth of that band
+comes from the top bar's own layout — the screen gap above the bar, the bar
+height, and the same gap again below it — not from the bar rect alone, so a
+revealed bar floats between the screen edge and the window it pushed. Only
+windows centred on the bar's monitor are pushed; a window on a neighbouring
+monitor that merely clips into this one is left alone. It stores each window's
+original position at capture and animates back onto it — Windows never moves a
+window back on its own.
+
+That stored position is the only record of where a window came from, so a shell
+that dies mid-reveal loses it. `reach_top_bar_push_recover` covers that once per
+attach: a maximized window always rests at its monitor's origin, so any maximized
+window found resting anywhere else is put back before the first push. It is the
+only recovery this path needs.
+
+The motion goes through `app_control`'s window ops
+(`reach_app_control_window_bounds` / `reach_app_control_window_frame_bounds` to
+read, `reach_app_control_move_windows` to write, one `SetWindowPos` with
+`SWP_NOSIZE` per covered window per frame in the adapter). The flags are
+`SWP_NOSENDCHANGING` so a maximized window cannot clamp the move back, and
+`SWP_ASYNCWINDOWPOS` so a slow app cannot stall the frame. `BeginDeferWindowPos`
+cannot serve this path at all: `DeferWindowPos` rejects `SWP_NOSENDCHANGING` with
+`ERROR_INVALID_PARAMETER`, and without that flag the move is clamped away. These
+are the only synchronous window ops on that service — the `schedule_*` ones go to
+its worker thread because activate/minimize/close can block on another process,
+while a push that misses its frame is worse than useless. They also work in the
+outer window rect the OS repositions, never the DWM `frame_bounds` the rest of
+the shell measures with; mixing the two drifts by the invisible resize border.
+The work area is deliberately left alone: changing it costs ~37 ms per call,
+which no per-frame path can afford.
 
 Every popup gets its bounds and its notch from one place —
 `reach_popup_place(anchor, width, height, margin)` in `features/popup`. It

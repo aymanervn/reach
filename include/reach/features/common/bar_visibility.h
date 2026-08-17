@@ -52,6 +52,7 @@ extern "C"
     {
         reach_rect_f32 animated_bounds;
         reach_rect_f32 reveal_bounds;
+        float reveal_progress;
         int32_t edge_mode;
         int32_t visible;
         int32_t redraw;
@@ -65,6 +66,10 @@ extern "C"
 
     void reach_bar_visibility_reset(reach_bar_visibility_state *state);
     void reach_bar_begin_reveal_session(reach_bar_visibility_state *state);
+
+    float reach_bar_hidden_position(reach_bar_edge edge, reach_rect_f32 shown_bounds,
+                                    reach_rect_f32 monitor_bounds);
+    float reach_bar_reveal_progress(float animated_y, float shown_y, float hidden_y);
 
     reach_bar_visibility_result
     reach_bar_update_visibility(reach_bar_visibility_state *state, reach_animation_manager *manager,

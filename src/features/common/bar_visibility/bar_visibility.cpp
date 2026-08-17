@@ -6,7 +6,7 @@ static int32_t reach_bar_point_in_rect(reach_point_i32 point, reach_rect_f32 rec
            (float)point.y >= rect.y && (float)point.y < rect.y + rect.height;
 }
 
-static float reach_bar_hidden_y(reach_bar_edge edge, reach_rect_f32 shown_bounds,
+float reach_bar_hidden_position(reach_bar_edge edge, reach_rect_f32 shown_bounds,
                                 reach_rect_f32 monitor_bounds)
 {
     if (edge == REACH_BAR_EDGE_TOP)
@@ -14,6 +14,21 @@ static float reach_bar_hidden_y(reach_bar_edge edge, reach_rect_f32 shown_bounds
         return monitor_bounds.y - shown_bounds.height - 4.0f;
     }
     return monitor_bounds.y + monitor_bounds.height + 4.0f;
+}
+
+float reach_bar_reveal_progress(float animated_y, float shown_y, float hidden_y)
+{
+    float travel = shown_y - hidden_y;
+    if (travel == 0.0f)
+    {
+        return 1.0f;
+    }
+    float progress = (animated_y - hidden_y) / travel;
+    if (progress < 0.0f)
+    {
+        return 0.0f;
+    }
+    return progress > 1.0f ? 1.0f : progress;
 }
 
 static float reach_bar_reveal_span_inset(float inset, float width)
@@ -93,7 +108,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     }
 
     float hidden_y =
-        reach_bar_hidden_y(request->edge, request->shown_bounds, request->monitor_bounds);
+        reach_bar_hidden_position(request->edge, request->shown_bounds, request->monitor_bounds);
     reach_rect_f32 current_bounds = request->shown_bounds;
     if (state->animation_initialized)
     {
@@ -176,6 +191,8 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     reach_rect_f32 animated = request->shown_bounds;
     animated.y = reach_animation_manager_value(manager, y_track);
     result.animated_bounds = animated;
+    result.reveal_progress =
+        reach_bar_reveal_progress(animated.y, request->shown_bounds.y, hidden_y);
     if (edge_mode != REACH_BAR_REVEAL_EDGE_DISABLED)
     {
         result.reveal_bounds = reach_bar_reveal_edge_bounds(

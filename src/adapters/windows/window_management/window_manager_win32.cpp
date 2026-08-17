@@ -792,21 +792,16 @@ static reach_result reach_window_manager_outer_bounds(const reach_window_manager
     return REACH_OK;
 }
 
-static reach_result reach_window_manager_set_outer_bounds(reach_window_manager *manager,
-                                                          const reach_window_outer_bounds *windows,
-                                                          size_t count)
+static reach_result reach_window_manager_move_windows(reach_window_manager *manager,
+                                                      const reach_window_move *windows,
+                                                      size_t count)
 {
     if (manager == nullptr || windows == nullptr || count == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    HDWP defer = BeginDeferWindowPos((int)count);
-    if (defer == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
+    reach_result result = REACH_OK;
     for (size_t index = 0; index < count; ++index)
     {
         HWND hwnd = reinterpret_cast<HWND>(windows[index].window);
@@ -814,18 +809,16 @@ static reach_result reach_window_manager_set_outer_bounds(reach_window_manager *
         {
             continue;
         }
-        const reach_rect_f32 *bounds = &windows[index].bounds;
-        HDWP next = DeferWindowPos(defer, hwnd, nullptr, (int)bounds->x, (int)bounds->y,
-                                   (int)bounds->width, (int)bounds->height,
-                                   SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
-        if (next == nullptr)
+        const reach_point_f32 *position = &windows[index].position;
+        if (!SetWindowPos(hwnd, nullptr, (int)position->x, (int)position->y, 0, 0,
+                          SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING |
+                              SWP_ASYNCWINDOWPOS))
         {
-            return REACH_ERROR;
+            result = REACH_ERROR;
         }
-        defer = next;
     }
 
-    return EndDeferWindowPos(defer) ? REACH_OK : REACH_ERROR;
+    return result;
 }
 
 static reach_result reach_window_manager_pin_app_for_window(reach_window_manager *manager,
@@ -926,7 +919,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.window_at = reach_window_manager_window_at;
     out_port->ops.frame_bounds = reach_window_manager_frame_bounds;
     out_port->ops.outer_bounds = reach_window_manager_outer_bounds;
-    out_port->ops.set_outer_bounds = reach_window_manager_set_outer_bounds;
+    out_port->ops.move_windows = reach_window_manager_move_windows;
     out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
     out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;

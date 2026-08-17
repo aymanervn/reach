@@ -408,10 +408,12 @@ reach_result reach_host_move_top_bar_reveal_frame(reach_host *host)
                                              REACH_TOP_BAR_ANIM_Y);
 
     int32_t window_changed = 0;
-    return reach_host_apply_window_state(&host->top_bar.window, bounds, 1.0f,
-                                         &host->top_bar.last_bounds, &host->top_bar.last_opacity,
-                                         &host->top_bar.bounds_valid, &host->top_bar.opacity_valid,
-                                         &window_changed);
+    reach_result result = reach_host_apply_window_state(
+        &host->top_bar.window, bounds, 1.0f, &host->top_bar.last_bounds,
+        &host->top_bar.last_opacity, &host->top_bar.bounds_valid, &host->top_bar.opacity_valid,
+        &window_changed);
+    reach_top_bar_move_window_push_frame(host->top_bar_capsule);
+    return result;
 }
 
 reach_result reach_host_move_bar_animation_frame(reach_host *host)

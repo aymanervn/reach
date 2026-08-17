@@ -10,8 +10,8 @@ typedef struct reach_top_bar_window_push reach_top_bar_window_push;
 typedef struct reach_top_bar_window_push_request
 {
     reach_rect_f32 monitor_bounds;
-    reach_rect_f32 shown_bounds;
-    reach_rect_f32 animated_bounds;
+    float push_depth;
+    float reveal_progress;
     int32_t bar_can_hide;
 } reach_top_bar_window_push_request;
 
