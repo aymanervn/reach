@@ -31,6 +31,7 @@ struct reach_top_bar
 reach_top_bar_state *reach_top_bar_state_mut(reach_top_bar *top_bar);
 reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *top_bar);
 reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar);
+int32_t reach_top_bar_bluetooth_absence_pending(const reach_top_bar *top_bar);
 
 reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *layout,
                                                     int32_t local_x, int32_t local_y);
@@ -86,7 +87,7 @@ static inline float reach_top_bar_text_advance(const uint16_t *text, float text_
 static inline reach_rect_f32 reach_top_bar_text_run(float left, float height, float advance,
                                                     float text_size)
 {
-    return reach_top_bar_rect(left - text_size * 0.5f, 0.0f, advance + text_size, height);
+    return reach_top_bar_rect(left, 0.0f, advance + text_size, height);
 }
 
 #endif

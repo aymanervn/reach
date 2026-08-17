@@ -88,28 +88,34 @@ static int32_t reach_top_bar_now_playing_utf16_equal(const uint16_t *a, const ui
     return 1;
 }
 
+// The scissor clips flush against the text slot, so the first glyph is drawn hard on the edge and
+// reads as clipped until it has scrolled clear. A leading space gives it that clearance up front.
 static void reach_top_bar_now_playing_compose_line(reach_top_bar_now_playing_model *model)
 {
     static const uint16_t separator[] = {' ', 0x2022, ' ', 0};
 
     size_t length = 0;
+    if (model->title[0] == 0 && model->artist[0] == 0)
+    {
+        model->line[0] = 0;
+        return;
+    }
+
+    model->line[length++] = ' ';
     for (size_t index = 0; model->title[index] != 0 && length + 1 < 260; ++index)
     {
         model->line[length++] = model->title[index];
     }
-    if (length > 0 && model->artist[0] != 0)
+    if (model->title[0] != 0 && model->artist[0] != 0)
     {
         for (size_t index = 0; separator[index] != 0 && length + 1 < 260; ++index)
         {
             model->line[length++] = separator[index];
         }
     }
-    if (length > 0 || model->title[0] == 0)
+    for (size_t index = 0; model->artist[index] != 0 && length + 1 < 260; ++index)
     {
-        for (size_t index = 0; model->artist[index] != 0 && length + 1 < 260; ++index)
-        {
-            model->line[length++] = model->artist[index];
-        }
+        model->line[length++] = model->artist[index];
     }
     model->line[length] = 0;
 }
@@ -291,13 +297,14 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
         return REACH_OK;
     }
 
+    float dpi_scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     reach_rect_f32 text = input->layout->text;
     text.x += input->text_offset_x;
     text.width = input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
     reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
-                                     theme->now_playing_title_text_size, REACH_TEXT_WEIGHT_BOLD,
-                                     REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title,
-                                     input->layout->text);
+                                     theme->now_playing_title_text_size * dpi_scale,
+                                     REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING,
+                                     theme->now_playing_title, input->layout->text);
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
                                      input->model->playback == REACH_MEDIA_PLAYBACK_PLAYING
@@ -564,5 +571,6 @@ reach_top_bar_now_playing_append_render_commands(reach_top_bar_now_playing *now_
     input.model = &model;
     input.layout = &now_playing->layout;
     input.text_offset_x = now_playing->text_offset_x;
+    input.dpi_scale = ctx->dpi_scale;
     return reach_top_bar_now_playing_build_render_commands(&input, out_commands);
 }

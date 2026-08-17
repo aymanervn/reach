@@ -44,6 +44,7 @@ typedef struct reach_top_bar_now_playing_render_input
     const reach_top_bar_now_playing_model *model;
     const reach_top_bar_now_playing_layout *layout;
     float text_offset_x;
+    float dpi_scale;
 } reach_top_bar_now_playing_render_input;
 
 typedef struct reach_top_bar_now_playing_render_context
