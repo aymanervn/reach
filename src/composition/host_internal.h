@@ -327,6 +327,7 @@ struct reach_host
     size_t stage_thumbnail_generation;
     int32_t stage_thumbnails_registered;
     int32_t stage_topmost;
+    int32_t stage_z_applied;
     int32_t top_bar_topmost;
     uint64_t wallpaper_image_id;
     uint16_t wallpaper_image_path[260];
@@ -555,6 +556,7 @@ int32_t reach_host_icon_size_px(const reach_host *host);
 void reach_host_release_render_icon(reach_host *host, uint64_t icon_id);
 
 void reach_host_drain_icon_evictions(reach_host *host);
+void reach_host_raise_top_bar_topmost(reach_host *host);
 void reach_host_drain_tray_retired_icons(reach_host *host);
 void reach_host_release_tray_render_icons(reach_host *host);
 void reach_host_release_quick_settings_audio_render_icons(reach_host *host);

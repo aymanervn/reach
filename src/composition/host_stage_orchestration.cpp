@@ -406,6 +406,7 @@ void reach_host_close_stage(reach_host *host)
         host->stage.window.ops.set_topmost(host->stage.window.window, 1) == REACH_OK)
     {
         host->stage_topmost = 1;
+        reach_host_raise_top_bar_topmost(host);
     }
     host->stage_transition.close_seconds = 0.0;
     reach_stage_begin_close(host->stage_capsule);

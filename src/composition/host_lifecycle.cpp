@@ -21,9 +21,9 @@ static void reach_host_on_dock_reveal_edge(void *user, reach_screen_hotspot_even
     reach_host_request_bar_visibility_update(host);
 }
 
-static void reach_host_promote_top_bar_topmost(reach_host *host)
+void reach_host_raise_top_bar_topmost(reach_host *host)
 {
-    if (host->top_bar_topmost || host->top_bar.window.ops.set_topmost == nullptr)
+    if (host == nullptr || host->top_bar.window.ops.set_topmost == nullptr)
     {
         return;
     }
@@ -31,6 +31,14 @@ static void reach_host_promote_top_bar_topmost(reach_host *host)
     if (host->top_bar.window.ops.set_topmost(host->top_bar.window.window, 1) == REACH_OK)
     {
         host->top_bar_topmost = 1;
+    }
+}
+
+static void reach_host_promote_top_bar_topmost(reach_host *host)
+{
+    if (!host->top_bar_topmost)
+    {
+        reach_host_raise_top_bar_topmost(host);
     }
 }
 
