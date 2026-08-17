@@ -345,6 +345,15 @@ void reach_host_on_system_controls_changed(void *user, uint32_t change_flags)
     host->quick_settings_system_change_flags.fetch_or(change_flags);
 }
 
+void reach_host_on_audio_volume_changed(void *user)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host != nullptr)
+    {
+        host->audio_volume_changed.store(1);
+    }
+}
+
 void reach_host_process_quick_settings_changes(reach_host *host, double delta_seconds)
 {
     if (host == nullptr)
@@ -356,6 +365,10 @@ void reach_host_process_quick_settings_changes(reach_host *host, double delta_se
     if (change_flags != 0)
     {
         reach_system_status_refresh_system(host->system_status, change_flags);
+    }
+    if (host->audio_volume_changed.exchange(0) != 0)
+    {
+        reach_system_status_refresh_audio(host->system_status);
     }
     reach_feature_tick_result changes = {};
     reach_quick_settings_process_changes(host->quick_settings_capsule, delta_seconds, &changes);

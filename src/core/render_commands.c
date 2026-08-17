@@ -76,3 +76,12 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
     return REACH_OK;
 }
 
+uint32_t reach_volume_vector_icon_id(float level, int32_t muted)
+{
+    if (muted || level <= 0.0f)
+    {
+        return REACH_VECTOR_ICON_VOLUME_ZERO;
+    }
+    return level < 0.5f ? REACH_VECTOR_ICON_VOLUME_LOW : REACH_VECTOR_ICON_VOLUME_HIGH;
+}
+

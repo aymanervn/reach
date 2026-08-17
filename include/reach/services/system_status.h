@@ -53,6 +53,9 @@ extern "C"
     int32_t reach_system_status_take_system(reach_system_status *service,
                                             reach_system_status_system_snapshot *out_snapshot);
 
+    void reach_system_status_read_audio(const reach_system_status *service,
+                                        reach_system_status_audio_snapshot *out_snapshot);
+
     void reach_system_status_read_system(const reach_system_status *service,
                                          reach_system_status_system_snapshot *out_snapshot);
 

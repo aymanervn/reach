@@ -355,6 +355,24 @@ int32_t reach_system_status_take_system(reach_system_status *service,
     return 1;
 }
 
+void reach_system_status_read_audio(const reach_system_status *service,
+                                    reach_system_status_audio_snapshot *out_snapshot)
+{
+    if (out_snapshot == nullptr)
+    {
+        return;
+    }
+    *out_snapshot = {};
+    if (service == nullptr)
+    {
+        return;
+    }
+
+    reach_system_status *mutable_service = const_cast<reach_system_status *>(service);
+    std::lock_guard<std::mutex> lock(mutable_service->audio.mutex);
+    *out_snapshot = mutable_service->audio_snapshot;
+}
+
 void reach_system_status_read_system(const reach_system_status *service,
                                      reach_system_status_system_snapshot *out_snapshot)
 {
