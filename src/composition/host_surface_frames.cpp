@@ -413,9 +413,15 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         {
             (void)host->stage.window.ops.show(host->stage.window.window);
         }
+        if (!host->stage_z_applied)
+        {
+            reach_host_raise_stage_under_top_bar(host);
+            host->stage_z_applied = 1;
+        }
     }
     else
     {
+        host->stage_z_applied = 0;
         if (host->stage.window.ops.hide != nullptr)
         {
             (void)host->stage.window.ops.hide(host->stage.window.window);
