@@ -70,21 +70,18 @@ static void reach_host_layout_apply_visibility(const reach_host_layout_target *t
     if (target->desc != nullptr)
     {
         reach_surface_runtime *surface = target->desc->surface;
+        int32_t activates =
+            (target->desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
+        reach_host_apply_surface_activation(target->desc, visible);
+
         if (visible)
         {
-            if ((target->desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0)
-            {
-                reach_host_apply_surface_activation(target->desc, 1);
-            }
-            else if (surface->window.ops.show != nullptr)
+            if (!activates && surface->window.ops.show != nullptr)
             {
                 (void)surface->window.ops.show(surface->window.window);
             }
-            return;
         }
-
-        reach_host_apply_surface_activation(target->desc, 0);
-        if (surface->window.ops.hide != nullptr)
+        else if (surface->window.ops.hide != nullptr)
         {
             (void)surface->window.ops.hide(surface->window.window);
         }
@@ -108,22 +105,22 @@ static void reach_host_layout_apply_visibility(const reach_host_layout_target *t
     }
 }
 
-static int32_t reach_host_layout_was_banded(const reach_host *host,
-                                            reach_layout_participant participant)
+static const reach_layout_entry *reach_host_layout_applied_entry(
+    const reach_host *host, reach_layout_participant participant)
 {
     if (!host->has_applied_layout_plan)
     {
-        return 0;
+        return nullptr;
     }
     for (size_t index = 0; index < host->applied_layout_plan.count; ++index)
     {
         const reach_layout_entry *entry = &host->applied_layout_plan.entries[index];
         if (entry->participant == participant)
         {
-            return entry->layer > 0;
+            return entry;
         }
     }
-    return 0;
+    return nullptr;
 }
 
 void reach_host_apply_layout(reach_host *host)
@@ -144,8 +141,13 @@ void reach_host_apply_layout(reach_host *host)
     for (size_t index = 0; index < plan.count; ++index)
     {
         const reach_layout_entry *entry = &plan.entries[index];
-        reach_host_layout_apply_visibility(&host->layout_targets[entry->participant],
-                                           entry->visible);
+        const reach_layout_entry *applied =
+            reach_host_layout_applied_entry(host, entry->participant);
+        if (applied == nullptr || applied->visible != entry->visible)
+        {
+            reach_host_layout_apply_visibility(&host->layout_targets[entry->participant],
+                                               entry->visible);
+        }
     }
 
     reach_window_id above = 0;
@@ -156,7 +158,9 @@ void reach_host_apply_layout(reach_host *host)
 
         if (entry->layer == 0)
         {
-            if (reach_host_layout_was_banded(host, entry->participant))
+            const reach_layout_entry *applied =
+                reach_host_layout_applied_entry(host, entry->participant);
+            if (applied != nullptr && applied->layer > 0)
             {
                 (void)reach_host_layout_set_topmost(target, 0);
             }

@@ -231,10 +231,23 @@ the tray popup and the context menu all place through it; a popup that clamps
 its own bounds or re-derives its notch at render time has reintroduced the bug
 this helper exists to prevent.
 
+`features/common/layout` is the other shared state machine: a pure registry of
+participants, layers, conditions and visibility intent with a `resolve` that has no
+OS types, no ports and no host include. Composition owns every layer number and the
+one pass that applies a resolved plan; the manager itself only answers what the
+arrangement should be. See the composition section for the model.
+
 Dock and top bar are both bars: each owns a `reach_bar_visibility_state` driven
 by the shared `features/common/bar_visibility` state machine, and composition
 reconciles both through one `reach_host_reconcile_bar_visibility` over the
-descriptor's `update_visibility` / `bar_edge` / reveal-edge fields.
+descriptor's `update_visibility` / `edge` / `occluded` / reveal-edge fields.
+Neither bar names its own edge or decides what covers it — both come from the
+descriptor. The two bars answer `occluded` from different sources and must:
+the top bar rests in the app band, so windows genuinely cover it and its source
+is the cached trespass flag, recomputed only on move-size end, foreground change
+and window-list change. The dock is permanently topmost and is never in the
+windows' range, so it hides by policy — the maximized / snapped rule — and a
+floating window overlapping the dock band must never hide it.
 
 Two separate inputs decide how another open surface affects the bars, and both
 apply to both bars identically. A surface that declares `bar_shown_while_open`
@@ -281,10 +294,44 @@ order against a shared `reach_host_frame_context`.
 Surfaces that take OS activation declare `BEHAVIOR_ACTIVATES`; the class rules then
 own show-on-activate, close-on-focus-loss, and the staleness check that discards a
 focus-loss signal the surface has already recovered from (reach's own foreground
-handover emits one). An activating surface must show through
-`reach_host_apply_surface_activation` (idempotent via `surface->activated`), never
-through the per-frame `show()` in `reach_host_apply_transient_frame` — a fullscreen
-surface re-asserting `HWND_TOPMOST` every frame makes the desktop unusable.
+handover emits one). An activating surface shows through
+`reach_host_apply_surface_activation` (idempotent via `surface->activated`) and never
+through a raw `show()` — a fullscreen surface re-asserting `HWND_TOPMOST` every frame
+makes the desktop unusable.
+
+Z-order and visibility for the twelve windows reach owns are decided in one place:
+the `features/common/layout` manager plus the apply pass in `host_layout.cpp`. Each
+participant registers a base layer and, optionally, per-condition layer and
+visibility overrides; `reach_layout_resolve` is a pure function of registrations,
+the active condition set, and per-participant intent. Layer 0 is the app band — an
+exit, not a slot, and Windows owns ordering inside it. Layers above 0 are the
+topmost band, ordered among ourselves: the pass walks the plan in descending layer,
+seeds the chain with `set_topmost(1)`, and chains each following participant behind
+the previous with `place_behind`. It emits `set_topmost(0)` only on the transition
+out of the band, never while a participant rests there — `HWND_NOTOPMOST` lifts a
+window to the top of the app band, so a redundant demote would pop a resting bar
+above whatever covers it. The pass is the sole owner of `show()` / `hide()` for
+these windows; frame steps compute intent and render, and never touch visibility or
+z. It emits nothing when the resolved plan equals the last applied one, and emits
+each op only for the participants whose layer or visibility actually changed.
+
+Conditions are bits, not triggers: the arrangement is recomputed from the whole
+active set, so setting an already-set condition is a no-op and a missed one heals on
+the next resolve. `GAME_MODE` resolves every participant hidden and is the only
+game-mode branch in composition outside `host_game_mode.cpp`, which owns the state,
+and the one gate in `reach_host_update` — in game mode nothing below that gate runs
+at all, rather than running and having its output suppressed. The top bar is the
+only participant whose layer moves: it rests at 0 and rises to 130 while its reveal
+transition is live, while a `bar_shown_while_open` surface is open, or while a popup
+holds the bars. Starting that Y animation and reporting the transition are the same
+act, performed by `reach_bar_update_visibility` alone — nothing else may write
+`REACH_TOP_BAR_ANIM_Y`, and nothing may set the bar's layer except the resolve
+reading `reach_bar_visibility_result.reveal_transition_active`. The three screen
+hotspots are participants too, with no capsule and no `reach_surface_id`, keyed by
+the handle the manager mints; the screen-hotspot port carries `set_topmost` /
+`native_id` / `place_behind` so they chain and seed like any other participant.
+The wallpaper is not a participant: it re-pins itself to `HWND_BOTTOM` and is
+deliberately not hidden in game mode.
 Every open path calls one entry point —
 `reach_host_surface_opening(host, id, origin)` — and never hand-picks close rules. It
 derives the sweep from declarative properties: opening anything closes every open
