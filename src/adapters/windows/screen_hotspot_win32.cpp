@@ -167,25 +167,6 @@ static reach_result reach_screen_hotspot_hide(reach_screen_hotspot *hotspot)
     return REACH_OK;
 }
 
-static reach_result reach_screen_hotspot_place_behind(reach_screen_hotspot *hotspot,
-                                                        reach_window_id window)
-{
-    if (hotspot == nullptr || hotspot->hwnd == nullptr || window == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    HWND target = reinterpret_cast<HWND>(window);
-    if ((GetWindowLongPtrW(target, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)
-    {
-        return REACH_OK;
-    }
-
-    BOOL ok = SetWindowPos(hotspot->hwnd, target, 0, 0, 0, 0,
-                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-    return ok ? REACH_OK : REACH_ERROR;
-}
-
 static reach_result reach_screen_hotspot_set_callback(reach_screen_hotspot *hotspot,
                                                         reach_screen_hotspot_callback callback,
                                                         void *user)
@@ -284,7 +265,6 @@ reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_
     out_port->ops.set_bounds = reach_screen_hotspot_set_bounds;
     out_port->ops.show = reach_screen_hotspot_show;
     out_port->ops.hide = reach_screen_hotspot_hide;
-    out_port->ops.place_behind = reach_screen_hotspot_place_behind;
     out_port->ops.set_callback = reach_screen_hotspot_set_callback;
     out_port->ops.has_pending_events = reach_screen_hotspot_has_pending_events;
     out_port->ops.dispatch_events = reach_screen_hotspot_dispatch_events;

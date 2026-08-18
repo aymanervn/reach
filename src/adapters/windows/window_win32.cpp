@@ -1055,6 +1055,14 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
+    if (reach_window_no_activate_surface(window->role))
+    {
+        ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
+        SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_TOP, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        return REACH_OK;
+    }
+
     if (!reach_window_topmost_surface(window->role))
     {
         int show_command = IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW;

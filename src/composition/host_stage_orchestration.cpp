@@ -36,16 +36,6 @@ void reach_host_sync_stage_reveal_corner(reach_host *host, reach_rect_f32 monito
     {
         host->stage_reveal.corner_visible = 1;
     }
-    if (host->dock.window.ops.native_id != nullptr &&
-        host->stage_reveal_corner.ops.place_behind != nullptr)
-    {
-        reach_window_id dock_id = host->dock.window.ops.native_id(host->dock.window.window);
-        if (dock_id != 0)
-        {
-            (void)host->stage_reveal_corner.ops.place_behind(host->stage_reveal_corner.hotspot,
-                                                             dock_id);
-        }
-    }
 }
 
 static const reach_monitor_info *reach_host_stage_monitor_for(reach_host *host,
@@ -344,6 +334,18 @@ void reach_host_sync_stage_thumbnails(reach_host *host)
     }
 }
 
+static void reach_host_raise_stage_under_top_bar(reach_host *host)
+{
+    if (host->stage.window.ops.raise != nullptr)
+    {
+        (void)host->stage.window.ops.raise(host->stage.window.window);
+    }
+    if (host->top_bar.window.ops.raise != nullptr)
+    {
+        (void)host->top_bar.window.ops.raise(host->top_bar.window.window);
+    }
+}
+
 void reach_host_open_stage(reach_host *host)
 {
     if (host == nullptr || host->stage_capsule == nullptr)
@@ -387,6 +389,7 @@ void reach_host_open_stage(reach_host *host)
     reach_host_surface_opening(host, REACH_SURFACE_ID_STAGE,
                                REACH_SURFACE_ORIGIN_NONE);
     reach_host_surface_transition_set(host, &host->stage_transition, 1);
+    reach_host_raise_stage_under_top_bar(host);
     reach_host_register_stage_thumbnails(host);
     reach_host_sync_stage_thumbnails(host);
     reach_host_request_update(host);
@@ -401,12 +404,6 @@ void reach_host_close_stage(reach_host *host)
     if (!reach_stage_is_open(host->stage_capsule))
     {
         return;
-    }
-    if (!host->stage_topmost && host->stage.window.ops.set_topmost != nullptr &&
-        host->stage.window.ops.set_topmost(host->stage.window.window, 1) == REACH_OK)
-    {
-        host->stage_topmost = 1;
-        reach_host_raise_top_bar_topmost(host);
     }
     host->stage_transition.close_seconds = 0.0;
     reach_stage_begin_close(host->stage_capsule);

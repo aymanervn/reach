@@ -122,8 +122,7 @@ static int32_t reach_host_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f3
 }
 
 static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
-                                         reach_host_bar_reveal_state *reveal,
-                                         reach_surface_runtime *surface, int32_t mode,
+                                         reach_host_bar_reveal_state *reveal, int32_t mode,
                                          reach_rect_f32 edge_bounds)
 {
     if (hotspot == nullptr || hotspot->hotspot == nullptr || reveal == nullptr)
@@ -156,15 +155,6 @@ static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
         hotspot->ops.show(hotspot->hotspot) == REACH_OK)
     {
         reveal->edge_visible = 1;
-    }
-    if (surface != nullptr && surface->window.ops.native_id != nullptr &&
-        hotspot->ops.place_behind != nullptr)
-    {
-        reach_window_id surface_id = surface->window.ops.native_id(surface->window.window);
-        if (surface_id != 0)
-        {
-            (void)hotspot->ops.place_behind(hotspot->hotspot, surface_id);
-        }
     }
 }
 
@@ -223,7 +213,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         desc->surface->dirty_flags = 1;
     }
 
-    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, desc->surface, result.edge_mode,
+    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, result.edge_mode,
                                  result.reveal_bounds);
 
     return result.animated_bounds;

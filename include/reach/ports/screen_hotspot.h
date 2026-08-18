@@ -30,7 +30,6 @@ extern "C"
 
         reach_result (*hide)(reach_screen_hotspot *hotspot);
 
-        reach_result (*place_behind)(reach_screen_hotspot *hotspot, reach_window_id window);
 
         reach_result (*set_callback)(reach_screen_hotspot *hotspot,
                                      reach_screen_hotspot_callback callback, void *user);
