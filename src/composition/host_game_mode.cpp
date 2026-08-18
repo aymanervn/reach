@@ -59,6 +59,8 @@ reach_result reach_host_update_game_mode(reach_host *host)
         return REACH_OK;
     }
     reach_runtime_policy_set_game_mode(&host->runtime_policy, next_active);
+    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_GAME_MODE,
+                               next_active);
     reach_system_stats_set_enabled(host->system_stats, !next_active);
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
