@@ -2,7 +2,7 @@
 
 #define REACH_HOST_LAYER_DOCK_REVEAL_EDGE 120
 #define REACH_HOST_LAYER_TOP_BAR_REVEAL_EDGE 140
-#define REACH_HOST_LAYER_STAGE_REVEAL_CORNER 170
+#define REACH_HOST_LAYER_STAGE_REVEAL_CORNER 150
 
 static_assert(REACH_HOST_SURFACE_COUNT + 3 <= REACH_LAYOUT_MAX_PARTICIPANTS,
               "layout participant capacity must cover every surface and hotspot");
