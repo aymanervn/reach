@@ -557,7 +557,8 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             out->redraw =
                 out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_STAGE_BUTTON);
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_STAGE;
+            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER;
+            out->action.index = REACH_DOCK_TRIGGER_PRIMARY;
             return;
         }
         if (hit.type == REACH_DOCK_HIT_ITEM)
@@ -603,7 +604,8 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         if (pressed == REACH_DOCK_HIT_STAGE_BUTTON && hit.type == pressed)
         {
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE;
+            out->action.kind = REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER;
+            out->action.index = REACH_DOCK_TRIGGER_PRIMARY;
         }
         else if (pressed == REACH_DOCK_HIT_ITEM && hit.type == pressed)
         {

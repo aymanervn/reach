@@ -280,6 +280,15 @@ static reach_result reach_host_handle_pointer_wheel(reach_host *host, const reac
     return REACH_OK;
 }
 
+static reach_result reach_host_activate_dock_trigger(reach_host *host, size_t trigger)
+{
+    if (trigger == REACH_DOCK_TRIGGER_PRIMARY)
+    {
+        reach_host_toggle_stage(host);
+    }
+    return REACH_OK;
+}
+
 reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_ui_event *event,
                                                   const reach_capsule_pointer_result *result)
 {
@@ -312,9 +321,8 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
         (void)reach_host_render_dock_surface(host, &host->layout.dock);
         return show_result;
     }
-    case REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE:
-        reach_host_toggle_stage(host);
-        return REACH_OK;
+    case REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER:
+        return reach_host_activate_dock_trigger(host, result->action.index);
     case REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS:
     {
         reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
