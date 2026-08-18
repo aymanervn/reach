@@ -373,7 +373,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_STAGE].layer = 50;
     descs[REACH_SURFACE_ID_LAUNCHER].layer = 100;
     descs[REACH_SURFACE_ID_DOCK].layer = 110;
-    descs[REACH_SURFACE_ID_TOP_BAR].layer = 130;
+    descs[REACH_SURFACE_ID_TOP_BAR].layer = 0;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].layer = 160;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].layer = 170;
     descs[REACH_SURFACE_ID_TRAY].layer = 180;
@@ -459,6 +459,78 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_SWITCHER].routed_events =
         reach_switcher_routed_events(&descs[REACH_SURFACE_ID_SWITCHER].routed_event_count);
     descs[REACH_SURFACE_ID_SWITCHER].handle_routed = reach_host_handle_switcher_event;
+}
+
+#define REACH_HOST_LAYER_DOCK_REVEAL_EDGE 120
+#define REACH_HOST_LAYER_TOP_BAR_REVEALED 130
+#define REACH_HOST_LAYER_TOP_BAR_REVEAL_EDGE 140
+#define REACH_HOST_LAYER_STAGE_REVEAL_CORNER 150
+
+static_assert(REACH_HOST_SURFACE_COUNT + 3 <= REACH_LAYOUT_MAX_PARTICIPANTS,
+              "layout participant capacity must cover every surface and hotspot");
+
+static void reach_host_register_hotspot_participant(reach_host *host,
+                                                    reach_screen_hotspot_port *hotspot,
+                                                    int32_t layer,
+                                                    reach_layout_participant *out_participant)
+{
+    reach_layout_participant participant = 0;
+    if (reach_layout_register(&host->layout_manager, layer, &participant) != REACH_OK)
+    {
+        return;
+    }
+    host->layout_targets[participant].hotspot = hotspot;
+    *out_participant = participant;
+}
+
+void reach_host_init_layout(reach_host *host)
+{
+    REACH_ASSERT(host != nullptr);
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    host->layout_manager = {};
+    host->applied_layout_plan = {};
+    host->has_applied_layout_plan = 0;
+    for (size_t index = 0; index < REACH_LAYOUT_MAX_PARTICIPANTS; ++index)
+    {
+        host->layout_targets[index] = {};
+    }
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_desc *desc = &host->surface_descs[index];
+        reach_layout_participant participant = 0;
+        if (reach_layout_register(&host->layout_manager, desc->layer, &participant) != REACH_OK)
+        {
+            continue;
+        }
+        host->layout_targets[participant].surface = desc->surface;
+        host->surface_participants[index] = participant;
+    }
+
+    reach_host_register_hotspot_participant(host, &host->dock_reveal_edge,
+                                            REACH_HOST_LAYER_DOCK_REVEAL_EDGE,
+                                            &host->dock_reveal_edge_participant);
+    reach_host_register_hotspot_participant(host, &host->top_bar_reveal_edge,
+                                            REACH_HOST_LAYER_TOP_BAR_REVEAL_EDGE,
+                                            &host->top_bar_reveal_edge_participant);
+    reach_host_register_hotspot_participant(host, &host->stage_reveal_corner,
+                                            REACH_HOST_LAYER_STAGE_REVEAL_CORNER,
+                                            &host->stage_reveal_corner_participant);
+
+    reach_layout_participant top_bar = host->surface_participants[REACH_SURFACE_ID_TOP_BAR];
+    reach_layout_register_override(&host->layout_manager, top_bar,
+                                   REACH_LAYOUT_CONDITION_TOP_BAR_REVEALED,
+                                   REACH_HOST_LAYER_TOP_BAR_REVEALED);
+    reach_layout_register_override(&host->layout_manager, top_bar,
+                                   REACH_LAYOUT_CONDITION_BARS_FORCED,
+                                   REACH_HOST_LAYER_TOP_BAR_REVEALED);
+    reach_layout_register_override(&host->layout_manager, top_bar,
+                                   REACH_LAYOUT_CONDITION_BARS_HELD,
+                                   REACH_HOST_LAYER_TOP_BAR_REVEALED);
 }
 
 void reach_host_surface_opening(reach_host *host, reach_surface_id opening,

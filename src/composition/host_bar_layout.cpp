@@ -208,6 +208,17 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     reach_bar_visibility_result result = desc->update_visibility(desc->capsule, &request);
 
+    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_FORCED,
+                               request.force_shown);
+    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_HELD,
+                               request.hold_open);
+    if (id == REACH_SURFACE_ID_TOP_BAR)
+    {
+        reach_layout_set_condition(&host->layout_manager,
+                                   REACH_LAYOUT_CONDITION_TOP_BAR_REVEALED,
+                                   result.reveal_transition_active);
+    }
+
     if (result.redraw && desc->surface != nullptr)
     {
         desc->surface->dirty_flags = 1;

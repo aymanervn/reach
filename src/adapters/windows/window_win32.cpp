@@ -616,11 +616,10 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
 
 static int32_t reach_window_topmost_surface(reach_surface_role role)
 {
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
-           role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
-           role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD ||
-           role == REACH_SURFACE_STAGE;
+    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
+           role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
+           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
+           role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_STAGE;
 }
 
 static DWORD reach_window_ex_style(reach_surface_role role)
