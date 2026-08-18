@@ -415,7 +415,7 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         }
         if (!host->stage_z_applied)
         {
-            reach_host_raise_stage_under_top_bar(host);
+            reach_host_raise_stage(host);
             host->stage_z_applied = 1;
         }
     }

@@ -334,15 +334,11 @@ void reach_host_sync_stage_thumbnails(reach_host *host)
     }
 }
 
-void reach_host_raise_stage_under_top_bar(reach_host *host)
+void reach_host_raise_stage(reach_host *host)
 {
     if (host->stage.window.ops.raise != nullptr)
     {
         (void)host->stage.window.ops.raise(host->stage.window.window);
-    }
-    if (host->top_bar.window.ops.raise != nullptr)
-    {
-        (void)host->top_bar.window.ops.raise(host->top_bar.window.window);
     }
 }
 

@@ -872,18 +872,22 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
         return reach_bar_visibility_result{};
     }
 
+    float screen_gap = request->shown_bounds.y - request->monitor_bounds.y;
+    float push_depth = screen_gap * 2.0f + request->shown_bounds.height;
+
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_BAR_EDGE_TOP;
     bar_request.pointer_sequence_active = top_bar->state.pointer_sequence_active;
+    bar_request.can_hide = reach_top_bar_window_push_any_trespassing(
+        top_bar->window_push, bar_request.monitor_bounds,
+        bar_request.monitor_bounds.y + push_depth);
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);
 
-    float screen_gap = bar_request.shown_bounds.y - bar_request.monitor_bounds.y;
-
     top_bar->push_monitor_bounds = bar_request.monitor_bounds;
     top_bar->push_shown_bounds = bar_request.shown_bounds;
-    top_bar->push_depth = screen_gap * 2.0f + bar_request.shown_bounds.height;
+    top_bar->push_depth = push_depth;
     top_bar->push_can_hide = bar_request.can_hide;
     top_bar->push_hover_revealed = result.hover_revealed;
     reach_top_bar_apply_window_push(top_bar, result.reveal_progress);

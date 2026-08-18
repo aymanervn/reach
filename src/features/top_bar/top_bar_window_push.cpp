@@ -156,6 +156,45 @@ static void reach_top_bar_push_collect(reach_top_bar_window_push *push, reach_re
     }
 }
 
+int32_t reach_top_bar_window_push_any_trespassing(const reach_top_bar_window_push *push,
+                                                  reach_rect_f32 monitor_bounds, float target_top)
+{
+    if (push == nullptr || push->apps == nullptr || push->windows == nullptr)
+    {
+        return 0;
+    }
+    if (push->captured)
+    {
+        return push->pushed_count > 0;
+    }
+
+    const reach_window_snapshot *windows = reach_window_tracking_windows(push->windows);
+    size_t window_count = reach_window_tracking_window_count(push->windows);
+    if (windows == nullptr)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < window_count; ++index)
+    {
+        const reach_window_snapshot *window = &windows[index];
+        if (!reach_top_bar_push_window_pushable(window))
+        {
+            continue;
+        }
+
+        reach_rect_f32 bounds = {};
+        if (reach_app_control_window_bounds(push->apps, window->id, &bounds) != REACH_OK ||
+            !reach_top_bar_push_window_on_monitor(bounds, monitor_bounds) ||
+            bounds.y >= target_top)
+        {
+            continue;
+        }
+        return 1;
+    }
+    return 0;
+}
+
 static void reach_top_bar_push_write(reach_top_bar_window_push *push, float progress)
 {
     reach_window_move moves[REACH_TOP_BAR_PUSH_MAX_WINDOWS] = {};
