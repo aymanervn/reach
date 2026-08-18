@@ -53,6 +53,7 @@ extern "C"
         reach_rect_f32 animated_bounds;
         reach_rect_f32 reveal_bounds;
         float reveal_progress;
+        int32_t reveal_transition_active;
         int32_t hover_revealed;
         int32_t edge_mode;
         int32_t visible;
