@@ -13,6 +13,7 @@ typedef struct reach_top_bar_window_push_request
     float push_depth;
     float reveal_progress;
     int32_t bar_can_hide;
+    int32_t hover_revealed;
 } reach_top_bar_window_push_request;
 
 reach_result reach_top_bar_window_push_create(reach_top_bar_window_push **out_push);

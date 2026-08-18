@@ -195,6 +195,10 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
 
     if (!push->captured)
     {
+        if (!request->hover_revealed)
+        {
+            return;
+        }
         push->target_top = request->monitor_bounds.y + request->push_depth;
         reach_top_bar_push_collect(push, request->monitor_bounds);
         push->captured = 1;

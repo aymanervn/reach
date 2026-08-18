@@ -859,6 +859,7 @@ static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float reveal
     push_request.push_depth = top_bar->push_depth;
     push_request.reveal_progress = reveal_progress;
     push_request.bar_can_hide = top_bar->push_can_hide;
+    push_request.hover_revealed = top_bar->push_hover_revealed;
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
 
@@ -885,8 +886,7 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
     top_bar->push_depth = screen_gap * 2.0f + bar_request.shown_bounds.height;
     top_bar->push_can_hide = bar_request.can_hide;
     top_bar->push_hover_revealed = result.hover_revealed;
-    reach_top_bar_apply_window_push(top_bar,
-                                    result.hover_revealed ? result.reveal_progress : 0.0f);
+    reach_top_bar_apply_window_push(top_bar, result.reveal_progress);
 
     return result;
 }
@@ -895,12 +895,6 @@ void reach_top_bar_move_window_push_frame(reach_top_bar *top_bar)
 {
     if (top_bar == nullptr || top_bar->push_depth <= 0.0f)
     {
-        return;
-    }
-
-    if (!top_bar->push_hover_revealed)
-    {
-        reach_top_bar_apply_window_push(top_bar, 0.0f);
         return;
     }
 
