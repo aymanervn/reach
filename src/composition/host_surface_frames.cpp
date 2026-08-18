@@ -380,6 +380,11 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         return REACH_OK;
     }
 
+    reach_layout_set_visible(&host->layout_manager,
+                             host->surface_participants[REACH_SURFACE_ID_STAGE],
+                             state->open ||
+                                 reach_host_surface_transition_visible(&host->stage_transition));
+
     if (!state->open && reach_host_surface_transition_visible(&host->stage_transition))
     {
         reach_host_surface_transition_set(host, &host->stage_transition, 0);
@@ -413,15 +418,9 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         {
             (void)host->stage.window.ops.show(host->stage.window.window);
         }
-        if (!host->stage_z_applied)
-        {
-            reach_host_raise_stage(host);
-            host->stage_z_applied = 1;
-        }
     }
     else
     {
-        host->stage_z_applied = 0;
         if (host->stage.window.ops.hide != nullptr)
         {
             (void)host->stage.window.ops.hide(host->stage.window.window);

@@ -619,12 +619,8 @@ static int32_t reach_window_topmost_surface(reach_surface_role role)
     return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
            role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
            role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD;
-}
-
-static int32_t reach_window_self_ordered_surface(reach_surface_role role)
-{
-    return role == REACH_SURFACE_STAGE;
+           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD ||
+           role == REACH_SURFACE_STAGE;
 }
 
 static DWORD reach_window_ex_style(reach_surface_role role)
@@ -730,10 +726,6 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     int show_command =
         no_activate ? SW_SHOWNOACTIVATE : (IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW);
     ShowWindow(window->hwnd, show_command);
-    if (reach_window_self_ordered_surface(window->role))
-    {
-        return REACH_OK;
-    }
     if (no_activate)
     {
         SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0,

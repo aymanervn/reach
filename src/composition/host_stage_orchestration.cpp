@@ -334,14 +334,6 @@ void reach_host_sync_stage_thumbnails(reach_host *host)
     }
 }
 
-void reach_host_raise_stage(reach_host *host)
-{
-    if (host->stage.window.ops.raise != nullptr)
-    {
-        (void)host->stage.window.ops.raise(host->stage.window.window);
-    }
-}
-
 void reach_host_open_stage(reach_host *host)
 {
     if (host == nullptr || host->stage_capsule == nullptr)

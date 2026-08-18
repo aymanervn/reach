@@ -370,7 +370,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                      reach_stage_capsule_ops(),
                                      REACH_SURFACE_POINTER_NONE};
 
-    descs[REACH_SURFACE_ID_STAGE].layer = 0;
+    descs[REACH_SURFACE_ID_STAGE].layer = 50;
     descs[REACH_SURFACE_ID_LAUNCHER].layer = 100;
     descs[REACH_SURFACE_ID_DOCK].layer = 110;
     descs[REACH_SURFACE_ID_TOP_BAR].layer = 130;
