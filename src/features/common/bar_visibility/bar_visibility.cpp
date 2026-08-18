@@ -188,6 +188,8 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
                                            REACH_EASING_EASE_IN_OUT);
     }
 
+    result.reveal_transition_active = reach_animation_manager_active(manager, y_track);
+
     reach_rect_f32 animated = request->shown_bounds;
     animated.y = reach_animation_manager_value(manager, y_track);
     result.animated_bounds = animated;
