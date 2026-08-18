@@ -863,6 +863,26 @@ static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float reveal
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
 
+static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
+{
+    float screen_gap = shown_bounds.y - monitor_bounds.y;
+    return screen_gap * 2.0f + shown_bounds.height;
+}
+
+int32_t reach_top_bar_windows_trespassing(const reach_top_bar *top_bar,
+                                          reach_rect_f32 shown_bounds,
+                                          reach_rect_f32 monitor_bounds)
+{
+    if (top_bar == nullptr)
+    {
+        return 0;
+    }
+
+    float push_depth = reach_top_bar_push_depth(shown_bounds, monitor_bounds);
+    return reach_top_bar_window_push_any_trespassing(top_bar->window_push, monitor_bounds,
+                                                     monitor_bounds.y + push_depth);
+}
+
 reach_bar_visibility_result
 reach_top_bar_update_visibility(reach_top_bar *top_bar,
                                 const reach_bar_visibility_request *request)
@@ -872,15 +892,11 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
         return reach_bar_visibility_result{};
     }
 
-    float screen_gap = request->shown_bounds.y - request->monitor_bounds.y;
-    float push_depth = screen_gap * 2.0f + request->shown_bounds.height;
+    float push_depth =
+        reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds);
 
     reach_bar_visibility_request bar_request = *request;
-    bar_request.edge = REACH_BAR_EDGE_TOP;
     bar_request.pointer_sequence_active = top_bar->state.pointer_sequence_active;
-    bar_request.can_hide = reach_top_bar_window_push_any_trespassing(
-        top_bar->window_push, bar_request.monitor_bounds,
-        bar_request.monitor_bounds.y + push_depth);
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);

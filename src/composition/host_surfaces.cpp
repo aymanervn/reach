@@ -403,11 +403,15 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
         reach_host_apply_quick_settings_pointer_action;
     descs[REACH_SURFACE_ID_DOCK].update_visibility = reach_host_dock_update_visibility;
+    descs[REACH_SURFACE_ID_DOCK].edge = REACH_BAR_EDGE_BOTTOM;
+    descs[REACH_SURFACE_ID_DOCK].occluded = reach_host_dock_occluded;
     descs[REACH_SURFACE_ID_DOCK].reveal_edge = &host->dock_reveal_edge;
     descs[REACH_SURFACE_ID_DOCK].reveal = &host->dock_reveal;
     descs[REACH_SURFACE_ID_DOCK].reveal_animation = reach_host_dock_reveal_animation;
     descs[REACH_SURFACE_ID_DOCK].reveal_frame = reach_host_move_dock_reveal_frame;
     descs[REACH_SURFACE_ID_TOP_BAR].update_visibility = reach_host_top_bar_update_visibility;
+    descs[REACH_SURFACE_ID_TOP_BAR].edge = REACH_BAR_EDGE_TOP;
+    descs[REACH_SURFACE_ID_TOP_BAR].occluded = reach_host_top_bar_occluded;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal_edge = &host->top_bar_reveal_edge;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal = &host->top_bar_reveal;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal_animation = reach_host_top_bar_reveal_animation;

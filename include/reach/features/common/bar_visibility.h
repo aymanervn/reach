@@ -18,13 +18,6 @@ extern "C"
         REACH_BAR_EDGE_TOP = 1
     } reach_bar_edge;
 
-    typedef enum reach_bar_reveal_edge_mode
-    {
-        REACH_BAR_REVEAL_EDGE_DISABLED = 0,
-        REACH_BAR_REVEAL_EDGE_THIN = 1,
-        REACH_BAR_REVEAL_EDGE_BRIDGE = 2
-    } reach_bar_reveal_edge_mode;
-
     typedef struct reach_bar_visibility_state
     {
         int32_t target_hidden;
@@ -55,7 +48,7 @@ extern "C"
         float reveal_progress;
         int32_t reveal_transition_active;
         int32_t hover_revealed;
-        int32_t edge_mode;
+        int32_t reveal_edge_shown;
         int32_t visible;
         int32_t redraw;
     } reach_bar_visibility_result;

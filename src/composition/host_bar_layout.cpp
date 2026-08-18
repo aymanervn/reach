@@ -22,8 +22,11 @@ static int32_t reach_host_popup_open(const reach_host *host)
                                        reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
 }
 
-int32_t reach_host_bars_can_hide(const reach_host *host)
+int32_t reach_host_dock_occluded(reach_host *host, reach_rect_f32 shown_bounds,
+                                 reach_rect_f32 monitor_bounds)
 {
+    (void)shown_bounds;
+    (void)monitor_bounds;
     REACH_ASSERT(host != nullptr);
     if (host == nullptr)
     {
@@ -42,6 +45,36 @@ int32_t reach_host_bars_can_hide(const reach_host *host)
         return 1;
     }
     return 0;
+}
+
+int32_t reach_host_top_bar_occluded(reach_host *host, reach_rect_f32 shown_bounds,
+                                    reach_rect_f32 monitor_bounds)
+{
+    REACH_ASSERT(host != nullptr);
+    if (host == nullptr)
+    {
+        return 0;
+    }
+
+    reach_host_bar_occlusion *cache = &host->top_bar_occlusion;
+    if (!cache->valid || !reach_host_rect_equal(cache->shown_bounds, shown_bounds) ||
+        !reach_host_rect_equal(cache->monitor_bounds, monitor_bounds))
+    {
+        cache->occluded =
+            reach_top_bar_windows_trespassing(host->top_bar_capsule, shown_bounds, monitor_bounds);
+        cache->shown_bounds = shown_bounds;
+        cache->monitor_bounds = monitor_bounds;
+        cache->valid = 1;
+    }
+    return cache->occluded;
+}
+
+void reach_host_invalidate_bar_occlusion(reach_host *host)
+{
+    if (host != nullptr)
+    {
+        host->top_bar_occlusion.valid = 0;
+    }
 }
 
 void reach_host_request_bar_visibility_update(reach_host *host)
@@ -122,7 +155,7 @@ static int32_t reach_host_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f3
 }
 
 static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
-                                         reach_host_bar_reveal_state *reveal, int32_t mode,
+                                         reach_host_bar_reveal_state *reveal, int32_t shown,
                                          reach_rect_f32 edge_bounds)
 {
     if (hotspot == nullptr || hotspot->hotspot == nullptr || reveal == nullptr)
@@ -130,7 +163,7 @@ static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
         return;
     }
 
-    if (mode == REACH_BAR_REVEAL_EDGE_DISABLED)
+    if (!shown)
     {
         if (reveal->edge_visible && hotspot->ops.hide != nullptr &&
             hotspot->ops.hide(hotspot->hotspot) == REACH_OK)
@@ -198,7 +231,9 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.monitor_bounds = monitor_bounds;
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
     request.game_mode = reach_host_game_mode_enabled(host);
-    request.can_hide = reach_host_bars_can_hide(host);
+    request.edge = desc->edge;
+    request.can_hide =
+        desc->occluded != nullptr ? desc->occluded(host, shown_bounds, monitor_bounds) : 0;
     request.force_shown = reach_host_bar_forced_shown(host);
     request.hold_open = reach_host_popup_open(host);
     request.reveal_seconds =
@@ -224,7 +259,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         desc->surface->dirty_flags = 1;
     }
 
-    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, result.edge_mode,
+    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, result.reveal_edge_shown,
                                  result.reveal_bounds);
 
     return result.animated_bounds;

@@ -169,12 +169,23 @@ typedef struct reach_surface_desc
 
     reach_bar_visibility_result (*update_visibility)(void *capsule,
                                                      const reach_bar_visibility_request *request);
+    reach_bar_edge edge;
+    int32_t (*occluded)(reach_host *host, reach_rect_f32 shown_bounds,
+                        reach_rect_f32 monitor_bounds);
     int32_t bar_shown_while_open;
     reach_screen_hotspot_port *reveal_edge;
     reach_host_bar_reveal_state *reveal;
     reach_bar_reveal_animation (*reveal_animation)(const void *capsule);
     reach_result (*reveal_frame)(reach_host *host);
 } reach_surface_desc;
+
+typedef struct reach_host_bar_occlusion
+{
+    int32_t valid;
+    int32_t occluded;
+    reach_rect_f32 shown_bounds;
+    reach_rect_f32 monitor_bounds;
+} reach_host_bar_occlusion;
 
 typedef struct reach_host_layout_target
 {
@@ -332,6 +343,7 @@ struct reach_host
     reach_host_bar_reveal_state dock_reveal;
     reach_top_bar *top_bar_capsule;
     reach_host_bar_reveal_state top_bar_reveal;
+    reach_host_bar_occlusion top_bar_occlusion;
     reach_host_pointer_move_state pointer_move;
     reach_host_window_list_state window_list;
     reach_clipboard_feature *clipboard_capsule;
@@ -594,7 +606,11 @@ void reach_host_apply_window_control_result(reach_host *host);
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host);
 
-int32_t reach_host_bars_can_hide(const reach_host *host);
+int32_t reach_host_dock_occluded(reach_host *host, reach_rect_f32 shown_bounds,
+                                 reach_rect_f32 monitor_bounds);
+int32_t reach_host_top_bar_occluded(reach_host *host, reach_rect_f32 shown_bounds,
+                                    reach_rect_f32 monitor_bounds);
+void reach_host_invalidate_bar_occlusion(reach_host *host);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);
 void reach_host_hide_bar_reveal_edges(reach_host *host);

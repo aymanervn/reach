@@ -1,5 +1,11 @@
 #include "reach/features/common/bar_visibility.h"
 
+typedef enum reach_bar_reveal_edge_span
+{
+    REACH_BAR_REVEAL_EDGE_THIN = 0,
+    REACH_BAR_REVEAL_EDGE_BRIDGE = 1
+} reach_bar_reveal_edge_span;
+
 static int32_t reach_bar_point_in_rect(reach_point_i32 point, reach_rect_f32 rect)
 {
     return (float)point.x >= rect.x && (float)point.x < rect.x + rect.width &&
@@ -123,41 +129,33 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
         request->pointer_valid && reach_bar_point_in_rect(request->pointer, bridge_bounds);
 
     int32_t target_hidden = 0;
-    int32_t edge_mode = REACH_BAR_REVEAL_EDGE_DISABLED;
+    int32_t reveal_edge_shown = 0;
 
     if (request->game_mode)
     {
         state->reveal_session_active = 0;
         target_hidden = 1;
-        edge_mode = REACH_BAR_REVEAL_EDGE_DISABLED;
     }
     else if (!request->can_hide)
     {
         state->reveal_session_active = 0;
         target_hidden = 0;
-        edge_mode = REACH_BAR_REVEAL_EDGE_BRIDGE;
     }
     else if (request->pointer_sequence_active || request->force_shown)
     {
         target_hidden = 0;
-        edge_mode = REACH_BAR_REVEAL_EDGE_BRIDGE;
     }
     else if (request->hold_open && !state->target_hidden)
     {
         target_hidden = 0;
-        edge_mode = REACH_BAR_REVEAL_EDGE_BRIDGE;
     }
     else if (state->reveal_session_active)
     {
-        if (pointer_in_bridge || pointer_over_bar)
-        {
-            edge_mode = REACH_BAR_REVEAL_EDGE_BRIDGE;
-        }
-        else
+        if (!pointer_in_bridge && !pointer_over_bar)
         {
             state->reveal_session_active = 0;
             target_hidden = 1;
-            edge_mode = REACH_BAR_REVEAL_EDGE_THIN;
+            reveal_edge_shown = 1;
         }
     }
     else if (pointer_over_bar)
@@ -167,7 +165,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     else
     {
         target_hidden = 1;
-        edge_mode = REACH_BAR_REVEAL_EDGE_THIN;
+        reveal_edge_shown = 1;
     }
 
     float target_y = target_hidden ? hidden_y : request->shown_bounds.y;
@@ -195,7 +193,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     result.animated_bounds = animated;
     result.reveal_progress =
         reach_bar_reveal_progress(animated.y, request->shown_bounds.y, hidden_y);
-    if (edge_mode != REACH_BAR_REVEAL_EDGE_DISABLED)
+    if (reveal_edge_shown)
     {
         result.reveal_bounds = reach_bar_reveal_edge_bounds(
             request->edge, REACH_BAR_REVEAL_EDGE_THIN, request->reveal_span_inset,
@@ -203,7 +201,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     }
     result.hover_revealed =
         state->reveal_session_active && (pointer_in_bridge || pointer_over_bar) ? 1 : 0;
-    result.edge_mode = edge_mode;
+    result.reveal_edge_shown = reveal_edge_shown;
     result.visible = target_hidden ? 0 : 1;
     return result;
 }
