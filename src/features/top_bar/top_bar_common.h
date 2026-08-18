@@ -30,6 +30,7 @@ struct reach_top_bar
     reach_rect_f32 push_shown_bounds;
     float push_depth;
     int32_t push_can_hide;
+    int32_t push_hover_revealed;
 };
 
 reach_top_bar_state *reach_top_bar_state_mut(reach_top_bar *top_bar);
