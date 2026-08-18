@@ -106,6 +106,7 @@ target_compile_features(reach_core PUBLIC
 
 add_library(reach_features STATIC
     src/features/common/bar_visibility/bar_visibility.cpp
+    src/features/common/layout/layout.cpp
     src/features/common/loader/loader_render.cpp
     src/features/common/marquee/marquee.cpp
     src/features/common/progress_bar/progress_bar_render.cpp
@@ -634,6 +635,18 @@ target_link_libraries(reach_pin_config_tests PRIVATE
     reach_services
 )
 
+add_executable(reach_layout_tests
+    tests/layout_tests.cpp
+)
+
+reach_configure_common(reach_layout_tests)
+target_compile_features(reach_layout_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_layout_tests PRIVATE
+    reach_features
+)
+
 add_executable(reach_quick_settings_feature_tests
     tests/quick_settings_feature_tests.cpp
 )
@@ -804,6 +817,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
 )
 
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
+    add_test(NAME reach_layout_tests COMMAND reach_layout_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)
