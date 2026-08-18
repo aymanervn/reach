@@ -199,6 +199,8 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
             request->edge, REACH_BAR_REVEAL_EDGE_THIN, request->reveal_span_inset,
             request->shown_bounds, request->monitor_bounds);
     }
+    result.hover_revealed =
+        state->reveal_session_active && (pointer_in_bridge || pointer_over_bar) ? 1 : 0;
     result.edge_mode = edge_mode;
     result.visible = target_hidden ? 0 : 1;
     return result;
