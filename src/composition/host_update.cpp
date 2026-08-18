@@ -305,6 +305,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         }
     }
     reach_host_sync_pointer_move_subscriptions(host);
+    reach_host_apply_layout(host);
 
     host->dirty.layout = 0;
     host->dirty.render = 0;

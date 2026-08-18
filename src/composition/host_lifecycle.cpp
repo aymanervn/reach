@@ -531,6 +531,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                  REACH_HOST_ANIMATION_COUNT);
     reach_host_surface_transitions_init(host);
     reach_host_init_surface_descriptors(host);
+    reach_host_init_layout(host);
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {

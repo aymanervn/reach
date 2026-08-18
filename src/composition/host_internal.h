@@ -7,6 +7,7 @@
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
 
+#include "reach/features/common/layout.h"
 #include "reach/features/common/text_edit.h"
 #include "reach/features/context_menu.h"
 #include "reach/features/feature_capsule.h"
@@ -144,6 +145,8 @@ typedef struct reach_surface_desc
 
     uint32_t behavior_flags;
 
+    int32_t layer;
+
     reach_surface_role role;
 
     int32_t pointer_priority;
@@ -173,7 +176,16 @@ typedef struct reach_surface_desc
     reach_result (*reveal_frame)(reach_host *host);
 } reach_surface_desc;
 
+typedef struct reach_host_layout_target
+{
+    reach_surface_runtime *surface;
+    reach_screen_hotspot_port *hotspot;
+} reach_host_layout_target;
+
 void reach_host_init_surface_descriptors(reach_host *host);
+
+void reach_host_init_layout(reach_host *host);
+void reach_host_apply_layout(reach_host *host);
 
 int32_t reach_host_surface_is_open(const reach_surface_desc *desc);
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
@@ -281,6 +293,14 @@ struct reach_host
     reach_host_surface_transition clipboard_transition;
 
     reach_surface_desc surface_descs[REACH_HOST_SURFACE_COUNT];
+    reach_layout layout_manager;
+    reach_host_layout_target layout_targets[REACH_LAYOUT_MAX_PARTICIPANTS];
+    reach_layout_participant surface_participants[REACH_HOST_SURFACE_COUNT];
+    reach_layout_participant dock_reveal_edge_participant;
+    reach_layout_participant top_bar_reveal_edge_participant;
+    reach_layout_participant stage_reveal_corner_participant;
+    reach_layout_plan applied_layout_plan;
+    int32_t has_applied_layout_plan;
     reach_input_source_port input_source;
     reach_clock *clock;
     reach_input_language_service *input_language;
