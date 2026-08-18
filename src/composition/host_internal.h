@@ -124,7 +124,7 @@ typedef enum reach_surface_behavior_flags
 
 typedef struct reach_host_bar_reveal_state
 {
-    int32_t edge_visible;
+    reach_layout_participant participant;
     int32_t edge_bounds_valid;
     reach_rect_f32 edge_bounds;
 } reach_host_bar_reveal_state;
@@ -189,7 +189,7 @@ typedef struct reach_host_bar_occlusion
 
 typedef struct reach_host_layout_target
 {
-    reach_surface_runtime *surface;
+    const reach_surface_desc *desc;
     reach_screen_hotspot_port *hotspot;
 } reach_host_layout_target;
 
@@ -211,7 +211,6 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening,
 
 struct reach_host_frame_context
 {
-    int32_t game_mode;
     reach_rect_f32 monitor_bounds;
     int32_t dock_layout_changed;
     int32_t launcher_layout_changed;
@@ -261,7 +260,7 @@ typedef struct reach_host_window_list_state
 
 typedef struct reach_host_stage_reveal_state
 {
-    int32_t corner_visible;
+    reach_layout_participant participant;
     int32_t corner_bounds_valid;
     reach_rect_f32 corner_bounds;
 } reach_host_stage_reveal_state;
@@ -307,9 +306,6 @@ struct reach_host
     reach_layout layout_manager;
     reach_host_layout_target layout_targets[REACH_LAYOUT_MAX_PARTICIPANTS];
     reach_layout_participant surface_participants[REACH_HOST_SURFACE_COUNT];
-    reach_layout_participant dock_reveal_edge_participant;
-    reach_layout_participant top_bar_reveal_edge_participant;
-    reach_layout_participant stage_reveal_corner_participant;
     reach_layout_plan applied_layout_plan;
     int32_t has_applied_layout_plan;
     reach_input_source_port input_source;
@@ -612,8 +608,8 @@ int32_t reach_host_top_bar_occluded(reach_host *host, reach_rect_f32 shown_bound
                                     reach_rect_f32 monitor_bounds);
 void reach_host_invalidate_bar_occlusion(reach_host *host);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
+void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);
-void reach_host_hide_bar_reveal_edges(reach_host *host);
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
                                                    reach_rect_f32 shown_bounds,

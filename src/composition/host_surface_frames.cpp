@@ -6,27 +6,6 @@ typedef struct reach_host_frame_state
     int32_t visible;
 } reach_host_frame_state;
 
-static void reach_host_apply_surface_activation(const reach_surface_desc *desc, int32_t active)
-{
-    reach_surface_runtime *surface = desc->surface;
-    if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0)
-    {
-        return;
-    }
-
-    if (!active)
-    {
-        surface->activated = 0;
-        return;
-    }
-
-    if (!surface->activated && surface->window.ops.show != nullptr)
-    {
-        (void)surface->window.ops.show(surface->window.window);
-        surface->activated = 1;
-    }
-}
-
 void reach_host_sync_surface_input_regions(const reach_surface_desc *desc)
 {
     if (desc->surface == nullptr || desc->capsule_ops == nullptr ||
@@ -43,12 +22,18 @@ void reach_host_sync_surface_input_regions(const reach_surface_desc *desc)
                                                       region_count);
 }
 
+static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id, int32_t visible)
+{
+    reach_layout_set_visible(&host->layout_manager, host->surface_participants[id], visible);
+}
+
 static reach_result reach_host_apply_transient_frame(
-    reach_host *host, reach_surface_runtime *surface, reach_host_surface_transition *transition,
-    int32_t game_mode, reach_rect_f32 target_bounds, float radius, reach_host_frame_state *out)
+    reach_host *host, reach_surface_id id, reach_host_surface_transition *transition,
+    reach_rect_f32 target_bounds, float radius, reach_host_frame_state *out)
 {
     *out = {};
 
+    reach_surface_runtime *surface = host->surface_descs[id].surface;
     reach_rect_f32 bounds = reach_host_surface_transition_bounds(host, transition, target_bounds);
     float opacity = reach_host_surface_transition_opacity(host, transition);
     reach_result result = reach_host_apply_window_state(
@@ -64,25 +49,14 @@ static reach_result reach_host_apply_transient_frame(
         (void)surface->window.ops.apply_rounded_corners(surface->window.window, radius);
     }
 
-    if (!game_mode && reach_host_surface_transition_visible(transition))
-    {
-        if (surface->window.ops.show != nullptr)
-        {
-            (void)surface->window.ops.show(surface->window.window);
-        }
-        out->visible = 1;
-    }
-    else if (surface->window.ops.hide != nullptr)
-    {
-        (void)surface->window.ops.hide(surface->window.window);
-    }
+    out->visible = reach_host_surface_transition_visible(transition);
+    reach_host_set_surface_visible(host, id, out->visible);
 
     return REACH_OK;
 }
 
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
     const int32_t launcher_layout_changed = ctx->launcher_layout_changed;
     int32_t launcher_window_changed = 0;
     reach_rect_f32 launcher_bounds = reach_host_surface_transition_bounds(
@@ -98,31 +72,19 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
         return result;
     }
 
-    if (!game_mode && reach_launcher_is_open(host->launcher_capsule) &&
+    if (reach_launcher_is_open(host->launcher_capsule) &&
         (host->dirty.render || host->launcher.dirty_flags || launcher_layout_changed))
     {
         (void)reach_host_render_launcher_surface(host, &host->layout.launcher);
     }
-    const reach_surface_desc *desc = &host->surface_descs[REACH_SURFACE_ID_LAUNCHER];
-    if (!game_mode && reach_host_surface_transition_visible(&host->launcher_transition))
-    {
-        reach_host_apply_surface_activation(desc, reach_host_surface_is_open(desc));
-    }
-    else
-    {
-        if (host->launcher.window.ops.hide != nullptr)
-        {
-            (void)host->launcher.window.ops.hide(host->launcher.window.window);
-        }
-        reach_host_apply_surface_activation(desc, 0);
-    }
+    reach_host_set_surface_visible(host, REACH_SURFACE_ID_LAUNCHER,
+                                   reach_host_surface_transition_visible(&host->launcher_transition));
 
     return REACH_OK;
 }
 
 reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
     const reach_rect_f32 monitor_bounds = ctx->monitor_bounds;
     int32_t clipboard_animating = 0;
     int32_t clipboard_layout_changed = reach_clipboard_feature_relayout(
@@ -139,7 +101,7 @@ reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame
         reach_clipboard_feature_state_ptr(host->clipboard_capsule)->layout.bounds;
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, &host->clipboard_surface, &host->clipboard_transition, game_mode, clipboard_bounds,
+        host, REACH_SURFACE_ID_CLIPBOARD, &host->clipboard_transition, clipboard_bounds,
         host->theme->radius_large * reach_host_layout_dpi_scale(host), &frame);
     if (result != REACH_OK)
     {
@@ -156,25 +118,14 @@ reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame
 
 reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
     const int32_t dock_layout_changed = ctx->dock_layout_changed;
-    if (game_mode)
-    {
-        if (host->dock.window.ops.hide != nullptr)
-        {
-            (void)host->dock.window.ops.hide(host->dock.window.window);
-        }
-        return REACH_OK;
-    }
     if (host->dock.window.ops.set_bounds == nullptr)
     {
         return REACH_OK;
     }
 
-    if (host->dock.window.ops.show != nullptr)
-    {
-        (void)host->dock.window.ops.show(host->dock.window.window);
-    }
+    reach_host_set_surface_visible(host, REACH_SURFACE_ID_DOCK, 1);
+
     int32_t dock_window_changed = 0;
     float dock_radius =
         reach_theme_dock_corner_radius(host->theme, host->layout.dock.bounds.height);
@@ -216,15 +167,6 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
         return REACH_OK;
     }
 
-    if (ctx->game_mode)
-    {
-        if (host->top_bar.window.ops.hide != nullptr)
-        {
-            (void)host->top_bar.window.ops.hide(host->top_bar.window.window);
-        }
-        return REACH_OK;
-    }
-
     reach_host_build_top_bar_layout(host, ctx->monitor_bounds);
 
     const reach_top_bar_state *state = reach_top_bar_state_ptr(host->top_bar_capsule);
@@ -232,10 +174,7 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
     reach_rect_f32 bounds = reach_host_reconcile_bar_visibility(host, REACH_SURFACE_ID_TOP_BAR,
                                                                 shown_bounds, ctx->monitor_bounds);
 
-    if (host->top_bar.window.ops.show != nullptr)
-    {
-        (void)host->top_bar.window.ops.show(host->top_bar.window.window);
-    }
+    reach_host_set_surface_visible(host, REACH_SURFACE_ID_TOP_BAR, 1);
 
     int32_t window_changed = 0;
     reach_result result = reach_host_apply_window_state(
@@ -256,7 +195,7 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
 
 reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
+    (void)ctx;
     if (host->tray.window.ops.set_bounds == nullptr)
     {
         return REACH_OK;
@@ -267,7 +206,7 @@ reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_cont
 
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, &host->tray, &host->tray_transition, game_mode, tray_bounds,
+        host, REACH_SURFACE_ID_TRAY, &host->tray_transition, tray_bounds,
         reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
     if (result != REACH_OK)
     {
@@ -283,23 +222,20 @@ reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_cont
 
 reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
+    (void)ctx;
     if (host->quick_settings.window.ops.set_bounds == nullptr)
     {
         return REACH_OK;
     }
 
-    if (!game_mode)
-    {
-        reach_host_refresh_quick_settings_layout(host);
-        reach_host_update_quick_settings_animation(host);
-    }
+    reach_host_refresh_quick_settings_layout(host);
+    reach_host_update_quick_settings_animation(host);
 
     const reach_rect_f32 quick_settings_bounds =
         reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds;
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, &host->quick_settings, &host->quick_settings_transition, game_mode,
+        host, REACH_SURFACE_ID_QUICK_SETTINGS, &host->quick_settings_transition,
         quick_settings_bounds,
         reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
     if (result != REACH_OK)
@@ -335,7 +271,6 @@ static reach_rect_f32 reach_host_apply_switcher_bounds_animation(reach_host *hos
 
 reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
     const reach_rect_f32 monitor_bounds = ctx->monitor_bounds;
     if (host->switcher.window.ops.set_bounds == nullptr)
     {
@@ -349,7 +284,7 @@ reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_
 
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, &host->switcher, &host->switcher_transition, game_mode, switcher_bounds,
+        host, REACH_SURFACE_ID_SWITCHER, &host->switcher_transition, switcher_bounds,
         16.0f * reach_host_layout_dpi_scale(host), &frame);
     if (result != REACH_OK)
     {
@@ -368,7 +303,6 @@ reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_
 
 reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
     if (host->stage.window.ops.set_bounds == nullptr)
     {
         return REACH_OK;
@@ -380,10 +314,10 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         return REACH_OK;
     }
 
-    reach_layout_set_visible(&host->layout_manager,
-                             host->surface_participants[REACH_SURFACE_ID_STAGE],
-                             state->open ||
-                                 reach_host_surface_transition_visible(&host->stage_transition));
+    reach_host_set_surface_visible(host, REACH_SURFACE_ID_STAGE,
+                                   state->open ||
+                                       reach_host_surface_transition_visible(
+                                           &host->stage_transition));
 
     if (!state->open && reach_host_surface_transition_visible(&host->stage_transition))
     {
@@ -404,7 +338,7 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         return result;
     }
 
-    if (!game_mode && state->open)
+    if (state->open)
     {
         if (reach_stage_is_open(host->stage_capsule))
         {
@@ -414,54 +348,31 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
                 (void)reach_host_render_stage_surface(host, stage_bounds);
             }
         }
-        if (host->stage.window.ops.show != nullptr)
-        {
-            (void)host->stage.window.ops.show(host->stage.window.window);
-        }
     }
     else
     {
-        if (host->stage.window.ops.hide != nullptr)
-        {
-            (void)host->stage.window.ops.hide(host->stage.window.window);
-        }
         reach_host_cleanup_closed_stage(host);
     }
 
-    if (game_mode)
-    {
-        if (host->stage_reveal_corner.ops.hide != nullptr)
-        {
-            (void)host->stage_reveal_corner.ops.hide(host->stage_reveal_corner.hotspot);
-        }
-        host->stage_reveal.corner_visible = 0;
-    }
-    else
-    {
-        reach_host_sync_stage_reveal_corner(host, ctx->monitor_bounds);
-    }
+    reach_host_sync_stage_reveal_corner(host, ctx->monitor_bounds);
     return REACH_OK;
 }
 
 reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx)
 {
-    const int32_t game_mode = ctx->game_mode;
+    (void)ctx;
     if (host->context_menu.window.ops.set_bounds == nullptr)
     {
         return REACH_OK;
     }
 
-    if (!game_mode)
-    {
-
-        reach_host_reanchor_context_menu(host);
-    }
+    reach_host_reanchor_context_menu(host);
 
     const reach_rect_f32 context_menu_bounds =
         reach_context_menu_state_ptr(host->context_menu_capsule)->bounds;
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, &host->context_menu, &host->context_menu_transition, game_mode, context_menu_bounds,
+        host, REACH_SURFACE_ID_CONTEXT_MENU, &host->context_menu_transition, context_menu_bounds,
         reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
     if (result != REACH_OK)
     {

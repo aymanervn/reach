@@ -27,13 +27,6 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
                                  REACH_HOST_ANIMATION_COUNT);
     reach_host_surface_transitions_init(host);
     reach_dock_clear_item_x_animations(host->dock_capsule);
-    reach_host_hide_bar_reveal_edges(host);
-    host->stage_reveal.corner_visible = 0;
-    host->stage_reveal.corner_bounds_valid = 0;
-    if (host->stage_reveal_corner.ops.hide != nullptr)
-    {
-        (void)host->stage_reveal_corner.ops.hide(host->stage_reveal_corner.hotspot);
-    }
 
     reach_host_mark_all_surfaces_dirty(host);
     host->dirty.render = 1;
@@ -82,7 +75,14 @@ reach_result reach_host_update_game_mode(reach_host *host)
         host->dirty.render = 1;
         reach_host_mark_all_surfaces_dirty(host);
     }
-    reach_host_sync_pointer_move_subscriptions(host);
+    if (next_active)
+    {
+        reach_host_suspend_pointer_move_subscriptions(host);
+    }
+    else
+    {
+        reach_host_sync_pointer_move_subscriptions(host);
+    }
 
     return REACH_OK;
 }

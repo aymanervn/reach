@@ -13,10 +13,6 @@ static size_t reach_host_window_list_item_windows(reach_host *host, size_t item_
 
 static int32_t reach_host_window_list_blocked(reach_host *host)
 {
-    if (reach_host_game_mode_enabled(host))
-    {
-        return 1;
-    }
     if (reach_context_menu_window_list_is_open(host->context_menu_capsule))
     {
         return 0;
@@ -196,8 +192,7 @@ void reach_host_window_list_update(reach_host *host, double delta_seconds)
         return;
     }
 
-    if (!host->has_layout || reach_host_game_mode_enabled(host) ||
-        state->open_item >= reach_dock_item_count(host->dock_capsule))
+    if (!host->has_layout || state->open_item >= reach_dock_item_count(host->dock_capsule))
     {
         reach_host_close_context_menu(host);
         return;
