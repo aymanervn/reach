@@ -57,6 +57,7 @@ void reach_host_apply_foreground_change(reach_host *host)
     }
 
     reach_host_note_foreground_window(host, foreground);
+    reach_host_invalidate_bar_occlusion(host);
     reach_host_refresh_switcher_windows(host);
     if (reach_input_language_service_refresh(host->input_language, foreground))
     {

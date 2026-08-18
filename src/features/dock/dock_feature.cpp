@@ -746,7 +746,6 @@ reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_
     }
 
     reach_bar_visibility_request bar_request = *request;
-    bar_request.edge = REACH_BAR_EDGE_BOTTOM;
     bar_request.pointer_sequence_active = animations->state.pointer_sequence_active;
 
     reach_bar_visibility_result result = reach_bar_update_visibility(

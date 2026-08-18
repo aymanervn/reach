@@ -189,6 +189,10 @@ extern "C"
 
     void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control *apps);
 
+    int32_t reach_top_bar_windows_trespassing(const reach_top_bar *top_bar,
+                                              reach_rect_f32 shown_bounds,
+                                              reach_rect_f32 monitor_bounds);
+
     void reach_top_bar_move_window_push_frame(reach_top_bar *top_bar);
 
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);

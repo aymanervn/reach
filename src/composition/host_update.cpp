@@ -137,6 +137,10 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     int32_t window_manager_dirty =
         host->window_manager.ops.needs_refresh != nullptr &&
         host->window_manager.ops.needs_refresh(host->window_manager.manager);
+    if (window_manager_dirty)
+    {
+        reach_host_invalidate_bar_occlusion(host);
+    }
     if (window_manager_dirty && host->window_manager.ops.refresh != nullptr)
     {
         (void)host->window_manager.ops.refresh(host->window_manager.manager);
