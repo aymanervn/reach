@@ -323,6 +323,7 @@ struct reach_host
     reach_switcher *switcher_capsule;
     reach_stage *stage_capsule;
     reach_host_stage_reveal_state stage_reveal;
+    int32_t stage_z_applied;
     reach_window_thumbnail_id stage_thumbnail_ids[REACH_STAGE_MAX_TILES];
     size_t stage_thumbnail_generation;
     int32_t stage_thumbnails_registered;
@@ -466,6 +467,7 @@ void reach_host_remember_launcher_restore_window(reach_host *host);
 void reach_host_toggle_launcher(reach_host *host);
 
 void reach_host_open_stage(reach_host *host);
+void reach_host_raise_stage_under_top_bar(reach_host *host);
 void reach_host_sync_stage_thumbnails(reach_host *host);
 void reach_host_sync_stage_window_states(reach_host *host);
 void reach_host_cleanup_closed_stage(reach_host *host);
