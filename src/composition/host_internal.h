@@ -467,7 +467,7 @@ void reach_host_remember_launcher_restore_window(reach_host *host);
 void reach_host_toggle_launcher(reach_host *host);
 
 void reach_host_open_stage(reach_host *host);
-void reach_host_raise_stage_under_top_bar(reach_host *host);
+void reach_host_raise_stage(reach_host *host);
 void reach_host_sync_stage_thumbnails(reach_host *host);
 void reach_host_sync_stage_window_states(reach_host *host);
 void reach_host_cleanup_closed_stage(reach_host *host);

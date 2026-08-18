@@ -22,6 +22,9 @@ void reach_top_bar_window_push_destroy(reach_top_bar_window_push *push);
 void reach_top_bar_window_push_attach(reach_top_bar_window_push *push, reach_app_control *apps,
                                       reach_window_tracking *windows);
 
+int32_t reach_top_bar_window_push_any_trespassing(const reach_top_bar_window_push *push,
+                                                  reach_rect_f32 monitor_bounds, float target_top);
+
 void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
                                      const reach_top_bar_window_push_request *request);
 void reach_top_bar_window_push_release(reach_top_bar_window_push *push);
