@@ -370,6 +370,16 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                      reach_stage_capsule_ops(),
                                      REACH_SURFACE_POINTER_NONE};
 
+    descs[REACH_SURFACE_ID_STAGE].layer = 0;
+    descs[REACH_SURFACE_ID_LAUNCHER].layer = 100;
+    descs[REACH_SURFACE_ID_DOCK].layer = 110;
+    descs[REACH_SURFACE_ID_TOP_BAR].layer = 130;
+    descs[REACH_SURFACE_ID_TRAY].layer = 150;
+    descs[REACH_SURFACE_ID_SWITCHER].layer = 160;
+    descs[REACH_SURFACE_ID_CONTEXT_MENU].layer = 180;
+    descs[REACH_SURFACE_ID_QUICK_SETTINGS].layer = 190;
+    descs[REACH_SURFACE_ID_CLIPBOARD].layer = 200;
+
     descs[REACH_SURFACE_ID_CONTEXT_MENU].role = REACH_SURFACE_CONTEXT_MENU;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].pointer_priority = 10;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].apply_pointer_action =

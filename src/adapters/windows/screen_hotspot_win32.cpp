@@ -167,6 +167,42 @@ static reach_result reach_screen_hotspot_hide(reach_screen_hotspot *hotspot)
     return REACH_OK;
 }
 
+static reach_result reach_screen_hotspot_set_topmost(reach_screen_hotspot *hotspot,
+                                                       int32_t enabled)
+{
+    if (hotspot == nullptr || hotspot->hwnd == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    BOOL ok = SetWindowPos(hotspot->hwnd, enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    return ok ? REACH_OK : REACH_ERROR;
+}
+
+static reach_window_id reach_screen_hotspot_native_id(const reach_screen_hotspot *hotspot)
+{
+    if (hotspot == nullptr || hotspot->hwnd == nullptr)
+    {
+        return 0;
+    }
+    return reinterpret_cast<reach_window_id>(hotspot->hwnd);
+}
+
+static reach_result reach_screen_hotspot_place_behind(reach_screen_hotspot *hotspot,
+                                                        reach_window_id target_window)
+{
+    if (hotspot == nullptr || hotspot->hwnd == nullptr || target_window == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND target = reinterpret_cast<HWND>(target_window);
+    BOOL ok = SetWindowPos(hotspot->hwnd, target, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    return ok ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_screen_hotspot_set_callback(reach_screen_hotspot *hotspot,
                                                         reach_screen_hotspot_callback callback,
                                                         void *user)
@@ -265,6 +301,9 @@ reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_
     out_port->ops.set_bounds = reach_screen_hotspot_set_bounds;
     out_port->ops.show = reach_screen_hotspot_show;
     out_port->ops.hide = reach_screen_hotspot_hide;
+    out_port->ops.set_topmost = reach_screen_hotspot_set_topmost;
+    out_port->ops.native_id = reach_screen_hotspot_native_id;
+    out_port->ops.place_behind = reach_screen_hotspot_place_behind;
     out_port->ops.set_callback = reach_screen_hotspot_set_callback;
     out_port->ops.has_pending_events = reach_screen_hotspot_has_pending_events;
     out_port->ops.dispatch_events = reach_screen_hotspot_dispatch_events;
