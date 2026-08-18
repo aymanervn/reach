@@ -9,11 +9,6 @@ static void reach_host_on_dock_reveal_edge(void *user, reach_screen_hotspot_even
     {
         return;
     }
-    if (reach_host_game_mode_enabled(host))
-    {
-        return;
-    }
-
     if (event == REACH_SCREEN_HOTSPOT_ENTER)
     {
         reach_dock_begin_reveal_session(host->dock_capsule);
@@ -28,11 +23,6 @@ static void reach_host_on_top_bar_reveal_edge(void *user, reach_screen_hotspot_e
     {
         return;
     }
-    if (reach_host_game_mode_enabled(host))
-    {
-        return;
-    }
-
     if (event == REACH_SCREEN_HOTSPOT_ENTER)
     {
         reach_top_bar_begin_reveal_session(host->top_bar_capsule);
@@ -415,9 +405,7 @@ static void reach_host_cleanup(reach_host *host)
     host->wallpaper_image_path[0] = 0;
     host->stage_reveal_corner = {};
     host->window_thumbnails = {};
-    host->stage_reveal.corner_visible = 0;
-    host->stage_reveal.corner_bounds_valid = 0;
-    host->stage_reveal.corner_bounds = {};
+    host->stage_reveal = {};
     host->stage_thumbnails_registered = 0;
     host->dock_reveal = {};
     host->top_bar_reveal = {};

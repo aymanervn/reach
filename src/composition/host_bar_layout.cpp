@@ -106,14 +106,13 @@ static void reach_host_sync_pointer_move_enabled(reach_platform_window_port *win
     }
 }
 
-void reach_host_sync_pointer_move_subscriptions(reach_host *host)
+static void reach_host_apply_pointer_move_subscriptions(reach_host *host, int32_t enabled)
 {
     if (host == nullptr)
     {
         return;
     }
 
-    int32_t enabled = !reach_host_game_mode_enabled(host);
     int32_t force = !host->pointer_move.subscriptions_initialized;
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
@@ -140,6 +139,16 @@ void reach_host_sync_pointer_move_subscriptions(reach_host *host)
     }
 }
 
+void reach_host_sync_pointer_move_subscriptions(reach_host *host)
+{
+    reach_host_apply_pointer_move_subscriptions(host, 1);
+}
+
+void reach_host_suspend_pointer_move_subscriptions(reach_host *host)
+{
+    reach_host_apply_pointer_move_subscriptions(host, 0);
+}
+
 static int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32 *out_pointer)
 {
     return host != nullptr && out_pointer != nullptr &&
@@ -154,7 +163,7 @@ static int32_t reach_host_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f3
            fabsf(a.height - b.height) < 0.5f;
 }
 
-static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
+static void reach_host_apply_reveal_edge(reach_host *host, reach_screen_hotspot_port *hotspot,
                                          reach_host_bar_reveal_state *reveal, int32_t shown,
                                          reach_rect_f32 edge_bounds)
 {
@@ -163,18 +172,8 @@ static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
         return;
     }
 
-    if (!shown)
-    {
-        if (reveal->edge_visible && hotspot->ops.hide != nullptr &&
-            hotspot->ops.hide(hotspot->hotspot) == REACH_OK)
-        {
-            reveal->edge_visible = 0;
-        }
-        return;
-    }
-
-    if (!reveal->edge_bounds_valid ||
-        !reach_host_reveal_edge_rect_equal(reveal->edge_bounds, edge_bounds))
+    if (shown && (!reveal->edge_bounds_valid ||
+                  !reach_host_reveal_edge_rect_equal(reveal->edge_bounds, edge_bounds)))
     {
         if (hotspot->ops.set_bounds != nullptr &&
             hotspot->ops.set_bounds(hotspot->hotspot, edge_bounds) == REACH_OK)
@@ -184,34 +183,7 @@ static void reach_host_apply_reveal_edge(reach_screen_hotspot_port *hotspot,
         }
     }
 
-    if (!reveal->edge_visible && hotspot->ops.show != nullptr &&
-        hotspot->ops.show(hotspot->hotspot) == REACH_OK)
-    {
-        reveal->edge_visible = 1;
-    }
-}
-
-void reach_host_hide_bar_reveal_edges(reach_host *host)
-{
-    if (host == nullptr)
-    {
-        return;
-    }
-
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
-    {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->reveal_edge == nullptr || desc->reveal == nullptr)
-        {
-            continue;
-        }
-        if (desc->reveal_edge->ops.hide != nullptr)
-        {
-            (void)desc->reveal_edge->ops.hide(desc->reveal_edge->hotspot);
-        }
-        desc->reveal->edge_visible = 0;
-        desc->reveal->edge_bounds_valid = 0;
-    }
+    reach_layout_set_visible(&host->layout_manager, reveal->participant, shown);
 }
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
@@ -230,7 +202,6 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.shown_bounds = shown_bounds;
     request.monitor_bounds = monitor_bounds;
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
-    request.game_mode = reach_host_game_mode_enabled(host);
     request.edge = desc->edge;
     request.can_hide =
         desc->occluded != nullptr ? desc->occluded(host, shown_bounds, monitor_bounds) : 0;
@@ -259,8 +230,8 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         desc->surface->dirty_flags = 1;
     }
 
-    reach_host_apply_reveal_edge(desc->reveal_edge, desc->reveal, result.reveal_edge_shown,
-                                 result.reveal_bounds);
+    reach_host_apply_reveal_edge(host, desc->reveal_edge, desc->reveal,
+                                 result.reveal_edge_shown, result.reveal_bounds);
 
     return result.animated_bounds;
 }
@@ -385,11 +356,6 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
     {
         return 0;
     }
-    if (reach_host_game_mode_enabled(host))
-    {
-        return 0;
-    }
-
     int32_t position_animating = 0;
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {

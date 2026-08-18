@@ -131,12 +131,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     int32_t target_hidden = 0;
     int32_t reveal_edge_shown = 0;
 
-    if (request->game_mode)
-    {
-        state->reveal_session_active = 0;
-        target_hidden = 1;
-    }
-    else if (!request->can_hide)
+    if (!request->can_hide)
     {
         state->reveal_session_active = 0;
         target_hidden = 0;

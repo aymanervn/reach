@@ -76,6 +76,25 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
     reach_host_surface_transition_finish(host, &host->stage_transition);
 }
 
+static reach_result reach_host_finish_update(reach_host *host)
+{
+    reach_host_apply_layout(host);
+
+    host->dirty.layout = 0;
+    host->dirty.render = 0;
+    host->dirty.update_requested = 0;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        if (surface != nullptr)
+        {
+            surface->dirty_flags = 0;
+        }
+    }
+
+    return REACH_OK;
+}
+
 reach_result reach_host_update(reach_host *host, double delta_seconds)
 {
     if (host == nullptr)
@@ -93,6 +112,38 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     }
 
     reach_host_apply_window_control_result(host);
+
+    int32_t window_manager_dirty =
+        host->window_manager.ops.needs_refresh != nullptr &&
+        host->window_manager.ops.needs_refresh(host->window_manager.manager);
+    if (window_manager_dirty)
+    {
+        reach_host_invalidate_bar_occlusion(host);
+    }
+    if (window_manager_dirty && host->window_manager.ops.refresh != nullptr)
+    {
+        (void)host->window_manager.ops.refresh(host->window_manager.manager);
+
+        int32_t open_windows_changed = 0;
+        (void)reach_host_refresh_open_windows(host, &open_windows_changed);
+
+        if (open_windows_changed)
+        {
+            reach_host_refresh_switcher_windows(host);
+            host->dock.dirty_flags = 1;
+            host->top_bar.dirty_flags = 1;
+            host->switcher.dirty_flags = 1;
+        }
+        reach_host_sync_stage_window_states(host);
+        reach_host_apply_foreground_change(host);
+    }
+
+    (void)reach_host_update_game_mode(host);
+    if (reach_host_game_mode_enabled(host))
+    {
+        return reach_host_finish_update(host);
+    }
+
     reach_host_tick_animations(host, delta_seconds);
     reach_host_window_list_update(host, delta_seconds);
     reach_host_drain_now_playing_retired_covers(host);
@@ -134,33 +185,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
     }
-    int32_t window_manager_dirty =
-        host->window_manager.ops.needs_refresh != nullptr &&
-        host->window_manager.ops.needs_refresh(host->window_manager.manager);
-    if (window_manager_dirty)
-    {
-        reach_host_invalidate_bar_occlusion(host);
-    }
-    if (window_manager_dirty && host->window_manager.ops.refresh != nullptr)
-    {
-        (void)host->window_manager.ops.refresh(host->window_manager.manager);
-
-        int32_t open_windows_changed = 0;
-        (void)reach_host_refresh_open_windows(host, &open_windows_changed);
-
-        if (open_windows_changed)
-        {
-            reach_host_refresh_switcher_windows(host);
-            host->dock.dirty_flags = 1;
-            host->top_bar.dirty_flags = 1;
-            host->switcher.dirty_flags = 1;
-        }
-        reach_host_sync_stage_window_states(host);
-        reach_host_apply_foreground_change(host);
-    }
-    (void)reach_host_update_game_mode(host);
-    int32_t game_mode = reach_host_game_mode_enabled(host);
-    if (!game_mode && host->tray_provider.ops.needs_refresh != nullptr &&
+    if (host->tray_provider.ops.needs_refresh != nullptr &&
         host->tray_provider.ops.needs_refresh(host->tray_provider.provider))
     {
         (void)reach_host_refresh_tray_items(host);
@@ -229,15 +254,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                     host->dock.dirty_flags = 1;
                 }
                 reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
-                reach_rect_f32 animated_dock_bounds =
-                    game_mode
-                        ? shown_dock_bounds
-                        : reach_host_reconcile_bar_visibility(host, REACH_SURFACE_ID_DOCK,
-                                                              shown_dock_bounds, bounds);
-                if (game_mode)
-                {
-                    reach_host_hide_bar_reveal_edges(host);
-                }
+                reach_rect_f32 animated_dock_bounds = reach_host_reconcile_bar_visibility(
+                    host, REACH_SURFACE_ID_DOCK, shown_dock_bounds, bounds);
 
                 layout.dock.bounds = animated_dock_bounds;
 
@@ -272,7 +290,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                                                    host->pinned_apps, host->pinned_app_count);
 
                 reach_host_frame_context frame_ctx = {};
-                frame_ctx.game_mode = game_mode;
                 frame_ctx.monitor_bounds = bounds;
                 frame_ctx.dock_layout_changed = dock_layout_changed;
                 frame_ctx.launcher_layout_changed = launcher_layout_changed;
@@ -309,21 +326,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         }
     }
     reach_host_sync_pointer_move_subscriptions(host);
-    reach_host_apply_layout(host);
-
-    host->dirty.layout = 0;
-    host->dirty.render = 0;
-    host->dirty.update_requested = 0;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
-    {
-        reach_surface_runtime *surface = host->surface_descs[index].surface;
-        if (surface != nullptr)
-        {
-            surface->dirty_flags = 0;
-        }
-    }
-
-    return REACH_OK;
+    return reach_host_finish_update(host);
 }
 
 int32_t reach_host_frame_interval_ms(const reach_host *host)
