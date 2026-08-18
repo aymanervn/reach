@@ -413,27 +413,9 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         {
             (void)host->stage.window.ops.show(host->stage.window.window);
         }
-        if (!state->closing && !host->stage_z_applied &&
-            host->dock.window.ops.native_id != nullptr &&
-            host->stage.window.ops.place_behind != nullptr)
-        {
-            reach_window_id dock_id = host->dock.window.ops.native_id(host->dock.window.window);
-            if (dock_id != 0 && host->stage.window.ops.place_behind(host->stage.window.window,
-                                                                    dock_id) == REACH_OK)
-            {
-                host->stage_z_applied = 1;
-                reach_host_raise_top_bar_topmost(host);
-            }
-        }
     }
     else
     {
-        host->stage_z_applied = 0;
-        if (host->stage_topmost && host->stage.window.ops.set_topmost != nullptr &&
-            host->stage.window.ops.set_topmost(host->stage.window.window, 0) == REACH_OK)
-        {
-            host->stage_topmost = 0;
-        }
         if (host->stage.window.ops.hide != nullptr)
         {
             (void)host->stage.window.ops.hide(host->stage.window.window);

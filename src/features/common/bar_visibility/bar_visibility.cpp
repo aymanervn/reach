@@ -196,8 +196,8 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     if (edge_mode != REACH_BAR_REVEAL_EDGE_DISABLED)
     {
         result.reveal_bounds = reach_bar_reveal_edge_bounds(
-            request->edge, edge_mode, request->reveal_span_inset, request->shown_bounds,
-            request->monitor_bounds);
+            request->edge, REACH_BAR_REVEAL_EDGE_THIN, request->reveal_span_inset,
+            request->shown_bounds, request->monitor_bounds);
     }
     result.edge_mode = edge_mode;
     result.visible = target_hidden ? 0 : 1;
