@@ -122,9 +122,11 @@ extern "C"
         REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS = 16,
         REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17,
         REACH_DOCK_POINTER_ACTION_HOVER_ITEM = 18,
-        REACH_DOCK_POINTER_ACTION_PRESS_STAGE = 19,
-        REACH_DOCK_POINTER_ACTION_TOGGLE_STAGE = 20
+        REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER = 19,
+        REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER = 20
     } reach_dock_pointer_action_kind;
+
+#define REACH_DOCK_TRIGGER_PRIMARY 0
 
     size_t reach_dock_reorder_target(const reach_dock_feature_model *model,
                                      const reach_dock_layout *layout, size_t current_index,
