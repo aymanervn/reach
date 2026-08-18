@@ -16,10 +16,6 @@ void reach_host_set_tray_popup_open(reach_host *host, int32_t open)
     reach_host_surface_transition_set(host, &host->tray_transition, next_open);
     if (next_open)
     {
-        if (host->tray.window.ops.set_topmost != nullptr)
-        {
-            (void)host->tray.window.ops.set_topmost(host->tray.window.window, 1);
-        }
         reach_host_surface_opening(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_ID_TOP_BAR);
         (void)reach_host_refresh_tray_items(host);
     }
@@ -81,10 +77,7 @@ reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,
         return REACH_OK;
     }
 
-    if (host->tray.window.ops.set_topmost != nullptr)
-    {
-        (void)host->tray.window.ops.set_topmost(host->tray.window.window, 0);
-    }
+    reach_host_set_tray_popup_open(host, 0);
     return host->tray_provider.ops.activate(host->tray_provider.provider, item_id, action);
 }
 
