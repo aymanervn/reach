@@ -86,27 +86,27 @@ static reach_rect_f32 reach_top_bar_rect_union(reach_rect_f32 left, reach_rect_f
     return reach_top_bar_rect(left.x, left.y, right.x + right.width - left.x, left.height);
 }
 
-static void reach_top_bar_push_pill(const reach_theme *theme,
-                                    reach_render_command_buffer *commands, reach_rect_f32 pill)
+static void reach_top_bar_push_pill(const reach_theme *theme, reach_render_command_buffer *commands,
+                                    reach_rect_f32 pill, float dpi_scale)
 {
     float radius = pill.height * 0.5f;
+    float border_thickness = reach_theme_border_thickness(theme, dpi_scale);
 
     reach_top_bar_push_rect(commands, pill, theme->bar_background, radius);
 
-    if (theme->border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
+    if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {
         return;
     }
 
     reach_render_command border = {};
     border.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    border.rect = reach_top_bar_rect(pill.x + theme->border_thickness * 0.5f,
-                                     pill.y + theme->border_thickness * 0.5f,
-                                     pill.width - theme->border_thickness,
-                                     pill.height - theme->border_thickness);
+    border.rect =
+        reach_top_bar_rect(pill.x + border_thickness * 0.5f, pill.y + border_thickness * 0.5f,
+                           pill.width - border_thickness, pill.height - border_thickness);
     border.color = theme->bar_border;
     border.radius = radius;
-    border.stroke_width = theme->border_thickness;
+    border.stroke_width = border_thickness;
     reach_render_command_buffer_push(commands, &border);
 }
 
@@ -456,7 +456,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
         {
             pill = reach_top_bar_rect_union(layout->pills[REACH_TOP_BAR_PILL_TRAY], pill);
         }
-        reach_top_bar_push_pill(ctx->theme, out_commands, pill);
+        reach_top_bar_push_pill(ctx->theme, out_commands, pill, ctx->dpi_scale);
     }
 
     reach_top_bar_render_input input = {};

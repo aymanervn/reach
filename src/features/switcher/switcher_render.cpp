@@ -99,25 +99,27 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
     size_t visible_count = reach_switcher_visible_count(input->model->window_count);
 
+    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
+
     command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect.x = 0.5f;
-    command.rect.y = 0.5f;
-    command.rect.width = input->bounds.width - 1.0f;
-    command.rect.height = input->bounds.height - 1.0f;
+    command.rect.x = border_thickness * 0.5f;
+    command.rect.y = border_thickness * 0.5f;
+    command.rect.width = input->bounds.width - border_thickness;
+    command.rect.height = input->bounds.height - border_thickness;
     command.color = theme->bar_background;
     command.radius = radius;
     reach_render_command_buffer_push(out_commands, &command);
 
     command = {};
     command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect.x = 0.5f;
-    command.rect.y = 0.5f;
-    command.rect.width = input->bounds.width - 1.0f;
-    command.rect.height = input->bounds.height - 1.0f;
+    command.rect.x = border_thickness * 0.5f;
+    command.rect.y = border_thickness * 0.5f;
+    command.rect.width = input->bounds.width - border_thickness;
+    command.rect.height = input->bounds.height - border_thickness;
     command.color = theme->bar_border;
     command.radius = radius;
-    command.stroke_width = reach_switcher_input_scale(input, 1.0f);
+    command.stroke_width = border_thickness;
     reach_render_command_buffer_push(out_commands, &command);
 
     if (visible_count > 0)

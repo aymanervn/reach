@@ -457,6 +457,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     const reach_theme *theme = input->theme;
     const reach_clipboard_model *model = input->model;
     const reach_clipboard_layout *layout = input->layout;
+    const float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
     reach_render_command_buffer_clear(commands);
 
     reach_render_command command = {};
@@ -468,11 +469,12 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
 
     command = {};
     command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = {0.5f, 0.5f, reach_clipboard_max_float(0.0f, layout->bounds.width - 1.0f),
-                    reach_clipboard_max_float(0.0f, layout->bounds.height - 1.0f)};
+    command.rect = {border_thickness * 0.5f, border_thickness * 0.5f,
+                    reach_clipboard_max_float(0.0f, layout->bounds.width - border_thickness),
+                    reach_clipboard_max_float(0.0f, layout->bounds.height - border_thickness)};
     command.color = theme->clipboard_border;
     command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
-    command.stroke_width = theme->border_thickness;
+    command.stroke_width = border_thickness;
     reach_render_command_buffer_push(commands, &command);
 
     command = {};
@@ -603,13 +605,15 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
 
         command = {};
         command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-        command.rect = {local_visible_item.x + 0.5f, local_visible_item.y + 0.5f,
-                        reach_clipboard_max_float(0.0f, local_visible_item.width - 1.0f),
-                        reach_clipboard_max_float(0.0f, local_visible_item.height - 1.0f)};
+        command.rect = {
+            local_visible_item.x + border_thickness * 0.5f,
+            local_visible_item.y + border_thickness * 0.5f,
+            reach_clipboard_max_float(0.0f, local_visible_item.width - border_thickness),
+            reach_clipboard_max_float(0.0f, local_visible_item.height - border_thickness)};
         command.color = theme->clipboard_item_hover_border;
         command.color.a *= hover;
         command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
-        command.stroke_width = theme->border_thickness;
+        command.stroke_width = border_thickness;
         reach_render_command_buffer_push(commands, &command);
 
         const float close_size = metrics.close_button_size;
