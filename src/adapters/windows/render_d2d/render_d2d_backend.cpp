@@ -10,6 +10,8 @@ void reach_d2d_destroy(reach_render_backend *backend)
     }
 
     reach_d2d_clear_icon_cache(backend);
+    reach_d2d_clear_shadow_cache(backend);
+    reach_d2d_release_shadow_bake_context(backend);
 
     if (backend->d2d_context != nullptr)
     {

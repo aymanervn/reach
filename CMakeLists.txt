@@ -172,6 +172,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_icons.cpp
     src/adapters/windows/render_d2d/render_d2d_svg.cpp
     src/adapters/windows/render_d2d/render_d2d_shapes.cpp
+    src/adapters/windows/render_d2d/render_d2d_shadow.cpp
     src/adapters/windows/render_d2d/render_d2d_text.cpp
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/search_retriever_win32.cpp

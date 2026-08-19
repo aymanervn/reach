@@ -28,6 +28,7 @@ struct reach_top_bar
     float quick_settings_target_width;
     reach_rect_f32 push_monitor_bounds;
     reach_rect_f32 push_shown_bounds;
+    float push_shadow_clearance;
     float push_depth;
     int32_t push_can_hide;
     int32_t push_hover_revealed;

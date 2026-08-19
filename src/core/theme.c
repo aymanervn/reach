@@ -3,7 +3,6 @@
 #define REACH_RGB8(r, g, b, a) {(r) / 255.0f, (g) / 255.0f, (b) / 255.0f, (a)}
 
 #define REACH_THEME_TRANSLUCENT 0.92f
-#define REACH_THEME_BORDER 0.45f
 #define REACH_THEME_STAGE 0.99f
 
 #define REACH_PURE_WHITE(a) REACH_RGB8(255, 255, 255, a)
@@ -17,6 +16,8 @@
 #define REACH_DARK_STRUCTURE(a) REACH_RGB8(37, 38, 49, a)
 #define REACH_DARK_MID_CONTRAST_GRAY(a) REACH_RGB8(148, 150, 153, a)
 #define REACH_DARK_HIGH_CONTRAST_WHITE(a) REACH_RGB8(203, 203, 214, a)
+#define REACH_DARK_EDGE_ON_DEEP(a) REACH_RGB8(101, 101, 106, a)
+#define REACH_DARK_EDGE_ON_BASE(a) REACH_RGB8(108, 108, 119, a)
 
 #define REACH_DARK_ACCENT_BLUE(a) REACH_RGB8(61, 148, 255, a)
 #define REACH_DARK_ACCENT_CYAN(a) REACH_RGB8(51, 184, 245, a)
@@ -34,6 +35,7 @@
 #define REACH_LIGHT_MIDTONE(a) REACH_RGB8(220, 220, 220, a)
 #define REACH_LIGHT_MID_CONTRAST_GRAY(a) REACH_RGB8(110, 111, 109, a)
 #define REACH_LIGHT_HIGH_CONTRAST_BLACK(a) REACH_RGB8(18, 23, 31, a)
+#define REACH_LIGHT_EDGE_ON_BASE(a) REACH_RGB8(148, 151, 154, a)
 
 #define REACH_LIGHT_ACCENT_BLUE(a) REACH_RGB8(31, 97, 209, a)
 #define REACH_LIGHT_ACCENT_CYAN(a) REACH_RGB8(20, 128, 184, a)
@@ -44,6 +46,12 @@
 #define REACH_LIGHT_ACCENT_ORANGE(a) REACH_RGB8(194, 97, 20, a)
 #define REACH_LIGHT_ACCENT_YELLOW(a) REACH_RGB8(168, 122, 15, a)
 #define REACH_LIGHT_ACCENT_RED(a) REACH_RGB8(199, 61, 46, a)
+
+#define REACH_SHADOW_AMBIENT(blur_px)                                                              \
+    {.offset_x = 0.0f, .offset_y = 0.0f, .blur = (blur_px), .color = REACH_RGB8(0, 0, 0, 0.3f)}
+
+#define REACH_THEME_SHADOWS                                                                        \
+    .bar_shadow = REACH_SHADOW_AMBIENT(5.0f), .popup_shadow = REACH_SHADOW_AMBIENT(5.0f)
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
@@ -62,9 +70,9 @@ static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
 
     .bar_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT),
-    .bar_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
+    .bar_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .popup_background = REACH_DARK_BASE(REACH_THEME_TRANSLUCENT),
-    .popup_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
+    .popup_border = REACH_DARK_EDGE_ON_BASE(1.0f),
 
     .primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .inverse_text = REACH_DARK_BASE(0.92f),
@@ -110,7 +118,7 @@ static const reach_theme reach_theme_dark = {
     .launcher_placeholder_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .launcher_selection_highlight = REACH_DARK_HIGH_CONTRAST_WHITE(0.25f),
     .launcher_search_icon = REACH_DARK_HIGH_CONTRAST_WHITE(0.32f),
-    .launcher_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
+    .launcher_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .launcher_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
     .launcher_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .launcher_row_selected_background = REACH_DARK_RAISED(1.0f),
@@ -143,7 +151,7 @@ static const reach_theme reach_theme_dark = {
     .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
 
     .clipboard_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT),
-    .clipboard_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
+    .clipboard_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .clipboard_primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .clipboard_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .clipboard_item_background = REACH_DARK_RAISED(1.0f),
@@ -187,6 +195,7 @@ static const reach_theme reach_theme_dark = {
             [REACH_THEME_ACCENT_RED] = REACH_DARK_ACCENT_RED(1.0f),
         },
 
+    REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
 };
 
@@ -194,9 +203,9 @@ static const reach_theme reach_theme_light = {
     .mode = REACH_THEME_MODE_LIGHT,
 
     .bar_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .bar_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
+    .bar_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .popup_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
+    .popup_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
 
     .primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
     .inverse_text = REACH_PURE_WHITE(0.95f),
@@ -242,7 +251,7 @@ static const reach_theme reach_theme_light = {
     .launcher_placeholder_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_selection_highlight = REACH_LIGHT_ACCENT_BLUE(0.28f),
     .launcher_search_icon = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.36f),
-    .launcher_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
+    .launcher_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .launcher_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .launcher_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_row_selected_background = REACH_LIGHT_MIDTONE(1.0f),
@@ -275,7 +284,7 @@ static const reach_theme reach_theme_light = {
     .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
 
     .clipboard_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .clipboard_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
+    .clipboard_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .clipboard_primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
     .clipboard_secondary_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .clipboard_item_background = REACH_LIGHT_RAISED(1.0f),
@@ -319,6 +328,7 @@ static const reach_theme reach_theme_light = {
             [REACH_THEME_ACCENT_RED] = REACH_LIGHT_ACCENT_RED(1.0f),
         },
 
+    REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
 };
 
@@ -367,6 +377,45 @@ float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale)
 {
     const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
     return actual->border_thickness * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+}
+
+static float reach_shadow_ceil(float value)
+{
+    float truncated = (float)(int)value;
+    return value > truncated ? truncated + 1.0f : truncated;
+}
+
+static float reach_shadow_edge(float extent, float offset)
+{
+    float edge = extent - offset;
+    return edge > 0.0f ? reach_shadow_ceil(edge) : 0.0f;
+}
+
+float reach_theme_shadow_extent(const reach_shadow *shadow, float dpi_scale)
+{
+    float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+    float sigma = (shadow != 0 ? shadow->blur : 0.0f) * scale * 0.5f;
+    return sigma * 3.0f;
+}
+
+reach_shadow_pad reach_theme_shadow_pad(const reach_shadow *shadow, float dpi_scale)
+{
+    reach_shadow_pad pad = {0.0f, 0.0f, 0.0f, 0.0f};
+    if (shadow == 0 || shadow->color.a <= 0.0f)
+    {
+        return pad;
+    }
+
+    float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+    float extent = reach_theme_shadow_extent(shadow, dpi_scale);
+    float offset_x = shadow->offset_x * scale;
+    float offset_y = shadow->offset_y * scale;
+
+    pad.left = reach_shadow_edge(extent, offset_x);
+    pad.right = reach_shadow_edge(extent, -offset_x);
+    pad.top = reach_shadow_edge(extent, offset_y);
+    pad.bottom = reach_shadow_edge(extent, -offset_y);
+    return pad;
 }
 
 float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height)

@@ -31,8 +31,19 @@ void reach_render_command_buffer_clear(reach_render_command_buffer *buffer)
 {
     if (buffer != 0)
     {
+        reach_rect_f32 empty = {0.0f, 0.0f, 0.0f, 0.0f};
         buffer->count = 0;
         buffer->has_scissor = 0;
+        buffer->content_rect = empty;
+    }
+}
+
+void reach_render_command_buffer_set_content_rect(reach_render_command_buffer *buffer,
+                                                  reach_rect_f32 content_rect)
+{
+    if (buffer != 0)
+    {
+        buffer->content_rect = content_rect;
     }
 }
 
@@ -52,6 +63,32 @@ void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buff
     {
         buffer->has_scissor = 0;
     }
+}
+
+reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
+                                      const reach_render_command *shape,
+                                      const reach_shadow *shadow, float dpi_scale)
+{
+    float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+    reach_render_command command;
+
+    if (buffer == 0 || shape == 0 || shadow == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (shadow->color.a <= 0.0f || shadow->blur <= 0.0f)
+    {
+        return REACH_OK;
+    }
+
+    command = *shape;
+    command.type = REACH_RENDER_COMMAND_SHADOW;
+    command.color = shadow->color;
+    command.stroke_width = 0.0f;
+    command.blur_radius = shadow->blur * scale;
+    command.shadow_offset_x = shadow->offset_x * scale;
+    command.shadow_offset_y = shadow->offset_y * scale;
+    return reach_render_command_buffer_push(buffer, &command);
 }
 
 reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer,

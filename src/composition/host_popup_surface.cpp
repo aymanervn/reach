@@ -1,8 +1,8 @@
 #include "host_internal.h"
 
-reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_runtime *surface,
-                                             reach_rect_f32 bounds, float notch_anchor_x,
-                                             int32_t notch_side,
+reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id surface_id,
+                                             reach_surface_runtime *surface, reach_rect_f32 bounds,
+                                             float notch_anchor_x, int32_t notch_side,
                                              const reach_render_command_buffer *content_commands)
 {
     if (host == nullptr || surface == nullptr || surface->renderer.ops.begin_frame == nullptr)
@@ -11,6 +11,8 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_run
     }
 
     reach_render_command_buffer commands = {};
+
+    reach_host_stamp_surface_content(host, surface_id, &commands);
 
     reach_popup_background_input popup = {};
     popup.theme = host->theme != nullptr ? host->theme : reach_theme_default();

@@ -120,39 +120,30 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
         return REACH_INVALID_ARGUMENT;
     }
 
-    float radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
-    float notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
-    float notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
-    float notch_center = reach_popup_clamp_notch_center_scaled(
-        input->notch_center_x, input->bounds.width, input->dpi_scale);
-    reach_color border = input->theme->popup_border;
     float border_thickness = reach_theme_border_thickness(input->theme, input->dpi_scale);
-    reach_render_command command = {};
+
+    reach_render_command shape = {};
+    shape.rect.x = border_thickness * 0.5f;
+    shape.rect.y = border_thickness * 0.5f;
+    shape.rect.width = input->bounds.width - border_thickness;
+    shape.rect.height = input->bounds.height - border_thickness;
+    shape.radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
+    shape.notch_center_x = reach_popup_clamp_notch_center_scaled(
+        input->notch_center_x, input->bounds.width, input->dpi_scale);
+    shape.notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
+    shape.notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
+    shape.notch_side = input->notch_side;
+
+    reach_render_push_shadow(out_commands, &shape, &input->theme->popup_shadow, input->dpi_scale);
+
+    reach_render_command command = shape;
     command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
-    command.rect.x = border_thickness * 0.5f;
-    command.rect.y = border_thickness * 0.5f;
-    command.rect.width = input->bounds.width - border_thickness;
-    command.rect.height = input->bounds.height - border_thickness;
     command.color = input->theme->popup_background;
-    command.radius = radius;
-    command.notch_center_x = notch_center;
-    command.notch_width = notch_width;
-    command.notch_height = notch_height;
-    command.notch_side = input->notch_side;
     reach_render_command_buffer_push(out_commands, &command);
 
-    command = {};
+    command = shape;
     command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
-    command.rect.x = border_thickness * 0.5f;
-    command.rect.y = border_thickness * 0.5f;
-    command.rect.width = input->bounds.width - border_thickness;
-    command.rect.height = input->bounds.height - border_thickness;
-    command.color = border;
-    command.radius = radius;
+    command.color = input->theme->popup_border;
     command.stroke_width = border_thickness;
-    command.notch_center_x = notch_center;
-    command.notch_width = notch_width;
-    command.notch_height = notch_height;
-    command.notch_side = input->notch_side;
     return reach_render_command_buffer_push(out_commands, &command);
 }

@@ -6,7 +6,8 @@ typedef struct reach_host_frame_state
     int32_t visible;
 } reach_host_frame_state;
 
-void reach_host_sync_surface_input_regions(const reach_surface_desc *desc)
+void reach_host_sync_surface_input_regions(const reach_host *host,
+                                           const reach_surface_desc *desc)
 {
     if (desc->surface == nullptr || desc->capsule_ops == nullptr ||
         desc->capsule_ops->input_regions == nullptr ||
@@ -18,6 +19,13 @@ void reach_host_sync_surface_input_regions(const reach_surface_desc *desc)
     reach_rect_f32 regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS] = {};
     size_t region_count = desc->capsule_ops->input_regions(desc->capsule, regions,
                                                            REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS);
+
+    reach_shadow_pad pad = reach_host_surface_shadow_pad(host, desc->id);
+    for (size_t index = 0; index < region_count; ++index)
+    {
+        regions[index].x += pad.left;
+        regions[index].y += pad.top;
+    }
     (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window, regions,
                                                       region_count);
 }
@@ -37,7 +45,8 @@ static reach_result reach_host_apply_transient_frame(
     reach_rect_f32 bounds = reach_host_surface_transition_bounds(host, transition, target_bounds);
     float opacity = reach_host_surface_transition_opacity(host, transition);
     reach_result result = reach_host_apply_window_state(
-        &surface->window, bounds, opacity, &surface->last_bounds, &surface->last_opacity,
+        &surface->window, bounds, reach_host_surface_shadow_pad(host, id), opacity,
+        &surface->last_bounds, &surface->last_opacity,
         &surface->bounds_valid, &surface->opacity_valid, &out->window_changed);
     if (result != REACH_OK)
     {
@@ -64,7 +73,9 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
     float launcher_opacity =
         reach_host_surface_transition_opacity(host, &host->launcher_transition);
     reach_result result = reach_host_apply_window_state(
-        &host->launcher.window, launcher_bounds, launcher_opacity, &host->launcher.last_bounds,
+        &host->launcher.window, launcher_bounds,
+        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_LAUNCHER), launcher_opacity,
+        &host->launcher.last_bounds,
         &host->launcher.last_opacity, &host->launcher.bounds_valid, &host->launcher.opacity_valid,
         &launcher_window_changed);
     if (result != REACH_OK)
@@ -130,7 +141,8 @@ reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_cont
     float dock_radius =
         reach_theme_dock_corner_radius(host->theme, host->layout.dock.bounds.height);
     reach_result result = reach_host_apply_window_state(
-        &host->dock.window, host->layout.dock.bounds, 1.0f, &host->dock.last_bounds,
+        &host->dock.window, host->layout.dock.bounds,
+        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_DOCK), 1.0f, &host->dock.last_bounds,
         &host->dock.last_opacity, &host->dock.bounds_valid, &host->dock.opacity_valid,
         &dock_window_changed);
     if (result != REACH_OK)
@@ -178,9 +190,9 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
 
     int32_t window_changed = 0;
     reach_result result = reach_host_apply_window_state(
-        &host->top_bar.window, bounds, 1.0f, &host->top_bar.last_bounds,
-        &host->top_bar.last_opacity, &host->top_bar.bounds_valid, &host->top_bar.opacity_valid,
-        &window_changed);
+        &host->top_bar.window, bounds, reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_TOP_BAR),
+        1.0f, &host->top_bar.last_bounds, &host->top_bar.last_opacity,
+        &host->top_bar.bounds_valid, &host->top_bar.opacity_valid, &window_changed);
     if (result != REACH_OK)
     {
         return result;
@@ -331,7 +343,8 @@ reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_con
         reach_host_surface_transition_bounds(host, &host->stage_transition, stage_bounds);
     float opacity = reach_host_surface_transition_opacity(host, &host->stage_transition);
     reach_result result = reach_host_apply_window_state(
-        &host->stage.window, bounds, opacity, &host->stage.last_bounds, &host->stage.last_opacity,
+        &host->stage.window, bounds, reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_STAGE),
+        opacity, &host->stage.last_bounds, &host->stage.last_opacity,
         &host->stage.bounds_valid, &host->stage.opacity_valid, &window_changed);
     if (result != REACH_OK)
     {

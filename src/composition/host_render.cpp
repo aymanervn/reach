@@ -31,6 +31,7 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
     {
         return result;
     }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_DOCK, &commands);
 
     if (host->dock.renderer.ops.begin_frame(host->dock.renderer.backend) != REACH_OK)
     {
@@ -61,6 +62,7 @@ reach_result reach_host_render_top_bar_surface(reach_host *host)
     {
         return result;
     }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_TOP_BAR, &commands);
 
     if (host->top_bar.renderer.ops.begin_frame(host->top_bar.renderer.backend) != REACH_OK)
     {
@@ -90,6 +92,7 @@ reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bou
     {
         return result;
     }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_TRAY, &commands);
 
     if (host->tray.renderer.ops.begin_frame(host->tray.renderer.backend) != REACH_OK)
     {
@@ -119,7 +122,7 @@ reach_result reach_host_render_quick_settings_surface(reach_host *host)
     const reach_quick_settings_state *quick_settings_state =
         reach_quick_settings_state_ptr(host->quick_settings_capsule);
     return reach_host_render_popup_surface(
-        host, &host->quick_settings, quick_settings_state->bounds,
+        host, REACH_SURFACE_ID_QUICK_SETTINGS, &host->quick_settings, quick_settings_state->bounds,
         quick_settings_state->notch_anchor_x,
         reach_popup_notch_side(quick_settings_state->drop_direction), &commands);
 }
@@ -273,6 +276,7 @@ reach_result reach_host_render_context_menu_surface(reach_host *host)
     {
         return build_result;
     }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_CONTEXT_MENU, &commands);
 
     if (host->context_menu.renderer.ops.begin_frame(host->context_menu.renderer.backend) !=
         REACH_OK)
