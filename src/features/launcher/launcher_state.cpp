@@ -913,7 +913,6 @@ const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
         reach_launcher_capsule_tick,
         reach_launcher_capsule_is_open,
         nullptr,
-        nullptr,
         reach_launcher_capsule_needs_frame,
         reach_launcher_capsule_wants_pointer_move,
         reach_launcher_capsule_handle_pointer,

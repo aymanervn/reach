@@ -168,11 +168,6 @@ static int32_t reach_switcher_capsule_is_open(const void *capsule)
     return reach_switcher_is_open(static_cast<const reach_switcher *>(capsule));
 }
 
-static void reach_switcher_capsule_force_close(void *capsule)
-{
-    reach_switcher_force_close(static_cast<reach_switcher *>(capsule));
-}
-
 static int32_t reach_switcher_capsule_needs_frame(const void *capsule)
 {
     return reach_switcher_width_animation_active(static_cast<const reach_switcher *>(capsule));
@@ -218,7 +213,6 @@ const reach_feature_capsule_ops *reach_switcher_capsule_ops(void)
         nullptr,
         reach_switcher_capsule_tick,
         reach_switcher_capsule_is_open,
-        reach_switcher_capsule_force_close,
         nullptr,
         reach_switcher_capsule_needs_frame,
         nullptr,

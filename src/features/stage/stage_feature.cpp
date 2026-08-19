@@ -458,11 +458,6 @@ static int32_t reach_stage_capsule_is_open(const void *capsule)
     return reach_stage_is_open(stage) && !reach_stage_is_closing(stage);
 }
 
-static void reach_stage_capsule_force_close(void *capsule)
-{
-    reach_stage_force_close(static_cast<reach_stage *>(capsule));
-}
-
 static void reach_stage_capsule_on_game_mode(void *capsule, int32_t enabled)
 {
     if (enabled)
@@ -490,20 +485,9 @@ const reach_feature_capsule_ops *reach_stage_capsule_ops(void)
     static const reach_feature_capsule_ops ops = {reach_stage_capsule_reset,
                                                   reach_stage_capsule_tick,
                                                   reach_stage_capsule_is_open,
-                                                  reach_stage_capsule_force_close,
                                                   reach_stage_capsule_on_game_mode,
                                                   reach_stage_capsule_needs_frame,
                                                   reach_stage_capsule_wants_pointer_move,
                                                   reach_stage_handle_pointer};
     return &ops;
-}
-
-const reach_ui_event_type *reach_stage_activation_events(size_t *out_count)
-{
-    static const reach_ui_event_type events[] = {REACH_UI_EVENT_STAGE_TOGGLE};
-    if (out_count != nullptr)
-    {
-        *out_count = sizeof(events) / sizeof(events[0]);
-    }
-    return events;
 }

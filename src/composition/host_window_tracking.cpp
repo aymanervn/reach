@@ -1,5 +1,30 @@
 #include "host_internal.h"
 
+void reach_host_refresh_window_world(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    reach_host_invalidate_window_facts(host);
+    if (host->window_manager.ops.refresh != nullptr)
+    {
+        (void)host->window_manager.ops.refresh(host->window_manager.manager);
+    }
+
+    int32_t open_windows_changed = 0;
+    (void)reach_host_refresh_open_windows(host, &open_windows_changed);
+    if (open_windows_changed)
+    {
+        reach_host_refresh_switcher_windows(host);
+        host->dock.dirty_flags = 1;
+        host->top_bar.dirty_flags = 1;
+        host->switcher.dirty_flags = 1;
+    }
+    reach_host_request_update(host);
+}
+
 void reach_host_note_foreground_window(reach_host *host, uintptr_t foreground_window)
 {
     if (host != nullptr)
@@ -57,7 +82,7 @@ void reach_host_apply_foreground_change(reach_host *host)
     }
 
     reach_host_note_foreground_window(host, foreground);
-    reach_host_invalidate_bar_occlusion(host);
+    reach_host_invalidate_window_facts(host);
     reach_host_refresh_switcher_windows(host);
     if (reach_input_language_service_refresh(host->input_language, foreground))
     {

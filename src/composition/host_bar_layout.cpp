@@ -1,7 +1,5 @@
 #include "host_internal.h"
 
-#include <math.h>
-
 static int32_t reach_host_bar_forced_shown(const reach_host *host)
 {
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
@@ -22,58 +20,31 @@ static int32_t reach_host_popup_open(const reach_host *host)
                                        reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
 }
 
-int32_t reach_host_dock_occluded(reach_host *host, reach_rect_f32 shown_bounds,
-                                 reach_rect_f32 monitor_bounds)
+static const reach_host_window_facts *reach_host_current_window_facts(reach_host *host)
 {
-    (void)shown_bounds;
-    (void)monitor_bounds;
-    REACH_ASSERT(host != nullptr);
-    if (host == nullptr)
+    reach_host_window_facts *facts = &host->window_facts;
+    if (facts->valid)
     {
-        return 0;
+        return facts;
     }
-    if (host->window_manager.ops.any_window_maximized_on_primary != nullptr &&
-        host->window_manager.ops.any_window_maximized_on_primary(host->window_manager.manager))
-    {
-        return 1;
-    }
-    uintptr_t foreground = reach_host_foreground_window(host);
-    if (host->window_manager.ops.window_is_snapped_on_primary != nullptr &&
+
+    facts->any_window_maximized =
+        host->window_manager.ops.any_window_maximized_on_primary != nullptr &&
+        host->window_manager.ops.any_window_maximized_on_primary(host->window_manager.manager);
+    facts->foreground_snapped =
+        host->window_manager.ops.window_is_snapped_on_primary != nullptr &&
         host->window_manager.ops.window_is_snapped_on_primary(host->window_manager.manager,
-                                                              foreground))
-    {
-        return 1;
-    }
-    return 0;
+                                                              reach_host_foreground_window(host));
+    facts->valid = 1;
+    return facts;
 }
 
-int32_t reach_host_top_bar_occluded(reach_host *host, reach_rect_f32 shown_bounds,
-                                    reach_rect_f32 monitor_bounds)
-{
-    REACH_ASSERT(host != nullptr);
-    if (host == nullptr)
-    {
-        return 0;
-    }
-
-    reach_host_bar_occlusion *cache = &host->top_bar_occlusion;
-    if (!cache->valid || !reach_host_rect_equal(cache->shown_bounds, shown_bounds) ||
-        !reach_host_rect_equal(cache->monitor_bounds, monitor_bounds))
-    {
-        cache->occluded =
-            reach_top_bar_windows_trespassing(host->top_bar_capsule, shown_bounds, monitor_bounds);
-        cache->shown_bounds = shown_bounds;
-        cache->monitor_bounds = monitor_bounds;
-        cache->valid = 1;
-    }
-    return cache->occluded;
-}
-
-void reach_host_invalidate_bar_occlusion(reach_host *host)
+void reach_host_invalidate_window_facts(reach_host *host)
 {
     if (host != nullptr)
     {
-        host->top_bar_occlusion.valid = 0;
+        host->window_facts.valid = 0;
+        reach_top_bar_invalidate_occlusion(host->top_bar_capsule);
     }
 }
 
@@ -157,12 +128,6 @@ static int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32
                REACH_OK;
 }
 
-static int32_t reach_host_reveal_edge_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
-{
-    return fabsf(a.x - b.x) < 0.5f && fabsf(a.y - b.y) < 0.5f && fabsf(a.width - b.width) < 0.5f &&
-           fabsf(a.height - b.height) < 0.5f;
-}
-
 static void reach_host_apply_reveal_edge(reach_host *host, reach_screen_hotspot_port *hotspot,
                                          reach_host_bar_reveal_state *reveal, int32_t shown,
                                          reach_rect_f32 edge_bounds)
@@ -172,8 +137,8 @@ static void reach_host_apply_reveal_edge(reach_host *host, reach_screen_hotspot_
         return;
     }
 
-    if (shown && (!reveal->edge_bounds_valid ||
-                  !reach_host_reveal_edge_rect_equal(reveal->edge_bounds, edge_bounds)))
+    if (shown &&
+        (!reveal->edge_bounds_valid || !reach_host_rect_equal(reveal->edge_bounds, edge_bounds)))
     {
         if (hotspot->ops.set_bounds != nullptr &&
             hotspot->ops.set_bounds(hotspot->hotspot, edge_bounds) == REACH_OK)
@@ -183,7 +148,8 @@ static void reach_host_apply_reveal_edge(reach_host *host, reach_screen_hotspot_
         }
     }
 
-    reach_layout_set_visible(&host->layout_manager, reveal->participant, shown);
+    reach_layout_set_visible(&host->layout_manager, reach_host_hotspot_participant(host, hotspot),
+                             shown);
 }
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
@@ -198,13 +164,14 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         return shown_bounds;
     }
 
+    const reach_host_window_facts *facts = reach_host_current_window_facts(host);
+
     reach_bar_visibility_request request = {};
     request.shown_bounds = shown_bounds;
     request.monitor_bounds = monitor_bounds;
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
-    request.edge = desc->edge;
-    request.can_hide =
-        desc->occluded != nullptr ? desc->occluded(host, shown_bounds, monitor_bounds) : 0;
+    request.any_window_maximized = facts->any_window_maximized;
+    request.foreground_snapped = facts->foreground_snapped;
     request.force_shown = reach_host_bar_forced_shown(host);
     request.hold_open = reach_host_popup_open(host);
     request.reveal_seconds =

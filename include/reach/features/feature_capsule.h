@@ -66,7 +66,6 @@ extern "C"
         void (*tick)(void *capsule, double delta_seconds, reach_feature_tick_result *out);
         int32_t (*is_open)(const void *capsule);
 
-        void (*force_close)(void *capsule);
         void (*on_game_mode)(void *capsule, int32_t enabled);
 
         int32_t (*needs_frame)(const void *capsule);

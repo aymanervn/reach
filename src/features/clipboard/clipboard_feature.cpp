@@ -351,11 +351,6 @@ static int32_t reach_clipboard_capsule_is_open(const void *capsule)
     return reach_clipboard_is_open(clipboard);
 }
 
-static void reach_clipboard_capsule_force_close(void *capsule)
-{
-    (void)reach_clipboard_set_open(static_cast<reach_clipboard_feature *>(capsule), 0);
-}
-
 static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
 {
     reach_clipboard_feature *clipboard = const_cast<reach_clipboard_feature *>(
@@ -479,7 +474,6 @@ const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void)
         reach_clipboard_capsule_reset,
         reach_clipboard_capsule_tick,
         reach_clipboard_capsule_is_open,
-        reach_clipboard_capsule_force_close,
         nullptr,
         reach_clipboard_capsule_needs_frame,
         reach_clipboard_capsule_wants_pointer_move,

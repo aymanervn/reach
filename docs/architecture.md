@@ -240,14 +240,28 @@ arrangement should be. See the composition section for the model.
 Dock and top bar are both bars: each owns a `reach_bar_visibility_state` driven
 by the shared `features/common/bar_visibility` state machine, and composition
 reconciles both through one `reach_host_reconcile_bar_visibility` over the
-descriptor's `update_visibility` / `edge` / `occluded` / reveal-edge fields.
-Neither bar names its own edge or decides what covers it — both come from the
-descriptor. The two bars answer `occluded` from different sources and must:
-the top bar rests in the app band, so windows genuinely cover it and its source
-is the cached trespass flag, recomputed only on move-size end, foreground change
-and window-list change. The dock is permanently topmost and is never in the
-windows' range, so it hides by policy — the maximized / snapped rule — and a
-floating window overlapping the dock band must never hide it.
+descriptor's `update_visibility` and reveal-edge fields. Each bar names its own
+edge and decides for itself what counts as covered: composition passes only
+*facts* about foreign windows on the request — `any_window_maximized` and
+`foreground_snapped` — and each capsule turns them into `can_hide`. The two bars
+answer differently and must: the top bar rests in the app band, so windows
+genuinely cover it and it uses its own trespass test, cached inside the capsule.
+The dock is permanently topmost and is never in the windows' range, so it hides
+by policy — the maximized / snapped rule — and a floating window overlapping the
+dock band must never hide it.
+
+Both answers are cached, so what makes them correct is that every path which
+learns the window world changed goes through one function,
+`reach_host_refresh_window_world`: it invalidates the facts and the capsule's
+trespass cache, refreshes the manager, and refreshes the open-window list. The
+three callers are the polled `needs_refresh` path in `reach_host_update`, the
+`WINDOW_STATE_CHANGED` event, and the completion of reach's own window
+operations (`reach_host_apply_window_control_result` — snap, minimize, close).
+A path that refreshes without invalidating is the failure this shape exists to
+prevent: it leaves the bars deciding from a stale answer, and only an unrelated
+foreground change heals it. Reach's own operations therefore need no detection
+at all, and the service publishes a dragged window once, on move-size end, never
+during the drag.
 
 Two separate inputs decide how another open surface affects the bars, and both
 apply to both bars identically. A surface that declares `bar_shown_while_open`
@@ -294,10 +308,10 @@ order against a shared `reach_host_frame_context`.
 Surfaces that take OS activation declare `BEHAVIOR_ACTIVATES`; the class rules then
 own show-on-activate, close-on-focus-loss, and the staleness check that discards a
 focus-loss signal the surface has already recovered from (reach's own foreground
-handover emits one). An activating surface shows through
-`reach_host_apply_surface_activation` (idempotent via `surface->activated`) and never
-through a raw `show()` — a fullscreen surface re-asserting `HWND_TOPMOST` every frame
-makes the desktop unusable.
+handover emits one). An activating surface shows once through the
+apply pass (idempotent via `surface->activated`) and never through a raw `show()` —
+a fullscreen surface re-asserting `HWND_TOPMOST` every frame makes the desktop
+unusable.
 
 Z-order and visibility for the twelve windows reach owns are decided in one place:
 the `features/common/layout` manager plus the apply pass in `host_layout.cpp`. Each
@@ -332,6 +346,16 @@ the handle the manager mints; the screen-hotspot port carries `set_topmost` /
 `native_id` / `place_behind` so they chain and seed like any other participant.
 The wallpaper is not a participant: it re-pins itself to `HWND_BOTTOM` and is
 deliberately not hidden in game mode.
+
+Band membership has exactly one author. The Win32 window adapter no longer keys
+topmost off `reach_surface_role`, caches no topmost bit, and never changes z in
+`show()` or `raise()` — a second table there would have to be kept in sync with the
+layer registry by hand, and a cached bit goes stale the moment `place_behind` puts a
+window in the band. Windows are created non-topmost and hidden; the first apply pass
+shows and chains them in the same frame. The one visibility owner rule holds across
+the lifecycle too: `reach_host_stop` hides through `reach_host_hide_all_surfaces` so
+the applied plan stays truthful, rather than hiding windows behind the pass's back.
+
 Every open path calls one entry point —
 `reach_host_surface_opening(host, id, origin)` — and never hand-picks close rules. It
 derives the sweep from declarative properties: opening anything closes every open

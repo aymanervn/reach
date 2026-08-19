@@ -106,11 +106,7 @@ void reach_host_apply_window_control_result(reach_host *host)
         return;
     }
 
-    if (host->window_manager.ops.refresh != nullptr)
-    {
-        (void)host->window_manager.ops.refresh(host->window_manager.manager);
-        (void)reach_host_refresh_open_windows(host, nullptr);
-    }
+    reach_host_refresh_window_world(host);
 
     if (result == REACH_OK)
     {

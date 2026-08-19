@@ -209,22 +209,23 @@ static void reach_dock_push_background(const reach_theme *theme, const reach_doc
     reach_render_command_buffer_push(commands, &command);
 }
 
-static void reach_dock_push_stage_button(const reach_dock_render_input *input,
-                                         reach_render_command_buffer *commands, float icon_box_size)
+static void reach_dock_push_trigger_button(const reach_dock_render_input *input,
+                                           reach_render_command_buffer *commands,
+                                           float icon_box_size)
 {
     const reach_theme *theme = input->theme;
-    reach_rect_f32 stage_box =
-        reach_dock_icon_box_for_slot(input->layout->stage_button, icon_box_size);
+    reach_rect_f32 trigger_box =
+        reach_dock_icon_box_for_slot(input->layout->trigger_button, icon_box_size);
 
     reach_color glyph = theme->system_glyph;
-    if (input->click_feedback_index == input->stage_feedback_index &&
+    if (input->click_feedback_index == input->trigger_feedback_index &&
         input->click_feedback_opacity > reach_dock_metrics_values.click_feedback_min_opacity)
     {
         glyph =
             reach_theme_color_mix(glyph, theme->bar_click_feedback, input->click_feedback_opacity);
     }
 
-    reach_dock_push_vector_icon(commands, stage_box, REACH_VECTOR_ICON_MENU, glyph);
+    reach_dock_push_vector_icon(commands, trigger_box, REACH_VECTOR_ICON_MENU, glyph);
 }
 
 reach_result reach_dock_build_render_commands(const reach_dock_render_input *input,
@@ -245,7 +246,7 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
 
     reach_dock_push_background(theme, layout, out_commands, dock_radius);
-    reach_dock_push_stage_button(input, out_commands, icon_box_size);
+    reach_dock_push_trigger_button(input, out_commands, icon_box_size);
 
     for (size_t index = 0; index < layout->app_slot_count; ++index)
     {
@@ -380,7 +381,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.click_feedback_index = state->feedback_index;
     input.click_feedback_opacity =
         reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
-    input.stage_feedback_index = REACH_DOCK_FEEDBACK_STAGE_BUTTON;
+    input.trigger_feedback_index = REACH_DOCK_FEEDBACK_TRIGGER;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     return reach_dock_build_render_commands(&input, out_commands);

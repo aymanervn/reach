@@ -1,24 +1,21 @@
 #include "host_internal.h"
 
-static void reach_host_apply_surface_activation(const reach_surface_desc *desc, int32_t active)
+reach_layout_participant reach_host_hotspot_participant(const reach_host *host,
+                                                        const reach_screen_hotspot_port *hotspot)
 {
-    reach_surface_runtime *surface = desc->surface;
-    if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0)
+    if (host == nullptr || hotspot == nullptr)
     {
-        return;
+        return REACH_LAYOUT_MAX_PARTICIPANTS;
     }
 
-    if (!active)
+    for (size_t index = 0; index < host->layout_manager.participant_count; ++index)
     {
-        surface->activated = 0;
-        return;
+        if (host->layout_targets[index].hotspot == hotspot)
+        {
+            return (reach_layout_participant)index;
+        }
     }
-
-    if (!surface->activated && surface->window.ops.show != nullptr)
-    {
-        (void)surface->window.ops.show(surface->window.window);
-        surface->activated = 1;
-    }
+    return REACH_LAYOUT_MAX_PARTICIPANTS;
 }
 
 static reach_window_id reach_host_layout_native_id(const reach_host_layout_target *target)
@@ -70,20 +67,26 @@ static void reach_host_layout_apply_visibility(const reach_host_layout_target *t
     if (target->desc != nullptr)
     {
         reach_surface_runtime *surface = target->desc->surface;
-        int32_t activates =
-            (target->desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
-        reach_host_apply_surface_activation(target->desc, visible);
+        int32_t activates = (target->desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
 
-        if (visible)
+        if (!visible)
         {
-            if (!activates && surface->window.ops.show != nullptr)
+            surface->activated = 0;
+            if (surface->window.ops.hide != nullptr)
             {
-                (void)surface->window.ops.show(surface->window.window);
+                (void)surface->window.ops.hide(surface->window.window);
             }
+            return;
         }
-        else if (surface->window.ops.hide != nullptr)
+
+        if (activates && surface->activated)
         {
-            (void)surface->window.ops.hide(surface->window.window);
+            return;
+        }
+        if (surface->window.ops.show != nullptr)
+        {
+            (void)surface->window.ops.show(surface->window.window);
+            surface->activated = activates;
         }
         return;
     }
@@ -190,4 +193,20 @@ void reach_host_apply_layout(reach_host *host)
 
     host->applied_layout_plan = plan;
     host->has_applied_layout_plan = 1;
+}
+
+void reach_host_hide_all_surfaces(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (reach_layout_participant participant = 0;
+         participant < (reach_layout_participant)host->layout_manager.participant_count;
+         ++participant)
+    {
+        reach_layout_set_visible(&host->layout_manager, participant, 0);
+    }
+    reach_host_apply_layout(host);
 }

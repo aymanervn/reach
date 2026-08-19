@@ -984,20 +984,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     if (event->type == REACH_UI_EVENT_WINDOW_STATE_CHANGED)
     {
-        if (host->window_manager.ops.refresh != nullptr)
-        {
-            (void)host->window_manager.ops.refresh(host->window_manager.manager);
-        }
-
-        int32_t open_windows_changed = 0;
-        (void)reach_host_refresh_open_windows(host, &open_windows_changed);
-
-        if (open_windows_changed)
-        {
-            reach_host_refresh_switcher_windows(host);
-            host->dock.dirty_flags = 1;
-            host->switcher.dirty_flags = 1;
-        }
+        reach_host_refresh_window_world(host);
         reach_host_sync_stage_window_states(host);
         reach_host_apply_foreground_change(host);
         (void)reach_host_update_game_mode(host);

@@ -718,6 +718,19 @@ reach_result reach_service_shared_publish_windows(const reach_service_window_sna
     return REACH_OK;
 }
 
+reach_result reach_service_shared_bump_window_sequence(void)
+{
+    if (g_writer.view == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_shared_writer_begin_publish();
+    ++g_writer.view->window_sequence;
+    reach_shared_writer_end_publish();
+    return REACH_OK;
+}
+
 reach_result reach_service_shared_publish_game_mode(int32_t active)
 {
     if (g_writer.view == nullptr)

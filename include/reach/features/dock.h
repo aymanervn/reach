@@ -97,7 +97,7 @@ extern "C"
         float dragged_box_x;
         size_t click_feedback_index;
         float click_feedback_opacity;
-        size_t stage_feedback_index;
+        size_t trigger_feedback_index;
         int32_t text_alignment_center;
     } reach_dock_render_input;
 
@@ -108,7 +108,7 @@ extern "C"
     {
         REACH_DOCK_POINTER_REGION_NONE = 0,
         REACH_DOCK_POINTER_REGION_ITEM = 1,
-        REACH_DOCK_POINTER_REGION_STAGE_BUTTON = 5
+        REACH_DOCK_POINTER_REGION_TRIGGER = 5
     } reach_dock_pointer_region;
 
     typedef enum reach_dock_pointer_action_kind
@@ -197,7 +197,7 @@ extern "C"
 
     enum
     {
-        REACH_DOCK_FEEDBACK_STAGE_BUTTON = REACH_MAX_DOCK_ITEMS,
+        REACH_DOCK_FEEDBACK_TRIGGER = REACH_MAX_DOCK_ITEMS,
         REACH_DOCK_FEEDBACK_NONE
     };
 

@@ -420,11 +420,6 @@ static int32_t reach_context_menu_capsule_is_open(const void *capsule)
     return reach_context_menu_is_open(static_cast<const reach_context_menu *>(capsule));
 }
 
-static void reach_context_menu_capsule_force_close(void *capsule)
-{
-    reach_context_menu_reset(static_cast<reach_context_menu *>(capsule));
-}
-
 static int32_t reach_context_menu_capsule_wants_pointer_move(const void *capsule)
 {
     return reach_context_menu_is_open(static_cast<const reach_context_menu *>(capsule));
@@ -565,7 +560,6 @@ const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
         reach_context_menu_capsule_reset,
         reach_context_menu_capsule_tick,
         reach_context_menu_capsule_is_open,
-        reach_context_menu_capsule_force_close,
         nullptr,
         reach_context_menu_capsule_needs_frame,
         reach_context_menu_capsule_wants_pointer_move,

@@ -31,7 +31,6 @@ struct reach_platform_window
     float corner_radius;
     int tracking_mouse_leave;
     int pointer_move_enabled;
-    int topmost_enabled;
     int suppress_capture_changed;
     int shell_hook_registered;
     reach_rect_f32 input_regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS];
@@ -614,14 +613,6 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
            role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_STAGE;
 }
 
-static int32_t reach_window_topmost_surface(reach_surface_role role)
-{
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
-           role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-           role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_STAGE;
-}
-
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = role == REACH_SURFACE_SETTINGS ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW;
@@ -636,10 +627,6 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     else
     {
         style |= WS_EX_LAYERED;
-    }
-    if (reach_window_topmost_surface(role))
-    {
-        style |= WS_EX_TOPMOST;
     }
     if (reach_window_no_activate_surface(role))
     {
@@ -727,9 +714,9 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     ShowWindow(window->hwnd, show_command);
     if (no_activate)
     {
-        SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0,
-                     0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+        SetWindowPos(window->hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER |
+                         SWP_SHOWWINDOW);
     }
     else
     {
@@ -1002,9 +989,8 @@ static reach_result reach_platform_window_set_topmost(reach_platform_window *win
         return REACH_INVALID_ARGUMENT;
     }
 
-    window->topmost_enabled = enabled ? 1 : 0;
-    BOOL ok = SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0,
-                           0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    BOOL ok = SetWindowPos(window->hwnd, enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     return ok ? REACH_OK : REACH_ERROR;
 }
 
@@ -1049,23 +1035,11 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
     if (reach_window_no_activate_surface(window->role))
     {
         ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
-        SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_TOP, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         return REACH_OK;
     }
 
-    if (!reach_window_topmost_surface(window->role))
-    {
-        int show_command = IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW;
-        ShowWindow(window->hwnd, show_command);
-        BringWindowToTop(window->hwnd);
-        reach_platform_window_focus(window->hwnd);
-        return REACH_OK;
-    }
-
-    ShowWindow(window->hwnd, SW_SHOW);
-    window->topmost_enabled = 1;
-    SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    int show_command = IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW;
+    ShowWindow(window->hwnd, show_command);
     BringWindowToTop(window->hwnd);
     reach_platform_window_focus(window->hwnd);
 
@@ -1203,7 +1177,6 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     }
     window->role = role;
     window->pointer_move_enabled = 1;
-    window->topmost_enabled = reach_window_topmost_surface(role);
     const wchar_t *title = role == REACH_SURFACE_SETTINGS ? L"Reach Settings" : L"Reach";
     window->hwnd =
         CreateWindowExW(reach_window_ex_style(role), reach_window_class_name(role), title, WS_POPUP,
