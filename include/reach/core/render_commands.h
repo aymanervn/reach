@@ -28,7 +28,8 @@ extern "C"
         REACH_RENDER_COMMAND_ICON_TINT = 13,
         REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
         REACH_RENDER_COMMAND_TEXTBOX = 15,
-        REACH_RENDER_COMMAND_ARC_STROKE = 16
+        REACH_RENDER_COMMAND_ARC_STROKE = 16,
+        REACH_RENDER_COMMAND_SHADOW = 17
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -120,6 +121,8 @@ extern "C"
         reach_color color;
         float radius;
         float blur_radius;
+        float shadow_offset_x;
+        float shadow_offset_y;
         float image_contrast;
         float icon_fade_start;
         int32_t has_clip_rect;
@@ -156,6 +159,7 @@ extern "C"
         size_t count;
         reach_rect_f32 scissor_rect;
         int32_t has_scissor;
+        reach_rect_f32 content_rect;
     } reach_render_command_buffer;
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
@@ -163,6 +167,11 @@ extern "C"
                                                   const reach_render_command *command);
     void reach_render_command_buffer_set_scissor(reach_render_command_buffer *buffer,
                                                  reach_rect_f32 scissor_rect);
+    void reach_render_command_buffer_set_content_rect(reach_render_command_buffer *buffer,
+                                                      reach_rect_f32 content_rect);
+    reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
+                                          const reach_render_command *shape,
+                                          const reach_shadow *shadow, float dpi_scale);
     void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buffer);
 
 #ifdef __cplusplus

@@ -178,6 +178,8 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
     request.reveal_span_inset =
         id == REACH_SURFACE_ID_TOP_BAR ? reach_host_stage_reveal_corner_size(host) : 0.0f;
+    request.shadow_clearance = reach_theme_shadow_extent(reach_host_surface_shadow(host, id),
+                                                         reach_host_layout_dpi_scale(host));
 
     reach_bar_visibility_result result = desc->update_visibility(desc->capsule, &request);
 
@@ -359,7 +361,8 @@ reach_result reach_host_move_dock_reveal_frame(reach_host *host)
 
     int32_t window_changed = 0;
     reach_result result = reach_host_apply_window_state(
-        &host->dock.window, bounds, 1.0f, &host->dock.last_bounds, &host->dock.last_opacity,
+        &host->dock.window, bounds, reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_DOCK),
+        1.0f, &host->dock.last_bounds, &host->dock.last_opacity,
         &host->dock.bounds_valid, &host->dock.opacity_valid, &window_changed);
     if (result != REACH_OK)
     {
@@ -378,9 +381,9 @@ reach_result reach_host_move_top_bar_reveal_frame(reach_host *host)
 
     int32_t window_changed = 0;
     reach_result result = reach_host_apply_window_state(
-        &host->top_bar.window, bounds, 1.0f, &host->top_bar.last_bounds,
-        &host->top_bar.last_opacity, &host->top_bar.bounds_valid, &host->top_bar.opacity_valid,
-        &window_changed);
+        &host->top_bar.window, bounds, reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_TOP_BAR),
+        1.0f, &host->top_bar.last_bounds, &host->top_bar.last_opacity,
+        &host->top_bar.bounds_valid, &host->top_bar.opacity_valid, &window_changed);
     reach_top_bar_move_window_push_frame(host->top_bar_capsule);
     return result;
 }

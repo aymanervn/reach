@@ -92,6 +92,11 @@ static void reach_top_bar_push_pill(const reach_theme *theme, reach_render_comma
     float radius = pill.height * 0.5f;
     float border_thickness = reach_theme_border_thickness(theme, dpi_scale);
 
+    reach_render_command shape = {};
+    shape.rect = pill;
+    shape.radius = radius;
+    reach_render_push_shadow(commands, &shape, &theme->bar_shadow, dpi_scale);
+
     reach_top_bar_push_rect(commands, pill, theme->bar_background, radius);
 
     if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)

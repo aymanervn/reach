@@ -33,6 +33,28 @@ struct reach_d2d_icon_cache_entry
     ID2D1Bitmap *bitmap;
 };
 
+struct reach_d2d_shadow_key
+{
+    float content_width;
+    float content_height;
+    float radius;
+    float blur;
+    float offset_x;
+    float offset_y;
+    float notch_offset_x;
+    float notch_width;
+    float notch_height;
+    int32_t notch_side;
+    int32_t has_notch;
+    reach_color color;
+};
+
+struct reach_d2d_shadow_cache_entry
+{
+    reach_d2d_shadow_key key;
+    ID2D1Bitmap1 *bitmap;
+};
+
 struct reach_render_backend
 {
     HWND hwnd;
@@ -70,8 +92,12 @@ struct reach_render_backend
 
     std::vector<reach_d2d_icon_cache_entry> icon_cache;
 
+    ID2D1DeviceContext *shadow_bake_context;
+    std::vector<reach_d2d_shadow_cache_entry> shadow_cache;
+
     UINT target_width;
     UINT target_height;
+    reach_rect_f32 backdrop_content_rect;
 };
 
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
@@ -112,8 +138,19 @@ reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RE
                                               float radius, int32_t corner_mask,
                                               ID2D1Geometry **out_geometry);
 
+reach_result reach_d2d_create_notched_rounded_rect_geometry(ID2D1Factory *factory,
+                                                            const reach_render_command *command,
+                                                            ID2D1PathGeometry **out_geometry);
+
 reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command);
+
+reach_result reach_d2d_draw_shadow(reach_render_backend *backend,
+                                   const reach_render_command *command);
+void reach_d2d_clear_shadow_cache(reach_render_backend *backend);
+void reach_d2d_release_shadow_bake_context(reach_render_backend *backend);
+reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
+                                          reach_rect_f32 content_rect);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target,
                                      const reach_render_command *command);
 reach_result reach_d2d_draw_notch_stroke(ID2D1RenderTarget *target,

@@ -22,6 +22,22 @@ extern "C"
         REACH_THEME_MODE_LIGHT = 1,
     } reach_theme_mode;
 
+    typedef struct reach_shadow
+    {
+        float offset_x;
+        float offset_y;
+        float blur;
+        reach_color color;
+    } reach_shadow;
+
+    typedef struct reach_shadow_pad
+    {
+        float left;
+        float top;
+        float right;
+        float bottom;
+    } reach_shadow_pad;
+
     typedef enum reach_theme_accent
     {
         REACH_THEME_ACCENT_BLUE = 0,
@@ -42,8 +58,10 @@ extern "C"
 
         reach_color bar_background;
         reach_color bar_border;
+        reach_shadow bar_shadow;
         reach_color popup_background;
         reach_color popup_border;
+        reach_shadow popup_shadow;
 
         reach_color primary_text;
         reach_color inverse_text;
@@ -190,6 +208,8 @@ extern "C"
     reach_color reach_theme_color_alpha(reach_color color, float alpha);
     reach_color reach_theme_color_mix(reach_color from, reach_color to, float t);
     float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale);
+    float reach_theme_shadow_extent(const reach_shadow *shadow, float dpi_scale);
+    reach_shadow_pad reach_theme_shadow_pad(const reach_shadow *shadow, float dpi_scale);
     float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height);
     float reach_theme_icon_box_size(const reach_theme *theme, float dock_height);
     float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);

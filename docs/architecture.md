@@ -356,6 +356,34 @@ shows and chains them in the same frame. The one visibility owner rule holds acr
 the lifecycle too: `reach_host_stop` hides through `reach_host_hide_all_surfaces` so
 the applied plan stays truthful, rather than hiding windows behind the pass's back.
 
+Surfaces that cast a shadow are drawn into a window larger than themselves, and the
+rule that keeps that from leaking is absolute: **`reach_rect_f32 bounds` means content
+bounds everywhere.** A descriptor declares which theme shadow a surface takes
+(`reach_surface_shadow`); `reach_host_surface_shadow_pad` is the single producer of the
+resulting margin, and it has exactly three consumers — the rect handed to `set_bounds`,
+the command buffer's `content_rect`, and the input-region offset. `last_bounds` keeps the
+content rect, so hit testing, popup placement, trespass, dock-local conversion and the top
+bar's window-push band all keep working untouched. A fourth consumer would be the failure
+this shape exists to prevent.
+
+The margin is not empty space the renderer may ignore. The WUC host-backdrop visual is
+sized to the whole window, so it must be inset-clipped to `content_rect` or the acrylic
+fills the margin with a hard-edged rectangle. Bars need the same care at the other end:
+they never hide their window, they slide to `reach_bar_hidden_position`, so that position
+takes the shadow's extent as clearance — without it a retracted bar leaves its shadow
+smeared along the screen edge. Both paths that derive the hidden position must pass the
+same clearance or reveal progress drifts between them.
+
+Shadow rasterisation is the adapter's, and it is cached per backend on the shape rather
+than the size: the ring around a rounded rect is invariant along its straight runs, so it
+is baked once and drawn as slices, stretched along whichever axes can stretch. A notched
+shape cannot stretch along the notch's axis and a shape too small to hold two corner caps
+cannot stretch at all — both are facts about geometry, never about whether something is
+animating, which is why an animating surface is a cache hit rather than a special case.
+Entries whose key is size-independent are permanent; the few that must carry a size are
+bounded, because a surface that animates a dimension too small to slice would otherwise
+mint one entry per frame.
+
 Every open path calls one entry point —
 `reach_host_surface_opening(host, id, origin)` — and never hand-picks close rules. It
 derives the sweep from declarative properties: opening anything closes every open

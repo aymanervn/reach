@@ -100,6 +100,13 @@ typedef enum reach_surface_id
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
 
+typedef enum reach_surface_shadow
+{
+    REACH_SURFACE_SHADOW_NONE = 0,
+    REACH_SURFACE_SHADOW_BAR = 1,
+    REACH_SURFACE_SHADOW_POPUP = 2
+} reach_surface_shadow;
+
 typedef enum reach_surface_pointer_flags
 {
     REACH_SURFACE_POINTER_NONE = 0,
@@ -141,6 +148,8 @@ typedef struct reach_surface_desc
     const reach_feature_capsule_ops *capsule_ops;
 
     uint32_t pointer_flags;
+
+    reach_surface_shadow shadow;
 
     uint32_t behavior_flags;
 
@@ -215,7 +224,8 @@ struct reach_host_frame_context
 };
 typedef struct reach_host_frame_context reach_host_frame_context;
 
-void reach_host_sync_surface_input_regions(const reach_surface_desc *desc);
+void reach_host_sync_surface_input_regions(const reach_host *host,
+                                           const reach_surface_desc *desc);
 
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame_context *ctx);
@@ -436,11 +446,15 @@ static inline int32_t reach_host_primary_monitor_bounds(const reach_host *host,
 int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
 int32_t reach_host_opacity_equal(float a, float b);
 
+const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surface_id id);
+reach_shadow_pad reach_host_surface_shadow_pad(const reach_host *host, reach_surface_id id);
+void reach_host_stamp_surface_content(const reach_host *host, reach_surface_id id,
+                                      reach_render_command_buffer *commands);
 reach_result reach_host_apply_window_state(reach_platform_window_port *window,
-                                           reach_rect_f32 bounds, float opacity,
-                                           reach_rect_f32 *last_bounds, float *last_opacity,
-                                           int32_t *bounds_valid, int32_t *opacity_valid,
-                                           int32_t *out_changed);
+                                           reach_rect_f32 bounds, reach_shadow_pad pad,
+                                           float opacity, reach_rect_f32 *last_bounds,
+                                           float *last_opacity, int32_t *bounds_valid,
+                                           int32_t *opacity_valid, int32_t *out_changed);
 void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
                                         size_t y_track, size_t opacity_track,
                                         float settle_offset);
@@ -473,9 +487,9 @@ void reach_host_on_quick_settings_window_event(void *user, const reach_ui_event 
 void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_stage_window_event(void *user, const reach_ui_event *event);
 
-reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_runtime *surface,
-                                             reach_rect_f32 bounds, float notch_anchor_x,
-                                             int32_t notch_side,
+reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id surface_id,
+                                             reach_surface_runtime *surface, reach_rect_f32 bounds,
+                                             float notch_anchor_x, int32_t notch_side,
                                              const reach_render_command_buffer *content_commands);
 
 void reach_host_sync_popup_mouse_hook(reach_host *host);

@@ -932,6 +932,7 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
 
     top_bar->push_monitor_bounds = bar_request.monitor_bounds;
     top_bar->push_shown_bounds = bar_request.shown_bounds;
+    top_bar->push_shadow_clearance = bar_request.shadow_clearance;
     top_bar->push_depth = push_depth;
     top_bar->push_can_hide = bar_request.can_hide;
     top_bar->push_hover_revealed = result.hover_revealed;
@@ -947,8 +948,9 @@ void reach_top_bar_move_window_push_frame(reach_top_bar *top_bar)
         return;
     }
 
-    float hidden_y = reach_bar_hidden_position(REACH_TOP_BAR_EDGE, top_bar->push_shown_bounds,
-                                               top_bar->push_monitor_bounds);
+    float hidden_y =
+        reach_bar_hidden_position(REACH_TOP_BAR_EDGE, top_bar->push_shown_bounds,
+                                  top_bar->push_monitor_bounds, top_bar->push_shadow_clearance);
     float animated_y = reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
     reach_top_bar_apply_window_push(
         top_bar, reach_bar_reveal_progress(animated_y, top_bar->push_shown_bounds.y, hidden_y));

@@ -305,7 +305,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                     {
                         return result;
                     }
-                    reach_host_sync_surface_input_regions(desc);
+                    reach_host_sync_surface_input_regions(host, desc);
                 }
             }
         }

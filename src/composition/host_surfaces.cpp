@@ -14,11 +14,71 @@ int32_t reach_host_opacity_equal(float a, float b)
     return fabsf(a - b) < 0.001f;
 }
 
+const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return nullptr;
+    }
+
+    const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    switch (host->surface_descs[id].shadow)
+    {
+    case REACH_SURFACE_SHADOW_BAR:
+        return &theme->bar_shadow;
+    case REACH_SURFACE_SHADOW_POPUP:
+        return &theme->popup_shadow;
+    default:
+        return nullptr;
+    }
+}
+
+reach_shadow_pad reach_host_surface_shadow_pad(const reach_host *host, reach_surface_id id)
+{
+    reach_shadow_pad pad = {};
+    const reach_shadow *shadow = reach_host_surface_shadow(host, id);
+    if (shadow == nullptr)
+    {
+        return pad;
+    }
+    return reach_theme_shadow_pad(shadow, reach_host_layout_dpi_scale(host));
+}
+
+static reach_rect_f32 reach_host_surface_window_bounds(reach_rect_f32 content,
+                                                       reach_shadow_pad pad)
+{
+    content.x -= pad.left;
+    content.y -= pad.top;
+    content.width += pad.left + pad.right;
+    content.height += pad.top + pad.bottom;
+    return content;
+}
+
+void reach_host_stamp_surface_content(const reach_host *host, reach_surface_id id,
+                                      reach_render_command_buffer *commands)
+{
+    if (host == nullptr || commands == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+
+    const reach_surface_runtime *surface = host->surface_descs[id].surface;
+    if (surface == nullptr || !surface->bounds_valid)
+    {
+        return;
+    }
+
+    reach_shadow_pad pad = reach_host_surface_shadow_pad(host, id);
+    reach_rect_f32 content = {pad.left, pad.top, surface->last_bounds.width,
+                              surface->last_bounds.height};
+    reach_render_command_buffer_set_content_rect(commands, content);
+}
+
 reach_result reach_host_apply_window_state(reach_platform_window_port *window,
-                                           reach_rect_f32 bounds, float opacity,
-                                           reach_rect_f32 *last_bounds, float *last_opacity,
-                                           int32_t *bounds_valid, int32_t *opacity_valid,
-                                           int32_t *out_changed)
+                                           reach_rect_f32 bounds, reach_shadow_pad pad,
+                                           float opacity, reach_rect_f32 *last_bounds,
+                                           float *last_opacity, int32_t *bounds_valid,
+                                           int32_t *opacity_valid, int32_t *out_changed)
 {
     REACH_ASSERT(window != nullptr);
     REACH_ASSERT(last_bounds != nullptr);
@@ -36,7 +96,8 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
     if (window->ops.set_bounds != nullptr &&
         (!*bounds_valid || !reach_host_rect_equal(*last_bounds, bounds)))
     {
-        reach_result result = window->ops.set_bounds(window->window, bounds);
+        reach_result result =
+            window->ops.set_bounds(window->window, reach_host_surface_window_bounds(bounds, pad));
         if (result != REACH_OK)
         {
             return result;
@@ -371,6 +432,12 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                      host->stage_capsule,
                                      reach_stage_capsule_ops(),
                                      REACH_SURFACE_POINTER_NONE};
+
+    descs[REACH_SURFACE_ID_DOCK].shadow = REACH_SURFACE_SHADOW_BAR;
+    descs[REACH_SURFACE_ID_TOP_BAR].shadow = REACH_SURFACE_SHADOW_BAR;
+    descs[REACH_SURFACE_ID_TRAY].shadow = REACH_SURFACE_SHADOW_POPUP;
+    descs[REACH_SURFACE_ID_QUICK_SETTINGS].shadow = REACH_SURFACE_SHADOW_POPUP;
+    descs[REACH_SURFACE_ID_CONTEXT_MENU].shadow = REACH_SURFACE_SHADOW_POPUP;
 
     descs[REACH_SURFACE_ID_STAGE].layer = 50;
     descs[REACH_SURFACE_ID_LAUNCHER].layer = 100;

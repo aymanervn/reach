@@ -193,9 +193,12 @@ static void reach_dock_push_background(const reach_dock_render_input *input,
     const reach_dock_layout *layout = input->layout;
     float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
 
-    reach_dock_push_rect(commands,
-                         reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height),
-                         theme->bar_background, dock_radius);
+    reach_render_command shape = {};
+    shape.rect = reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height);
+    shape.radius = dock_radius;
+    reach_render_push_shadow(commands, &shape, &theme->bar_shadow, input->dpi_scale);
+
+    reach_dock_push_rect(commands, shape.rect, theme->bar_background, dock_radius);
 
     if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {

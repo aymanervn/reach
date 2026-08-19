@@ -125,10 +125,11 @@ static float reach_d2d_notch_mirror_y(float value, float y, float h, int32_t mir
     return mirrored ? (2.0f * y + h - value) : value;
 }
 
-reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
-                                                 const reach_render_command *command)
+reach_result reach_d2d_create_notched_rounded_rect_geometry(ID2D1Factory *factory,
+                                                            const reach_render_command *command,
+                                                            ID2D1PathGeometry **out_geometry)
 {
-    if (target == nullptr || command == nullptr)
+    if (factory == nullptr || command == nullptr || out_geometry == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -178,18 +179,10 @@ reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
 
     notch_center = (notch_left + notch_right) * 0.5f;
 
-    ID2D1SolidColorBrush *brush = nullptr;
-    ID2D1Factory *factory = nullptr;
     ID2D1PathGeometry *geometry = nullptr;
     ID2D1GeometrySink *sink = nullptr;
 
-    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
-
-    if (SUCCEEDED(hr))
-    {
-        target->GetFactory(&factory);
-        hr = factory != nullptr ? factory->CreatePathGeometry(&geometry) : E_FAIL;
-    }
+    HRESULT hr = factory->CreatePathGeometry(&geometry);
 
     if (SUCCEEDED(hr))
     {
@@ -236,6 +229,52 @@ reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
         hr = sink->Close();
     }
 
+    if (sink != nullptr)
+    {
+        sink->Release();
+    }
+
+    if (FAILED(hr))
+    {
+        if (geometry != nullptr)
+        {
+            geometry->Release();
+        }
+        return REACH_ERROR;
+    }
+
+    *out_geometry = geometry;
+    return REACH_OK;
+}
+
+reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
+                                                 const reach_render_command *command)
+{
+    if (target == nullptr || command == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    ID2D1Factory *factory = nullptr;
+    target->GetFactory(&factory);
+    if (factory == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    ID2D1PathGeometry *geometry = nullptr;
+    reach_result result =
+        reach_d2d_create_notched_rounded_rect_geometry(factory, command, &geometry);
+    factory->Release();
+
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    ID2D1SolidColorBrush *brush = nullptr;
+    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
+
     if (SUCCEEDED(hr))
     {
         if (command->stroke_width > 0.0f)
@@ -248,22 +287,11 @@ reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
         }
     }
 
-    if (sink != nullptr)
-    {
-        sink->Release();
-    }
-    if (geometry != nullptr)
-    {
-        geometry->Release();
-    }
-    if (factory != nullptr)
-    {
-        factory->Release();
-    }
     if (brush != nullptr)
     {
         brush->Release();
     }
+    geometry->Release();
 
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
