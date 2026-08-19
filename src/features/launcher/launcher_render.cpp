@@ -289,12 +289,14 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         }
     }
 
+    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
     command = {};
     command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = {0.5f, 0.5f, layout->bounds.width - 1.0f, outer_height - 1.0f};
+    command.rect = {border_thickness * 0.5f, border_thickness * 0.5f,
+                    layout->bounds.width - border_thickness, outer_height - border_thickness};
     command.color = theme->launcher_border;
     command.radius = launcher_radius;
-    command.stroke_width = theme->border_thickness;
+    command.stroke_width = border_thickness;
     reach_render_command_buffer_push(out_commands, &command);
 
     return REACH_OK;

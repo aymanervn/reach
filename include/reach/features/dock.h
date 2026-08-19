@@ -99,6 +99,7 @@ extern "C"
         float click_feedback_opacity;
         size_t trigger_feedback_index;
         int32_t text_alignment_center;
+        float dpi_scale;
     } reach_dock_render_input;
 
     reach_result reach_dock_build_render_commands(const reach_dock_render_input *input,

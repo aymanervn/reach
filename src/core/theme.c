@@ -3,6 +3,7 @@
 #define REACH_RGB8(r, g, b, a) {(r) / 255.0f, (g) / 255.0f, (b) / 255.0f, (a)}
 
 #define REACH_THEME_TRANSLUCENT 0.92f
+#define REACH_THEME_BORDER 0.45f
 #define REACH_THEME_STAGE 0.99f
 
 #define REACH_PURE_WHITE(a) REACH_RGB8(255, 255, 255, a)
@@ -46,7 +47,7 @@
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
-    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 1.5f,        \
+    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 0.75f,       \
     .icon_box_height_ratio = 0.60f, .icon_max_box_ratio = 0.76f,                                   \
     .icon_box_corner_radius_ratio = 0.28f, .icon_box_corner_radius_max = 14.0f,                    \
     .tray_slot_size_ratio = 0.3f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,   \
@@ -61,9 +62,9 @@ static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
 
     .bar_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT),
-    .bar_border = REACH_DARK_STRUCTURE(REACH_THEME_TRANSLUCENT),
+    .bar_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
     .popup_background = REACH_DARK_BASE(REACH_THEME_TRANSLUCENT),
-    .popup_border = REACH_DARK_STRUCTURE(REACH_THEME_TRANSLUCENT),
+    .popup_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
 
     .primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .inverse_text = REACH_DARK_BASE(0.92f),
@@ -109,7 +110,7 @@ static const reach_theme reach_theme_dark = {
     .launcher_placeholder_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .launcher_selection_highlight = REACH_DARK_HIGH_CONTRAST_WHITE(0.25f),
     .launcher_search_icon = REACH_DARK_HIGH_CONTRAST_WHITE(0.32f),
-    .launcher_border = REACH_DARK_STRUCTURE(REACH_THEME_TRANSLUCENT),
+    .launcher_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
     .launcher_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
     .launcher_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .launcher_row_selected_background = REACH_DARK_RAISED(1.0f),
@@ -142,7 +143,7 @@ static const reach_theme reach_theme_dark = {
     .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
 
     .clipboard_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT),
-    .clipboard_border = REACH_DARK_STRUCTURE(REACH_THEME_TRANSLUCENT),
+    .clipboard_border = REACH_DARK_HIGH_CONTRAST_WHITE(REACH_THEME_BORDER),
     .clipboard_primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .clipboard_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .clipboard_item_background = REACH_DARK_RAISED(1.0f),
@@ -193,9 +194,9 @@ static const reach_theme reach_theme_light = {
     .mode = REACH_THEME_MODE_LIGHT,
 
     .bar_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .bar_border = REACH_LIGHT_MIDTONE(REACH_THEME_TRANSLUCENT),
+    .bar_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
     .popup_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .popup_border = REACH_LIGHT_MIDTONE(REACH_THEME_TRANSLUCENT),
+    .popup_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
 
     .primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
     .inverse_text = REACH_PURE_WHITE(0.95f),
@@ -241,7 +242,7 @@ static const reach_theme reach_theme_light = {
     .launcher_placeholder_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_selection_highlight = REACH_LIGHT_ACCENT_BLUE(0.28f),
     .launcher_search_icon = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.36f),
-    .launcher_border = REACH_LIGHT_MIDTONE(REACH_THEME_TRANSLUCENT),
+    .launcher_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
     .launcher_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .launcher_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_row_selected_background = REACH_LIGHT_MIDTONE(1.0f),
@@ -274,7 +275,7 @@ static const reach_theme reach_theme_light = {
     .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
 
     .clipboard_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
-    .clipboard_border = REACH_LIGHT_STRUCTURE(REACH_THEME_TRANSLUCENT),
+    .clipboard_border = REACH_LIGHT_HIGH_CONTRAST_BLACK(REACH_THEME_BORDER),
     .clipboard_primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
     .clipboard_secondary_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .clipboard_item_background = REACH_LIGHT_RAISED(1.0f),
@@ -360,6 +361,12 @@ reach_color reach_theme_color_mix(reach_color from, reach_color to, float t)
     color.b = from.b + (to.b - from.b) * t;
     color.a = from.a + (to.a - from.a) * t;
     return color;
+}
+
+float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale)
+{
+    const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
+    return actual->border_thickness * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
 float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height)

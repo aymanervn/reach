@@ -189,6 +189,7 @@ extern "C"
     reach_color reach_theme_accent_color(const reach_theme *theme, reach_theme_accent accent);
     reach_color reach_theme_color_alpha(reach_color color, float alpha);
     reach_color reach_theme_color_mix(reach_color from, reach_color to, float t);
+    float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale);
     float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height);
     float reach_theme_icon_box_size(const reach_theme *theme, float dock_height);
     float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);

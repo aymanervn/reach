@@ -186,26 +186,30 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     }
 }
 
-static void reach_dock_push_background(const reach_theme *theme, const reach_dock_layout *layout,
+static void reach_dock_push_background(const reach_dock_render_input *input,
                                        reach_render_command_buffer *commands, float dock_radius)
 {
+    const reach_theme *theme = input->theme;
+    const reach_dock_layout *layout = input->layout;
+    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
+
     reach_dock_push_rect(commands,
                          reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height),
                          theme->bar_background, dock_radius);
 
-    if (theme->border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
+    if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {
         return;
     }
 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = reach_dock_rect(theme->border_thickness * 0.5f, theme->border_thickness * 0.5f,
-                                   layout->bounds.width - theme->border_thickness,
-                                   layout->bounds.height - theme->border_thickness);
+    command.rect = reach_dock_rect(border_thickness * 0.5f, border_thickness * 0.5f,
+                                   layout->bounds.width - border_thickness,
+                                   layout->bounds.height - border_thickness);
     command.color = theme->bar_border;
     command.radius = dock_radius;
-    command.stroke_width = theme->border_thickness;
+    command.stroke_width = border_thickness;
     reach_render_command_buffer_push(commands, &command);
 }
 
@@ -245,7 +249,7 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     float icon_box_size = reach_theme_icon_box_size(theme, layout->bounds.height);
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
 
-    reach_dock_push_background(theme, layout, out_commands, dock_radius);
+    reach_dock_push_background(input, out_commands, dock_radius);
     reach_dock_push_trigger_button(input, out_commands, icon_box_size);
 
     for (size_t index = 0; index < layout->app_slot_count; ++index)
@@ -383,6 +387,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
         reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
     input.trigger_feedback_index = REACH_DOCK_FEEDBACK_TRIGGER;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
+    input.dpi_scale = ctx->dpi_scale;
 
     return reach_dock_build_render_commands(&input, out_commands);
 }
