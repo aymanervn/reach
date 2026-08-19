@@ -839,11 +839,6 @@ static int32_t reach_quick_settings_capsule_is_open(const void *capsule)
     return reach_quick_settings_is_open(static_cast<const reach_quick_settings *>(capsule));
 }
 
-static void reach_quick_settings_capsule_force_close(void *capsule)
-{
-    reach_quick_settings_force_close(static_cast<reach_quick_settings *>(capsule));
-}
-
 static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
 {
     const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
@@ -967,7 +962,6 @@ const reach_feature_capsule_ops *reach_quick_settings_capsule_ops(void)
         reach_quick_settings_capsule_reset,
         reach_quick_settings_capsule_tick,
         reach_quick_settings_capsule_is_open,
-        reach_quick_settings_capsule_force_close,
         nullptr,
         reach_quick_settings_capsule_needs_frame,
         reach_quick_settings_capsule_wants_pointer_move,

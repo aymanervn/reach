@@ -201,11 +201,6 @@ static int32_t reach_tray_capsule_is_open(const void *capsule)
     return reach_tray_popup_is_open(static_cast<const reach_tray *>(capsule));
 }
 
-static void reach_tray_capsule_force_close(void *capsule)
-{
-    (void)reach_tray_set_popup_open(static_cast<reach_tray *>(capsule), 0);
-}
-
 static int32_t reach_tray_capsule_needs_frame(const void *capsule)
 {
     const reach_tray *tray = static_cast<const reach_tray *>(capsule);
@@ -307,7 +302,6 @@ const reach_feature_capsule_ops *reach_tray_capsule_ops(void)
         reach_tray_capsule_reset,
         reach_tray_capsule_tick,
         reach_tray_capsule_is_open,
-        reach_tray_capsule_force_close,
         nullptr,
         reach_tray_capsule_needs_frame,
         nullptr,

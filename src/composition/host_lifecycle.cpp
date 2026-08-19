@@ -706,8 +706,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         *out_shell = nullptr;
         return result;
     }
-    host->dock_reveal = {};
-    host->top_bar_reveal = {};
     host->dirty.layout = 1;
     host->dirty.render = 1;
     host->dirty.monitors = 1;
@@ -901,17 +899,9 @@ reach_result reach_host_start(reach_host *host)
         return result;
     }
 
-    if (host->dock.window.ops.show != nullptr)
+    if (host->wallpaper_surface.ops.show != nullptr)
     {
-        if (host->wallpaper_surface.ops.show != nullptr)
-        {
-            result = host->wallpaper_surface.ops.show(host->wallpaper_surface.surface);
-            if (result != REACH_OK)
-            {
-                return result;
-            }
-        }
-        result = host->dock.window.ops.show(host->dock.window.window);
+        result = host->wallpaper_surface.ops.show(host->wallpaper_surface.surface);
         if (result != REACH_OK)
         {
             return result;
@@ -981,30 +971,7 @@ reach_result reach_host_stop(reach_host *host)
     {
         (void)host->window_manager.ops.stop(host->window_manager.manager);
     }
-    if (host->dock.window.ops.hide != nullptr)
-    {
-        (void)host->dock.window.ops.hide(host->dock.window.window);
-    }
-    if (host->launcher.window.ops.hide != nullptr)
-    {
-        (void)host->launcher.window.ops.hide(host->launcher.window.window);
-    }
-    if (host->tray.window.ops.hide != nullptr)
-    {
-        (void)host->tray.window.ops.hide(host->tray.window.window);
-    }
-    if (host->switcher.window.ops.hide != nullptr)
-    {
-        (void)host->switcher.window.ops.hide(host->switcher.window.window);
-    }
-    if (host->context_menu.window.ops.hide != nullptr)
-    {
-        (void)host->context_menu.window.ops.hide(host->context_menu.window.window);
-    }
-    if (host->quick_settings.window.ops.hide != nullptr)
-    {
-        (void)host->quick_settings.window.ops.hide(host->quick_settings.window.window);
-    }
+    reach_host_hide_all_surfaces(host);
     if (host->wallpaper_surface.ops.hide != nullptr)
     {
         (void)host->wallpaper_surface.ops.hide(host->wallpaper_surface.surface);

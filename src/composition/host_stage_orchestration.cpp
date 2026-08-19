@@ -31,7 +31,8 @@ void reach_host_sync_stage_reveal_corner(reach_host *host, reach_rect_f32 monito
         }
     }
 
-    reach_layout_set_visible(&host->layout_manager, host->stage_reveal.participant, 1);
+    reach_layout_set_visible(&host->layout_manager,
+                             reach_host_hotspot_participant(host, &host->stage_reveal_corner), 1);
 }
 
 static const reach_monitor_info *reach_host_stage_monitor_for(reach_host *host,

@@ -7,7 +7,7 @@ typedef enum reach_dock_hit_type
 {
     REACH_DOCK_HIT_NONE = 0,
     REACH_DOCK_HIT_ITEM = 1,
-    REACH_DOCK_HIT_STAGE_BUTTON = 5
+    REACH_DOCK_HIT_TRIGGER = 5
 } reach_dock_hit_type;
 
 typedef struct reach_dock_hit_result

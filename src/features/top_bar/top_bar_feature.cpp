@@ -4,8 +4,11 @@
 #include "top_bar_metrics.h"
 #include "top_bar_now_playing.h"
 
+#include <math.h>
 #include <new>
 #include <stdio.h>
+
+static const reach_bar_edge REACH_TOP_BAR_EDGE = REACH_BAR_EDGE_TOP;
 
 const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar)
 {
@@ -869,18 +872,41 @@ static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f3
     return screen_gap * 2.0f + shown_bounds.height;
 }
 
-int32_t reach_top_bar_windows_trespassing(const reach_top_bar *top_bar,
-                                          reach_rect_f32 shown_bounds,
-                                          reach_rect_f32 monitor_bounds)
+static int32_t reach_top_bar_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
+{
+    return fabsf(a.x - b.x) < 0.5f && fabsf(a.y - b.y) < 0.5f && fabsf(a.width - b.width) < 0.5f &&
+           fabsf(a.height - b.height) < 0.5f;
+}
+
+void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar)
+{
+    if (top_bar != nullptr)
+    {
+        top_bar->occlusion_valid = 0;
+    }
+}
+
+static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
+                                                 reach_rect_f32 shown_bounds,
+                                                 reach_rect_f32 monitor_bounds)
 {
     if (top_bar == nullptr)
     {
         return 0;
     }
 
-    float push_depth = reach_top_bar_push_depth(shown_bounds, monitor_bounds);
-    return reach_top_bar_window_push_any_trespassing(top_bar->window_push, monitor_bounds,
-                                                     monitor_bounds.y + push_depth);
+    if (!top_bar->occlusion_valid ||
+        !reach_top_bar_rect_equal(top_bar->occlusion_shown_bounds, shown_bounds) ||
+        !reach_top_bar_rect_equal(top_bar->occlusion_monitor_bounds, monitor_bounds))
+    {
+        float push_depth = reach_top_bar_push_depth(shown_bounds, monitor_bounds);
+        top_bar->occlusion_occluded = reach_top_bar_window_push_any_trespassing(
+            top_bar->window_push, monitor_bounds, monitor_bounds.y + push_depth);
+        top_bar->occlusion_shown_bounds = shown_bounds;
+        top_bar->occlusion_monitor_bounds = monitor_bounds;
+        top_bar->occlusion_valid = 1;
+    }
+    return top_bar->occlusion_occluded;
 }
 
 reach_bar_visibility_result
@@ -896,7 +922,10 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar,
         reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds);
 
     reach_bar_visibility_request bar_request = *request;
+    bar_request.edge = REACH_TOP_BAR_EDGE;
     bar_request.pointer_sequence_active = top_bar->state.pointer_sequence_active;
+    bar_request.can_hide =
+        reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds);
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);
@@ -918,7 +947,7 @@ void reach_top_bar_move_window_push_frame(reach_top_bar *top_bar)
         return;
     }
 
-    float hidden_y = reach_bar_hidden_position(REACH_BAR_EDGE_TOP, top_bar->push_shown_bounds,
+    float hidden_y = reach_bar_hidden_position(REACH_TOP_BAR_EDGE, top_bar->push_shown_bounds,
                                                top_bar->push_monitor_bounds);
     float animated_y = reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
     reach_top_bar_apply_window_push(
@@ -969,6 +998,7 @@ static void reach_top_bar_capsule_reset(void *capsule)
     }
     reach_bar_visibility_reset(&top_bar->state.visibility);
     reach_top_bar_window_push_release(top_bar->window_push);
+    reach_top_bar_invalidate_occlusion(top_bar);
     reach_top_bar_now_playing_reset(top_bar->now_playing_subfeature);
     top_bar->state.pointer_sequence_active = 0;
     top_bar->state.pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
@@ -989,6 +1019,7 @@ static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
     }
     reach_bar_visibility_reset(&top_bar->state.visibility);
     reach_top_bar_window_push_release(top_bar->window_push);
+    reach_top_bar_invalidate_occlusion(top_bar);
     top_bar->state.pointer_sequence_active = 0;
 }
 
@@ -1187,7 +1218,6 @@ const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
         reach_top_bar_capsule_reset,
         reach_top_bar_capsule_tick,
         reach_top_bar_capsule_is_open,
-        nullptr,
         reach_top_bar_capsule_on_game_mode,
         reach_top_bar_capsule_needs_frame,
         reach_top_bar_capsule_wants_pointer_move,

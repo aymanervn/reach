@@ -24,7 +24,7 @@ struct reach_helper_session_state
     HWINEVENTHOOK name_hook;
     HWINEVENTHOOK move_size_start_hook;
     HWINEVENTHOOK move_size_end_hook;
-    int32_t move_size_active;
+    HWND move_size_window;
 };
 
 struct reach_helper_window_metadata
@@ -890,6 +890,10 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
         if (event == EVENT_OBJECT_DESTROY)
         {
             reach_helper_forget_window_metadata(hwnd);
+            if (g_session.move_size_window == hwnd)
+            {
+                g_session.move_size_window = nullptr;
+            }
         }
         if (event == EVENT_SYSTEM_MINIMIZESTART)
         {
@@ -898,13 +902,14 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
 
         if (event == EVENT_SYSTEM_MOVESIZESTART)
         {
-            g_session.move_size_active = 1;
+            g_session.move_size_window = hwnd;
             return;
         }
         if (event == EVENT_SYSTEM_MOVESIZEEND)
         {
-            g_session.move_size_active = 0;
+            g_session.move_size_window = nullptr;
             reach_helper_publish_window_state();
+            (void)reach_service_shared_bump_window_sequence();
             return;
         }
 
@@ -914,7 +919,7 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
         }
         if (event == EVENT_OBJECT_LOCATIONCHANGE)
         {
-            if (g_session.move_size_active)
+            if (g_session.move_size_window == hwnd)
             {
                 return;
             }

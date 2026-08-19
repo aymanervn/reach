@@ -32,7 +32,7 @@ static int32_t reach_host_bar_cluster_holds_surface_open(reach_host *host,
     case REACH_SURFACE_ID_LAUNCHER:
         return dock_region != REACH_DOCK_POINTER_REGION_NONE;
     case REACH_SURFACE_ID_STAGE:
-        return dock_region == REACH_DOCK_POINTER_REGION_STAGE_BUTTON;
+        return dock_region == REACH_DOCK_POINTER_REGION_TRIGGER;
     default:
         return 0;
     }

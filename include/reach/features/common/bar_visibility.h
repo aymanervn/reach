@@ -32,6 +32,8 @@ extern "C"
         reach_rect_f32 monitor_bounds;
         reach_point_i32 pointer;
         int32_t pointer_valid;
+        int32_t any_window_maximized;
+        int32_t foreground_snapped;
         int32_t can_hide;
         int32_t pointer_sequence_active;
         int32_t force_shown;

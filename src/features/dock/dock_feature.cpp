@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <time.h>
 
+static const reach_bar_edge REACH_DOCK_EDGE = REACH_BAR_EDGE_BOTTOM;
+
 enum reach_dock_slot_lifecycle
 {
     REACH_DOCK_SLOT_EMPTY = 0,
@@ -258,8 +260,8 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
     {
     case REACH_DOCK_HIT_ITEM:
         return REACH_DOCK_POINTER_REGION_ITEM;
-    case REACH_DOCK_HIT_STAGE_BUTTON:
-        return REACH_DOCK_POINTER_REGION_STAGE_BUTTON;
+    case REACH_DOCK_HIT_TRIGGER:
+        return REACH_DOCK_POINTER_REGION_TRIGGER;
     case REACH_DOCK_HIT_NONE:
     default:
         return REACH_DOCK_POINTER_REGION_NONE;
@@ -552,10 +554,10 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     {
         reach_dock_capsule_begin_pointer_sequence(dock, out);
         state->pressed_control = hit.type;
-        if (hit.type == REACH_DOCK_HIT_STAGE_BUTTON)
+        if (hit.type == REACH_DOCK_HIT_TRIGGER)
         {
             out->redraw =
-                out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_STAGE_BUTTON);
+                out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_TRIGGER);
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER;
             out->action.index = REACH_DOCK_TRIGGER_PRIMARY;
@@ -601,7 +603,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 
         reach_dock_hit_type pressed = static_cast<reach_dock_hit_type>(state->pressed_control);
         state->pressed_control = REACH_DOCK_HIT_NONE;
-        if (pressed == REACH_DOCK_HIT_STAGE_BUTTON && hit.type == pressed)
+        if (pressed == REACH_DOCK_HIT_TRIGGER && hit.type == pressed)
         {
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER;
@@ -724,7 +726,6 @@ const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
         reach_dock_capsule_reset,
         reach_dock_capsule_tick,
         reach_dock_capsule_is_open,
-        nullptr,
         reach_dock_capsule_on_game_mode,
         reach_dock_capsule_needs_frame,
         reach_dock_capsule_wants_pointer_move,
@@ -748,7 +749,9 @@ reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_
     }
 
     reach_bar_visibility_request bar_request = *request;
+    bar_request.edge = REACH_DOCK_EDGE;
     bar_request.pointer_sequence_active = animations->state.pointer_sequence_active;
+    bar_request.can_hide = request->any_window_maximized || request->foreground_snapped;
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &animations->state.visibility, &animations->manager, REACH_DOCK_ANIM_Y, &bar_request);
@@ -1439,10 +1442,10 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     const float top = (layout->bounds.height - icon_size) * 0.5f;
 
     float x = gap;
-    layout->stage_button.width = icon_size;
-    layout->stage_button.height = icon_size;
-    layout->stage_button.x = x;
-    layout->stage_button.y = top;
+    layout->trigger_button.width = icon_size;
+    layout->trigger_button.height = icon_size;
+    layout->trigger_button.x = x;
+    layout->trigger_button.y = top;
     x += app_slot_width;
 
     size_t item_index = 0;

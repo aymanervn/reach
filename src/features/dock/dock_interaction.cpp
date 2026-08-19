@@ -25,9 +25,9 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
         return result;
     }
 
-    if (reach_dock_rect_contains(layout->stage_button, x, y))
+    if (reach_dock_rect_contains(layout->trigger_button, x, y))
     {
-        result.type = REACH_DOCK_HIT_STAGE_BUTTON;
+        result.type = REACH_DOCK_HIT_TRIGGER;
         return result;
     }
 
@@ -115,7 +115,7 @@ float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layou
 
 static int32_t reach_dock_feedback_start(reach_dock *dock, size_t slot, float target_opacity)
 {
-    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_STAGE_BUTTON)
+    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_TRIGGER)
     {
         return 0;
     }
@@ -154,7 +154,7 @@ int32_t reach_dock_feedback_press_immediate(reach_dock *dock, size_t slot, float
 
 int32_t reach_dock_feedback_set_immediate(reach_dock *dock, size_t slot, float opacity)
 {
-    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_STAGE_BUTTON)
+    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_TRIGGER)
     {
         return 0;
     }

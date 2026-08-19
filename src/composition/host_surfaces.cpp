@@ -137,7 +137,9 @@ void reach_host_surface_transition_set(reach_host *host, reach_host_surface_tran
     }
 
     int32_t target_open = open ? 1 : 0;
-    if (transition->target_open == target_open && (target_open || !transition->visible))
+    if (transition->target_open == target_open &&
+        (target_open || !transition->visible ||
+         reach_host_surface_transition_active(host, transition)))
     {
         return;
     }
@@ -403,15 +405,11 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
         reach_host_apply_quick_settings_pointer_action;
     descs[REACH_SURFACE_ID_DOCK].update_visibility = reach_host_dock_update_visibility;
-    descs[REACH_SURFACE_ID_DOCK].edge = REACH_BAR_EDGE_BOTTOM;
-    descs[REACH_SURFACE_ID_DOCK].occluded = reach_host_dock_occluded;
     descs[REACH_SURFACE_ID_DOCK].reveal_edge = &host->dock_reveal_edge;
     descs[REACH_SURFACE_ID_DOCK].reveal = &host->dock_reveal;
     descs[REACH_SURFACE_ID_DOCK].reveal_animation = reach_host_dock_reveal_animation;
     descs[REACH_SURFACE_ID_DOCK].reveal_frame = reach_host_move_dock_reveal_frame;
     descs[REACH_SURFACE_ID_TOP_BAR].update_visibility = reach_host_top_bar_update_visibility;
-    descs[REACH_SURFACE_ID_TOP_BAR].edge = REACH_BAR_EDGE_TOP;
-    descs[REACH_SURFACE_ID_TOP_BAR].occluded = reach_host_top_bar_occluded;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal_edge = &host->top_bar_reveal_edge;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal = &host->top_bar_reveal;
     descs[REACH_SURFACE_ID_TOP_BAR].reveal_animation = reach_host_top_bar_reveal_animation;
@@ -457,9 +455,6 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_CLIPBOARD].toggle_events =
         reach_clipboard_activation_events(&descs[REACH_SURFACE_ID_CLIPBOARD].toggle_event_count);
     descs[REACH_SURFACE_ID_CLIPBOARD].toggle = reach_host_toggle_clipboard;
-    descs[REACH_SURFACE_ID_STAGE].toggle_events =
-        reach_stage_activation_events(&descs[REACH_SURFACE_ID_STAGE].toggle_event_count);
-    descs[REACH_SURFACE_ID_STAGE].toggle = reach_host_toggle_stage;
     descs[REACH_SURFACE_ID_SWITCHER].routed_events =
         reach_switcher_routed_events(&descs[REACH_SURFACE_ID_SWITCHER].routed_event_count);
     descs[REACH_SURFACE_ID_SWITCHER].handle_routed = reach_host_handle_switcher_event;
@@ -475,8 +470,7 @@ static_assert(REACH_HOST_SURFACE_COUNT + 3 <= REACH_LAYOUT_MAX_PARTICIPANTS,
 
 static void reach_host_register_hotspot_participant(reach_host *host,
                                                     reach_screen_hotspot_port *hotspot,
-                                                    int32_t layer,
-                                                    reach_layout_participant *out_participant)
+                                                    int32_t layer)
 {
     reach_layout_participant participant = 0;
     reach_result result = reach_layout_register(&host->layout_manager, layer, &participant);
@@ -487,7 +481,6 @@ static void reach_host_register_hotspot_participant(reach_host *host,
     }
     host->layout_targets[participant].hotspot = hotspot;
     reach_layout_set_visible(&host->layout_manager, participant, 0);
-    *out_participant = participant;
 }
 
 void reach_host_init_layout(reach_host *host)
@@ -522,17 +515,15 @@ void reach_host_init_layout(reach_host *host)
     }
 
     reach_host_register_hotspot_participant(host, &host->dock_reveal_edge,
-                                            REACH_HOST_LAYER_DOCK_REVEAL_EDGE,
-                                            &host->dock_reveal.participant);
+                                            REACH_HOST_LAYER_DOCK_REVEAL_EDGE);
     reach_host_register_hotspot_participant(host, &host->top_bar_reveal_edge,
-                                            REACH_HOST_LAYER_TOP_BAR_REVEAL_EDGE,
-                                            &host->top_bar_reveal.participant);
+                                            REACH_HOST_LAYER_TOP_BAR_REVEAL_EDGE);
     reach_host_register_hotspot_participant(host, &host->stage_reveal_corner,
-                                            REACH_HOST_LAYER_STAGE_REVEAL_CORNER,
-                                            &host->stage_reveal.participant);
+                                            REACH_HOST_LAYER_STAGE_REVEAL_CORNER);
 
     for (reach_layout_participant participant = 0;
-         participant < (reach_layout_participant)(REACH_HOST_SURFACE_COUNT + 3); ++participant)
+         participant < (reach_layout_participant)host->layout_manager.participant_count;
+         ++participant)
     {
         reach_layout_register_visibility(&host->layout_manager, participant,
                                          REACH_LAYOUT_CONDITION_GAME_MODE, 0);
