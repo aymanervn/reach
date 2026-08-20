@@ -156,6 +156,16 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_platform_window(REACH_SURFACE_BATTERY,
+                                                      &dependencies.battery_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.battery_window.window,
+                                                           &dependencies.battery_renderer);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_platform_window(REACH_SURFACE_CLIPBOARD,
                                                       &dependencies.clipboard_window);
     }
@@ -255,6 +265,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
+            dependencies.battery_window = {};
+            dependencies.battery_renderer = {};
             dependencies.clipboard_window = {};
             dependencies.clipboard_renderer = {};
             dependencies.clipboard = {};

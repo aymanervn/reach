@@ -41,6 +41,10 @@ reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *
     {
         return REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON;
     }
+    if (reach_top_bar_rect_contains(layout->battery_button, local_x, local_y))
+    {
+        return REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON;
+    }
     return REACH_TOP_BAR_POINTER_REGION_NONE;
 }
 
@@ -212,6 +216,11 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
         out->handled = 1;
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE;
         return;
+    case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
+        out->redraw = reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON);
+        out->handled = 1;
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_BATTERY;
+        return;
     default:
         return;
     }
@@ -281,6 +290,10 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
             out->handled = 1;
             out->action_kind = REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE;
+            break;
+        case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
+            out->handled = 1;
+            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_BATTERY;
             break;
         default:
             break;

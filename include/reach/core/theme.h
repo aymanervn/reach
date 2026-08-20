@@ -77,6 +77,7 @@ extern "C"
         reach_color bar_battery_shell;
         reach_color bar_battery_fill;
         reach_color bar_battery_low;
+        reach_color bar_battery_saver;
         reach_color bar_stats_cpu;
         reach_color bar_stats_memory;
         reach_color bar_stats_download;

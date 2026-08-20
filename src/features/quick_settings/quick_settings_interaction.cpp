@@ -68,12 +68,6 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
         return result;
     }
 
-    if (reach_quick_settings_point_in_rect(layout->battery_saver_tile.bounds, x, y))
-    {
-        result.type = REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE;
-        return result;
-    }
-
     if (reach_quick_settings_point_in_rect(layout->project_tile.bounds, x, y))
     {
         result.type = REACH_QUICK_SETTINGS_HIT_PROJECT_TILE;
@@ -187,12 +181,6 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
     if (hit.type == REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE)
     {
         action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH;
-        return action;
-    }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE)
-    {
-        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER;
         return action;
     }
 

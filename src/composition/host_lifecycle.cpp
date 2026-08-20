@@ -215,6 +215,14 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->quick_settings.renderer.ops.destroy(host->quick_settings.renderer.backend);
     }
+    if (host->battery.window.ops.destroy != nullptr)
+    {
+        host->battery.window.ops.destroy(host->battery.window.window);
+    }
+    if (host->battery.renderer.ops.destroy != nullptr)
+    {
+        host->battery.renderer.ops.destroy(host->battery.renderer.backend);
+    }
     if (host->clipboard_surface.window.ops.destroy != nullptr)
     {
         host->clipboard_surface.window.ops.destroy(host->clipboard_surface.window.window);
@@ -336,6 +344,8 @@ static void reach_host_cleanup(reach_host *host)
     host->stage_capsule = nullptr;
     reach_quick_settings_destroy(host->quick_settings_capsule);
     host->quick_settings_capsule = nullptr;
+    reach_battery_destroy(host->battery_capsule);
+    host->battery_capsule = nullptr;
     reach_clipboard_feature_destroy(host->clipboard_capsule);
     host->clipboard_capsule = nullptr;
     reach_dock_destroy(host->dock_capsule);
@@ -397,6 +407,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_surface_runtime_init(&host->stage);
     reach_surface_runtime_init(&host->context_menu);
     reach_surface_runtime_init(&host->quick_settings);
+    reach_surface_runtime_init(&host->battery);
     reach_surface_runtime_init(&host->clipboard_surface);
     host->dock_reveal_edge = {};
     host->top_bar_reveal_edge = {};
@@ -474,6 +485,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
+    host->battery_capsule = nullptr;
+    if (reach_battery_create(&host->battery_capsule) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
     host->clipboard_capsule = nullptr;
     if (reach_clipboard_feature_create(&host->clipboard_capsule) != REACH_OK)
     {
@@ -514,6 +530,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_surface_runtime_init(&host->stage);
     reach_surface_runtime_init(&host->context_menu);
     reach_surface_runtime_init(&host->quick_settings);
+    reach_surface_runtime_init(&host->battery);
     reach_surface_runtime_init(&host->clipboard_surface);
     reach_animation_manager_init(&host->animations, host->animation_tracks,
                                  REACH_HOST_ANIMATION_COUNT);
@@ -556,6 +573,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->context_menu.renderer = dependencies->context_menu_renderer;
     host->quick_settings.window = dependencies->quick_settings_window;
     host->quick_settings.renderer = dependencies->quick_settings_renderer;
+    host->battery.window = dependencies->battery_window;
+    host->battery.renderer = dependencies->battery_renderer;
     host->clipboard_surface.window = dependencies->clipboard_window;
     host->clipboard_surface.renderer = dependencies->clipboard_renderer;
     host->input_source = dependencies->input_source;
@@ -833,6 +852,15 @@ reach_result reach_host_start(reach_host *host)
             return result;
         }
     }
+    if (host->battery.window.ops.set_event_callback != nullptr)
+    {
+        result = host->battery.window.ops.set_event_callback(
+            host->battery.window.window, reach_host_on_battery_window_event, host);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
     if (host->clipboard_surface.window.ops.set_event_callback != nullptr)
     {
         result = host->clipboard_surface.window.ops.set_event_callback(
@@ -948,6 +976,7 @@ reach_result reach_host_stop(reach_host *host)
     reach_context_menu_force_close(host->context_menu_capsule);
     reach_host_set_tray_popup_open(host, 0);
     reach_host_set_quick_settings_open(host, 0);
+    reach_host_set_battery_open(host, 0);
     reach_launcher_cancel_search(host->launcher_capsule);
     reach_host_stop_config_reload_worker(host);
     reach_host_stop_launcher_search_worker(host);

@@ -68,12 +68,8 @@ reach_quick_settings_visible_output_device_count(const reach_quick_settings_mode
 static size_t
 reach_quick_settings_visible_system_tile_count(const reach_quick_settings_model *model)
 {
-    size_t count = 3;
-    if (model != nullptr && model->power.has_battery)
-    {
-        ++count;
-    }
-    return count;
+    (void)model;
+    return 3;
 }
 
 void reach_quick_settings_model_init(reach_quick_settings_model *model)
@@ -93,7 +89,6 @@ void reach_quick_settings_model_init(reach_quick_settings_model *model)
     model->bluetooth = {};
     model->bluetooth_pending = 0;
     model->bluetooth_pending_enabled = 0;
-    model->power = {};
     model->brightness = {};
 }
 
@@ -177,7 +172,6 @@ void reach_quick_settings_model_set_output_devices(reach_quick_settings_model *m
 void reach_quick_settings_model_set_system_states(reach_quick_settings_model *model,
                                                   const reach_network_state *network,
                                                   const reach_bluetooth_state *bluetooth,
-                                                  const reach_power_state *power,
                                                   const reach_brightness_state *brightness)
 {
     if (model == nullptr)
@@ -187,7 +181,6 @@ void reach_quick_settings_model_set_system_states(reach_quick_settings_model *mo
 
     model->network = network != nullptr ? *network : reach_network_state{};
     model->bluetooth = bluetooth != nullptr ? *bluetooth : reach_bluetooth_state{};
-    model->power = power != nullptr ? *power : reach_power_state{};
     model->brightness = brightness != nullptr ? *brightness : reach_brightness_state{};
 
     if (model->network.signal_strength < 0)
@@ -201,8 +194,6 @@ void reach_quick_settings_model_set_system_states(reach_quick_settings_model *mo
     model->brightness.level = reach_quick_settings_clamp01(model->brightness.level);
     model->bluetooth.available = model->bluetooth.available ? 1 : 0;
     model->bluetooth.enabled = model->bluetooth.enabled ? 1 : 0;
-    model->power.has_battery = model->power.has_battery ? 1 : 0;
-    model->power.battery_saver_on = model->power.battery_saver_on ? 1 : 0;
     model->brightness.available = model->brightness.available ? 1 : 0;
 }
 
@@ -397,11 +388,6 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
                                            tile_index++, &metrics);
     reach_quick_settings_place_system_tile(&layout.bluetooth_tile, grid_bounds, tile_width,
                                            tile_index++, &metrics);
-    if (model != nullptr && model->power.has_battery)
-    {
-        reach_quick_settings_place_system_tile(&layout.battery_saver_tile, grid_bounds, tile_width,
-                                               tile_index++, &metrics);
-    }
     reach_quick_settings_place_system_tile(&layout.project_tile, grid_bounds, tile_width,
                                            tile_index++, &metrics);
 
@@ -884,9 +870,6 @@ static void reach_quick_settings_capsule_apply_action(const reach_quick_settings
     case REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH:
         out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BLUETOOTH;
         break;
-    case REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BATTERY_SAVER;
-        break;
     case REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT:
         out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_OPEN_PROJECT;
         break;
@@ -1139,7 +1122,7 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     {
         reach_quick_settings_system_apply_result apply_result = {};
         reach_quick_settings_apply_system_states(quick_settings, &system_snapshot.network,
-                                                 &system_snapshot.bluetooth, &system_snapshot.power,
+                                                 &system_snapshot.bluetooth,
                                                  &system_snapshot.brightness,
                                                  system_snapshot.bluetooth_valid, &apply_result);
         if (apply_result.bluetooth_pending_cleared)
@@ -1499,7 +1482,6 @@ const uint16_t *reach_quick_settings_output_device_id(const reach_quick_settings
 void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settings,
                                               const reach_network_state *network,
                                               const reach_bluetooth_state *bluetooth,
-                                              const reach_power_state *power,
                                               const reach_brightness_state *brightness,
                                               int32_t bluetooth_valid,
                                               reach_quick_settings_system_apply_result *out)
@@ -1511,13 +1493,11 @@ void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settin
 
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
 
-    reach_power_state previous_power = state->model.power;
     reach_brightness_state previous_brightness = state->model.brightness;
     int32_t bluetooth_pending = state->model.bluetooth_pending;
     int32_t bluetooth_pending_enabled = state->model.bluetooth_pending_enabled;
 
-    reach_quick_settings_model_set_system_states(&state->model, network, bluetooth, power,
-                                                 brightness);
+    reach_quick_settings_model_set_system_states(&state->model, network, bluetooth, brightness);
 
     if (bluetooth_pending && bluetooth_valid &&
         (!state->model.bluetooth.available ||
@@ -1527,8 +1507,7 @@ void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settin
         out->bluetooth_pending_cleared = 1;
     }
 
-    int32_t layout_changed = previous_power.has_battery != state->model.power.has_battery ||
-                             previous_brightness.available != state->model.brightness.available;
+    int32_t layout_changed = previous_brightness.available != state->model.brightness.available;
 
     out->relayout = layout_changed && state->open;
 }

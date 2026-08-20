@@ -262,6 +262,34 @@ reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_
     return REACH_OK;
 }
 
+reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_context *ctx)
+{
+    (void)ctx;
+    if (host->battery.window.ops.set_bounds == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    reach_host_sync_battery_saver_pending(host);
+    reach_host_relayout_battery(host);
+
+    const reach_rect_f32 battery_bounds = reach_battery_state_ptr(host->battery_capsule)->bounds;
+    reach_host_frame_state frame = {};
+    reach_result result = reach_host_apply_transient_frame(
+        host, REACH_SURFACE_ID_BATTERY, &host->battery_transition, battery_bounds,
+        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    if (frame.visible && reach_battery_is_open(host->battery_capsule) &&
+        (host->dirty.render || host->battery.dirty_flags))
+    {
+        (void)reach_host_render_battery_surface(host);
+    }
+    return REACH_OK;
+}
+
 static reach_rect_f32 reach_host_apply_switcher_bounds_animation(reach_host *host,
                                                                  reach_rect_f32 target)
 {
