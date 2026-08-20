@@ -16,6 +16,7 @@
 #include "reach/features/launcher.h"
 #include "reach/services/pin_config.h"
 #include "reach/features/popup.h"
+#include "reach/features/battery.h"
 #include "reach/features/quick_settings.h"
 #include "reach/features/stage.h"
 #include "reach/features/switcher.h"
@@ -53,6 +54,8 @@ typedef enum reach_host_animation_id
     REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY,
     REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
     REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY,
+    REACH_HOST_ANIMATION_BATTERY_TRANSITION_Y,
+    REACH_HOST_ANIMATION_BATTERY_TRANSITION_OPACITY,
     REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
     REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY,
     REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
@@ -97,6 +100,7 @@ typedef enum reach_surface_id
     REACH_SURFACE_ID_CONTEXT_MENU,
     REACH_SURFACE_ID_SWITCHER,
     REACH_SURFACE_ID_STAGE,
+    REACH_SURFACE_ID_BATTERY,
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
 
@@ -233,6 +237,7 @@ reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_cont
 reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_frame_context *ctx);
+reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx);
@@ -299,6 +304,7 @@ struct reach_host
     reach_window_thumbnail_port window_thumbnails;
     reach_surface_runtime context_menu;
     reach_surface_runtime quick_settings;
+    reach_surface_runtime battery;
     reach_surface_runtime clipboard_surface;
     reach_host_surface_transition launcher_transition;
     int32_t launcher_restore_pending;
@@ -307,6 +313,7 @@ struct reach_host
     reach_host_surface_transition stage_transition;
     reach_host_surface_transition context_menu_transition;
     reach_host_surface_transition quick_settings_transition;
+    reach_host_surface_transition battery_transition;
     reach_host_surface_transition clipboard_transition;
 
     reach_surface_desc surface_descs[REACH_HOST_SURFACE_COUNT];
@@ -380,6 +387,7 @@ struct reach_host
     reach_system_status *system_status;
     reach_system_stats *system_stats;
     reach_quick_settings *quick_settings_capsule;
+    reach_battery *battery_capsule;
     reach_popup_capture_port popup_capture;
 };
 
@@ -484,6 +492,7 @@ void reach_host_on_tray_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_switcher_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_context_menu_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_quick_settings_window_event(void *user, const reach_ui_event *event);
+void reach_host_on_battery_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_stage_window_event(void *user, const reach_ui_event *event);
 
@@ -641,6 +650,11 @@ void reach_host_clear_sticky_dock_feedback(reach_host *host);
 
 void reach_host_set_quick_settings_open(reach_host *host, int32_t open);
 void reach_host_toggle_quick_settings(reach_host *host);
+void reach_host_set_battery_open(reach_host *host, int32_t open);
+void reach_host_toggle_battery(reach_host *host);
+void reach_host_refresh_battery_power(reach_host *host);
+void reach_host_sync_battery_saver_pending(reach_host *host);
+void reach_host_relayout_battery(reach_host *host);
 
 void reach_host_process_quick_settings_changes(reach_host *host, double delta_seconds);
 void reach_host_refresh_quick_settings_layout(reach_host *host);
@@ -653,6 +667,10 @@ reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mod
 void reach_host_relayout_quick_settings(reach_host *host, int32_t animate_height);
 
 void reach_host_update_quick_settings_animation(reach_host *host);
+
+reach_result reach_host_apply_battery_pointer_action(reach_host *host,
+                                                    const reach_ui_event *event,
+                                                    const reach_capsule_pointer_result *result);
 
 reach_result
 reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_event *event,
@@ -701,6 +719,7 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
 reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bounds);
 
 reach_result reach_host_render_quick_settings_surface(reach_host *host);
+reach_result reach_host_render_battery_surface(reach_host *host);
 
 reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32 bounds);
 

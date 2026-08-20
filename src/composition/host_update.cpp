@@ -70,6 +70,7 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
     }
     reach_host_surface_transition_finish(host, &host->tray_transition);
     reach_host_surface_transition_finish(host, &host->quick_settings_transition);
+    reach_host_surface_transition_finish(host, &host->battery_transition);
     reach_host_surface_transition_finish(host, &host->switcher_transition);
     reach_host_surface_transition_finish(host, &host->context_menu_transition);
     reach_host_surface_transition_finish(host, &host->clipboard_transition);

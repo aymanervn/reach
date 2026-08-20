@@ -258,6 +258,31 @@ reach_result reach_host_render_clipboard_surface(reach_host *host)
     return result != REACH_OK ? result : end_result;
 }
 
+reach_result reach_host_render_battery_surface(reach_host *host)
+{
+    if (host == nullptr || host->battery.renderer.ops.begin_frame == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    reach_battery_render_context render_ctx = {};
+    render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+
+    reach_render_command_buffer content = {};
+    reach_result build_result =
+        reach_battery_append_render_commands(host->battery_capsule, &render_ctx, &content);
+    if (build_result != REACH_OK)
+    {
+        return build_result;
+    }
+
+    const reach_battery_state *state = reach_battery_state_ptr(host->battery_capsule);
+    return reach_host_render_popup_surface(host, REACH_SURFACE_ID_BATTERY, &host->battery,
+                                           state->bounds, state->notch_anchor_x,
+                                           reach_popup_notch_side(state->drop_direction), &content);
+}
+
 reach_result reach_host_render_context_menu_surface(reach_host *host)
 {
     if (host == nullptr || host->context_menu.renderer.ops.begin_frame == nullptr)

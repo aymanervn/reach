@@ -571,16 +571,6 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         bluetooth_label, bluetooth_enabled, REACH_THEME_ACCENT_BLUE, &input->theme, &metrics,
         input->dpi_scale);
 
-    if (input->model.power.has_battery)
-    {
-        static const uint16_t battery_saver_label[] = {'B', 'a', 't', 't', 'e', 'r', 'y',
-                                                       ' ', 's', 'a', 'v', 'e', 'r', 0};
-        reach_quick_settings_push_system_tile_commands(
-            commands, &input->layout.battery_saver_tile, REACH_VECTOR_ICON_BATTERY_SAVER,
-            battery_saver_label, input->model.power.battery_saver_on, REACH_THEME_ACCENT_ORANGE,
-            &input->theme, &metrics, input->dpi_scale);
-    }
-
     static const uint16_t project_label[] = {'P', 'r', 'o', 'j', 'e', 'c', 't', 0};
     reach_quick_settings_push_system_tile_commands(commands, &input->layout.project_tile,
                                                    REACH_VECTOR_ICON_PROJECT, project_label, 0,

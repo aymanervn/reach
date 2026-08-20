@@ -65,6 +65,7 @@ extern "C"
         reach_rect_f32 volume_label;
         reach_rect_f32 settings_button;
         reach_rect_f32 language_button;
+        reach_rect_f32 battery_button;
         reach_rect_f32 battery_shell;
         reach_rect_f32 battery_cap;
         reach_rect_f32 stats_cpu;
@@ -94,6 +95,7 @@ extern "C"
         REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON,
+        REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON,
         REACH_TOP_BAR_FEEDBACK_NONE
     };
 
@@ -106,7 +108,8 @@ extern "C"
         REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW = 4,
         REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON = 5,
         REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON = 6,
-        REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON = 7
+        REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON = 7,
+        REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON = 8
     } reach_top_bar_pointer_region;
 
     typedef enum reach_top_bar_pointer_action_kind
@@ -127,7 +130,9 @@ extern "C"
         REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE = 13,
         REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE = 14,
         REACH_TOP_BAR_POINTER_ACTION_PRESS_SETTINGS = 15,
-        REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS = 16
+        REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS = 16,
+        REACH_TOP_BAR_POINTER_ACTION_PRESS_BATTERY = 17,
+        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_BATTERY = 18
     } reach_top_bar_pointer_action_kind;
 
     typedef struct reach_top_bar_state
@@ -168,6 +173,9 @@ extern "C"
         int32_t stats_valid;
         int32_t battery_valid;
         int32_t battery_percent;
+        int32_t battery_saver_on;
+        int32_t battery_saver_pending;
+        int32_t battery_saver_pending_enabled;
 
         reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS];
         size_t tray_item_count;
@@ -220,6 +228,9 @@ extern "C"
     reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar *top_bar,
                                                                  int32_t local_x, int32_t local_y);
     void reach_top_bar_suppress_power_release(reach_top_bar *top_bar);
+
+    void reach_top_bar_set_battery_saver_pending(reach_top_bar *top_bar, int32_t pending,
+                                                 int32_t pending_enabled);
 
     size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar);
 

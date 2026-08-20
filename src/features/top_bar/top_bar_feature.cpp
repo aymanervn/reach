@@ -90,6 +90,17 @@ void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control 
     }
 }
 
+void reach_top_bar_set_battery_saver_pending(reach_top_bar *top_bar, int32_t pending,
+                                             int32_t pending_enabled)
+{
+    if (top_bar == nullptr)
+    {
+        return;
+    }
+    top_bar->state.battery_saver_pending = pending ? 1 : 0;
+    top_bar->state.battery_saver_pending_enabled = pending_enabled ? 1 : 0;
+}
+
 void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status)
 {
     if (top_bar != nullptr)
@@ -158,6 +169,7 @@ static void reach_top_bar_update_stats(reach_top_bar *top_bar)
     state->battery_valid =
         snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
     state->battery_percent = state->battery_valid ? snapshot.power.battery_percent : 0;
+    state->battery_saver_on = snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0;
 
     state->stats_valid = snapshot.valid;
     if (!snapshot.valid)
@@ -444,6 +456,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     const float dot_size = ctx->theme->bar_separator_dot_size * scale;
     const float dot_gap = ctx->theme->bar_separator_dot_gap * scale;
+    const float border_thickness = reach_theme_border_thickness(ctx->theme, scale);
 
     float now_playing_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH, &top_bar->now_playing_target_width,
@@ -451,7 +464,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                                 scale));
 
     float power_clock_width = padding + power_button_size + clock_gap + clock_width + dot_gap +
-                              dot_size + dot_gap + now_playing_width;
+                              dot_size + dot_gap + now_playing_width + border_thickness;
     float left = edge_inset;
     layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK] =
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
@@ -464,9 +477,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->clock_date = reach_top_bar_text_run(clock_x + time_advance + clock_gap, height,
                                                 date_advance, date_size);
 
-    layout->now_playing =
-        reach_top_bar_rect(left + power_clock_width - now_playing_width, 0.0f, now_playing_width,
-                           height);
+    layout->now_playing = reach_top_bar_rect(
+        left + power_clock_width - border_thickness - now_playing_width, border_thickness,
+        now_playing_width, height - border_thickness * 2.0f);
     layout->now_playing_separator =
         reach_top_bar_rect(layout->now_playing.x - dot_gap - dot_size, (height - dot_size) * 0.5f,
                            dot_size, dot_size);
@@ -580,6 +593,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->battery_cap =
             reach_top_bar_rect(cluster_x + shell_width + metrics.battery_cap_gap * scale,
                                (height - cap_height) * 0.5f, cap_width, cap_height);
+        layout->battery_button = reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f,
+                                                    battery_width, button_size);
         cluster_x += battery_width + battery_gap;
     }
     layout->quick_settings_button = reach_top_bar_rect(

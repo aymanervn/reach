@@ -366,6 +366,9 @@ reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const rea
     case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS:
         reach_host_toggle_quick_settings(host);
         return REACH_OK;
+    case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_BATTERY:
+        reach_host_toggle_battery(host);
+        return REACH_OK;
     case REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE:
         return reach_host_cycle_input_language(host);
     case REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS:
@@ -855,6 +858,11 @@ void reach_host_on_context_menu_window_event(void *user, const reach_ui_event *e
 void reach_host_on_quick_settings_window_event(void *user, const reach_ui_event *event)
 {
     reach_host_on_surface_event(user, event, REACH_SURFACE_QUICK_SETTINGS);
+}
+
+void reach_host_on_battery_window_event(void *user, const reach_ui_event *event)
+{
+    reach_host_on_surface_event(user, event, REACH_SURFACE_BATTERY);
 }
 
 void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *event)

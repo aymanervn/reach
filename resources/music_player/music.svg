@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 25 25" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <rect id="music" x="0.187" y="0.858" width="24" height="23.962" style="fill:none;"/>
+    <path d="M9.992,19.819l0,1c0,-0.16 -0.009,-0.317 -0.028,-0.472c0.018,-0.174 0.028,-0.35 0.028,-0.528Z"/>
+    <path d="M10.638,24.402c-0.613,0.268 -1.289,0.417 -2,0.417c-2.76,0 -5,-2.24 -5,-5c0,-2.76 2.24,-5 5,-5c0.711,0 1.387,0.149 2,0.417l-0,-14.379l3,0c0,3.935 3.066,7.209 7.097,7.869c-0.487,0.08 -0.988,0.121 -1.5,0.121c-2.137,0 -4.093,-0.726 -5.597,-1.927l0,12.899c0,0.178 -0.009,0.355 -0.028,0.528c-0.191,1.82 -1.361,3.35 -2.972,4.055Z"/>
+</svg>

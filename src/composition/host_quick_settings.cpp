@@ -261,14 +261,6 @@ reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_
         return REACH_OK;
     }
 
-    if (action == REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BATTERY_SAVER)
-    {
-        reach_quick_settings_refresh_system(host->quick_settings_capsule, 0);
-        host->quick_settings.dirty_flags = 1;
-        host->dirty.render = 1;
-        return REACH_OK;
-    }
-
     if (action == REACH_QUICK_SETTINGS_POINTER_ACTION_OPEN_PROJECT)
     {
         reach_host_set_quick_settings_open(host, 0);

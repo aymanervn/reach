@@ -26,6 +26,8 @@ static int32_t reach_host_bar_cluster_holds_surface_open(reach_host *host,
         return top_bar_region == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW;
     case REACH_SURFACE_ID_QUICK_SETTINGS:
         return top_bar_region == REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON;
+    case REACH_SURFACE_ID_BATTERY:
+        return top_bar_region == REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON;
     case REACH_SURFACE_ID_CONTEXT_MENU:
         return reach_context_menu_state_ptr(host->context_menu_capsule)->power_open &&
                top_bar_region == REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;

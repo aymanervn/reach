@@ -171,6 +171,10 @@ void reach_host_surface_transitions_init(reach_host *host)
                                        REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
                                        REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY,
                                        REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE);
+    reach_host_surface_transition_init(host, &host->battery_transition,
+                                       REACH_HOST_ANIMATION_BATTERY_TRANSITION_Y,
+                                       REACH_HOST_ANIMATION_BATTERY_TRANSITION_OPACITY,
+                                       REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE);
     reach_host_surface_transition_init(host, &host->switcher_transition,
                                        REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
                                        REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY,
@@ -308,6 +312,11 @@ static void reach_host_surface_quick_settings_close(reach_host *host)
     reach_host_set_quick_settings_open(host, 0);
 }
 
+static void reach_host_surface_battery_close(reach_host *host)
+{
+    reach_host_set_battery_open(host, 0);
+}
+
 static void reach_host_surface_context_menu_close(reach_host *host)
 {
     reach_host_close_context_menu(host);
@@ -407,6 +416,14 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                               host->quick_settings_capsule,
                                               reach_quick_settings_capsule_ops(),
                                               REACH_SURFACE_POINTER_NONE};
+    descs[REACH_SURFACE_ID_BATTERY] = {REACH_SURFACE_ID_BATTERY,
+                                       REACH_SURFACE_CLASS_POPUP,
+                                       &host->battery,
+                                       &host->battery_transition,
+                                       reach_host_surface_battery_close,
+                                       host->battery_capsule,
+                                       reach_battery_capsule_ops(),
+                                       REACH_SURFACE_POINTER_NONE};
     descs[REACH_SURFACE_ID_CONTEXT_MENU] = {REACH_SURFACE_ID_CONTEXT_MENU,
                                             REACH_SURFACE_CLASS_POPUP,
                                             &host->context_menu,
@@ -437,6 +454,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_TOP_BAR].shadow = REACH_SURFACE_SHADOW_BAR;
     descs[REACH_SURFACE_ID_TRAY].shadow = REACH_SURFACE_SHADOW_POPUP;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].shadow = REACH_SURFACE_SHADOW_POPUP;
+    descs[REACH_SURFACE_ID_BATTERY].shadow = REACH_SURFACE_SHADOW_POPUP;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].shadow = REACH_SURFACE_SHADOW_POPUP;
 
     descs[REACH_SURFACE_ID_STAGE].layer = 50;
@@ -445,6 +463,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_TOP_BAR].layer = 0;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].layer = 160;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].layer = 170;
+    descs[REACH_SURFACE_ID_BATTERY].layer = 175;
     descs[REACH_SURFACE_ID_TRAY].layer = 180;
     descs[REACH_SURFACE_ID_CLIPBOARD].layer = 190;
     descs[REACH_SURFACE_ID_SWITCHER].layer = 200;
@@ -467,6 +486,9 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_TRAY].role = REACH_SURFACE_TRAY_MENU;
     descs[REACH_SURFACE_ID_TRAY].pointer_priority = 40;
     descs[REACH_SURFACE_ID_TRAY].apply_pointer_action = reach_host_apply_tray_pointer_action;
+    descs[REACH_SURFACE_ID_BATTERY].role = REACH_SURFACE_BATTERY;
+    descs[REACH_SURFACE_ID_BATTERY].pointer_priority = 55;
+    descs[REACH_SURFACE_ID_BATTERY].apply_pointer_action = reach_host_apply_battery_pointer_action;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].role = REACH_SURFACE_QUICK_SETTINGS;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].pointer_priority = 50;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
@@ -509,6 +531,8 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_TRAY].frame_priority = 40;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame = reach_host_frame_quick_settings;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame_priority = 50;
+    descs[REACH_SURFACE_ID_BATTERY].frame = reach_host_frame_battery;
+    descs[REACH_SURFACE_ID_BATTERY].frame_priority = 55;
     descs[REACH_SURFACE_ID_SWITCHER].frame = reach_host_frame_switcher;
     descs[REACH_SURFACE_ID_SWITCHER].frame_priority = 60;
     descs[REACH_SURFACE_ID_STAGE].frame = reach_host_frame_stage;

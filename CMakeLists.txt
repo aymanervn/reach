@@ -113,6 +113,9 @@ add_library(reach_features STATIC
     src/features/common/scrollbar/scrollbar_render.cpp
     src/features/common/text_edit/text_edit.cpp
     src/features/common/ui_controls/ui_controls.cpp
+    src/features/battery/battery_feature.cpp
+    src/features/battery/battery_interaction.cpp
+    src/features/battery/battery_render.cpp
     src/features/clipboard/clipboard_feature.cpp
     src/features/clipboard/clipboard_interaction.cpp
     src/features/clipboard/clipboard_model.cpp
@@ -273,6 +276,7 @@ add_library(reach_composition STATIC
     src/composition/host_lifecycle.cpp
     src/composition/host_popup.cpp
     src/composition/host_popup_surface.cpp
+    src/composition/host_battery.cpp
     src/composition/host_quick_settings.cpp
     src/composition/host_render.cpp
     src/composition/host_surface_frames.cpp
@@ -661,6 +665,18 @@ target_link_libraries(reach_quick_settings_feature_tests PRIVATE
     reach_features
 )
 
+add_executable(reach_battery_feature_tests
+    tests/battery_feature_tests.cpp
+)
+
+reach_configure_common(reach_battery_feature_tests)
+target_compile_features(reach_battery_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_battery_feature_tests PRIVATE
+    reach_features
+)
+
 add_executable(reach_context_menu_feature_tests
     tests/context_menu_feature_tests.cpp
 )
@@ -821,6 +837,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
     add_test(NAME reach_layout_tests COMMAND reach_layout_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
+    add_test(NAME reach_battery_feature_tests COMMAND reach_battery_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)
     add_test(NAME reach_wallpaper_feature_tests COMMAND reach_wallpaper_feature_tests)

@@ -610,7 +610,8 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
     return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
            role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
            role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-           role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_STAGE;
+           role == REACH_SURFACE_BATTERY || role == REACH_SURFACE_CLIPBOARD ||
+           role == REACH_SURFACE_STAGE;
 }
 
 static DWORD reach_window_ex_style(reach_surface_role role)
@@ -619,8 +620,9 @@ static DWORD reach_window_ex_style(reach_surface_role role)
     if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
         role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
         role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-        role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD ||
-        role == REACH_SURFACE_SETTINGS || role == REACH_SURFACE_STAGE)
+        role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_BATTERY ||
+        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
+        role == REACH_SURFACE_STAGE)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
@@ -810,8 +812,9 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
     if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TOP_BAR ||
         window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_TRAY_MENU ||
         window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
-        window->role == REACH_SURFACE_SETTINGS || window->role == REACH_SURFACE_STAGE)
+        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_BATTERY ||
+        window->role == REACH_SURFACE_CLIPBOARD || window->role == REACH_SURFACE_SETTINGS ||
+        window->role == REACH_SURFACE_STAGE)
     {
         return REACH_OK;
     }
@@ -852,8 +855,9 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
     if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TOP_BAR ||
         window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_TRAY_MENU ||
         window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
-        window->role == REACH_SURFACE_SETTINGS || window->role == REACH_SURFACE_STAGE)
+        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_BATTERY ||
+        window->role == REACH_SURFACE_CLIPBOARD || window->role == REACH_SURFACE_SETTINGS ||
+        window->role == REACH_SURFACE_STAGE)
     {
         return REACH_OK;
     }

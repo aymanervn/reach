@@ -31,6 +31,7 @@ typedef struct reach_top_bar_render_input
     const uint16_t *stats_upload_text;
     int32_t battery_valid;
     int32_t battery_percent;
+    int32_t battery_saver_on;
     float power_hover;
     size_t click_feedback_index;
     float click_feedback_opacity;
@@ -357,13 +358,22 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
         fill_width = fill_height;
     }
 
-    reach_color fill_color = (float)percent <= metrics.battery_low_percent
-                                 ? theme->bar_battery_low
-                                 : theme->bar_battery_fill;
+    reach_color fill_color = theme->bar_battery_fill;
+    if ((float)percent <= metrics.battery_low_percent)
+    {
+        fill_color = theme->bar_battery_low;
+    }
+    else if (input->battery_saver_on)
+    {
+        fill_color = theme->bar_battery_saver;
+    }
     reach_top_bar_push_rect(commands,
                             reach_top_bar_rect(shell.x + inset, shell.y + inset, fill_width,
                                                fill_height),
                             fill_color, fill_height * 0.5f);
+
+    reach_top_bar_push_button_feedback(input, commands, input->layout->battery_button,
+                                       REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON);
 }
 
 static void reach_top_bar_push_glyph_button(const reach_top_bar_render_input *input,
@@ -472,6 +482,8 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.dpi_scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
     input.battery_valid = state->battery_valid;
     input.battery_percent = state->battery_percent;
+    input.battery_saver_on = state->battery_saver_pending ? state->battery_saver_pending_enabled
+                                                          : state->battery_saver_on;
     input.power_hover =
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
     input.click_feedback_index = state->feedback_index;

@@ -9,6 +9,7 @@
 
 #include <winsock2.h>
 #include <windows.h>
+#include <powrprof.h>
 #include <wlanapi.h>
 #include <iphlpapi.h>
 #include <wbemidl.h>
@@ -858,6 +859,118 @@ static reach_result reach_system_controls_get_power_state(void *userdata,
         status.BatteryLifePercent == 255 ? -1 : (int32_t)status.BatteryLifePercent;
     out_state->battery_saver_on = status.SystemStatusFlag == 1 ? 1 : 0;
     return REACH_OK;
+}
+
+static const wchar_t REACH_POWER_BACKUP_KEY[] = L"Software\\Reach";
+static const wchar_t REACH_POWER_BACKUP_VALUE[] = L"BatterySaverThreshold";
+static const DWORD REACH_ENERGY_SAVER_ALWAYS = 100;
+static const DWORD REACH_ENERGY_SAVER_NEVER = 0;
+
+static int32_t reach_system_controls_read_saver_backup(DWORD *out_threshold)
+{
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, REACH_POWER_BACKUP_KEY, 0, KEY_QUERY_VALUE, &key) !=
+        ERROR_SUCCESS)
+    {
+        return 0;
+    }
+
+    DWORD value = 0;
+    DWORD size = sizeof(value);
+    DWORD type = 0;
+    LONG status = RegQueryValueExW(key, REACH_POWER_BACKUP_VALUE, nullptr, &type,
+                                   reinterpret_cast<BYTE *>(&value), &size);
+    RegCloseKey(key);
+
+    if (status != ERROR_SUCCESS || type != REG_DWORD || value > 100)
+    {
+        return 0;
+    }
+
+    *out_threshold = value;
+    return 1;
+}
+
+static void reach_system_controls_write_saver_backup(DWORD threshold)
+{
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, REACH_POWER_BACKUP_KEY, 0, nullptr, 0, KEY_SET_VALUE,
+                        nullptr, &key, nullptr) != ERROR_SUCCESS)
+    {
+        return;
+    }
+
+    (void)RegSetValueExW(key, REACH_POWER_BACKUP_VALUE, 0, REG_DWORD,
+                         reinterpret_cast<const BYTE *>(&threshold), sizeof(threshold));
+    RegCloseKey(key);
+}
+
+static void reach_system_controls_clear_saver_backup(void)
+{
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, REACH_POWER_BACKUP_KEY, 0, KEY_SET_VALUE, &key) !=
+        ERROR_SUCCESS)
+    {
+        return;
+    }
+
+    (void)RegDeleteValueW(key, REACH_POWER_BACKUP_VALUE);
+    RegCloseKey(key);
+}
+
+// Windows exposes no API that turns battery saver on or off — powrprof only exports the overlay
+// scheme setters and WinRT PowerManager is read-only. Driving the charge level at which Windows
+// engages it is the documented stand-in: 100 means "whenever on battery", 0 means never. The
+// previous threshold is kept in the registry so turning saver off restores the user's setting
+// even across a restart.
+static reach_result reach_system_controls_set_battery_saver_enabled(void *userdata, int32_t enabled)
+{
+    (void)userdata;
+
+    GUID *scheme = nullptr;
+    if (PowerGetActiveScheme(nullptr, &scheme) != ERROR_SUCCESS || scheme == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    DWORD current = 0;
+    int32_t current_valid =
+        PowerReadDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
+                              &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, &current) == ERROR_SUCCESS;
+
+    DWORD target = REACH_ENERGY_SAVER_NEVER;
+    if (enabled)
+    {
+        if (current_valid && current < REACH_ENERGY_SAVER_ALWAYS)
+        {
+            reach_system_controls_write_saver_backup(current);
+        }
+        target = REACH_ENERGY_SAVER_ALWAYS;
+    }
+    else
+    {
+        DWORD restored = 0;
+        if (reach_system_controls_read_saver_backup(&restored))
+        {
+            target = restored;
+        }
+    }
+
+    reach_result result = REACH_OK;
+    if (PowerWriteDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
+                               &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, target) != ERROR_SUCCESS ||
+        PowerSetActiveScheme(nullptr, scheme) != ERROR_SUCCESS)
+    {
+        result = REACH_ERROR;
+    }
+
+    if (result == REACH_OK && !enabled)
+    {
+        reach_system_controls_clear_saver_backup();
+    }
+
+    LocalFree(scheme);
+    return result;
 }
 
 static int32_t reach_system_controls_variant_bool(const VARIANT *variant)

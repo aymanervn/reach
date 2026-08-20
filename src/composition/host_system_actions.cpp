@@ -169,9 +169,8 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
         const reach_quick_settings_model *model =
             &reach_quick_settings_state_ptr(host->quick_settings_capsule)->model;
         reach_quick_settings_system_apply_result apply_result = {};
-        reach_quick_settings_apply_system_states(
-            host->quick_settings_capsule, &model->network, &model->bluetooth, &model->power,
-            &brightness, 0, &apply_result);
+        reach_quick_settings_apply_system_states(host->quick_settings_capsule, &model->network,
+                                                 &model->bluetooth, &brightness, 0, &apply_result);
         if (apply_result.relayout)
         {
             reach_host_relayout_quick_settings(host, 1);

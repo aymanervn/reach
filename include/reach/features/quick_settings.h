@@ -29,7 +29,6 @@ extern "C"
         reach_bluetooth_state bluetooth;
         int32_t bluetooth_pending;
         int32_t bluetooth_pending_enabled;
-        reach_power_state power;
         reach_brightness_state brightness;
     } reach_quick_settings_model;
 
@@ -87,7 +86,6 @@ extern "C"
         reach_rect_f32 system_grid_bounds;
         reach_quick_settings_tile_layout network_tile;
         reach_quick_settings_tile_layout bluetooth_tile;
-        reach_quick_settings_tile_layout battery_saver_tile;
         reach_quick_settings_tile_layout project_tile;
         size_t system_tile_count;
 
@@ -128,7 +126,6 @@ extern "C"
         REACH_QUICK_SETTINGS_POINTER_ACTION_SET_BRIGHTNESS,
         REACH_QUICK_SETTINGS_POINTER_ACTION_NETWORK_TILE,
         REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BLUETOOTH,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BATTERY_SAVER,
         REACH_QUICK_SETTINGS_POINTER_ACTION_OPEN_PROJECT,
         REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_OUTPUT_DEVICES,
         REACH_QUICK_SETTINGS_POINTER_ACTION_SET_OUTPUT_DEVICE,
@@ -158,7 +155,6 @@ extern "C"
     void reach_quick_settings_model_set_system_states(reach_quick_settings_model *model,
                                                       const reach_network_state *network,
                                                       const reach_bluetooth_state *bluetooth,
-                                                      const reach_power_state *power,
                                                       const reach_brightness_state *brightness);
 
     uint32_t reach_quick_settings_volume_icon_id(float volume_level, int32_t muted);
@@ -290,7 +286,6 @@ extern "C"
     void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settings,
                                                   const reach_network_state *network,
                                                   const reach_bluetooth_state *bluetooth,
-                                                  const reach_power_state *power,
                                                   const reach_brightness_state *brightness,
                                                   int32_t bluetooth_valid,
                                                   reach_quick_settings_system_apply_result *out);

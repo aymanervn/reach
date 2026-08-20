@@ -43,8 +43,6 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
         return 215;
     case REACH_VECTOR_ICON_WIFI_HIGH:
         return 216;
-    case REACH_VECTOR_ICON_BATTERY_SAVER:
-        return 218;
     case REACH_VECTOR_ICON_PROJECT:
         return 219;
     case REACH_VECTOR_ICON_BRIGHTNESS:
@@ -89,6 +87,8 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
         return 239;
     case REACH_VECTOR_ICON_MENU:
         return 240;
+    case REACH_VECTOR_ICON_MUSIC_NOTE:
+        return 241;
     default:
         return 0;
     }
