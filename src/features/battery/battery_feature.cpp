@@ -81,8 +81,7 @@ void reach_battery_format_percent(uint16_t *dst, size_t dst_count, int32_t perce
     dst[length] = 0;
 }
 
-int32_t reach_battery_set_power(reach_battery *battery, int32_t valid, int32_t percent,
-                                int32_t saver_on)
+int32_t reach_battery_set_power(reach_battery *battery, int32_t percent, int32_t saver_on)
 {
     if (battery == nullptr)
     {
@@ -90,7 +89,6 @@ int32_t reach_battery_set_power(reach_battery *battery, int32_t valid, int32_t p
     }
 
     reach_battery_model *model = &battery->state.model;
-    int32_t next_valid = valid ? 1 : 0;
     int32_t next_saver = saver_on ? 1 : 0;
     if (percent < 0)
     {
@@ -101,10 +99,8 @@ int32_t reach_battery_set_power(reach_battery *battery, int32_t valid, int32_t p
         percent = 100;
     }
 
-    int32_t changed =
-        model->valid != next_valid || model->percent != percent || model->saver_on != next_saver;
+    int32_t changed = model->percent != percent || model->saver_on != next_saver;
 
-    model->valid = next_valid;
     model->percent = percent;
     model->saver_on = next_saver;
 
@@ -140,7 +136,6 @@ static void reach_battery_place(reach_battery_state *state,
     const reach_battery_metrics &metrics = reach_battery_metrics_values;
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
 
-    state->dpi_scale = scale;
     state->drop_direction = ctx->drop_direction;
 
     float padding = metrics.padding * scale;
@@ -173,7 +168,6 @@ static void reach_battery_place(reach_battery_state *state,
     float content_width = popup_width - row_inset * 2.0f;
 
     state->percent_label = {content_x, content_y, content_width, row_height};
-    state->percent_value = state->percent_label;
     content_y += row_height + row_gap;
 
     state->separator = {separator_inset, content_y, popup_width - separator_inset * 2.0f,

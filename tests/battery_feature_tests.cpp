@@ -85,14 +85,14 @@ static void test_pending_reconciles_with_system(void)
     reach_battery_set_saver_pending(battery, 1, 1);
     expect_true(reach_battery_saver_pending(battery), "requesting saver marks the model pending");
 
-    (void)reach_battery_set_power(battery, 1, 55, 0);
+    (void)reach_battery_set_power(battery, 55, 0);
     expect_true(reach_battery_saver_pending(battery),
                 "pending survives a snapshot that still disagrees");
     expect_true(
         reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 1,
         "the requested state keeps showing while pending");
 
-    (void)reach_battery_set_power(battery, 1, 55, 1);
+    (void)reach_battery_set_power(battery, 55, 1);
     expect_true(!reach_battery_saver_pending(battery),
                 "pending clears once the system agrees with the request");
     expect_true(
@@ -107,7 +107,7 @@ static void test_pending_expires(void)
     reach_battery *battery = nullptr;
     expect_true(reach_battery_create(&battery) == REACH_OK, "battery capsule is created");
 
-    (void)reach_battery_set_power(battery, 1, 40, 0);
+    (void)reach_battery_set_power(battery, 40, 0);
     reach_battery_set_saver_pending(battery, 1, 1);
 
     const reach_feature_capsule_ops *ops = reach_battery_capsule_ops();
@@ -133,18 +133,16 @@ static void test_power_values_clamp(void)
     reach_battery *battery = nullptr;
     expect_true(reach_battery_create(&battery) == REACH_OK, "battery capsule is created");
 
-    expect_true(reach_battery_set_power(battery, 1, 140, 0), "a new reading reports a change");
+    expect_true(reach_battery_set_power(battery, 140, 0), "a new reading reports a change");
     expect_true(reach_battery_state_ptr(battery)->model.percent == 100,
                 "percent above full clamps");
 
-    expect_true(!reach_battery_set_power(battery, 1, 140, 0),
+    expect_true(!reach_battery_set_power(battery, 140, 0),
                 "an identical reading reports no change");
 
-    (void)reach_battery_set_power(battery, 0, -20, 0);
+    (void)reach_battery_set_power(battery, -20, 0);
     expect_true(reach_battery_state_ptr(battery)->model.percent == 0,
                 "negative percent clamps to zero");
-    expect_true(!reach_battery_state_ptr(battery)->model.valid,
-                "an absent battery is marked invalid");
 
     reach_battery_destroy(battery);
 }

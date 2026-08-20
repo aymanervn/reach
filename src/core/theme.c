@@ -73,6 +73,9 @@ static const reach_theme reach_theme_dark = {
     .bar_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .popup_background = REACH_DARK_BASE(REACH_THEME_TRANSLUCENT),
     .popup_border = REACH_DARK_EDGE_ON_BASE(1.0f),
+    .popup_separator = REACH_DARK_STRUCTURE(1.0f),
+    .toggle_track_off = REACH_DARK_DEEP(1.0f),
+    .toggle_knob = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
 
     .primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .inverse_text = REACH_DARK_BASE(0.92f),
@@ -207,6 +210,9 @@ static const reach_theme reach_theme_light = {
     .bar_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT),
     .popup_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
+    .popup_separator = REACH_LIGHT_STRUCTURE(1.0f),
+    .toggle_track_off = REACH_LIGHT_MID_CONTRAST_GRAY(0.8f),
+    .toggle_knob = REACH_LIGHT_BASE(1.0f),
 
     .primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
     .inverse_text = REACH_PURE_WHITE(0.95f),

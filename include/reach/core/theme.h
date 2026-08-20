@@ -61,6 +61,9 @@ extern "C"
         reach_shadow bar_shadow;
         reach_color popup_background;
         reach_color popup_border;
+        reach_color popup_separator;
+        reach_color toggle_track_off;
+        reach_color toggle_knob;
         reach_shadow popup_shadow;
 
         reach_color primary_text;

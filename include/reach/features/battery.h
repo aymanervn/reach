@@ -24,7 +24,6 @@ extern "C"
 
     typedef struct reach_battery_model
     {
-        int32_t valid;
         int32_t percent;
         int32_t saver_on;
         int32_t saver_pending;
@@ -37,14 +36,12 @@ extern "C"
         reach_battery_model model;
         reach_rect_f32 bounds;
         reach_rect_f32 percent_label;
-        reach_rect_f32 percent_value;
         reach_rect_f32 separator;
         reach_rect_f32 saver_row;
         reach_rect_f32 saver_label;
         reach_rect_f32 saver_toggle;
         float notch_anchor_x;
         int32_t drop_direction;
-        float dpi_scale;
     } reach_battery_state;
 
     typedef struct reach_battery_open_context
@@ -77,8 +74,7 @@ extern "C"
     void reach_battery_open(reach_battery *battery, const reach_battery_open_context *ctx);
     void reach_battery_relayout(reach_battery *battery, const reach_battery_open_context *ctx);
 
-    int32_t reach_battery_set_power(reach_battery *battery, int32_t valid, int32_t percent,
-                                    int32_t saver_on);
+    int32_t reach_battery_set_power(reach_battery *battery, int32_t percent, int32_t saver_on);
     void reach_battery_set_saver_pending(reach_battery *battery, int32_t pending,
                                          int32_t pending_enabled);
     int32_t reach_battery_saver_pending(const reach_battery *battery);
