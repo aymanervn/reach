@@ -49,7 +49,7 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
 
     uint16_t value[8] = {};
     reach_battery_format_percent(value, 8, state->model.percent);
-    reach_battery_push_text(out_commands, state->percent_value, value,
+    reach_battery_push_text(out_commands, state->percent_label, value,
                             metrics.value_text_size * scale, REACH_TEXT_WEIGHT_DEMIBOLD,
                             REACH_TEXT_ALIGNMENT_TRAILING, theme->primary_text);
 
@@ -57,7 +57,7 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
     separator.type = REACH_RENDER_COMMAND_RECT;
     separator.rect = state->separator;
     separator.radius = state->separator.height * 0.5f;
-    separator.color = theme->quick_settings_separator;
+    separator.color = theme->popup_separator;
     (void)reach_render_command_buffer_push(out_commands, &separator);
 
     reach_battery_push_text(out_commands, state->saver_label, saver_label,
@@ -65,9 +65,9 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
                             REACH_TEXT_ALIGNMENT_LEADING, theme->context_menu_text);
 
     reach_ui_toggle_style toggle_style = {};
-    toggle_style.track_off = theme->settings_toggle_track_off;
+    toggle_style.track_off = theme->toggle_track_off;
     toggle_style.track_on = reach_theme_accent_color(theme, REACH_THEME_ACCENT_GREEN);
-    toggle_style.knob = theme->settings_toggle_knob;
+    toggle_style.knob = theme->toggle_knob;
     reach_ui_toggle_render(out_commands, state->saver_toggle, &toggle_style,
                            reach_battery_model_saver_effective(&state->model) ? 1.0f : 0.0f);
 

@@ -28,12 +28,12 @@ void reach_host_refresh_battery_power(reach_host *host)
     reach_system_stats_snapshot snapshot = {};
     reach_system_stats_snapshot_take(host->system_stats, &snapshot);
 
-    int32_t valid = snapshot.power_valid && snapshot.power.has_battery &&
-                    snapshot.power.battery_percent >= 0;
-    int32_t percent = valid ? snapshot.power.battery_percent : 0;
+    int32_t has_reading = snapshot.power_valid && snapshot.power.has_battery &&
+                          snapshot.power.battery_percent >= 0;
+    int32_t percent = has_reading ? snapshot.power.battery_percent : 0;
     int32_t saver_on = snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0;
 
-    if (reach_battery_set_power(host->battery_capsule, valid, percent, saver_on))
+    if (reach_battery_set_power(host->battery_capsule, percent, saver_on))
     {
         reach_top_bar_set_battery_saver_pending(
             host->top_bar_capsule, reach_battery_saver_pending(host->battery_capsule),
