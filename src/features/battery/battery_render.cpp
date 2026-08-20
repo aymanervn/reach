@@ -66,7 +66,7 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = theme->settings_toggle_track_off;
-    toggle_style.track_on = theme->bar_battery_saver;
+    toggle_style.track_on = reach_theme_accent_color(theme, REACH_THEME_ACCENT_GREEN);
     toggle_style.knob = theme->settings_toggle_knob;
     reach_ui_toggle_render(out_commands, state->saver_toggle, &toggle_style,
                            reach_battery_model_saver_effective(&state->model) ? 1.0f : 0.0f);
