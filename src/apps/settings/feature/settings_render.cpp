@@ -476,7 +476,7 @@ static void render_display_page(const reach_settings_render_input *input,
     const display_toggle_card cards[] = {
         {layout->display_fps_card, layout->display_fps_icon, layout->display_fps_title,
          layout->display_fps_subtitle, layout->display_fps_toggle, REACH_VECTOR_ICON_ARROW_UP,
-         nullptr, L"Smoother animations", L"Run animations at 120fps",
+         nullptr, L"Adaptive animations", L"Match your display's refresh rate, up to 120fps",
          reach_animation_manager_value(&model->display_fps_animation, 0)},
         {layout->display_font_card, layout->display_font_icon, layout->display_font_title,
          layout->display_font_subtitle, layout->display_font_toggle, REACH_VECTOR_ICON_NONE, L"F",
