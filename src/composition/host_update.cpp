@@ -317,7 +317,19 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
 
 int32_t reach_host_frame_interval_ms(const reach_host *host)
 {
-    return host != nullptr && host->high_refresh_rate ? 8 : 16;
+    if (host == nullptr || !host->high_refresh_rate)
+    {
+        return 16;
+    }
+
+    const reach_monitor_info *primary = host->monitors.ops.primary(host->monitors.list);
+    if (primary == nullptr || primary->refresh_rate_hz == 0)
+    {
+        return 16;
+    }
+
+    const int32_t cap_fps = primary->refresh_rate_hz < 120 ? primary->refresh_rate_hz : 120;
+    return 1000 / cap_fps;
 }
 
 reach_theme_mode reach_host_theme_mode(const reach_host *host)
