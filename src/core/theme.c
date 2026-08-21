@@ -14,6 +14,7 @@
 #define REACH_DARK_BASE(a) REACH_RGB8(30, 31, 42, a)
 #define REACH_DARK_RAISED(a) REACH_RGB8(34, 36, 45, a)
 #define REACH_DARK_STRUCTURE(a) REACH_RGB8(37, 38, 49, a)
+#define REACH_DARK_MIDTONE(a) REACH_RGB8(44, 45, 54, a)
 #define REACH_DARK_MID_CONTRAST_GRAY(a) REACH_RGB8(148, 150, 153, a)
 #define REACH_DARK_HIGH_CONTRAST_WHITE(a) REACH_RGB8(203, 203, 214, a)
 #define REACH_DARK_EDGE_ON_DEEP(a) REACH_RGB8(101, 101, 106, a)
@@ -102,12 +103,12 @@ static const reach_theme reach_theme_dark = {
 
     .tray_click_feedback = REACH_DARK_RAISED(1.0f),
 
-    .quick_settings_slider_track = REACH_DARK_STRUCTURE(1.0f),
+    .quick_settings_slider_track = REACH_DARK_MIDTONE(1.0f),
     .quick_settings_slider_fill = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .quick_settings_slider_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.38f),
-    .quick_settings_button_background = REACH_DARK_STRUCTURE(1.0f),
+    .quick_settings_button_background = REACH_DARK_MIDTONE(1.0f),
     .quick_settings_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
-    .quick_settings_separator = REACH_DARK_STRUCTURE(1.0f),
+    .quick_settings_separator = REACH_DARK_MIDTONE(1.0f),
     .quick_settings_app_volume_track = REACH_DARK_HIGH_CONTRAST_WHITE(0.32f),
     .quick_settings_app_volume_fill = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .quick_settings_app_volume_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.42f),
@@ -137,7 +138,7 @@ static const reach_theme reach_theme_dark = {
     .switcher_label_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
 
     .context_menu_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
-    .context_menu_hover_background = REACH_DARK_STRUCTURE(1.0f),
+    .context_menu_hover_background = REACH_DARK_MIDTONE(1.0f),
     .context_menu_close_background = REACH_CRITICAL_RED(1.0f),
     .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
     .menu_accent_shutdown = REACH_DARK_ACCENT_RED(1.0f),
