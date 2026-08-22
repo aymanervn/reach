@@ -107,7 +107,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     command.rect.y = border_thickness * 0.5f;
     command.rect.width = input->bounds.width - border_thickness;
     command.rect.height = input->bounds.height - border_thickness;
-    command.color = theme->bar_background;
+    command.color = theme->switcher_background;
     command.radius = radius;
     reach_render_command_buffer_push(out_commands, &command);
 
