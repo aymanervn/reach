@@ -91,6 +91,18 @@ void reach_layout_set_condition(reach_layout *layout, reach_layout_condition con
     }
 }
 
+void reach_layout_set_layer_intent(reach_layout *layout, reach_layout_participant participant,
+                                   int32_t active, int32_t layer)
+{
+    reach_layout_participant_state *state = reach_layout_participant_at(layout, participant);
+    if (state == nullptr)
+    {
+        return;
+    }
+    state->layer_intent_active = active ? 1 : 0;
+    state->layer_intent = layer;
+}
+
 void reach_layout_set_visible(reach_layout *layout, reach_layout_participant participant,
                               int32_t wants_visible)
 {
@@ -101,8 +113,7 @@ void reach_layout_set_visible(reach_layout *layout, reach_layout_participant par
     }
 }
 
-static reach_layout_entry reach_layout_resolve_participant(const reach_layout *layout,
-                                                           size_t index)
+static reach_layout_entry reach_layout_resolve_participant(const reach_layout *layout, size_t index)
 {
     const reach_layout_participant_state *state = &layout->participants[index];
 
@@ -139,6 +150,11 @@ static reach_layout_entry reach_layout_resolve_participant(const reach_layout *l
                 visibility_overridden = 1;
             }
         }
+    }
+
+    if (state->layer_intent_active && (!layer_overridden || state->layer_intent > entry.layer))
+    {
+        entry.layer = state->layer_intent;
     }
 
     return entry;

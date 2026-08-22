@@ -52,6 +52,17 @@ extern "C"
         reach_screen_hotspot_ops ops;
     } reach_screen_hotspot_port;
 
+    typedef struct reach_screen_hotspot_factory_ops
+    {
+        reach_result (*create)(void *factory, reach_screen_hotspot_port *out_port);
+    } reach_screen_hotspot_factory_ops;
+
+    typedef struct reach_screen_hotspot_factory_port
+    {
+        void *factory;
+        reach_screen_hotspot_factory_ops ops;
+    } reach_screen_hotspot_factory_port;
+
 #ifdef __cplusplus
 }
 #endif

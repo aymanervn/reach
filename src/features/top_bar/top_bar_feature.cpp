@@ -860,8 +860,9 @@ static void reach_top_bar_update_language(reach_top_bar *top_bar)
     reach_copy_utf16(top_bar->state.language_code, 8, language.code);
 }
 
-void reach_top_bar_begin_reveal_session(reach_top_bar *top_bar)
+static void reach_top_bar_bar_begin_session(void *capsule)
 {
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
     if (top_bar != nullptr)
     {
         reach_bar_begin_reveal_session(&top_bar->state.visibility);
@@ -922,9 +923,10 @@ static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
     return top_bar->occlusion_occluded;
 }
 
-reach_bar_visibility_result
-reach_top_bar_update_visibility(reach_top_bar *top_bar, const reach_bar_visibility_request *request)
+static reach_bar_visibility_result
+reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_request *request)
 {
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
     if (top_bar == nullptr || request == nullptr)
     {
         return reach_bar_visibility_result{};
@@ -952,8 +954,9 @@ reach_top_bar_update_visibility(reach_top_bar *top_bar, const reach_bar_visibili
     return result;
 }
 
-void reach_top_bar_move_window_push_frame(reach_top_bar *top_bar)
+static void reach_top_bar_bar_position_frame(void *capsule)
 {
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
     if (top_bar == nullptr || top_bar->push_depth <= 0.0f)
     {
         return;
@@ -984,8 +987,9 @@ static int32_t reach_top_bar_width_animation_active(const reach_top_bar *top_bar
                                           REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH);
 }
 
-reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *top_bar)
+static reach_bar_reveal_animation reach_top_bar_bar_animation(const void *capsule)
 {
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     reach_bar_reveal_animation animation = {};
     if (top_bar == nullptr)
     {
@@ -994,12 +998,21 @@ reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *t
 
     animation.position_animating =
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
+    animation.animated_y = reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
     animation.content_animating =
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
         reach_top_bar_width_animation_active(top_bar) ||
         reach_top_bar_now_playing_scroll_active(top_bar);
     return animation;
+}
+
+const reach_bar_reveal_ops *reach_top_bar_reveal_ops(void)
+{
+    static const reach_bar_reveal_ops ops = {
+        reach_top_bar_bar_begin_session, reach_top_bar_bar_update_visibility,
+        reach_top_bar_bar_animation, reach_top_bar_bar_position_frame};
+    return &ops;
 }
 
 static void reach_top_bar_capsule_reset(void *capsule)

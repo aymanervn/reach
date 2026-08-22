@@ -102,12 +102,12 @@ extern "C"
     reach_result reach_windows_create_power_session(reach_power_session_port *out_port);
     reach_result reach_windows_create_audio_volume(reach_audio_volume_port *out_port);
     reach_result reach_windows_create_system_controls(reach_system_controls_port *out_port);
-    reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_port);
+    reach_result
+    reach_windows_create_screen_hotspot_factory(reach_screen_hotspot_factory_port *out_port);
     reach_result reach_windows_create_image_loader(reach_image_loader_port *out_port);
     reach_result reach_windows_create_input_language(reach_input_language_port *out_port);
     reach_result reach_windows_create_system_stats(reach_system_stats_port *out_port);
     reach_result reach_windows_create_clock(reach_clock_port *out_port);
-    reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_port);
     reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port *out_port);
     reach_result reach_windows_create_foreground_watcher(reach_foreground_watcher_port *out_port);
     reach_result reach_windows_create_explorer_desktop_compat_host(void);

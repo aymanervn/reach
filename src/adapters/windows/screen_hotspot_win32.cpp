@@ -25,7 +25,7 @@ static const wchar_t *reach_screen_hotspot_class_name()
 }
 
 static void reach_screen_hotspot_queue_event(reach_screen_hotspot *hotspot,
-                                               reach_screen_hotspot_event event)
+                                             reach_screen_hotspot_event event)
 {
     if (hotspot == nullptr)
     {
@@ -47,7 +47,7 @@ static void reach_screen_hotspot_queue_event(reach_screen_hotspot *hotspot,
 }
 
 static LRESULT CALLBACK reach_screen_hotspot_proc(HWND hwnd, UINT message, WPARAM wparam,
-                                                    LPARAM lparam)
+                                                  LPARAM lparam)
 {
     reach_screen_hotspot *hotspot =
         reinterpret_cast<reach_screen_hotspot *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -111,7 +111,7 @@ static reach_result reach_screen_hotspot_register_class()
 }
 
 static reach_result reach_screen_hotspot_set_bounds(reach_screen_hotspot *hotspot,
-                                                      reach_rect_f32 bounds)
+                                                    reach_rect_f32 bounds)
 {
     if (hotspot == nullptr || hotspot->hwnd == nullptr)
     {
@@ -167,8 +167,7 @@ static reach_result reach_screen_hotspot_hide(reach_screen_hotspot *hotspot)
     return REACH_OK;
 }
 
-static reach_result reach_screen_hotspot_set_topmost(reach_screen_hotspot *hotspot,
-                                                       int32_t enabled)
+static reach_result reach_screen_hotspot_set_topmost(reach_screen_hotspot *hotspot, int32_t enabled)
 {
     if (hotspot == nullptr || hotspot->hwnd == nullptr)
     {
@@ -190,7 +189,7 @@ static reach_window_id reach_screen_hotspot_native_id(const reach_screen_hotspot
 }
 
 static reach_result reach_screen_hotspot_place_behind(reach_screen_hotspot *hotspot,
-                                                        reach_window_id target_window)
+                                                      reach_window_id target_window)
 {
     if (hotspot == nullptr || hotspot->hwnd == nullptr || target_window == 0)
     {
@@ -204,8 +203,8 @@ static reach_result reach_screen_hotspot_place_behind(reach_screen_hotspot *hots
 }
 
 static reach_result reach_screen_hotspot_set_callback(reach_screen_hotspot *hotspot,
-                                                        reach_screen_hotspot_callback callback,
-                                                        void *user)
+                                                      reach_screen_hotspot_callback callback,
+                                                      void *user)
 {
     if (hotspot == nullptr)
     {
@@ -263,7 +262,7 @@ static void reach_screen_hotspot_destroy(reach_screen_hotspot *hotspot)
     delete hotspot;
 }
 
-reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_port)
+static reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_port)
 {
     if (out_port == nullptr)
     {
@@ -286,8 +285,8 @@ reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_
 
     hotspot->hwnd =
         CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_LAYERED,
-                        reach_screen_hotspot_class_name(), L"ReachScreenHotspot", WS_POPUP, 0, 0,
-                        1, 1, nullptr, nullptr, GetModuleHandleW(nullptr), hotspot);
+                        reach_screen_hotspot_class_name(), L"ReachScreenHotspot", WS_POPUP, 0, 0, 1,
+                        1, nullptr, nullptr, GetModuleHandleW(nullptr), hotspot);
 
     if (hotspot->hwnd == nullptr)
     {
@@ -308,5 +307,25 @@ reach_result reach_windows_create_screen_hotspot(reach_screen_hotspot_port *out_
     out_port->ops.has_pending_events = reach_screen_hotspot_has_pending_events;
     out_port->ops.dispatch_events = reach_screen_hotspot_dispatch_events;
     out_port->ops.destroy = reach_screen_hotspot_destroy;
+    return REACH_OK;
+}
+
+static reach_result reach_windows_screen_hotspot_factory_create(void *factory,
+                                                                reach_screen_hotspot_port *out_port)
+{
+    (void)factory;
+    return reach_windows_create_screen_hotspot(out_port);
+}
+
+reach_result
+reach_windows_create_screen_hotspot_factory(reach_screen_hotspot_factory_port *out_port)
+{
+    if (out_port == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_port = {};
+    out_port->ops.create = reach_windows_screen_hotspot_factory_create;
     return REACH_OK;
 }

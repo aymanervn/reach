@@ -1,32 +1,14 @@
 #include "host_internal.h"
 
-reach_layout_participant reach_host_hotspot_participant(const reach_host *host,
-                                                        const reach_screen_hotspot_port *hotspot)
-{
-    if (host == nullptr || hotspot == nullptr)
-    {
-        return REACH_LAYOUT_MAX_PARTICIPANTS;
-    }
-
-    for (size_t index = 0; index < host->layout_manager.participant_count; ++index)
-    {
-        if (host->layout_targets[index].hotspot == hotspot)
-        {
-            return (reach_layout_participant)index;
-        }
-    }
-    return REACH_LAYOUT_MAX_PARTICIPANTS;
-}
-
 static reach_window_id reach_host_layout_native_id(const reach_host_layout_target *target)
 {
     if (target->desc != nullptr && target->desc->surface->window.ops.native_id != nullptr)
     {
         return target->desc->surface->window.ops.native_id(target->desc->surface->window.window);
     }
-    if (target->hotspot != nullptr && target->hotspot->ops.native_id != nullptr)
+    if (target->edge_reveal != nullptr && target->edge_reveal->ops.native_id != nullptr)
     {
-        return target->hotspot->ops.native_id(target->hotspot->hotspot);
+        return target->edge_reveal->ops.native_id(target->edge_reveal->hotspot);
     }
     return 0;
 }
@@ -39,9 +21,9 @@ static reach_result reach_host_layout_set_topmost(const reach_host_layout_target
         return target->desc->surface->window.ops.set_topmost(target->desc->surface->window.window,
                                                              enabled);
     }
-    if (target->hotspot != nullptr && target->hotspot->ops.set_topmost != nullptr)
+    if (target->edge_reveal != nullptr && target->edge_reveal->ops.set_topmost != nullptr)
     {
-        return target->hotspot->ops.set_topmost(target->hotspot->hotspot, enabled);
+        return target->edge_reveal->ops.set_topmost(target->edge_reveal->hotspot, enabled);
     }
     return REACH_NOT_IMPLEMENTED;
 }
@@ -54,9 +36,9 @@ static reach_result reach_host_layout_place_behind(const reach_host_layout_targe
         return target->desc->surface->window.ops.place_behind(target->desc->surface->window.window,
                                                               above);
     }
-    if (target->hotspot != nullptr && target->hotspot->ops.place_behind != nullptr)
+    if (target->edge_reveal != nullptr && target->edge_reveal->ops.place_behind != nullptr)
     {
-        return target->hotspot->ops.place_behind(target->hotspot->hotspot, above);
+        return target->edge_reveal->ops.place_behind(target->edge_reveal->hotspot, above);
     }
     return REACH_NOT_IMPLEMENTED;
 }
@@ -91,25 +73,25 @@ static void reach_host_layout_apply_visibility(const reach_host_layout_target *t
         return;
     }
 
-    if (target->hotspot == nullptr || target->hotspot->hotspot == nullptr)
+    if (target->edge_reveal == nullptr || target->edge_reveal->hotspot == nullptr)
     {
         return;
     }
     if (visible)
     {
-        if (target->hotspot->ops.show != nullptr)
+        if (target->edge_reveal->ops.show != nullptr)
         {
-            (void)target->hotspot->ops.show(target->hotspot->hotspot);
+            (void)target->edge_reveal->ops.show(target->edge_reveal->hotspot);
         }
     }
-    else if (target->hotspot->ops.hide != nullptr)
+    else if (target->edge_reveal->ops.hide != nullptr)
     {
-        (void)target->hotspot->ops.hide(target->hotspot->hotspot);
+        (void)target->edge_reveal->ops.hide(target->edge_reveal->hotspot);
     }
 }
 
-static const reach_layout_entry *reach_host_layout_applied_entry(
-    const reach_host *host, reach_layout_participant participant)
+static const reach_layout_entry *
+reach_host_layout_applied_entry(const reach_host *host, reach_layout_participant participant)
 {
     if (!host->has_applied_layout_plan)
     {
@@ -135,8 +117,7 @@ void reach_host_apply_layout(reach_host *host)
 
     reach_layout_plan plan = {};
     reach_layout_resolve(&host->layout_manager, &plan);
-    if (host->has_applied_layout_plan &&
-        reach_layout_plan_equal(&plan, &host->applied_layout_plan))
+    if (host->has_applied_layout_plan && reach_layout_plan_equal(&plan, &host->applied_layout_plan))
     {
         return;
     }

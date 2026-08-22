@@ -20,24 +20,25 @@ static int32_t reach_host_surface_has_pending_events(const reach_surface_runtime
            surface->window.ops.has_pending_events(surface->window.window);
 }
 
-static int32_t reach_host_hotspot_has_pending_events(const reach_screen_hotspot_port *hotspot)
+static int32_t
+reach_host_edge_reveal_has_pending_events(const reach_screen_hotspot_port *edge_reveal)
 {
-    return hotspot != nullptr && hotspot->ops.has_pending_events != nullptr &&
-           hotspot->ops.has_pending_events(hotspot->hotspot);
+    return edge_reveal != nullptr && edge_reveal->ops.has_pending_events != nullptr &&
+           edge_reveal->ops.has_pending_events(edge_reveal->hotspot);
 }
 
-static void reach_host_dispatch_hotspot_events(reach_screen_hotspot_port *hotspot)
+static void reach_host_dispatch_edge_reveal_events(reach_screen_hotspot_port *edge_reveal)
 {
-    if (hotspot == nullptr || hotspot->ops.dispatch_events == nullptr)
+    if (edge_reveal == nullptr || edge_reveal->ops.dispatch_events == nullptr)
     {
         return;
     }
-    if (hotspot->ops.has_pending_events != nullptr &&
-        !hotspot->ops.has_pending_events(hotspot->hotspot))
+    if (edge_reveal->ops.has_pending_events != nullptr &&
+        !edge_reveal->ops.has_pending_events(edge_reveal->hotspot))
     {
         return;
     }
-    (void)hotspot->ops.dispatch_events(hotspot->hotspot);
+    (void)edge_reveal->ops.dispatch_events(edge_reveal->hotspot);
 }
 
 int32_t reach_host_has_pending_events(const reach_host *host)
@@ -55,9 +56,14 @@ int32_t reach_host_has_pending_events(const reach_host *host)
         }
     }
 
-    return reach_host_hotspot_has_pending_events(&host->dock_reveal_edge) ||
-           reach_host_hotspot_has_pending_events(&host->top_bar_reveal_edge) ||
-           reach_host_hotspot_has_pending_events(&host->stage_reveal_corner);
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        if (reach_host_edge_reveal_has_pending_events(&host->edge_reveals[index].port))
+        {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 reach_result reach_host_dispatch_events(reach_host *host)
@@ -72,9 +78,10 @@ reach_result reach_host_dispatch_events(reach_host *host)
         reach_host_dispatch_surface_events(host->surface_descs[index].surface);
     }
 
-    reach_host_dispatch_hotspot_events(&host->dock_reveal_edge);
-    reach_host_dispatch_hotspot_events(&host->top_bar_reveal_edge);
-    reach_host_dispatch_hotspot_events(&host->stage_reveal_corner);
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_host_dispatch_edge_reveal_events(&host->edge_reveals[index].port);
+    }
 
     host->dirty.events_dispatched_this_cycle = 1;
     return REACH_OK;

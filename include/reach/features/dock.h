@@ -166,11 +166,10 @@ extern "C"
     void reach_dock_mark_items_changed(reach_dock *dock);
     int32_t reach_dock_take_items_changed(reach_dock *dock);
 
-
     reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
                                                            int32_t local_y);
 
-    void reach_dock_begin_reveal_session(reach_dock *dock);
+    const reach_bar_reveal_ops *reach_dock_reveal_ops(void);
 
     typedef struct reach_dock_build_context
     {
@@ -266,8 +265,7 @@ extern "C"
 
     size_t reach_dock_collect_matching_windows(const reach_pinned_app_model *pinned_app,
                                                const reach_window_snapshot *windows,
-                                               size_t window_count,
-                                               const uintptr_t *focus_history,
+                                               size_t window_count, const uintptr_t *focus_history,
                                                size_t focus_history_count,
                                                reach_dock_window_matches_pinned_fn matches,
                                                void *match_user, size_t *out_indices, size_t cap);
@@ -280,12 +278,6 @@ extern "C"
     size_t reach_dock_order_count(reach_dock *dock);
     reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index);
     void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys, size_t count);
-
-    reach_bar_visibility_result
-    reach_dock_update_visibility(reach_dock *animations,
-                                 const reach_bar_visibility_request *request);
-
-    reach_bar_reveal_animation reach_dock_reveal_animation(const reach_dock *dock);
 
 #ifdef __cplusplus
 }

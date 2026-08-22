@@ -72,7 +72,6 @@ static void test_override_precedence(void)
     reach_layout layout = {};
     reach_layout_participant bar = 0;
     reach_layout_register(&layout, 0, &bar);
-    reach_layout_register_override(&layout, bar, REACH_LAYOUT_CONDITION_TOP_BAR_REVEALED, 130);
     reach_layout_register_override(&layout, bar, REACH_LAYOUT_CONDITION_BARS_HELD, 130);
     reach_layout_register_override(&layout, bar, REACH_LAYOUT_CONDITION_BARS_FORCED, 90);
 
@@ -84,12 +83,14 @@ static void test_override_precedence(void)
     reach_layout_resolve(&layout, &plan);
     expect_int(plan.entries[0].layer, 90, "a single override replaces the base layer");
 
+    reach_layout_set_layer_intent(&layout, bar, 1, 120);
     reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_BARS_HELD, 1);
     reach_layout_resolve(&layout, &plan);
     expect_int(plan.entries[0].layer, 130, "the highest matching override wins");
 
     reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_BARS_HELD, 0);
     reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_BARS_FORCED, 0);
+    reach_layout_set_layer_intent(&layout, bar, 0, 120);
     reach_layout_resolve(&layout, &plan);
     expect_int(plan.entries[0].layer, 0, "clearing every condition falls back to the base layer");
 }
@@ -191,19 +192,17 @@ static void test_layer_zero_resolves_as_exit(void)
     reach_layout_participant banded = 0;
     reach_layout_register(&layout, 0, &resting);
     reach_layout_register(&layout, 50, &banded);
-    reach_layout_register_override(&layout, resting, REACH_LAYOUT_CONDITION_TOP_BAR_REVEALED, 130);
-
     reach_layout_plan plan = {};
     reach_layout_resolve(&layout, &plan);
     expect_true(plan.entries[0].participant == banded, "a banded participant outranks layer 0");
     expect_int(entry_for(&plan, resting)->layer, 0, "layer 0 is reported, not skipped");
 
-    reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_TOP_BAR_REVEALED, 1);
+    reach_layout_set_layer_intent(&layout, resting, 1, 130);
     reach_layout_resolve(&layout, &plan);
     expect_true(plan.entries[0].participant == resting,
                 "the promoted participant rises above the band");
 
-    reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_TOP_BAR_REVEALED, 0);
+    reach_layout_set_layer_intent(&layout, resting, 0, 130);
     reach_layout_resolve(&layout, &plan);
     expect_int(entry_for(&plan, resting)->layer, 0, "the participant falls back on its own");
 }
@@ -242,8 +241,7 @@ static void test_registration_limits(void)
     expect_true(reach_layout_register(&layout, 0, &participant) != REACH_OK,
                 "registration past the capacity fails");
     expect_true(reach_layout_register_override(&layout, REACH_LAYOUT_MAX_PARTICIPANTS,
-                                               REACH_LAYOUT_CONDITION_GAME_MODE,
-                                               10) != REACH_OK,
+                                               REACH_LAYOUT_CONDITION_GAME_MODE, 10) != REACH_OK,
                 "an unknown participant is rejected");
 }
 
