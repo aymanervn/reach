@@ -276,8 +276,9 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
     }
 }
 
-void reach_dock_begin_reveal_session(reach_dock *dock)
+static void reach_dock_bar_begin_session(void *capsule)
 {
+    reach_dock *dock = static_cast<reach_dock *>(capsule);
     if (dock != nullptr)
     {
         reach_bar_begin_reveal_session(&dock->state.visibility);
@@ -777,9 +778,10 @@ int32_t reach_dock_clear_context_feedback(reach_dock *dock)
     return reach_pressable_clear_latched_feedback(&dock->state.pressable, &feedback);
 }
 
-reach_bar_visibility_result
-reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_request *request)
+static reach_bar_visibility_result
+reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_request *request)
 {
+    reach_dock *animations = static_cast<reach_dock *>(capsule);
     if (animations == nullptr || request == nullptr)
     {
         return reach_bar_visibility_result{};
@@ -799,8 +801,9 @@ reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_
     return result;
 }
 
-reach_bar_reveal_animation reach_dock_reveal_animation(const reach_dock *dock)
+static reach_bar_reveal_animation reach_dock_bar_animation(const void *capsule)
 {
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
     reach_bar_reveal_animation animation = {};
     if (dock == nullptr)
     {
@@ -809,11 +812,20 @@ reach_bar_reveal_animation reach_dock_reveal_animation(const reach_dock *dock)
 
     animation.position_animating =
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
+    animation.animated_y = reach_animation_manager_value(&dock->manager, REACH_DOCK_ANIM_Y);
     animation.content_animating =
         reach_dock_slots_animating(dock) || dock->state.drag.active ||
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP) ||
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
     return animation;
+}
+
+const reach_bar_reveal_ops *reach_dock_reveal_ops(void)
+{
+    static const reach_bar_reveal_ops ops = {reach_dock_bar_begin_session,
+                                             reach_dock_bar_update_visibility,
+                                             reach_dock_bar_animation, nullptr};
+    return &ops;
 }
 
 static reach_dock_order_key reach_dock_order_key_for_item(const reach_dock_item_model *item)

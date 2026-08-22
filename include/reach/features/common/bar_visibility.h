@@ -59,7 +59,17 @@ extern "C"
     {
         int32_t position_animating;
         int32_t content_animating;
+        float animated_y;
     } reach_bar_reveal_animation;
+
+    typedef struct reach_bar_reveal_ops
+    {
+        void (*begin_session)(void *capsule);
+        reach_bar_visibility_result (*update_visibility)(
+            void *capsule, const reach_bar_visibility_request *request);
+        reach_bar_reveal_animation (*animation)(const void *capsule);
+        void (*position_frame)(void *capsule);
+    } reach_bar_reveal_ops;
 
     void reach_bar_visibility_reset(reach_bar_visibility_state *state);
     void reach_bar_begin_reveal_session(reach_bar_visibility_state *state);

@@ -279,6 +279,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 frame_ctx.monitor_bounds = bounds;
                 frame_ctx.dock_layout_changed = dock_layout_changed;
                 frame_ctx.launcher_layout_changed = launcher_layout_changed;
+                reach_host_sync_edge_reveals(host, bounds);
                 reach_surface_id frame_order[REACH_HOST_SURFACE_COUNT];
                 size_t frame_count = 0;
                 for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)

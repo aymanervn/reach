@@ -30,9 +30,10 @@ names, version constants. Includes `core`.
 Abstract interfaces for every external boundary — renderer, surface, input, monitor,
 OS controls, filesystem, clipboard, media, icons, the Reach Service client. The
 `window_thumbnail` port abstracts live window previews (DWM thumbnails on Windows);
-`screen_hotspot` abstracts a screen-edge/corner trigger region — the dock's reveal
-edge and the stage's hot corner are two instances of the one port, and its Win32
-adapter registers its window class idempotently so further instances cost nothing.
+`screen_hotspot` abstracts the platform capability for an invisible rectangular
+trigger window. Composition presents those windows as descriptor-declared edge
+reveals; the Win32 adapter registers its window class idempotently so further
+instances cost nothing.
 The media
 port separates fast core-state reads from generation-checked cover reads so image I/O
 cannot block transport state. Interfaces only. Includes `core`, `protocol`.
@@ -176,8 +177,9 @@ has crossed the screen edge leaves the windows parked for the first ~80% of the
 reveal and then racing to catch up. Both the full frame path and the
 `reach_host_move_bar_animation_frame` fast path feed it: that fast path slides a
 bar without a redraw and so never reaches `reconcile_bar_visibility`, which is
-exactly the state a hide settles into, so it calls
-`reach_top_bar_move_window_push_frame` to keep the push on the same clock.
+exactly the state a hide settles into. The descriptor's optional
+`reach_bar_reveal_ops.position_frame` hook keeps feature-owned effects such as
+the top-bar push on that same clock while the generic path moves the surface.
 
 It **moves** windows and never resizes them. A resize makes the app relayout its
 whole client area on every frame, cross-process, which is the one cost this path
@@ -240,15 +242,20 @@ arrangement should be. See the composition section for the model.
 Dock and top bar are both bars: each owns a `reach_bar_visibility_state` driven
 by the shared `features/common/bar_visibility` state machine, and composition
 reconciles both through one `reach_host_reconcile_bar_visibility` over the
-descriptor's `update_visibility` and reveal-edge fields. Each bar names its own
-edge and decides for itself what counts as covered: composition passes only
+descriptor `bar_reveal` spec and feature-owned `reach_bar_reveal_ops`. The spec
+declaratively supplies dynamic edge-reveal and active-layer policy; the capsule
+names its own edge and decides what counts as covered. Composition passes only
 *facts* about foreign windows on the request — `any_window_maximized` and
 `foreground_snapped` — and each capsule turns them into `can_hide`. The two bars
 answer differently and must: the top bar rests in the app band, so windows
 genuinely cover it and it uses its own trespass test, cached inside the capsule.
 The dock is permanently topmost and is never in the windows' range, so it hides
 by policy — the maximized / snapped rule — and a floating window overlapping the
-dock band must never hide it.
+dock band must never hide it. A single screen-hotspot factory creates every
+descriptor-declared edge reveal. Fixed triggers declare an anchor and DP size;
+Stage is an always-enabled 4dp top-left square. Animated bars publish managed
+bounds from the shared visibility result. Generic runtime loops own geometry,
+callback binding, event dispatch, bounds caching, layout registration and teardown.
 
 Both answers are cached, so what makes them correct is that every path which
 learns the window world changed goes through one function,
@@ -340,10 +347,11 @@ transition is live, while a `bar_shown_while_open` surface is open, or while a p
 holds the bars. Starting that Y animation and reporting the transition are the same
 act, performed by `reach_bar_update_visibility` alone — nothing else may write
 `REACH_TOP_BAR_ANIM_Y`, and nothing may set the bar's layer except the resolve
-reading `reach_bar_visibility_result.reveal_transition_active`. The three screen
-hotspots are participants too, with no capsule and no `reach_surface_id`, keyed by
-the handle the manager mints; the screen-hotspot port carries `set_topmost` /
-`native_id` / `place_behind` so they chain and seed like any other participant.
+reading `reach_bar_visibility_result.reveal_transition_active` into that
+participant's layer intent. Descriptor-declared edge reveals are participants too,
+attached to their owning surface runtime but independently visible; the underlying
+screen-hotspot port carries `set_topmost` / `native_id` / `place_behind` so they
+chain and seed like any other participant.
 The wallpaper is not a participant: it re-pins itself to `HWND_BOTTOM` and is
 deliberately not hidden in game mode.
 

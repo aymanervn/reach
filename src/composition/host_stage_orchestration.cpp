@@ -1,43 +1,7 @@
 #include "host_internal.h"
 
-float reach_host_stage_reveal_corner_size(reach_host *host)
-{
-    float scale = reach_host_layout_dpi_scale(host);
-    return 4.0f * (scale > 0.0f ? scale : 1.0f);
-}
-
-void reach_host_sync_stage_reveal_corner(reach_host *host, reach_rect_f32 monitor_bounds)
-{
-    if (host == nullptr || host->stage_reveal_corner.hotspot == nullptr)
-    {
-        return;
-    }
-
-    reach_rect_f32 corner_bounds = {};
-    corner_bounds.x = monitor_bounds.x;
-    corner_bounds.y = monitor_bounds.y;
-    corner_bounds.width = reach_host_stage_reveal_corner_size(host);
-    corner_bounds.height = reach_host_stage_reveal_corner_size(host);
-
-    if (!host->stage_reveal.corner_bounds_valid ||
-        !reach_host_rect_equal(host->stage_reveal.corner_bounds, corner_bounds))
-    {
-        if (host->stage_reveal_corner.ops.set_bounds != nullptr &&
-            host->stage_reveal_corner.ops.set_bounds(host->stage_reveal_corner.hotspot,
-                                                     corner_bounds) == REACH_OK)
-        {
-            host->stage_reveal.corner_bounds = corner_bounds;
-            host->stage_reveal.corner_bounds_valid = 1;
-        }
-    }
-
-    reach_layout_set_visible(&host->layout_manager,
-                             reach_host_hotspot_participant(host, &host->stage_reveal_corner), 1);
-}
-
-static const reach_monitor_info *reach_host_stage_monitor_for(reach_host *host,
-                                                              reach_rect_f32 frame,
-                                                              uint32_t *out_rank)
+static const reach_monitor_info *
+reach_host_stage_monitor_for(reach_host *host, reach_rect_f32 frame, uint32_t *out_rank)
 {
     REACH_ASSERT(out_rank != nullptr);
     *out_rank = 0;
@@ -144,8 +108,8 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
         {
             continue;
         }
-        reach_result frame_result =
-            host->window_manager.ops.frame_bounds(host->window_manager.manager, snapshot->id, &frame);
+        reach_result frame_result = host->window_manager.ops.frame_bounds(
+            host->window_manager.manager, snapshot->id, &frame);
         if (frame_result != REACH_OK || frame.width <= 0.0f || frame.height <= 0.0f)
         {
             continue;
@@ -168,10 +132,10 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
 
     if (collected < capacity)
     {
-        reach_window_id desktop = host->wallpaper_surface.ops.desktop_window != nullptr
-                                      ? host->wallpaper_surface.ops.desktop_window(
-                                            host->wallpaper_surface.surface)
-                                      : 0;
+        reach_window_id desktop =
+            host->wallpaper_surface.ops.desktop_window != nullptr
+                ? host->wallpaper_surface.ops.desktop_window(host->wallpaper_surface.surface)
+                : 0;
         if (desktop != 0)
         {
             static const uint16_t desktop_label[] = {'D', 'e', 's', 'k', 't', 'o', 'p', 0};
@@ -371,8 +335,7 @@ void reach_host_open_stage(reach_host *host)
         return;
     }
 
-    reach_host_surface_opening(host, REACH_SURFACE_ID_STAGE,
-                               REACH_SURFACE_ORIGIN_NONE);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_ORIGIN_NONE);
     reach_host_surface_transition_set(host, &host->stage_transition, 1);
     reach_host_register_stage_thumbnails(host);
     reach_host_sync_stage_thumbnails(host);
@@ -465,9 +428,8 @@ reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach
     return REACH_OK;
 }
 
-void reach_host_on_stage_reveal_corner(void *user, reach_screen_hotspot_event event)
+void reach_host_on_stage_edge_reveal(reach_host *host, reach_screen_hotspot_event event)
 {
-    reach_host *host = static_cast<reach_host *>(user);
     if (host == nullptr || event != REACH_SCREEN_HOTSPOT_ENTER)
     {
         return;

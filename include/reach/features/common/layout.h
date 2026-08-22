@@ -16,10 +16,9 @@ extern "C"
     typedef enum reach_layout_condition
     {
         REACH_LAYOUT_CONDITION_GAME_MODE = 0,
-        REACH_LAYOUT_CONDITION_TOP_BAR_REVEALED = 1,
-        REACH_LAYOUT_CONDITION_BARS_FORCED = 2,
-        REACH_LAYOUT_CONDITION_BARS_HELD = 3,
-        REACH_LAYOUT_CONDITION_COUNT = 4
+        REACH_LAYOUT_CONDITION_BARS_FORCED = 1,
+        REACH_LAYOUT_CONDITION_BARS_HELD = 2,
+        REACH_LAYOUT_CONDITION_COUNT = 3
     } reach_layout_condition;
 
     typedef uint32_t reach_layout_participant;
@@ -27,6 +26,8 @@ extern "C"
     typedef struct reach_layout_participant_state
     {
         int32_t base_layer;
+        int32_t layer_intent_active;
+        int32_t layer_intent;
         int32_t wants_visible;
         uint32_t layer_conditions;
         int32_t layer_overrides[REACH_LAYOUT_CONDITION_COUNT];
@@ -66,6 +67,8 @@ extern "C"
 
     void reach_layout_set_condition(reach_layout *layout, reach_layout_condition condition,
                                     int32_t active);
+    void reach_layout_set_layer_intent(reach_layout *layout, reach_layout_participant participant,
+                                       int32_t active, int32_t layer);
     void reach_layout_set_visible(reach_layout *layout, reach_layout_participant participant,
                                   int32_t wants_visible);
 

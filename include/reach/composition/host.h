@@ -51,10 +51,9 @@ extern "C"
         reach_render_backend_port launcher_renderer;
         reach_platform_window_port dock_window;
         reach_render_backend_port dock_renderer;
-        reach_screen_hotspot_port dock_reveal_edge;
         reach_platform_window_port top_bar_window;
         reach_render_backend_port top_bar_renderer;
-        reach_screen_hotspot_port top_bar_reveal_edge;
+        reach_screen_hotspot_factory_port screen_hotspots;
         reach_image_loader_port image_loader;
         reach_platform_window_port tray_window;
         reach_render_backend_port tray_renderer;
@@ -62,7 +61,6 @@ extern "C"
         reach_render_backend_port switcher_renderer;
         reach_platform_window_port stage_window;
         reach_render_backend_port stage_renderer;
-        reach_screen_hotspot_port stage_reveal_corner;
         reach_window_thumbnail_port window_thumbnails;
         reach_platform_window_port context_menu_window;
         reach_render_backend_port context_menu_renderer;

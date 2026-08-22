@@ -34,6 +34,11 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
 
     if (result == REACH_OK)
     {
+        result = reach_windows_create_screen_hotspot_factory(&dependencies.screen_hotspots);
+    }
+
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_explorer_desktop_compat_host();
     }
 
@@ -64,10 +69,6 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_screen_hotspot(&dependencies.dock_reveal_edge);
-    }
-    if (result == REACH_OK)
-    {
         result = reach_windows_create_platform_window(REACH_SURFACE_TOP_BAR,
                                                       &dependencies.top_bar_window);
     }
@@ -75,10 +76,6 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     {
         result = reach_windows_create_dcomp_render_backend(dependencies.top_bar_window.window,
                                                            &dependencies.top_bar_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_screen_hotspot(&dependencies.top_bar_reveal_edge);
     }
     if (result == REACH_OK)
     {
@@ -109,10 +106,6 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     {
         result = reach_windows_create_dcomp_render_backend(dependencies.stage_window.window,
                                                            &dependencies.stage_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_screen_hotspot(&dependencies.stage_reveal_corner);
     }
     if (result == REACH_OK)
     {

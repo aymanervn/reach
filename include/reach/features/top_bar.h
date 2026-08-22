@@ -194,8 +194,6 @@ extern "C"
 
     void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar);
 
-    void reach_top_bar_move_window_push_frame(reach_top_bar *top_bar);
-
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
@@ -212,8 +210,7 @@ extern "C"
         int32_t tray_popup_open;
     } reach_top_bar_build_context;
 
-    void reach_top_bar_build_layout(reach_top_bar *top_bar,
-                                    const reach_top_bar_build_context *ctx);
+    void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_build_context *ctx);
 
     reach_point_i32 reach_top_bar_local_point(const reach_top_bar_layout *layout, int32_t x,
                                               int32_t y);
@@ -229,12 +226,7 @@ extern "C"
 
     size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar);
 
-    void reach_top_bar_begin_reveal_session(reach_top_bar *top_bar);
-    reach_bar_visibility_result
-    reach_top_bar_update_visibility(reach_top_bar *top_bar,
-                                    const reach_bar_visibility_request *request);
-
-    reach_bar_reveal_animation reach_top_bar_reveal_animation(const reach_top_bar *top_bar);
+    const reach_bar_reveal_ops *reach_top_bar_reveal_ops(void);
 
     typedef struct reach_top_bar_render_context
     {
