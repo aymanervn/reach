@@ -606,10 +606,18 @@ static int32_t reach_helper_window_occupies_whole_monitor(HWND hwnd, RECT window
     return reach_helper_rect_matches_monitor(window_rect, info.rcMonitor);
 }
 
+static int32_t reach_helper_window_is_windowed(HWND hwnd)
+{
+    LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+    int32_t has_caption = (style & WS_CAPTION) == WS_CAPTION;
+    int32_t has_windowed_frame = (style & WS_THICKFRAME) != 0 && (style & WS_POPUP) == 0;
+    return has_caption || has_windowed_frame;
+}
+
 static int32_t reach_helper_window_is_game(HWND hwnd)
 {
     if (hwnd == nullptr || !IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
-        IsZoomed(hwnd))
+        IsZoomed(hwnd) || reach_helper_window_is_windowed(hwnd))
     {
         return 0;
     }
