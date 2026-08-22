@@ -4,6 +4,7 @@
 #include "reach/features/stage.h"
 
 #include "reach/core/theme.h"
+#include "reach/features/common/pressable.h"
 #include "reach/support/animation.h"
 
 static inline float reach_stage_animation_seconds_default(void)
@@ -34,6 +35,8 @@ struct reach_stage
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_STAGE_ANIMATION_COUNT];
     reach_stage_state state;
+    reach_pressable pressable;
+    size_t pressable_generation;
 };
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);

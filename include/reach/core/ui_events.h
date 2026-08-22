@@ -8,6 +8,12 @@ extern "C"
 {
 #endif
 
+    typedef enum reach_pointer_button
+    {
+        REACH_POINTER_BUTTON_PRIMARY = 0,
+        REACH_POINTER_BUTTON_SECONDARY = 1
+    } reach_pointer_button;
+
     typedef enum reach_ui_event_type
     {
         REACH_UI_EVENT_NONE = 0,
@@ -16,7 +22,6 @@ extern "C"
         REACH_UI_EVENT_DOCK_APP_CLICK = 5,
         REACH_UI_EVENT_TRAY_BUTTON_CLICK = 6,
         REACH_UI_EVENT_POINTER_UP = 7,
-        REACH_UI_EVENT_POINTER_CONTEXT = 8,
         REACH_UI_EVENT_WALLPAPER_CHANGED = 9,
         REACH_UI_EVENT_POINTER_MOVE = 10,
         REACH_UI_EVENT_POINTER_LEAVE = 11,
@@ -85,6 +90,7 @@ extern "C"
         int32_t x;
         int32_t y;
         int32_t wheel_delta;
+        reach_pointer_button button;
         uint16_t text[REACH_MAX_SEARCH_CHARS + 1];
     } reach_ui_event;
 

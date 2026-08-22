@@ -215,7 +215,8 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
 }
 
 reach_quick_settings_action
-reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int32_t x, int32_t y)
+reach_quick_settings_begin_slider_gesture_if_hit(reach_quick_settings *quick_settings, int32_t x,
+                                                 int32_t y)
 {
     reach_quick_settings_action action = {};
     if (quick_settings == nullptr)
@@ -227,14 +228,15 @@ reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int
     reach_quick_settings_hit_result hit = reach_quick_settings_hit_test(
         &state->layout, &state->model, (float)x - state->bounds.x, (float)y - state->bounds.y);
     action = reach_quick_settings_action_for_hit(hit);
-    if (action.type == REACH_QUICK_SETTINGS_ACTION_NONE)
+    if (action.type != REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME &&
+        action.type != REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME &&
+        action.type != REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS)
     {
+        action = {};
         return action;
     }
 
-    state->drag.active = action.type == REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME ||
-                         action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME ||
-                         action.type == REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
+    state->drag.active = 1;
     state->drag.type = hit.type;
     state->drag.last_level = action.volume_level;
     state->drag.level_valid = state->drag.active;
@@ -243,6 +245,53 @@ reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int
                                     REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
                                     hit.session_instance_id);
     return action;
+}
+
+uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result hit)
+{
+    reach_quick_settings_press_target_kind kind = REACH_QUICK_SETTINGS_PRESS_TARGET_NONE;
+    size_t index = 0;
+    switch (hit.type)
+    {
+    case REACH_QUICK_SETTINGS_HIT_NETWORK_TILE:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_NETWORK_TILE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_TILE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_PROJECT_TILE:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_PROJECT_TILE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW;
+        index = hit.output_device_index;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_NONE:
+    case REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER:
+    case REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER:
+    case REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER:
+    default:
+        return REACH_PRESSABLE_TARGET_NONE;
+    }
+    return (static_cast<uint64_t>(kind) << 32) | static_cast<uint32_t>(index);
+}
+
+reach_quick_settings_press_target_kind reach_quick_settings_pressable_target_kind(uint64_t target)
+{
+    return target == REACH_PRESSABLE_TARGET_NONE
+               ? REACH_QUICK_SETTINGS_PRESS_TARGET_NONE
+               : static_cast<reach_quick_settings_press_target_kind>(target >> 32);
+}
+
+size_t reach_quick_settings_pressable_target_index(uint64_t target)
+{
+    return target == REACH_PRESSABLE_TARGET_NONE ? 0 : static_cast<size_t>(target & UINT32_MAX);
 }
 
 reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings *quick_settings,

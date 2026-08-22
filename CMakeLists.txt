@@ -110,6 +110,7 @@ add_library(reach_features STATIC
     src/features/common/loader/loader_render.cpp
     src/features/common/marquee/marquee.cpp
     src/features/common/progress_bar/progress_bar_render.cpp
+    src/features/common/pressable/pressable.cpp
     src/features/common/scrollbar/scrollbar_render.cpp
     src/features/common/text_edit/text_edit.cpp
     src/features/common/ui_controls/ui_controls.cpp
@@ -807,6 +808,14 @@ reach_configure_common(reach_dock_model_tests)
 target_compile_features(reach_dock_model_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_dock_model_tests PRIVATE reach_features)
 
+add_executable(reach_pressable_tests
+    tests/pressable_tests.cpp
+)
+
+reach_configure_common(reach_pressable_tests)
+target_compile_features(reach_pressable_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_pressable_tests PRIVATE reach_features)
+
 add_executable(reach_loader_tests
     tests/loader_tests.cpp
 )
@@ -851,6 +860,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
     add_test(NAME reach_dock_model_tests COMMAND reach_dock_model_tests)
+    add_test(NAME reach_pressable_tests COMMAND reach_pressable_tests)
     add_test(NAME reach_loader_tests COMMAND reach_loader_tests)
     add_test(NAME reach_window_tracking_tests COMMAND reach_window_tracking_tests)
 endif()

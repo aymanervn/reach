@@ -16,6 +16,11 @@ struct reach_launcher
     size_t pointer_pinned_app_count;
 };
 
+uint32_t reach_launcher_search_generation(const reach_launcher *launcher)
+{
+    return launcher != nullptr ? launcher->search_generation : 0;
+}
+
 void reach_launcher_set_pointer_context(reach_launcher *launcher,
                                         const reach_launcher_layout *layout,
                                         const reach_pinned_app_model *pinned_apps,
@@ -159,8 +164,7 @@ void reach_launcher_state_init(reach_launcher_state *state)
     state->model.selected_result_index = 0;
     state->model.search_error = 0;
     reach_scrollbar_model_init(&state->model.result_scrollbar, REACH_SCROLLBAR_DRAG_STEPPED, 1.0f);
-    state->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
-    state->pressed_launcher_index = REACH_MAX_PINNED_APPS;
+    reach_pressable_init(&state->pressable);
     state->launcher_scrollbar_drag = reach_scrollbar_drag{};
     reach_text_edit_init(&state->launcher_text_edit, REACH_MAX_SEARCH_CHARS);
     state->launcher_caret_blink_seconds = 0.0;
@@ -616,16 +620,6 @@ static int32_t reach_launcher_tick_caret(reach_launcher *launcher, double delta_
     return 0;
 }
 
-void reach_launcher_clear_pressed(reach_launcher *launcher)
-{
-    if (launcher == nullptr)
-    {
-        return;
-    }
-    launcher->state.pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
-    launcher->state.pressed_launcher_index = REACH_MAX_PINNED_APPS;
-}
-
 static void reach_launcher_reset_scrollbar_drag(reach_launcher *launcher)
 {
     if (launcher == nullptr)
@@ -757,10 +751,10 @@ void reach_launcher_handle_text_event(reach_launcher *launcher, const reach_ui_e
 static void reach_launcher_capsule_reset(void *capsule)
 {
     reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
-    reach_launcher_clear_pressed(launcher);
     reach_launcher_reset_scrollbar_drag(launcher);
     if (launcher != nullptr)
     {
+        reach_pressable_reset(&launcher->state.pressable, nullptr);
         launcher->pointer_layout_valid = 0;
     }
 }
@@ -789,8 +783,18 @@ static int32_t reach_launcher_capsule_needs_frame(const void *capsule)
 static int32_t reach_launcher_capsule_wants_pointer_move(const void *capsule)
 {
     const reach_launcher *launcher = static_cast<const reach_launcher *>(capsule);
-    return launcher != nullptr && reach_launcher_state_ptr(const_cast<reach_launcher *>(launcher))
-                                      ->launcher_scrollbar_drag.active;
+    if (launcher == nullptr)
+    {
+        return 0;
+    }
+    const reach_launcher_state *state =
+        reach_launcher_state_ptr(const_cast<reach_launcher *>(launcher));
+    return state->launcher_scrollbar_drag.active || reach_pressable_tracking(&state->pressable);
+}
+
+static int32_t reach_launcher_capsule_pointer_sequence_active(const void *capsule)
+{
+    return reach_launcher_capsule_wants_pointer_move(capsule);
 }
 
 static reach_launcher_event_context
@@ -829,13 +833,11 @@ reach_launcher_capsule_apply_event_result(const reach_launcher_event_result *eve
     {
         out->action.kind = REACH_LAUNCHER_POINTER_ACTION_OPEN_RESULT;
     }
-}
-
-static int32_t reach_launcher_capsule_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
-{
-    return rect.width > 0.0f && rect.height > 0.0f && (float)x >= rect.x &&
-           (float)x <= rect.x + rect.width && (float)y >= rect.y &&
-           (float)y <= rect.y + rect.height;
+    else if (event_result->action.type == REACH_LAUNCHER_ACTION_REVEAL_RESULT)
+    {
+        out->action.kind = REACH_LAUNCHER_POINTER_ACTION_REVEAL_RESULT;
+        out->action.index = event_result->action.result_index;
+    }
 }
 
 static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
@@ -857,48 +859,33 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     switch (event->kind)
     {
     case REACH_POINTER_EVENT_DOWN:
-        reach_launcher_pointer_down(launcher, event->x, event->y, &ctx, &event_result);
+        reach_launcher_pointer_down(launcher, event->x, event->y, event->button, &ctx,
+                                    &event_result);
         break;
     case REACH_POINTER_EVENT_UP:
-        if (launcher->state.launcher_scrollbar_drag.active)
+        if (event->button == REACH_POINTER_BUTTON_PRIMARY &&
+            launcher->state.launcher_scrollbar_drag.active)
         {
             reach_launcher_scrollbar_release(launcher, &event_result);
         }
         else
         {
-            reach_launcher_pointer_up(launcher, event->x, event->y, &ctx, &event_result);
+            reach_launcher_pointer_up(launcher, event->x, event->y, event->button, &ctx,
+                                      &event_result);
         }
         break;
     case REACH_POINTER_EVENT_MOVE:
-        reach_launcher_scrollbar_drag_move(launcher, event->y, &ctx, &event_result);
+        reach_launcher_pointer_move(launcher, event->x, event->y, &ctx, &event_result);
         break;
     case REACH_POINTER_EVENT_WHEEL:
         reach_launcher_wheel(launcher, event->x, event->y, event->wheel_delta, &ctx, &event_result);
         break;
     case REACH_POINTER_EVENT_CANCEL:
-        reach_launcher_scrollbar_release(launcher, &event_result);
-        reach_launcher_clear_pressed(launcher);
+        reach_launcher_pointer_cancel(launcher, &event_result);
         break;
-    case REACH_POINTER_EVENT_CONTEXT:
-    {
-        reach_launcher_hit_result hit = reach_launcher_hit_test(
-            &launcher->state.model, &launcher->pointer_layout, event->x, event->y);
-        if (hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
-            hit.index < launcher->state.model.result_count)
-        {
-            out->handled = 1;
-            if (launcher->state.model.results[hit.index].kind == REACH_SEARCH_RESULT_APP)
-            {
-                out->action.kind = REACH_LAUNCHER_POINTER_ACTION_REVEAL_RESULT;
-                out->action.index = hit.index;
-            }
-            return;
-        }
-        out->handled = reach_launcher_capsule_rect_contains(launcher->pointer_layout.bounds,
-                                                            event->x, event->y);
-        return;
-    }
     case REACH_POINTER_EVENT_LEAVE:
+        reach_launcher_pointer_leave(launcher, &event_result);
+        break;
     case REACH_POINTER_EVENT_MIDDLE:
     default:
         return;
@@ -909,13 +896,10 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
 const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_launcher_capsule_reset,
-        reach_launcher_capsule_tick,
-        reach_launcher_capsule_is_open,
-        nullptr,
-        reach_launcher_capsule_needs_frame,
-        reach_launcher_capsule_wants_pointer_move,
-        reach_launcher_capsule_handle_pointer,
+        reach_launcher_capsule_reset,          reach_launcher_capsule_tick,
+        reach_launcher_capsule_is_open,        nullptr,
+        reach_launcher_capsule_needs_frame,    reach_launcher_capsule_wants_pointer_move,
+        reach_launcher_capsule_handle_pointer, reach_launcher_capsule_pointer_sequence_active,
     };
     return &ops;
 }

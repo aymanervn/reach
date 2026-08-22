@@ -16,7 +16,6 @@ struct reach_top_bar_now_playing
     reach_top_bar_now_playing_layout layout;
     reach_marquee_state marquee;
     float text_offset_x;
-    reach_now_playing_action pressed_action;
     uint64_t observed_generation;
 };
 
@@ -390,7 +389,6 @@ void reach_top_bar_now_playing_reset(reach_top_bar_now_playing *now_playing)
     now_playing->layout = {};
     reach_marquee_reset(&now_playing->marquee);
     now_playing->text_offset_x = 0.0f;
-    now_playing->pressed_action = REACH_NOW_PLAYING_ACTION_NONE;
     now_playing->observed_generation = 0;
 }
 
@@ -432,10 +430,6 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     }
     now_playing->model = next;
     now_playing->observed_generation = snapshot.generation;
-    if (now_playing->pressed_action != REACH_NOW_PLAYING_ACTION_NONE && snapshot.transport_pending)
-    {
-        now_playing->pressed_action = REACH_NOW_PLAYING_ACTION_NONE;
-    }
     out->changed = 1;
     out->visibility_changed = was_visible != next.visible;
 }
@@ -496,63 +490,14 @@ void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, 
     now_playing->layout = reach_top_bar_now_playing_compute_layout(&model, theme, bounds, dpi_scale);
 }
 
-int32_t reach_top_bar_now_playing_pointer_down(reach_top_bar_now_playing *now_playing, int32_t x,
-                                            int32_t y)
+reach_now_playing_action reach_top_bar_now_playing_action_at(
+    const reach_top_bar_now_playing *now_playing, int32_t x, int32_t y)
 {
     if (now_playing == nullptr)
     {
-        return 0;
+        return REACH_NOW_PLAYING_ACTION_NONE;
     }
-    reach_now_playing_action action =
-        reach_top_bar_now_playing_hit_test(&now_playing->model, &now_playing->layout, x, y);
-    if (action == REACH_NOW_PLAYING_ACTION_NONE)
-    {
-        return now_playing->model.visible &&
-               (reach_top_bar_now_playing_contains(now_playing->layout.previous_button, x, y) ||
-                reach_top_bar_now_playing_contains(now_playing->layout.play_pause_button, x, y) ||
-                reach_top_bar_now_playing_contains(now_playing->layout.next_button, x, y));
-    }
-    now_playing->pressed_action = action;
-    return 1;
-}
-
-int32_t reach_top_bar_now_playing_pointer_up(reach_top_bar_now_playing *now_playing, int32_t x, int32_t y,
-                                          reach_now_playing_action *out_action)
-{
-    if (out_action != nullptr)
-    {
-        *out_action = REACH_NOW_PLAYING_ACTION_NONE;
-    }
-    if (now_playing == nullptr)
-    {
-        return 0;
-    }
-    reach_now_playing_action pressed = now_playing->pressed_action;
-    now_playing->pressed_action = REACH_NOW_PLAYING_ACTION_NONE;
-    if (pressed == REACH_NOW_PLAYING_ACTION_NONE)
-    {
-        return now_playing->model.visible &&
-               (reach_top_bar_now_playing_contains(now_playing->layout.previous_button, x, y) ||
-                reach_top_bar_now_playing_contains(now_playing->layout.play_pause_button, x, y) ||
-                reach_top_bar_now_playing_contains(now_playing->layout.next_button, x, y));
-    }
-    reach_now_playing_action released =
-        reach_top_bar_now_playing_hit_test(&now_playing->model, &now_playing->layout, x, y);
-    if (pressed == released && out_action != nullptr)
-    {
-        *out_action = released;
-    }
-    return 1;
-}
-
-int32_t reach_top_bar_now_playing_pointer_cancel(reach_top_bar_now_playing *now_playing)
-{
-    if (now_playing == nullptr || now_playing->pressed_action == REACH_NOW_PLAYING_ACTION_NONE)
-    {
-        return 0;
-    }
-    now_playing->pressed_action = REACH_NOW_PLAYING_ACTION_NONE;
-    return 1;
+    return reach_top_bar_now_playing_hit_test(&now_playing->model, &now_playing->layout, x, y);
 }
 
 reach_result

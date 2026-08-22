@@ -2,6 +2,39 @@
 
 #include "clipboard_common.h"
 
+static uint64_t reach_clipboard_pressable_target(reach_clipboard_hit_result hit)
+{
+    if (hit.type != REACH_CLIPBOARD_HIT_ITEM && hit.type != REACH_CLIPBOARD_HIT_ITEM_CLOSE &&
+        hit.type != REACH_CLIPBOARD_HIT_CLEAR)
+    {
+        return REACH_PRESSABLE_TARGET_NONE;
+    }
+    return ((uint64_t)hit.type << 32) | (uint64_t)hit.index;
+}
+
+static reach_clipboard_hit_result reach_clipboard_pressable_hit(uint64_t target)
+{
+    reach_clipboard_hit_result hit = {};
+    hit.type = (reach_clipboard_hit_type)(target >> 32);
+    hit.index = (size_t)(target & UINT32_MAX);
+    return hit;
+}
+
+static void reach_clipboard_apply_pressable_result(const reach_pressable_result *result,
+                                                   reach_clipboard_event_result *out)
+{
+    if (result == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw |= result->redraw;
+    if (result->capture != 0)
+    {
+        out->capture_pointer = result->capture;
+    }
+    out->sync_pointer_subscriptions |= result->sync_pointer_subscriptions;
+}
+
 void reach_clipboard_pointer_down(reach_clipboard_feature *clipboard, int32_t x, int32_t y,
                                   reach_clipboard_event_result *out)
 {
@@ -35,10 +68,13 @@ void reach_clipboard_pointer_down(reach_clipboard_feature *clipboard, int32_t x,
     if (hit.type == REACH_CLIPBOARD_HIT_ITEM || hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE ||
         hit.type == REACH_CLIPBOARD_HIT_CLEAR)
     {
-        state->model.pressed_index = hit.index;
-        state->model.pressed_hit_type = hit.type;
-        state->model.pressed_item_id =
+        state->press_identity =
             hit.index < state->model.count ? state->model.items[hit.index].id : 0;
+        reach_pressable_result result = {};
+        reach_pressable_press(&state->pressable, REACH_POINTER_BUTTON_PRIMARY,
+                              reach_clipboard_pressable_target(hit), REACH_PRESSABLE_FEEDBACK_NONE,
+                              nullptr, &result);
+        reach_clipboard_apply_pressable_result(&result, out);
         out->handled = 1;
     }
 }
@@ -59,41 +95,47 @@ void reach_clipboard_pointer_up(reach_clipboard_feature *clipboard, int32_t x, i
     }
 
     reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &state->layout, x, y);
-    size_t pressed = state->model.pressed_index;
-    reach_clipboard_hit_type pressed_hit_type =
-        (reach_clipboard_hit_type)state->model.pressed_hit_type;
-    uint64_t pressed_item_id = state->model.pressed_item_id;
-    reach_clipboard_model_clear_press(&state->model);
+    uint64_t press_identity = state->press_identity;
+    int32_t was_tracking = reach_pressable_tracking(&state->pressable);
+    reach_pressable_result result = {};
+    reach_pressable_release(&state->pressable, REACH_POINTER_BUTTON_PRIMARY,
+                            reach_clipboard_pressable_target(hit), nullptr, &result);
+    reach_clipboard_apply_pressable_result(&result, out);
+    state->press_identity = 0;
+    if (!result.activated)
+    {
+        out->handled = was_tracking;
+        return;
+    }
+    hit = reach_clipboard_pressable_hit(result.activated_target);
 
-    if (hit.type == REACH_CLIPBOARD_HIT_CLEAR && pressed_hit_type == REACH_CLIPBOARD_HIT_CLEAR)
+    if (hit.type == REACH_CLIPBOARD_HIT_CLEAR)
     {
         out->handled = 1;
         out->action = REACH_CLIPBOARD_ACTION_CLEAR_ALL;
         return;
     }
 
-    if (hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE &&
-        pressed_hit_type == REACH_CLIPBOARD_HIT_ITEM_CLOSE && hit.index == pressed &&
-        hit.index < state->model.count && state->model.items[hit.index].id == pressed_item_id)
+    if (hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE && hit.index < state->model.count &&
+        state->model.items[hit.index].id == press_identity)
     {
         out->handled = 1;
         out->action = REACH_CLIPBOARD_ACTION_REMOVE_ITEM;
         out->item_index = hit.index;
-        out->item_id = pressed_item_id;
+        out->item_id = press_identity;
         out->redraw = 1;
         out->relayout = 1;
         out->request_update = 1;
         return;
     }
 
-    if (hit.type == REACH_CLIPBOARD_HIT_ITEM && pressed_hit_type == REACH_CLIPBOARD_HIT_ITEM &&
-        hit.index == pressed && hit.index < state->model.count &&
-        state->model.items[hit.index].id == pressed_item_id)
+    if (hit.type == REACH_CLIPBOARD_HIT_ITEM && hit.index < state->model.count &&
+        state->model.items[hit.index].id == press_identity)
     {
         out->handled = 1;
         out->action = REACH_CLIPBOARD_ACTION_RESTORE_ITEM;
         out->item_index = hit.index;
-        out->item_id = pressed_item_id;
+        out->item_id = press_identity;
     }
 }
 
@@ -156,6 +198,12 @@ void reach_clipboard_pointer_move(reach_clipboard_feature *clipboard, int32_t x,
     }
 
     reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &state->layout, x, y);
+    if (reach_pressable_tracking(&state->pressable))
+    {
+        reach_pressable_result result = {};
+        reach_pressable_update(&state->pressable, reach_clipboard_pressable_target(hit), &result);
+        reach_clipboard_apply_pressable_result(&result, out);
+    }
     size_t next =
         (hit.type == REACH_CLIPBOARD_HIT_ITEM || hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE)
             ? hit.index
@@ -199,12 +247,20 @@ void reach_clipboard_wheel(reach_clipboard_feature *clipboard, int32_t x, int32_
     out->request_update = 1;
 }
 
-void reach_clipboard_clear_press_state(reach_clipboard_feature *clipboard)
+void reach_clipboard_cancel_press(reach_clipboard_feature *clipboard,
+                                  reach_clipboard_event_result *out)
 {
-    if (clipboard != nullptr)
+    if (clipboard == nullptr || out == nullptr)
     {
-        reach_clipboard_model_clear_press(&reach_clipboard_feature_state_mut(clipboard)->model);
+        return;
     }
+    reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
+    int32_t was_tracking = reach_pressable_tracking(&state->pressable);
+    reach_pressable_result result = {};
+    reach_pressable_cancel(&state->pressable, nullptr, &result);
+    reach_clipboard_apply_pressable_result(&result, out);
+    state->press_identity = 0;
+    out->handled |= was_tracking;
 }
 
 int32_t reach_clipboard_remove_item(reach_clipboard_feature *clipboard, size_t index,

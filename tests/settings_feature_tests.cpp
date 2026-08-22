@@ -100,8 +100,7 @@ static void test_navigation_pages(void)
     expect_true(nav_count == REACH_SETTINGS_NAV_ITEM_COUNT, "settings exposes all nav items");
     expect_true(nav[0].page == REACH_SETTINGS_PAGE_WIFI && equals_ascii(nav[0].label, "Wi-Fi"),
                 "first nav item is Wi-Fi");
-    expect_true(nav[6].page == REACH_SETTINGS_PAGE_UPDATE &&
-                    equals_ascii(nav[6].label, "Updates"),
+    expect_true(nav[6].page == REACH_SETTINGS_PAGE_UPDATE && equals_ascii(nav[6].label, "Updates"),
                 "last nav item is Updates");
 
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_UPDATE);
@@ -188,38 +187,40 @@ static void test_power_timers(void)
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
 
-    expect_true(reach_settings_model_power_minutes(model.get(),
-                                                   REACH_SETTINGS_POWER_TIMER_SLEEP) == 30,
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    30,
                 "sleep timer defaults to 30 minutes");
     expect_true(reach_settings_power_option_minutes(REACH_SETTINGS_POWER_TIMER_SLEEP, 0) == 0,
                 "first option of every timer is never");
-    expect_true(equals_ascii(
-                    reach_settings_power_option_label(REACH_SETTINGS_POWER_TIMER_SHUTDOWN, 0),
-                    "Never"),
-                "never option is labelled");
+    expect_true(
+        equals_ascii(reach_settings_power_option_label(REACH_SETTINGS_POWER_TIMER_SHUTDOWN, 0),
+                     "Never"),
+        "never option is labelled");
 
     reach_settings_model_set_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP, 45);
     expect_true(model->power_selected[REACH_SETTINGS_POWER_TIMER_SLEEP] ==
                     REACH_SETTINGS_POWER_CUSTOM_OPTION,
                 "off-preset config value selects the custom option");
-    expect_true(equals_ascii(model->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
-                                                      [REACH_SETTINGS_POWER_FIELD_HOURS]
-                                                          .text,
+    expect_true(equals_ascii(model
+                                 ->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
+                                                     [REACH_SETTINGS_POWER_FIELD_HOURS]
+                                 .text,
                              "0") &&
-                    equals_ascii(model->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
-                                                          [REACH_SETTINGS_POWER_FIELD_MINUTES]
-                                                              .text,
+                    equals_ascii(model
+                                     ->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
+                                                         [REACH_SETTINGS_POWER_FIELD_MINUTES]
+                                     .text,
                                  "45"),
                 "off-preset config value seeds the custom hour and minute boxes");
-    expect_true(reach_settings_model_power_minutes(model.get(),
-                                                   REACH_SETTINGS_POWER_TIMER_SLEEP) == 45,
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    45,
                 "raw config value is preserved");
     expect_true(!reach_settings_model_power_animations_active(model.get()),
                 "seeding from config does not animate");
 
     reach_settings_model_select_power_option(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK, 2);
-    expect_true(reach_settings_model_power_minutes(model.get(),
-                                                   REACH_SETTINGS_POWER_TIMER_LOCK) == 5,
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK) ==
+                    5,
                 "selecting an option applies its minutes");
     expect_true(reach_settings_model_power_animations_active(model.get()),
                 "selecting an option starts the cross-fade animation");
@@ -239,8 +240,7 @@ static void test_power_apply_tracking(void)
     expect_true(reach_settings_model_power_dirty(model.get()),
                 "changing an option marks the page dirty");
     reach_settings_model_power_mark_applied(model.get());
-    expect_true(!reach_settings_model_power_dirty(model.get()),
-                "applying clears the dirty state");
+    expect_true(!reach_settings_model_power_dirty(model.get()), "applying clears the dirty state");
     reach_settings_model_select_power_option(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP, 0);
     reach_settings_model_select_power_option(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP, 1);
     expect_true(!reach_settings_model_power_dirty(model.get()),
@@ -261,13 +261,15 @@ static void test_power_custom_textbox(void)
     expect_true(model->power_selected[REACH_SETTINGS_POWER_TIMER_SLEEP] ==
                     REACH_SETTINGS_POWER_CUSTOM_OPTION,
                 "focusing a custom box selects the custom option");
-    expect_true(equals_ascii(model->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
-                                                      [REACH_SETTINGS_POWER_FIELD_HOURS]
-                                                          .text,
+    expect_true(equals_ascii(model
+                                 ->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
+                                                     [REACH_SETTINGS_POWER_FIELD_HOURS]
+                                 .text,
                              "0") &&
-                    equals_ascii(model->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
-                                                          [REACH_SETTINGS_POWER_FIELD_MINUTES]
-                                                              .text,
+                    equals_ascii(model
+                                     ->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
+                                                         [REACH_SETTINGS_POWER_FIELD_MINUTES]
+                                     .text,
                                  "30"),
                 "custom boxes are seeded from the current minutes");
 
@@ -277,8 +279,8 @@ static void test_power_custom_textbox(void)
                 "digits replace the seeded selection");
     expect_true(reach_settings_model_power_insert_char(model.get(), (uint16_t)'5'),
                 "digits append at the caret");
-    expect_true(reach_settings_model_power_minutes(model.get(),
-                                                   REACH_SETTINGS_POWER_TIMER_SLEEP) == 75,
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    75,
                 "typed minutes update the pending value");
     expect_true(reach_settings_model_power_dirty(model.get()),
                 "typed custom minutes mark the page dirty");
@@ -287,28 +289,29 @@ static void test_power_custom_textbox(void)
     expect_true(reach_settings_model_power_handle_edit_key(model.get(),
                                                            REACH_TEXT_EDIT_KEY_BACKSPACE, no_mods),
                 "backspace edits the focused box");
-    expect_true(reach_settings_model_power_minutes(model.get(),
-                                                   REACH_SETTINGS_POWER_TIMER_SLEEP) == 7,
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    7,
                 "backspace re-parses the pending minutes");
 
     reach_settings_model_power_focus_custom(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP,
                                             REACH_SETTINGS_POWER_FIELD_HOURS);
     expect_true(reach_settings_model_power_insert_char(model.get(), (uint16_t)'2'),
                 "hour box accepts digits");
-    expect_true(reach_settings_model_power_minutes(model.get(),
-                                                   REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
                     2 * 60 + 7,
                 "hours and minutes combine into the pending value");
 
     reach_settings_model_power_blur(model.get());
     expect_true(model->power_focused_timer == -1, "blur releases focus");
-    expect_true(equals_ascii(model->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
-                                                      [REACH_SETTINGS_POWER_FIELD_HOURS]
-                                                          .text,
+    expect_true(equals_ascii(model
+                                 ->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
+                                                     [REACH_SETTINGS_POWER_FIELD_HOURS]
+                                 .text,
                              "2") &&
-                    equals_ascii(model->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
-                                                          [REACH_SETTINGS_POWER_FIELD_MINUTES]
-                                                              .text,
+                    equals_ascii(model
+                                     ->power_custom_edits[REACH_SETTINGS_POWER_TIMER_SLEEP]
+                                                         [REACH_SETTINGS_POWER_FIELD_MINUTES]
+                                     .text,
                                  "7"),
                 "blur keeps the normalized hour and minute values");
 }
@@ -324,40 +327,38 @@ static void test_power_wait_apps_toggle(void)
                 "sleep, shutdown, and restart offer the wait-for-apps toggle");
     expect_true(!reach_settings_power_timer_supports_wait(REACH_SETTINGS_POWER_TIMER_LOCK),
                 "lock has no wait-for-apps toggle");
-    expect_true(!reach_settings_model_power_wait_apps(model.get(),
-                                                      REACH_SETTINGS_POWER_TIMER_SLEEP),
-                "wait-for-apps defaults off");
+    expect_true(
+        !reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
+        "wait-for-apps defaults off");
 
-    expect_true(reach_settings_model_toggle_power_wait_apps(model.get(),
-                                                            REACH_SETTINGS_POWER_TIMER_SLEEP),
-                "toggling a supported row is accepted");
-    expect_true(reach_settings_model_power_wait_apps(model.get(),
-                                                     REACH_SETTINGS_POWER_TIMER_SLEEP) == 1,
-                "toggling turns the flag on");
+    expect_true(
+        reach_settings_model_toggle_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
+        "toggling a supported row is accepted");
+    expect_true(
+        reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) == 1,
+        "toggling turns the flag on");
     expect_true(reach_settings_model_power_animations_active(model.get()),
                 "toggling animates the switch");
     expect_true(reach_settings_model_tick_power_animations(model.get(), 1.0),
                 "toggle animation tick reports activity");
     expect_true(!reach_settings_model_power_animations_active(model.get()),
                 "toggle animation completes after its duration");
-    expect_true(reach_settings_model_power_dirty(model.get()),
-                "toggling marks the page dirty");
+    expect_true(reach_settings_model_power_dirty(model.get()), "toggling marks the page dirty");
     reach_settings_model_power_mark_applied(model.get());
     expect_true(!reach_settings_model_power_dirty(model.get()),
                 "applying clears the wait-for-apps dirty state");
     expect_true(reach_settings_model_toggle_power_wait_apps(model.get(),
                                                             REACH_SETTINGS_POWER_TIMER_SLEEP) &&
-                    reach_settings_model_toggle_power_wait_apps(
-                        model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) &&
+                    reach_settings_model_toggle_power_wait_apps(model.get(),
+                                                                REACH_SETTINGS_POWER_TIMER_SLEEP) &&
                     !reach_settings_model_power_dirty(model.get()),
                 "toggling twice returns to the applied state");
 
-    expect_true(!reach_settings_model_toggle_power_wait_apps(model.get(),
-                                                             REACH_SETTINGS_POWER_TIMER_LOCK),
-                "toggling the lock row is rejected");
+    expect_true(
+        !reach_settings_model_toggle_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK),
+        "toggling the lock row is rejected");
     reach_settings_model_set_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK, 1);
-    expect_true(!reach_settings_model_power_wait_apps(model.get(),
-                                                      REACH_SETTINGS_POWER_TIMER_LOCK),
+    expect_true(!reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK),
                 "setting the lock row wait flag is ignored");
 }
 
@@ -443,16 +444,15 @@ static void test_account_password_form(void)
     expect_true(reach_settings_model_account_submit_ready(model.get()),
                 "matching passwords can be submitted");
 
-    reach_settings_model_account_apply_status(model.get(),
-                                              REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS);
+    reach_settings_model_account_apply_status(model.get(), REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS);
     expect_true(model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS &&
                     model->account_password_edits[REACH_SETTINGS_ACCOUNT_FIELD_NEW].length == 0 &&
                     model->account_focused_field < 0,
                 "successful change clears and blurs the form");
-    expect_true(equals_ascii(reach_settings_account_status_message(
-                                 REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS),
-                             "Password changed"),
-                "success status has a message");
+    expect_true(
+        equals_ascii(reach_settings_account_status_message(REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS),
+                     "Password changed"),
+        "success status has a message");
 }
 
 static void test_button_press_feedback(void)
@@ -463,7 +463,16 @@ static void test_button_press_feedback(void)
                                                         REACH_SETTINGS_HIT_POWER_APPLY) == 0.0f,
                 "buttons start unpressed");
 
-    reach_settings_model_press_button(model.get(), REACH_SETTINGS_HIT_POWER_APPLY);
+    reach_pressable_feedback_style feedback = {};
+    feedback.animations = &model->button_press_animation;
+    feedback.track = 0;
+    feedback.pressed_value = 1.0f;
+    feedback.release_seconds = 0.18;
+    feedback.release_easing = REACH_EASING_EASE_OUT;
+    reach_pressable_result result = {};
+    reach_pressable_press(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
+                          REACH_SETTINGS_HIT_POWER_APPLY, REACH_SETTINGS_HIT_POWER_APPLY,
+                          &feedback, &result);
     expect_true(reach_settings_model_button_press_value(model.get(),
                                                         REACH_SETTINGS_HIT_POWER_APPLY) == 1.0f,
                 "pressed button reports full press");
@@ -471,19 +480,21 @@ static void test_button_press_feedback(void)
                     model.get(), REACH_SETTINGS_HIT_ACCOUNT_PASSWORD) == 0.0f,
                 "other buttons stay unpressed");
 
-    reach_settings_model_release_button(model.get());
+    reach_pressable_release(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
+                            REACH_SETTINGS_HIT_POWER_APPLY, &feedback, &result);
     expect_true(reach_settings_model_button_press_active(model.get()),
                 "release starts the fade animation");
     reach_settings_model_tick_button_press(model.get(), 0.05);
-    float mid = reach_settings_model_button_press_value(model.get(),
-                                                        REACH_SETTINGS_HIT_POWER_APPLY);
+    float mid =
+        reach_settings_model_button_press_value(model.get(), REACH_SETTINGS_HIT_POWER_APPLY);
     expect_true(mid > 0.0f && mid < 1.0f, "press fades out gradually");
     reach_settings_model_tick_button_press(model.get(), 0.5);
     expect_true(reach_settings_model_button_press_value(model.get(),
                                                         REACH_SETTINGS_HIT_POWER_APPLY) == 0.0f,
                 "press fade completes");
-    expect_true(model->pressed_button == REACH_SETTINGS_HIT_NONE,
-                "completed fade clears the pressed button");
+    expect_true(reach_pressable_feedback_index(&model->button_pressable) ==
+                    REACH_PRESSABLE_FEEDBACK_NONE,
+                "completed fade clears the feedback target");
 }
 
 int main(void)

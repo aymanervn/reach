@@ -35,7 +35,5 @@ reach_tray_hit_result reach_tray_hit_test_popup(const reach_tray_model *model,
 reach_tray_feature_action reach_tray_action_for_hit(const reach_tray_model *model,
                                                     reach_tray_hit_result hit,
                                                     reach_tray_action provider_action);
-int32_t reach_tray_feedback_press(reach_tray *tray, size_t index);
-int32_t reach_tray_feedback_release(reach_tray *tray);
 
 #endif

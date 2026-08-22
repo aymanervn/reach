@@ -65,48 +65,126 @@ size_t reach_top_bar_tray_icon_at(const reach_top_bar_layout *layout, int32_t lo
     return REACH_TOP_BAR_MAX_TRAY_ICONS;
 }
 
-static int32_t reach_top_bar_feedback_start(reach_top_bar *top_bar, size_t slot,
-                                            float target_opacity)
+reach_pressable_feedback_style reach_top_bar_pressable_feedback(reach_top_bar *top_bar)
 {
-    if (top_bar == nullptr || slot >= REACH_TOP_BAR_FEEDBACK_NONE)
+    reach_pressable_feedback_style feedback = {};
+    if (top_bar != nullptr)
     {
-        return 0;
+        feedback.animations = reach_top_bar_manager(top_bar);
+        feedback.track = REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY;
+        feedback.pressed_value = 0.50f;
+        feedback.press_seconds = 0.055;
+        feedback.release_seconds = 0.055;
+        feedback.press_easing = REACH_EASING_EASE_IN_OUT;
+        feedback.release_easing = REACH_EASING_EASE_IN_OUT;
     }
-
-    reach_top_bar_state_mut(top_bar)->feedback_index = slot;
-    reach_animation_manager_animate_to(reach_top_bar_manager(top_bar),
-                                       REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY, target_opacity, 0.055,
-                                       REACH_EASING_EASE_IN_OUT);
-    return 1;
+    return feedback;
 }
 
-int32_t reach_top_bar_feedback_press(reach_top_bar *top_bar, size_t slot)
+static uint64_t reach_top_bar_pressable_target(reach_top_bar_pointer_region region, uint32_t detail)
 {
-    if (top_bar == nullptr)
-    {
-        return 0;
-    }
-
-    reach_top_bar_state_mut(top_bar)->feedback_pressed = 1;
-    return reach_top_bar_feedback_start(top_bar, slot, 0.50f);
+    return region == REACH_TOP_BAR_POINTER_REGION_NONE
+               ? REACH_PRESSABLE_TARGET_NONE
+               : (static_cast<uint64_t>(region) << 32) | detail;
 }
 
-int32_t reach_top_bar_feedback_release(reach_top_bar *top_bar)
+static reach_top_bar_pointer_region reach_top_bar_pressable_region(uint64_t target)
 {
-    if (top_bar == nullptr ||
-        (!reach_top_bar_state_mut(top_bar)->feedback_pressed &&
-         reach_top_bar_state_mut(top_bar)->feedback_index == REACH_TOP_BAR_FEEDBACK_NONE))
-    {
-        return 0;
-    }
+    return target == REACH_PRESSABLE_TARGET_NONE
+               ? REACH_TOP_BAR_POINTER_REGION_NONE
+               : static_cast<reach_top_bar_pointer_region>(target >> 32);
+}
 
-    reach_top_bar_state_mut(top_bar)->feedback_pressed = 0;
-    if (reach_top_bar_state_mut(top_bar)->feedback_index != REACH_TOP_BAR_FEEDBACK_NONE)
+static uint32_t reach_top_bar_pressable_detail(uint64_t target)
+{
+    return static_cast<uint32_t>(target);
+}
+
+static uint64_t reach_top_bar_pressable_target_at(reach_top_bar *top_bar, int32_t local_x,
+                                                  int32_t local_y, reach_pointer_button button)
+{
+    if (button == REACH_POINTER_BUTTON_PRIMARY)
     {
-        return reach_top_bar_feedback_start(
-            top_bar, reach_top_bar_state_mut(top_bar)->feedback_index, 0.0f);
+        reach_now_playing_action media = reach_top_bar_now_playing_action_at(
+            reach_top_bar_now_playing_subfeature(top_bar), local_x, local_y);
+        if (media != REACH_NOW_PLAYING_ACTION_NONE)
+        {
+            return reach_top_bar_pressable_target(REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING,
+                                                  static_cast<uint32_t>(media));
+        }
     }
-    return 0;
+    reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
+    reach_top_bar_pointer_region region =
+        reach_top_bar_hit_test(state != nullptr ? &state->layout : nullptr, local_x, local_y);
+    if (button == REACH_POINTER_BUTTON_SECONDARY &&
+        region != REACH_TOP_BAR_POINTER_REGION_TRAY_ICON)
+    {
+        return REACH_PRESSABLE_TARGET_NONE;
+    }
+    uint32_t detail = 0;
+    if (region == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON && state != nullptr)
+    {
+        size_t index = reach_top_bar_tray_icon_at(&state->layout, local_x, local_y);
+        if (index >= state->tray_item_count)
+        {
+            return REACH_PRESSABLE_TARGET_NONE;
+        }
+        detail = state->tray_items[index].id;
+    }
+    return reach_top_bar_pressable_target(region, detail);
+}
+
+static size_t reach_top_bar_pressable_feedback_index(reach_top_bar *top_bar, uint64_t target)
+{
+    switch (reach_top_bar_pressable_region(target))
+    {
+    case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
+        return REACH_TOP_BAR_FEEDBACK_POWER_BUTTON;
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
+    {
+        reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
+        if (state == nullptr)
+        {
+            return REACH_PRESSABLE_FEEDBACK_NONE;
+        }
+        uint32_t item_id = reach_top_bar_pressable_detail(target);
+        for (size_t index = 0; index < state->tray_item_count; ++index)
+        {
+            if (state->tray_items[index].id == item_id)
+            {
+                return REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index;
+            }
+        }
+        return REACH_PRESSABLE_FEEDBACK_NONE;
+    }
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
+        return REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW;
+    case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
+        return REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON;
+    case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
+        return REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON;
+    case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
+        return REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON;
+    case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
+        return REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON;
+    case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
+    case REACH_TOP_BAR_POINTER_REGION_NONE:
+    default:
+        return REACH_PRESSABLE_FEEDBACK_NONE;
+    }
+}
+
+static void reach_top_bar_apply_pressable_result(const reach_pressable_result *pressable,
+                                                 reach_top_bar_event_result *out)
+{
+    if (pressable == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw = out->redraw || pressable->redraw;
+    out->capture = pressable->capture;
+    out->sync_pointer_subscriptions =
+        out->sync_pointer_subscriptions || pressable->sync_pointer_subscriptions;
 }
 
 static int32_t reach_top_bar_take_power_release_suppressed(reach_top_bar *top_bar)
@@ -135,28 +213,8 @@ static uint32_t reach_top_bar_media_action(reach_now_playing_action action)
     }
 }
 
-static void reach_top_bar_begin_pointer_sequence(reach_top_bar_state *state,
-                                                 reach_top_bar_event_result *out)
-{
-    if (!state->pointer_sequence_active)
-    {
-        state->pointer_sequence_active = 1;
-        out->sync_pointer_subscriptions = 1;
-    }
-}
-
-static void reach_top_bar_end_pointer_sequence(reach_top_bar_state *state,
-                                               reach_top_bar_event_result *out)
-{
-    if (state->pointer_sequence_active)
-    {
-        state->pointer_sequence_active = 0;
-        out->sync_pointer_subscriptions = 1;
-    }
-}
-
 void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
-                                reach_top_bar_event_result *out)
+                                reach_pointer_button button, reach_top_bar_event_result *out)
 {
     reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
     if (state == nullptr || out == nullptr)
@@ -164,61 +222,51 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
         return;
     }
 
-    reach_top_bar_pointer_region hit = reach_top_bar_hit_test(&state->layout, local_x, local_y);
-    reach_top_bar_begin_pointer_sequence(state, out);
-    if (hit != REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON)
+    uint64_t target = reach_top_bar_pressable_target_at(top_bar, local_x, local_y, button);
+    reach_top_bar_pointer_region region = reach_top_bar_pressable_region(target);
+    if (target == REACH_PRESSABLE_TARGET_NONE)
+    {
+        return;
+    }
+    if (button == REACH_POINTER_BUTTON_PRIMARY &&
+        region != REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON)
     {
         state->power_release_suppressed = 0;
     }
-
-    if (reach_top_bar_now_playing_pointer_down(reach_top_bar_now_playing_subfeature(top_bar),
-                                               local_x, local_y))
+    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+    reach_pressable_result pressable = {};
+    reach_pressable_press(&state->pressable, button, target,
+                          reach_top_bar_pressable_feedback_index(top_bar, target), &feedback,
+                          &pressable);
+    reach_top_bar_apply_pressable_result(&pressable, out);
+    out->handled = 1;
+    if (button == REACH_POINTER_BUTTON_SECONDARY)
     {
-        state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING;
-        out->handled = 1;
-        out->redraw = 1;
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING;
         return;
     }
-
-    state->pressed_control = hit;
-    switch (hit)
+    switch (region)
     {
     case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
-        out->redraw = reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_POWER_BUTTON);
-        out->handled = 1;
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER;
         return;
+    case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING;
+        return;
     case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
-        state->pressed_tray_index = reach_top_bar_tray_icon_at(&state->layout, local_x, local_y);
-        out->redraw = reach_top_bar_feedback_press(
-            top_bar, REACH_TOP_BAR_FEEDBACK_TRAY_BASE + state->pressed_tray_index);
-        out->handled = 1;
         return;
     case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
-        out->redraw = reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW);
-        out->handled = 1;
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_TRAY_OVERFLOW;
         return;
     case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
-        out->redraw =
-            reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);
-        out->handled = 1;
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS;
         return;
     case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
-        out->redraw = reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON);
-        out->handled = 1;
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_SETTINGS;
         return;
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
-        out->redraw = reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON);
-        out->handled = 1;
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE;
         return;
     case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
-        out->redraw = reach_top_bar_feedback_press(top_bar, REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON);
-        out->handled = 1;
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_BATTERY;
         return;
     default:
@@ -227,7 +275,7 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
 }
 
 void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
-                              reach_top_bar_event_result *out)
+                              reach_pointer_button button, reach_top_bar_event_result *out)
 {
     reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
     if (state == nullptr || out == nullptr)
@@ -235,72 +283,65 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         return;
     }
 
-    out->redraw = reach_top_bar_feedback_release(top_bar);
-
-    reach_now_playing_action media = REACH_NOW_PLAYING_ACTION_NONE;
-    if (reach_top_bar_now_playing_pointer_up(reach_top_bar_now_playing_subfeature(top_bar), local_x,
-                                             local_y, &media))
+    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+    reach_pressable_result pressable = {};
+    reach_pressable_release(&state->pressable, button,
+                            reach_top_bar_pressable_target_at(top_bar, local_x, local_y, button),
+                            &feedback, &pressable);
+    reach_top_bar_apply_pressable_result(&pressable, out);
+    if (!pressable.activated)
     {
-        state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
-        out->handled = 1;
-        out->redraw = 1;
-        out->action_kind = reach_top_bar_media_action(media);
-        reach_top_bar_end_pointer_sequence(state, out);
+        if (button == REACH_POINTER_BUTTON_PRIMARY)
+        {
+            state->power_release_suppressed = 0;
+        }
         return;
     }
-
-    reach_top_bar_pointer_region hit = reach_top_bar_hit_test(&state->layout, local_x, local_y);
-    reach_top_bar_pointer_region pressed =
-        static_cast<reach_top_bar_pointer_region>(state->pressed_control);
-    state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
-
-    if (hit == pressed)
+    reach_top_bar_pointer_region region =
+        reach_top_bar_pressable_region(pressable.activated_target);
+    uint32_t detail = reach_top_bar_pressable_detail(pressable.activated_target);
+    out->handled = 1;
+    if (button == REACH_POINTER_BUTTON_SECONDARY)
     {
-        switch (pressed)
-        {
-        case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
-            out->handled = 1;
-            if (!reach_top_bar_take_power_release_suppressed(top_bar))
-            {
-                out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER;
-            }
-            break;
-        case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
-            if (reach_top_bar_tray_icon_at(&state->layout, local_x, local_y) ==
-                    state->pressed_tray_index &&
-                state->pressed_tray_index < state->tray_item_count)
-            {
-                out->handled = 1;
-                out->action_kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT;
-                out->action_id = state->tray_items[state->pressed_tray_index].id;
-            }
-            break;
-        case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
-            out->handled = 1;
-            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW;
-            break;
-        case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
-            out->handled = 1;
-            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
-            break;
-        case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
-            out->handled = 1;
-            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS;
-            break;
-        case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
-            out->handled = 1;
-            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE;
-            break;
-        case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
-            out->handled = 1;
-            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_BATTERY;
-            break;
-        default:
-            break;
-        }
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT;
+        out->action_id = detail;
+        return;
     }
-
-    reach_top_bar_end_pointer_sequence(state, out);
+    switch (region)
+    {
+    case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
+        if (!reach_top_bar_take_power_release_suppressed(top_bar))
+        {
+            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER;
+        }
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
+        out->action_kind =
+            reach_top_bar_media_action(static_cast<reach_now_playing_action>(detail));
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT;
+        out->action_id = detail;
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW;
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS;
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE;
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
+        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_BATTERY;
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_NONE:
+    default:
+        return;
+    }
 }
 
 void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
@@ -311,6 +352,14 @@ void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t
     {
         return;
     }
+
+    reach_pressable_result pressable = {};
+    reach_pressable_update(
+        &state->pressable,
+        reach_top_bar_pressable_target_at(top_bar, local_x, local_y,
+                                          reach_pressable_button(&state->pressable)),
+        &pressable);
+    reach_top_bar_apply_pressable_result(&pressable, out);
 
     int32_t hovered = reach_top_bar_hit_test(&state->layout, local_x, local_y) ==
                       REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
@@ -327,30 +376,6 @@ void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t
     out->redraw = 1;
 }
 
-void reach_top_bar_pointer_context(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
-                                   reach_top_bar_event_result *out)
-{
-    reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
-    if (state == nullptr || out == nullptr)
-    {
-        return;
-    }
-
-    if (reach_top_bar_hit_test(&state->layout, local_x, local_y) !=
-        REACH_TOP_BAR_POINTER_REGION_TRAY_ICON)
-    {
-        return;
-    }
-
-    size_t index = reach_top_bar_tray_icon_at(&state->layout, local_x, local_y);
-    if (index < state->tray_item_count)
-    {
-        out->handled = 1;
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT;
-        out->action_id = state->tray_items[index].id;
-    }
-}
-
 void reach_top_bar_pointer_cancel(reach_top_bar *top_bar, reach_top_bar_event_result *out)
 {
     reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
@@ -359,11 +384,11 @@ void reach_top_bar_pointer_cancel(reach_top_bar *top_bar, reach_top_bar_event_re
         return;
     }
 
-    out->redraw =
-        reach_top_bar_now_playing_pointer_cancel(reach_top_bar_now_playing_subfeature(top_bar));
-    out->redraw = reach_top_bar_feedback_release(top_bar) || out->redraw;
-    state->pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
-    reach_top_bar_end_pointer_sequence(state, out);
+    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+    reach_pressable_result pressable = {};
+    reach_pressable_cancel(&state->pressable, &feedback, &pressable);
+    reach_top_bar_apply_pressable_result(&pressable, out);
+    state->power_release_suppressed = 0;
 }
 
 void reach_top_bar_pointer_leave(reach_top_bar *top_bar, reach_top_bar_event_result *out)
@@ -374,8 +399,9 @@ void reach_top_bar_pointer_leave(reach_top_bar *top_bar, reach_top_bar_event_res
         return;
     }
 
-    out->redraw =
-        reach_top_bar_now_playing_pointer_cancel(reach_top_bar_now_playing_subfeature(top_bar));
+    reach_pressable_result pressable = {};
+    reach_pressable_update(&state->pressable, REACH_PRESSABLE_TARGET_NONE, &pressable);
+    reach_top_bar_apply_pressable_result(&pressable, out);
     if (!state->power_hovered)
     {
         return;

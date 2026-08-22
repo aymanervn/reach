@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/features/common/pressable.h"
+
 typedef struct reach_quick_settings reach_quick_settings;
 typedef struct reach_quick_settings_state reach_quick_settings_state;
 
@@ -20,6 +22,17 @@ typedef enum reach_quick_settings_hit_type
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
     REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON
 } reach_quick_settings_hit_type;
+
+typedef enum reach_quick_settings_press_target_kind
+{
+    REACH_QUICK_SETTINGS_PRESS_TARGET_NONE = 0,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_NETWORK_TILE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_TILE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_PROJECT_TILE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON
+} reach_quick_settings_press_target_kind;
 #ifdef __cplusplus
 extern "C"
 {
@@ -31,6 +44,8 @@ extern "C"
     void reach_quick_settings_start_height_animation(reach_quick_settings *quick_settings,
                                                      float from_height, float to_height);
     float reach_quick_settings_height_animation_value(const reach_quick_settings *quick_settings);
+    uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings);
+    float reach_quick_settings_press_feedback_value(reach_quick_settings *quick_settings);
 #ifdef __cplusplus
 }
 #endif
@@ -40,7 +55,6 @@ typedef enum reach_quick_settings_action_type
     REACH_QUICK_SETTINGS_ACTION_NONE = 0,
     REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME,
     REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME,
-    REACH_QUICK_SETTINGS_ACTION_SET_SESSION_MUTED,
     REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS,
     REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH,
@@ -64,7 +78,6 @@ typedef struct reach_quick_settings_action
 {
     reach_quick_settings_action_type type;
     float volume_level;
-    int32_t muted;
     size_t session_index;
     size_t output_device_index;
     uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
@@ -77,11 +90,15 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
 reach_quick_settings_action
 reach_quick_settings_action_for_hit(reach_quick_settings_hit_result hit);
 reach_quick_settings_action
-reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int32_t x, int32_t y);
+reach_quick_settings_begin_slider_gesture_if_hit(reach_quick_settings *quick_settings, int32_t x,
+                                                 int32_t y);
 reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings *quick_settings,
                                                            int32_t x, int32_t y);
 void reach_quick_settings_end_drag(reach_quick_settings *quick_settings);
 int32_t reach_quick_settings_drag_active(const reach_quick_settings *quick_settings);
+uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result hit);
+reach_quick_settings_press_target_kind reach_quick_settings_pressable_target_kind(uint64_t target);
+size_t reach_quick_settings_pressable_target_index(uint64_t target);
 
 static inline float reach_quick_settings_clamp01(float value)
 {

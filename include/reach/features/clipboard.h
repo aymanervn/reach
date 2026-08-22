@@ -7,6 +7,7 @@
 #include "reach/core/theme.h"
 #include "reach/core/clipboard.h"
 #include "reach/core/scrollbar.h"
+#include "reach/features/common/pressable.h"
 #include "reach/support/animation.h"
 #include "reach/support/util.h"
 
@@ -22,9 +23,6 @@ extern "C"
         reach_clipboard_item items[REACH_CLIPBOARD_MAX_ITEMS];
         size_t count;
         size_t hovered_index;
-        size_t pressed_index;
-        int32_t pressed_hit_type;
-        uint64_t pressed_item_id;
         reach_scrollbar_model scrollbar;
     } reach_clipboard_model;
 
@@ -61,7 +59,6 @@ extern "C"
     } reach_clipboard_render_input;
 
     void reach_clipboard_model_init(reach_clipboard_model *model);
-    void reach_clipboard_model_clear_press(reach_clipboard_model *model);
     void reach_clipboard_model_clear_items(reach_clipboard_model *model);
     reach_clipboard_insert_result reach_clipboard_model_insert(reach_clipboard_model *model,
                                                                reach_clipboard_item item);
@@ -87,6 +84,8 @@ extern "C"
         reach_clipboard_model model;
         reach_clipboard_layout layout;
         reach_scrollbar_drag scrollbar_drag;
+        reach_pressable pressable;
+        uint64_t press_identity;
     } reach_clipboard_state;
 
     const reach_clipboard_state *

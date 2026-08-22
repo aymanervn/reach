@@ -8,6 +8,7 @@
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
 #include "reach/features/common/text_edit.h"
+#include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/search.h"
@@ -51,8 +52,6 @@ extern "C"
                                                size_t *out_count, int32_t *out_error);
 
     const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count);
-
-    void reach_launcher_clear_pressed(reach_launcher *launcher);
 
     void reach_launcher_remember_restore_window(reach_launcher *launcher, uintptr_t window);
     void reach_launcher_clear_restore_window(reach_launcher *launcher);
@@ -106,8 +105,7 @@ extern "C"
     struct reach_launcher_state
     {
         reach_launcher_model model;
-        int32_t pressed_launcher_hit_type;
-        size_t pressed_launcher_index;
+        reach_pressable pressable;
         reach_scrollbar_drag launcher_scrollbar_drag;
 
         reach_text_edit launcher_text_edit;

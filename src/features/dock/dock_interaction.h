@@ -53,11 +53,6 @@ typedef struct reach_dock_interaction_result
     size_t move_pin_target;
 } reach_dock_interaction_result;
 
-int32_t reach_dock_feedback_press(reach_dock *dock, size_t slot);
-int32_t reach_dock_feedback_press_immediate(reach_dock *dock, size_t slot, float opacity);
-int32_t reach_dock_feedback_set_immediate(reach_dock *dock, size_t slot, float opacity);
-int32_t reach_dock_feedback_release(reach_dock *dock);
-
 void reach_dock_item_press(reach_dock *dock, size_t index, int32_t x, int32_t y,
                            const reach_dock_interaction_context *ctx,
                            reach_dock_interaction_result *out);
@@ -66,9 +61,6 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
                             reach_dock_interaction_result *out);
 void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context *ctx,
                          reach_dock_interaction_result *out);
-int32_t reach_dock_item_release(reach_dock *dock, size_t index, reach_dock_item_action *out_action,
-                                reach_dock_interaction_result *out);
-void reach_dock_clear_pressed(reach_dock *dock);
 reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature_model *model,
                                                         size_t item_index);
 

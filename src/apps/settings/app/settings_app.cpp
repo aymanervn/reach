@@ -399,9 +399,9 @@ static void reach_settings_apply_theme(reach_settings_app *app)
     {
         return;
     }
-    app->theme = reach_theme_for_mode(reach_settings_model_light_theme(&app->model)
-                                          ? REACH_THEME_MODE_LIGHT
-                                          : REACH_THEME_MODE_DARK);
+    app->theme =
+        reach_theme_for_mode(reach_settings_model_light_theme(&app->model) ? REACH_THEME_MODE_LIGHT
+                                                                           : REACH_THEME_MODE_DARK);
     reach_settings_refresh_layout(app);
     app->dirty = 1;
 }
@@ -826,10 +826,10 @@ static void reach_settings_apply_result(reach_settings_app *app)
     }
     if (result != REACH_OK && operation->failure_class == REACH_WINDOWS_UPDATE_FAILURE_NONE)
     {
-        operation->failure_class = work == REACH_SETTINGS_UPDATE_WORK_VERIFY ||
-                                           work == REACH_SETTINGS_UPDATE_WORK_RESUME
-                                       ? REACH_WINDOWS_UPDATE_VERIFICATION_FAILED
-                                       : REACH_WINDOWS_UPDATE_INSTALL_FAILED;
+        operation->failure_class =
+            work == REACH_SETTINGS_UPDATE_WORK_VERIFY || work == REACH_SETTINGS_UPDATE_WORK_RESUME
+                ? REACH_WINDOWS_UPDATE_VERIFICATION_FAILED
+                : REACH_WINDOWS_UPDATE_INSTALL_FAILED;
         if (operation->overall_install_hresult == 0)
         {
             operation->overall_install_hresult = -1;
@@ -884,8 +884,7 @@ static void reach_settings_reach_worker_main(reach_settings_app *app)
         reach_result result = REACH_ERROR;
         if (work == REACH_SETTINGS_REACH_WORK_CHECK && app->app_update.check != nullptr)
         {
-            result = app->app_update.check(app->app_update.userdata,
-                                           (const uint16_t *)u"aymanervn",
+            result = app->app_update.check(app->app_update.userdata, (const uint16_t *)u"aymanervn",
                                            (const uint16_t *)u"reach", &info);
         }
         else if (work == REACH_SETTINGS_REACH_WORK_DOWNLOAD && app->app_update.download != nullptr)
@@ -1019,8 +1018,7 @@ static void reach_settings_apply_reach_progress(reach_settings_app *app)
 {
     uint64_t received = app->reach_worker.received.load();
     uint64_t total = app->reach_worker.total.load();
-    if (received != app->model.reach_download_received ||
-        total != app->model.reach_download_total)
+    if (received != app->model.reach_download_received || total != app->model.reach_download_total)
     {
         app->model.reach_download_received = received;
         app->model.reach_download_total = total;
@@ -1150,8 +1148,7 @@ static void reach_settings_schedule_startup_refresh(reach_settings_app *app)
         app->startup_worker.pending = 1;
         app->startup_worker.pending_work = REACH_SETTINGS_STARTUP_WORK_ENUMERATE;
     }
-    reach_settings_model_set_startup_status(&app->model,
-                                            REACH_SETTINGS_STARTUP_STATUS_LOADING);
+    reach_settings_model_set_startup_status(&app->model, REACH_SETTINGS_STARTUP_STATUS_LOADING);
     app->startup_worker.cv.notify_one();
     app->dirty = 1;
 }
@@ -1222,8 +1219,7 @@ static void reach_settings_load_startup_icons(reach_settings_app *app)
         request.size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
         reach_copy_utf16(request.path, 260, path);
         reach_icon_handle handle = {};
-        if (app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) ==
-            REACH_OK)
+        if (app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) == REACH_OK)
         {
             app->startup_icon_handles[index] = handle;
             reach_settings_model_set_startup_icon(&app->model, index, handle.id);
@@ -1291,8 +1287,8 @@ static void reach_settings_submit_password_change(reach_settings_app *app)
                 &current_valid) == REACH_OK &&
             !current_valid)
         {
-            reach_settings_model_account_apply_status(
-                &app->model, REACH_SETTINGS_ACCOUNT_STATUS_WRONG_CURRENT);
+            reach_settings_model_account_apply_status(&app->model,
+                                                      REACH_SETTINGS_ACCOUNT_STATUS_WRONG_CURRENT);
             return;
         }
     }
@@ -1302,8 +1298,7 @@ static void reach_settings_submit_password_change(reach_settings_app *app)
     }
     if (app->user_account.ops.change_password == nullptr)
     {
-        reach_settings_model_account_apply_status(&app->model,
-                                                  REACH_SETTINGS_ACCOUNT_STATUS_ERROR);
+        reach_settings_model_account_apply_status(&app->model, REACH_SETTINGS_ACCOUNT_STATUS_ERROR);
         return;
     }
     reach_user_account_password_status status = REACH_USER_ACCOUNT_PASSWORD_FAILED;
@@ -1327,13 +1322,81 @@ static void reach_settings_submit_password_change(reach_settings_app *app)
     reach_settings_model_account_apply_status(&app->model, model_status);
 }
 
+static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
+{
+    return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
+           type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_REACH_UPDATE ||
+           type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
+}
+
+static int32_t reach_settings_hit_is_window_button(reach_settings_hit_type type)
+{
+    return type == REACH_SETTINGS_HIT_CLOSE || type == REACH_SETTINGS_HIT_MINIMIZE;
+}
+
+static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
+{
+    uint32_t detail = 0;
+    switch (hit.type)
+    {
+    case REACH_SETTINGS_HIT_NAV_ITEM:
+        detail = (uint32_t)hit.page;
+        break;
+    case REACH_SETTINGS_HIT_UPDATE_CHECKBOX:
+        detail = (uint32_t)hit.update_index;
+        break;
+    case REACH_SETTINGS_HIT_POWER_OPTION:
+        detail = ((uint32_t)hit.power_timer << 16) | ((uint32_t)hit.power_option << 8) |
+                 (uint32_t)hit.power_custom_field;
+        break;
+    case REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE:
+        detail = (uint32_t)hit.power_timer;
+        break;
+    case REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD:
+        detail = (uint32_t)hit.account_field;
+        break;
+    case REACH_SETTINGS_HIT_STARTUP_TOGGLE:
+        detail = (uint32_t)hit.startup_index;
+        break;
+    case REACH_SETTINGS_HIT_NONE:
+    case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB:
+    case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB:
+        return REACH_PRESSABLE_TARGET_NONE;
+    default:
+        break;
+    }
+    return ((uint64_t)hit.type << 32) | detail;
+}
+
+static reach_pressable_feedback_style reach_settings_pressable_feedback(reach_settings_app *app)
+{
+    reach_pressable_feedback_style feedback = {};
+    feedback.animations = app != nullptr ? &app->model.button_press_animation : nullptr;
+    feedback.track = 0;
+    feedback.pressed_value = 1.0f;
+    feedback.release_seconds = 0.18;
+    feedback.release_easing = REACH_EASING_EASE_OUT;
+    return feedback;
+}
+
+static void reach_settings_apply_pressable_result(reach_settings_app *app,
+                                                  const reach_pressable_result *result)
+{
+    if (app == nullptr || result == nullptr)
+    {
+        return;
+    }
+    app->dirty |= result->redraw;
+    if (result->capture != 0 && app->window.ops.set_pointer_capture != nullptr)
+    {
+        (void)app->window.ops.set_pointer_capture(app->window.window, result->capture > 0);
+    }
+}
+
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app->model.pressed_button != REACH_SETTINGS_HIT_NONE)
-    {
-        reach_settings_model_release_button(&app->model);
-        app->dirty = 1;
-    }
     if (app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
@@ -1349,6 +1412,25 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
+    reach_pressable_feedback_style feedback = reach_settings_pressable_feedback(app);
+    reach_pressable_result pressable_result = {};
+    reach_pressable_release(&app->model.button_pressable, REACH_POINTER_BUTTON_PRIMARY,
+                            reach_settings_pressable_target(hit), &feedback, &pressable_result);
+    reach_settings_apply_pressable_result(app, &pressable_result);
+    if (!pressable_result.activated)
+    {
+        if (app->model.selected_page == REACH_SETTINGS_PAGE_ACCOUNT)
+        {
+            reach_settings_model_account_blur(&app->model);
+            app->dirty = 1;
+        }
+        else if (app->model.selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
+        {
+            reach_settings_model_power_blur(&app->model);
+            app->dirty = 1;
+        }
+        return;
+    }
     if (hit.type == REACH_SETTINGS_HIT_CLOSE)
     {
         app->running = 0;
@@ -1554,28 +1636,16 @@ static void reach_settings_handle_text_event(reach_settings_app *app, const reac
         }
         if (key != REACH_TEXT_EDIT_KEY_NONE)
         {
-            handled = power_focused
-                          ? reach_settings_model_power_handle_edit_key(&app->model, key, modifiers)
-                          : reach_settings_model_account_handle_edit_key(&app->model, key,
-                                                                         modifiers);
+            handled =
+                power_focused
+                    ? reach_settings_model_power_handle_edit_key(&app->model, key, modifiers)
+                    : reach_settings_model_account_handle_edit_key(&app->model, key, modifiers);
         }
     }
     if (handled)
     {
         app->dirty = 1;
     }
-}
-
-static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
-{
-    return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
-           type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_REACH_UPDATE ||
-           type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
-}
-
-static int32_t reach_settings_hit_is_window_button(reach_settings_hit_type type)
-{
-    return type == REACH_SETTINGS_HIT_CLOSE || type == REACH_SETTINGS_HIT_MINIMIZE;
 }
 
 static void reach_settings_handle_pointer_down(reach_settings_app *app, const reach_ui_event *event)
@@ -1589,10 +1659,17 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
-    if (reach_settings_hit_is_button(hit.type))
+    uint64_t target = reach_settings_pressable_target(hit);
+    if (target != REACH_PRESSABLE_TARGET_NONE)
     {
-        reach_settings_model_press_button(&app->model, hit.type);
-        app->dirty = 1;
+        reach_pressable_feedback_style feedback = reach_settings_pressable_feedback(app);
+        reach_pressable_result result = {};
+        size_t feedback_index = reach_settings_hit_is_button(hit.type)
+                                    ? (size_t)hit.type
+                                    : REACH_PRESSABLE_FEEDBACK_NONE;
+        reach_pressable_press(&app->model.button_pressable, REACH_POINTER_BUTTON_PRIMARY, target,
+                              feedback_index, &feedback, &result);
+        reach_settings_apply_pressable_result(app, &result);
     }
     if (hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK ||
         hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB)
@@ -1630,9 +1707,14 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
         return;
     }
     reach_settings_refresh_bounds(app);
+    reach_settings_refresh_layout(app);
 
     reach_settings_hit_result hover = reach_settings_hit_test(
         &app->layout, (float)event->x - app->bounds.x, (float)event->y - app->bounds.y);
+    reach_pressable_result result = {};
+    reach_pressable_update(&app->model.button_pressable, reach_settings_pressable_target(hover),
+                           &result);
+    reach_settings_apply_pressable_result(app, &result);
     int32_t hovered = reach_settings_hit_is_window_button(hover.type) ? (int32_t)hover.type
                                                                       : REACH_SETTINGS_HIT_NONE;
     if (reach_settings_model_set_hovered_button(&app->model, hovered))
@@ -1670,7 +1752,8 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     {
         return;
     }
-    else if (event->type == REACH_UI_EVENT_POINTER_DOWN)
+    else if (event->type == REACH_UI_EVENT_POINTER_DOWN &&
+             event->button == REACH_POINTER_BUTTON_PRIMARY)
     {
         reach_settings_handle_pointer_down(app, event);
     }
@@ -1678,12 +1761,16 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     {
         reach_settings_handle_pointer_move(app, event);
     }
-    else if (event->type == REACH_UI_EVENT_POINTER_UP)
+    else if (event->type == REACH_UI_EVENT_POINTER_UP &&
+             event->button == REACH_POINTER_BUTTON_PRIMARY)
     {
         reach_settings_handle_pointer_up(app, event);
     }
     else if (event->type == REACH_UI_EVENT_POINTER_LEAVE)
     {
+        reach_pressable_result result = {};
+        reach_pressable_update(&app->model.button_pressable, REACH_PRESSABLE_TARGET_NONE, &result);
+        reach_settings_apply_pressable_result(app, &result);
         if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
         {
             app->dirty = 1;
@@ -1691,15 +1778,14 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     }
     else if (event->type == REACH_UI_EVENT_POINTER_CANCEL)
     {
+        reach_pressable_feedback_style feedback = reach_settings_pressable_feedback(app);
+        reach_pressable_result result = {};
+        reach_pressable_cancel(&app->model.button_pressable, &feedback, &result);
+        reach_settings_apply_pressable_result(app, &result);
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
         reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
         if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
         {
-            app->dirty = 1;
-        }
-        if (app->model.pressed_button != REACH_SETTINGS_HIT_NONE)
-        {
-            reach_settings_model_release_button(&app->model);
             app->dirty = 1;
         }
     }
@@ -1967,8 +2053,7 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
         const_cast<reach_settings_update_worker *>(&app->update_worker);
     std::lock_guard<std::mutex> lock(worker->mutex);
     return app->dirty || reach_busy || startup_busy || worker->pending || worker->in_flight ||
-           worker->completed ||
-           app->update_worker.progress_state.load() != 0 ||
+           worker->completed || app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
            app->model.startup_scrollbar.offset != app->model.startup_scrollbar.target ||
            app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||

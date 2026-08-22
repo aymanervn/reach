@@ -8,6 +8,7 @@
 #include "reach/core/loader.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/scrollbar.h"
+#include "reach/features/common/pressable.h"
 #include "reach/core/startup_apps.h"
 #include "reach/core/theme.h"
 #include "reach/core/windows_update.h"
@@ -176,10 +177,10 @@ extern "C"
         int32_t display_light_theme;
         reach_animation_track display_theme_track;
         reach_animation_manager display_theme_animation;
-        int32_t pressed_button;
         int32_t hovered_button;
         reach_animation_track button_press_track;
         reach_animation_manager button_press_animation;
+        reach_pressable button_pressable;
     } reach_settings_model;
 
     typedef struct reach_settings_nav_item
@@ -399,8 +400,6 @@ extern "C"
                                                     double delta_seconds);
     const uint16_t *reach_settings_account_status_message(int32_t status);
 
-    void reach_settings_model_press_button(reach_settings_model *model, int32_t hit_type);
-    void reach_settings_model_release_button(reach_settings_model *model);
     float reach_settings_model_button_press_value(const reach_settings_model *model,
                                                   int32_t hit_type);
     int32_t reach_settings_model_tick_button_press(reach_settings_model *model,

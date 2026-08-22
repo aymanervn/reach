@@ -280,6 +280,8 @@ void reach_clipboard_feature_reset(reach_clipboard_feature *clipboard)
 {
     if (clipboard != nullptr)
     {
+        reach_pressable_reset(&clipboard->state.pressable, nullptr);
+        clipboard->state.press_identity = 0;
         reach_clipboard_model_init(&clipboard->state.model);
     }
 }
@@ -382,6 +384,7 @@ reach_clipboard_capsule_apply_event_result(const reach_clipboard_event_result *e
     out->redraw = out->redraw || event_result->redraw;
     out->relayout = out->relayout || event_result->relayout;
     out->capture = event_result->capture_pointer;
+    out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
     if (event_result->action == REACH_CLIPBOARD_ACTION_CLEAR_ALL)
     {
         out->action.kind = REACH_CLIPBOARD_POINTER_ACTION_CLEAR_ALL;
@@ -417,10 +420,18 @@ static void reach_clipboard_capsule_handle_pointer(void *capsule, const reach_po
     switch (event->kind)
     {
     case REACH_POINTER_EVENT_DOWN:
-        reach_clipboard_clear_press_state(clipboard);
+        if (event->button != REACH_POINTER_BUTTON_PRIMARY)
+        {
+            return;
+        }
+        reach_clipboard_cancel_press(clipboard, &event_result);
         reach_clipboard_pointer_down(clipboard, event->x, event->y, &event_result);
         break;
     case REACH_POINTER_EVENT_UP:
+        if (event->button != REACH_POINTER_BUTTON_PRIMARY)
+        {
+            return;
+        }
         if (clipboard->state.scrollbar_drag.active)
         {
             reach_clipboard_scrollbar_release(clipboard, &event_result);
@@ -444,13 +455,13 @@ static void reach_clipboard_capsule_handle_pointer(void *capsule, const reach_po
         reach_clipboard_wheel(clipboard, event->x, event->y, event->wheel_delta, &event_result);
         break;
     case REACH_POINTER_EVENT_LEAVE:
-        out->redraw = reach_clipboard_pointer_leave(clipboard);
-        return;
+        reach_clipboard_pointer_move(clipboard, event->x, event->y, &event_result);
+        event_result.redraw |= reach_clipboard_pointer_leave(clipboard);
+        break;
     case REACH_POINTER_EVENT_CANCEL:
         reach_clipboard_scrollbar_release(clipboard, &event_result);
-        reach_clipboard_clear_press_state(clipboard);
+        reach_clipboard_cancel_press(clipboard, &event_result);
         break;
-    case REACH_POINTER_EVENT_CONTEXT:
     case REACH_POINTER_EVENT_MIDDLE:
     default:
         return;
@@ -478,6 +489,13 @@ const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void)
         reach_clipboard_capsule_needs_frame,
         reach_clipboard_capsule_wants_pointer_move,
         reach_clipboard_capsule_handle_pointer,
+        [](const void *capsule) -> int32_t
+        {
+            const reach_clipboard_feature *clipboard =
+                static_cast<const reach_clipboard_feature *>(capsule);
+            return clipboard != nullptr && (clipboard->state.scrollbar_drag.active ||
+                                            reach_pressable_tracking(&clipboard->state.pressable));
+        },
     };
     return &ops;
 }
@@ -527,6 +545,7 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     }
     reach_animation_manager_init(&clipboard->animations, clipboard->animation_tracks,
                                  REACH_CLIPBOARD_ANIMATION_COUNT);
+    reach_pressable_init(&clipboard->state.pressable);
     clipboard->refresh_requested.store(0);
     reach_clipboard_model_init(&clipboard->state.model);
     *out_clipboard = clipboard;
@@ -724,7 +743,8 @@ int32_t reach_clipboard_set_open(reach_clipboard_feature *clipboard, int32_t ope
     }
     state->model.open = next;
     state->model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    reach_clipboard_model_clear_press(&state->model);
+    reach_pressable_reset(&state->pressable, nullptr);
+    state->press_identity = 0;
     reach_scrollbar_end_drag(&state->scrollbar_drag);
     reach_clipboard_feature_collapse_all_hover(clipboard);
     return 1;

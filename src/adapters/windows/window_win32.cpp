@@ -47,8 +47,7 @@ static int32_t reach_platform_window_rect_contains(reach_rect_f32 rect, float x,
 static int32_t reach_platform_window_point_in_caption(const reach_platform_window *window, float x,
                                                       float y)
 {
-    if (window == nullptr ||
-        !reach_platform_window_rect_contains(window->caption.bounds, x, y))
+    if (window == nullptr || !reach_platform_window_rect_contains(window->caption.bounds, x, y))
     {
         return 0;
     }
@@ -379,9 +378,11 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONDOWN:
+    case WM_RBUTTONDOWN:
         if (window != nullptr)
         {
-            if (reach_platform_window_point_in_caption(window, (float)GET_X_LPARAM(lparam),
+            if (message == WM_LBUTTONDOWN &&
+                reach_platform_window_point_in_caption(window, (float)GET_X_LPARAM(lparam),
                                                        (float)GET_Y_LPARAM(lparam)))
             {
                 ReleaseCapture();
@@ -395,6 +396,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_POINTER_DOWN;
+            event.button = message == WM_RBUTTONDOWN ? REACH_POINTER_BUTTON_SECONDARY
+                                                     : REACH_POINTER_BUTTON_PRIMARY;
             event.x = point.x;
             event.y = point.y;
             reach_platform_window_queue_event(window, &event);
@@ -412,10 +415,10 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             point.y = GET_Y_LPARAM(lparam);
             ClientToScreen(hwnd, &point);
             reach_ui_event event = {};
-            event.type = message == WM_RBUTTONUP
-                             ? REACH_UI_EVENT_POINTER_CONTEXT
-                             : (message == WM_MBUTTONUP ? REACH_UI_EVENT_POINTER_MIDDLE
-                                                        : REACH_UI_EVENT_POINTER_UP);
+            event.type =
+                message == WM_MBUTTONUP ? REACH_UI_EVENT_POINTER_MIDDLE : REACH_UI_EVENT_POINTER_UP;
+            event.button = message == WM_RBUTTONUP ? REACH_POINTER_BUTTON_SECONDARY
+                                                   : REACH_POINTER_BUTTON_PRIMARY;
             event.x = point.x;
             event.y = point.y;
             reach_platform_window_queue_event(window, &event);
@@ -685,7 +688,7 @@ static void reach_platform_window_focus(HWND hwnd)
 }
 
 static reach_result reach_platform_window_place_behind(reach_platform_window *window,
-                                                      reach_window_id target_window)
+                                                       reach_window_id target_window)
 {
     if (window == nullptr || window->hwnd == nullptr || target_window == 0)
     {
