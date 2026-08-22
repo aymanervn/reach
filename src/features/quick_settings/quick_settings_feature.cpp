@@ -345,16 +345,18 @@ static void reach_quick_settings_place_system_tile(reach_quick_settings_tile_lay
         values->system_tile_icon_box, values->system_tile_icon_box);
 
     tile->icon = reach_quick_settings_rect(
-        tile->icon_background.x + (values->system_tile_icon_box - values->system_tile_icon_size) * 0.5f,
-        tile->icon_background.y + (values->system_tile_icon_box - values->system_tile_icon_size) * 0.5f,
+        tile->icon_background.x +
+            (values->system_tile_icon_box - values->system_tile_icon_size) * 0.5f,
+        tile->icon_background.y +
+            (values->system_tile_icon_box - values->system_tile_icon_size) * 0.5f,
         values->system_tile_icon_size, values->system_tile_icon_size);
 
     float label_x =
         tile->icon_background.x + values->system_tile_icon_box + values->system_tile_icon_gap;
-    tile->label = reach_quick_settings_rect(
-        label_x, tile->bounds.y,
-        tile->bounds.x + tile->bounds.width - values->content_padding - label_x,
-        tile->bounds.height);
+    tile->label = reach_quick_settings_rect(label_x, tile->bounds.y,
+                                            tile->bounds.x + tile->bounds.width -
+                                                values->content_padding - label_x,
+                                            tile->bounds.height);
 }
 
 reach_quick_settings_layout
@@ -671,6 +673,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
 enum
 {
     REACH_QUICK_SETTINGS_ANIMATION_HEIGHT = 0,
+    REACH_QUICK_SETTINGS_ANIMATION_PRESS_FEEDBACK,
     REACH_QUICK_SETTINGS_ANIMATION_COUNT
 };
 
@@ -685,6 +688,8 @@ struct reach_quick_settings
 {
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_QUICK_SETTINGS_ANIMATION_COUNT];
+    reach_pressable pressable;
+    reach_quick_settings_action press_action;
     reach_quick_settings_state state;
 
     reach_system_status *status;
@@ -697,6 +702,32 @@ struct reach_quick_settings
     size_t retired_render_icon_count;
 };
 
+static reach_pressable_feedback_style
+reach_quick_settings_pressable_feedback(reach_quick_settings *quick_settings)
+{
+    reach_pressable_feedback_style feedback = {};
+    feedback.animations = quick_settings != nullptr ? &quick_settings->animations : nullptr;
+    feedback.track = REACH_QUICK_SETTINGS_ANIMATION_PRESS_FEEDBACK;
+    feedback.pressed_value = 1.0f;
+    feedback.press_seconds = 0.055;
+    feedback.release_seconds = 0.10;
+    feedback.press_easing = REACH_EASING_EASE_IN_OUT;
+    feedback.release_easing = REACH_EASING_EASE_OUT;
+    return feedback;
+}
+
+static void reach_quick_settings_reset_pressable(reach_quick_settings *quick_settings)
+{
+    if (quick_settings == nullptr)
+    {
+        return;
+    }
+    reach_pressable_feedback_style feedback =
+        reach_quick_settings_pressable_feedback(quick_settings);
+    reach_pressable_reset(&quick_settings->pressable, &feedback);
+    quick_settings->press_action = {};
+}
+
 const reach_quick_settings_state *
 reach_quick_settings_state_ptr(reach_quick_settings *quick_settings)
 {
@@ -706,6 +737,26 @@ reach_quick_settings_state_ptr(reach_quick_settings *quick_settings)
 reach_quick_settings_state *reach_quick_settings_state_mut(reach_quick_settings *quick_settings)
 {
     return quick_settings != nullptr ? &quick_settings->state : nullptr;
+}
+
+uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings)
+{
+    if (quick_settings == nullptr)
+    {
+        return REACH_PRESSABLE_TARGET_NONE;
+    }
+    size_t feedback_index = reach_pressable_feedback_index(&quick_settings->pressable);
+    return feedback_index == REACH_PRESSABLE_FEEDBACK_NONE ? REACH_PRESSABLE_TARGET_NONE
+                                                           : static_cast<uint64_t>(feedback_index);
+}
+
+float reach_quick_settings_press_feedback_value(reach_quick_settings *quick_settings)
+{
+    reach_pressable_feedback_style feedback =
+        reach_quick_settings_pressable_feedback(quick_settings);
+    return quick_settings != nullptr
+               ? reach_pressable_feedback_value(&quick_settings->pressable, &feedback)
+               : 0.0f;
 }
 
 int32_t reach_quick_settings_is_open(const reach_quick_settings *quick_settings)
@@ -730,6 +781,7 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
     state->drag.active = 0;
     state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     state->drag.level_valid = 0;
+    reach_quick_settings_reset_pressable(quick_settings);
     return 1;
 }
 
@@ -743,6 +795,7 @@ void reach_quick_settings_force_close(reach_quick_settings *quick_settings)
     state->open = 0;
     state->drag.active = 0;
     state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
+    reach_quick_settings_reset_pressable(quick_settings);
 }
 
 void reach_quick_settings_reset(reach_quick_settings *quick_settings)
@@ -760,6 +813,7 @@ void reach_quick_settings_reset(reach_quick_settings *quick_settings)
     state->content_bounds = {};
     state->layout = {};
     state->drag = {};
+    reach_quick_settings_reset_pressable(quick_settings);
     quick_settings->bluetooth_pending_active = 0;
     quick_settings->bluetooth_pending_elapsed_seconds = 0.0;
     quick_settings->bluetooth_pending_refresh_elapsed_seconds = 0.0;
@@ -813,8 +867,19 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
                                               reach_feature_tick_result *out)
 {
     reach_quick_settings *quick_settings = static_cast<reach_quick_settings *>(capsule);
+    int32_t animations_were_active =
+        quick_settings != nullptr &&
+        reach_animation_manager_any_active(&quick_settings->animations);
     reach_quick_settings_tick(quick_settings, delta_seconds);
-    if (out != nullptr && reach_quick_settings_height_animation_active(quick_settings))
+    if (quick_settings != nullptr)
+    {
+        reach_pressable_feedback_style feedback =
+            reach_quick_settings_pressable_feedback(quick_settings);
+        reach_pressable_settle_feedback(&quick_settings->pressable, &feedback);
+    }
+    if (out != nullptr && (animations_were_active ||
+                           (quick_settings != nullptr &&
+                            reach_animation_manager_any_active(&quick_settings->animations))))
     {
         out->redraw = 1;
     }
@@ -832,7 +897,7 @@ static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
     {
         return 0;
     }
-    return reach_quick_settings_height_animation_active(quick_settings) ||
+    return reach_animation_manager_any_active(&quick_settings->animations) ||
            quick_settings->bluetooth_pending_active ||
            (quick_settings->status != nullptr &&
             (reach_system_status_audio_pending(quick_settings->status) ||
@@ -841,7 +906,73 @@ static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
 
 static int32_t reach_quick_settings_capsule_wants_pointer_move(const void *capsule)
 {
-    return reach_quick_settings_drag_active(static_cast<const reach_quick_settings *>(capsule));
+    const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
+    return quick_settings != nullptr && (reach_quick_settings_drag_active(quick_settings) ||
+                                         reach_pressable_tracking(&quick_settings->pressable));
+}
+
+static int32_t reach_quick_settings_capsule_pointer_sequence_active(const void *capsule)
+{
+    return reach_quick_settings_capsule_wants_pointer_move(capsule);
+}
+
+static reach_quick_settings_hit_result
+reach_quick_settings_capsule_hit_test(reach_quick_settings *quick_settings, int32_t x, int32_t y)
+{
+    reach_quick_settings_hit_result hit = {};
+    if (quick_settings == nullptr)
+    {
+        return hit;
+    }
+    const reach_quick_settings_state *state = &quick_settings->state;
+    return reach_quick_settings_hit_test(&state->layout, &state->model, (float)x - state->bounds.x,
+                                         (float)y - state->bounds.y);
+}
+
+static int32_t reach_quick_settings_utf16_equal(const uint16_t *a, const uint16_t *b)
+{
+    if (a == nullptr || b == nullptr)
+    {
+        return a == b;
+    }
+    size_t index = 0;
+    while (a[index] != 0 && b[index] != 0 && a[index] == b[index])
+    {
+        ++index;
+    }
+    return a[index] == b[index];
+}
+
+static int32_t reach_quick_settings_press_actions_match(const reach_quick_settings_action *pressed,
+                                                        const reach_quick_settings_action *released)
+{
+    if (pressed == nullptr || released == nullptr || pressed->type != released->type)
+    {
+        return 0;
+    }
+    if (pressed->type == REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE)
+    {
+        return pressed->output_device_index == released->output_device_index &&
+               reach_quick_settings_utf16_equal(pressed->output_device_id,
+                                                released->output_device_id);
+    }
+    return pressed->type != REACH_QUICK_SETTINGS_ACTION_NONE;
+}
+
+static void
+reach_quick_settings_capsule_apply_pressable_result(const reach_pressable_result *pressable,
+                                                    reach_capsule_pointer_result *out)
+{
+    if (pressable == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw |= pressable->redraw;
+    if (pressable->capture != 0)
+    {
+        out->capture = pressable->capture;
+    }
+    out->sync_pointer_subscriptions |= pressable->sync_pointer_subscriptions;
 }
 
 static void reach_quick_settings_capsule_apply_action(const reach_quick_settings_action *action,
@@ -883,7 +1014,6 @@ static void reach_quick_settings_capsule_apply_action(const reach_quick_settings
     case REACH_QUICK_SETTINGS_ACTION_EXPAND:
         out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_EXPAND;
         break;
-    case REACH_QUICK_SETTINGS_ACTION_SET_SESSION_MUTED:
     case REACH_QUICK_SETTINGS_ACTION_NONE:
     default:
         break;
@@ -904,32 +1034,101 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
         return;
     }
 
-    if (event->kind == REACH_POINTER_EVENT_DOWN)
+    if (event->kind == REACH_POINTER_EVENT_DOWN && event->button == REACH_POINTER_BUTTON_PRIMARY)
     {
         reach_quick_settings_action action =
-            reach_quick_settings_begin_drag_if_hit(quick_settings, event->x, event->y);
-        if (action.type == REACH_QUICK_SETTINGS_ACTION_NONE)
-        {
-            return;
-        }
-        out->handled = 1;
-        reach_quick_settings_capsule_apply_action(&action, out);
+            reach_quick_settings_begin_slider_gesture_if_hit(quick_settings, event->x, event->y);
         if (reach_quick_settings_drag_active(quick_settings))
         {
+            out->handled = 1;
+            reach_quick_settings_capsule_apply_action(&action, out);
             out->capture = 1;
             out->sync_pointer_subscriptions = 1;
+            return;
         }
+
+        reach_quick_settings_hit_result hit =
+            reach_quick_settings_capsule_hit_test(quick_settings, event->x, event->y);
+        uint64_t target = reach_quick_settings_pressable_target(hit);
+        action = reach_quick_settings_action_for_hit(hit);
+        reach_pressable_feedback_style feedback =
+            reach_quick_settings_pressable_feedback(quick_settings);
+        reach_pressable_result pressable = {};
+        reach_pressable_press(&quick_settings->pressable, event->button, target,
+                              target == REACH_PRESSABLE_TARGET_NONE ? REACH_PRESSABLE_FEEDBACK_NONE
+                                                                    : static_cast<size_t>(target),
+                              &feedback, &pressable);
+        reach_quick_settings_capsule_apply_pressable_result(&pressable, out);
+        if (pressable.capture == 1)
+        {
+            quick_settings->press_action = action;
+        }
+        out->handled = reach_pressable_tracking(&quick_settings->pressable);
+        return;
+    }
+    if (event->kind == REACH_POINTER_EVENT_UP && event->button == REACH_POINTER_BUTTON_PRIMARY &&
+        reach_pressable_tracking(&quick_settings->pressable))
+    {
+        reach_quick_settings_hit_result hit =
+            reach_quick_settings_capsule_hit_test(quick_settings, event->x, event->y);
+        reach_quick_settings_action released_action = reach_quick_settings_action_for_hit(hit);
+        reach_pressable_feedback_style feedback =
+            reach_quick_settings_pressable_feedback(quick_settings);
+        reach_pressable_result pressable = {};
+        reach_pressable_release(&quick_settings->pressable, event->button,
+                                reach_quick_settings_pressable_target(hit), &feedback, &pressable);
+        reach_quick_settings_capsule_apply_pressable_result(&pressable, out);
+        out->handled = 1;
+        if (pressable.activated && reach_quick_settings_press_actions_match(
+                                       &quick_settings->press_action, &released_action))
+        {
+            reach_quick_settings_capsule_apply_action(&released_action, out);
+        }
+        quick_settings->press_action = {};
+        return;
+    }
+    if ((event->kind == REACH_POINTER_EVENT_MOVE || event->kind == REACH_POINTER_EVENT_LEAVE) &&
+        reach_pressable_tracking(&quick_settings->pressable))
+    {
+        uint64_t target = REACH_PRESSABLE_TARGET_NONE;
+        if (event->kind == REACH_POINTER_EVENT_MOVE)
+        {
+            target = reach_quick_settings_pressable_target(
+                reach_quick_settings_capsule_hit_test(quick_settings, event->x, event->y));
+        }
+        reach_pressable_result pressable = {};
+        reach_pressable_update(&quick_settings->pressable, target, &pressable);
+        reach_quick_settings_capsule_apply_pressable_result(&pressable, out);
+        out->handled = 1;
+        return;
+    }
+    if (event->kind == REACH_POINTER_EVENT_CANCEL &&
+        reach_pressable_tracking(&quick_settings->pressable))
+    {
+        reach_pressable_feedback_style feedback =
+            reach_quick_settings_pressable_feedback(quick_settings);
+        reach_pressable_result pressable = {};
+        reach_pressable_cancel(&quick_settings->pressable, &feedback, &pressable);
+        reach_quick_settings_capsule_apply_pressable_result(&pressable, out);
+        quick_settings->press_action = {};
+        out->handled = 1;
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_MOVE && reach_quick_settings_drag_active(quick_settings))
     {
         reach_quick_settings_action action =
             reach_quick_settings_drag_move(quick_settings, event->x, event->y);
+        if (action.type == REACH_QUICK_SETTINGS_ACTION_NONE)
+        {
+            out->handled = 1;
+            return;
+        }
         out->handled = 1;
         reach_quick_settings_capsule_apply_action(&action, out);
         return;
     }
-    if ((event->kind == REACH_POINTER_EVENT_UP || event->kind == REACH_POINTER_EVENT_CANCEL) &&
+    if (((event->kind == REACH_POINTER_EVENT_UP && event->button == REACH_POINTER_BUTTON_PRIMARY) ||
+         event->kind == REACH_POINTER_EVENT_CANCEL) &&
         reach_quick_settings_drag_active(quick_settings))
     {
         reach_quick_settings_end_drag(quick_settings);
@@ -949,6 +1148,7 @@ const reach_feature_capsule_ops *reach_quick_settings_capsule_ops(void)
         reach_quick_settings_capsule_needs_frame,
         reach_quick_settings_capsule_wants_pointer_move,
         reach_quick_settings_capsule_handle_pointer,
+        reach_quick_settings_capsule_pointer_sequence_active,
     };
     return &ops;
 }
@@ -966,6 +1166,7 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
     }
     reach_animation_manager_init(&quick_settings->animations, quick_settings->animation_tracks,
                                  REACH_QUICK_SETTINGS_ANIMATION_COUNT);
+    reach_pressable_init(&quick_settings->pressable);
     reach_quick_settings_model_init(&quick_settings->state.model);
     *out_quick_settings = quick_settings;
     return REACH_OK;
@@ -1121,10 +1322,9 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     if (reach_system_status_take_system(quick_settings->status, &system_snapshot))
     {
         reach_quick_settings_system_apply_result apply_result = {};
-        reach_quick_settings_apply_system_states(quick_settings, &system_snapshot.network,
-                                                 &system_snapshot.bluetooth,
-                                                 &system_snapshot.brightness,
-                                                 system_snapshot.bluetooth_valid, &apply_result);
+        reach_quick_settings_apply_system_states(
+            quick_settings, &system_snapshot.network, &system_snapshot.bluetooth,
+            &system_snapshot.brightness, system_snapshot.bluetooth_valid, &apply_result);
         if (apply_result.bluetooth_pending_cleared)
         {
             quick_settings->bluetooth_pending_active = 0;
@@ -1315,8 +1515,8 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     reach_rect_f32 surface_bounds = {};
     surface_bounds.width = state->bounds.width;
     surface_bounds.height = state->bounds.height;
-    state->content_bounds =
-        reach_quick_settings_content_bounds_for(surface_bounds, ctx->dpi_scale, ctx->drop_direction);
+    state->content_bounds = reach_quick_settings_content_bounds_for(surface_bounds, ctx->dpi_scale,
+                                                                    ctx->drop_direction);
     state->layout = reach_quick_settings_layout_for_content_bounds_scaled(
         state->content_bounds, ctx->theme, &state->model, ctx->dpi_scale);
 }

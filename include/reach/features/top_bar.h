@@ -8,6 +8,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
+#include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/services/app_control.h"
 #include "reach/services/icon_service.h"
@@ -95,8 +96,7 @@ extern "C"
         REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON,
-        REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON,
-        REACH_TOP_BAR_FEEDBACK_NONE
+        REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON
     };
 
     typedef enum reach_top_bar_pointer_region
@@ -139,11 +139,7 @@ extern "C"
     {
         reach_top_bar_layout layout;
         reach_bar_visibility_state visibility;
-        int32_t pointer_sequence_active;
-
-        int32_t pressed_control;
-        size_t feedback_index;
-        int32_t feedback_pressed;
+        reach_pressable pressable;
         int32_t power_hovered;
         int32_t power_release_suppressed;
 
@@ -181,7 +177,6 @@ extern "C"
         size_t tray_item_count;
         int32_t tray_overflow;
         int32_t tray_popup_open;
-        size_t pressed_tray_index;
     } reach_top_bar_state;
 
     typedef struct reach_top_bar reach_top_bar;

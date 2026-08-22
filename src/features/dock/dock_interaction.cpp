@@ -113,105 +113,6 @@ float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layou
     return wanted_local_x;
 }
 
-static int32_t reach_dock_feedback_start(reach_dock *dock, size_t slot, float target_opacity)
-{
-    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_TRIGGER)
-    {
-        return 0;
-    }
-
-    reach_dock_state_mut(dock)->feedback_index = slot;
-
-    reach_animation_manager_animate_to(reach_dock_manager(dock), REACH_DOCK_ANIM_FEEDBACK_OPACITY,
-                                       target_opacity, 0.055, REACH_EASING_EASE_IN_OUT);
-
-    return 1;
-}
-
-int32_t reach_dock_feedback_press(reach_dock *dock, size_t slot)
-{
-    if (dock == nullptr)
-    {
-        return 0;
-    }
-
-    reach_dock_state_mut(dock)->feedback_pressed = 1;
-    reach_dock_state_mut(dock)->feedback_sticky = 0;
-
-    return reach_dock_feedback_start(dock, slot, 0.50f);
-}
-
-int32_t reach_dock_feedback_press_immediate(reach_dock *dock, size_t slot, float opacity)
-{
-    if (dock == nullptr)
-    {
-        return 0;
-    }
-    reach_dock_state_mut(dock)->feedback_pressed = 1;
-    reach_dock_state_mut(dock)->feedback_sticky = 0;
-    return reach_dock_feedback_set_immediate(dock, slot, opacity);
-}
-
-int32_t reach_dock_feedback_set_immediate(reach_dock *dock, size_t slot, float opacity)
-{
-    if (dock == nullptr || slot > REACH_DOCK_FEEDBACK_TRIGGER)
-    {
-        return 0;
-    }
-
-    reach_dock_state_mut(dock)->feedback_index = slot;
-    reach_animation_manager_set(reach_dock_manager(dock), REACH_DOCK_ANIM_FEEDBACK_OPACITY,
-                                opacity);
-    return 1;
-}
-
-int32_t reach_dock_feedback_stick(reach_dock *dock)
-{
-    if (dock == nullptr || (!reach_dock_state_mut(dock)->feedback_pressed &&
-                            reach_dock_state_mut(dock)->feedback_index == REACH_DOCK_FEEDBACK_NONE))
-    {
-        return 0;
-    }
-
-    reach_dock_state_mut(dock)->feedback_pressed = 0;
-    reach_dock_state_mut(dock)->feedback_sticky =
-        reach_dock_state_mut(dock)->feedback_index != REACH_DOCK_FEEDBACK_NONE;
-
-    if (reach_dock_state_mut(dock)->feedback_sticky)
-    {
-        return reach_dock_feedback_set_immediate(dock, reach_dock_state_mut(dock)->feedback_index,
-                                                 0.50f);
-    }
-    return 0;
-}
-
-int32_t reach_dock_feedback_release(reach_dock *dock)
-{
-    if (dock == nullptr || (!reach_dock_state_mut(dock)->feedback_pressed &&
-                            reach_dock_state_mut(dock)->feedback_index == REACH_DOCK_FEEDBACK_NONE))
-    {
-        return 0;
-    }
-
-    reach_dock_state_mut(dock)->feedback_pressed = 0;
-    reach_dock_state_mut(dock)->feedback_sticky = 0;
-
-    if (reach_dock_state_mut(dock)->feedback_index != REACH_DOCK_FEEDBACK_NONE)
-    {
-        return reach_dock_feedback_start(dock, reach_dock_state_mut(dock)->feedback_index, 0.0f);
-    }
-    return 0;
-}
-
-int32_t reach_dock_feedback_clear_sticky(reach_dock *dock)
-{
-    if (dock != nullptr && reach_dock_state_mut(dock)->feedback_sticky)
-    {
-        return reach_dock_feedback_release(dock);
-    }
-    return 0;
-}
-
 static void reach_dock_drag_begin(reach_dock *dock, size_t index, int32_t x, int32_t y,
                                   const reach_dock_interaction_context *ctx,
                                   reach_dock_interaction_result *out)
@@ -247,13 +148,6 @@ void reach_dock_item_press(reach_dock *dock, size_t index, int32_t x, int32_t y,
         ctx->layout == nullptr)
     {
         return;
-    }
-
-    reach_dock_state_mut(dock)->pressed_index = index;
-
-    if (reach_dock_feedback_press(dock, index))
-    {
-        out->redraw = 1;
     }
 
     reach_dock_drag_begin(dock, index, x, y, ctx, out);
@@ -314,17 +208,8 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
         }
 
         state->drag.target_index = target;
-        state->feedback_index = target;
         out->redraw = 1;
         return;
-    }
-
-    current = reach_dock_feature_model_find_order_key(&state->model, state->drag.key);
-
-    if (current != REACH_MAX_DOCK_ITEMS && state->feedback_index != current)
-    {
-        state->feedback_index = current;
-        out->redraw = 1;
     }
 }
 
@@ -347,8 +232,6 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     uint32_t pin_id = state->drag.key.pinned ? state->drag.key.app_id : 0;
     int32_t dragged_pinned = state->drag.key.pinned;
     int32_t moved = state->drag.moved;
-    size_t previous_pressed_dock_index = state->pressed_index;
-
     size_t target_pinned_index =
         dragged_pinned ? reach_dock_feature_model_pinned_order_index(&state->model, pin_id)
                        : REACH_MAX_DOCK_ITEMS;
@@ -357,10 +240,7 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
 
     state->drag.active = 0;
     state->drag.moved = 0;
-    state->pressed_index = moved ? REACH_MAX_DOCK_ITEMS : previous_pressed_dock_index;
     out->redraw = 1;
-
-    (void)reach_dock_feedback_release(dock);
 
     if (moved && target_index < ctx->layout->app_slot_count)
     {
@@ -382,38 +262,6 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
         out->move_pin = 1;
         out->move_pin_id = pin_id;
         out->move_pin_target = target_pinned_index;
-    }
-}
-
-int32_t reach_dock_item_release(reach_dock *dock, size_t index, reach_dock_item_action *out_action,
-                                reach_dock_interaction_result *out)
-{
-    if (dock == nullptr || out_action == nullptr || out == nullptr)
-    {
-        return 0;
-    }
-
-    reach_dock_state *state = reach_dock_state_mut(dock);
-
-    if (state->pressed_index != index)
-    {
-        return 0;
-    }
-
-    state->pressed_index = REACH_MAX_DOCK_ITEMS;
-
-    *out_action = reach_dock_item_action_for_index(&state->model, index);
-
-    (void)reach_dock_feedback_release(dock);
-    out->redraw = 1;
-    return 1;
-}
-
-void reach_dock_clear_pressed(reach_dock *dock)
-{
-    if (dock != nullptr)
-    {
-        reach_dock_state_mut(dock)->pressed_index = REACH_MAX_DOCK_ITEMS;
     }
 }
 

@@ -1,5 +1,6 @@
 #include "context_menu_common.h"
 #include "reach/core/limits.h"
+#include "reach/features/common/pressable.h"
 #include "reach/support/animation.h"
 
 #include <new>
@@ -91,6 +92,15 @@ struct reach_context_menu
     reach_context_menu_state state;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_CONTEXT_MENU_ANIM_COUNT];
+    reach_pressable pressable;
+    uint64_t pressable_identity;
+};
+
+enum
+{
+    REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND = 1,
+    REACH_CONTEXT_MENU_PRESSABLE_ITEM = 2,
+    REACH_CONTEXT_MENU_PRESSABLE_CLOSE = 3
 };
 
 const reach_context_menu_state *reach_context_menu_state_ptr(reach_context_menu *menu)
@@ -107,6 +117,8 @@ void reach_context_menu_force_close(reach_context_menu *menu)
 {
     if (menu != nullptr)
     {
+        reach_pressable_reset(&menu->pressable, nullptr);
+        menu->pressable_identity = 0;
         menu->state.open = 0;
     }
 }
@@ -118,6 +130,8 @@ void reach_context_menu_reset(reach_context_menu *menu)
         return;
     }
     menu->state.open = 0;
+    reach_pressable_reset(&menu->pressable, nullptr);
+    menu->pressable_identity = 0;
     menu->state.power_open = 0;
     menu->state.window_list_open = 0;
     menu->state.target_index = REACH_MAX_DOCK_ITEMS;
@@ -249,8 +263,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
                                             &state->item_count);
     state->power_open = 1;
     state->window_list_open = 0;
-    reach_context_menu_place(state, ctx,
-                             reach_context_menu_power_popup_width * ctx->dpi_scale,
+    reach_context_menu_place(state, ctx, reach_context_menu_power_popup_width * ctx->dpi_scale,
                              reach_context_menu_power_anchor_ratio);
     state->target_index = REACH_MAX_DOCK_ITEMS;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -389,11 +402,9 @@ int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
     float corridor_right = popup_bounds.x + popup_bounds.width > anchor_slot.x + anchor_slot.width
                                ? popup_bounds.x + popup_bounds.width
                                : anchor_slot.x + anchor_slot.width;
-    float corridor_top = drop_direction == REACH_POPUP_DROP_DOWN
-                             ? bar_edge_y
-                             : popup_bounds.y + popup_bounds.height;
-    float corridor_bottom =
-        drop_direction == REACH_POPUP_DROP_DOWN ? popup_bounds.y : bar_edge_y;
+    float corridor_top =
+        drop_direction == REACH_POPUP_DROP_DOWN ? bar_edge_y : popup_bounds.y + popup_bounds.height;
+    float corridor_bottom = drop_direction == REACH_POPUP_DROP_DOWN ? popup_bounds.y : bar_edge_y;
     return x >= corridor_left - margin && x <= corridor_right + margin &&
            y >= corridor_top - margin && y <= corridor_bottom + margin;
 }
@@ -433,6 +444,68 @@ static int32_t reach_context_menu_point_in_bounds(const reach_context_menu_state
            (float)y <= state->bounds.y + state->bounds.height;
 }
 
+static uint64_t reach_context_menu_pressable_target(const reach_context_menu *menu, int32_t x,
+                                                    int32_t y, reach_pointer_button button)
+{
+    if (menu == nullptr)
+    {
+        return REACH_PRESSABLE_TARGET_NONE;
+    }
+    if (button == REACH_POINTER_BUTTON_SECONDARY)
+    {
+        return reach_context_menu_point_in_bounds(&menu->state, x, y)
+                   ? ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND << 32)
+                   : REACH_PRESSABLE_TARGET_NONE;
+    }
+    if (menu->state.window_list_open)
+    {
+        reach_context_menu_hit_result close_hit =
+            reach_context_menu_hit_test_close_buttons(&menu->state, x, y);
+        if (close_hit.hit)
+        {
+            return ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_CLOSE << 32) | close_hit.index;
+        }
+    }
+    reach_context_menu_hit_result hit =
+        reach_context_menu_hit_test_items(menu->state.item_slots, menu->state.item_count, x, y);
+    if (hit.hit)
+    {
+        return ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_ITEM << 32) | hit.index;
+    }
+    return reach_context_menu_point_in_bounds(&menu->state, x, y)
+               ? ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND << 32)
+               : REACH_PRESSABLE_TARGET_NONE;
+}
+
+static uint64_t reach_context_menu_pressable_identity(const reach_context_menu *menu,
+                                                      uint64_t target)
+{
+    if (menu == nullptr || target == REACH_PRESSABLE_TARGET_NONE)
+    {
+        return 0;
+    }
+    size_t index = (size_t)(target & UINT32_MAX);
+    uint64_t kind = target >> 32;
+    if (kind == REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND || index >= menu->state.item_count)
+    {
+        return 0;
+    }
+    return menu->state.window_list_open ? (uint64_t)menu->state.item_windows[index]
+                                        : (uint64_t)menu->state.item_commands[index];
+}
+
+static void reach_context_menu_apply_pressable_result(const reach_pressable_result *result,
+                                                      reach_capsule_pointer_result *out)
+{
+    if (result == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw |= result->redraw;
+    out->capture = result->capture;
+    out->sync_pointer_subscriptions = result->sync_pointer_subscriptions;
+}
+
 static void reach_context_menu_capsule_handle_pointer(void *capsule,
                                                       const reach_pointer_event *event,
                                                       reach_capsule_pointer_result *out)
@@ -452,58 +525,87 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     switch (event->kind)
     {
     case REACH_POINTER_EVENT_DOWN:
-        out->handled = reach_context_menu_point_in_bounds(&menu->state, event->x, event->y);
+    {
+        uint64_t target =
+            reach_context_menu_pressable_target(menu, event->x, event->y, event->button);
+        reach_pressable_result result = {};
+        reach_pressable_press(&menu->pressable, event->button, target,
+                              REACH_PRESSABLE_FEEDBACK_NONE, nullptr, &result);
+        reach_context_menu_apply_pressable_result(&result, out);
+        if (result.capture == 1)
+        {
+            menu->pressable_identity = event->button == REACH_POINTER_BUTTON_PRIMARY
+                                           ? reach_context_menu_pressable_identity(menu, target)
+                                           : 0;
+        }
+        out->handled = target != REACH_PRESSABLE_TARGET_NONE;
         break;
+    }
 
     case REACH_POINTER_EVENT_UP:
     {
-        reach_context_menu_hit_result hit = reach_context_menu_hit_test_items(
-            menu->state.item_slots, menu->state.item_count, event->x, event->y);
-        out->handled = 1;
-        if (menu->state.window_list_open)
+        int32_t was_tracking = reach_pressable_tracking(&menu->pressable);
+        uint64_t identity = menu->pressable_identity;
+        reach_pressable_result result = {};
+        reach_pressable_release(
+            &menu->pressable, event->button,
+            reach_context_menu_pressable_target(menu, event->x, event->y, event->button), nullptr,
+            &result);
+        reach_context_menu_apply_pressable_result(&result, out);
+        menu->pressable_identity = 0;
+        out->handled = was_tracking;
+        if (!result.activated)
         {
-            reach_context_menu_hit_result close_hit =
-                reach_context_menu_hit_test_close_buttons(&menu->state, event->x, event->y);
-            if (close_hit.hit)
-            {
-                out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_CLOSE_WINDOW;
-                out->action.window = menu->state.item_windows[close_hit.index];
-                break;
-            }
-            if (hit.hit && menu->state.item_windows[hit.index] != 0)
-            {
-                out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW;
-                out->action.window = menu->state.item_windows[hit.index];
-            }
-            else
-            {
-                out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
-            }
             break;
         }
-        reach_context_menu_action action = reach_context_menu_action_for_hit(
-            menu->state.item_commands, menu->state.item_count, hit);
-        if (action.command != 0)
+        if (event->button == REACH_POINTER_BUTTON_SECONDARY)
         {
-            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE;
-            out->action.id = action.command;
+            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
+            break;
+        }
+        uint64_t kind = result.activated_target >> 32;
+        size_t index = (size_t)(result.activated_target & UINT32_MAX);
+        if (kind == REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND)
+        {
+            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
+            break;
+        }
+        if (index >= menu->state.item_count ||
+            identity != reach_context_menu_pressable_identity(menu, result.activated_target))
+        {
+            break;
+        }
+        if (menu->state.window_list_open)
+        {
+            out->action.kind = kind == REACH_CONTEXT_MENU_PRESSABLE_CLOSE
+                                   ? REACH_CONTEXT_MENU_POINTER_ACTION_CLOSE_WINDOW
+                                   : REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW;
+            out->action.window = menu->state.item_windows[index];
         }
         else
         {
-            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
+            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE;
+            out->action.id = menu->state.item_commands[index];
         }
         break;
     }
 
     case REACH_POINTER_EVENT_MOVE:
     {
+        reach_pressable_result pressable_result = {};
+        reach_pressable_update(
+            &menu->pressable,
+            reach_context_menu_pressable_target(menu, event->x, event->y,
+                                                reach_pressable_button(&menu->pressable)),
+            &pressable_result);
+        reach_context_menu_apply_pressable_result(&pressable_result, out);
         reach_context_menu_hit_result hit = reach_context_menu_hit_test_items(
             menu->state.item_slots, menu->state.item_count, event->x, event->y);
         size_t hovered = hit.hit ? hit.index : REACH_CONTEXT_MENU_MAX_ITEMS;
         reach_context_menu_hit_result close_hit =
             reach_context_menu_hit_test_close_buttons(&menu->state, event->x, event->y);
         out->handled = 1;
-        out->redraw = reach_context_menu_set_hovered(menu, hovered);
+        out->redraw |= reach_context_menu_set_hovered(menu, hovered);
         out->redraw |= reach_context_menu_set_close_hovered(
             menu, close_hit.hit ? close_hit.index : REACH_CONTEXT_MENU_MAX_ITEMS);
         break;
@@ -511,15 +613,23 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
 
     case REACH_POINTER_EVENT_LEAVE:
     case REACH_POINTER_EVENT_CANCEL:
+    {
+        reach_pressable_result result = {};
+        if (event->kind == REACH_POINTER_EVENT_LEAVE)
+        {
+            reach_pressable_update(&menu->pressable, REACH_PRESSABLE_TARGET_NONE, &result);
+        }
+        else
+        {
+            reach_pressable_cancel(&menu->pressable, nullptr, &result);
+            menu->pressable_identity = 0;
+        }
+        reach_context_menu_apply_pressable_result(&result, out);
         out->handled = 1;
-        out->redraw = reach_context_menu_set_hovered(menu, REACH_CONTEXT_MENU_MAX_ITEMS);
+        out->redraw |= reach_context_menu_set_hovered(menu, REACH_CONTEXT_MENU_MAX_ITEMS);
         out->redraw |= reach_context_menu_set_close_hovered(menu, REACH_CONTEXT_MENU_MAX_ITEMS);
         break;
-
-    case REACH_POINTER_EVENT_CONTEXT:
-        out->handled = 1;
-        out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
-        break;
+    }
 
     case REACH_POINTER_EVENT_WHEEL:
     case REACH_POINTER_EVENT_MIDDLE:
@@ -554,6 +664,12 @@ static int32_t reach_context_menu_capsule_needs_frame(const void *capsule)
            reach_animation_manager_any_active(&menu->animations);
 }
 
+static int32_t reach_context_menu_capsule_pointer_sequence_active(const void *capsule)
+{
+    const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
+    return menu != nullptr && reach_pressable_tracking(&menu->pressable);
+}
+
 const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
@@ -564,6 +680,7 @@ const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
         reach_context_menu_capsule_needs_frame,
         reach_context_menu_capsule_wants_pointer_move,
         reach_context_menu_capsule_handle_pointer,
+        reach_context_menu_capsule_pointer_sequence_active,
     };
     return &ops;
 }
@@ -581,6 +698,7 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
     }
     reach_animation_manager_init(&menu->animations, menu->animation_tracks,
                                  REACH_CONTEXT_MENU_ANIM_COUNT);
+    reach_pressable_init(&menu->pressable);
     *out_menu = menu;
     return REACH_OK;
 }

@@ -22,6 +22,7 @@ reach_result reach_stage_create(reach_stage **out_stage)
     stage->state.animation_seconds = reach_stage_animation_seconds_default();
     reach_animation_manager_init(&stage->animations, stage->animation_tracks,
                                  REACH_STAGE_ANIMATION_COUNT);
+    reach_pressable_init(&stage->pressable);
     *out_stage = stage;
     return REACH_OK;
 }
@@ -74,6 +75,8 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
                                   ? state->animation_seconds
                                   : reach_stage_animation_seconds_default();
     *state = {};
+    reach_pressable_reset(&stage->pressable, nullptr);
+    stage->pressable_generation = 0;
     state->animation_seconds = animation_seconds;
     state->bounds = monitor_bounds;
     state->dpi_scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
@@ -230,6 +233,8 @@ void reach_stage_begin_close(reach_stage *stage)
     }
 
     stage->state.closing = 1;
+    reach_pressable_reset(&stage->pressable, nullptr);
+    stage->pressable_generation = 0;
     stage->state.has_hover = 0;
     reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f,
                                        reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
@@ -248,6 +253,8 @@ void reach_stage_force_close(reach_stage *stage)
     reach_stage_state *state = &stage->state;
     float animation_seconds = state->animation_seconds;
     *state = {};
+    reach_pressable_reset(&stage->pressable, nullptr);
+    stage->pressable_generation = 0;
     state->animation_seconds = animation_seconds;
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
@@ -477,6 +484,12 @@ static int32_t reach_stage_capsule_wants_pointer_move(const void *capsule)
     return reach_stage_is_open(static_cast<const reach_stage *>(capsule));
 }
 
+static int32_t reach_stage_capsule_pointer_sequence_active(const void *capsule)
+{
+    const reach_stage *stage = static_cast<const reach_stage *>(capsule);
+    return stage != nullptr && reach_pressable_tracking(&stage->pressable);
+}
+
 void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
                                 reach_capsule_pointer_result *out);
 
@@ -488,6 +501,7 @@ const reach_feature_capsule_ops *reach_stage_capsule_ops(void)
                                                   reach_stage_capsule_on_game_mode,
                                                   reach_stage_capsule_needs_frame,
                                                   reach_stage_capsule_wants_pointer_move,
-                                                  reach_stage_handle_pointer};
+                                                  reach_stage_handle_pointer,
+                                                  reach_stage_capsule_pointer_sequence_active};
     return &ops;
 }

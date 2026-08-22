@@ -38,8 +38,8 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
     const reach_theme *theme = ctx->theme;
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
 
-    static const uint16_t percent_label[] = {'B', 'a', 't', 't', 'e', 'r', 'y', ' ', 'p',
-                                             'e', 'r', 'c', 'e', 'n', 't', 'a', 'g', 'e', 0};
+    static const uint16_t percent_label[] = {'B', 'a', 't', 't', 'e', 'r', 'y', ' ', 'p', 'e',
+                                             'r', 'c', 'e', 'n', 't', 'a', 'g', 'e', 0};
     static const uint16_t saver_label[] = {'B', 'a', 't', 't', 'e', 'r', 'y',
                                            ' ', 's', 'a', 'v', 'e', 'r', 0};
 
@@ -70,6 +70,17 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
     toggle_style.knob = theme->toggle_knob;
     reach_ui_toggle_render(out_commands, state->saver_toggle, &toggle_style,
                            reach_battery_model_saver_effective(&state->model) ? 1.0f : 0.0f);
+
+    float press_feedback = reach_battery_press_feedback_value(battery);
+    if (press_feedback > 0.0f)
+    {
+        reach_render_command overlay = {};
+        overlay.type = REACH_RENDER_COMMAND_RECT;
+        overlay.rect = state->saver_row;
+        overlay.radius = theme->radius_small * scale;
+        overlay.color = {0.0f, 0.0f, 0.0f, 0.12f * press_feedback};
+        (void)reach_render_command_buffer_push(out_commands, &overlay);
+    }
 
     return REACH_OK;
 }

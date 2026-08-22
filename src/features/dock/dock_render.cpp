@@ -385,9 +385,11 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.focused_window = ctx->focused_window;
     input.dragged_render_index = dragged_render_index;
     input.dragged_box_x = dragged_x;
-    input.click_feedback_index = state->feedback_index;
-    input.click_feedback_opacity =
-        reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
+    input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
+    reach_pressable_feedback_style feedback = {};
+    feedback.animations = manager;
+    feedback.track = REACH_DOCK_ANIM_FEEDBACK_OPACITY;
+    input.click_feedback_opacity = reach_pressable_feedback_value(&state->pressable, &feedback);
     input.trigger_feedback_index = REACH_DOCK_FEEDBACK_TRIGGER;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     input.dpi_scale = ctx->dpi_scale;

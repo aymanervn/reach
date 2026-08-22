@@ -82,11 +82,8 @@ float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *n
 void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, const reach_theme *theme,
                                      reach_rect_f32 bounds, float dpi_scale);
 
-int32_t reach_top_bar_now_playing_pointer_down(reach_top_bar_now_playing *now_playing, int32_t x,
-                                            int32_t y);
-int32_t reach_top_bar_now_playing_pointer_up(reach_top_bar_now_playing *now_playing, int32_t x, int32_t y,
-                                          reach_now_playing_action *out_action);
-int32_t reach_top_bar_now_playing_pointer_cancel(reach_top_bar_now_playing *now_playing);
+reach_now_playing_action reach_top_bar_now_playing_action_at(
+    const reach_top_bar_now_playing *now_playing, int32_t x, int32_t y);
 
 reach_result
 reach_top_bar_now_playing_append_render_commands(reach_top_bar_now_playing *now_playing,

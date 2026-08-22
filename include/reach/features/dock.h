@@ -11,6 +11,7 @@
 #include "reach/ports/window_manager.h"
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
+#include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/window_tracking.h"
@@ -198,12 +199,11 @@ extern "C"
 
     enum
     {
-        REACH_DOCK_FEEDBACK_TRIGGER = REACH_MAX_DOCK_ITEMS,
-        REACH_DOCK_FEEDBACK_NONE
+        REACH_DOCK_FEEDBACK_TRIGGER = REACH_MAX_DOCK_ITEMS
     };
 
-    int32_t reach_dock_feedback_stick(reach_dock *dock);
-    int32_t reach_dock_feedback_clear_sticky(reach_dock *dock);
+    int32_t reach_dock_retain_context_feedback(reach_dock *dock);
+    int32_t reach_dock_clear_context_feedback(reach_dock *dock);
 
     typedef struct reach_dock_render_context
     {
@@ -240,16 +240,10 @@ extern "C"
         reach_dock_feature_model model;
 
         reach_bar_visibility_state visibility;
-        int32_t pointer_sequence_active;
+        reach_pressable pressable;
 
         reach_dock_drag_state drag;
-        size_t pressed_index;
-        int32_t pressed_control;
         size_t hovered_item;
-
-        size_t feedback_index;
-        int32_t feedback_pressed;
-        int32_t feedback_sticky;
 
         int32_t item_x_valid[REACH_MAX_DOCK_ITEMS];
         reach_dock_order_key item_x_keys[REACH_MAX_DOCK_ITEMS];

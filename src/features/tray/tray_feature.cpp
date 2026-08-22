@@ -16,6 +16,39 @@ struct reach_tray
     reach_popup_placement placement;
 };
 
+static reach_pressable_feedback_style reach_tray_pressable_feedback(reach_tray *tray)
+{
+    reach_pressable_feedback_style feedback = {};
+    feedback.animations = tray != nullptr ? &tray->manager : nullptr;
+    feedback.track = REACH_TRAY_ANIM_FEEDBACK_OPACITY;
+    feedback.pressed_value = 0.50f;
+    feedback.press_seconds = 0.055;
+    feedback.release_seconds = 0.055;
+    feedback.press_easing = REACH_EASING_EASE_IN_OUT;
+    feedback.release_easing = REACH_EASING_EASE_IN_OUT;
+    return feedback;
+}
+
+static uint64_t reach_tray_pressable_target(const reach_tray_model *model,
+                                            reach_tray_hit_result hit)
+{
+    return model != nullptr && hit.type == REACH_TRAY_HIT_ITEM && hit.index < model->item_count
+               ? (uint64_t)model->items[hit.index].id
+               : REACH_PRESSABLE_TARGET_NONE;
+}
+
+static void reach_tray_apply_pressable_result(const reach_pressable_result *result,
+                                              reach_capsule_pointer_result *out)
+{
+    if (result == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw = result->redraw;
+    out->capture = result->capture;
+    out->sync_pointer_subscriptions = result->sync_pointer_subscriptions;
+}
+
 const reach_tray_state *reach_tray_state_ptr(reach_tray *tray)
 {
     return tray != nullptr ? &tray->state : nullptr;
@@ -33,7 +66,7 @@ reach_result reach_tray_create(reach_tray **out_animations)
         return REACH_ERROR;
     }
     reach_animation_manager_init(&animations->manager, animations->tracks, REACH_TRAY_ANIM_COUNT);
-    animations->state.feedback_index = REACH_MAX_TRAY_ITEMS;
+    reach_pressable_init(&animations->state.pressable);
     *out_animations = animations;
     return REACH_OK;
 }
@@ -66,13 +99,8 @@ static void reach_tray_tick(reach_tray *animations, double delta_seconds,
         out->redraw = 1;
     }
 
-    if (feedback_was_active && !feedback_active && !animations->state.feedback_pressed &&
-        reach_animation_manager_value(&animations->manager, REACH_TRAY_ANIM_FEEDBACK_OPACITY) <=
-            0.001f)
-    {
-        reach_animation_manager_set(&animations->manager, REACH_TRAY_ANIM_FEEDBACK_OPACITY, 0.0f);
-        animations->state.feedback_index = REACH_MAX_TRAY_ITEMS;
-    }
+    reach_pressable_feedback_style feedback = reach_tray_pressable_feedback(animations);
+    reach_pressable_settle_feedback(&animations->state.pressable, &feedback);
 }
 
 int32_t reach_tray_popup_is_open(const reach_tray *tray)
@@ -94,7 +122,8 @@ int32_t reach_tray_set_popup_open(reach_tray *tray, int32_t open)
     tray->state.popup_open = next_open;
     if (!next_open)
     {
-        (void)reach_tray_feedback_release(tray);
+        reach_pressable_feedback_style feedback = reach_tray_pressable_feedback(tray);
+        reach_pressable_reset(&tray->state.pressable, &feedback);
     }
     return 1;
 }
@@ -103,6 +132,8 @@ static void reach_tray_reset(reach_tray *tray)
 {
     if (tray != nullptr)
     {
+        reach_pressable_feedback_style feedback = reach_tray_pressable_feedback(tray);
+        reach_pressable_reset(&tray->state.pressable, &feedback);
         reach_tray_model_init(&tray->state.model);
         tray->pointer_bounds_valid = 0;
     }
@@ -156,35 +187,6 @@ void reach_tray_layout_popup(reach_tray *tray, const reach_theme *theme,
     }
 }
 
-int32_t reach_tray_feedback_press(reach_tray *tray, size_t index)
-{
-    if (tray == nullptr || index >= REACH_MAX_TRAY_ITEMS)
-    {
-        return 0;
-    }
-    tray->state.feedback_pressed = 1;
-    tray->state.feedback_index = index;
-    reach_animation_manager_animate_to(&tray->manager, REACH_TRAY_ANIM_FEEDBACK_OPACITY, 0.50f,
-                                       0.055, REACH_EASING_EASE_IN_OUT);
-    return 1;
-}
-
-int32_t reach_tray_feedback_release(reach_tray *tray)
-{
-    if (tray == nullptr ||
-        (!tray->state.feedback_pressed && tray->state.feedback_index == REACH_MAX_TRAY_ITEMS))
-    {
-        return 0;
-    }
-    tray->state.feedback_pressed = 0;
-    if (tray->state.feedback_index != REACH_MAX_TRAY_ITEMS)
-    {
-        reach_animation_manager_animate_to(&tray->manager, REACH_TRAY_ANIM_FEEDBACK_OPACITY, 0.0f,
-                                           0.055, REACH_EASING_EASE_IN_OUT);
-    }
-    return 1;
-}
-
 static void reach_tray_capsule_reset(void *capsule)
 {
     reach_tray_reset(static_cast<reach_tray *>(capsule));
@@ -205,6 +207,17 @@ static int32_t reach_tray_capsule_needs_frame(const void *capsule)
 {
     const reach_tray *tray = static_cast<const reach_tray *>(capsule);
     return tray != nullptr && reach_animation_manager_any_active(&tray->manager);
+}
+
+static int32_t reach_tray_capsule_wants_pointer_move(const void *capsule)
+{
+    const reach_tray *tray = static_cast<const reach_tray *>(capsule);
+    return tray != nullptr && reach_pressable_tracking(&tray->state.pressable);
+}
+
+static int32_t reach_tray_capsule_pointer_sequence_active(const void *capsule)
+{
+    return reach_tray_capsule_wants_pointer_move(capsule);
 }
 
 static void reach_tray_capsule_set_action(const reach_tray_feature_action *action,
@@ -247,7 +260,12 @@ static void reach_tray_capsule_handle_pointer(void *capsule, const reach_pointer
     {
         if (hit.type == REACH_TRAY_HIT_ITEM)
         {
-            out->redraw = reach_tray_feedback_press(tray, hit.index);
+            reach_pressable_feedback_style feedback = reach_tray_pressable_feedback(tray);
+            reach_pressable_result result = {};
+            reach_pressable_press(&tray->state.pressable, event->button,
+                                  reach_tray_pressable_target(&tray->state.model, hit), hit.index,
+                                  &feedback, &result);
+            reach_tray_apply_pressable_result(&result, out);
             out->handled = 1;
         }
         else if (hit.type == REACH_TRAY_HIT_POPUP)
@@ -258,54 +276,62 @@ static void reach_tray_capsule_handle_pointer(void *capsule, const reach_pointer
     }
     if (event->kind == REACH_POINTER_EVENT_UP)
     {
-        out->redraw = reach_tray_feedback_release(tray);
-        if (hit.type == REACH_TRAY_HIT_ITEM)
+        reach_pressable_feedback_style feedback = reach_tray_pressable_feedback(tray);
+        reach_pressable_result result = {};
+        int32_t was_tracking = reach_pressable_tracking(&tray->state.pressable);
+        reach_pressable_release(&tray->state.pressable, event->button,
+                                reach_tray_pressable_target(&tray->state.model, hit), &feedback,
+                                &result);
+        reach_tray_apply_pressable_result(&result, out);
+        if (result.activated)
         {
-            reach_tray_feature_action action =
-                reach_tray_action_for_hit(&tray->state.model, hit, REACH_TRAY_ACTION_LEFT_CLICK);
+            reach_tray_feature_action action = reach_tray_action_for_hit(
+                &tray->state.model, hit,
+                event->button == REACH_POINTER_BUTTON_SECONDARY ? REACH_TRAY_ACTION_RIGHT_CLICK
+                                                                : REACH_TRAY_ACTION_LEFT_CLICK);
             reach_tray_capsule_set_action(&action, out);
             out->handled = 1;
         }
         else if (hit.type == REACH_TRAY_HIT_POPUP)
+        {
+            out->handled = 1;
+        }
+        else if (was_tracking)
         {
             out->handled = 1;
         }
         return;
     }
-    if (event->kind == REACH_POINTER_EVENT_CONTEXT)
+    if (event->kind == REACH_POINTER_EVENT_MOVE || event->kind == REACH_POINTER_EVENT_LEAVE)
     {
-        if (hit.type == REACH_TRAY_HIT_ITEM)
-        {
-            out->redraw = reach_tray_feedback_press(tray, hit.index);
-            out->redraw = reach_tray_feedback_release(tray) || out->redraw;
-            reach_tray_feature_action action =
-                reach_tray_action_for_hit(&tray->state.model, hit, REACH_TRAY_ACTION_RIGHT_CLICK);
-            reach_tray_capsule_set_action(&action, out);
-            out->handled = 1;
-        }
-        else if (hit.type == REACH_TRAY_HIT_POPUP)
-        {
-            out->handled = 1;
-        }
+        int32_t was_tracking = reach_pressable_tracking(&tray->state.pressable);
+        reach_pressable_result result = {};
+        uint64_t target = event->kind == REACH_POINTER_EVENT_MOVE
+                              ? reach_tray_pressable_target(&tray->state.model, hit)
+                              : REACH_PRESSABLE_TARGET_NONE;
+        reach_pressable_update(&tray->state.pressable, target, &result);
+        reach_tray_apply_pressable_result(&result, out);
+        out->handled = was_tracking;
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_MIDDLE || event->kind == REACH_POINTER_EVENT_CANCEL)
     {
-        out->redraw = reach_tray_feedback_release(tray);
-        out->handled = out->redraw;
+        int32_t was_tracking = reach_pressable_tracking(&tray->state.pressable);
+        reach_pressable_feedback_style feedback = reach_tray_pressable_feedback(tray);
+        reach_pressable_result result = {};
+        reach_pressable_cancel(&tray->state.pressable, &feedback, &result);
+        reach_tray_apply_pressable_result(&result, out);
+        out->handled = was_tracking;
     }
 }
 
 const reach_feature_capsule_ops *reach_tray_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_tray_capsule_reset,
-        reach_tray_capsule_tick,
-        reach_tray_capsule_is_open,
-        nullptr,
-        reach_tray_capsule_needs_frame,
-        nullptr,
-        reach_tray_capsule_handle_pointer,
+        reach_tray_capsule_reset,          reach_tray_capsule_tick,
+        reach_tray_capsule_is_open,        nullptr,
+        reach_tray_capsule_needs_frame,    reach_tray_capsule_wants_pointer_move,
+        reach_tray_capsule_handle_pointer, reach_tray_capsule_pointer_sequence_active,
     };
     return &ops;
 }
@@ -346,8 +372,9 @@ reach_popup_placement reach_tray_compute_popup_layout(reach_tray_model *model,
     float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
     float content_height = padding * 2.0f + (float)rows * slot_size + (float)(rows - 1) * gap;
 
-    placement = reach_popup_place(anchor, ceilf(content_width), ceilf(content_height + notch_height),
-                                  REACH_TRAY_POPUP_MARGIN * scale);
+    placement =
+        reach_popup_place(anchor, ceilf(content_width), ceilf(content_height + notch_height),
+                          REACH_TRAY_POPUP_MARGIN * scale);
     reach_rect_f32 *out_bounds = &placement.bounds;
 
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
@@ -397,9 +424,9 @@ reach_result reach_tray_append_render_commands(reach_tray *tray,
     input.notch_center_x = tray->placement.notch_anchor_x - ctx->bounds.x;
     input.notch_side = tray->placement.notch_side;
     input.dpi_scale = ctx->dpi_scale;
-    input.click_feedback_index = state->feedback_index;
-    input.click_feedback_opacity = reach_animation_manager_value(reach_tray_animation_manager(tray),
-                                                                 REACH_TRAY_ANIM_FEEDBACK_OPACITY);
+    reach_pressable_feedback_style feedback = reach_tray_pressable_feedback(tray);
+    input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
+    input.click_feedback_opacity = reach_pressable_feedback_value(&state->pressable, &feedback);
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
 
     return reach_tray_build_render_commands(&input, out_commands);

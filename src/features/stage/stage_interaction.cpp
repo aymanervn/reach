@@ -16,6 +16,38 @@ static int32_t reach_stage_tile_takes_pointer(const reach_stage_tile *tile)
     return !tile->departing && tile->presence > 0.5f;
 }
 
+enum
+{
+    REACH_STAGE_PRESSABLE_TILE = 1,
+    REACH_STAGE_PRESSABLE_CLOSE = 2
+};
+
+static uint64_t reach_stage_pressable_target(const reach_stage *stage, reach_point_f32 point)
+{
+    size_t index = 0;
+    if (reach_stage_close_button_at_point(stage, point, &index))
+    {
+        return ((uint64_t)REACH_STAGE_PRESSABLE_CLOSE << 32) | (uint64_t)index;
+    }
+    if (reach_stage_tile_at_point(stage, point, &index))
+    {
+        return ((uint64_t)REACH_STAGE_PRESSABLE_TILE << 32) | (uint64_t)index;
+    }
+    return REACH_PRESSABLE_TARGET_NONE;
+}
+
+static void reach_stage_apply_pressable_result(const reach_pressable_result *result,
+                                               reach_capsule_pointer_result *out)
+{
+    if (result == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw |= result->redraw;
+    out->capture = result->capture;
+    out->sync_pointer_subscriptions = result->sync_pointer_subscriptions;
+}
+
 reach_rect_f32 reach_stage_tile_close_button_rect(const reach_stage *stage, size_t index)
 {
     reach_rect_f32 rect = {};
@@ -124,6 +156,10 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
     {
     case REACH_POINTER_EVENT_MOVE:
     {
+        reach_pressable_result pressable_result = {};
+        reach_pressable_update(&stage->pressable, reach_stage_pressable_target(stage, point),
+                               &pressable_result);
+        reach_stage_apply_pressable_result(&pressable_result, out);
         size_t index = 0;
         int32_t hit = reach_stage_tile_at_point(stage, point, &index);
         int32_t changed = hit != state->has_hover || (hit && index != state->hover_index);
@@ -140,9 +176,9 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
             state->close_hover_index = close_index;
         }
 
-        reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER,
-                                           close_hit ? 1.0f : 0.0f,
-                                           reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
+        reach_animation_manager_animate_to(
+            &stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, close_hit ? 1.0f : 0.0f,
+            reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
 
         out->handled = 1;
         out->redraw = changed;
@@ -151,40 +187,62 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
 
     case REACH_POINTER_EVENT_DOWN:
     {
-        size_t index = 0;
-        if (reach_stage_close_button_at_point(stage, point, &index))
+        if (event->button != REACH_POINTER_BUTTON_PRIMARY)
         {
-            out->handled = 1;
             return;
         }
-        out->handled = reach_stage_tile_at_point(stage, point, &index);
+        uint64_t target = reach_stage_pressable_target(stage, point);
+        reach_pressable_result result = {};
+        reach_pressable_press(&stage->pressable, REACH_POINTER_BUTTON_PRIMARY, target,
+                              REACH_PRESSABLE_FEEDBACK_NONE, nullptr, &result);
+        reach_stage_apply_pressable_result(&result, out);
+        stage->pressable_generation =
+            target != REACH_PRESSABLE_TARGET_NONE ? state->tile_generation : 0;
+        out->handled = target != REACH_PRESSABLE_TARGET_NONE;
         return;
     }
 
     case REACH_POINTER_EVENT_UP:
     {
-        size_t index = 0;
-        if (reach_stage_close_button_at_point(stage, point, &index))
+        if (event->button != REACH_POINTER_BUTTON_PRIMARY)
         {
-            out->handled = 1;
+            return;
+        }
+        int32_t was_tracking = reach_pressable_tracking(&stage->pressable);
+        size_t pressed_generation = stage->pressable_generation;
+        reach_pressable_result result = {};
+        reach_pressable_release(&stage->pressable, REACH_POINTER_BUTTON_PRIMARY,
+                                reach_stage_pressable_target(stage, point), nullptr, &result);
+        reach_stage_apply_pressable_result(&result, out);
+        stage->pressable_generation = 0;
+        out->handled = was_tracking;
+        if (!result.activated || pressed_generation != state->tile_generation)
+        {
+            return;
+        }
+        size_t index = (size_t)(result.activated_target & UINT32_MAX);
+        uint64_t kind = result.activated_target >> 32;
+        if (index >= state->tile_count)
+        {
+            return;
+        }
+        if (kind == REACH_STAGE_PRESSABLE_CLOSE)
+        {
             out->redraw = 1;
             out->action.kind = REACH_STAGE_ACTION_CLOSE_WINDOW;
             out->action.index = index;
             out->action.window = state->tiles[index].window;
             reach_stage_depart_tile(stage, index);
-            reach_animation_manager_animate_to(&stage->animations,
-                                               REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f,
-                                               reach_stage_close_hover_seconds(),
-                                               REACH_EASING_EASE_OUT);
+            reach_animation_manager_animate_to(
+                &stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f,
+                reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
             return;
         }
 
-        if (reach_stage_tile_at_point(stage, point, &index))
+        if (kind == REACH_STAGE_PRESSABLE_TILE)
         {
-            out->handled = 1;
-            out->action.kind = state->tiles[index].desktop
-                                   ? REACH_STAGE_ACTION_SHOW_DESKTOP
-                                   : REACH_STAGE_ACTION_ACTIVATE_WINDOW;
+            out->action.kind = state->tiles[index].desktop ? REACH_STAGE_ACTION_SHOW_DESKTOP
+                                                           : REACH_STAGE_ACTION_ACTIVATE_WINDOW;
             out->action.index = index;
             out->action.window = state->tiles[index].window;
             state->selected_index = index;
@@ -193,18 +251,32 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
         return;
     }
 
-    case REACH_POINTER_EVENT_CONTEXT:
     case REACH_POINTER_EVENT_MIDDLE:
         return;
 
     case REACH_POINTER_EVENT_LEAVE:
     case REACH_POINTER_EVENT_CANCEL:
-        out->redraw = state->has_hover;
+    {
+        int32_t was_tracking = reach_pressable_tracking(&stage->pressable);
+        reach_pressable_result result = {};
+        if (event->kind == REACH_POINTER_EVENT_LEAVE)
+        {
+            reach_pressable_update(&stage->pressable, REACH_PRESSABLE_TARGET_NONE, &result);
+        }
+        else
+        {
+            reach_pressable_cancel(&stage->pressable, nullptr, &result);
+            stage->pressable_generation = 0;
+        }
+        reach_stage_apply_pressable_result(&result, out);
+        out->handled = was_tracking;
+        out->redraw |= state->has_hover;
         state->has_hover = 0;
         reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER,
                                            0.0f, reach_stage_close_hover_seconds(),
                                            REACH_EASING_EASE_OUT);
         return;
+    }
 
     case REACH_POINTER_EVENT_WHEEL:
     default:

@@ -47,8 +47,7 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
     }
 
     reach_animation_manager_init(&top_bar->manager, top_bar->tracks, REACH_TOP_BAR_ANIM_COUNT);
-    top_bar->state.feedback_index = REACH_TOP_BAR_FEEDBACK_NONE;
-    top_bar->state.pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
+    reach_pressable_init(&top_bar->state.pressable);
     *out_top_bar = top_bar;
     return REACH_OK;
 }
@@ -229,8 +228,8 @@ static void reach_top_bar_resolve_bluetooth(reach_top_bar_state *state,
     {
         state->bluetooth_absent_seconds = 0.0;
         *out_enabled = snapshot->bluetooth.enabled ? 1 : 0;
-        *out_icon_id = *out_enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON
-                                    : REACH_VECTOR_ICON_BLUETOOTH_OFF;
+        *out_icon_id =
+            *out_enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF;
         return;
     }
 
@@ -307,8 +306,8 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double
 
     if (state->network_icon_id == network_icon && state->bluetooth_icon_id == bluetooth_icon &&
         state->network_connected == network_connected &&
-        state->bluetooth_enabled == bluetooth_enabled &&
-        state->volume_valid == audio.state_valid && state->volume_muted == volume_muted &&
+        state->bluetooth_enabled == bluetooth_enabled && state->volume_valid == audio.state_valid &&
+        state->volume_muted == volume_muted &&
         reach_top_bar_utf16_equal(state->volume_text, volume_text) &&
         reach_top_bar_utf16_equal(state->network_name, name))
     {
@@ -468,21 +467,19 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float left = edge_inset;
     layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK] =
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
-    layout->power_button =
-        reach_top_bar_rect(left + padding, (height - power_button_size) * 0.5f, power_button_size,
-                           power_button_size);
+    layout->power_button = reach_top_bar_rect(left + padding, (height - power_button_size) * 0.5f,
+                                              power_button_size, power_button_size);
 
     float clock_x = layout->power_button.x + power_button_size + clock_gap;
     layout->clock_time = reach_top_bar_text_run(clock_x, height, time_advance, time_size);
-    layout->clock_date = reach_top_bar_text_run(clock_x + time_advance + clock_gap, height,
-                                                date_advance, date_size);
+    layout->clock_date =
+        reach_top_bar_text_run(clock_x + time_advance + clock_gap, height, date_advance, date_size);
 
-    layout->now_playing = reach_top_bar_rect(
-        left + power_clock_width - border_thickness - now_playing_width, border_thickness,
-        now_playing_width, height - border_thickness * 2.0f);
-    layout->now_playing_separator =
-        reach_top_bar_rect(layout->now_playing.x - dot_gap - dot_size, (height - dot_size) * 0.5f,
-                           dot_size, dot_size);
+    layout->now_playing =
+        reach_top_bar_rect(left + power_clock_width - border_thickness - now_playing_width,
+                           border_thickness, now_playing_width, height - border_thickness * 2.0f);
+    layout->now_playing_separator = reach_top_bar_rect(
+        layout->now_playing.x - dot_gap - dot_size, (height - dot_size) * 0.5f, dot_size, dot_size);
 
     reach_top_bar_update_language(top_bar);
     reach_top_bar_update_stats(top_bar);
@@ -558,9 +555,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                  quick_settings_button_width + pill_gap + button_size + padding;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
-    layout->tray_separator = reach_top_bar_rect(
-        layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x - dot_size * 0.5f,
-        (height - dot_size) * 0.5f, dot_size, dot_size);
+    layout->tray_separator =
+        reach_top_bar_rect(layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x - dot_size * 0.5f,
+                           (height - dot_size) * 0.5f, dot_size, dot_size);
 
     float cluster_x =
         layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + dot_size * 0.5f + dot_gap;
@@ -568,18 +565,20 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     {
         layout->stats_cpu = reach_top_bar_text_run(cluster_x, height, cpu_advance, stats_size);
         cluster_x += cpu_advance + stats_gap;
-        layout->stats_memory = reach_top_bar_text_run(cluster_x, height, memory_advance, stats_size);
+        layout->stats_memory =
+            reach_top_bar_text_run(cluster_x, height, memory_advance, stats_size);
         cluster_x += memory_advance + stats_group_gap;
         layout->stats_download =
             reach_top_bar_text_run(cluster_x, height, download_advance, stats_size);
         cluster_x += download_advance + stats_gap;
-        layout->stats_upload = reach_top_bar_text_run(cluster_x, height, upload_advance, stats_size);
+        layout->stats_upload =
+            reach_top_bar_text_run(cluster_x, height, upload_advance, stats_size);
         cluster_x += upload_advance + pill_gap;
     }
     if (language_width > 0.0f)
     {
-        layout->language_button = reach_top_bar_rect(
-            cluster_x, (height - button_size) * 0.5f, language_width, button_size);
+        layout->language_button = reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f,
+                                                     language_width, button_size);
         cluster_x += language_width + language_gap;
     }
     if (battery_width > 0.0f)
@@ -597,8 +596,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                                     battery_width, button_size);
         cluster_x += battery_width + battery_gap;
     }
-    layout->quick_settings_button = reach_top_bar_rect(
-        cluster_x, (height - button_size) * 0.5f, quick_settings_button_width, button_size);
+    layout->quick_settings_button = reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f,
+                                                       quick_settings_button_width, button_size);
 
     float glyph_y = (height - glyph_size) * 0.5f;
     float content_x = cluster_x + quick_settings_padding;
@@ -664,9 +663,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->tray_icons[index] = reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot);
         tray_x += tray_slot + tray_gap;
     }
-    layout->tray_overflow_button =
-        top_bar->state.tray_overflow ? reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot)
-                                     : reach_rect_f32{};
+    layout->tray_overflow_button = top_bar->state.tray_overflow
+                                       ? reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot)
+                                       : reach_rect_f32{};
 
     if (tray_cells > 0)
     {
@@ -679,8 +678,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     const float current_app_gap = metrics.current_app_gap * scale;
     const float name_size = metrics.current_app_name_text_size * scale;
-    float current_app_icon_size =
-        reach_top_bar_has_current_app_icon(top_bar) ? height * metrics.current_app_icon_scale : 0.0f;
+    float current_app_icon_size = reach_top_bar_has_current_app_icon(top_bar)
+                                      ? height * metrics.current_app_icon_scale
+                                      : 0.0f;
     float current_app_icon_gap = current_app_icon_size > 0.0f ? current_app_gap : 0.0f;
     float name_advance = reach_top_bar_text_advance(top_bar->state.current_app_name, name_size);
     float current_app_min_text = metrics.current_app_min_text_width * scale;
@@ -688,8 +688,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     {
         name_advance = current_app_min_text;
     }
-    float current_app_chrome =
-        padding * 2.0f + current_app_icon_size + current_app_icon_gap;
+    float current_app_chrome = padding * 2.0f + current_app_icon_size + current_app_icon_gap;
     float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
     float current_app_target = current_app_chrome + name_advance;
     if (current_app_target > current_app_max_width)
@@ -842,8 +841,7 @@ static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
     uint16_t next_date[64] = {};
     reach_top_bar_copy_ascii_to_utf16(next_time, 32, time_text);
     reach_top_bar_copy_ascii_to_utf16(next_date, 64, date_text);
-    if (state->clock_initialized &&
-        reach_top_bar_utf16_equal(state->clock_time_text, next_time) &&
+    if (state->clock_initialized && reach_top_bar_utf16_equal(state->clock_time_text, next_time) &&
         reach_top_bar_utf16_equal(state->clock_date_text, next_date))
     {
         return 0;
@@ -925,20 +923,18 @@ static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
 }
 
 reach_bar_visibility_result
-reach_top_bar_update_visibility(reach_top_bar *top_bar,
-                                const reach_bar_visibility_request *request)
+reach_top_bar_update_visibility(reach_top_bar *top_bar, const reach_bar_visibility_request *request)
 {
     if (top_bar == nullptr || request == nullptr)
     {
         return reach_bar_visibility_result{};
     }
 
-    float push_depth =
-        reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds);
+    float push_depth = reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds);
 
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_TOP_BAR_EDGE;
-    bar_request.pointer_sequence_active = top_bar->state.pointer_sequence_active;
+    bar_request.pointer_sequence_active = reach_pressable_tracking(&top_bar->state.pressable);
     bar_request.can_hide =
         reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds);
 
@@ -1017,11 +1013,8 @@ static void reach_top_bar_capsule_reset(void *capsule)
     reach_top_bar_window_push_release(top_bar->window_push);
     reach_top_bar_invalidate_occlusion(top_bar);
     reach_top_bar_now_playing_reset(top_bar->now_playing_subfeature);
-    top_bar->state.pointer_sequence_active = 0;
-    top_bar->state.pressed_control = REACH_TOP_BAR_POINTER_REGION_NONE;
-    top_bar->state.feedback_index = REACH_TOP_BAR_FEEDBACK_NONE;
-    top_bar->state.feedback_pressed = 0;
-    top_bar->state.pressed_tray_index = REACH_TOP_BAR_MAX_TRAY_ICONS;
+    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+    reach_pressable_reset(&top_bar->state.pressable, &feedback);
     top_bar->state.power_hovered = 0;
     top_bar->state.power_release_suppressed = 0;
     top_bar->state.bluetooth_absent_seconds = 0.0;
@@ -1037,7 +1030,8 @@ static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
     reach_bar_visibility_reset(&top_bar->state.visibility);
     reach_top_bar_window_push_release(top_bar->window_push);
     reach_top_bar_invalidate_occlusion(top_bar);
-    top_bar->state.pointer_sequence_active = 0;
+    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+    reach_pressable_reset(&top_bar->state.pressable, &feedback);
 }
 
 static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
@@ -1093,11 +1087,10 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
 
     reach_animation_manager_tick(manager, delta_seconds);
 
-    int32_t redraw =
-        feedback_was_active ||
-        reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
-        power_hover_was_active ||
-        reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
+    int32_t redraw = feedback_was_active ||
+                     reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
+                     power_hover_was_active ||
+                     reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
 
     if (width_was_active || reach_top_bar_width_animation_active(top_bar))
     {
@@ -1108,14 +1101,8 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         }
     }
 
-    if (feedback_was_active &&
-        !reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) &&
-        !top_bar->state.feedback_pressed &&
-        reach_animation_manager_value(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) <= 0.001f)
-    {
-        reach_animation_manager_set(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY, 0.0f);
-        top_bar->state.feedback_index = REACH_TOP_BAR_FEEDBACK_NONE;
-    }
+    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+    reach_pressable_settle_feedback(&top_bar->state.pressable, &feedback);
 
     if (redraw && out != nullptr)
     {
@@ -1147,7 +1134,7 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
 static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
-    return top_bar != nullptr && top_bar->state.pointer_sequence_active;
+    return top_bar != nullptr && reach_pressable_tracking(&top_bar->state.pressable);
 }
 
 static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
@@ -1181,6 +1168,7 @@ static void reach_top_bar_capsule_apply_event_result(const reach_top_bar_event_r
 {
     out->handled = event_result->handled;
     out->redraw = event_result->redraw;
+    out->capture = event_result->capture;
     out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
     out->action.kind = event_result->action_kind;
     out->action.id = event_result->action_id;
@@ -1204,16 +1192,13 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
     switch (event->kind)
     {
     case REACH_POINTER_EVENT_DOWN:
-        reach_top_bar_pointer_down(top_bar, local.x, local.y, &event_result);
+        reach_top_bar_pointer_down(top_bar, local.x, local.y, event->button, &event_result);
         break;
     case REACH_POINTER_EVENT_UP:
-        reach_top_bar_pointer_up(top_bar, local.x, local.y, &event_result);
+        reach_top_bar_pointer_up(top_bar, local.x, local.y, event->button, &event_result);
         break;
     case REACH_POINTER_EVENT_MOVE:
         reach_top_bar_pointer_move(top_bar, local.x, local.y, &event_result);
-        break;
-    case REACH_POINTER_EVENT_CONTEXT:
-        reach_top_bar_pointer_context(top_bar, local.x, local.y, &event_result);
         break;
     case REACH_POINTER_EVENT_CANCEL:
         reach_top_bar_pointer_cancel(top_bar, &event_result);
@@ -1232,14 +1217,10 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
 const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_top_bar_capsule_reset,
-        reach_top_bar_capsule_tick,
-        reach_top_bar_capsule_is_open,
-        reach_top_bar_capsule_on_game_mode,
-        reach_top_bar_capsule_needs_frame,
-        reach_top_bar_capsule_wants_pointer_move,
-        reach_top_bar_capsule_handle_pointer,
-        reach_top_bar_capsule_pointer_sequence_active,
+        reach_top_bar_capsule_reset,          reach_top_bar_capsule_tick,
+        reach_top_bar_capsule_is_open,        reach_top_bar_capsule_on_game_mode,
+        reach_top_bar_capsule_needs_frame,    reach_top_bar_capsule_wants_pointer_move,
+        reach_top_bar_capsule_handle_pointer, reach_top_bar_capsule_pointer_sequence_active,
         reach_top_bar_capsule_input_regions,
     };
     return &ops;

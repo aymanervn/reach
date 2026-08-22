@@ -486,9 +486,9 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
                                                           : state->battery_saver_on;
     input.power_hover =
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
-    input.click_feedback_index = state->feedback_index;
-    input.click_feedback_opacity =
-        reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
+    input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
+    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+    input.click_feedback_opacity = reach_pressable_feedback_value(&state->pressable, &feedback);
     input.current_app_name = state->current_app_name;
     input.tray_items = state->tray_items;
     input.tray_item_count = state->tray_item_count;

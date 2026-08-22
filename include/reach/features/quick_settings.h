@@ -138,6 +138,8 @@ extern "C"
         reach_quick_settings_layout layout;
         reach_theme theme;
         float dpi_scale;
+        uint64_t press_feedback_target;
+        float press_feedback_opacity;
     } reach_quick_settings_render_input;
 
     void reach_quick_settings_model_init(reach_quick_settings_model *model);
@@ -298,8 +300,7 @@ extern "C"
                                              uint32_t change_flags);
 
     void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
-                                              double delta_seconds,
-                                              reach_feature_tick_result *out);
+                                              double delta_seconds, reach_feature_tick_result *out);
     size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quick_settings,
                                                           uint64_t *out_ids, size_t cap);
 

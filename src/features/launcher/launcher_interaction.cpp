@@ -73,7 +73,47 @@ reach_launcher_hit_result reach_launcher_hit_test(const reach_launcher_model *mo
     return hit;
 }
 
+static uint64_t reach_launcher_pressable_target(const reach_launcher *launcher,
+                                                const reach_launcher_state *state,
+                                                const reach_launcher_event_context *ctx,
+                                                reach_launcher_hit_result hit,
+                                                reach_pointer_button button)
+{
+    if (state != nullptr && hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
+        hit.index < state->model.result_count &&
+        (button == REACH_POINTER_BUTTON_PRIMARY ||
+         state->model.results[hit.index].kind == REACH_SEARCH_RESULT_APP))
+    {
+        return (static_cast<uint64_t>(hit.type) << 56) |
+               (static_cast<uint64_t>(reach_launcher_search_generation(launcher)) << 24) |
+               static_cast<uint32_t>(hit.index);
+    }
+    if (button == REACH_POINTER_BUTTON_PRIMARY && ctx != nullptr &&
+        hit.type == REACH_LAUNCHER_HIT_PINNED_APP && hit.index < ctx->pinned_app_count)
+    {
+        return (static_cast<uint64_t>(hit.type) << 56) | ctx->pinned_apps[hit.index].id;
+    }
+    return REACH_PRESSABLE_TARGET_NONE;
+}
+
+static void reach_launcher_apply_pressable_result(const reach_pressable_result *pressable,
+                                                  reach_launcher_event_result *out)
+{
+    if (pressable == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw = out->redraw || pressable->redraw;
+    if (pressable->capture != 0)
+    {
+        out->capture_pointer = pressable->capture;
+    }
+    out->sync_pointer_subscriptions =
+        out->sync_pointer_subscriptions || pressable->sync_pointer_subscriptions;
+}
+
 void reach_launcher_pointer_down(reach_launcher *launcher, int32_t x, int32_t y,
+                                 reach_pointer_button button,
                                  const reach_launcher_event_context *ctx,
                                  reach_launcher_event_result *out)
 {
@@ -97,8 +137,8 @@ void reach_launcher_pointer_down(reach_launcher *launcher, int32_t x, int32_t y,
         return;
     }
 
-    if (hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_THUMB ||
-        hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_TRACK)
+    if (button == REACH_POINTER_BUTTON_PRIMARY && (hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_THUMB ||
+                                                   hit.type == REACH_LAUNCHER_HIT_SCROLLBAR_TRACK))
     {
         size_t old_offset = reach_launcher_result_scroll_offset_state(state);
         reach_scrollbar_layout scrollbar_layout = {ctx->layout->search_result_scrollbar_track,
@@ -116,19 +156,30 @@ void reach_launcher_pointer_down(reach_launcher *launcher, int32_t x, int32_t y,
         return;
     }
 
-    if (hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT && hit.index < state->model.result_count)
+    if (button == REACH_POINTER_BUTTON_PRIMARY && hit.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
+        hit.index < state->model.result_count)
     {
         (void)reach_launcher_set_selected_result_state(state, hit.index);
         out->redraw = 1;
     }
 
-    state->pressed_launcher_hit_type = hit.type;
-    state->pressed_launcher_index = hit.index;
-    out->handled = 1;
+    uint64_t target = reach_launcher_pressable_target(launcher, state, ctx, hit, button);
+    if (target != REACH_PRESSABLE_TARGET_NONE)
+    {
+        reach_pressable_result pressable = {};
+        reach_pressable_press(&state->pressable, button, target, REACH_PRESSABLE_FEEDBACK_NONE,
+                              nullptr, &pressable);
+        reach_launcher_apply_pressable_result(&pressable, out);
+        out->handled = 1;
+    }
+    else
+    {
+        out->handled = 1;
+    }
 }
 
 void reach_launcher_pointer_up(reach_launcher *launcher, int32_t x, int32_t y,
-                               const reach_launcher_event_context *ctx,
+                               reach_pointer_button button, const reach_launcher_event_context *ctx,
                                reach_launcher_event_result *out)
 {
     if (launcher == nullptr || ctx == nullptr || ctx->layout == nullptr || out == nullptr)
@@ -144,26 +195,35 @@ void reach_launcher_pointer_up(reach_launcher *launcher, int32_t x, int32_t y,
     }
 
     reach_launcher_hit_result hit = reach_launcher_hit_test(&state->model, ctx->layout, x, y);
-
-    reach_launcher_action action =
-        reach_launcher_action_for_hit(&state->model, ctx->pinned_apps, ctx->pinned_app_count, hit);
-
-    int32_t pressed_match =
-        state->pressed_launcher_hit_type == hit.type && state->pressed_launcher_index == hit.index;
-
-    state->pressed_launcher_hit_type = REACH_LAUNCHER_HIT_NONE;
-    state->pressed_launcher_index = REACH_MAX_PINNED_APPS;
-
-    if (pressed_match && action.type != REACH_LAUNCHER_ACTION_NONE)
+    reach_pressable_result pressable = {};
+    reach_pressable_release(&state->pressable, button,
+                            reach_launcher_pressable_target(launcher, state, ctx, hit, button),
+                            nullptr, &pressable);
+    reach_launcher_apply_pressable_result(&pressable, out);
+    if (pressable.activated)
     {
-        out->action = action;
-        out->handled = 1;
+        reach_launcher_action action = {};
+        if (button == REACH_POINTER_BUTTON_SECONDARY)
+        {
+            action.type = REACH_LAUNCHER_ACTION_REVEAL_RESULT;
+            action.result_index = hit.index;
+        }
+        else
+        {
+            action = reach_launcher_action_for_hit(&state->model, ctx->pinned_apps,
+                                                   ctx->pinned_app_count, hit);
+        }
+        if (action.type != REACH_LAUNCHER_ACTION_NONE)
+        {
+            out->action = action;
+            out->handled = 1;
+        }
     }
 }
 
-void reach_launcher_scrollbar_drag_move(reach_launcher *launcher, int32_t y,
-                                        const reach_launcher_event_context *ctx,
-                                        reach_launcher_event_result *out)
+void reach_launcher_pointer_move(reach_launcher *launcher, int32_t x, int32_t y,
+                                 const reach_launcher_event_context *ctx,
+                                 reach_launcher_event_result *out)
 {
     if (launcher == nullptr || ctx == nullptr || ctx->layout == nullptr || out == nullptr)
     {
@@ -171,6 +231,15 @@ void reach_launcher_scrollbar_drag_move(reach_launcher *launcher, int32_t y,
     }
 
     reach_launcher_state *state = reach_launcher_state_mut(launcher);
+
+    reach_launcher_hit_result hit = reach_launcher_hit_test(&state->model, ctx->layout, x, y);
+    reach_pressable_result pressable = {};
+    reach_pressable_update(
+        &state->pressable,
+        reach_launcher_pressable_target(launcher, state, ctx, hit,
+                                        reach_pressable_button(&state->pressable)),
+        &pressable);
+    reach_launcher_apply_pressable_result(&pressable, out);
 
     if (!state->launcher_scrollbar_drag.active)
     {
@@ -207,6 +276,30 @@ void reach_launcher_scrollbar_release(reach_launcher *launcher, reach_launcher_e
     out->sync_pointer_subscriptions = 1;
     out->capture_pointer = -1;
     out->handled = 1;
+}
+
+void reach_launcher_pointer_leave(reach_launcher *launcher, reach_launcher_event_result *out)
+{
+    if (launcher == nullptr || out == nullptr)
+    {
+        return;
+    }
+    reach_pressable_result pressable = {};
+    reach_pressable_update(&reach_launcher_state_mut(launcher)->pressable,
+                           REACH_PRESSABLE_TARGET_NONE, &pressable);
+    reach_launcher_apply_pressable_result(&pressable, out);
+}
+
+void reach_launcher_pointer_cancel(reach_launcher *launcher, reach_launcher_event_result *out)
+{
+    if (launcher == nullptr || out == nullptr)
+    {
+        return;
+    }
+    reach_pressable_result pressable = {};
+    reach_pressable_cancel(&reach_launcher_state_mut(launcher)->pressable, nullptr, &pressable);
+    reach_launcher_apply_pressable_result(&pressable, out);
+    reach_launcher_scrollbar_release(launcher, out);
 }
 
 void reach_launcher_wheel(reach_launcher *launcher, int32_t x, int32_t y, int32_t wheel_delta,

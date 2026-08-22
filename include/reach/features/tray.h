@@ -7,6 +7,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/core/theme.h"
+#include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/features/popup.h"
 #include "reach/support/animation.h"
@@ -66,9 +67,7 @@ extern "C"
     {
         int32_t popup_open;
         reach_tray_model model;
-
-        size_t feedback_index;
-        int32_t feedback_pressed;
+        reach_pressable pressable;
     } reach_tray_state;
 
     typedef struct reach_tray reach_tray;

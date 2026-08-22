@@ -35,12 +35,12 @@ void reach_settings_model_init(reach_settings_model *model)
                                  REACH_SETTINGS_POWER_TIMER_COUNT);
     model->power_focused_timer = -1;
     model->account_focused_field = -1;
-    model->pressed_button = REACH_SETTINGS_HIT_NONE;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;
     reach_animation_manager_init(&model->display_fps_animation, &model->display_fps_track, 1);
     reach_animation_manager_init(&model->display_font_animation, &model->display_font_track, 1);
     reach_animation_manager_init(&model->display_theme_animation, &model->display_theme_track, 1);
     reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
+    reach_pressable_init(&model->button_pressable);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
     {
         reach_text_edit_init(&model->account_password_edits[field],
@@ -74,30 +74,10 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
     model->selected_page = page;
 }
 
-void reach_settings_model_press_button(reach_settings_model *model, int32_t hit_type)
-{
-    if (model == nullptr || hit_type == REACH_SETTINGS_HIT_NONE)
-    {
-        return;
-    }
-    model->pressed_button = hit_type;
-    reach_animation_manager_set(&model->button_press_animation, 0, 1.0f);
-}
-
-void reach_settings_model_release_button(reach_settings_model *model)
-{
-    if (model == nullptr || model->pressed_button == REACH_SETTINGS_HIT_NONE)
-    {
-        return;
-    }
-    float current = reach_animation_manager_value(&model->button_press_animation, 0);
-    reach_animation_manager_start(&model->button_press_animation, 0, current, 0.0f, 0.18,
-                                  REACH_EASING_EASE_OUT);
-}
-
 float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)
 {
-    if (model == nullptr || model->pressed_button != hit_type)
+    if (model == nullptr || reach_pressable_feedback_index(&model->button_pressable) !=
+                                (size_t)hit_type)
     {
         return 0.0f;
     }
@@ -111,11 +91,10 @@ int32_t reach_settings_model_tick_button_press(reach_settings_model *model, doub
         return 0;
     }
     reach_animation_manager_tick(&model->button_press_animation, delta_seconds);
-    if (!reach_animation_manager_any_active(&model->button_press_animation) &&
-        reach_animation_manager_value(&model->button_press_animation, 0) <= 0.0f)
-    {
-        model->pressed_button = REACH_SETTINGS_HIT_NONE;
-    }
+    reach_pressable_feedback_style feedback = {};
+    feedback.animations = &model->button_press_animation;
+    feedback.track = 0;
+    reach_pressable_settle_feedback(&model->button_pressable, &feedback);
     return 1;
 }
 

@@ -119,6 +119,22 @@ reach_dock_state *reach_dock_state_mut(reach_dock *animations)
     return animations != nullptr ? &animations->state : nullptr;
 }
 
+static reach_pressable_feedback_style reach_dock_pressable_feedback(reach_dock *dock)
+{
+    reach_pressable_feedback_style feedback = {};
+    if (dock != nullptr)
+    {
+        feedback.animations = &dock->manager;
+        feedback.track = REACH_DOCK_ANIM_FEEDBACK_OPACITY;
+        feedback.pressed_value = 0.50f;
+        feedback.press_seconds = 0.055;
+        feedback.release_seconds = 0.055;
+        feedback.press_easing = REACH_EASING_EASE_IN_OUT;
+        feedback.release_easing = REACH_EASING_EASE_IN_OUT;
+    }
+    return feedback;
+}
+
 reach_result reach_dock_create(reach_dock **out_animations)
 {
     if (out_animations == nullptr)
@@ -133,10 +149,8 @@ reach_result reach_dock_create(reach_dock **out_animations)
     reach_animation_manager_init(&animations->manager, animations->tracks, REACH_DOCK_ANIM_COUNT);
     animations->state.drag.source_index = REACH_MAX_DOCK_ITEMS;
     animations->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
-    animations->state.pressed_index = REACH_MAX_DOCK_ITEMS;
-    animations->state.pressed_control = REACH_DOCK_HIT_NONE;
     animations->state.hovered_item = REACH_MAX_DOCK_ITEMS;
-    animations->state.feedback_index = REACH_DOCK_FEEDBACK_NONE;
+    reach_pressable_init(&animations->state.pressable);
     *out_animations = animations;
     return REACH_OK;
 }
@@ -182,14 +196,8 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
         redraw = 1;
     }
 
-    if (feedback_was_active &&
-        !reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY) &&
-        !state->feedback_pressed && !state->feedback_sticky &&
-        reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY) <= 0.001f)
-    {
-        reach_animation_manager_set(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY, 0.0f);
-        state->feedback_index = REACH_DOCK_FEEDBACK_NONE;
-    }
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(animations);
+    reach_pressable_settle_feedback(&state->pressable, &feedback);
 
     for (size_t index = 0; index < state->model.item_count; ++index)
     {
@@ -268,26 +276,6 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
     }
 }
 
-static int32_t reach_dock_begin_pointer_sequence(reach_dock *dock)
-{
-    if (dock == nullptr || dock->state.pointer_sequence_active)
-    {
-        return 0;
-    }
-    dock->state.pointer_sequence_active = 1;
-    return 1;
-}
-
-static int32_t reach_dock_end_pointer_sequence(reach_dock *dock)
-{
-    if (dock == nullptr || !dock->state.pointer_sequence_active)
-    {
-        return 0;
-    }
-    dock->state.pointer_sequence_active = 0;
-    return 1;
-}
-
 void reach_dock_begin_reveal_session(reach_dock *dock)
 {
     if (dock != nullptr)
@@ -303,7 +291,8 @@ static void reach_dock_reset_reveal_state(reach_dock *dock)
         return;
     }
     reach_bar_visibility_reset(&dock->state.visibility);
-    dock->state.pointer_sequence_active = 0;
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+    reach_pressable_reset(&dock->state.pressable, &feedback);
 }
 
 static void reach_dock_reset_model(reach_dock *dock)
@@ -405,8 +394,9 @@ static void reach_dock_capsule_reset(void *capsule)
     if (dock != nullptr)
     {
         dock->pointer_layout_valid = 0;
-        dock->state.pressed_control = REACH_DOCK_HIT_NONE;
         dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_reset(&dock->state.pressable, &feedback);
 
         dock->slots_synced = 0;
     }
@@ -442,32 +432,12 @@ static int32_t reach_dock_capsule_needs_frame(const void *capsule)
 static int32_t reach_dock_capsule_pointer_sequence_active(const void *capsule)
 {
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
-    return dock != nullptr && dock->state.pointer_sequence_active;
+    return dock != nullptr && reach_pressable_tracking(&dock->state.pressable);
 }
 
 static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
 {
     return reach_dock_capsule_pointer_sequence_active(capsule);
-}
-
-static void reach_dock_capsule_begin_pointer_sequence(reach_dock *dock,
-                                                      reach_capsule_pointer_result *out)
-{
-    if (reach_dock_begin_pointer_sequence(dock))
-    {
-        out->capture = 1;
-        out->sync_pointer_subscriptions = 1;
-    }
-}
-
-static void reach_dock_capsule_end_pointer_sequence(reach_dock *dock,
-                                                    reach_capsule_pointer_result *out)
-{
-    if (reach_dock_end_pointer_sequence(dock))
-    {
-        out->capture = -1;
-        out->sync_pointer_subscriptions = 1;
-    }
 }
 
 static reach_dock_interaction_context reach_dock_capsule_interaction_context(reach_dock *dock)
@@ -518,6 +488,40 @@ reach_dock_capsule_apply_interaction_result(const reach_dock_interaction_result 
     }
 }
 
+static const uint64_t REACH_DOCK_PRESSABLE_TRIGGER = UINT64_MAX - 1;
+
+static uint64_t reach_dock_pressable_target(const reach_dock *dock, reach_dock_hit_result hit,
+                                            reach_pointer_button button)
+{
+    if (dock != nullptr && hit.type == REACH_DOCK_HIT_ITEM &&
+        hit.index < dock->state.model.item_count)
+    {
+        reach_dock_order_key key = reach_dock_item_key_at(&dock->state.model, hit.index);
+        return ((uint64_t)(key.pinned ? 1 : 0) << 32) | key.app_id;
+    }
+    if (button == REACH_POINTER_BUTTON_PRIMARY && hit.type == REACH_DOCK_HIT_TRIGGER)
+    {
+        return REACH_DOCK_PRESSABLE_TRIGGER;
+    }
+    return REACH_PRESSABLE_TARGET_NONE;
+}
+
+static void reach_dock_capsule_apply_pressable_result(const reach_pressable_result *pressable,
+                                                      reach_capsule_pointer_result *out)
+{
+    if (pressable == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw = out->redraw || pressable->redraw;
+    if (pressable->capture != 0)
+    {
+        out->capture = pressable->capture;
+    }
+    out->sync_pointer_subscriptions =
+        out->sync_pointer_subscriptions || pressable->sync_pointer_subscriptions;
+}
+
 static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
                                               reach_capsule_pointer_result *out)
 {
@@ -552,12 +556,25 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 
     if (event->kind == REACH_POINTER_EVENT_DOWN)
     {
-        reach_dock_capsule_begin_pointer_sequence(dock, out);
-        state->pressed_control = hit.type;
+        uint64_t target = reach_dock_pressable_target(dock, hit, event->button);
+        if (target == REACH_PRESSABLE_TARGET_NONE)
+        {
+            return;
+        }
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        size_t feedback_index =
+            hit.type == REACH_DOCK_HIT_TRIGGER ? REACH_DOCK_FEEDBACK_TRIGGER : hit.index;
+        reach_pressable_press(&state->pressable, event->button, target, feedback_index, &feedback,
+                              &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
+        if (event->button == REACH_POINTER_BUTTON_SECONDARY)
+        {
+            out->handled = reach_pressable_tracking(&state->pressable);
+            return;
+        }
         if (hit.type == REACH_DOCK_HIT_TRIGGER)
         {
-            out->redraw =
-                out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_TRIGGER);
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER;
             out->action.index = REACH_DOCK_TRIGGER_PRIMARY;
@@ -575,70 +592,77 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             out->action.index = hit.index;
             return;
         }
-
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        reach_dock_clear_pressed(dock);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_UP)
     {
-        if (state->drag.active)
+        int32_t moved = event->button == REACH_POINTER_BUTTON_PRIMARY && state->drag.active &&
+                        state->drag.moved;
+        if (event->button == REACH_POINTER_BUTTON_PRIMARY && state->drag.active)
         {
-            int32_t moved = state->drag.moved;
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
             reach_dock_capsule_apply_interaction_result(&interaction, out);
-            if (moved)
-            {
-                state->pressed_control = REACH_DOCK_HIT_NONE;
-                out->handled = 1;
-                reach_dock_capsule_end_pointer_sequence(dock, out);
-                return;
-            }
-        }
-        else
-        {
-            out->redraw = out->redraw || reach_dock_feedback_release(dock);
         }
 
-        reach_dock_hit_type pressed = static_cast<reach_dock_hit_type>(state->pressed_control);
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        if (pressed == REACH_DOCK_HIT_TRIGGER && hit.type == pressed)
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        reach_pressable_release(&state->pressable, event->button,
+                                reach_dock_pressable_target(dock, hit, event->button), &feedback,
+                                &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
+        if (event->button == REACH_POINTER_BUTTON_SECONDARY)
+        {
+            if (pressable.activated && hit.type == REACH_DOCK_HIT_ITEM &&
+                hit.index < state->model.item_count)
+            {
+                out->handled = 1;
+                out->action.kind = REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT;
+                out->action.index = hit.index;
+            }
+            return;
+        }
+        if (moved)
+        {
+            out->handled = 1;
+            return;
+        }
+        if (pressable.activated_target == REACH_DOCK_PRESSABLE_TRIGGER)
         {
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER;
             out->action.index = REACH_DOCK_TRIGGER_PRIMARY;
         }
-        else if (pressed == REACH_DOCK_HIT_ITEM && hit.type == pressed)
+        else if (pressable.activated && hit.type == REACH_DOCK_HIT_ITEM &&
+                 hit.index < state->model.item_count)
         {
-            reach_dock_item_action item_action = {};
-            reach_dock_interaction_result interaction = {};
-            if (reach_dock_item_release(dock, hit.index, &item_action, &interaction))
+            size_t item_index = hit.index;
+            reach_dock_item_action item_action =
+                reach_dock_item_action_for_index(&state->model, item_index);
+            out->handled = 1;
+            if (item_action.type == REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED)
             {
-                reach_dock_capsule_apply_interaction_result(&interaction, out);
-                out->handled = 1;
-                if (item_action.type == REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED)
-                {
-                    out->action.kind = REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED;
-                    out->action.index = item_action.pinned_index;
-                    out->action.id = item_action.pin_id;
-                }
-                else if (item_action.type == REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW)
-                {
-                    out->action.kind = REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW;
-                    out->action.window = item_action.window;
-                }
+                out->action.kind = REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED;
+                out->action.index = item_action.pinned_index;
+                out->action.id = item_action.pin_id;
+            }
+            else if (item_action.type == REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW)
+            {
+                out->action.kind = REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW;
+                out->action.window = item_action.window;
             }
         }
-        else
-        {
-            reach_dock_clear_pressed(dock);
-        }
-        reach_dock_capsule_end_pointer_sequence(dock, out);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_MOVE)
     {
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        reach_pressable_update(
+            &state->pressable,
+            reach_dock_pressable_target(dock, hit, reach_pressable_button(&state->pressable)),
+            &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
         if (!state->drag.active)
         {
             size_t hovered_item =
@@ -654,37 +678,31 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         }
         if (state->drag.active)
         {
+            int32_t was_moved = state->drag.moved;
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_update(dock, reach_dock_capsule_screen_x(dock, event->x),
                                    reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
                                    &interaction);
             reach_dock_capsule_apply_interaction_result(&interaction, out);
+            if (!was_moved && state->drag.moved)
+            {
+                reach_pressable_disarm(&state->pressable, &feedback, &pressable);
+                reach_dock_capsule_apply_pressable_result(&pressable, out);
+            }
             out->handled = 1;
         }
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_MIDDLE)
     {
-        out->redraw = out->redraw || reach_dock_feedback_release(dock);
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        reach_dock_clear_pressed(dock);
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        reach_pressable_cancel(&state->pressable, &feedback, &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
         if (hit.type == REACH_DOCK_HIT_ITEM)
         {
             out->handled = 1;
             out->action.kind = REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE;
-            out->action.index = hit.index;
-        }
-        return;
-    }
-    if (event->kind == REACH_POINTER_EVENT_CONTEXT)
-    {
-        out->redraw = out->redraw || reach_dock_feedback_clear_sticky(dock);
-        if (hit.type == REACH_DOCK_HIT_ITEM)
-        {
-            out->redraw =
-                out->redraw || reach_dock_feedback_press_immediate(dock, hit.index, 0.50f);
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT;
             out->action.index = hit.index;
         }
         return;
@@ -697,20 +715,23 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
             reach_dock_capsule_apply_interaction_result(&interaction, out);
         }
-        out->redraw = out->redraw || reach_dock_feedback_release(dock);
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        reach_dock_clear_pressed(dock);
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        reach_pressable_cancel(&state->pressable, &feedback, &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
         if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
             state->hovered_item = REACH_MAX_DOCK_ITEMS;
             out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
             out->action.index = REACH_MAX_DOCK_ITEMS;
         }
-        reach_dock_capsule_end_pointer_sequence(dock, out);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_LEAVE)
     {
+        reach_pressable_result pressable = {};
+        reach_pressable_update(&state->pressable, REACH_PRESSABLE_TARGET_NONE, &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
         if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
             state->hovered_item = REACH_MAX_DOCK_ITEMS;
@@ -723,14 +744,10 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_dock_capsule_reset,
-        reach_dock_capsule_tick,
-        reach_dock_capsule_is_open,
-        reach_dock_capsule_on_game_mode,
-        reach_dock_capsule_needs_frame,
-        reach_dock_capsule_wants_pointer_move,
-        reach_dock_capsule_handle_pointer,
-        reach_dock_capsule_pointer_sequence_active,
+        reach_dock_capsule_reset,          reach_dock_capsule_tick,
+        reach_dock_capsule_is_open,        reach_dock_capsule_on_game_mode,
+        reach_dock_capsule_needs_frame,    reach_dock_capsule_wants_pointer_move,
+        reach_dock_capsule_handle_pointer, reach_dock_capsule_pointer_sequence_active,
     };
     return &ops;
 }
@@ -738,6 +755,26 @@ const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
 reach_animation_manager *reach_dock_manager(reach_dock *animations)
 {
     return animations != nullptr ? &animations->manager : nullptr;
+}
+
+int32_t reach_dock_retain_context_feedback(reach_dock *dock)
+{
+    if (dock == nullptr)
+    {
+        return 0;
+    }
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+    return reach_pressable_latch_feedback(&dock->state.pressable, &feedback);
+}
+
+int32_t reach_dock_clear_context_feedback(reach_dock *dock)
+{
+    if (dock == nullptr)
+    {
+        return 0;
+    }
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+    return reach_pressable_clear_latched_feedback(&dock->state.pressable, &feedback);
 }
 
 reach_bar_visibility_result
@@ -750,12 +787,12 @@ reach_dock_update_visibility(reach_dock *animations, const reach_bar_visibility_
 
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_DOCK_EDGE;
-    bar_request.pointer_sequence_active = animations->state.pointer_sequence_active;
+    bar_request.pointer_sequence_active = reach_pressable_tracking(&animations->state.pressable);
     bar_request.can_hide = request->any_window_maximized || request->foreground_snapped;
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &animations->state.visibility, &animations->manager, REACH_DOCK_ANIM_Y, &bar_request);
-    if (!result.visible && reach_dock_feedback_clear_sticky(animations))
+    if (!result.visible && reach_dock_clear_context_feedback(animations))
     {
         result.redraw = 1;
     }
@@ -770,7 +807,8 @@ reach_bar_reveal_animation reach_dock_reveal_animation(const reach_dock *dock)
         return animation;
     }
 
-    animation.position_animating = reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
+    animation.position_animating =
+        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
     animation.content_animating =
         reach_dock_slots_animating(dock) || dock->state.drag.active ||
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP) ||

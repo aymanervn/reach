@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/core/ui_events.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -26,7 +27,6 @@ extern "C"
         REACH_POINTER_EVENT_WHEEL = 4,
         REACH_POINTER_EVENT_LEAVE = 5,
         REACH_POINTER_EVENT_CANCEL = 6,
-        REACH_POINTER_EVENT_CONTEXT = 7,
         REACH_POINTER_EVENT_MIDDLE = 8
     } reach_pointer_event_kind;
 
@@ -37,6 +37,7 @@ extern "C"
         int32_t y;
         int32_t wheel_delta;
         uint32_t modifiers;
+        reach_pointer_button button;
     } reach_pointer_event;
 
     typedef struct reach_capsule_action

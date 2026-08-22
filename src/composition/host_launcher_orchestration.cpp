@@ -47,7 +47,6 @@ void reach_host_cleanup_closed_launcher(reach_host *host)
     reach_launcher_cancel_search(host->launcher_capsule);
     reach_launcher_clear_query(host->launcher_capsule);
     (void)reach_launcher_clear_results(host->launcher_capsule);
-    reach_launcher_clear_pressed(host->launcher_capsule);
     reach_launcher_reset_text_edit(host->launcher_capsule);
 }
 
