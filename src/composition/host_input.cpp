@@ -110,10 +110,6 @@ static reach_capsule_pointer_result reach_host_dispatch_pointer(reach_host *host
     }
     if (result.handled || result.redraw || result.relayout || result.capture != 0)
     {
-        if ((desc->pointer_flags & REACH_SURFACE_POINTER_UPDATES_BAR_VISIBILITY) != 0)
-        {
-            reach_host_request_bar_visibility_update(host);
-        }
         reach_host_request_update(host);
     }
     return result;
@@ -820,16 +816,20 @@ static reach_result reach_host_handle_pointer_leave(reach_host *host, reach_surf
     }
 
     const reach_surface_desc *src = reach_host_surface_for_role(host, source);
-    if (src != nullptr && src->capsule_ops->handle_pointer != nullptr)
+    if (src == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    if (src->capsule_ops->handle_pointer != nullptr)
     {
         reach_capsule_pointer_result leave =
             reach_host_dispatch_pointer(host, src->id, nullptr, REACH_POINTER_EVENT_LEAVE);
         (void)reach_host_apply_pointer(host, src->id, nullptr, &leave);
-        if (src->id == REACH_SURFACE_ID_DOCK)
-        {
-
-            reach_host_request_bar_visibility_update(host);
-        }
+    }
+    if (src->bar_reveal.ops != nullptr)
+    {
+        reach_host_request_bar_visibility_update(host);
     }
 
     return REACH_OK;

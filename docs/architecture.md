@@ -18,7 +18,9 @@ core ← protocol ← ports ← services ← features
 
 Primitives and neutral shared data — geometry, color, results, ids, render commands,
 theme, app/window/media/config data. No state, no policy, no OS. Includes nothing but
-the standard library.
+the standard library. Surface background colors are semantic theme tokens rather than
+value-based aliases: Dock, top bar and switcher each read their named background, while
+all popup capsules share the popup background contract.
 
 ## protocol
 
@@ -256,6 +258,9 @@ descriptor-declared edge reveal. Fixed triggers declare an anchor and DP size;
 Stage is an always-enabled 4dp top-left square. Animated bars publish managed
 bounds from the shared visibility result. Generic runtime loops own geometry,
 callback binding, event dispatch, bounds caching, layout registration and teardown.
+The `bar_reveal` capability also owns the surface-leave wake-up: every pointer leave
+on a bar surface requests visibility reconciliation, so a hidden-target decision
+never waits for an unrelated repaint.
 
 Both answers are cached, so what makes them correct is that every path which
 learns the window world changed goes through one function,

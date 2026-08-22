@@ -98,7 +98,7 @@ static void reach_top_bar_push_pill(const reach_theme *theme, reach_render_comma
     shape.radius = radius;
     reach_render_push_shadow(commands, &shape, &theme->bar_shadow, dpi_scale);
 
-    reach_top_bar_push_rect(commands, pill, theme->bar_background, radius);
+    reach_top_bar_push_rect(commands, pill, theme->top_bar_background, radius);
 
     if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {

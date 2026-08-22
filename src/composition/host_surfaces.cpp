@@ -345,8 +345,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                     nullptr,
                                     host->dock_capsule,
                                     reach_dock_capsule_ops(),
-                                    REACH_SURFACE_POINTER_UPDATES_BAR_VISIBILITY |
-                                        REACH_SURFACE_POINTER_SOURCE_GATED};
+                                    REACH_SURFACE_POINTER_SOURCE_GATED};
     descs[REACH_SURFACE_ID_TOP_BAR] = {REACH_SURFACE_ID_TOP_BAR,
                                        REACH_SURFACE_CLASS_PERSISTENT,
                                        &host->top_bar,
@@ -354,8 +353,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                        nullptr,
                                        host->top_bar_capsule,
                                        reach_top_bar_capsule_ops(),
-                                       REACH_SURFACE_POINTER_UPDATES_BAR_VISIBILITY |
-                                           REACH_SURFACE_POINTER_SOURCE_GATED};
+                                       REACH_SURFACE_POINTER_SOURCE_GATED};
     descs[REACH_SURFACE_ID_LAUNCHER] = {REACH_SURFACE_ID_LAUNCHER,
                                         REACH_SURFACE_CLASS_TRANSIENT,
                                         &host->launcher,
