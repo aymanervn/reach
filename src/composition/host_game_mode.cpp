@@ -32,6 +32,22 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
     host->dirty.render = 1;
 }
 
+static void reach_host_disable_bar_pointer_observations(reach_host *host)
+{
+    if (host == nullptr || host->input_source.ops.set_pointer_region == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        if (host->surface_descs[index].bar_reveal.ops != nullptr)
+        {
+            (void)host->input_source.ops.set_pointer_region(
+                host->input_source.source, static_cast<uint32_t>(index), {}, 0);
+        }
+    }
+}
+
 int32_t reach_host_game_mode_enabled(const reach_host *host)
 {
     return host != nullptr && reach_runtime_policy_game_mode_enabled(&host->runtime_policy);
@@ -77,6 +93,7 @@ reach_result reach_host_update_game_mode(reach_host *host)
     }
     if (next_active)
     {
+        reach_host_disable_bar_pointer_observations(host);
         reach_host_suspend_pointer_move_subscriptions(host);
     }
     else

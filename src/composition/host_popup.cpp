@@ -120,7 +120,8 @@ void reach_host_sync_popup_mouse_hook(reach_host *host)
     }
 }
 
-void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus)
+void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask,
+                                      int32_t restore_focus)
 {
     if (host == nullptr)
     {
@@ -130,7 +131,7 @@ void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->cls != REACH_SURFACE_CLASS_TRANSIENT && desc->cls != REACH_SURFACE_CLASS_POPUP)
+        if ((class_mask & reach_surface_class_bit(desc->cls)) == 0)
         {
             continue;
         }
@@ -144,4 +145,12 @@ void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus
         }
     }
     reach_host_clear_sticky_dock_feedback(host);
+}
+
+void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus)
+{
+    reach_host_close_surface_classes(host,
+                                     reach_surface_class_bit(REACH_SURFACE_CLASS_TRANSIENT) |
+                                         reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP),
+                                     restore_focus);
 }

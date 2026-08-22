@@ -150,10 +150,13 @@ struct reach_service_shared_state
     uint64_t window_sequence;
     uint64_t hotkey_sequence;
     uint64_t game_mode_sequence;
+    uint64_t manipulation_sequence;
+    uint64_t manipulation_window;
     uint32_t window_count;
     uint32_t hotkey_queue_start;
     uint32_t hotkey_queue_count;
     int32_t game_mode_active;
+    int32_t manipulation_active;
     uint64_t first_hotkey_event_number;
     uint64_t last_hotkey_event_number;
     reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS];

@@ -29,6 +29,7 @@ struct reach_shared_reader
     uint64_t last_window_sequence;
     uint64_t last_hotkey_sequence;
     uint64_t last_game_mode_sequence;
+    uint64_t last_manipulation_sequence;
     reach_service_shared_state cache;
     reach_shared_reader_subscriber subscribers[REACH_SHARED_MAX_SUBSCRIBERS];
 };
@@ -219,6 +220,7 @@ static void reach_shared_reader_set_disconnected(void)
     g_reader.last_window_sequence = 0;
     g_reader.last_hotkey_sequence = 0;
     g_reader.last_game_mode_sequence = 0;
+    g_reader.last_manipulation_sequence = 0;
     reach_shared_reader_unlock();
 
     reach_shared_reader_close_mapping();
@@ -241,6 +243,7 @@ static void reach_shared_reader_accept_state(const reach_service_shared_state *s
     int32_t windows_changed = 0;
     int32_t hotkeys_changed = 0;
     int32_t game_mode_changed = 0;
+    int32_t manipulation_changed = 0;
 
     reach_shared_reader_lock();
     if (!g_reader.connected)
@@ -251,11 +254,14 @@ static void reach_shared_reader_accept_state(const reach_service_shared_state *s
     windows_changed = state->window_sequence != g_reader.last_window_sequence;
     hotkeys_changed = state->hotkey_sequence != g_reader.last_hotkey_sequence;
     game_mode_changed = state->game_mode_sequence != g_reader.last_game_mode_sequence;
+    manipulation_changed =
+        state->manipulation_sequence != g_reader.last_manipulation_sequence;
     g_reader.cache = *state;
     g_reader.last_publish_sequence = state->publish_sequence;
     g_reader.last_window_sequence = state->window_sequence;
     g_reader.last_hotkey_sequence = state->hotkey_sequence;
     g_reader.last_game_mode_sequence = state->game_mode_sequence;
+    g_reader.last_manipulation_sequence = state->manipulation_sequence;
     reach_shared_reader_unlock();
 
     if (became_connected)
@@ -273,6 +279,10 @@ static void reach_shared_reader_accept_state(const reach_service_shared_state *s
     if (game_mode_changed)
     {
         reach_shared_reader_dispatch(REACH_SERVICE_SHARED_EVENT_GAME_MODE_CHANGED);
+    }
+    if (manipulation_changed)
+    {
+        reach_shared_reader_dispatch(REACH_SERVICE_SHARED_EVENT_WINDOW_MANIPULATION_CHANGED);
     }
 }
 
@@ -389,6 +399,7 @@ static void reach_shared_reader_stop_if_unused(void)
     g_reader.last_window_sequence = 0;
     g_reader.last_hotkey_sequence = 0;
     g_reader.last_game_mode_sequence = 0;
+    g_reader.last_manipulation_sequence = 0;
     reach_shared_reader_unlock();
 }
 
@@ -543,6 +554,21 @@ reach_result reach_service_shared_copy_game_mode(int32_t *out_active)
 
     reach_shared_reader_lock();
     *out_active = g_reader.cache.game_mode_active ? 1 : 0;
+    reach_shared_reader_unlock();
+    return REACH_OK;
+}
+
+reach_result reach_service_shared_copy_window_manipulation(uint64_t *out_window,
+                                                           int32_t *out_active)
+{
+    if (out_window == nullptr || out_active == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_shared_reader_lock();
+    *out_window = g_reader.cache.manipulation_window;
+    *out_active = g_reader.cache.manipulation_active ? 1 : 0;
     reach_shared_reader_unlock();
     return REACH_OK;
 }
@@ -727,6 +753,56 @@ reach_result reach_service_shared_bump_window_sequence(void)
 
     reach_shared_writer_begin_publish();
     ++g_writer.view->window_sequence;
+    reach_shared_writer_end_publish();
+    return REACH_OK;
+}
+
+reach_result reach_service_shared_publish_window_manipulation(uint64_t window, int32_t active)
+{
+    if (g_writer.view == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    active = active && window != 0 ? 1 : 0;
+    reach_shared_writer_begin_publish();
+    g_writer.view->manipulation_window = active ? window : 0;
+    g_writer.view->manipulation_active = active;
+    ++g_writer.view->manipulation_sequence;
+    reach_shared_writer_end_publish();
+    return REACH_OK;
+}
+
+reach_result reach_service_shared_finish_window_manipulation(
+    const reach_service_window_snapshot *windows, uint32_t window_count)
+{
+    if (g_writer.view == nullptr || (window_count > 0 && windows == nullptr))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (window_count > REACH_SERVICE_MAX_WINDOWS)
+    {
+        window_count = REACH_SERVICE_MAX_WINDOWS;
+    }
+
+    reach_shared_writer_begin_publish();
+    g_writer.view->version = reach_service_protocol_version();
+    g_writer.view->layout_size = sizeof(reach_service_shared_state);
+    g_writer.view->writer_pid = GetCurrentProcessId();
+    g_writer.view->generation = g_writer.generation;
+    g_writer.view->window_count = window_count;
+    for (uint32_t index = 0; index < window_count; ++index)
+    {
+        g_writer.view->windows[index] = windows[index];
+    }
+    for (uint32_t index = window_count; index < REACH_SERVICE_MAX_WINDOWS; ++index)
+    {
+        g_writer.view->windows[index] = {};
+    }
+    g_writer.view->manipulation_window = 0;
+    g_writer.view->manipulation_active = 0;
+    ++g_writer.view->window_sequence;
+    ++g_writer.view->manipulation_sequence;
     reach_shared_writer_end_publish();
     return REACH_OK;
 }

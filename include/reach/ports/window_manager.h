@@ -42,10 +42,6 @@ extern "C"
         reach_result (*snap)(reach_window_manager *manager, reach_window_id window_id,
                              reach_split_mode mode);
 
-        int32_t (*any_window_maximized_on_primary)(const reach_window_manager *manager);
-
-        int32_t (*window_is_snapped_on_primary)(const reach_window_manager *manager,
-                                                reach_window_id window_id);
         int32_t (*game_mode_active)(const reach_window_manager *manager);
         int32_t (*needs_refresh)(const reach_window_manager *manager);
         size_t (*window_count)(const reach_window_manager *manager);

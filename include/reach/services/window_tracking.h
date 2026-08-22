@@ -50,6 +50,10 @@ extern "C"
     size_t reach_window_tracking_collect_unminimized(const reach_window_tracking *service,
                                                      uintptr_t *out_windows,
                                                      size_t out_window_count);
+    int32_t reach_window_tracking_any_trespassing(const reach_window_tracking *service,
+                                                  reach_rect_f32 monitor_bounds,
+                                                  reach_rect_f32 protected_band,
+                                                  uintptr_t excluded_window);
 
     void reach_window_tracking_note_foreground(reach_window_tracking *service,
                                                uintptr_t foreground_window);

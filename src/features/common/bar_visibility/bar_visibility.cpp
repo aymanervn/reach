@@ -38,6 +38,34 @@ float reach_bar_reveal_progress(float animated_y, float shown_y, float hidden_y)
     return progress > 1.0f ? 1.0f : progress;
 }
 
+reach_rect_f32 reach_bar_protected_band(reach_bar_edge edge, reach_rect_f32 shown_bounds,
+                                        reach_rect_f32 monitor_bounds, float shadow_clearance)
+{
+    float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
+    float gap = edge == REACH_BAR_EDGE_TOP
+                    ? shown_bounds.y - monitor_bounds.y
+                    : monitor_bottom - (shown_bounds.y + shown_bounds.height);
+    if (gap < 0.0f)
+    {
+        gap = 0.0f;
+    }
+
+    float clearance = shadow_clearance > 0.0f ? shadow_clearance : 0.0f;
+    float depth = gap + shown_bounds.height + clearance;
+    if (depth > monitor_bounds.height)
+    {
+        depth = monitor_bounds.height;
+    }
+
+    reach_rect_f32 band = monitor_bounds;
+    band.height = depth;
+    if (edge == REACH_BAR_EDGE_BOTTOM)
+    {
+        band.y = monitor_bottom - depth;
+    }
+    return band;
+}
+
 static float reach_bar_reveal_span_inset(float inset, float width)
 {
     if (!(inset > 0.0f) || !(inset < width))
@@ -132,12 +160,22 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     int32_t target_hidden = 0;
     int32_t reveal_edge_shown = 0;
 
-    if (!request->can_hide)
+    if (request->force_shown)
     {
         state->reveal_session_active = 0;
         target_hidden = 0;
     }
-    else if (request->pointer_sequence_active || request->force_shown)
+    else if (request->force_hidden)
+    {
+        state->reveal_session_active = 0;
+        target_hidden = 1;
+    }
+    else if (!request->can_hide)
+    {
+        state->reveal_session_active = 0;
+        target_hidden = 0;
+    }
+    else if (request->pointer_sequence_active)
     {
         target_hidden = 0;
     }
@@ -198,6 +236,23 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     result.hover_revealed =
         state->reveal_session_active && (pointer_in_bridge || pointer_over_bar) ? 1 : 0;
     result.reveal_edge_shown = reveal_edge_shown;
+    result.pointer_observation_active =
+        request->can_hide && !request->force_shown && !request->force_hidden &&
+                !request->pointer_sequence_active && !request->hold_open && !target_hidden
+            ? 1
+            : 0;
+    if (result.pointer_observation_active)
+    {
+        float left = current_bounds.x < bridge_bounds.x ? current_bounds.x : bridge_bounds.x;
+        float top = current_bounds.y < bridge_bounds.y ? current_bounds.y : bridge_bounds.y;
+        float current_right = current_bounds.x + current_bounds.width;
+        float bridge_right = bridge_bounds.x + bridge_bounds.width;
+        float right = current_right > bridge_right ? current_right : bridge_right;
+        float current_bottom = current_bounds.y + current_bounds.height;
+        float bridge_bottom = bridge_bounds.y + bridge_bounds.height;
+        float bottom = current_bottom > bridge_bottom ? current_bottom : bridge_bottom;
+        result.pointer_observation_bounds = {left, top, right - left, bottom - top};
+    }
     result.visible = target_hidden ? 0 : 1;
     return result;
 }

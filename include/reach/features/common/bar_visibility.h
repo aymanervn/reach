@@ -32,12 +32,12 @@ extern "C"
         reach_rect_f32 monitor_bounds;
         reach_point_i32 pointer;
         int32_t pointer_valid;
-        int32_t any_window_maximized;
-        int32_t foreground_snapped;
         int32_t can_hide;
         int32_t pointer_sequence_active;
         int32_t force_shown;
+        int32_t force_hidden;
         int32_t hold_open;
+        uintptr_t excluded_window;
         float reveal_span_inset;
         float reveal_seconds;
         float shadow_clearance;
@@ -47,10 +47,12 @@ extern "C"
     {
         reach_rect_f32 animated_bounds;
         reach_rect_f32 reveal_bounds;
+        reach_rect_f32 pointer_observation_bounds;
         float reveal_progress;
         int32_t reveal_transition_active;
         int32_t hover_revealed;
         int32_t reveal_edge_shown;
+        int32_t pointer_observation_active;
         int32_t visible;
         int32_t redraw;
     } reach_bar_visibility_result;
@@ -69,6 +71,7 @@ extern "C"
             void *capsule, const reach_bar_visibility_request *request);
         reach_bar_reveal_animation (*animation)(const void *capsule);
         void (*position_frame)(void *capsule);
+        void (*invalidate_coverage)(void *capsule);
     } reach_bar_reveal_ops;
 
     void reach_bar_visibility_reset(reach_bar_visibility_state *state);
@@ -77,6 +80,9 @@ extern "C"
     float reach_bar_hidden_position(reach_bar_edge edge, reach_rect_f32 shown_bounds,
                                     reach_rect_f32 monitor_bounds, float shadow_clearance);
     float reach_bar_reveal_progress(float animated_y, float shown_y, float hidden_y);
+    reach_rect_f32 reach_bar_protected_band(reach_bar_edge edge, reach_rect_f32 shown_bounds,
+                                            reach_rect_f32 monitor_bounds,
+                                            float shadow_clearance);
 
     reach_bar_visibility_result
     reach_bar_update_visibility(reach_bar_visibility_state *state, reach_animation_manager *manager,

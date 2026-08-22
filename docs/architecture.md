@@ -246,34 +246,49 @@ by the shared `features/common/bar_visibility` state machine, and composition
 reconciles both through one `reach_host_reconcile_bar_visibility` over the
 descriptor `bar_reveal` spec and feature-owned `reach_bar_reveal_ops`. The spec
 declaratively supplies dynamic edge-reveal and active-layer policy; the capsule
-names its own edge and decides what counts as covered. Composition passes only
-*facts* about foreign windows on the request — `any_window_maximized` and
-`foreground_snapped` — and each capsule turns them into `can_hide`. The two bars
-answer differently and must: the top bar rests in the app band, so windows
-genuinely cover it and it uses its own trespass test, cached inside the capsule.
-The dock is permanently topmost and is never in the windows' range, so it hides
-by policy — the maximized / snapped rule — and a floating window overlapping the
-dock band must never hide it. A single screen-hotspot factory creates every
+names its own edge and caches whether a tracked app intersects the protected band
+returned by `reach_bar_protected_band`. The symmetric policy band reaches from the
+screen edge through the bar's content bounds and its rendered shadow extent. The
+shadow clearance comes from the theme's resolved per-monitor DPI geometry rather
+than an independent policy constant. `window_tracking` supplies the one outer-bounds
+trespass query used by both bars. The resulting hide policy is the
+same even though reveal presentation differs: the top bar rests in the app band
+and uses `reach_bar_reveal_ops.position_frame` to push trespassing windows, while
+the permanently-topmost Dock reveals over them without a side effect. A single
+screen-hotspot factory creates every
 descriptor-declared edge reveal. Fixed triggers declare an anchor and DP size;
 Stage is an always-enabled 4dp top-left square. Animated bars publish managed
 bounds from the shared visibility result. Generic runtime loops own geometry,
 callback binding, event dispatch, bounds caching, layout registration and teardown.
-The `bar_reveal` capability also owns the surface-leave wake-up: every pointer leave
-on a bar surface requests visibility reconciliation, so a hidden-target decision
-never waits for an unrelated repaint.
+The `bar_reveal` capability also owns pointer-exit wake-up. Surface leave remains
+a wake-up, but a hideable shown bar additionally publishes its bar-plus-bridge
+observation bounds. The Windows input adapter installs a passive low-level mouse
+hook only while at least one such region is active and posts only membership
+changes; it neither consumes input nor polls. This covers the interval after the
+thin edge hotspot is hidden, including a top bar that cannot receive a reliable
+surface leave because another window owns that part of the screen.
 
 Both answers are cached, so what makes them correct is that every path which
 learns the window world changed goes through one function,
-`reach_host_refresh_window_world`: it invalidates the facts and the capsule's
-trespass cache, refreshes the manager, and refreshes the open-window list. The
-three callers are the polled `needs_refresh` path in `reach_host_update`, the
-`WINDOW_STATE_CHANGED` event, and the completion of reach's own window
+`reach_host_refresh_window_world`: it invalidates every capsule's trespass cache
+through the generic bar capability, refreshes the manager, and refreshes the
+open-window list. The three callers are the `needs_refresh` path in
+`reach_host_update`, the `WINDOW_STATE_CHANGED` event, and the completion of reach's own window
 operations (`reach_host_apply_window_control_result` — snap, minimize, close).
 A path that refreshes without invalidating is the failure this shape exists to
 prevent: it leaves the bars deciding from a stale answer, and only an unrelated
-foreground change heals it. Reach's own operations therefore need no detection
-at all, and the service publishes a dragged window once, on move-size end, never
-during the drag.
+foreground change heals it.
+
+Window manipulation is a separate shared-service state, versioned with its own
+sequence. Interactive move/resize start publishes the manipulated app, location
+changes wake only the relevance check needed for monitor crossing, and end
+publishes the final window snapshot while atomically clearing manipulation. The
+host suppresses both bars only for a tracked app centred on their monitor,
+dismisses open popups, excludes that window from top-bar push, and keeps both edge
+reveals disabled until the manipulation ends. Reach consumes Win+Arrow and snaps
+asynchronously with `ShowWindow` / `SetWindowPos`, so it explicitly brackets that
+operation with the same host suppression lifecycle instead of expecting Windows
+move/size-loop events.
 
 Two separate inputs decide how another open surface affects the bars, and both
 apply to both bars identically. A surface that declares `bar_shown_while_open`
@@ -285,7 +300,10 @@ leaves the bars to hide on their own rules — the launcher and the clipboard ar
 pure transients that own the screen while they are up, and the switcher is the
 sole `OVERLAY`. The switcher exclusion is deliberate and differs from
 `reach_host_window_list_blocked`, which does count `OVERLAY`: the dock hover menu
-is suppressed during alt-tab while the bars still hide.
+is suppressed during alt-tab while the bars still hide. Manipulation suppression
+outranks popup hold and pointer sequences, but Stage's force-show remains higher
+priority. Game mode retains its separate immediate cut; ordinary bar changes use
+the shared reveal animation.
 
 ## composition
 
