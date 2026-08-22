@@ -877,13 +877,16 @@ static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float reveal
     push_request.reveal_progress = reveal_progress;
     push_request.bar_can_hide = top_bar->push_can_hide;
     push_request.hover_revealed = top_bar->push_hover_revealed;
+    push_request.excluded_window = top_bar->push_excluded_window;
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
 
-static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
+static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds,
+                                      float shadow_clearance)
 {
-    float screen_gap = shown_bounds.y - monitor_bounds.y;
-    return screen_gap * 2.0f + shown_bounds.height;
+    return reach_bar_protected_band(REACH_TOP_BAR_EDGE, shown_bounds, monitor_bounds,
+                                    shadow_clearance)
+        .height;
 }
 
 static int32_t reach_top_bar_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
@@ -902,7 +905,9 @@ void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar)
 
 static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
                                                  reach_rect_f32 shown_bounds,
-                                                 reach_rect_f32 monitor_bounds)
+                                                 reach_rect_f32 monitor_bounds,
+                                                 float shadow_clearance,
+                                                 uintptr_t excluded_window)
 {
     if (top_bar == nullptr)
     {
@@ -911,13 +916,17 @@ static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
 
     if (!top_bar->occlusion_valid ||
         !reach_top_bar_rect_equal(top_bar->occlusion_shown_bounds, shown_bounds) ||
-        !reach_top_bar_rect_equal(top_bar->occlusion_monitor_bounds, monitor_bounds))
+        !reach_top_bar_rect_equal(top_bar->occlusion_monitor_bounds, monitor_bounds) ||
+        fabsf(top_bar->occlusion_shadow_clearance - shadow_clearance) >= 0.5f)
     {
-        float push_depth = reach_top_bar_push_depth(shown_bounds, monitor_bounds);
+        reach_rect_f32 protected_band =
+            reach_bar_protected_band(REACH_TOP_BAR_EDGE, shown_bounds, monitor_bounds,
+                                     shadow_clearance);
         top_bar->occlusion_occluded = reach_top_bar_window_push_any_trespassing(
-            top_bar->window_push, monitor_bounds, monitor_bounds.y + push_depth);
+            top_bar->window_push, monitor_bounds, protected_band, excluded_window);
         top_bar->occlusion_shown_bounds = shown_bounds;
         top_bar->occlusion_monitor_bounds = monitor_bounds;
+        top_bar->occlusion_shadow_clearance = shadow_clearance;
         top_bar->occlusion_valid = 1;
     }
     return top_bar->occlusion_occluded;
@@ -932,13 +941,15 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
         return reach_bar_visibility_result{};
     }
 
-    float push_depth = reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds);
+    float push_depth = reach_top_bar_push_depth(
+        request->shown_bounds, request->monitor_bounds, request->shadow_clearance);
 
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_TOP_BAR_EDGE;
     bar_request.pointer_sequence_active = reach_pressable_tracking(&top_bar->state.pressable);
     bar_request.can_hide =
-        reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds);
+        reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds,
+                                          request->shadow_clearance, request->excluded_window);
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);
@@ -949,6 +960,7 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     top_bar->push_depth = push_depth;
     top_bar->push_can_hide = bar_request.can_hide;
     top_bar->push_hover_revealed = result.hover_revealed;
+    top_bar->push_excluded_window = request->excluded_window;
     reach_top_bar_apply_window_push(top_bar, result.reveal_progress);
 
     return result;
@@ -1007,11 +1019,17 @@ static reach_bar_reveal_animation reach_top_bar_bar_animation(const void *capsul
     return animation;
 }
 
+static void reach_top_bar_invalidate_bar_coverage(void *capsule)
+{
+    reach_top_bar_invalidate_occlusion(static_cast<reach_top_bar *>(capsule));
+}
+
 const reach_bar_reveal_ops *reach_top_bar_reveal_ops(void)
 {
     static const reach_bar_reveal_ops ops = {
         reach_top_bar_bar_begin_session, reach_top_bar_bar_update_visibility,
-        reach_top_bar_bar_animation, reach_top_bar_bar_position_frame};
+        reach_top_bar_bar_animation, reach_top_bar_bar_position_frame,
+        reach_top_bar_invalidate_bar_coverage};
     return &ops;
 }
 

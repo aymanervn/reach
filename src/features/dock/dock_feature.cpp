@@ -51,6 +51,11 @@ struct reach_dock
     int32_t pointer_layout_valid;
     const reach_pinned_app_model *pointer_pinned_apps;
     size_t pointer_pinned_app_count;
+    reach_rect_f32 coverage_shown_bounds;
+    reach_rect_f32 coverage_monitor_bounds;
+    float coverage_shadow_clearance;
+    int32_t coverage_valid;
+    int32_t coverage_trespassed;
 };
 
 void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
@@ -790,7 +795,30 @@ reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_reque
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_DOCK_EDGE;
     bar_request.pointer_sequence_active = reach_pressable_tracking(&animations->state.pressable);
-    bar_request.can_hide = request->any_window_maximized || request->foreground_snapped;
+    int32_t bounds_changed =
+        fabsf(animations->coverage_shown_bounds.x - request->shown_bounds.x) >= 0.5f ||
+        fabsf(animations->coverage_shown_bounds.y - request->shown_bounds.y) >= 0.5f ||
+        fabsf(animations->coverage_shown_bounds.width - request->shown_bounds.width) >= 0.5f ||
+        fabsf(animations->coverage_shown_bounds.height - request->shown_bounds.height) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.x - request->monitor_bounds.x) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.y - request->monitor_bounds.y) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.width - request->monitor_bounds.width) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.height - request->monitor_bounds.height) >= 0.5f ||
+        fabsf(animations->coverage_shadow_clearance - request->shadow_clearance) >= 0.5f;
+    if (!animations->coverage_valid || bounds_changed)
+    {
+        reach_rect_f32 protected_band =
+            reach_bar_protected_band(REACH_DOCK_EDGE, request->shown_bounds,
+                                     request->monitor_bounds, request->shadow_clearance);
+        animations->coverage_trespassed = reach_window_tracking_any_trespassing(
+            animations->windows, request->monitor_bounds, protected_band,
+            request->excluded_window);
+        animations->coverage_shown_bounds = request->shown_bounds;
+        animations->coverage_monitor_bounds = request->monitor_bounds;
+        animations->coverage_shadow_clearance = request->shadow_clearance;
+        animations->coverage_valid = 1;
+    }
+    bar_request.can_hide = animations->coverage_trespassed;
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &animations->state.visibility, &animations->manager, REACH_DOCK_ANIM_Y, &bar_request);
@@ -820,11 +848,21 @@ static reach_bar_reveal_animation reach_dock_bar_animation(const void *capsule)
     return animation;
 }
 
+static void reach_dock_invalidate_bar_coverage(void *capsule)
+{
+    reach_dock *dock = static_cast<reach_dock *>(capsule);
+    if (dock != nullptr)
+    {
+        dock->coverage_valid = 0;
+    }
+}
+
 const reach_bar_reveal_ops *reach_dock_reveal_ops(void)
 {
     static const reach_bar_reveal_ops ops = {reach_dock_bar_begin_session,
                                              reach_dock_bar_update_visibility,
-                                             reach_dock_bar_animation, nullptr};
+                                             reach_dock_bar_animation, nullptr,
+                                             reach_dock_invalidate_bar_coverage};
     return &ops;
 }
 

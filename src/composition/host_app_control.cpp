@@ -106,6 +106,7 @@ void reach_host_apply_window_control_result(reach_host *host)
         return;
     }
 
+    reach_host_end_programmatic_window_manipulation(host);
     reach_host_refresh_window_world(host);
 
     if (result == REACH_OK)

@@ -1,5 +1,113 @@
 #include "host_internal.h"
 
+static int32_t reach_host_window_manipulation_relevant(reach_host *host,
+                                                       reach_window_id window)
+{
+    if (host == nullptr || window == 0)
+    {
+        return 0;
+    }
+
+    const reach_window_snapshot *snapshot =
+        reach_window_tracking_window_by_id(host->window_tracking, window);
+    if (snapshot == nullptr || !snapshot->visible || snapshot->minimized)
+    {
+        return 0;
+    }
+
+    reach_rect_f32 monitor = {};
+    reach_rect_f32 bounds = {};
+    if (!reach_host_primary_monitor_bounds(host, &monitor) ||
+        reach_app_control_window_bounds(host->app_control, window, &bounds) != REACH_OK)
+    {
+        return 0;
+    }
+
+    float center_x = bounds.x + bounds.width * 0.5f;
+    float center_y = bounds.y + bounds.height * 0.5f;
+    return center_x >= monitor.x && center_x < monitor.x + monitor.width &&
+           center_y >= monitor.y && center_y < monitor.y + monitor.height;
+}
+
+static void reach_host_update_window_manipulation(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    reach_window_id active_window = 0;
+    if (host->window_manipulation.programmatic.active &&
+        reach_host_window_manipulation_relevant(
+            host, host->window_manipulation.programmatic.window))
+    {
+        active_window = host->window_manipulation.programmatic.window;
+    }
+    else if (host->window_manipulation.manual.active &&
+             reach_host_window_manipulation_relevant(host,
+                                                     host->window_manipulation.manual.window))
+    {
+        active_window = host->window_manipulation.manual.window;
+    }
+    int32_t bars_suppressed = active_window != 0;
+    int32_t began = bars_suppressed && !host->window_manipulation.bars_suppressed;
+    int32_t changed = bars_suppressed != host->window_manipulation.bars_suppressed ||
+                      active_window != host->window_manipulation.active_window;
+
+    host->window_manipulation.active_window = active_window;
+    host->window_manipulation.bars_suppressed = bars_suppressed;
+    if (!changed)
+    {
+        return;
+    }
+
+    if (began)
+    {
+        reach_host_close_surface_classes(
+            host, reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP), 0);
+    }
+    reach_host_invalidate_bar_coverage(host);
+    reach_host_request_bar_visibility_update(host);
+}
+
+void reach_host_sync_window_manipulation(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    reach_window_manipulation manipulation = {};
+    if (host->input_source.ops.get_window_manipulation != nullptr)
+    {
+        (void)host->input_source.ops.get_window_manipulation(host->input_source.source,
+                                                             &manipulation);
+    }
+    host->window_manipulation.manual = manipulation;
+    reach_host_update_window_manipulation(host);
+}
+
+void reach_host_begin_programmatic_window_manipulation(reach_host *host, reach_window_id window)
+{
+    if (host == nullptr || window == 0)
+    {
+        return;
+    }
+    host->window_manipulation.programmatic.window = window;
+    host->window_manipulation.programmatic.active = 1;
+    reach_host_update_window_manipulation(host);
+}
+
+void reach_host_end_programmatic_window_manipulation(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    host->window_manipulation.programmatic = {};
+    reach_host_update_window_manipulation(host);
+}
+
 void reach_host_refresh_window_world(reach_host *host)
 {
     if (host == nullptr)
@@ -7,7 +115,7 @@ void reach_host_refresh_window_world(reach_host *host)
         return;
     }
 
-    reach_host_invalidate_window_facts(host);
+    reach_host_invalidate_bar_coverage(host);
     if (host->window_manager.ops.refresh != nullptr)
     {
         (void)host->window_manager.ops.refresh(host->window_manager.manager);
@@ -82,7 +190,7 @@ void reach_host_apply_foreground_change(reach_host *host)
     }
 
     reach_host_note_foreground_window(host, foreground);
-    reach_host_invalidate_window_facts(host);
+    reach_host_invalidate_bar_coverage(host);
     reach_host_refresh_switcher_windows(host);
     if (reach_input_language_service_refresh(host->input_language, foreground))
     {

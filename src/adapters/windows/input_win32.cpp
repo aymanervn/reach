@@ -7,6 +7,15 @@
 #include <windows.h>
 #include <new>
 
+static const size_t REACH_INPUT_POINTER_REGION_CAPACITY = 16;
+
+struct reach_input_pointer_region
+{
+    reach_rect_f32 bounds;
+    int32_t enabled;
+    int32_t inside;
+};
+
 struct reach_input_source
 {
     reach_input_event_callback callback;
@@ -20,7 +29,12 @@ struct reach_input_source
     int32_t windows_key_down;
     int32_t windows_key_chord;
     uint32_t registered_media_hotkeys;
+    HHOOK pointer_hook;
+    reach_input_pointer_region pointer_regions[REACH_INPUT_POINTER_REGION_CAPACITY];
+    volatile LONG manipulation_event_pending;
 };
+
+static reach_input_source *g_pointer_hook_source;
 
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
 static const UINT REACH_INPUT_WM_UI_EVENT = WM_APP + 21;
@@ -36,6 +50,110 @@ static const int REACH_INPUT_HOTKEY_BRIGHTNESS_UP = 7;
 static const int REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN = 8;
 
 static void reach_input_reset_hotkey_state(reach_input_source *source);
+
+static int32_t reach_input_point_in_region(POINT point, reach_rect_f32 bounds)
+{
+    return (float)point.x >= bounds.x && (float)point.x < bounds.x + bounds.width &&
+           (float)point.y >= bounds.y && (float)point.y < bounds.y + bounds.height;
+}
+
+static void reach_input_post_pointer_region_event(reach_input_source *source, uint32_t region_id)
+{
+    if (source != nullptr && source->window != nullptr)
+    {
+        PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT,
+                     REACH_UI_EVENT_POINTER_REGION_CHANGED, region_id);
+    }
+}
+
+static void reach_input_update_pointer_regions(reach_input_source *source, POINT point)
+{
+    if (source == nullptr)
+    {
+        return;
+    }
+
+    for (uint32_t index = 0; index < REACH_INPUT_POINTER_REGION_CAPACITY; ++index)
+    {
+        reach_input_pointer_region *region = &source->pointer_regions[index];
+        if (!region->enabled)
+        {
+            continue;
+        }
+        int32_t inside = reach_input_point_in_region(point, region->bounds);
+        if (inside != region->inside)
+        {
+            region->inside = inside;
+            reach_input_post_pointer_region_event(source, index);
+        }
+    }
+}
+
+static LRESULT CALLBACK reach_input_pointer_hook_proc(int code, WPARAM wparam, LPARAM lparam)
+{
+    if (code == HC_ACTION && wparam == WM_MOUSEMOVE && g_pointer_hook_source != nullptr)
+    {
+        const MSLLHOOKSTRUCT *event = reinterpret_cast<const MSLLHOOKSTRUCT *>(lparam);
+        if (event != nullptr)
+        {
+            reach_input_update_pointer_regions(g_pointer_hook_source, event->pt);
+        }
+    }
+    return CallNextHookEx(g_pointer_hook_source != nullptr ? g_pointer_hook_source->pointer_hook
+                                                           : nullptr,
+                          code, wparam, lparam);
+}
+
+static int32_t reach_input_any_pointer_region_enabled(const reach_input_source *source)
+{
+    if (source == nullptr)
+    {
+        return 0;
+    }
+    for (size_t index = 0; index < REACH_INPUT_POINTER_REGION_CAPACITY; ++index)
+    {
+        if (source->pointer_regions[index].enabled)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static reach_result reach_input_sync_pointer_hook(reach_input_source *source)
+{
+    if (source == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    int32_t enabled = reach_input_any_pointer_region_enabled(source);
+    if (enabled && source->pointer_hook == nullptr)
+    {
+        if (g_pointer_hook_source != nullptr && g_pointer_hook_source != source)
+        {
+            return REACH_ERROR;
+        }
+        g_pointer_hook_source = source;
+        source->pointer_hook = SetWindowsHookExW(WH_MOUSE_LL, reach_input_pointer_hook_proc,
+                                                 GetModuleHandleW(nullptr), 0);
+        if (source->pointer_hook == nullptr)
+        {
+            g_pointer_hook_source = nullptr;
+            return REACH_ERROR;
+        }
+    }
+    else if (!enabled && source->pointer_hook != nullptr)
+    {
+        UnhookWindowsHookEx(source->pointer_hook);
+        source->pointer_hook = nullptr;
+        if (g_pointer_hook_source == source)
+        {
+            g_pointer_hook_source = nullptr;
+        }
+    }
+    return REACH_OK;
+}
 
 static uint32_t reach_input_media_hotkey_mask(int hotkey_id)
 {
@@ -180,6 +298,16 @@ static void reach_input_post_ui_event(reach_input_source *source, reach_ui_event
     if (source != nullptr && source->window != nullptr)
     {
         PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, type, id);
+    }
+}
+
+static void reach_input_post_manipulation_changed(reach_input_source *source)
+{
+    if (source != nullptr && source->window != nullptr &&
+        InterlockedExchange(&source->manipulation_event_pending, 1) == 0)
+    {
+        PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT,
+                     REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED, 0);
     }
 }
 
@@ -357,6 +485,14 @@ static void reach_input_shared_callback(void *user, reach_service_shared_reader_
     if (event == REACH_SERVICE_SHARED_EVENT_CONNECTED)
     {
         PostMessageW(source->window, REACH_INPUT_WM_HELPER_CONNECTED, 0, 0);
+        reach_input_post_manipulation_changed(source);
+        return;
+    }
+
+    if (event == REACH_SERVICE_SHARED_EVENT_DISCONNECTED ||
+        event == REACH_SERVICE_SHARED_EVENT_WINDOW_MANIPULATION_CHANGED)
+    {
+        reach_input_post_manipulation_changed(source);
         return;
     }
 
@@ -391,6 +527,10 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
         reach_ui_event event = {};
         event.type = static_cast<reach_ui_event_type>(wparam);
         event.id = static_cast<uint32_t>(lparam);
+        if (event.type == REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED)
+        {
+            InterlockedExchange(&source->manipulation_event_pending, 0);
+        }
         source->callback(source->user, &event);
         return 0;
     }
@@ -474,6 +614,12 @@ static reach_result reach_input_stop(reach_input_source *source)
     reach_service_shared_reader_unsubscribe(source);
     reach_input_unregister_media_hotkeys(source);
     reach_input_reset_hotkey_state(source);
+    for (size_t index = 0; index < REACH_INPUT_POINTER_REGION_CAPACITY; ++index)
+    {
+        source->pointer_regions[index] = {};
+    }
+    (void)reach_input_sync_pointer_hook(source);
+    InterlockedExchange(&source->manipulation_event_pending, 0);
     source->callback = nullptr;
     source->user = nullptr;
     return REACH_OK;
@@ -497,6 +643,54 @@ static reach_result reach_input_get_pointer_position(reach_input_source *source,
     out_position->x = cursor.x;
     out_position->y = cursor.y;
     return REACH_OK;
+}
+
+static reach_result reach_input_set_pointer_region(reach_input_source *source, uint32_t region_id,
+                                                   reach_rect_f32 bounds, int32_t enabled)
+{
+    if (source == nullptr || region_id >= REACH_INPUT_POINTER_REGION_CAPACITY)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_input_pointer_region *region = &source->pointer_regions[region_id];
+    if (!enabled || bounds.width <= 0.0f || bounds.height <= 0.0f)
+    {
+        *region = {};
+        return reach_input_sync_pointer_hook(source);
+    }
+
+    int32_t previous_inside = region->inside;
+    region->bounds = bounds;
+    region->enabled = 1;
+    POINT point = {};
+    if (GetCursorPos(&point))
+    {
+        region->inside = reach_input_point_in_region(point, bounds);
+        if (region->inside != previous_inside)
+        {
+            reach_input_post_pointer_region_event(source, region_id);
+        }
+    }
+    return reach_input_sync_pointer_hook(source);
+}
+
+static reach_result
+reach_input_get_window_manipulation(reach_input_source *source,
+                                    reach_window_manipulation *out_manipulation)
+{
+    (void)source;
+    if (out_manipulation == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    uint64_t window = 0;
+    int32_t active = 0;
+    reach_result result = reach_service_shared_copy_window_manipulation(&window, &active);
+    out_manipulation->window = static_cast<reach_window_id>(window);
+    out_manipulation->active = active;
+    return result;
 }
 
 static void reach_input_destroy(reach_input_source *source)
@@ -532,6 +726,8 @@ reach_result reach_windows_create_input_source(reach_input_source_port *out_port
     out_port->ops.start = reach_input_start;
     out_port->ops.stop = reach_input_stop;
     out_port->ops.get_pointer_position = reach_input_get_pointer_position;
+    out_port->ops.set_pointer_region = reach_input_set_pointer_region;
+    out_port->ops.get_window_manipulation = reach_input_get_window_manipulation;
     out_port->ops.destroy = reach_input_destroy;
     return REACH_OK;
 }

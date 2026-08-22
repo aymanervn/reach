@@ -14,6 +14,7 @@ typedef struct reach_top_bar_window_push_request
     float reveal_progress;
     int32_t bar_can_hide;
     int32_t hover_revealed;
+    uintptr_t excluded_window;
 } reach_top_bar_window_push_request;
 
 reach_result reach_top_bar_window_push_create(reach_top_bar_window_push **out_push);
@@ -23,7 +24,9 @@ void reach_top_bar_window_push_attach(reach_top_bar_window_push *push, reach_app
                                       reach_window_tracking *windows);
 
 int32_t reach_top_bar_window_push_any_trespassing(const reach_top_bar_window_push *push,
-                                                  reach_rect_f32 monitor_bounds, float target_top);
+                                                  reach_rect_f32 monitor_bounds,
+                                                  reach_rect_f32 protected_band,
+                                                  uintptr_t excluded_window);
 
 void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
                                      const reach_top_bar_window_push_request *request);

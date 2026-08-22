@@ -20,31 +20,19 @@ static int32_t reach_host_popup_open(const reach_host *host)
                                        reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
 }
 
-static const reach_host_window_facts *reach_host_current_window_facts(reach_host *host)
-{
-    reach_host_window_facts *facts = &host->window_facts;
-    if (facts->valid)
-    {
-        return facts;
-    }
-
-    facts->any_window_maximized =
-        host->window_manager.ops.any_window_maximized_on_primary != nullptr &&
-        host->window_manager.ops.any_window_maximized_on_primary(host->window_manager.manager);
-    facts->foreground_snapped =
-        host->window_manager.ops.window_is_snapped_on_primary != nullptr &&
-        host->window_manager.ops.window_is_snapped_on_primary(host->window_manager.manager,
-                                                              reach_host_foreground_window(host));
-    facts->valid = 1;
-    return facts;
-}
-
-void reach_host_invalidate_window_facts(reach_host *host)
+void reach_host_invalidate_bar_coverage(reach_host *host)
 {
     if (host != nullptr)
     {
-        host->window_facts.valid = 0;
-        reach_top_bar_invalidate_occlusion(host->top_bar_capsule);
+        for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+        {
+            const reach_surface_desc *desc = &host->surface_descs[index];
+            if (desc->bar_reveal.ops != nullptr &&
+                desc->bar_reveal.ops->invalidate_coverage != nullptr)
+            {
+                desc->bar_reveal.ops->invalidate_coverage(desc->capsule);
+            }
+        }
     }
 }
 
@@ -143,6 +131,18 @@ static void reach_host_apply_edge_reveal(reach_host *host, reach_host_edge_revea
     reach_host_set_edge_reveal_visible(host, runtime, shown);
 }
 
+static void reach_host_apply_bar_pointer_observation(
+    reach_host *host, reach_surface_id id, const reach_bar_visibility_result *result)
+{
+    if (host == nullptr || result == nullptr || host->input_source.ops.set_pointer_region == nullptr)
+    {
+        return;
+    }
+    (void)host->input_source.ops.set_pointer_region(
+        host->input_source.source, static_cast<uint32_t>(id), result->pointer_observation_bounds,
+        result->pointer_observation_active);
+}
+
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
                                                    reach_rect_f32 shown_bounds,
                                                    reach_rect_f32 monitor_bounds)
@@ -155,16 +155,14 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         return shown_bounds;
     }
 
-    const reach_host_window_facts *facts = reach_host_current_window_facts(host);
-
     reach_bar_visibility_request request = {};
     request.shown_bounds = shown_bounds;
     request.monitor_bounds = monitor_bounds;
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
-    request.any_window_maximized = facts->any_window_maximized;
-    request.foreground_snapped = facts->foreground_snapped;
     request.force_shown = reach_host_bar_forced_shown(host);
+    request.force_hidden = host->window_manipulation.bars_suppressed;
     request.hold_open = reach_host_popup_open(host);
+    request.excluded_window = host->window_manipulation.active_window;
     request.reveal_seconds =
         (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
     request.reveal_span_inset =
@@ -174,6 +172,8 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     reach_bar_visibility_result result =
         desc->bar_reveal.ops->update_visibility(desc->capsule, &request);
+
+    reach_host_apply_bar_pointer_observation(host, id, &result);
 
     reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_FORCED,
                                request.force_shown);

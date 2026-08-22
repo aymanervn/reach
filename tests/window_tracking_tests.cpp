@@ -36,6 +36,7 @@ static reach_window_snapshot make_window(uintptr_t id, const char *path, const c
 }
 
 static reach_window_snapshot fake_windows[REACH_MAX_OPEN_WINDOWS];
+static reach_rect_f32 fake_window_bounds[REACH_MAX_OPEN_WINDOWS];
 static size_t fake_window_count;
 
 static size_t fake_window_count_op(const reach_window_manager *manager)
@@ -56,11 +57,31 @@ static reach_result fake_window_at_op(const reach_window_manager *manager, size_
     return REACH_OK;
 }
 
+static reach_result fake_outer_bounds_op(const reach_window_manager *manager,
+                                         reach_window_id window_id, reach_rect_f32 *out_bounds)
+{
+    (void)manager;
+    if (out_bounds == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < fake_window_count; ++index)
+    {
+        if (fake_windows[index].id == window_id)
+        {
+            *out_bounds = fake_window_bounds[index];
+            return REACH_OK;
+        }
+    }
+    return REACH_ERROR;
+}
+
 static reach_window_tracking *make_service(void)
 {
     reach_window_manager_port port = {};
     port.ops.window_count = fake_window_count_op;
     port.ops.window_at = fake_window_at_op;
+    port.ops.outer_bounds = fake_outer_bounds_op;
     reach_window_tracking *service = nullptr;
     if (reach_window_tracking_create(port, &service) != REACH_OK)
     {
@@ -75,7 +96,47 @@ static void set_windows(const reach_window_snapshot *windows, size_t count)
     for (size_t index = 0; index < count; ++index)
     {
         fake_windows[index] = windows[index];
+        fake_window_bounds[index] = {};
     }
+}
+
+static void test_trespass_uses_protected_band_and_monitor(void)
+{
+    reach_window_tracking *service = make_service();
+    if (service == nullptr)
+    {
+        ++failures;
+        return;
+    }
+
+    reach_window_snapshot windows[3] = {
+        make_window(41, "C:\\apps\\bottom.exe", ""),
+        make_window(42, "C:\\apps\\middle.exe", ""),
+        make_window(43, "C:\\apps\\secondary.exe", ""),
+    };
+    set_windows(windows, 3);
+    fake_window_bounds[0] = {100.0f, 200.0f, 600.0f, 580.0f};
+    fake_window_bounds[1] = {100.0f, 200.0f, 600.0f, 400.0f};
+    fake_window_bounds[2] = {1100.0f, 100.0f, 600.0f, 700.0f};
+    (void)reach_window_tracking_refresh(service, nullptr);
+
+    reach_rect_f32 monitor = {0.0f, 0.0f, 1000.0f, 800.0f};
+    reach_rect_f32 bottom_band = {0.0f, 744.0f, 1000.0f, 56.0f};
+    expect_true(reach_window_tracking_any_trespassing(service, monitor, bottom_band, 0),
+                "floating window trespassing the Dock band is detected");
+    expect_true(!reach_window_tracking_any_trespassing(service, monitor, bottom_band, 41),
+                "the actively manipulated window can be excluded");
+
+    windows[0].minimized = 1;
+    set_windows(windows, 3);
+    fake_window_bounds[0] = {100.0f, 200.0f, 600.0f, 580.0f};
+    fake_window_bounds[1] = {100.0f, 200.0f, 600.0f, 400.0f};
+    fake_window_bounds[2] = {1100.0f, 100.0f, 600.0f, 700.0f};
+    (void)reach_window_tracking_refresh(service, nullptr);
+    expect_true(!reach_window_tracking_any_trespassing(service, monitor, bottom_band, 0),
+                "minimized and other-monitor windows do not trespass the bar band");
+
+    reach_window_tracking_destroy(service);
 }
 
 static uint32_t group_of(const reach_window_tracking *service, uintptr_t window_id)
@@ -204,5 +265,6 @@ int main(void)
     test_identity_rule();
     test_group_id_assignment_and_stability();
     test_empty_identity_and_aumid_split();
+    test_trespass_uses_protected_band_and_monitor();
     return failures == 0 ? 0 : 1;
 }

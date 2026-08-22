@@ -46,7 +46,8 @@ static int32_t reach_host_game_mode_allows_event(reach_ui_event_type type)
            type == REACH_UI_EVENT_MEDIA_NEXT || type == REACH_UI_EVENT_VOLUME_UP ||
            type == REACH_UI_EVENT_VOLUME_DOWN || type == REACH_UI_EVENT_VOLUME_MUTE ||
            type == REACH_UI_EVENT_BRIGHTNESS_UP || type == REACH_UI_EVENT_BRIGHTNESS_DOWN ||
-           type == REACH_UI_EVENT_NOW_PLAYING_CHANGED;
+           type == REACH_UI_EVENT_NOW_PLAYING_CHANGED ||
+           type == REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED;
 }
 
 static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
@@ -1030,9 +1031,22 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     if (event->type == REACH_UI_EVENT_WINDOW_STATE_CHANGED)
     {
         reach_host_refresh_window_world(host);
+        reach_host_sync_window_manipulation(host);
         reach_host_sync_stage_window_states(host);
         reach_host_apply_foreground_change(host);
         (void)reach_host_update_game_mode(host);
+        return REACH_OK;
+    }
+
+    if (event->type == REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED)
+    {
+        reach_host_sync_window_manipulation(host);
+        return REACH_OK;
+    }
+
+    if (event->type == REACH_UI_EVENT_POINTER_REGION_CHANGED)
+    {
+        reach_host_request_bar_visibility_update(host);
         return REACH_OK;
     }
 

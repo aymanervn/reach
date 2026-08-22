@@ -157,42 +157,40 @@ static void reach_top_bar_push_collect(reach_top_bar_window_push *push, reach_re
 }
 
 int32_t reach_top_bar_window_push_any_trespassing(const reach_top_bar_window_push *push,
-                                                  reach_rect_f32 monitor_bounds, float target_top)
+                                                  reach_rect_f32 monitor_bounds,
+                                                  reach_rect_f32 protected_band,
+                                                  uintptr_t excluded_window)
 {
     if (push == nullptr || push->apps == nullptr || push->windows == nullptr)
     {
         return 0;
     }
-    if (push->captured)
+    if (push->captured && push->pushed_count > 0)
     {
-        return push->pushed_count > 0;
-    }
-
-    const reach_window_snapshot *windows = reach_window_tracking_windows(push->windows);
-    size_t window_count = reach_window_tracking_window_count(push->windows);
-    if (windows == nullptr)
-    {
-        return 0;
-    }
-
-    for (size_t index = 0; index < window_count; ++index)
-    {
-        const reach_window_snapshot *window = &windows[index];
-        if (!reach_top_bar_push_window_pushable(window))
-        {
-            continue;
-        }
-
-        reach_rect_f32 bounds = {};
-        if (reach_app_control_window_bounds(push->apps, window->id, &bounds) != REACH_OK ||
-            !reach_top_bar_push_window_on_monitor(bounds, monitor_bounds) ||
-            bounds.y >= target_top)
-        {
-            continue;
-        }
         return 1;
     }
-    return 0;
+
+    return reach_window_tracking_any_trespassing(push->windows, monitor_bounds, protected_band,
+                                                 excluded_window);
+}
+
+static void reach_top_bar_window_push_exclude(reach_top_bar_window_push *push,
+                                              uintptr_t excluded_window)
+{
+    if (push == nullptr || excluded_window == 0 || !push->captured)
+    {
+        return;
+    }
+
+    size_t write = 0;
+    for (size_t read = 0; read < push->pushed_count; ++read)
+    {
+        if (push->pushed[read].window != excluded_window)
+        {
+            push->pushed[write++] = push->pushed[read];
+        }
+    }
+    push->pushed_count = write;
 }
 
 static void reach_top_bar_push_write(reach_top_bar_window_push *push, float progress)
@@ -219,6 +217,8 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
     {
         return;
     }
+
+    reach_top_bar_window_push_exclude(push, request->excluded_window);
 
     if (!push->recovered && !push->captured && request->push_depth > 0.0f)
     {

@@ -222,12 +222,13 @@ typedef struct reach_host_edge_reveal_runtime
     reach_rect_f32 bounds;
 } reach_host_edge_reveal_runtime;
 
-typedef struct reach_host_window_facts
+typedef struct reach_host_window_manipulation_state
 {
-    int32_t valid;
-    int32_t any_window_maximized;
-    int32_t foreground_snapped;
-} reach_host_window_facts;
+    reach_window_manipulation manual;
+    reach_window_manipulation programmatic;
+    reach_window_id active_window;
+    int32_t bars_suppressed;
+} reach_host_window_manipulation_state;
 
 typedef struct reach_host_layout_target
 {
@@ -385,7 +386,7 @@ struct reach_host
     reach_wallpaper *wallpaper;
     reach_dock *dock_capsule;
     reach_top_bar *top_bar_capsule;
-    reach_host_window_facts window_facts;
+    reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;
     reach_host_window_list_state window_list;
     reach_clipboard_feature *clipboard_capsule;
@@ -533,6 +534,8 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
 
 void reach_host_sync_popup_mouse_hook(reach_host *host);
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);
+void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask,
+                                      int32_t restore_focus);
 
 void reach_host_notify_launcher_search_ready(reach_host *host);
 void reach_host_cleanup_closed_launcher(reach_host *host);
@@ -650,8 +653,12 @@ void reach_host_apply_window_control_result(reach_host *host);
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host);
 
-void reach_host_invalidate_window_facts(reach_host *host);
+void reach_host_invalidate_bar_coverage(reach_host *host);
 void reach_host_refresh_window_world(reach_host *host);
+void reach_host_sync_window_manipulation(reach_host *host);
+void reach_host_begin_programmatic_window_manipulation(reach_host *host,
+                                                       reach_window_id window);
+void reach_host_end_programmatic_window_manipulation(reach_host *host);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
 void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);

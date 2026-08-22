@@ -127,6 +127,53 @@ size_t reach_window_tracking_collect_unminimized(const reach_window_tracking *se
     return window_count;
 }
 
+static int32_t reach_window_tracking_rects_overlap(reach_rect_f32 a, reach_rect_f32 b)
+{
+    return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height &&
+           a.y + a.height > b.y;
+}
+
+static int32_t reach_window_tracking_rect_centered_on_monitor(reach_rect_f32 bounds,
+                                                             reach_rect_f32 monitor)
+{
+    float center_x = bounds.x + bounds.width * 0.5f;
+    float center_y = bounds.y + bounds.height * 0.5f;
+    return center_x >= monitor.x && center_x < monitor.x + monitor.width &&
+           center_y >= monitor.y && center_y < monitor.y + monitor.height;
+}
+
+int32_t reach_window_tracking_any_trespassing(const reach_window_tracking *service,
+                                              reach_rect_f32 monitor_bounds,
+                                              reach_rect_f32 protected_band,
+                                              uintptr_t excluded_window)
+{
+    if (service == nullptr || service->window_manager.ops.outer_bounds == nullptr)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        const reach_window_snapshot *window = &service->open_windows[index];
+        if (window->id == 0 || window->id == excluded_window || !window->visible ||
+            window->minimized)
+        {
+            continue;
+        }
+
+        reach_rect_f32 bounds = {};
+        if (service->window_manager.ops.outer_bounds(service->window_manager.manager, window->id,
+                                                     &bounds) != REACH_OK ||
+            !reach_window_tracking_rect_centered_on_monitor(bounds, monitor_bounds) ||
+            !reach_window_tracking_rects_overlap(bounds, protected_band))
+        {
+            continue;
+        }
+        return 1;
+    }
+    return 0;
+}
+
 const reach_window_snapshot *
 reach_window_tracking_window_by_id(const reach_window_tracking *service, uintptr_t window_id)
 {
