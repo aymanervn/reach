@@ -360,25 +360,28 @@ void reach_host_set_theme_mode(reach_host *host, reach_theme_mode mode)
 
 int32_t reach_host_needs_frame(const reach_host *host)
 {
-    int32_t window_manager_needs_refresh = 0;
-
-    if (host != nullptr)
-    {
-        if (host->window_manager.manager != nullptr &&
-            host->window_manager.ops.needs_refresh != nullptr)
-        {
-            window_manager_needs_refresh =
-                host->window_manager.ops.needs_refresh(host->window_manager.manager);
-        }
-    }
-
     if (host == nullptr)
     {
         return 0;
     }
 
-    if (host->dirty.update_requested || window_manager_needs_refresh || host->dirty.render ||
-        reach_host_any_surface_dirty(host) || reach_icon_service_work_pending(host->icon_service) ||
+    int32_t window_manager_needs_refresh =
+        host->window_manager.manager != nullptr &&
+        host->window_manager.ops.needs_refresh != nullptr &&
+        host->window_manager.ops.needs_refresh(host->window_manager.manager);
+
+    if (host->dirty.update_requested || window_manager_needs_refresh)
+    {
+        return 1;
+    }
+
+    if (reach_host_game_mode_enabled(host))
+    {
+        return 0;
+    }
+
+    if (host->dirty.render || reach_host_any_surface_dirty(host) ||
+        reach_icon_service_work_pending(host->icon_service) ||
         reach_host_config_reload_work_pending(host) ||
         reach_animation_manager_any_active(&host->animations) ||
         reach_host_window_list_wants_frames(host) || reach_clock_minute_elapsed(host->clock) ||
@@ -401,6 +404,9 @@ int32_t reach_host_needs_frame(const reach_host *host)
 
 uint32_t reach_host_idle_wait_ms(const reach_host *host)
 {
-    return host != nullptr ? reach_clock_next_minute_delay_ms(host->clock)
-                           : REACH_CLOCK_WAIT_FOREVER;
+    if (host == nullptr || reach_host_game_mode_enabled(host))
+    {
+        return REACH_CLOCK_WAIT_FOREVER;
+    }
+    return reach_clock_next_minute_delay_ms(host->clock);
 }
