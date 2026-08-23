@@ -34,6 +34,24 @@ int main()
     failed += expect(state->model.result_count == 2);
     failed += expect(state->model.selected_result_index == 0);
 
+    reach_launcher_layout pointer_layout = {};
+    pointer_layout.bounds = {0.0f, 0.0f, 200.0f, 112.0f};
+    pointer_layout.search_result_items = pointer_layout.bounds;
+    reach_launcher_set_pointer_context(capsule, &pointer_layout, nullptr, 0);
+    const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
+    reach_pointer_event pointer = {};
+    pointer.kind = REACH_POINTER_EVENT_DOWN;
+    pointer.button = REACH_POINTER_BUTTON_SECONDARY;
+    pointer.x = 50;
+    pointer.y = 84;
+    reach_capsule_pointer_result pointer_result = {};
+    capsule_ops->handle_pointer(capsule, &pointer, &pointer_result);
+    failed += expect(pointer_result.handled == 1);
+    pointer.kind = REACH_POINTER_EVENT_UP;
+    capsule_ops->handle_pointer(capsule, &pointer, &pointer_result);
+    failed += expect(pointer_result.action.kind == REACH_LAUNCHER_POINTER_ACTION_REVEAL_RESULT);
+    failed += expect(pointer_result.action.index == 1);
+
     event.type = REACH_UI_EVENT_ARROW_DOWN;
     failed += expect(reach_launcher_handle_event(capsule, &event, 0) == REACH_OK);
     failed += expect(state->model.selected_result_index == 1);
