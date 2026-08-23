@@ -72,6 +72,8 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     }
     ctx.window_entries = entries;
     ctx.window_entry_count = window_count;
+    ctx.text_measure.context = host->context_menu.renderer.backend;
+    ctx.text_measure.measure = host->context_menu.renderer.ops.measure_text;
 
     reach_context_menu_open_window_list(host->context_menu_capsule, item_index, &ctx);
     reach_host_open_context_menu_transition(host);

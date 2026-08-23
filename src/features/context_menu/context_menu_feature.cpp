@@ -332,9 +332,33 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
     }
     state->power_open = 0;
     state->window_list_open = 1;
-    reach_context_menu_place(state, ctx,
-                             reach_context_menu_window_list_popup_width * ctx->dpi_scale,
-                             reach_context_menu_window_list_anchor_ratio);
+    float popup_width = reach_context_menu_window_list_popup_width * ctx->dpi_scale;
+    float max_text_width = 0.0f;
+    if (ctx->text_measure.measure != nullptr)
+    {
+        const float text_size = reach_context_menu_small_metrics.text_size * ctx->dpi_scale;
+        for (size_t index = 0; index < state->item_count; ++index)
+        {
+            float text_width = 0.0f;
+            if (ctx->text_measure.measure(ctx->text_measure.context, state->item_titles[index],
+                                          text_size, REACH_TEXT_WEIGHT_NORMAL, &text_width) ==
+                    REACH_OK &&
+                text_width > max_text_width)
+            {
+                max_text_width = text_width;
+            }
+        }
+    }
+    float measured_width =
+        max_text_width +
+        (reach_context_menu_small_metrics.text_leading_inset +
+         reach_context_menu_small_metrics.text_trailing_inset_with_close) *
+            ctx->dpi_scale;
+    if (measured_width > popup_width)
+    {
+        popup_width = measured_width;
+    }
+    reach_context_menu_place(state, ctx, popup_width, reach_context_menu_window_list_anchor_ratio);
     state->target_index = target_index;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;

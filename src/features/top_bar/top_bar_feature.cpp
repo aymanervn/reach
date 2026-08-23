@@ -390,11 +390,12 @@ static float reach_top_bar_height(float dpi_scale)
     return reach_top_bar_metrics_values.height * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
 }
 
-static float reach_top_bar_stats_slot_advance(const uint16_t *text, const uint16_t *widest,
-                                              float text_size)
+static float reach_top_bar_stats_slot_advance(const reach_text_measure_port *measure,
+                                              const uint16_t *text, const uint16_t *widest,
+                                              float text_size, int32_t text_weight)
 {
-    float advance = reach_top_bar_text_advance(text, text_size);
-    float minimum = reach_top_bar_text_advance(widest, text_size);
+    float advance = reach_top_bar_text_advance(measure, text, text_size, text_weight);
+    float minimum = reach_top_bar_text_advance(measure, widest, text_size, text_weight);
     return advance > minimum ? advance : minimum;
 }
 
@@ -449,8 +450,12 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float time_size = metrics.clock_time_text_size * scale;
     const float date_size = metrics.clock_date_text_size * scale;
 
-    float time_advance = reach_top_bar_text_advance(top_bar->state.clock_time_text, time_size);
-    float date_advance = reach_top_bar_text_advance(top_bar->state.clock_date_text, date_size);
+    float time_advance = reach_top_bar_text_advance(
+        &ctx->text_measure, top_bar->state.clock_time_text, time_size,
+        metrics.clock_time_text_weight);
+    float date_advance = reach_top_bar_text_advance(
+        &ctx->text_measure, top_bar->state.clock_date_text, date_size,
+        metrics.clock_date_text_weight);
     float clock_width = time_advance + clock_gap + date_advance;
 
     const float dot_size = ctx->theme->bar_separator_dot_size * scale;
@@ -505,14 +510,18 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float stats_width = 0.0f;
     if (top_bar->state.stats_valid)
     {
-        cpu_advance = reach_top_bar_stats_slot_advance(top_bar->state.stats_cpu_text,
-                                                       (const uint16_t *)L"CPU 100%", stats_size);
+        cpu_advance = reach_top_bar_stats_slot_advance(
+            &ctx->text_measure, top_bar->state.stats_cpu_text, (const uint16_t *)L"CPU 100%",
+            stats_size, metrics.stats_text_weight);
         memory_advance = reach_top_bar_stats_slot_advance(
-            top_bar->state.stats_memory_text, (const uint16_t *)L"RAM 100%", stats_size);
+            &ctx->text_measure, top_bar->state.stats_memory_text, (const uint16_t *)L"RAM 100%",
+            stats_size, metrics.stats_text_weight);
         download_advance = reach_top_bar_stats_slot_advance(
-            top_bar->state.stats_download_text, (const uint16_t *)L"\u2193 999KB", stats_size);
+            &ctx->text_measure, top_bar->state.stats_download_text,
+            (const uint16_t *)L"\u2193 999KB", stats_size, metrics.stats_text_weight);
         upload_advance = reach_top_bar_stats_slot_advance(
-            top_bar->state.stats_upload_text, (const uint16_t *)L"\u2191 999KB", stats_size);
+            &ctx->text_measure, top_bar->state.stats_upload_text,
+            (const uint16_t *)L"\u2191 999KB", stats_size, metrics.stats_text_weight);
         stats_width = cpu_advance + stats_gap + memory_advance + stats_group_gap +
                       download_advance + stats_gap + upload_advance + pill_gap;
     }
@@ -521,8 +530,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float quick_settings_padding = metrics.quick_settings_padding * scale;
     const float quick_settings_content_gap = metrics.quick_settings_content_gap * scale;
     const float network_name_size = metrics.network_name_text_size * scale;
-    float network_name_advance =
-        reach_top_bar_text_advance(top_bar->state.network_name, network_name_size);
+    float network_name_advance = reach_top_bar_text_advance(
+        &ctx->text_measure, top_bar->state.network_name, network_name_size,
+        metrics.network_name_text_weight);
     if (network_name_advance > metrics.network_name_max_width * scale)
     {
         network_name_advance = metrics.network_name_max_width * scale;
@@ -540,7 +550,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float volume_text_size = metrics.volume_text_size * scale;
     float volume_advance =
         top_bar->state.volume_valid
-            ? reach_top_bar_text_advance(top_bar->state.volume_text, volume_text_size)
+            ? reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.volume_text,
+                                         volume_text_size, metrics.volume_text_weight)
             : 0.0f;
     if (volume_advance > 0.0f)
     {
@@ -682,7 +693,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                       ? height * metrics.current_app_icon_scale
                                       : 0.0f;
     float current_app_icon_gap = current_app_icon_size > 0.0f ? current_app_gap : 0.0f;
-    float name_advance = reach_top_bar_text_advance(top_bar->state.current_app_name, name_size);
+    float name_advance = reach_top_bar_text_advance(&ctx->text_measure,
+                                                    top_bar->state.current_app_name, name_size,
+                                                    metrics.current_app_name_text_weight);
     float current_app_min_text = metrics.current_app_min_text_width * scale;
     if (name_advance < current_app_min_text)
     {
@@ -726,7 +739,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     }
 
     reach_top_bar_now_playing_relayout(top_bar->now_playing_subfeature, ctx->theme,
-                                       layout->now_playing, scale);
+                                       layout->now_playing, scale, &ctx->text_measure);
 }
 
 reach_point_i32 reach_top_bar_local_point(const reach_top_bar_layout *layout, int32_t x, int32_t y)

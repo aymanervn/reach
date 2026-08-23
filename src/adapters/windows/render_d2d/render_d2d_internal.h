@@ -102,6 +102,8 @@ struct reach_render_backend
 
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
 void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_font);
+reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float text_size,
+                                    int32_t text_weight, float *out_width);
 void reach_d2d_release_fonts(reach_render_backend *backend);
 D2D1_COLOR_F reach_d2d_color(reach_color color);
 void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr);

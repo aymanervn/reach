@@ -2,6 +2,7 @@
 
 static const wchar_t reach_d2d_font_fallback[] = L"Segoe UI";
 static const wchar_t reach_d2d_bundled_font_family[] = L"JetBrains Mono";
+static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend);
 static const UINT reach_d2d_bundled_font_resources[] = {300, 301, 302, 303};
 
 static int32_t reach_d2d_load_font_resource(UINT resource_id, const void **out_data,
@@ -138,6 +139,58 @@ void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_fo
     }
     backend->use_bundled_font = use_bundled_font ? 1 : 0;
     backend->ui_font_family[0] = 0;
+}
+
+reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float text_size,
+                                    int32_t text_weight, float *out_width)
+{
+    reach_render_backend *backend = static_cast<reach_render_backend *>(context);
+    if (backend == nullptr || text == nullptr || out_width == nullptr || text_size <= 0.0f ||
+        backend->text_factory == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_width = 0.0f;
+    const wchar_t *value = reinterpret_cast<const wchar_t *>(text);
+    const UINT32 length = static_cast<UINT32>(wcslen(value));
+    if (length == 0)
+    {
+        return REACH_OK;
+    }
+
+    const DWRITE_FONT_WEIGHT weight = text_weight > 0
+                                          ? static_cast<DWRITE_FONT_WEIGHT>(text_weight)
+                                          : DWRITE_FONT_WEIGHT_NORMAL;
+    IDWriteTextFormat *format = nullptr;
+    HRESULT hr = backend->text_factory->CreateTextFormat(
+        reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, text_size, L"", &format);
+    if (FAILED(hr) || format == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+    IDWriteTextLayout *layout = nullptr;
+    hr = backend->text_factory->CreateTextLayout(value, length, format, 1000000.0f,
+                                                 text_size * 4.0f, &layout);
+    format->Release();
+    if (FAILED(hr) || layout == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    DWRITE_TEXT_METRICS metrics = {};
+    hr = layout->GetMetrics(&metrics);
+    layout->Release();
+    if (FAILED(hr))
+    {
+        return REACH_ERROR;
+    }
+
+    *out_width = metrics.widthIncludingTrailingWhitespace;
+    return REACH_OK;
 }
 
 void reach_d2d_release_fonts(reach_render_backend *backend)

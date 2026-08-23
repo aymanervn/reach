@@ -10,6 +10,7 @@
 #include "reach/features/common/bar_visibility.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
+#include "reach/ports/text_measure.h"
 #include "reach/services/app_control.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/now_playing.h"
@@ -208,6 +209,7 @@ extern "C"
         const reach_top_bar_tray_item *tray_items;
         size_t tray_item_count;
         int32_t tray_popup_open;
+        reach_text_measure_port text_measure;
     } reach_top_bar_build_context;
 
     void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_build_context *ctx);

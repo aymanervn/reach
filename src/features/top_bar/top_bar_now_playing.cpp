@@ -59,12 +59,22 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static float reach_top_bar_now_playing_text_advance(const uint16_t *text, float text_size)
+static float reach_top_bar_now_playing_text_advance(const reach_text_measure_port *measure,
+                                                    const uint16_t *text, float text_size)
 {
     if (text == nullptr || text_size <= 0.0f)
     {
         return 0.0f;
     }
+    float width = 0.0f;
+    if (measure != nullptr && measure->measure != nullptr &&
+        measure->measure(measure->context, text, text_size, REACH_TEXT_WEIGHT_BOLD, &width) ==
+            REACH_OK &&
+        width >= 0.0f)
+    {
+        return width;
+    }
+
     size_t length = 0;
     while (text[length] != 0)
     {
@@ -142,7 +152,7 @@ float reach_top_bar_now_playing_model_desired_width(const reach_top_bar_now_play
 reach_top_bar_now_playing_layout
 reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *model,
                                       const reach_theme *theme, reach_rect_f32 bounds,
-                                      float dpi_scale)
+                                      float dpi_scale, const reach_text_measure_port *text_measure)
 {
     reach_top_bar_now_playing_layout layout = {};
     if (model == nullptr || bounds.width <= 0.0f || bounds.height <= 0.0f)
@@ -184,7 +194,8 @@ reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *
 
     float text_size = actual->now_playing_title_text_size * dpi_scale;
     layout.text = reach_top_bar_now_playing_rect(text_x, bounds.y, text_width, bounds.height);
-    layout.text_advance = reach_top_bar_now_playing_text_advance(model->line, text_size);
+    layout.text_advance =
+        reach_top_bar_now_playing_text_advance(text_measure, model->line, text_size);
     layout.previous_button = reach_top_bar_now_playing_rect(
         previous_x, bounds.y + (bounds.height - skip_size) * 0.5f, skip_size, skip_size);
     layout.play_pause_button = reach_top_bar_now_playing_rect(
@@ -480,14 +491,16 @@ float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *n
 }
 
 void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, const reach_theme *theme,
-                                     reach_rect_f32 bounds, float dpi_scale)
+                                     reach_rect_f32 bounds, float dpi_scale,
+                                     const reach_text_measure_port *text_measure)
 {
     if (now_playing == nullptr)
     {
         return;
     }
     reach_top_bar_now_playing_model model = now_playing->model;
-    now_playing->layout = reach_top_bar_now_playing_compute_layout(&model, theme, bounds, dpi_scale);
+    now_playing->layout =
+        reach_top_bar_now_playing_compute_layout(&model, theme, bounds, dpi_scale, text_measure);
 }
 
 reach_now_playing_action reach_top_bar_now_playing_action_at(

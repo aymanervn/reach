@@ -79,12 +79,22 @@ static inline reach_rect_f32 reach_top_bar_rect(float x, float y, float width, f
     return rect;
 }
 
-static inline float reach_top_bar_text_advance(const uint16_t *text, float text_size)
+static inline float reach_top_bar_text_advance(const reach_text_measure_port *measure,
+                                               const uint16_t *text, float text_size,
+                                               int32_t text_weight)
 {
     if (text == nullptr || text_size <= 0.0f)
     {
         return 0.0f;
     }
+    float width = 0.0f;
+    if (measure != nullptr && measure->measure != nullptr &&
+        measure->measure(measure->context, text, text_size, text_weight, &width) == REACH_OK &&
+        width >= 0.0f)
+    {
+        return width;
+    }
+
     size_t length = 0;
     while (text[length] != 0)
     {

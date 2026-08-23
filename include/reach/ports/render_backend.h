@@ -2,6 +2,7 @@
 #define REACH_PORTS_RENDER_BACKEND_H
 
 #include "reach/core/render_commands.h"
+#include "reach/ports/text_measure.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -18,6 +19,7 @@ extern "C"
                                 const reach_render_command_buffer *commands);
         void (*release_icon)(reach_render_backend *backend, uint64_t icon_id);
         void (*set_ui_font)(reach_render_backend *backend, int32_t use_bundled_font);
+        reach_text_measure_fn measure_text;
         void (*destroy)(reach_render_backend *backend);
     } reach_render_backend_ops;
 

@@ -9,6 +9,7 @@
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/features/popup.h"
+#include "reach/ports/text_measure.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -83,6 +84,7 @@ extern "C"
         size_t item_count;
         const reach_context_menu_window_entry *window_entries;
         size_t window_entry_count;
+        reach_text_measure_port text_measure;
     } reach_context_menu_open_context;
 
     void reach_context_menu_open_power(reach_context_menu *menu,
