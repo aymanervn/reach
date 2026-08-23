@@ -175,20 +175,22 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
+    out_snapshot->power_screen_off_minutes =
+        (int32_t)GetPrivateProfileIntW(L"power", L"screen_off_minutes", 10, path);
     out_snapshot->power_sleep_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"sleep_minutes", 30, path);
     out_snapshot->power_lock_minutes =
-        (int32_t)GetPrivateProfileIntW(L"power", L"lock_minutes", 0, path);
+        (int32_t)GetPrivateProfileIntW(L"power", L"lock_minutes", 15, path);
     out_snapshot->power_shutdown_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"shutdown_minutes", 0, path);
     out_snapshot->power_restart_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"restart_minutes", 0, path);
     out_snapshot->power_sleep_wait_apps =
-        (int32_t)GetPrivateProfileIntW(L"power", L"sleep_wait_apps", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"power", L"sleep_wait_apps", 1, path) != 0;
     out_snapshot->power_shutdown_wait_apps =
         (int32_t)GetPrivateProfileIntW(L"power", L"shutdown_wait_apps", 0, path) != 0;
     out_snapshot->power_restart_wait_apps =
-        (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 1, path) != 0;
     out_snapshot->high_refresh_rate =
         (int32_t)GetPrivateProfileIntW(L"display", L"high_refresh_rate", 0, path) != 0;
     out_snapshot->bundled_font =
@@ -255,6 +257,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
     WritePrivateProfileStringW(L"dock", L"height", value, path);
     WritePrivateProfileStringW(L"dock", L"width", nullptr, path);
     WritePrivateProfileStringW(L"dock", L"icon_size", nullptr, path);
+    swprintf_s(value, L"%d", snapshot->power_screen_off_minutes);
+    WritePrivateProfileStringW(L"power", L"screen_off_minutes", value, path);
     swprintf_s(value, L"%d", snapshot->power_sleep_minutes);
     WritePrivateProfileStringW(L"power", L"sleep_minutes", value, path);
     swprintf_s(value, L"%d", snapshot->power_lock_minutes);

@@ -13,6 +13,7 @@ const uint16_t *reach_settings_power_sleep_page_placeholder(void)
 static const int32_t
     reach_settings_power_presets[REACH_SETTINGS_POWER_TIMER_COUNT]
                                 [REACH_SETTINGS_POWER_PRESET_COUNT] = {
+                                    {0, 5, 10, 15, 30},
                                     {0, 5, 15, 30, 60},
                                     {0, 1, 5, 10, 15},
                                     {0, 30, 60, 120, 180},
@@ -22,6 +23,8 @@ static const int32_t
 const reach_settings_power_row_style *reach_settings_power_row_styles(void)
 {
     static const reach_settings_power_row_style styles[REACH_SETTINGS_POWER_TIMER_COUNT] = {
+        {REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Screen off",
+         (const uint16_t *)L"Turn off the screen when idle for", REACH_THEME_ACCENT_BLUE},
         {REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Sleep",
          (const uint16_t *)L"Put the device to sleep when idle for", REACH_THEME_ACCENT_LAVENDER},
         {REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Auto lock",
@@ -336,7 +339,8 @@ int32_t reach_settings_model_power_handle_edit_key(reach_settings_model *model,
 
 int32_t reach_settings_power_timer_supports_wait(size_t timer)
 {
-    return timer < REACH_SETTINGS_POWER_TIMER_COUNT && timer != REACH_SETTINGS_POWER_TIMER_LOCK;
+    return timer < REACH_SETTINGS_POWER_TIMER_COUNT && timer != REACH_SETTINGS_POWER_TIMER_LOCK &&
+           timer != REACH_SETTINGS_POWER_TIMER_SCREEN_OFF;
 }
 
 void reach_settings_model_set_power_wait_apps(reach_settings_model *model, size_t timer,

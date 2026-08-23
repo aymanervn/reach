@@ -332,6 +332,8 @@ static void reach_settings_load_power_config(reach_settings_app *app)
     {
         return;
     }
+    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF,
+                                           snapshot->power_screen_off_minutes);
     reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP,
                                            snapshot->power_sleep_minutes);
     reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_LOCK,
@@ -362,6 +364,8 @@ static void reach_settings_save_power_config(reach_settings_app *app)
     {
         return;
     }
+    snapshot->power_screen_off_minutes = reach_settings_model_power_minutes(
+        &app->model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF);
     snapshot->power_sleep_minutes =
         reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP);
     snapshot->power_lock_minutes =

@@ -187,6 +187,9 @@ static void test_power_timers(void)
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
 
+    expect_true(reach_settings_model_power_minutes(
+                    model.get(), REACH_SETTINGS_POWER_TIMER_SCREEN_OFF) == 10,
+                "screen-off timer defaults to 10 minutes");
     expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
                     30,
                 "sleep timer defaults to 30 minutes");
@@ -328,15 +331,15 @@ static void test_power_wait_apps_toggle(void)
     expect_true(!reach_settings_power_timer_supports_wait(REACH_SETTINGS_POWER_TIMER_LOCK),
                 "lock has no wait-for-apps toggle");
     expect_true(
-        !reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
-        "wait-for-apps defaults off");
+        reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
+        "sleep wait-for-apps default matches the active configuration");
 
     expect_true(
         reach_settings_model_toggle_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
         "toggling a supported row is accepted");
     expect_true(
-        reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) == 1,
-        "toggling turns the flag on");
+        reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) == 0,
+        "toggling turns the flag off");
     expect_true(reach_settings_model_power_animations_active(model.get()),
                 "toggling animates the switch");
     expect_true(reach_settings_model_tick_power_animations(model.get(), 1.0),
@@ -357,6 +360,9 @@ static void test_power_wait_apps_toggle(void)
     expect_true(
         !reach_settings_model_toggle_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK),
         "toggling the lock row is rejected");
+    expect_true(!reach_settings_model_toggle_power_wait_apps(
+                    model.get(), REACH_SETTINGS_POWER_TIMER_SCREEN_OFF),
+                "toggling the screen-off row is rejected");
     reach_settings_model_set_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK, 1);
     expect_true(!reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK),
                 "setting the lock row wait flag is ignored");
