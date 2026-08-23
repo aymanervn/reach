@@ -8,7 +8,7 @@ void reach_host_set_tray_popup_open(reach_host *host, int32_t open)
     }
 
     int32_t next_open = open ? 1 : 0;
-    if (!reach_tray_set_popup_open(host->tray_capsule, next_open))
+    if (!reach_top_bar_set_tray_popup_open(host->top_bar_capsule, next_open))
     {
         return;
     }
@@ -32,13 +32,14 @@ void reach_host_toggle_tray_popup(reach_host *host)
 {
     if (host != nullptr)
     {
-        reach_host_set_tray_popup_open(host, !reach_tray_popup_is_open(host->tray_capsule));
+        reach_host_set_tray_popup_open(
+            host, !reach_top_bar_tray_popup_is_open(host->top_bar_capsule));
     }
 }
 
 reach_result reach_host_refresh_tray_items(reach_host *host)
 {
-    return host != nullptr ? reach_tray_refresh(host->tray_capsule, &host->tray_provider)
+    return host != nullptr ? reach_top_bar_refresh_tray(host->top_bar_capsule)
                            : REACH_OK;
 }
 
@@ -65,20 +66,20 @@ void reach_host_compute_tray_popup_layout(reach_host *host, reach_rect_f32 *out_
     anchor.bar_height = top_bar_layout->bounds.height;
     anchor.direction = REACH_POPUP_DROP_DOWN;
 
-    reach_tray_layout_popup(host->tray_capsule, theme, &anchor,
-                            reach_host_layout_dpi_scale(host), out_bounds);
+    reach_top_bar_layout_tray_popup(host->top_bar_capsule, theme, &anchor,
+                                    reach_host_layout_dpi_scale(host), out_bounds);
 }
 
 reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,
                                            reach_tray_action action)
 {
-    if (host == nullptr || host->tray_provider.ops.activate == nullptr)
+    if (host == nullptr)
     {
         return REACH_OK;
     }
 
     reach_host_set_tray_popup_open(host, 0);
-    return host->tray_provider.ops.activate(host->tray_provider.provider, item_id, action);
+    return reach_tray_service_activate(host->tray_service, item_id, action);
 }
 
 reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_ui_event *event,
@@ -91,15 +92,15 @@ reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_
     }
 
     reach_tray_action provider_action = REACH_TRAY_ACTION_LEFT_CLICK;
-    if (result->action.kind == REACH_TRAY_POINTER_ACTION_ACTIVATE_RIGHT)
+    if (result->action.kind == REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT)
     {
         provider_action = REACH_TRAY_ACTION_RIGHT_CLICK;
     }
-    else if (result->action.kind != REACH_TRAY_POINTER_ACTION_ACTIVATE_LEFT)
+    else if (result->action.kind != REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT)
     {
         return REACH_OK;
     }
 
     return reach_host_activate_tray_item(host, static_cast<uint32_t>(result->action.id),
-                                        provider_action);
+                                         provider_action);
 }

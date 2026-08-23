@@ -505,7 +505,7 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
         }
 
         if (desc->id == REACH_SURFACE_ID_DOCK &&
-            reach_tray_state_ptr(host->tray_capsule)->popup_open &&
+            reach_top_bar_tray_popup_is_open(host->top_bar_capsule) &&
             (up.action.kind == REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED ||
              up.action.kind == REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW) &&
             !reach_rect_contains(host->tray.last_bounds, event->x, event->y))
@@ -515,7 +515,7 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
         return reach_host_apply_pointer(host, desc->id, event, &up);
     }
 
-    if (reach_tray_state_ptr(host->tray_capsule)->popup_open &&
+    if (reach_top_bar_tray_popup_is_open(host->top_bar_capsule) &&
         !reach_rect_contains(host->tray.last_bounds, event->x, event->y))
     {
         reach_host_set_tray_popup_open(host, 0);
@@ -694,7 +694,7 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
         {
 
             if (source_desc->id == REACH_SURFACE_ID_DOCK &&
-                reach_tray_state_ptr(host->tray_capsule)->popup_open &&
+                reach_top_bar_tray_popup_is_open(host->top_bar_capsule) &&
                 source_down.action.kind == REACH_DOCK_POINTER_ACTION_PRESS_ITEM)
             {
                 reach_host_cancel_dock_pointer_sequence(host);

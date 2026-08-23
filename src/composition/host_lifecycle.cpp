@@ -245,16 +245,14 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->config_store.ops.destroy(host->config_store.store);
     }
-    if (host->tray_provider.ops.destroy != nullptr)
-    {
-        host->tray_provider.ops.destroy(host->tray_provider.provider);
-    }
     reach_launcher_attach_search(host->launcher_capsule, nullptr);
     reach_launcher_attach_icons(host->launcher_capsule, nullptr);
     reach_dock_attach_services(host->dock_capsule, nullptr, nullptr);
     reach_top_bar_attach_app_control(host->top_bar_capsule, nullptr);
     reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr, nullptr,
-                                  nullptr, nullptr);
+                                  nullptr, nullptr, nullptr);
+    reach_tray_service_destroy(host->tray_service);
+    host->tray_service = nullptr;
     reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
     reach_quick_settings_attach_status(host->quick_settings_capsule, nullptr);
     reach_search_service_destroy(host->search_service);
@@ -301,8 +299,6 @@ static void reach_host_cleanup(reach_host *host)
     host->dock_capsule = nullptr;
     reach_top_bar_destroy(host->top_bar_capsule);
     host->top_bar_capsule = nullptr;
-    reach_tray_destroy(host->tray_capsule);
-    host->tray_capsule = nullptr;
     reach_context_menu_destroy(host->context_menu_capsule);
     host->context_menu_capsule = nullptr;
     reach_launcher_destroy(host->launcher_capsule);
@@ -369,7 +365,7 @@ static void reach_host_cleanup(reach_host *host)
     host->window_manager = {};
     host->foreground_watcher = {};
     host->config_store = {};
-    host->tray_provider = {};
+    host->tray_service = nullptr;
     host->search_provider = {};
     host->app_launcher = {};
     host->settings_launcher = {};
@@ -383,7 +379,6 @@ static void reach_host_cleanup(reach_host *host)
     host->quick_settings_capsule = nullptr;
     host->clipboard_capsule = nullptr;
     host->dock_capsule = nullptr;
-    host->tray_capsule = nullptr;
     host->power_session = {};
     host->audio_volume = {};
     host->system_controls = {};
@@ -446,11 +441,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     host->top_bar_capsule = nullptr;
     if (reach_top_bar_create(&host->top_bar_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->tray_capsule = nullptr;
-    if (reach_tray_create(&host->tray_capsule) != REACH_OK)
     {
         result = REACH_ERROR;
     }
@@ -542,7 +532,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
-    host->tray_provider = dependencies->tray_provider;
+    host->tray_service = nullptr;
+    if (reach_tray_service_create(dependencies->tray_provider, &host->tray_service) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
     host->search_provider = dependencies->search_provider;
     host->search_service = nullptr;
     if (reach_search_service_create(host->search_provider, reach_host_on_search_service_ready, host,
@@ -622,7 +616,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_dock_attach_services(host->dock_capsule, host->icon_service, host->window_tracking);
     reach_top_bar_attach_services(host->top_bar_capsule, host->now_playing_service,
                                   host->icon_service, host->window_tracking, host->system_stats,
-                                  host->clock, host->input_language);
+                                  host->clock, host->input_language, host->tray_service);
     reach_top_bar_attach_app_control(host->top_bar_capsule, host->app_control);
     reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
                                    host->window_tracking);

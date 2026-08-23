@@ -5,6 +5,7 @@
 
 #include "top_bar_metrics.h"
 #include "top_bar_now_playing.h"
+#include "top_bar_tray.h"
 #include "top_bar_window_push.h"
 
 struct reach_top_bar
@@ -14,6 +15,7 @@ struct reach_top_bar
     reach_top_bar_state state;
     reach_top_bar_now_playing *now_playing_subfeature;
     reach_top_bar_window_push *window_push;
+    reach_top_bar_tray_popup *tray_popup;
     reach_now_playing_service *now_playing;
     reach_icon_service *icons;
     reach_window_tracking *windows;
@@ -22,6 +24,7 @@ struct reach_top_bar
     reach_clock *clock;
     reach_input_language_service *input_language;
     reach_system_status *status;
+    reach_tray_service *tray;
     float now_playing_target_width;
     float current_app_target_width;
     float tray_target_width;

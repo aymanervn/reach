@@ -65,7 +65,7 @@ generation, coalescing provider thumbnail bursts without delaying core state.
 
 ## features
 
-Self-contained UI capsules — dock, launcher, switcher, tray, quick settings, clipboard,
+Self-contained UI capsules — dock, launcher, switcher, quick settings, clipboard,
 settings, context menu, wallpaper. Each owns its state, layout, animation,
 hit-testing, render composition, and interaction behind
 create/update/handle_event/append_render_commands entry points, and returns semantic
@@ -137,9 +137,12 @@ notification on the current default render device (and re-registers when that
 device changes), fires on a COM thread, and lands in the same
 composition-owned atomic-flag → drain → `refresh_*` path the system-controls
 watcher uses.
-Tray owns popup item hit resolution, press/release feedback, left/right activation
-semantics, and cancellation. Composition retains provider activation, topmost
-window handling, and popup lifecycle.
+The tray service owns the provider port, cached item snapshot, activation, and native icon
+retirement. The top bar consumes that service directly and owns both the inline tray cells and
+its private overflow-popup capsule: popup layout, item hit resolution, press/release feedback,
+left/right semantic actions, and cancellation. Composition retains topmost-window handling,
+surface lifecycle, semantic-action translation, and renderer-cache eviction before retired native
+icons are released.
 Stage is the window overview: a fullscreen overlay capsule that shrinks every open
 window into a centered grid. It owns tile layout, the open/close animation, hover
 state, and hit resolution, and reports only activate/dismiss actions. It never calls
@@ -167,9 +170,9 @@ edit model, query, and attached search; composition only routes the raw
 TEXT_CHAR/TEXT_EDIT events and applies the reported redraw/relayout).
 
 **Accepted coupling (by design — do not “fix”):** the top bar cluster. The top
-bar hosts the tray / quick-settings / power buttons, so those popup features may
-take the top bar layout directly (e.g. `reach_tray_layout_popup(…, top_bar_layout,
-…)`); no anchor indirection is wanted between them. Now Playing is not a
+bar hosts the tray / quick-settings / power buttons, so its private tray overflow UI and the
+other popup features may take the top bar layout directly; no anchor indirection is wanted
+between them. Now Playing is not a
 separate feature: its private UI subfeature lives inside the top bar and consumes
 the shared Now Playing service, leaving room for a future standalone music feature
 to consume the same stable service independently. It renders one bold line and

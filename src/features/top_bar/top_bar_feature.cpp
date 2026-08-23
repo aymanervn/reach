@@ -39,9 +39,12 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
     }
 
     if (reach_top_bar_now_playing_create(&top_bar->now_playing_subfeature) != REACH_OK ||
-        reach_top_bar_window_push_create(&top_bar->window_push) != REACH_OK)
+        reach_top_bar_window_push_create(&top_bar->window_push) != REACH_OK ||
+        reach_top_bar_tray_popup_create(&top_bar->tray_popup) != REACH_OK)
     {
         reach_top_bar_now_playing_destroy(top_bar->now_playing_subfeature);
+        reach_top_bar_window_push_destroy(top_bar->window_push);
+        reach_top_bar_tray_popup_destroy(top_bar->tray_popup);
         delete top_bar;
         return REACH_ERROR;
     }
@@ -59,6 +62,7 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
         reach_top_bar_window_push_release(top_bar->window_push);
         reach_top_bar_window_push_destroy(top_bar->window_push);
         reach_top_bar_now_playing_destroy(top_bar->now_playing_subfeature);
+        reach_top_bar_tray_popup_destroy(top_bar->tray_popup);
     }
     delete top_bar;
 }
@@ -66,7 +70,8 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
 void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_service *now_playing,
                                    reach_icon_service *icons, reach_window_tracking *windows,
                                    reach_system_stats *stats, reach_clock *clock,
-                                   reach_input_language_service *input_language)
+                                   reach_input_language_service *input_language,
+                                   reach_tray_service *tray)
 {
     if (top_bar != nullptr)
     {
@@ -76,6 +81,7 @@ void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_ser
         top_bar->stats = stats;
         top_bar->clock = clock;
         top_bar->input_language = input_language;
+        top_bar->tray = tray;
         reach_top_bar_window_push_attach(top_bar->window_push, top_bar->apps, top_bar->windows);
     }
 }
@@ -357,21 +363,26 @@ reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *t
     return top_bar != nullptr ? top_bar->now_playing_subfeature : nullptr;
 }
 
-static void reach_top_bar_update_tray_items(reach_top_bar *top_bar,
-                                            const reach_top_bar_build_context *ctx)
+static void reach_top_bar_update_tray_items(reach_top_bar *top_bar)
 {
     reach_top_bar_state *state = &top_bar->state;
-    size_t count = ctx->tray_item_count;
+    size_t count = reach_tray_service_item_count(top_bar->tray);
     state->tray_overflow = count > REACH_TOP_BAR_MAX_TRAY_ICONS;
     if (count > REACH_TOP_BAR_MAX_TRAY_ICONS)
     {
         count = REACH_TOP_BAR_MAX_TRAY_ICONS;
     }
     state->tray_item_count = count;
-    state->tray_popup_open = ctx->tray_popup_open;
+    state->tray_popup_open = reach_top_bar_tray_popup_is_open(top_bar);
     for (size_t index = 0; index < count; ++index)
     {
-        state->tray_items[index] = ctx->tray_items[index];
+        const reach_tray_item *item = reach_tray_service_item_at(top_bar->tray, index);
+        state->tray_items[index] = {};
+        if (item != nullptr)
+        {
+            state->tray_items[index].id = item->id;
+            state->tray_items[index].icon_id = item->icon_id;
+        }
     }
 }
 
@@ -638,7 +649,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f, button_size, button_size);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x;
 
-    reach_top_bar_update_tray_items(top_bar, ctx);
+    reach_top_bar_update_tray_items(top_bar);
     const float tray_slot = height * metrics.tray_icon_scale;
     const float tray_gap = metrics.tray_icon_gap * scale;
     const size_t tray_count = top_bar->state.tray_item_count;
@@ -677,6 +688,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->tray_overflow_button = top_bar->state.tray_overflow
                                        ? reach_top_bar_rect(tray_x, tray_y, tray_slot, tray_slot)
                                        : reach_rect_f32{};
+    reach_top_bar_tray_set_overflow_start(top_bar, top_bar->state.tray_item_count);
 
     if (tray_cells > 0)
     {

@@ -82,26 +82,27 @@ reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bou
         return REACH_OK;
     }
 
-    reach_render_command_buffer commands = {};
-    reach_tray_render_context render_ctx = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
+    reach_top_bar_tray_render_context render_ctx = {};
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.bounds = bounds;
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
     reach_result result =
-        reach_tray_append_render_commands(host->tray_capsule, &render_ctx, &commands);
+        reach_top_bar_append_tray_render_commands(host->top_bar_capsule, &render_ctx, commands);
     if (result != REACH_OK)
     {
         return result;
     }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_TRAY, &commands);
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_TRAY, commands);
 
     if (host->tray.renderer.ops.begin_frame(host->tray.renderer.backend) != REACH_OK)
     {
         return REACH_ERROR;
     }
 
-    (void)host->tray.renderer.ops.execute(host->tray.renderer.backend, &commands);
+    (void)host->tray.renderer.ops.execute(host->tray.renderer.backend, commands);
     return host->tray.renderer.ops.end_frame(host->tray.renderer.backend);
 }
 

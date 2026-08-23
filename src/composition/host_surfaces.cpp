@@ -376,8 +376,8 @@ void reach_host_init_surface_descriptors(reach_host *host)
                                     &host->tray,
                                     &host->tray_transition,
                                     reach_host_surface_tray_close,
-                                    host->tray_capsule,
-                                    reach_tray_capsule_ops(),
+                                    host->top_bar_capsule,
+                                    reach_top_bar_tray_capsule_ops(),
                                     REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED};
     descs[REACH_SURFACE_ID_QUICK_SETTINGS] = {REACH_SURFACE_ID_QUICK_SETTINGS,
                                               REACH_SURFACE_CLASS_POPUP,

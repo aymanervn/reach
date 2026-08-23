@@ -211,23 +211,7 @@ void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bo
     ctx.text_measure.context = host->top_bar.renderer.backend;
     ctx.text_measure.measure = host->top_bar.renderer.ops.measure_text;
 
-    reach_top_bar_tray_item tray_items[REACH_TOP_BAR_MAX_TRAY_ICONS] = {};
-    size_t tray_item_count = reach_tray_item_count(host->tray_capsule);
-    size_t copied_count = tray_item_count < REACH_TOP_BAR_MAX_TRAY_ICONS
-                              ? tray_item_count
-                              : REACH_TOP_BAR_MAX_TRAY_ICONS;
-    for (size_t index = 0; index < copied_count; ++index)
-    {
-        tray_items[index].id = reach_tray_item_id(host->tray_capsule, index);
-        tray_items[index].icon_id = reach_tray_item_icon_id(host->tray_capsule, index);
-    }
-    ctx.tray_items = tray_items;
-    ctx.tray_item_count = tray_item_count;
-    ctx.tray_popup_open = reach_tray_popup_is_open(host->tray_capsule);
-
     reach_top_bar_build_layout(host->top_bar_capsule, &ctx);
-    reach_tray_set_overflow_start(host->tray_capsule,
-                                  reach_top_bar_tray_overflow_start(host->top_bar_capsule));
 }
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host)
@@ -342,8 +326,8 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
 
     return position_animating && host->has_layout && !host->dirty.update_requested &&
            !host->dirty.layout && !host->dirty.render && !reach_host_any_surface_dirty(host) &&
-           !reach_animation_manager_active(reach_tray_animation_manager(host->tray_capsule),
-                                           REACH_TRAY_ANIM_FEEDBACK_OPACITY) &&
+           !reach_animation_manager_any_active(
+               reach_top_bar_tray_animation_manager(host->top_bar_capsule)) &&
            !reach_quick_settings_height_animation_active(host->quick_settings_capsule);
 }
 
