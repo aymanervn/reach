@@ -1,4 +1,5 @@
 #include "reach/features/quick_settings.h"
+#include "reach/features/popup.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -98,11 +99,43 @@ static void test_volume_icon_selection(void)
                 "high volume uses high icon");
 }
 
+static void test_expansion_keeps_popup_anchor_position(void)
+{
+    reach_quick_settings *quick_settings = nullptr;
+    expect_true(reach_quick_settings_create(&quick_settings) == REACH_OK,
+                "quick settings capsule is created");
+    if (quick_settings == nullptr)
+    {
+        return;
+    }
+
+    reach_quick_settings_layout_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.dpi_scale = 1.25f;
+    ctx.anchor_button = {120.25f, 8.25f, 32.0f, 24.0f};
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    ctx.bar_edge_y = 40.25f;
+    ctx.drop_direction = REACH_POPUP_DROP_DOWN;
+
+    (void)reach_quick_settings_set_open(quick_settings, 1);
+    reach_quick_settings_refresh_layout(quick_settings, &ctx);
+    const float initial_y = reach_quick_settings_state_ptr(quick_settings)->bounds.y;
+
+    (void)reach_quick_settings_toggle_expanded(quick_settings);
+    reach_quick_settings_relayout(quick_settings, &ctx, 1);
+    (void)reach_quick_settings_update_open_animation(quick_settings, &ctx);
+
+    expect_near(reach_quick_settings_state_ptr(quick_settings)->bounds.y, initial_y, 0.001f,
+                "height animation preserves the popup anchor position");
+    reach_quick_settings_destroy(quick_settings);
+}
+
 int main(void)
 {
     test_model_clamps_volume();
     test_session_list_cap_is_respected();
     test_volume_icon_selection();
+    test_expansion_keeps_popup_anchor_position();
 
     if (g_failures != 0)
     {
