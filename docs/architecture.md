@@ -106,7 +106,7 @@ monitor width through `reach_dock_layout`, represents appearing and dying slots
 as normalized reveal units, and uniformly scales every internal dimension only
 when the animated one-row content would otherwise overflow. There is no minimum
 Dock width, height, icon size or scale. Layout reserves 32dp at each horizontal
-screen edge and 18dp below the Dock; fitted heights remain bottom-anchored so the
+screen edge and 12dp below the Dock; fitted heights remain bottom-anchored so the
 bottom margin is invariant as the Dock scales. Host-owned reusable command buffers
 are sized from these capacities so the worst-case Dock does not truncate render
 commands or place the enlarged buffer on a frame's stack.

@@ -48,7 +48,7 @@ static void test_dock_reserves_side_safe_margins(void)
                 "Dock side safe margins exceed its bottom margin");
     expect_near(layout.available_width, 904.0f, 0.001f,
                 "Dock fitting width excludes both DPI-scaled side margins");
-    expect_near(layout.bounds.y + layout.bounds.height, 723.0f, 0.001f,
+    expect_near(layout.bounds.y + layout.bounds.height, 732.0f, 0.001f,
                 "native Dock bounds preserve the DPI-scaled bottom margin");
 
     input.work_area.width = 40.0f;
