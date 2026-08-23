@@ -88,13 +88,15 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     }
 
     reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
     command.rect.x = 0.0f;
     command.rect.y = 0.0f;
     command.rect.width = layout->bounds.width;
     command.rect.height = outer_height;
-    command.color = theme->launcher_search_background;
     command.radius = launcher_radius;
+    reach_render_push_shadow(out_commands, &command, &theme->popup_shadow, input->dpi_scale);
+
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.color = theme->launcher_search_background;
     reach_render_command_buffer_push(out_commands, &command);
 
     {
