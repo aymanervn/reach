@@ -164,6 +164,7 @@ reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32
     {
         return build_result;
     }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_SWITCHER, commands);
 
     if (host->switcher.renderer.ops.begin_frame(host->switcher.renderer.backend) != REACH_OK)
     {
@@ -227,6 +228,7 @@ reach_result reach_host_render_launcher_surface(reach_host *host,
     {
         return build_result;
     }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_LAUNCHER, commands);
 
     if (host->launcher.renderer.ops.begin_frame(host->launcher.renderer.backend) != REACH_OK)
     {
@@ -252,6 +254,7 @@ reach_result reach_host_render_clipboard_surface(reach_host *host)
     {
         return result;
     }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_CLIPBOARD, commands);
     result =
         host->clipboard_surface.renderer.ops.begin_frame(host->clipboard_surface.renderer.backend);
     if (result != REACH_OK)

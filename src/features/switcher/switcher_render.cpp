@@ -108,7 +108,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     shape.radius = radius;
     reach_result result = reach_render_push_bordered_background(
         out_commands, &shape, theme->switcher_background, theme->bar_border, border_thickness,
-        nullptr, input->dpi_scale);
+        &theme->popup_shadow, input->dpi_scale);
     if (result != REACH_OK)
     {
         return result;
