@@ -38,7 +38,7 @@ reach_context_menu_hit_test_close_buttons(const reach_context_menu_state *state,
         if (state->item_windows[index] != 0 &&
             reach_context_menu_rect_contains(
                 reach_context_menu_close_button_rect(
-                    reach_context_menu_metrics_for(state->window_list_open),
+                    reach_context_menu_metrics_for(state->power_open, state->window_list_open),
                     state->item_slots[index], state->dpi_scale),
                 x, y))
         {

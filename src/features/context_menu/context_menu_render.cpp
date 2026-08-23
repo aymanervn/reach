@@ -93,7 +93,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return REACH_INVALID_ARGUMENT;
     }
 
-    const reach_context_menu_metrics *metrics = reach_context_menu_metrics_for(input->window_list);
+    const reach_context_menu_metrics *metrics =
+        reach_context_menu_metrics_for(input->power_menu, input->window_list);
 
     reach_render_command_buffer_clear(out_commands);
     reach_render_command command = {};
@@ -214,6 +215,7 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.item_commands = state->item_commands;
     input.item_icon_ids = state->item_icon_ids;
     input.item_titles = state->item_titles;
+    input.power_menu = state->power_open;
     input.window_list = state->window_list_open;
     input.hover_opacity = reach_context_menu_hover_opacity(menu);
     input.close_hovered_index = state->close_hovered_index;

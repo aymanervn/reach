@@ -204,7 +204,7 @@ static void reach_context_menu_place(reach_context_menu_state *state,
                                      float anchor_ratio)
 {
     const reach_context_menu_metrics *metrics =
-        reach_context_menu_metrics_for(state->window_list_open);
+        reach_context_menu_metrics_for(state->power_open, state->window_list_open);
     state->anchored = ctx->anchored;
     state->drop_direction = ctx->drop_direction;
     state->anchor_popup_width = popup_width;
