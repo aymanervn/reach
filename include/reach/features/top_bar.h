@@ -71,7 +71,6 @@ extern "C"
         reach_rect_f32 language_button;
         reach_rect_f32 battery_button;
         reach_rect_f32 battery_shell;
-        reach_rect_f32 battery_cap;
         reach_rect_f32 stats_cpu;
         reach_rect_f32 stats_memory;
         reach_rect_f32 stats_download;
@@ -173,6 +172,7 @@ extern "C"
         int32_t battery_valid;
         int32_t battery_percent;
         int32_t battery_saver_on;
+        int32_t battery_charging;
         int32_t battery_saver_pending;
         int32_t battery_saver_pending_enabled;
 

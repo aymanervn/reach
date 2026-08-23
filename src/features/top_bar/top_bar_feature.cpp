@@ -175,6 +175,7 @@ static void reach_top_bar_update_stats(reach_top_bar *top_bar)
         snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
     state->battery_percent = state->battery_valid ? snapshot.power.battery_percent : 0;
     state->battery_saver_on = snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0;
+    state->battery_charging = snapshot.power_valid && snapshot.power.battery_charging ? 1 : 0;
 
     state->stats_valid = snapshot.valid;
     if (!snapshot.valid)
@@ -506,9 +507,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         top_bar->state.language_code[0] != 0 ? metrics.language_width * scale : 0.0f;
     float language_gap = language_width > 0.0f ? pill_gap : 0.0f;
 
-    const float battery_cap_advance = (metrics.battery_cap_gap + metrics.battery_cap_width) * scale;
-    float battery_width =
-        top_bar->state.battery_valid ? metrics.battery_width * scale + battery_cap_advance : 0.0f;
+    float battery_width = top_bar->state.battery_valid ? metrics.battery_width * scale : 0.0f;
     float battery_gap = battery_width > 0.0f ? pill_gap : 0.0f;
 
     const float stats_size = metrics.stats_text_size * scale;
@@ -605,17 +604,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     }
     if (battery_width > 0.0f)
     {
-        const float shell_width = metrics.battery_width * scale;
-        const float shell_height = metrics.battery_height * scale;
-        const float cap_width = metrics.battery_cap_width * scale;
-        const float cap_height = metrics.battery_cap_height * scale;
-        layout->battery_shell = reach_top_bar_rect(cluster_x, (height - shell_height) * 0.5f,
-                                                   shell_width, shell_height);
-        layout->battery_cap =
-            reach_top_bar_rect(cluster_x + shell_width + metrics.battery_cap_gap * scale,
-                               (height - cap_height) * 0.5f, cap_width, cap_height);
         layout->battery_button = reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f,
                                                     battery_width, button_size);
+        layout->battery_shell = layout->battery_button;
         cluster_x += battery_width + battery_gap;
     }
     layout->quick_settings_button = reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f,
