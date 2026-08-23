@@ -130,6 +130,28 @@ static void test_settled_bar_tracks_resized_shown_bounds(void)
                 "the settled position track adopts the resized shown target");
 }
 
+static void test_resized_shown_bounds_override_an_old_position_animation(void)
+{
+    reach_animation_track track = {};
+    reach_animation_manager manager = {};
+    reach_animation_manager_init(&manager, &track, 1);
+    reach_bar_visibility_state state = {};
+    reach_bar_visibility_request request = base_request();
+    request.edge = REACH_BAR_EDGE_BOTTOM;
+    request.shown_bounds = {100.0f, 718.0f, 800.0f, 64.0f};
+
+    (void)reach_bar_update_visibility(&state, &manager, 0, &request);
+    reach_animation_manager_start(&manager, 0, 700.0f, 718.0f, 0.25, REACH_EASING_EASE_IN_OUT);
+    request.shown_bounds = {100.0f, 750.0f, 800.0f, 32.0f};
+    reach_bar_visibility_result resized =
+        reach_bar_update_visibility(&state, &manager, 0, &request);
+
+    expect_true(resized.animated_bounds.y == 750.0f,
+                "resized shown geometry overrides an obsolete position animation");
+    expect_true(!reach_animation_manager_active(&manager, 0),
+                "adopting resized shown geometry retires the obsolete animation");
+}
+
 int main(void)
 {
     test_protected_bands_are_symmetric();
@@ -137,5 +159,6 @@ int main(void)
     test_stage_force_show_precedes_manipulation();
     test_pointer_observation_wakes_hover_exit();
     test_settled_bar_tracks_resized_shown_bounds();
+    test_resized_shown_bounds_override_an_old_position_animation();
     return failures == 0 ? 0 : 1;
 }

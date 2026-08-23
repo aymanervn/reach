@@ -221,8 +221,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
         reach_animation_manager_animate_to(manager, y_track, target_y, reveal_seconds,
                                            REACH_EASING_EASE_IN_OUT);
     }
-    else if (!reach_animation_manager_active(manager, y_track) &&
-             fabsf(reach_animation_manager_target(manager, y_track) - target_y) >= 0.01f)
+    else if (fabsf(reach_animation_manager_target(manager, y_track) - target_y) >= 0.01f)
     {
         reach_animation_manager_set(manager, y_track, target_y);
     }
