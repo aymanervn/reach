@@ -27,6 +27,8 @@ struct reach_context_menu_metrics
 };
 
 static constexpr float reach_context_menu_hover_text_size = 11.0f;
+static constexpr float reach_context_menu_item_scale =
+    reach_context_menu_hover_text_size / 14.0f;
 
 static constexpr reach_context_menu_metrics reach_context_menu_make_large_metrics()
 {
@@ -77,6 +79,16 @@ static constexpr reach_context_menu_metrics reach_context_menu_make_item_metrics
 {
     reach_context_menu_metrics metrics = reach_context_menu_make_large_metrics();
     metrics.text_size = reach_context_menu_hover_text_size;
+    metrics.item_height *= reach_context_menu_item_scale;
+    metrics.padding *= reach_context_menu_item_scale;
+    metrics.text_leading_inset *= reach_context_menu_item_scale;
+    metrics.text_trailing_inset *= reach_context_menu_item_scale;
+    metrics.text_trailing_inset_with_close *= reach_context_menu_item_scale;
+    metrics.icon_size *= reach_context_menu_item_scale;
+    metrics.icon_inset *= reach_context_menu_item_scale;
+    metrics.icon_text_inset *= reach_context_menu_item_scale;
+    metrics.close_button_size *= reach_context_menu_item_scale;
+    metrics.close_button_inset *= reach_context_menu_item_scale;
     return metrics;
 }
 
@@ -89,7 +101,8 @@ static constexpr reach_context_menu_metrics reach_context_menu_item_metrics =
 
 static constexpr float reach_context_menu_power_popup_width = 176.0f;
 static constexpr float reach_context_menu_power_anchor_ratio = 0.72f;
-static constexpr float reach_context_menu_item_popup_width = 208.0f;
+static constexpr float reach_context_menu_item_popup_width =
+    224.0f * reach_context_menu_item_scale;
 static constexpr float reach_context_menu_item_anchor_ratio = 0.30f;
 static constexpr float reach_context_menu_window_list_anchor_ratio = 0.5f;
 
