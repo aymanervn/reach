@@ -171,8 +171,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
     }
-    if (host->tray_provider.ops.needs_refresh != nullptr &&
-        host->tray_provider.ops.needs_refresh(host->tray_provider.provider))
+    if (reach_tray_service_needs_refresh(host->tray_service))
     {
         (void)reach_host_refresh_tray_items(host);
         host->tray.dirty_flags = 1;

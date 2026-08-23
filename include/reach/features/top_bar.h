@@ -10,6 +10,7 @@
 #include "reach/features/common/bar_visibility.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
+#include "reach/features/popup.h"
 #include "reach/ports/text_measure.h"
 #include "reach/services/app_control.h"
 #include "reach/services/icon_service.h"
@@ -18,6 +19,7 @@
 #include "reach/services/input_language.h"
 #include "reach/services/system_stats.h"
 #include "reach/services/system_status.h"
+#include "reach/services/tray.h"
 #include "reach/services/window_tracking.h"
 #include "reach/support/animation.h"
 
@@ -189,7 +191,8 @@ extern "C"
                                        reach_now_playing_service *now_playing,
                                        reach_icon_service *icons, reach_window_tracking *windows,
                                        reach_system_stats *stats, reach_clock *clock,
-                                       reach_input_language_service *input_language);
+                                       reach_input_language_service *input_language,
+                                       reach_tray_service *tray);
 
     void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control *apps);
 
@@ -206,9 +209,6 @@ extern "C"
         const reach_theme *theme;
         reach_rect_f32 monitor_bounds;
         float dpi_scale;
-        const reach_top_bar_tray_item *tray_items;
-        size_t tray_item_count;
-        int32_t tray_popup_open;
         reach_text_measure_port text_measure;
     } reach_top_bar_build_context;
 
@@ -227,6 +227,28 @@ extern "C"
                                                  int32_t pending_enabled);
 
     size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar);
+
+    const reach_feature_capsule_ops *reach_top_bar_tray_capsule_ops(void);
+    int32_t reach_top_bar_tray_popup_is_open(const reach_top_bar *top_bar);
+    int32_t reach_top_bar_set_tray_popup_open(reach_top_bar *top_bar, int32_t open);
+    reach_result reach_top_bar_refresh_tray(reach_top_bar *top_bar);
+    void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *theme,
+                                         const reach_popup_anchor *anchor, float dpi_scale,
+                                         reach_rect_f32 *out_bounds);
+    reach_animation_manager *reach_top_bar_tray_animation_manager(reach_top_bar *top_bar);
+    size_t reach_top_bar_tray_item_count(const reach_top_bar *top_bar);
+    uint64_t reach_top_bar_tray_item_icon_id(const reach_top_bar *top_bar, size_t index);
+
+    typedef struct reach_top_bar_tray_render_context
+    {
+        const reach_theme *theme;
+        reach_rect_f32 bounds;
+        float dpi_scale;
+    } reach_top_bar_tray_render_context;
+
+    reach_result reach_top_bar_append_tray_render_commands(
+        reach_top_bar *top_bar, const reach_top_bar_tray_render_context *ctx,
+        reach_render_command_buffer *out_commands);
 
     const reach_bar_reveal_ops *reach_top_bar_reveal_ops(void);
 

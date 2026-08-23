@@ -74,6 +74,7 @@ add_library(reach_services STATIC
     src/services/input_language.cpp
     src/services/system_stats.cpp
     src/services/system_status.cpp
+    src/services/tray.cpp
     src/services/window_tracking.cpp
 )
 
@@ -145,12 +146,9 @@ add_library(reach_features STATIC
     src/features/top_bar/top_bar_window_push.cpp
     src/features/top_bar/top_bar_interaction.cpp
     src/features/top_bar/top_bar_render.cpp
+    src/features/top_bar/top_bar_tray.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
-    src/features/tray/tray_feature.cpp
-    src/features/tray/tray_interaction.cpp
-    src/features/tray/tray_model.cpp
-    src/features/tray/tray_render.cpp
     src/features/wallpaper/wallpaper_feature.cpp
 )
 

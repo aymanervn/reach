@@ -21,7 +21,6 @@
 #include "reach/features/stage.h"
 #include "reach/features/switcher.h"
 #include "reach/features/top_bar.h"
-#include "reach/features/tray.h"
 #include "reach/features/wallpaper.h"
 
 #include "reach/core/runtime_policy.h"
@@ -32,6 +31,7 @@
 #include "reach/services/idle_watch.h"
 #include "reach/services/now_playing.h"
 #include "reach/services/search.h"
+#include "reach/services/tray.h"
 #include "reach/services/clock.h"
 #include "reach/services/input_language.h"
 #include "reach/services/system_stats.h"
@@ -365,7 +365,7 @@ struct reach_host
     reach_window_manager_port window_manager;
     reach_foreground_watcher_port foreground_watcher;
     reach_config_store_port config_store;
-    reach_tray_provider_port tray_provider;
+    reach_tray_service *tray_service;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
     reach_settings_launcher_port settings_launcher;
@@ -396,7 +396,6 @@ struct reach_host
     reach_search_service *search_service;
     reach_app_control *app_control;
     reach_host_deferred_launch deferred_launch;
-    reach_tray *tray_capsule;
     reach_switcher *switcher_capsule;
     reach_stage *stage_capsule;
     reach_window_thumbnail_id stage_thumbnail_ids[REACH_STAGE_MAX_TILES];

@@ -55,17 +55,16 @@ void reach_host_drain_icon_evictions(reach_host *host)
 
 void reach_host_drain_tray_retired_icons(reach_host *host)
 {
-    if (host == nullptr || host->tray_provider.ops.take_retired_icon == nullptr ||
-        host->tray_provider.ops.release_retired_icon == nullptr)
+    if (host == nullptr || host->tray_service == nullptr)
     {
         return;
     }
 
     uint64_t icon_id = 0;
-    while (host->tray_provider.ops.take_retired_icon(host->tray_provider.provider, &icon_id))
+    while (reach_tray_service_take_retired_icon(host->tray_service, &icon_id))
     {
         reach_host_release_render_icon(host, icon_id);
-        host->tray_provider.ops.release_retired_icon(host->tray_provider.provider, icon_id);
+        reach_tray_service_release_retired_icon(host->tray_service, icon_id);
     }
 }
 
@@ -76,7 +75,7 @@ void reach_host_release_tray_render_icons(reach_host *host)
         return;
     }
 
-    size_t count = reach_tray_item_count(host->tray_capsule);
+    size_t count = reach_top_bar_tray_item_count(host->top_bar_capsule);
     if (count > REACH_MAX_TRAY_ITEMS)
     {
         count = REACH_MAX_TRAY_ITEMS;
@@ -84,7 +83,7 @@ void reach_host_release_tray_render_icons(reach_host *host)
 
     for (size_t index = 0; index < count; ++index)
     {
-        uint64_t icon_id = reach_tray_item_icon_id(host->tray_capsule, index);
+        uint64_t icon_id = reach_top_bar_tray_item_icon_id(host->top_bar_capsule, index);
         if (icon_id != 0)
         {
             reach_host_release_render_icon(host, icon_id);

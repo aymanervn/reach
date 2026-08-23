@@ -225,7 +225,7 @@ reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_cont
     {
         return result;
     }
-    if (frame.visible && reach_tray_popup_is_open(host->tray_capsule) &&
+    if (frame.visible && reach_top_bar_tray_popup_is_open(host->top_bar_capsule) &&
         (host->dirty.render || host->tray.dirty_flags))
     {
         (void)reach_host_render_tray_surface(host, tray_bounds);
