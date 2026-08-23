@@ -337,7 +337,7 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
 
     for (size_t index = 0; index < a_count; ++index)
     {
-        if (a[index].id != b[index].id || !reach_host_utf16_equal(a[index].title, b[index].title) ||
+        if (a[index].id != b[index].id ||
             !reach_host_utf16_equal(a[index].path, b[index].path) ||
             !reach_host_utf16_equal(a[index].arguments, b[index].arguments) ||
             !reach_host_utf16_equal(a[index].icon_ref, b[index].icon_ref) ||

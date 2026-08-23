@@ -52,8 +52,8 @@ system status, Now Playing, … Includes `ports`, `protocol`, `core`. Window
 tracking owns the one naming policy for a running app
 (`reach_window_tracking_app_display_name`: executable stem, window title as
 fallback); every surface that labels an app — the top bar's current-app pill, the
-switcher — reads it from there. A pinned app's stored title is a config record,
-not a live label, so nothing renders it as one. Now Playing
+switcher — reads it from there. Pinned apps do not persist a title; the Dock derives
+its icon fallback from the executable path and never treats config as a live label. Now Playing
 publishes atomic core media generations immediately, enriches them with the latest
 generation's cover asynchronously, owns transport serialization and cover lifetime,
 and masks every transport control while a command is settling. A new core generation

@@ -213,9 +213,9 @@ static reach_result reach_config_store_load(reach_config_store *store,
     {
         wchar_t section[32] = {};
         swprintf_s(section, L"pinned.%u", (unsigned)index);
-        wchar_t title[128] = {};
-        GetPrivateProfileStringW(section, L"title", L"", title, 128, path);
-        if (title[0] == 0)
+        wchar_t app_path[260] = {};
+        GetPrivateProfileStringW(section, L"path", L"", app_path, 260, path);
+        if (app_path[0] == 0)
         {
             continue;
         }
@@ -223,9 +223,7 @@ static reach_result reach_config_store_load(reach_config_store *store,
         reach_pinned_app_model *app = &out_snapshot->pinned_apps[out_snapshot->pinned_app_count];
         app->id = (uint32_t)GetPrivateProfileIntW(section, L"id",
                                                   (int)(out_snapshot->pinned_app_count + 1), path);
-        reach_copy_utf16(app->title, 128, reinterpret_cast<const uint16_t *>(title));
-        GetPrivateProfileStringW(section, L"path", L"", reinterpret_cast<wchar_t *>(app->path), 260,
-                                 path);
+        reach_copy_utf16(app->path, 260, reinterpret_cast<const uint16_t *>(app_path));
         GetPrivateProfileStringW(section, L"arguments", L"",
                                  reinterpret_cast<wchar_t *>(app->arguments), 260, path);
         GetPrivateProfileStringW(section, L"icon", L"", reinterpret_cast<wchar_t *>(app->icon_ref),
@@ -303,8 +301,7 @@ static reach_result reach_config_store_save(reach_config_store *store,
         const reach_pinned_app_model *app = &snapshot->pinned_apps[index];
         swprintf_s(value, L"%u", (unsigned)app->id);
         WritePrivateProfileStringW(section, L"id", value, path);
-        WritePrivateProfileStringW(section, L"title", reinterpret_cast<const wchar_t *>(app->title),
-                                   path);
+        WritePrivateProfileStringW(section, L"title", nullptr, path);
         WritePrivateProfileStringW(section, L"path", reinterpret_cast<const wchar_t *>(app->path),
                                    path);
         WritePrivateProfileStringW(section, L"arguments",

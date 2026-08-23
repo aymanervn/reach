@@ -5,6 +5,23 @@
 #include "dock_common.h"
 #include "dock_metrics.h"
 
+static uint16_t reach_dock_pinned_fallback_initial(const reach_pinned_app_model *app)
+{
+    if (app == nullptr || app->path[0] == 0)
+    {
+        return '?';
+    }
+    size_t stem = 0;
+    for (size_t index = 0; app->path[index] != 0; ++index)
+    {
+        if (app->path[index] == '\\' || app->path[index] == '/')
+        {
+            stem = index + 1;
+        }
+    }
+    return app->path[stem] != 0 ? app->path[stem] : '?';
+}
+
 static void reach_dock_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                  reach_color color, float radius)
 {
@@ -351,7 +368,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
             {
                 const reach_pinned_app_model *app = &ctx->pinned_apps[item->pinned_index];
                 icon_path = app->icon_ref[0] != 0 ? app->icon_ref : app->path;
-                initial = app->title[0] != 0 ? app->title[0] : '?';
+                initial = reach_dock_pinned_fallback_initial(app);
             }
         }
         else
