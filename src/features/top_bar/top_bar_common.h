@@ -86,30 +86,13 @@ static inline float reach_top_bar_text_advance(const reach_text_measure_port *me
                                                const uint16_t *text, float text_size,
                                                int32_t text_weight)
 {
-    if (text == nullptr || text_size <= 0.0f)
-    {
-        return 0.0f;
-    }
-    float width = 0.0f;
-    if (measure != nullptr && measure->measure != nullptr &&
-        measure->measure(measure->context, text, text_size, text_weight, &width) == REACH_OK &&
-        width >= 0.0f)
-    {
-        return width;
-    }
-
-    size_t length = 0;
-    while (text[length] != 0)
-    {
-        ++length;
-    }
-    return (float)length * text_size * reach_top_bar_metrics_values.glyph_advance_ratio;
+    return reach_text_width_or_estimate(measure, text, text_size, text_weight,
+                                        reach_top_bar_metrics_values.glyph_advance_ratio);
 }
 
-static inline reach_rect_f32 reach_top_bar_text_run(float left, float height, float advance,
-                                                    float text_size)
+static inline reach_rect_f32 reach_top_bar_text_run(float left, float height, float advance)
 {
-    return reach_top_bar_rect(left, 0.0f, advance + text_size, height);
+    return reach_top_bar_rect(left, 0.0f, advance, height);
 }
 
 #endif

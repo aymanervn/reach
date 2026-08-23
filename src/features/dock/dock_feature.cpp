@@ -26,6 +26,7 @@ struct reach_dock_slot
 
 static const double REACH_DOCK_SLOT_ANIMATION_SECONDS = 0.25;
 static const float REACH_DOCK_SLOT_REVEAL_THRESHOLD = 0.7f;
+static const float REACH_DOCK_OUTER_PADDING_SCALE = 1.15f;
 
 struct reach_dock;
 static void reach_dock_settle_slots(reach_dock *dock);
@@ -1516,8 +1517,9 @@ reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_i
         app_slot_units = 0.0f;
     }
 
-    const float native_width =
-        native_gap * 2.0f + (app_slot_units + 1.0f) * (native_icon_size + native_gap);
+    const float native_outer_padding = native_gap * REACH_DOCK_OUTER_PADDING_SCALE;
+    const float native_width = native_outer_padding * 2.0f + native_icon_size +
+                               app_slot_units * (native_icon_size + native_gap);
     result.scale = 1.0f;
     if (available_width > 0.0f && native_width > available_width)
     {
@@ -1572,7 +1574,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
 
     const float top = (layout->bounds.height - icon_size) * 0.5f;
 
-    float x = gap;
+    float x = gap * REACH_DOCK_OUTER_PADDING_SCALE;
     layout->trigger_button.width = icon_size;
     layout->trigger_button.height = icon_size;
     layout->trigger_button.x = x;

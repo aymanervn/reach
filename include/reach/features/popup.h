@@ -54,6 +54,8 @@ extern "C"
     float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale);
     reach_result reach_popup_push_background(const reach_popup_background_input *input,
                                              reach_render_command_buffer *out_commands);
+    reach_result reach_popup_push_border(const reach_popup_background_input *input,
+                                         reach_render_command_buffer *out_commands);
 
 #ifdef __cplusplus
 }

@@ -21,6 +21,9 @@ struct reach_context_menu_metrics
     float close_button_size;
     float close_button_inset;
     float close_glyph_inset_ratio;
+
+    float glyph_advance_ratio;
+    float window_list_max_width;
 };
 
 static constexpr reach_context_menu_metrics reach_context_menu_make_large_metrics()
@@ -43,6 +46,9 @@ static constexpr reach_context_menu_metrics reach_context_menu_make_large_metric
     metrics.close_button_size = 20.0f;
     metrics.close_button_inset = 7.0f;
     metrics.close_glyph_inset_ratio = 0.30f;
+
+    metrics.glyph_advance_ratio = 0.62f;
+    metrics.window_list_max_width = 320.0f;
 
     return metrics;
 }
@@ -74,7 +80,6 @@ static constexpr float reach_context_menu_power_popup_width = 176.0f;
 static constexpr float reach_context_menu_power_anchor_ratio = 0.72f;
 static constexpr float reach_context_menu_item_popup_width = 208.0f;
 static constexpr float reach_context_menu_item_anchor_ratio = 0.30f;
-static constexpr float reach_context_menu_window_list_popup_width = 122.0f;
 static constexpr float reach_context_menu_window_list_anchor_ratio = 0.5f;
 
 static inline const reach_context_menu_metrics *reach_context_menu_metrics_for(int32_t window_list)

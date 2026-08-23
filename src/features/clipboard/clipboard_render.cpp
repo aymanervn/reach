@@ -470,16 +470,6 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     reach_render_command_buffer_push(commands, &command);
 
     command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = {border_thickness * 0.5f, border_thickness * 0.5f,
-                    reach_clipboard_max_float(0.0f, layout->bounds.width - border_thickness),
-                    reach_clipboard_max_float(0.0f, layout->bounds.height - border_thickness)};
-    command.color = theme->clipboard_border;
-    command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
-    command.stroke_width = border_thickness;
-    reach_render_command_buffer_push(commands, &command);
-
-    command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
     command.rect = reach_clipboard_local(layout->title, layout->bounds);
     command.color = theme->clipboard_primary_text;
@@ -707,7 +697,15 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
                                               theme->clipboard_scrollbar_thumb, commands);
     }
 
-    return REACH_OK;
+    command = {};
+    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
+    command.rect = {border_thickness * 0.5f, border_thickness * 0.5f,
+                    reach_clipboard_max_float(0.0f, layout->bounds.width - border_thickness),
+                    reach_clipboard_max_float(0.0f, layout->bounds.height - border_thickness)};
+    command.color = theme->clipboard_border;
+    command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
+    command.stroke_width = border_thickness;
+    return reach_render_command_buffer_push(commands, &command);
 }
 reach_result reach_clipboard_append_render_commands(reach_clipboard_feature *clipboard,
                                                     const reach_theme *theme, float dpi_scale,

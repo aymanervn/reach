@@ -31,7 +31,8 @@ static int32_t reach_top_bar_now_playing_contains(reach_rect_f32 rect, int32_t x
 }
 
 static void reach_top_bar_now_playing_push_rect(reach_render_command_buffer *commands,
-                                             reach_rect_f32 rect, reach_color color, float radius)
+                                                reach_rect_f32 rect, reach_color color,
+                                                float radius)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
@@ -42,9 +43,9 @@ static void reach_top_bar_now_playing_push_rect(reach_render_command_buffer *com
 }
 
 static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *commands,
-                                             reach_rect_f32 rect, const uint16_t *value, float size,
-                                             int32_t weight, int32_t alignment, reach_color color,
-                                             reach_rect_f32 clip)
+                                                reach_rect_f32 rect, const uint16_t *value,
+                                                float size, int32_t weight, int32_t alignment,
+                                                reach_color color, reach_rect_f32 clip)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
@@ -62,25 +63,8 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
 static float reach_top_bar_now_playing_text_advance(const reach_text_measure_port *measure,
                                                     const uint16_t *text, float text_size)
 {
-    if (text == nullptr || text_size <= 0.0f)
-    {
-        return 0.0f;
-    }
-    float width = 0.0f;
-    if (measure != nullptr && measure->measure != nullptr &&
-        measure->measure(measure->context, text, text_size, REACH_TEXT_WEIGHT_BOLD, &width) ==
-            REACH_OK &&
-        width >= 0.0f)
-    {
-        return width;
-    }
-
-    size_t length = 0;
-    while (text[length] != 0)
-    {
-        ++length;
-    }
-    return (float)length * text_size * reach_top_bar_metrics_values.glyph_advance_ratio;
+    return reach_text_width_or_estimate(measure, text, text_size, REACH_TEXT_WEIGHT_BOLD,
+                                        reach_top_bar_metrics_values.glyph_advance_ratio);
 }
 
 static int32_t reach_top_bar_now_playing_utf16_equal(const uint16_t *a, const uint16_t *b)
@@ -149,10 +133,9 @@ float reach_top_bar_now_playing_model_desired_width(const reach_top_bar_now_play
     return actual->now_playing_width * dpi_scale;
 }
 
-reach_top_bar_now_playing_layout
-reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *model,
-                                      const reach_theme *theme, reach_rect_f32 bounds,
-                                      float dpi_scale, const reach_text_measure_port *text_measure)
+reach_top_bar_now_playing_layout reach_top_bar_now_playing_compute_layout(
+    const reach_top_bar_now_playing_model *model, const reach_theme *theme, reach_rect_f32 bounds,
+    float dpi_scale, const reach_text_measure_port *text_measure)
 {
     reach_top_bar_now_playing_layout layout = {};
     if (model == nullptr || bounds.width <= 0.0f || bounds.height <= 0.0f)
@@ -163,10 +146,11 @@ reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *
     if (!model->visible)
     {
         layout.bounds = bounds;
-        float glyph = bounds.height * reach_top_bar_metrics_values.now_playing_collapsed_glyph_scale;
-        layout.cover = reach_top_bar_now_playing_rect(bounds.x + (bounds.width - glyph) * 0.5f,
-                                                      bounds.y + (bounds.height - glyph) * 0.5f,
-                                                      glyph, glyph);
+        float glyph =
+            bounds.height * reach_top_bar_metrics_values.now_playing_collapsed_glyph_scale;
+        layout.cover =
+            reach_top_bar_now_playing_rect(bounds.x + (bounds.width - glyph) * 0.5f,
+                                           bounds.y + (bounds.height - glyph) * 0.5f, glyph, glyph);
         return layout;
     }
 
@@ -208,14 +192,16 @@ reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *
 
 reach_now_playing_action
 reach_top_bar_now_playing_hit_test(const reach_top_bar_now_playing_model *model,
-                                const reach_top_bar_now_playing_layout *layout, int32_t x, int32_t y)
+                                   const reach_top_bar_now_playing_layout *layout, int32_t x,
+                                   int32_t y)
 {
     if (model == nullptr || layout == nullptr || !model->visible ||
         !reach_top_bar_now_playing_contains(layout->bounds, x, y))
     {
         return REACH_NOW_PLAYING_ACTION_NONE;
     }
-    if (model->previous_enabled && reach_top_bar_now_playing_contains(layout->previous_button, x, y))
+    if (model->previous_enabled &&
+        reach_top_bar_now_playing_contains(layout->previous_button, x, y))
     {
         return REACH_NOW_PLAYING_ACTION_PREVIOUS;
     }
@@ -233,7 +219,7 @@ reach_top_bar_now_playing_hit_test(const reach_top_bar_now_playing_model *model,
 
 reach_result
 reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_render_input *input,
-                                             reach_render_command_buffer *out_commands)
+                                                reach_render_command_buffer *out_commands)
 {
     if (input == nullptr || input->theme == nullptr || input->model == nullptr ||
         input->layout == nullptr || out_commands == nullptr)
@@ -294,12 +280,12 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
         (void)reach_render_command_buffer_push(out_commands, &cover);
 
         reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                         theme->now_playing_background, radius);
+                                            theme->now_playing_background, radius);
     }
     else
     {
         reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                         theme->bar_button_background, radius);
+                                            theme->bar_button_background, radius);
     }
 
     if (input->layout->text.width <= 0.0f || input->layout->play_pause_button.width <= 0.0f)
@@ -310,11 +296,12 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     float dpi_scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     reach_rect_f32 text = input->layout->text;
     text.x += input->text_offset_x;
-    text.width = input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
+    text.width =
+        input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
     reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
-                                     theme->now_playing_title_text_size * dpi_scale,
-                                     REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                                     theme->now_playing_title, input->layout->text);
+                                        theme->now_playing_title_text_size * dpi_scale,
+                                        REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING,
+                                        theme->now_playing_title, input->layout->text);
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
                                      input->model->playback == REACH_MEDIA_PLAYBACK_PLAYING
@@ -332,9 +319,9 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
         if (index == 1)
         {
             float size = button.height * 1.25f;
-            background =
-                reach_top_bar_now_playing_rect(button.x + (button.width - size) * 0.5f,
-                                            button.y + (button.height - size) * 0.5f, size, size);
+            background = reach_top_bar_now_playing_rect(button.x + (button.width - size) * 0.5f,
+                                                        button.y + (button.height - size) * 0.5f,
+                                                        size, size);
         }
         if (index == 1 && input->model->cover_accent.a > 0.0f)
         {
@@ -344,15 +331,15 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
                 button_color.a = 0.78f;
             }
             reach_top_bar_now_playing_push_rect(out_commands, background, button_color,
-                                             background.height * 0.5f);
+                                                background.height * 0.5f);
         }
 
         float icon_size = button.height * (index == 1 ? 0.58f : 0.70f);
         reach_render_command icon = {};
         icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         icon.rect = reach_top_bar_now_playing_rect(button.x + (button.width - icon_size) * 0.5f,
-                                                button.y + (button.height - icon_size) * 0.5f,
-                                                icon_size, icon_size);
+                                                   button.y + (button.height - icon_size) * 0.5f,
+                                                   icon_size, icon_size);
         if (index == 1 && input->model->playback != REACH_MEDIA_PLAYBACK_PLAYING)
         {
             icon.rect.x += icon_size * 0.06f;
@@ -404,8 +391,8 @@ void reach_top_bar_now_playing_reset(reach_top_bar_now_playing *now_playing)
 }
 
 void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
-                                 reach_now_playing_service *service,
-                                 reach_top_bar_now_playing_update_result *out)
+                                    reach_now_playing_service *service,
+                                    reach_top_bar_now_playing_update_result *out)
 {
     if (out != nullptr)
     {
@@ -445,8 +432,7 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     out->visibility_changed = was_visible != next.visible;
 }
 
-int32_t reach_top_bar_now_playing_tick(reach_top_bar_now_playing *now_playing,
-                                       double delta_seconds)
+int32_t reach_top_bar_now_playing_tick(reach_top_bar_now_playing *now_playing, double delta_seconds)
 {
     if (now_playing == nullptr || !now_playing->model.visible)
     {
@@ -481,7 +467,7 @@ int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now
 }
 
 float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *now_playing,
-                                           const reach_theme *theme, float dpi_scale)
+                                              const reach_theme *theme, float dpi_scale)
 {
     if (now_playing == nullptr)
     {
@@ -490,9 +476,10 @@ float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *n
     return reach_top_bar_now_playing_model_desired_width(&now_playing->model, theme, dpi_scale);
 }
 
-void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, const reach_theme *theme,
-                                     reach_rect_f32 bounds, float dpi_scale,
-                                     const reach_text_measure_port *text_measure)
+void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing,
+                                        const reach_theme *theme, reach_rect_f32 bounds,
+                                        float dpi_scale,
+                                        const reach_text_measure_port *text_measure)
 {
     if (now_playing == nullptr)
     {
@@ -503,8 +490,9 @@ void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, 
         reach_top_bar_now_playing_compute_layout(&model, theme, bounds, dpi_scale, text_measure);
 }
 
-reach_now_playing_action reach_top_bar_now_playing_action_at(
-    const reach_top_bar_now_playing *now_playing, int32_t x, int32_t y)
+reach_now_playing_action
+reach_top_bar_now_playing_action_at(const reach_top_bar_now_playing *now_playing, int32_t x,
+                                    int32_t y)
 {
     if (now_playing == nullptr)
     {
@@ -513,10 +501,9 @@ reach_now_playing_action reach_top_bar_now_playing_action_at(
     return reach_top_bar_now_playing_hit_test(&now_playing->model, &now_playing->layout, x, y);
 }
 
-reach_result
-reach_top_bar_now_playing_append_render_commands(reach_top_bar_now_playing *now_playing,
-                                              const reach_top_bar_now_playing_render_context *ctx,
-                                              reach_render_command_buffer *out_commands)
+reach_result reach_top_bar_now_playing_append_render_commands(
+    reach_top_bar_now_playing *now_playing, const reach_top_bar_now_playing_render_context *ctx,
+    reach_render_command_buffer *out_commands)
 {
     if (now_playing == nullptr || ctx == nullptr || ctx->theme == nullptr ||
         out_commands == nullptr)

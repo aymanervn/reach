@@ -111,17 +111,6 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     command.radius = radius;
     reach_render_command_buffer_push(out_commands, &command);
 
-    command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect.x = border_thickness * 0.5f;
-    command.rect.y = border_thickness * 0.5f;
-    command.rect.width = input->bounds.width - border_thickness;
-    command.rect.height = input->bounds.height - border_thickness;
-    command.color = theme->bar_border;
-    command.radius = radius;
-    command.stroke_width = border_thickness;
-    reach_render_command_buffer_push(out_commands, &command);
-
     if (visible_count > 0)
     {
         float total_width = (float)visible_count * item_size + (float)(visible_count - 1) * gap;
@@ -192,6 +181,17 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
             }
         }
     }
+
+    command = {};
+    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
+    command.rect.x = border_thickness * 0.5f;
+    command.rect.y = border_thickness * 0.5f;
+    command.rect.width = input->bounds.width - border_thickness;
+    command.rect.height = input->bounds.height - border_thickness;
+    command.color = theme->bar_border;
+    command.radius = radius;
+    command.stroke_width = border_thickness;
+    reach_render_command_buffer_push(out_commands, &command);
 
     return REACH_OK;
 }

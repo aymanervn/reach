@@ -184,6 +184,9 @@ Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite render
 implementation with the same font family, size, and weight used for drawing; features retain only
 a conservative estimate for unavailable-adapter cases. This keeps exact text metrics outside
 feature policy while allowing the top bar and Dock window-list popup to size before rendering.
+Applying a different UI font invalidates both rendering and layout so the next normal frame
+remeasures every text-sized surface. The Dock window-list popup fits its widest measured title
+between one-letter-plus-close-control chrome and a monitor-bounded maximum, ellipsizing beyond it.
 
 The window push is the top bar's second private subfeature: while the bar can
 hide and is sliding in, it moves the windows the bar would cover down by the

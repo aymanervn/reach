@@ -462,12 +462,12 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float time_size = metrics.clock_time_text_size * scale;
     const float date_size = metrics.clock_date_text_size * scale;
 
-    float time_advance = reach_top_bar_text_advance(
-        &ctx->text_measure, top_bar->state.clock_time_text, time_size,
-        metrics.clock_time_text_weight);
-    float date_advance = reach_top_bar_text_advance(
-        &ctx->text_measure, top_bar->state.clock_date_text, date_size,
-        metrics.clock_date_text_weight);
+    float time_advance =
+        reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.clock_time_text, time_size,
+                                   metrics.clock_time_text_weight);
+    float date_advance =
+        reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.clock_date_text, date_size,
+                                   metrics.clock_date_text_weight);
     float clock_width = time_advance + clock_gap + date_advance;
 
     const float dot_size = ctx->theme->bar_separator_dot_size * scale;
@@ -488,9 +488,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                               power_button_size, power_button_size);
 
     float clock_x = layout->power_button.x + power_button_size + clock_gap;
-    layout->clock_time = reach_top_bar_text_run(clock_x, height, time_advance, time_size);
+    layout->clock_time = reach_top_bar_text_run(clock_x, height, time_advance);
     layout->clock_date =
-        reach_top_bar_text_run(clock_x + time_advance + clock_gap, height, date_advance, date_size);
+        reach_top_bar_text_run(clock_x + time_advance + clock_gap, height, date_advance);
 
     layout->now_playing =
         reach_top_bar_rect(left + power_clock_width - border_thickness - now_playing_width,
@@ -503,8 +503,14 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     float right = layout->bounds.width - edge_inset;
     float button_size = height * metrics.bar_button_scale;
+    const float language_size = metrics.language_text_size * scale;
+    const float language_padding = metrics.language_padding * scale;
     float language_width =
-        top_bar->state.language_code[0] != 0 ? metrics.language_width * scale : 0.0f;
+        top_bar->state.language_code[0] != 0
+            ? reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.language_code,
+                                         language_size, metrics.language_text_weight) +
+                  language_padding * 2.0f
+            : 0.0f;
     float language_gap = language_width > 0.0f ? pill_gap : 0.0f;
 
     float battery_width = top_bar->state.battery_valid ? metrics.battery_width * scale : 0.0f;
@@ -530,8 +536,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
             &ctx->text_measure, top_bar->state.stats_download_text,
             (const uint16_t *)L"\u2193 999KB", stats_size, metrics.stats_text_weight);
         upload_advance = reach_top_bar_stats_slot_advance(
-            &ctx->text_measure, top_bar->state.stats_upload_text,
-            (const uint16_t *)L"\u2191 999KB", stats_size, metrics.stats_text_weight);
+            &ctx->text_measure, top_bar->state.stats_upload_text, (const uint16_t *)L"\u2191 999KB",
+            stats_size, metrics.stats_text_weight);
         stats_width = cpu_advance + stats_gap + memory_advance + stats_group_gap +
                       download_advance + stats_gap + upload_advance + pill_gap;
     }
@@ -540,9 +546,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float quick_settings_padding = metrics.quick_settings_padding * scale;
     const float quick_settings_content_gap = metrics.quick_settings_content_gap * scale;
     const float network_name_size = metrics.network_name_text_size * scale;
-    float network_name_advance = reach_top_bar_text_advance(
-        &ctx->text_measure, top_bar->state.network_name, network_name_size,
-        metrics.network_name_text_weight);
+    float network_name_advance =
+        reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.network_name,
+                                   network_name_size, metrics.network_name_text_weight);
     if (network_name_advance > metrics.network_name_max_width * scale)
     {
         network_name_advance = metrics.network_name_max_width * scale;
@@ -584,16 +590,13 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + dot_size * 0.5f + dot_gap;
     if (top_bar->state.stats_valid)
     {
-        layout->stats_cpu = reach_top_bar_text_run(cluster_x, height, cpu_advance, stats_size);
+        layout->stats_cpu = reach_top_bar_text_run(cluster_x, height, cpu_advance);
         cluster_x += cpu_advance + stats_gap;
-        layout->stats_memory =
-            reach_top_bar_text_run(cluster_x, height, memory_advance, stats_size);
+        layout->stats_memory = reach_top_bar_text_run(cluster_x, height, memory_advance);
         cluster_x += memory_advance + stats_group_gap;
-        layout->stats_download =
-            reach_top_bar_text_run(cluster_x, height, download_advance, stats_size);
+        layout->stats_download = reach_top_bar_text_run(cluster_x, height, download_advance);
         cluster_x += download_advance + stats_gap;
-        layout->stats_upload =
-            reach_top_bar_text_run(cluster_x, height, upload_advance, stats_size);
+        layout->stats_upload = reach_top_bar_text_run(cluster_x, height, upload_advance);
         cluster_x += upload_advance + pill_gap;
     }
     if (language_width > 0.0f)
@@ -619,8 +622,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     if (network_name_advance > 0.0f)
     {
         content_x += quick_settings_content_gap;
-        layout->network_label =
-            reach_top_bar_text_run(content_x, height, network_name_advance, network_name_size);
+        layout->network_label = reach_top_bar_text_run(content_x, height, network_name_advance);
         content_x += network_name_advance;
     }
     if (top_bar->state.bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
@@ -632,7 +634,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     if (volume_advance > 0.0f)
     {
         content_x += quick_settings_content_gap;
-        layout->volume_label = reach_top_bar_rect(content_x, 0.0f, volume_advance, height);
+        layout->volume_label = reach_top_bar_text_run(content_x, height, volume_advance);
     }
 
     cluster_x += quick_settings_button_width + pill_gap;
@@ -696,14 +698,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                       ? height * metrics.current_app_icon_scale
                                       : 0.0f;
     float current_app_icon_gap = current_app_icon_size > 0.0f ? current_app_gap : 0.0f;
-    float name_advance = reach_top_bar_text_advance(&ctx->text_measure,
-                                                    top_bar->state.current_app_name, name_size,
-                                                    metrics.current_app_name_text_weight);
-    float current_app_min_text = metrics.current_app_min_text_width * scale;
-    if (name_advance < current_app_min_text)
-    {
-        name_advance = current_app_min_text;
-    }
+    float name_advance =
+        reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.current_app_name, name_size,
+                                   metrics.current_app_name_text_weight);
     float current_app_chrome = padding * 2.0f + current_app_icon_size + current_app_icon_gap;
     float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
     float current_app_target = current_app_chrome + name_advance;
@@ -922,8 +919,7 @@ void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar)
 static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
                                                  reach_rect_f32 shown_bounds,
                                                  reach_rect_f32 monitor_bounds,
-                                                 float shadow_clearance,
-                                                 uintptr_t excluded_window)
+                                                 float shadow_clearance, uintptr_t excluded_window)
 {
     if (top_bar == nullptr)
     {
@@ -935,9 +931,8 @@ static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
         !reach_top_bar_rect_equal(top_bar->occlusion_monitor_bounds, monitor_bounds) ||
         fabsf(top_bar->occlusion_shadow_clearance - shadow_clearance) >= 0.5f)
     {
-        reach_rect_f32 protected_band =
-            reach_bar_protected_band(REACH_TOP_BAR_EDGE, shown_bounds, monitor_bounds,
-                                     shadow_clearance);
+        reach_rect_f32 protected_band = reach_bar_protected_band(REACH_TOP_BAR_EDGE, shown_bounds,
+                                                                 monitor_bounds, shadow_clearance);
         top_bar->occlusion_occluded = reach_top_bar_window_push_any_trespassing(
             top_bar->window_push, monitor_bounds, protected_band, excluded_window);
         top_bar->occlusion_shown_bounds = shown_bounds;
@@ -957,8 +952,8 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
         return reach_bar_visibility_result{};
     }
 
-    float push_depth = reach_top_bar_push_depth(
-        request->shown_bounds, request->monitor_bounds, request->shadow_clearance);
+    float push_depth = reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds,
+                                                request->shadow_clearance);
 
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_TOP_BAR_EDGE;

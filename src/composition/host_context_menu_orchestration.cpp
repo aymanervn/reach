@@ -8,11 +8,11 @@ void reach_host_open_context_menu_transition(reach_host *host)
     }
     const reach_context_menu_state *state =
         reach_context_menu_state_ptr(host->context_menu_capsule);
-    reach_host_surface_transition_set_settle_offset(
-        host, &host->context_menu_transition,
-        state != nullptr && state->drop_direction == REACH_POPUP_DROP_DOWN
-            ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE
-            : REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
+    reach_host_surface_transition_set_settle_offset(host, &host->context_menu_transition,
+                                                    state != nullptr && state->drop_direction ==
+                                                                            REACH_POPUP_DROP_DOWN
+                                                        ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE
+                                                        : REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
     reach_host_surface_transition_set(host, &host->context_menu_transition, 1);
 }
 
@@ -223,6 +223,8 @@ void reach_host_reanchor_context_menu(reach_host *host)
     ctx.bar_edge_y = host->layout.dock.bounds.y;
     ctx.drop_direction = REACH_POPUP_DROP_UP;
     ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
+    ctx.text_measure.context = host->context_menu.renderer.backend;
+    ctx.text_measure.measure = host->context_menu.renderer.ops.measure_text;
     if (state->power_open)
     {
         const reach_top_bar_layout *top_bar_layout =
@@ -309,7 +311,7 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
         ctx.anchored = 1;
         ctx.anchor_button = slot;
         ctx.bar_edge_y = host->layout.dock.bounds.y;
-    ctx.drop_direction = REACH_POPUP_DROP_UP;
+        ctx.drop_direction = REACH_POPUP_DROP_UP;
         ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
     }
 
