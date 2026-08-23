@@ -262,6 +262,9 @@ void reach_host_apply_power_config(reach_host *host, const reach_config_snapshot
         return;
     }
     reach_idle_watch_config config = {};
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SCREEN_OFF] =
+        snapshot->power_screen_off_minutes;
+    config.wait_awake_apps[REACH_IDLE_WATCH_ACTION_SCREEN_OFF] = 1;
     config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SLEEP] = snapshot->power_sleep_minutes;
     config.timeout_minutes[REACH_IDLE_WATCH_ACTION_LOCK] = snapshot->power_lock_minutes;
     config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SHUTDOWN] = snapshot->power_shutdown_minutes;

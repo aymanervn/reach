@@ -54,10 +54,13 @@ void reach_settings_model_init(reach_settings_model *model)
                                  REACH_SETTINGS_POWER_CUSTOM_DIGITS);
         }
     }
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF, 10);
     reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SLEEP, 30);
-    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_LOCK, 0);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_LOCK, 15);
     reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN, 0);
     reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_RESTART, 0);
+    reach_settings_model_set_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_SLEEP, 1);
+    reach_settings_model_set_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_RESTART, 1);
     reach_settings_model_power_mark_applied(model);
 }
 

@@ -10,6 +10,16 @@ struct reach_power_session
     int32_t unused;
 };
 
+static reach_result reach_power_session_screen_off(reach_power_session *session)
+{
+    (void)session;
+    DWORD_PTR result = 0;
+    return SendMessageTimeoutW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, 2,
+                               SMTO_ABORTIFHUNG, 1000, &result)
+               ? REACH_OK
+               : REACH_ERROR;
+}
+
 static reach_result reach_power_enable_shutdown_privilege(void)
 {
     HANDLE token = nullptr;
@@ -135,6 +145,7 @@ reach_result reach_windows_create_power_session(reach_power_session_port *out_po
     }
 
     out_port->session = session;
+    out_port->ops.screen_off = reach_power_session_screen_off;
     out_port->ops.lock = reach_power_session_lock;
     out_port->ops.sleep = reach_power_session_sleep;
     out_port->ops.restart = reach_power_session_restart;

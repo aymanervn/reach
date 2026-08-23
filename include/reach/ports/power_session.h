@@ -14,6 +14,7 @@ extern "C"
 
     typedef struct reach_power_session_ops
     {
+        reach_result (*screen_off)(reach_power_session *session);
         reach_result (*lock)(reach_power_session *session);
         reach_result (*sleep)(reach_power_session *session);
         reach_result (*restart)(reach_power_session *session);

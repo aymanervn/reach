@@ -118,6 +118,10 @@ static void reach_idle_watch_fire(reach_idle_watch *service, uint32_t mask)
         }
         return;
     }
+    if ((mask & (1u << REACH_IDLE_WATCH_ACTION_SCREEN_OFF)) && ops->screen_off != nullptr)
+    {
+        (void)ops->screen_off(session);
+    }
     if ((mask & (1u << REACH_IDLE_WATCH_ACTION_LOCK)) && ops->lock != nullptr)
     {
         (void)ops->lock(session);

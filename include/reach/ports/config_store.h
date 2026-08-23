@@ -24,6 +24,7 @@ extern "C"
         uint16_t wallpaper_path[260];
         uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
         float dock_height;
+        int32_t power_screen_off_minutes;
         int32_t power_sleep_minutes;
         int32_t power_lock_minutes;
         int32_t power_shutdown_minutes;
