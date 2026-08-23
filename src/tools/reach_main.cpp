@@ -60,8 +60,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
 
     if (!launch_allowed)
     {
-        MessageBoxW(nullptr, L"Reach must be started with reachctl --install.", L"Reach",
-                    MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(nullptr,
+                    L"Reach cannot be launched directly. Run reachctl --start, or run "
+                    L"reachctl --install first if Reach is not installed.",
+                    L"Reach", MB_OK | MB_ICONINFORMATION);
         return 0;
     }
 
