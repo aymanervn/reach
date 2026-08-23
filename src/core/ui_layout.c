@@ -48,6 +48,7 @@ reach_result reach_dock_layout_compute(const reach_dock_model *dock,
     out_layout->bounds.height = dock_height;
     out_layout->app_slot_count = 0;
     out_layout->available_width = available_width;
+    out_layout->native_height = dock_height;
     out_layout->content_scale = 1.0f;
 
     return REACH_OK;
