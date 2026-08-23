@@ -1557,8 +1557,10 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     }
 
     const float dpi_scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    const float native_height =
+        layout->native_height > 0.0f ? layout->native_height : layout->bounds.height;
     const reach_dock_fit_result fit =
-        reach_dock_fit_metrics(layout->bounds.height, ctx->icon_size * dpi_scale,
+        reach_dock_fit_metrics(native_height, ctx->icon_size * dpi_scale,
                                ctx->gap * dpi_scale, layout->available_width, app_slot_units);
     const float center_x = layout->bounds.x + layout->bounds.width * 0.5f;
     const float bottom = layout->bounds.y + layout->bounds.height;
@@ -1566,6 +1568,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     layout->bounds.y = bottom - fit.height;
     layout->bounds.width = fit.width;
     layout->bounds.height = fit.height;
+    layout->native_height = native_height;
     layout->content_scale = fit.scale;
 
     const float icon_size = fit.icon_size;

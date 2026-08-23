@@ -253,6 +253,67 @@ static void test_fit_metrics_scale_every_dimension_without_a_minimum(void)
                 "fit calculation has no minimum scale clamp");
 }
 
+static void test_adaptive_layout_rebuild_keeps_native_height(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK && dock != nullptr,
+                "Dock creation succeeds for adaptive rebuild test");
+    if (dock == nullptr)
+    {
+        return;
+    }
+
+    reach_pinned_app_model pins[10] = {};
+    for (size_t index = 0; index < 10; ++index)
+    {
+        char path[64] = {};
+        snprintf(path, sizeof(path), "C:\\pins\\pin_%zu.exe", index);
+        pins[index] = make_pin((uint32_t)(index + 1), path);
+    }
+
+    reach_dock_model model = {};
+    reach_dock_model_defaults(&model);
+    reach_ui_layout_input input = {};
+    input.work_area = {0.0f, 0.0f, 357.8f, 1080.0f};
+    input.dpi_scale = 1.0f;
+    reach_dock_layout layout = {};
+    expect_true(reach_dock_layout_compute(&model, &input, &layout) == REACH_OK,
+                "adaptive rebuild test computes native Dock layout");
+
+    reach_dock_build_context context = {};
+    context.theme = reach_theme_default();
+    context.dpi_scale = 1.0f;
+    context.icon_size = model.icon_size;
+    context.gap = model.gap;
+    context.pinned_apps = pins;
+    context.pinned_app_count = 10;
+
+    reach_dock_build_layout(dock, &context, &layout);
+    const reach_rect_f32 first_bounds = layout.bounds;
+    const reach_rect_f32 first_slot = layout.app_slots[0];
+    const float first_scale = layout.content_scale;
+
+    reach_dock_build_layout(dock, &context, &layout);
+
+    expect_near(first_scale, 0.5f, 0.0001f, "test Dock enters adaptive fitting");
+    expect_near(layout.native_height, 64.0f, 0.0001f,
+                "adaptive rebuild preserves native height");
+    expect_near(layout.bounds.x, first_bounds.x, 0.0001f,
+                "adaptive rebuild preserves fitted horizontal position");
+    expect_near(layout.bounds.y, first_bounds.y, 0.0001f,
+                "adaptive rebuild preserves fitted vertical position");
+    expect_near(layout.bounds.width, first_bounds.width, 0.0001f,
+                "adaptive rebuild preserves fitted width");
+    expect_near(layout.bounds.height, first_bounds.height, 0.0001f,
+                "adaptive rebuild does not scale height twice");
+    expect_near(layout.app_slots[0].x, first_slot.x, 0.0001f,
+                "adaptive rebuild preserves item horizontal geometry");
+    expect_near(layout.app_slots[0].y, first_slot.y, 0.0001f,
+                "adaptive rebuild preserves item vertical geometry");
+
+    reach_dock_destroy(dock);
+}
+
 int main(void)
 {
     test_unpinned_windows_group_into_one_item();
@@ -264,5 +325,6 @@ int main(void)
     test_capacity_keeps_all_pinned_and_running_groups();
     test_fit_metrics_keep_native_size_until_overflow();
     test_fit_metrics_scale_every_dimension_without_a_minimum();
+    test_adaptive_layout_rebuild_keeps_native_height();
     return failures == 0 ? 0 : 1;
 }
