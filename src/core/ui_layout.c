@@ -32,29 +32,17 @@ reach_result reach_dock_layout_compute(const reach_dock_model *dock,
 
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     float dock_height = reach_scale(dock->height, scale);
-    float dock_width = reach_scale(dock->width, scale);
-    float dock_x = input->work_area.x + (input->work_area.width - dock_width) * 0.5f;
+    float dock_x = input->work_area.x + input->work_area.width * 0.5f;
     float dock_y =
         input->work_area.y + input->work_area.height - dock_height - reach_scale(18.0f, scale);
 
     out_layout->bounds.x = dock_x;
     out_layout->bounds.y = dock_y;
-    out_layout->bounds.width = dock_width;
+    out_layout->bounds.width = 0.0f;
     out_layout->bounds.height = dock_height;
-    out_layout->app_slot_count = input->pinned_app_count;
-
-    float icon_size = reach_scale(dock->icon_size, scale);
-    float gap = reach_scale(dock->gap, scale);
-    float top = (dock_height - icon_size) * 0.5f;
-    float left = gap;
-
-    for (size_t index = 0; index < input->pinned_app_count; ++index)
-    {
-        out_layout->app_slots[index].x = left + (icon_size + gap) * (float)index;
-        out_layout->app_slots[index].y = top;
-        out_layout->app_slots[index].width = icon_size;
-        out_layout->app_slots[index].height = icon_size;
-    }
+    out_layout->app_slot_count = 0;
+    out_layout->available_width = input->work_area.width;
+    out_layout->content_scale = 1.0f;
 
     return REACH_OK;
 }
@@ -72,9 +60,8 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
 
     out_layout->search_box.width = reach_scale(640.0f, scale);
     out_layout->search_box.height = reach_scale(52.0f, scale);
-    out_layout->search_box.x =
-        input->monitor_bounds.x +
-        (input->monitor_bounds.width - out_layout->search_box.width) * 0.5f;
+    out_layout->search_box.x = input->monitor_bounds.x +
+                               (input->monitor_bounds.width - out_layout->search_box.width) * 0.5f;
     out_layout->search_box.y =
         input->monitor_bounds.y +
         (input->monitor_bounds.height - out_layout->search_box.height) * 0.5f;
@@ -91,8 +78,8 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
                                 reach_scale(1.0f, scale);
     out_layout->search_text_input.x = out_layout->search_box.x + search_text_padding_x;
     out_layout->search_text_input.y = out_layout->search_box.y + search_text_padding_y;
-    out_layout->search_text_input.width = out_layout->search_icon.x - search_text_padding_x -
-                                          out_layout->search_text_input.x;
+    out_layout->search_text_input.width =
+        out_layout->search_icon.x - search_text_padding_x - out_layout->search_text_input.x;
     out_layout->search_text_input.height =
         out_layout->search_box.height - search_text_padding_y * 2.0f;
 
@@ -122,15 +109,15 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     out_layout->search_results.y = out_layout->search_box.y + out_layout->search_box.height;
     out_layout->search_results.width = out_layout->search_box.width;
     size_t visible_result_count = reach_visible_launcher_result_count(launcher);
-    size_t visible_row_count =
-        visible_result_count > 0 ? visible_result_count
-                                 : (reach_launcher_error_row_visible(launcher) ? 1 : 0);
+    size_t visible_row_count = visible_result_count > 0
+                                   ? visible_result_count
+                                   : (reach_launcher_error_row_visible(launcher) ? 1 : 0);
     float search_results_items_height =
         visible_row_count > 0 ? reach_scale(56.0f * (float)visible_row_count, scale) : 0.0f;
-    out_layout->search_results.height =
-        visible_row_count > 0 ? search_results_top_padding + search_results_items_height +
-                                    search_results_bottom_padding
-                              : 0.0f;
+    out_layout->search_results.height = visible_row_count > 0 ? search_results_top_padding +
+                                                                    search_results_items_height +
+                                                                    search_results_bottom_padding
+                                                              : 0.0f;
     out_layout->search_result_items = out_layout->search_results;
     out_layout->search_result_items.y += search_results_top_padding;
     out_layout->search_result_items.height = search_results_items_height;
@@ -143,9 +130,9 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
         float track_width = reach_scale(4.0f, scale);
         float track_padding_y = reach_scale(8.0f, scale);
         out_layout->search_result_items.width = out_layout->search_results.width - gutter_width;
-        out_layout->search_result_scrollbar_track.x =
-            out_layout->search_results.x + out_layout->search_results.width - gutter_width * 0.5f -
-            track_width * 0.5f;
+        out_layout->search_result_scrollbar_track.x = out_layout->search_results.x +
+                                                      out_layout->search_results.width -
+                                                      gutter_width * 0.5f - track_width * 0.5f;
         out_layout->search_result_scrollbar_track.y =
             out_layout->search_result_items.y + track_padding_y;
         out_layout->search_result_scrollbar_track.width = track_width;
@@ -166,13 +153,12 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
         out_layout->bounds.x = out_layout->search_box.x;
         out_layout->bounds.width = out_layout->search_box.width;
         out_layout->bounds.y = out_layout->search_box.y;
-        out_layout->bounds.height = out_layout->search_results.y +
-                                    out_layout->search_results.height - out_layout->bounds.y;
+        out_layout->bounds.height =
+            out_layout->search_results.y + out_layout->search_results.height - out_layout->bounds.y;
     }
     else if (out_layout->pinned_app_slot_count > 0)
     {
-        float launcher_left =
-            apps_x < out_layout->search_box.x ? apps_x : out_layout->search_box.x;
+        float launcher_left = apps_x < out_layout->search_box.x ? apps_x : out_layout->search_box.x;
         float launcher_right = apps_x + total_width;
         float search_right = out_layout->search_box.x + out_layout->search_box.width;
         if (search_right > launcher_right)

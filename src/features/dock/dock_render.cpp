@@ -85,10 +85,14 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
     }
 
     const reach_dock_metrics &metrics = reach_dock_metrics_values;
+    const float content_scale =
+        input->layout->content_scale > 0.0f ? input->layout->content_scale : 1.0f;
+    const float indicator_size = metrics.running_indicator_size * content_scale;
+    const float indicator_gap = metrics.running_indicator_gap * content_scale;
+    const float indicator_bottom_inset = metrics.running_indicator_bottom_inset * content_scale;
     int32_t focused = input->model->items[index].window == input->focused_window;
-    float indicator_y = icon_box.y + icon_box.height + metrics.running_indicator_gap;
-    float max_indicator_y = input->layout->bounds.height - metrics.running_indicator_size -
-                            metrics.running_indicator_bottom_inset;
+    float indicator_y = icon_box.y + icon_box.height + indicator_gap;
+    float max_indicator_y = input->layout->bounds.height - indicator_size - indicator_bottom_inset;
     if (indicator_y > max_indicator_y)
     {
         indicator_y = max_indicator_y;
@@ -98,12 +102,10 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
         input->theme->dock_running_indicator, focused ? metrics.running_indicator_focused_alpha
                                                       : metrics.running_indicator_unfocused_alpha);
 
-    reach_dock_push_rect(
-        commands,
-        reach_dock_rect(icon_box.x + (icon_box.width - metrics.running_indicator_size) * 0.5f,
-                        indicator_y, metrics.running_indicator_size,
-                        metrics.running_indicator_size),
-        color, metrics.running_indicator_size * 0.5f);
+    reach_dock_push_rect(commands,
+                         reach_dock_rect(icon_box.x + (icon_box.width - indicator_size) * 0.5f,
+                                         indicator_y, indicator_size, indicator_size),
+                         color, indicator_size * 0.5f);
 }
 
 static void reach_dock_push_item(const reach_dock_render_input *input,
@@ -299,8 +301,7 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
 
     const float slot_x = reach_dock_slot_box_x(theme, layout, index);
     reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
-    if (state->item_x_valid[index] &&
-        reach_dock_key_equal(&state->item_x_keys[index], &item_key))
+    if (state->item_x_valid[index] && reach_dock_key_equal(&state->item_x_keys[index], &item_key))
     {
         return slot_x + reach_animation_manager_value(manager, reach_dock_item_animation_id(index));
     }
@@ -339,8 +340,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
                           : state->drag.x;
 
     reach_dock_render_item render_items[REACH_MAX_DOCK_ITEMS] = {};
-    for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_DOCK_ITEMS;
-         ++index)
+    for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         const reach_dock_item_model *item = &state->model.items[index];
         const uint16_t *icon_path = nullptr;

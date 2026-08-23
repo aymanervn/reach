@@ -8,7 +8,6 @@ void reach_dock_model_defaults(reach_dock_model *dock)
     }
 
     dock->height = 64.0f;
-    dock->width = 560.0f;
     dock->icon_size = 40.0f;
     dock->gap = 12.0f;
     dock->visible = 1;

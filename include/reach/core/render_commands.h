@@ -9,7 +9,7 @@ extern "C"
 {
 #endif
 
-#define REACH_MAX_RENDER_COMMANDS 256
+#define REACH_MAX_RENDER_COMMANDS (REACH_MAX_DOCK_ITEMS * 2 + REACH_MAX_DOCK_RUNNING_APPS + 16)
 
     typedef enum reach_render_command_type
     {

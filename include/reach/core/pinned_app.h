@@ -10,8 +10,6 @@ extern "C"
 {
 #endif
 
-#define REACH_MAX_PINNED_APPS 12
-
     typedef struct reach_pinned_app_model
     {
         uint32_t id;
