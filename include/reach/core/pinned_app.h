@@ -13,7 +13,6 @@ extern "C"
     typedef struct reach_pinned_app_model
     {
         uint32_t id;
-        uint16_t title[128];
         uint16_t path[260];
         uint16_t arguments[260];
         uint16_t icon_ref[260];

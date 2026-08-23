@@ -125,12 +125,9 @@ static reach_result reach_pin_add_default_explorer(reach_config_snapshot *snapsh
 
     app->id = (uint32_t)(snapshot->pinned_app_count + 1);
 
-    const uint16_t explorer_title[] = {'e', 'x', 'p', 'l', 'o', 'r', 'e', 'r', 0};
-
     const uint16_t explorer_path[] = {'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'e',
                                       'x', 'p', 'l',  'o', 'r', 'e', 'r', '.', 'e', 'x', 'e',  0};
 
-    (void)reach_copy_utf16(app->title, 128, explorer_title);
     (void)reach_copy_utf16(app->path, 260, explorer_path);
     (void)reach_copy_utf16(app->icon_ref, 260, explorer_path);
 
@@ -194,7 +191,6 @@ reach_result reach_pin_config_pin_path(reach_config_store_port *store, const uin
     reach_pinned_app_model *app = &snapshot.pinned_apps[snapshot.pinned_app_count];
     *app = {};
     app->id = (uint32_t)(snapshot.pinned_app_count + 1);
-    reach_copy_path_stem_utf16(app->title, 128, path);
     (void)reach_copy_utf16(app->path, 260, path);
     (void)reach_copy_utf16(app->icon_ref, 260, path);
     snapshot.pinned_app_count += 1;
@@ -258,15 +254,6 @@ reach_result reach_pin_config_pin_app(reach_config_store_port *store,
     reach_pinned_app_model *pinned = &snapshot.pinned_apps[snapshot.pinned_app_count];
     *pinned = {};
     pinned->id = (uint32_t)(snapshot.pinned_app_count + 1);
-
-    if (app->title[0] != 0)
-    {
-        (void)reach_copy_utf16(pinned->title, 128, app->title);
-    }
-    else
-    {
-        reach_copy_path_stem_utf16(pinned->title, 128, app->path);
-    }
 
     (void)reach_copy_utf16(pinned->path, 260, app->path);
     (void)reach_copy_utf16(pinned->arguments, 260, app->arguments);
