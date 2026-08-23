@@ -340,6 +340,8 @@ struct reach_host
     reach_surface_runtime quick_settings;
     reach_surface_runtime battery;
     reach_surface_runtime clipboard_surface;
+    reach_render_command_buffer render_commands;
+    reach_render_command_buffer popup_render_commands;
     reach_host_surface_transition launcher_transition;
     int32_t launcher_restore_pending;
     reach_host_surface_transition tray_transition;
@@ -534,8 +536,7 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
 
 void reach_host_sync_popup_mouse_hook(reach_host *host);
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);
-void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask,
-                                      int32_t restore_focus);
+void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int32_t restore_focus);
 
 void reach_host_notify_launcher_search_ready(reach_host *host);
 void reach_host_cleanup_closed_launcher(reach_host *host);
@@ -656,8 +657,7 @@ reach_dock_build_context reach_host_dock_build_context(reach_host *host);
 void reach_host_invalidate_bar_coverage(reach_host *host);
 void reach_host_refresh_window_world(reach_host *host);
 void reach_host_sync_window_manipulation(reach_host *host);
-void reach_host_begin_programmatic_window_manipulation(reach_host *host,
-                                                       reach_window_id window);
+void reach_host_begin_programmatic_window_manipulation(reach_host *host, reach_window_id window);
 void reach_host_end_programmatic_window_manipulation(reach_host *host);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
 void reach_host_suspend_pointer_move_subscriptions(reach_host *host);

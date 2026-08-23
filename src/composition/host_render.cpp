@@ -15,7 +15,8 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
 
     const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
 
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_dock_render_context render_ctx = {};
     render_ctx.theme = theme;
     render_ctx.layout = layout;
@@ -26,19 +27,19 @@ reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_l
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
     reach_result result =
-        reach_dock_append_render_commands(host->dock_capsule, &render_ctx, &commands);
+        reach_dock_append_render_commands(host->dock_capsule, &render_ctx, commands);
     if (result != REACH_OK)
     {
         return result;
     }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_DOCK, &commands);
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_DOCK, commands);
 
     if (host->dock.renderer.ops.begin_frame(host->dock.renderer.backend) != REACH_OK)
     {
         return REACH_ERROR;
     }
 
-    result = host->dock.renderer.ops.execute(host->dock.renderer.backend, &commands);
+    result = host->dock.renderer.ops.execute(host->dock.renderer.backend, commands);
     reach_result end_result = host->dock.renderer.ops.end_frame(host->dock.renderer.backend);
     return result != REACH_OK ? result : end_result;
 }
@@ -50,26 +51,27 @@ reach_result reach_host_render_top_bar_surface(reach_host *host)
         return REACH_OK;
     }
 
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_top_bar_render_context render_ctx = {};
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     render_ctx.icon_size_px = reach_host_icon_size_px(host);
 
     reach_result result =
-        reach_top_bar_append_render_commands(host->top_bar_capsule, &render_ctx, &commands);
+        reach_top_bar_append_render_commands(host->top_bar_capsule, &render_ctx, commands);
     if (result != REACH_OK)
     {
         return result;
     }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_TOP_BAR, &commands);
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_TOP_BAR, commands);
 
     if (host->top_bar.renderer.ops.begin_frame(host->top_bar.renderer.backend) != REACH_OK)
     {
         return REACH_ERROR;
     }
 
-    (void)host->top_bar.renderer.ops.execute(host->top_bar.renderer.backend, &commands);
+    (void)host->top_bar.renderer.ops.execute(host->top_bar.renderer.backend, commands);
     return host->top_bar.renderer.ops.end_frame(host->top_bar.renderer.backend);
 }
 
@@ -110,10 +112,11 @@ reach_result reach_host_render_quick_settings_surface(reach_host *host)
         return REACH_OK;
     }
 
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_result result = reach_quick_settings_append_render_commands(
         host->quick_settings_capsule, host->theme != nullptr ? host->theme : reach_theme_default(),
-        reach_host_layout_dpi_scale(host), &commands);
+        reach_host_layout_dpi_scale(host), commands);
     if (result != REACH_OK)
     {
         return result;
@@ -124,7 +127,7 @@ reach_result reach_host_render_quick_settings_surface(reach_host *host)
     return reach_host_render_popup_surface(
         host, REACH_SURFACE_ID_QUICK_SETTINGS, &host->quick_settings, quick_settings_state->bounds,
         quick_settings_state->notch_anchor_x,
-        reach_popup_notch_side(quick_settings_state->drop_direction), &commands);
+        reach_popup_notch_side(quick_settings_state->drop_direction), commands);
 }
 
 size_t reach_host_switcher_visible_count(const reach_host *host)
@@ -152,9 +155,10 @@ reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.icon_size_px = reach_host_icon_size_px(host);
 
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_result build_result =
-        reach_switcher_append_render_commands(host->switcher_capsule, &ctx, &commands);
+        reach_switcher_append_render_commands(host->switcher_capsule, &ctx, commands);
     if (build_result != REACH_OK)
     {
         return build_result;
@@ -165,7 +169,7 @@ reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32
         return REACH_ERROR;
     }
 
-    (void)host->switcher.renderer.ops.execute(host->switcher.renderer.backend, &commands);
+    (void)host->switcher.renderer.ops.execute(host->switcher.renderer.backend, commands);
     return host->switcher.renderer.ops.end_frame(host->switcher.renderer.backend);
 }
 
@@ -181,9 +185,10 @@ reach_result reach_host_render_stage_surface(reach_host *host, reach_rect_f32 bo
     ctx.bounds = bounds;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_result build_result =
-        reach_stage_append_render_commands(host->stage_capsule, &ctx, &commands);
+        reach_stage_append_render_commands(host->stage_capsule, &ctx, commands);
     if (build_result != REACH_OK)
     {
         return build_result;
@@ -194,7 +199,7 @@ reach_result reach_host_render_stage_surface(reach_host *host, reach_rect_f32 bo
         return REACH_ERROR;
     }
 
-    (void)host->stage.renderer.ops.execute(host->stage.renderer.backend, &commands);
+    (void)host->stage.renderer.ops.execute(host->stage.renderer.backend, commands);
     return host->stage.renderer.ops.end_frame(host->stage.renderer.backend);
 }
 
@@ -213,9 +218,10 @@ reach_result reach_host_render_launcher_surface(reach_host *host,
     render_ctx.layout = layout;
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_result build_result =
-        reach_launcher_append_render_commands(host->launcher_capsule, &render_ctx, &commands);
+        reach_launcher_append_render_commands(host->launcher_capsule, &render_ctx, commands);
     if (build_result != REACH_OK)
     {
         return build_result;
@@ -226,7 +232,7 @@ reach_result reach_host_render_launcher_surface(reach_host *host,
         return REACH_ERROR;
     }
 
-    (void)host->launcher.renderer.ops.execute(host->launcher.renderer.backend, &commands);
+    (void)host->launcher.renderer.ops.execute(host->launcher.renderer.backend, commands);
     return host->launcher.renderer.ops.end_frame(host->launcher.renderer.backend);
 }
 
@@ -236,10 +242,11 @@ reach_result reach_host_render_clipboard_surface(reach_host *host)
     {
         return REACH_OK;
     }
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_result result = reach_clipboard_append_render_commands(
         host->clipboard_capsule, host->theme != nullptr ? host->theme : reach_theme_default(),
-        reach_host_layout_dpi_scale(host), &commands);
+        reach_host_layout_dpi_scale(host), commands);
     if (result != REACH_OK)
     {
         return result;
@@ -252,7 +259,7 @@ reach_result reach_host_render_clipboard_surface(reach_host *host)
     }
 
     result = host->clipboard_surface.renderer.ops.execute(host->clipboard_surface.renderer.backend,
-                                                          &commands);
+                                                          commands);
     reach_result end_result =
         host->clipboard_surface.renderer.ops.end_frame(host->clipboard_surface.renderer.backend);
     return result != REACH_OK ? result : end_result;
@@ -269,9 +276,10 @@ reach_result reach_host_render_battery_surface(reach_host *host)
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
-    reach_render_command_buffer content = {};
+    reach_render_command_buffer *content = &host->render_commands;
+    reach_render_command_buffer_clear(content);
     reach_result build_result =
-        reach_battery_append_render_commands(host->battery_capsule, &render_ctx, &content);
+        reach_battery_append_render_commands(host->battery_capsule, &render_ctx, content);
     if (build_result != REACH_OK)
     {
         return build_result;
@@ -280,7 +288,7 @@ reach_result reach_host_render_battery_surface(reach_host *host)
     const reach_battery_state *state = reach_battery_state_ptr(host->battery_capsule);
     return reach_host_render_popup_surface(host, REACH_SURFACE_ID_BATTERY, &host->battery,
                                            state->bounds, state->notch_anchor_x,
-                                           reach_popup_notch_side(state->drop_direction), &content);
+                                           reach_popup_notch_side(state->drop_direction), content);
 }
 
 reach_result reach_host_render_context_menu_surface(reach_host *host)
@@ -294,14 +302,15 @@ reach_result reach_host_render_context_menu_surface(reach_host *host)
     render_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     render_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
 
-    reach_render_command_buffer commands = {};
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
     reach_result build_result = reach_context_menu_append_render_commands(
-        host->context_menu_capsule, &render_ctx, &commands);
+        host->context_menu_capsule, &render_ctx, commands);
     if (build_result != REACH_OK)
     {
         return build_result;
     }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_CONTEXT_MENU, &commands);
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_CONTEXT_MENU, commands);
 
     if (host->context_menu.renderer.ops.begin_frame(host->context_menu.renderer.backend) !=
         REACH_OK)
@@ -310,7 +319,7 @@ reach_result reach_host_render_context_menu_surface(reach_host *host)
     }
 
     reach_result result =
-        host->context_menu.renderer.ops.execute(host->context_menu.renderer.backend, &commands);
+        host->context_menu.renderer.ops.execute(host->context_menu.renderer.backend, commands);
     reach_result end_result =
         host->context_menu.renderer.ops.end_frame(host->context_menu.renderer.backend);
     return result != REACH_OK ? result : end_result;

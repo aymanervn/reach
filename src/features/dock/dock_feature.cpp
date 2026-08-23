@@ -22,7 +22,6 @@ struct reach_dock_slot
 {
     int32_t lifecycle;
     reach_dock_order_key key;
-    float target_width;
 };
 
 static const double REACH_DOCK_SLOT_ANIMATION_SECONDS = 0.25;
@@ -40,7 +39,7 @@ struct reach_dock
     reach_dock_state state;
 
     reach_dock_slot slots[REACH_DOCK_SLOT_CAPACITY];
-    uint8_t slot_order[REACH_DOCK_SLOT_CAPACITY];
+    uint16_t slot_order[REACH_DOCK_SLOT_CAPACITY];
     size_t slot_order_count;
     int32_t slots_synced;
 
@@ -803,7 +802,8 @@ reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_reque
         fabsf(animations->coverage_monitor_bounds.x - request->monitor_bounds.x) >= 0.5f ||
         fabsf(animations->coverage_monitor_bounds.y - request->monitor_bounds.y) >= 0.5f ||
         fabsf(animations->coverage_monitor_bounds.width - request->monitor_bounds.width) >= 0.5f ||
-        fabsf(animations->coverage_monitor_bounds.height - request->monitor_bounds.height) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.height - request->monitor_bounds.height) >=
+            0.5f ||
         fabsf(animations->coverage_shadow_clearance - request->shadow_clearance) >= 0.5f;
     if (!animations->coverage_valid || bounds_changed)
     {
@@ -811,8 +811,7 @@ reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_reque
             reach_bar_protected_band(REACH_DOCK_EDGE, request->shown_bounds,
                                      request->monitor_bounds, request->shadow_clearance);
         animations->coverage_trespassed = reach_window_tracking_any_trespassing(
-            animations->windows, request->monitor_bounds, protected_band,
-            request->excluded_window);
+            animations->windows, request->monitor_bounds, protected_band, request->excluded_window);
         animations->coverage_shown_bounds = request->shown_bounds;
         animations->coverage_monitor_bounds = request->monitor_bounds;
         animations->coverage_shadow_clearance = request->shadow_clearance;
@@ -859,10 +858,9 @@ static void reach_dock_invalidate_bar_coverage(void *capsule)
 
 const reach_bar_reveal_ops *reach_dock_reveal_ops(void)
 {
-    static const reach_bar_reveal_ops ops = {reach_dock_bar_begin_session,
-                                             reach_dock_bar_update_visibility,
-                                             reach_dock_bar_animation, nullptr,
-                                             reach_dock_invalidate_bar_coverage};
+    static const reach_bar_reveal_ops ops = {
+        reach_dock_bar_begin_session, reach_dock_bar_update_visibility, reach_dock_bar_animation,
+        nullptr, reach_dock_invalidate_bar_coverage};
     return &ops;
 }
 
@@ -937,6 +935,7 @@ static void reach_dock_build_candidate_items(
     reach_dock_app_group groups[REACH_MAX_DOCK_ITEMS] = {};
     size_t group_count = 0;
     size_t pinned_group_count = 0;
+    size_t running_group_count = 0;
 
     for (size_t index = 0;
          pinned_apps != nullptr && index < pinned_app_count && group_count < REACH_MAX_DOCK_ITEMS;
@@ -972,7 +971,8 @@ static void reach_dock_build_candidate_items(
                 break;
             }
         }
-        if (grouped || group_count >= REACH_MAX_DOCK_ITEMS)
+        if (grouped || running_group_count >= REACH_MAX_DOCK_RUNNING_APPS ||
+            group_count >= REACH_MAX_DOCK_ITEMS)
         {
             continue;
         }
@@ -982,6 +982,7 @@ static void reach_dock_build_candidate_items(
         groups[group_count].pinned_index = REACH_MAX_DOCK_ITEMS;
         groups[group_count].representative = open_windows[index].id;
         ++group_count;
+        ++running_group_count;
     }
 
     for (size_t index = 0; index < group_count; ++index)
@@ -1185,9 +1186,14 @@ static size_t reach_dock_slot_track(size_t pool_index)
     return REACH_DOCK_ANIM_SLOT_BASE + pool_index;
 }
 
-static float reach_dock_slot_width(const reach_dock *dock, size_t pool_index)
+static float reach_dock_slot_reveal(const reach_dock *dock, size_t pool_index)
 {
-    return reach_animation_manager_value(&dock->manager, reach_dock_slot_track(pool_index));
+    float reveal = reach_animation_manager_value(&dock->manager, reach_dock_slot_track(pool_index));
+    if (reveal < 0.0f)
+    {
+        return 0.0f;
+    }
+    return reveal > 1.0f ? 1.0f : reveal;
 }
 
 static void reach_dock_gate_animating_hit(reach_dock *dock, reach_dock_hit_result *hit)
@@ -1295,7 +1301,7 @@ static void reach_dock_settle_slots(reach_dock *dock)
     }
 }
 
-static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
+static void reach_dock_sync_slots(reach_dock *dock)
 {
     reach_dock_state *state = &dock->state;
     size_t item_count = state->model.item_count;
@@ -1317,10 +1323,8 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
             size_t pool = index;
             dock->slots[pool].lifecycle = REACH_DOCK_SLOT_STEADY;
             dock->slots[pool].key = reach_dock_item_key_at(&state->model, index);
-            dock->slots[pool].target_width = app_slot_width;
-            reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool),
-                                        app_slot_width);
-            dock->slot_order[dock->slot_order_count++] = (uint8_t)pool;
+            reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool), 1.0f);
+            dock->slot_order[dock->slot_order_count++] = (uint16_t)pool;
         }
         dock->slots_synced = 1;
         return;
@@ -1353,14 +1357,14 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
         }
     }
 
-    uint8_t dying_anchor[REACH_DOCK_SLOT_CAPACITY] = {};
+    uint16_t dying_anchor[REACH_DOCK_SLOT_CAPACITY] = {};
     size_t last_live = 0;
     for (size_t at = 0; at < dock->slot_order_count; ++at)
     {
         size_t pool = dock->slot_order[at];
         if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING)
         {
-            dying_anchor[pool] = (uint8_t)last_live;
+            dying_anchor[pool] = (uint16_t)last_live;
         }
         else if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_EMPTY)
         {
@@ -1368,7 +1372,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
         }
     }
 
-    uint8_t new_order[REACH_DOCK_SLOT_CAPACITY] = {};
+    uint16_t new_order[REACH_DOCK_SLOT_CAPACITY] = {};
     size_t new_count = 0;
     for (size_t index = 0; index < item_count; ++index)
     {
@@ -1383,21 +1387,14 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
 
                 slot->lifecycle = REACH_DOCK_SLOT_APPEARING;
             }
-            if (slot->target_width != app_slot_width || slot->lifecycle != REACH_DOCK_SLOT_STEADY)
+            if (slot->lifecycle != REACH_DOCK_SLOT_STEADY)
             {
-                slot->target_width = app_slot_width;
-                if (slot->lifecycle == REACH_DOCK_SLOT_STEADY)
+                if (reach_animation_manager_target(&dock->manager, reach_dock_slot_track(pool)) !=
+                    1.0f)
                 {
-
-                    reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool),
-                                                app_slot_width);
-                }
-                else if (reach_animation_manager_target(
-                             &dock->manager, reach_dock_slot_track(pool)) != app_slot_width)
-                {
-                    reach_animation_manager_animate_to(
-                        &dock->manager, reach_dock_slot_track(pool), app_slot_width,
-                        REACH_DOCK_SLOT_ANIMATION_SECONDS, REACH_EASING_EASE_IN_OUT);
+                    reach_animation_manager_animate_to(&dock->manager, reach_dock_slot_track(pool),
+                                                       1.0f, REACH_DOCK_SLOT_ANIMATION_SECONDS,
+                                                       REACH_EASING_EASE_IN_OUT);
                 }
             }
         }
@@ -1410,18 +1407,17 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
             }
             dock->slots[pool].lifecycle = REACH_DOCK_SLOT_APPEARING;
             dock->slots[pool].key = item_key;
-            dock->slots[pool].target_width = app_slot_width;
-            reach_animation_manager_start(&dock->manager, reach_dock_slot_track(pool), 0.0f,
-                                          app_slot_width, REACH_DOCK_SLOT_ANIMATION_SECONDS,
+            reach_animation_manager_start(&dock->manager, reach_dock_slot_track(pool), 0.0f, 1.0f,
+                                          REACH_DOCK_SLOT_ANIMATION_SECONDS,
                                           REACH_EASING_EASE_IN_OUT);
         }
-        new_order[new_count++] = (uint8_t)pool;
+        new_order[new_count++] = (uint16_t)pool;
         for (size_t dying = 0; dying < REACH_DOCK_SLOT_CAPACITY; ++dying)
         {
             if (dock->slots[dying].lifecycle == REACH_DOCK_SLOT_DYING &&
                 dying_anchor[dying] == pool && dying != pool)
             {
-                new_order[new_count++] = (uint8_t)dying;
+                new_order[new_count++] = (uint16_t)dying;
             }
         }
     }
@@ -1443,7 +1439,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width)
         }
         if (!present)
         {
-            new_order[new_count++] = (uint8_t)pool;
+            new_order[new_count++] = (uint16_t)pool;
         }
     }
     for (size_t at = 0; at < new_count; ++at)
@@ -1468,8 +1464,7 @@ static void reach_dock_snap_slots(reach_dock *dock)
             continue;
         }
         slot->lifecycle = REACH_DOCK_SLOT_STEADY;
-        reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool),
-                                    slot->target_width);
+        reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool), 1.0f);
     }
 }
 
@@ -1485,16 +1480,11 @@ float reach_dock_item_reveal(reach_dock *dock, size_t item_index)
     {
         return 1.0f;
     }
-    const reach_dock_slot *slot = &dock->slots[pool];
-    if (slot->lifecycle == REACH_DOCK_SLOT_STEADY)
+    if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_STEADY)
     {
         return 1.0f;
     }
-    if (slot->target_width <= 0.0f)
-    {
-        return 0.0f;
-    }
-    const float progress = reach_dock_slot_width(dock, pool) / slot->target_width;
+    const float progress = reach_dock_slot_reveal(dock, pool);
     if (progress <= REACH_DOCK_SLOT_REVEAL_THRESHOLD)
     {
         return 0.0f;
@@ -1502,6 +1492,42 @@ float reach_dock_item_reveal(reach_dock *dock, size_t item_index)
     float reveal =
         (progress - REACH_DOCK_SLOT_REVEAL_THRESHOLD) / (1.0f - REACH_DOCK_SLOT_REVEAL_THRESHOLD);
     return reveal > 1.0f ? 1.0f : reveal;
+}
+
+reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_icon_size,
+                                             float native_gap, float available_width,
+                                             float app_slot_units)
+{
+    reach_dock_fit_result result = {};
+    if (native_height < 0.0f)
+    {
+        native_height = 0.0f;
+    }
+    if (native_icon_size < 0.0f)
+    {
+        native_icon_size = 0.0f;
+    }
+    if (native_gap < 0.0f)
+    {
+        native_gap = 0.0f;
+    }
+    if (app_slot_units < 0.0f)
+    {
+        app_slot_units = 0.0f;
+    }
+
+    const float native_width =
+        native_gap * 2.0f + (app_slot_units + 1.0f) * (native_icon_size + native_gap);
+    result.scale = 1.0f;
+    if (available_width > 0.0f && native_width > available_width)
+    {
+        result.scale = available_width / native_width;
+    }
+    result.width = native_width * result.scale;
+    result.height = native_height * result.scale;
+    result.icon_size = native_icon_size * result.scale;
+    result.gap = native_gap * result.scale;
+    return result;
 }
 
 void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *ctx,
@@ -1519,13 +1545,30 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     reach_dock_build_items(dock, ctx->pinned_apps, ctx->pinned_app_count);
 
     layout->app_slot_count = dock->state.model.item_count;
-    const float scale = ctx->dpi_scale;
-    const float icon_size = ctx->icon_size * scale;
-    const float gap = ctx->gap * scale;
-    const size_t count = dock->state.model.item_count;
-    const reach_theme *theme = ctx->theme;
+    reach_dock_sync_slots(dock);
+
+    float app_slot_units = 0.0f;
+    for (size_t at = 0; at < dock->slot_order_count; ++at)
+    {
+        float reveal = reach_dock_slot_reveal(dock, dock->slot_order[at]);
+        app_slot_units += reveal;
+    }
+
+    const float dpi_scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    const reach_dock_fit_result fit =
+        reach_dock_fit_metrics(layout->bounds.height, ctx->icon_size * dpi_scale,
+                               ctx->gap * dpi_scale, layout->available_width, app_slot_units);
+    const float center_x = layout->bounds.x + layout->bounds.width * 0.5f;
+    const float bottom = layout->bounds.y + layout->bounds.height;
+    layout->bounds.x = center_x - fit.width * 0.5f;
+    layout->bounds.y = bottom - fit.height;
+    layout->bounds.width = fit.width;
+    layout->bounds.height = fit.height;
+    layout->content_scale = fit.scale;
+
+    const float icon_size = fit.icon_size;
+    const float gap = fit.gap;
     const float app_slot_width = icon_size + gap;
-    reach_dock_sync_slots(dock, app_slot_width);
 
     const float top = (layout->bounds.height - icon_size) * 0.5f;
 
@@ -1553,7 +1596,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
                 ++item_index;
             }
         }
-        x += reach_dock_slot_width(dock, pool);
+        x += reach_dock_slot_reveal(dock, pool) * app_slot_width;
     }
 
     for (; item_index < layout->app_slot_count; ++item_index)
@@ -1563,14 +1606,6 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
         layout->app_slots[item_index].width = icon_size;
         layout->app_slots[item_index].height = icon_size;
         x += app_slot_width;
-    }
-
-    const float dock_width = ceilf(x + gap);
-    const float old_width = layout->bounds.width;
-    if (dock_width != old_width)
-    {
-        layout->bounds.x += (old_width - dock_width) * 0.5f;
-        layout->bounds.width = dock_width;
     }
 
     dock->pointer_layout = *layout;

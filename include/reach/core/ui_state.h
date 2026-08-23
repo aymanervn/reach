@@ -20,7 +20,6 @@ extern "C"
     typedef struct reach_dock_model
     {
         float height;
-        float width;
         float icon_size;
         float gap;
         int32_t visible;

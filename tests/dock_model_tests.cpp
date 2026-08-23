@@ -1,5 +1,6 @@
 #include "reach/features/dock.h"
 
+#include <math.h>
 #include <stdio.h>
 
 static int failures;
@@ -10,6 +11,15 @@ static void expect_true(int condition, const char *message)
     {
         ++failures;
         fprintf(stderr, "FAILED: %s\n", message);
+    }
+}
+
+static void expect_near(float actual, float expected, float tolerance, const char *message)
+{
+    if (fabsf(actual - expected) > tolerance)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: %s (expected %.3f, got %.3f)\n", message, expected, actual);
     }
 }
 
@@ -185,6 +195,64 @@ static void test_key_equality_semantics(void)
     expect_true(reach_dock_key_equal(&unpinned_key, &unpinned_key), "same key matches itself");
 }
 
+static void test_capacity_keeps_all_pinned_and_running_groups(void)
+{
+    static reach_pinned_app_model pins[REACH_MAX_PINNED_APPS];
+    static reach_window_snapshot windows[REACH_MAX_DOCK_RUNNING_APPS];
+    static uint32_t group_ids[REACH_MAX_DOCK_RUNNING_APPS];
+    reach_dock_feature_model model = {};
+    reach_dock_feature_model_init(&model);
+
+    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    {
+        char path[64] = {};
+        snprintf(path, sizeof(path), "C:\\pins\\pin_%zu.exe", index);
+        pins[index] = make_pin((uint32_t)(index + 1), path);
+    }
+    for (size_t index = 0; index < REACH_MAX_DOCK_RUNNING_APPS; ++index)
+    {
+        char path[64] = {};
+        snprintf(path, sizeof(path), "C:\\running\\app_%zu.exe", index);
+        windows[index] = make_window((uintptr_t)(index + 1000), path, "");
+        group_ids[index] = (uint32_t)(index + 1000);
+    }
+
+    reach_dock_feature_model_build_items(&model, pins, REACH_MAX_PINNED_APPS, windows, group_ids,
+                                         REACH_MAX_DOCK_RUNNING_APPS, matches_thunk, nullptr);
+
+    expect_true(REACH_MAX_PINNED_APPS == 96, "configured pin capacity is 96");
+    expect_true(REACH_MAX_DOCK_RUNNING_APPS == 96, "running Dock app capacity is 96");
+    expect_true(REACH_MAX_DOCK_ITEMS == 192, "combined Dock capacity is 192");
+    expect_true(model.item_count == REACH_MAX_DOCK_ITEMS,
+                "all pinned and running groups fit together");
+    expect_true(model.items[REACH_MAX_PINNED_APPS - 1].pinned == 1, "last pinned item is retained");
+    expect_true(model.items[REACH_MAX_PINNED_APPS].pinned == 0,
+                "first running item follows the pins");
+}
+
+static void test_fit_metrics_keep_native_size_until_overflow(void)
+{
+    reach_dock_fit_result fit = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 600.0f, 10.0f);
+    expect_near(fit.scale, 1.0f, 0.0001f, "fitting content stays at native scale");
+    expect_near(fit.width, 596.0f, 0.0001f, "native width includes trigger and outer gaps");
+    expect_near(fit.height, 64.0f, 0.0001f, "native height is unchanged");
+}
+
+static void test_fit_metrics_scale_every_dimension_without_a_minimum(void)
+{
+    reach_dock_fit_result half = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 298.0f, 10.0f);
+    expect_near(half.scale, 0.5f, 0.0001f, "overflow resolves to the exact fit scale");
+    expect_near(half.width, 298.0f, 0.0001f, "overflow width exactly fits the monitor");
+    expect_near(half.height, 32.0f, 0.0001f, "Dock height scales uniformly");
+    expect_near(half.icon_size, 20.0f, 0.0001f, "icons scale uniformly");
+    expect_near(half.gap, 6.0f, 0.0001f, "gaps scale uniformly");
+
+    reach_dock_fit_result tiny = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 10.0f);
+    expect_near(tiny.width, 1.0f, 0.0001f, "arbitrarily narrow monitors still fit exactly");
+    expect_true(tiny.scale > 0.0f && tiny.scale < half.scale,
+                "fit calculation has no minimum scale clamp");
+}
+
 int main(void)
 {
     test_unpinned_windows_group_into_one_item();
@@ -193,5 +261,8 @@ int main(void)
     test_order_preserved_and_new_groups_append();
     test_same_path_different_aumid_stays_split();
     test_key_equality_semantics();
+    test_capacity_keeps_all_pinned_and_running_groups();
+    test_fit_metrics_keep_native_size_until_overflow();
+    test_fit_metrics_scale_every_dimension_without_a_minimum();
     return failures == 0 ? 0 : 1;
 }

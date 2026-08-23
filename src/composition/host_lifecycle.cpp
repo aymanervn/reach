@@ -646,8 +646,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         {
             if (snapshot.dock_height > 0.0f)
                 host->dock_config.height = snapshot.dock_height;
-            if (snapshot.dock_width > 0.0f)
-                host->dock_config.width = snapshot.dock_width;
             host->dock_config.icon_size =
                 reach_theme_icon_box_size(host->theme, host->dock_config.height);
             (void)reach_host_set_pinned_apps(host, snapshot.pinned_apps, snapshot.pinned_app_count);

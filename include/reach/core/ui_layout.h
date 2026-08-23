@@ -23,6 +23,8 @@ extern "C"
         reach_rect_f32 trigger_button;
         reach_rect_f32 app_slots[REACH_MAX_DOCK_ITEMS];
         size_t app_slot_count;
+        float available_width;
+        float content_scale;
     } reach_dock_layout;
 
     typedef struct reach_launcher_layout

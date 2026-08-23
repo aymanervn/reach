@@ -1,5 +1,7 @@
 #include "reach/services/pin_config.h"
 
+#include <stdio.h>
+
 struct test_store
 {
     reach_config_snapshot snapshot;
@@ -48,7 +50,7 @@ int main()
 {
     int failed = 0;
 
-    test_store backing = {};
+    static test_store backing = {};
     backing.snapshot.pinned_app_count = 4;
     for (size_t index = 0; index < backing.snapshot.pinned_app_count; ++index)
     {
@@ -91,7 +93,7 @@ int main()
     failed += expect(backing.snapshot.pinned_apps[4].arguments[0] == '-');
     failed += expect(backing.snapshot.pinned_apps[4].app_user_model_id[0] == 'V');
 
-    test_store update_backing = {};
+    static test_store update_backing = {};
     update_backing.snapshot.pinned_app_count = 1;
     update_backing.snapshot.pinned_apps[0].id = 1;
     copy_ascii(update_backing.snapshot.pinned_apps[0].path, 260, "helper.exe");
@@ -111,6 +113,32 @@ int main()
     failed += expect(update_backing.snapshot.pinned_app_count == 1);
     failed += expect(update_backing.snapshot.pinned_apps[0].arguments[0] == '-');
     failed += expect(update_backing.snapshot.pinned_apps[0].app_user_model_id[0] == 'E');
+
+    static test_store capacity_backing = {};
+    capacity_backing.snapshot.pinned_app_count = REACH_MAX_PINNED_APPS - 1;
+    for (size_t index = 0; index < capacity_backing.snapshot.pinned_app_count; ++index)
+    {
+        capacity_backing.snapshot.pinned_apps[index].id = (uint32_t)(index + 1);
+        char path[32] = {};
+        snprintf(path, sizeof(path), "pin_%zu.exe", index);
+        copy_ascii(capacity_backing.snapshot.pinned_apps[index].path, 260, path);
+    }
+    reach_config_store_port capacity_port = {};
+    capacity_port.store = reinterpret_cast<reach_config_store *>(&capacity_backing);
+    capacity_port.ops.load = test_load;
+    capacity_port.ops.save = test_save;
+
+    reach_pinned_app_model last_app = {};
+    copy_ascii(last_app.path, 260, "last.exe");
+    failed += expect(reach_pin_config_pin_app(&capacity_port, &last_app) == REACH_OK);
+    failed += expect(capacity_backing.snapshot.pinned_app_count == REACH_MAX_PINNED_APPS);
+    failed += expect(capacity_backing.save_count == 1);
+
+    reach_pinned_app_model overflow_app = {};
+    copy_ascii(overflow_app.path, 260, "overflow.exe");
+    failed += expect(reach_pin_config_pin_app(&capacity_port, &overflow_app) == REACH_ERROR);
+    failed += expect(capacity_backing.snapshot.pinned_app_count == REACH_MAX_PINNED_APPS);
+    failed += expect(capacity_backing.save_count == 1);
 
     return failed == 0 ? 0 : 1;
 }

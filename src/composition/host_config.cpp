@@ -1,5 +1,8 @@
 #include "host_internal.h"
 
+#include <memory>
+#include <new>
+
 reach_result reach_host_set_pinned_apps(reach_host *host, const reach_pinned_app_model *apps,
                                         size_t count)
 {
@@ -270,7 +273,7 @@ void reach_host_apply_power_config(reach_host *host, const reach_config_snapshot
 }
 
 static const uint16_t *reach_host_primary_wallpaper_path(reach_host *host,
-                                                          const reach_config_snapshot *snapshot)
+                                                         const reach_config_snapshot *snapshot)
 {
     if (host->monitors.list != nullptr && host->monitors.ops.count != nullptr &&
         host->monitors.ops.get != nullptr)
@@ -369,8 +372,13 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
 
     if (apply_wallpaper)
     {
-        reach_config_snapshot writable_snapshot = *snapshot;
-        reach_host_seed_or_apply_wallpaper(host, &writable_snapshot);
+        std::unique_ptr<reach_config_snapshot> writable_snapshot(
+            new (std::nothrow) reach_config_snapshot(*snapshot));
+        if (writable_snapshot == nullptr)
+        {
+            return REACH_ERROR;
+        }
+        reach_host_seed_or_apply_wallpaper(host, writable_snapshot.get());
     }
     reach_host_apply_power_config(host, snapshot);
     host->high_refresh_rate = snapshot->high_refresh_rate ? 1 : 0;

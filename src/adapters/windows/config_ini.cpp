@@ -37,8 +37,8 @@ static std::string reach_config_read_bytes(const wchar_t *path)
 
 static void reach_config_write_utf16_file(const wchar_t *path, const std::wstring &text)
 {
-    HANDLE out = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
-                             nullptr);
+    HANDLE out =
+        CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (out == INVALID_HANDLE_VALUE)
     {
         return;
@@ -110,8 +110,8 @@ static void reach_config_write_version_header(const wchar_t *path, const wchar_t
         }
     }
 
-    reach_config_write_utf16_file(path, std::wstring(comment) + L"\r\n" +
-                                            existing.substr(body_start));
+    reach_config_write_utf16_file(path,
+                                  std::wstring(comment) + L"\r\n" + existing.substr(body_start));
 }
 
 struct reach_config_store
@@ -175,8 +175,6 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
-    out_snapshot->dock_width = (float)GetPrivateProfileIntW(L"dock", L"width", 560, path);
-    out_snapshot->dock_icon_size = (float)GetPrivateProfileIntW(L"dock", L"icon_size", 40, path);
     out_snapshot->power_sleep_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"sleep_minutes", 30, path);
     out_snapshot->power_lock_minutes =
@@ -257,10 +255,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
     wchar_t value[32] = {};
     swprintf_s(value, L"%.0f", snapshot->dock_height);
     WritePrivateProfileStringW(L"dock", L"height", value, path);
-    swprintf_s(value, L"%.0f", snapshot->dock_width);
-    WritePrivateProfileStringW(L"dock", L"width", value, path);
-    swprintf_s(value, L"%.0f", snapshot->dock_icon_size);
-    WritePrivateProfileStringW(L"dock", L"icon_size", value, path);
+    WritePrivateProfileStringW(L"dock", L"width", nullptr, path);
+    WritePrivateProfileStringW(L"dock", L"icon_size", nullptr, path);
     swprintf_s(value, L"%d", snapshot->power_sleep_minutes);
     WritePrivateProfileStringW(L"power", L"sleep_minutes", value, path);
     swprintf_s(value, L"%d", snapshot->power_lock_minutes);
