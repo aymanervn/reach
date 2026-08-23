@@ -3,6 +3,7 @@
 
 #include "reach/core/render_commands.h"
 #include "reach/features/common/marquee.h"
+#include "reach/ports/text_measure.h"
 #include "reach/services/now_playing.h"
 
 typedef struct reach_top_bar_now_playing reach_top_bar_now_playing;
@@ -63,7 +64,7 @@ float reach_top_bar_now_playing_model_desired_width(const reach_top_bar_now_play
 reach_top_bar_now_playing_layout
 reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *model,
                                       const reach_theme *theme, reach_rect_f32 bounds,
-                                      float dpi_scale);
+                                      float dpi_scale, const reach_text_measure_port *text_measure);
 reach_now_playing_action
 reach_top_bar_now_playing_hit_test(const reach_top_bar_now_playing_model *model,
                                 const reach_top_bar_now_playing_layout *layout, int32_t x, int32_t y);
@@ -80,7 +81,8 @@ int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now
 float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *now_playing,
                                            const reach_theme *theme, float dpi_scale);
 void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, const reach_theme *theme,
-                                     reach_rect_f32 bounds, float dpi_scale);
+                                     reach_rect_f32 bounds, float dpi_scale,
+                                     const reach_text_measure_port *text_measure);
 
 reach_now_playing_action reach_top_bar_now_playing_action_at(
     const reach_top_bar_now_playing *now_playing, int32_t x, int32_t y);

@@ -177,6 +177,11 @@ scrolls it with the shared `features/common/marquee` clock when the text
 overruns its slot; the scroll is gated on the bar being shown, so a hidden or
 game-mode bar never asks for a frame.
 
+Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the
+implementation with the same font family, size, and weight used for drawing; features retain only
+a conservative estimate for unavailable-adapter cases. This keeps exact text metrics outside
+feature policy while allowing the top bar and Dock window-list popup to size before rendering.
+
 The window push is the top bar's second private subfeature: while the bar can
 hide and is sliding in, it moves the windows the bar would cover down by the
 bar's own reveal progress, so they track the bar edge on one clock. That
