@@ -27,7 +27,6 @@ struct reach_top_bar_metrics
     float current_app_gap;
     float current_app_name_text_size;
     int32_t current_app_name_text_weight;
-    float current_app_min_text_width;
     float current_app_max_width_ratio;
 
     float tray_icon_scale;
@@ -45,7 +44,7 @@ struct reach_top_bar_metrics
     float network_name_max_width;
     float volume_text_size;
     int32_t volume_text_weight;
-    float language_width;
+    float language_padding;
     float language_text_size;
     int32_t language_text_weight;
 
@@ -89,7 +88,6 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.current_app_gap = 8.0f;
     metrics.current_app_name_text_size = 12.5f;
     metrics.current_app_name_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
-    metrics.current_app_min_text_width = 34.0f;
     metrics.current_app_max_width_ratio = 0.28f;
 
     metrics.tray_icon_scale = 0.52f;
@@ -107,7 +105,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.network_name_max_width = 96.0f;
     metrics.volume_text_size = 11.0f;
     metrics.volume_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
-    metrics.language_width = 32.0f;
+    metrics.language_padding = 6.0f;
     metrics.language_text_size = 11.0f;
     metrics.language_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
 

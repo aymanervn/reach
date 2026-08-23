@@ -193,7 +193,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         }
     }
 
-    return REACH_OK;
+    return reach_popup_push_border(&popup, out_commands);
 }
 
 reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,

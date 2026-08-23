@@ -210,7 +210,6 @@ static void reach_dock_push_background(const reach_dock_render_input *input,
 {
     const reach_theme *theme = input->theme;
     const reach_dock_layout *layout = input->layout;
-    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
 
     reach_render_command shape = {};
     shape.rect = reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height);
@@ -218,6 +217,14 @@ static void reach_dock_push_background(const reach_dock_render_input *input,
     reach_render_push_shadow(commands, &shape, &theme->bar_shadow, input->dpi_scale);
 
     reach_dock_push_rect(commands, shape.rect, theme->dock_background, dock_radius);
+}
+
+static void reach_dock_push_border(const reach_dock_render_input *input,
+                                   reach_render_command_buffer *commands, float dock_radius)
+{
+    const reach_theme *theme = input->theme;
+    const reach_dock_layout *layout = input->layout;
+    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
 
     if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {
@@ -287,6 +294,8 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
         reach_dock_push_item(input, out_commands, input->dragged_render_index, input->dragged_box_x,
                              1, icon_box_size, icon_box_radius);
     }
+
+    reach_dock_push_border(input, out_commands, dock_radius);
 
     return REACH_OK;
 }

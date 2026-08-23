@@ -234,15 +234,15 @@ static void test_fit_metrics_keep_native_size_until_overflow(void)
 {
     reach_dock_fit_result fit = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 600.0f, 10.0f);
     expect_near(fit.scale, 1.0f, 0.0001f, "fitting content stays at native scale");
-    expect_near(fit.width, 596.0f, 0.0001f, "native width includes trigger and outer gaps");
+    expect_near(fit.width, 587.6f, 0.0001f, "native width has equal enlarged outer padding");
     expect_near(fit.height, 64.0f, 0.0001f, "native height is unchanged");
 }
 
 static void test_fit_metrics_scale_every_dimension_without_a_minimum(void)
 {
-    reach_dock_fit_result half = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 298.0f, 10.0f);
+    reach_dock_fit_result half = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 293.8f, 10.0f);
     expect_near(half.scale, 0.5f, 0.0001f, "overflow resolves to the exact fit scale");
-    expect_near(half.width, 298.0f, 0.0001f, "overflow width exactly fits the monitor");
+    expect_near(half.width, 293.8f, 0.0001f, "overflow width exactly fits the monitor");
     expect_near(half.height, 32.0f, 0.0001f, "Dock height scales uniformly");
     expect_near(half.icon_size, 20.0f, 0.0001f, "icons scale uniformly");
     expect_near(half.gap, 6.0f, 0.0001f, "gaps scale uniformly");

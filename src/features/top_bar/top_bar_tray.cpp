@@ -473,7 +473,7 @@ reach_result reach_top_bar_append_tray_render_commands(
             reach_render_command_buffer_push(out_commands, &command);
         }
     }
-    return REACH_OK;
+    return reach_popup_push_border(&popup, out_commands);
 }
 
 void reach_top_bar_tray_set_overflow_start(reach_top_bar *top_bar, size_t overflow_start)

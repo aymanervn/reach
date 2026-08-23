@@ -262,8 +262,7 @@ void reach_host_apply_power_config(reach_host *host, const reach_config_snapshot
         return;
     }
     reach_idle_watch_config config = {};
-    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SCREEN_OFF] =
-        snapshot->power_screen_off_minutes;
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SCREEN_OFF] = snapshot->power_screen_off_minutes;
     config.wait_awake_apps[REACH_IDLE_WATCH_ACTION_SCREEN_OFF] = 1;
     config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SLEEP] = snapshot->power_sleep_minutes;
     config.timeout_minutes[REACH_IDLE_WATCH_ACTION_LOCK] = snapshot->power_lock_minutes;
@@ -340,8 +339,7 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
 
     for (size_t index = 0; index < a_count; ++index)
     {
-        if (a[index].id != b[index].id ||
-            !reach_host_utf16_equal(a[index].path, b[index].path) ||
+        if (a[index].id != b[index].id || !reach_host_utf16_equal(a[index].path, b[index].path) ||
             !reach_host_utf16_equal(a[index].arguments, b[index].arguments) ||
             !reach_host_utf16_equal(a[index].icon_ref, b[index].icon_ref) ||
             !reach_host_utf16_equal(a[index].app_user_model_id, b[index].app_user_model_id))
@@ -418,6 +416,7 @@ void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font)
         surface->renderer.ops.set_ui_font(surface->renderer.backend, enabled);
         reach_surface_runtime_mark_dirty(surface, 1);
     }
+    host->dirty.layout = 1;
     host->dirty.render = 1;
     reach_host_request_update(host);
 }

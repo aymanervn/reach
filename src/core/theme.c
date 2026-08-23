@@ -56,7 +56,7 @@
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
-    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 0.75f,       \
+    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 1.2f,        \
     .icon_box_height_ratio = 0.60f, .icon_max_box_ratio = 0.76f,                                   \
     .icon_box_corner_radius_ratio = 0.28f, .icon_box_corner_radius_max = 14.0f,                    \
     .tray_slot_size_ratio = 0.3f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,   \

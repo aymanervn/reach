@@ -88,11 +88,11 @@ static reach_rect_f32 reach_top_bar_rect_union(reach_rect_f32 left, reach_rect_f
     return reach_top_bar_rect(left.x, left.y, right.x + right.width - left.x, left.height);
 }
 
-static void reach_top_bar_push_pill(const reach_theme *theme, reach_render_command_buffer *commands,
-                                    reach_rect_f32 pill, float dpi_scale)
+static void reach_top_bar_push_pill_background(const reach_theme *theme,
+                                               reach_render_command_buffer *commands,
+                                               reach_rect_f32 pill, float dpi_scale)
 {
     float radius = pill.height * 0.5f;
-    float border_thickness = reach_theme_border_thickness(theme, dpi_scale);
 
     reach_render_command shape = {};
     shape.rect = pill;
@@ -100,6 +100,14 @@ static void reach_top_bar_push_pill(const reach_theme *theme, reach_render_comma
     reach_render_push_shadow(commands, &shape, &theme->bar_shadow, dpi_scale);
 
     reach_top_bar_push_rect(commands, pill, theme->top_bar_background, radius);
+}
+
+static void reach_top_bar_push_pill_border(const reach_theme *theme,
+                                           reach_render_command_buffer *commands,
+                                           reach_rect_f32 pill, float dpi_scale)
+{
+    float radius = pill.height * 0.5f;
+    float border_thickness = reach_theme_border_thickness(theme, dpi_scale);
 
     if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
     {
@@ -115,6 +123,15 @@ static void reach_top_bar_push_pill(const reach_theme *theme, reach_render_comma
     border.radius = radius;
     border.stroke_width = border_thickness;
     reach_render_command_buffer_push(commands, &border);
+}
+
+static reach_rect_f32 reach_top_bar_render_pill(const reach_top_bar_layout *layout, size_t index)
+{
+    return index == REACH_TOP_BAR_PILL_QUICK_SETTINGS &&
+                   layout->pill_visible[REACH_TOP_BAR_PILL_TRAY]
+               ? reach_top_bar_rect_union(layout->pills[REACH_TOP_BAR_PILL_TRAY],
+                                          layout->pills[index])
+               : layout->pills[index];
 }
 
 static void reach_top_bar_push_power_button(const reach_top_bar_render_input *input,
@@ -451,7 +468,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
     {
         reach_top_bar_push_text(commands, layout->volume_label, input->volume_text,
                                 metrics.volume_text_size * input->dpi_scale,
-                                metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_TRAILING,
+                                metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
                                 input->volume_muted ? input->theme->bar_text_secondary
                                                     : input->theme->bar_text_primary);
     }
@@ -479,13 +496,8 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
         {
             continue;
         }
-        reach_rect_f32 pill = layout->pills[index];
-        if (index == REACH_TOP_BAR_PILL_QUICK_SETTINGS &&
-            layout->pill_visible[REACH_TOP_BAR_PILL_TRAY])
-        {
-            pill = reach_top_bar_rect_union(layout->pills[REACH_TOP_BAR_PILL_TRAY], pill);
-        }
-        reach_top_bar_push_pill(ctx->theme, out_commands, pill, ctx->dpi_scale);
+        reach_top_bar_push_pill_background(ctx->theme, out_commands,
+                                           reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
     }
 
     reach_top_bar_render_input input = {};
@@ -545,6 +557,21 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;
     now_playing.dpi_scale = ctx->dpi_scale;
-    return reach_top_bar_now_playing_append_render_commands(
+    reach_result result = reach_top_bar_now_playing_append_render_commands(
         reach_top_bar_now_playing_subfeature(top_bar), &now_playing, out_commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
+    {
+        if (!layout->pill_visible[index] || index == REACH_TOP_BAR_PILL_TRAY)
+        {
+            continue;
+        }
+        reach_top_bar_push_pill_border(ctx->theme, out_commands,
+                                       reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
+    }
+    return REACH_OK;
 }

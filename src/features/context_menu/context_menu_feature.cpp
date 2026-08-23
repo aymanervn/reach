@@ -251,6 +251,50 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     }
 }
 
+static float reach_context_menu_window_list_width(const reach_context_menu_state *state,
+                                                  const reach_context_menu_open_context *ctx)
+{
+    const reach_context_menu_metrics &metrics = reach_context_menu_small_metrics;
+    const float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    const float text_size = metrics.text_size * scale;
+    float widest_title = 0.0f;
+    for (size_t index = 0; index < state->item_count; ++index)
+    {
+        float width =
+            reach_text_width_or_estimate(&ctx->text_measure, state->item_titles[index], text_size,
+                                         REACH_TEXT_WEIGHT_NORMAL, metrics.glyph_advance_ratio);
+        if (width > widest_title)
+        {
+            widest_title = width;
+        }
+    }
+
+    const float chrome = (metrics.padding * 2.0f + metrics.text_leading_inset +
+                          metrics.text_trailing_inset_with_close) *
+                         scale;
+    const float one_letter =
+        reach_text_width_or_estimate(&ctx->text_measure, (const uint16_t *)L"W", text_size,
+                                     REACH_TEXT_WEIGHT_NORMAL, metrics.glyph_advance_ratio);
+    const float minimum = chrome + one_letter;
+    float maximum = metrics.window_list_max_width * scale;
+    const float monitor_width = ctx->monitor.width - metrics.screen_margin * scale * 2.0f;
+    if (monitor_width > 0.0f && monitor_width < maximum)
+    {
+        maximum = monitor_width;
+    }
+    if (maximum < minimum)
+    {
+        return maximum > 0.0f ? maximum : minimum;
+    }
+
+    float width = chrome + widest_title;
+    if (width < minimum)
+    {
+        width = minimum;
+    }
+    return width > maximum ? maximum : width;
+}
+
 void reach_context_menu_open_power(reach_context_menu *menu,
                                    const reach_context_menu_open_context *ctx)
 {
@@ -332,32 +376,7 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
     }
     state->power_open = 0;
     state->window_list_open = 1;
-    float popup_width = reach_context_menu_window_list_popup_width * ctx->dpi_scale;
-    float max_text_width = 0.0f;
-    if (ctx->text_measure.measure != nullptr)
-    {
-        const float text_size = reach_context_menu_small_metrics.text_size * ctx->dpi_scale;
-        for (size_t index = 0; index < state->item_count; ++index)
-        {
-            float text_width = 0.0f;
-            if (ctx->text_measure.measure(ctx->text_measure.context, state->item_titles[index],
-                                          text_size, REACH_TEXT_WEIGHT_NORMAL, &text_width) ==
-                    REACH_OK &&
-                text_width > max_text_width)
-            {
-                max_text_width = text_width;
-            }
-        }
-    }
-    float measured_width =
-        max_text_width +
-        (reach_context_menu_small_metrics.text_leading_inset +
-         reach_context_menu_small_metrics.text_trailing_inset_with_close) *
-            ctx->dpi_scale;
-    if (measured_width > popup_width)
-    {
-        popup_width = measured_width;
-    }
+    float popup_width = reach_context_menu_window_list_width(state, ctx);
     reach_context_menu_place(state, ctx, popup_width, reach_context_menu_window_list_anchor_ratio);
     state->target_index = target_index;
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -441,8 +460,10 @@ void reach_context_menu_reanchor(reach_context_menu *menu,
     {
         return;
     }
-    reach_context_menu_place(&menu->state, ctx, menu->state.anchor_popup_width,
-                             menu->state.anchor_ratio);
+    float popup_width = menu->state.window_list_open
+                            ? reach_context_menu_window_list_width(&menu->state, ctx)
+                            : menu->state.anchor_popup_width;
+    reach_context_menu_place(&menu->state, ctx, popup_width, menu->state.anchor_ratio);
 }
 
 static void reach_context_menu_capsule_reset(void *capsule)

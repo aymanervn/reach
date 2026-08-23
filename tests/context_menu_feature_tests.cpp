@@ -1,5 +1,6 @@
 #include "reach/features/context_menu.h"
 
+#include <math.h>
 #include <stdio.h>
 
 static int failures;
@@ -11,6 +12,38 @@ static void expect_true(int condition, const char *message)
         ++failures;
         fprintf(stderr, "FAILED: %s\n", message);
     }
+}
+
+static void expect_near(float actual, float expected, float tolerance, const char *message)
+{
+    if (fabsf(actual - expected) > tolerance)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: %s (expected %.3f, got %.3f)\n", message, expected, actual);
+    }
+}
+
+struct test_text_measure
+{
+    float unit_width;
+};
+
+static reach_result measure_text(void *context, const uint16_t *text, float text_size,
+                                 int32_t text_weight, float *out_width)
+{
+    (void)text_size;
+    (void)text_weight;
+    if (context == nullptr || text == nullptr || out_width == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    size_t length = 0;
+    while (text[length] != 0)
+    {
+        ++length;
+    }
+    *out_width = (float)length * static_cast<test_text_measure *>(context)->unit_width;
+    return REACH_OK;
 }
 
 static int text_equals_ascii(const uint16_t *text, const char *expected)
@@ -96,9 +129,58 @@ static void test_window_list_remove(void)
     reach_context_menu_destroy(menu);
 }
 
+static void test_window_list_width_fits_and_clamps_measured_titles(void)
+{
+    reach_context_menu *menu = nullptr;
+    if (reach_context_menu_create(&menu) != REACH_OK || menu == nullptr)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: context menu creation for sizing\n");
+        return;
+    }
+
+    test_text_measure measure = {10.0f};
+    reach_context_menu_window_entry entry = {11, (const uint16_t *)L"Reach"};
+    reach_context_menu_open_context ctx = {};
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = 1;
+    ctx.anchor_button = {380.0f, 960.0f, 40.0f, 40.0f};
+    ctx.bar_edge_y = 1000.0f;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    ctx.window_entries = &entry;
+    ctx.window_entry_count = 1;
+    ctx.text_measure.context = &measure;
+    ctx.text_measure.measure = measure_text;
+
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 88.0f, 0.0001f,
+                "window list fits measured title and close-button chrome");
+
+    entry.title =
+        (const uint16_t *)L"A title long enough to exceed the configured preview maximum width";
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 320.0f, 0.0001f,
+                "window list clamps long titles to its maximum width");
+
+    ctx.monitor.width = 180.0f;
+    reach_context_menu_reanchor(menu, &ctx);
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 164.0f, 0.0001f,
+                "window list maximum respects monitor margins");
+
+    entry.title = (const uint16_t *)L"A";
+    ctx.monitor.width = 1920.0f;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 48.0f, 0.0001f,
+                "window list minimum fits one letter and close-button chrome");
+
+    reach_context_menu_destroy(menu);
+}
+
 int main(void)
 {
     test_power_commands_and_text();
     test_window_list_remove();
+    test_window_list_width_fits_and_clamps_measured_titles();
     return failures == 0 ? 0 : 1;
 }
