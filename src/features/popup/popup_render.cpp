@@ -113,12 +113,10 @@ float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, f
 
 static reach_render_command reach_popup_shape(const reach_popup_background_input *input)
 {
-    float border_thickness = reach_theme_border_thickness(input->theme, input->dpi_scale);
     reach_render_command shape = {};
-    shape.rect.x = border_thickness * 0.5f;
-    shape.rect.y = border_thickness * 0.5f;
-    shape.rect.width = input->bounds.width - border_thickness;
-    shape.rect.height = input->bounds.height - border_thickness;
+    shape.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
+    shape.rect.width = input->bounds.width;
+    shape.rect.height = input->bounds.height;
     shape.radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
     shape.notch_center_x = reach_popup_clamp_notch_center_scaled(
         input->notch_center_x, input->bounds.width, input->dpi_scale);
@@ -144,26 +142,8 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     }
 
     reach_render_command shape = reach_popup_shape(input);
-
-    reach_render_push_shadow(out_commands, &shape, &input->theme->popup_shadow, input->dpi_scale);
-
-    reach_render_command command = shape;
-    command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
-    command.color = input->theme->popup_background;
-    return reach_render_command_buffer_push(out_commands, &command);
-}
-
-reach_result reach_popup_push_border(const reach_popup_background_input *input,
-                                     reach_render_command_buffer *out_commands)
-{
-    if (!reach_popup_render_input_valid(input, out_commands))
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    reach_render_command command = reach_popup_shape(input);
-    command.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
-    command.color = input->theme->popup_border;
-    command.stroke_width = reach_theme_border_thickness(input->theme, input->dpi_scale);
-    return reach_render_command_buffer_push(out_commands, &command);
+    return reach_render_push_bordered_background(
+        out_commands, &shape, input->theme->popup_background, input->theme->popup_border,
+        reach_theme_border_thickness(input->theme, input->dpi_scale),
+        &input->theme->popup_shadow, input->dpi_scale);
 }

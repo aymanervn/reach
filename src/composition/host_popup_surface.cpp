@@ -40,12 +40,6 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
         }
     }
 
-    result = reach_popup_push_border(&popup, commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
     result = surface->renderer.ops.begin_frame(surface->renderer.backend);
     if (result != REACH_OK)
     {

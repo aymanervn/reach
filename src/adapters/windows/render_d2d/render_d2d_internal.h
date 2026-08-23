@@ -144,7 +144,7 @@ reach_result reach_d2d_create_notched_rounded_rect_geometry(ID2D1Factory *factor
                                                             const reach_render_command *command,
                                                             ID2D1PathGeometry **out_geometry);
 
-reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
+reach_result reach_d2d_fill_notched_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command);
 
 reach_result reach_d2d_draw_shadow(reach_render_backend *backend,
@@ -155,9 +155,7 @@ reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
                                           reach_rect_f32 content_rect);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target,
                                      const reach_render_command *command);
-reach_result reach_d2d_draw_notch_stroke(ID2D1RenderTarget *target,
-                                         const reach_render_command *command);
-reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
+reach_result reach_d2d_fill_rect_or_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command);
 reach_result reach_d2d_draw_arc_stroke(ID2D1RenderTarget *target,
                                        const reach_render_command *command);

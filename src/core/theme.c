@@ -2,7 +2,6 @@
 
 #define REACH_RGB8(r, g, b, a) {(r) / 255.0f, (g) / 255.0f, (b) / 255.0f, (a)}
 
-#define REACH_THEME_TRANSLUCENT_SURFACE_ALPHA 0.92f
 #define REACH_THEME_STAGE_BACKDROP_ALPHA 0.99f
 
 #define REACH_PURE_WHITE(a) REACH_RGB8(255, 255, 255, a)
@@ -70,9 +69,9 @@
 static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
 
-    .dock_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .dock_background = REACH_DARK_DEEP(1.0f),
     .top_bar_background = REACH_DARK_DEEP(1.0f),
-    .switcher_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .switcher_background = REACH_DARK_DEEP(1.0f),
     .bar_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .popup_background = REACH_DARK_BASE(1.0f),
     .popup_border = REACH_DARK_EDGE_ON_BASE(1.0f),
@@ -120,7 +119,7 @@ static const reach_theme reach_theme_dark = {
     .now_playing_title = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .now_playing_control_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
 
-    .launcher_search_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .launcher_search_background = REACH_DARK_DEEP(1.0f),
     .launcher_search_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .launcher_placeholder_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .launcher_selection_highlight = REACH_DARK_HIGH_CONTRAST_WHITE(0.25f),
@@ -157,7 +156,7 @@ static const reach_theme reach_theme_dark = {
     .stage_close_glyph = REACH_PURE_WHITE(0.80f),
     .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
 
-    .clipboard_background = REACH_DARK_DEEP(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .clipboard_background = REACH_DARK_DEEP(1.0f),
     .clipboard_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .clipboard_primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .clipboard_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
@@ -209,9 +208,9 @@ static const reach_theme reach_theme_dark = {
 static const reach_theme reach_theme_light = {
     .mode = REACH_THEME_MODE_LIGHT,
 
-    .dock_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .dock_background = REACH_LIGHT_BASE(1.0f),
     .top_bar_background = REACH_LIGHT_BASE(1.0f),
-    .switcher_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .switcher_background = REACH_LIGHT_BASE(1.0f),
     .bar_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_background = REACH_LIGHT_BASE(1.0f),
     .popup_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
@@ -259,7 +258,7 @@ static const reach_theme reach_theme_light = {
     .now_playing_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
     .now_playing_control_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
 
-    .launcher_search_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .launcher_search_background = REACH_LIGHT_BASE(1.0f),
     .launcher_search_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.95f),
     .launcher_placeholder_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .launcher_selection_highlight = REACH_LIGHT_ACCENT_BLUE(0.28f),
@@ -296,7 +295,7 @@ static const reach_theme reach_theme_light = {
     .stage_close_glyph = REACH_PURE_WHITE(0.80f),
     .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
 
-    .clipboard_background = REACH_LIGHT_BASE(REACH_THEME_TRANSLUCENT_SURFACE_ALPHA),
+    .clipboard_background = REACH_LIGHT_BASE(1.0f),
     .clipboard_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .clipboard_primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
     .clipboard_secondary_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),

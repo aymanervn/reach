@@ -86,18 +86,22 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         outer_height =
             (layout->search_results.y - layout->bounds.y) + layout->search_results.height;
     }
+    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
 
     reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
     command.rect.x = 0.0f;
     command.rect.y = 0.0f;
     command.rect.width = layout->bounds.width;
     command.rect.height = outer_height;
     command.radius = launcher_radius;
-    reach_render_push_shadow(out_commands, &command, &theme->popup_shadow, input->dpi_scale);
-
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.color = theme->launcher_search_background;
-    reach_render_command_buffer_push(out_commands, &command);
+    reach_result result = reach_render_push_bordered_background(
+        out_commands, &command, theme->launcher_search_background, theme->launcher_border,
+        border_thickness, &theme->popup_shadow, input->dpi_scale);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
 
     {
         reach_color transparent = {};
@@ -109,7 +113,6 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.rect.height = layout->search_text_input.height;
         command.color = transparent;
         command.radius = 0.0f;
-        command.stroke_width = 0.0f;
         command.text_size = reach_launcher_scale(input, 18.0f);
         command.text_weight = REACH_TEXT_WEIGHT_NORMAL;
         command.text_alignment = input->text_alignment_leading;
@@ -290,16 +293,6 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             reach_render_command_buffer_push(out_commands, &command);
         }
     }
-
-    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
-    command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = {border_thickness * 0.5f, border_thickness * 0.5f,
-                    layout->bounds.width - border_thickness, outer_height - border_thickness};
-    command.color = theme->launcher_border;
-    command.radius = launcher_radius;
-    command.stroke_width = border_thickness;
-    reach_render_command_buffer_push(out_commands, &command);
 
     return REACH_OK;
 }
