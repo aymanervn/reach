@@ -59,8 +59,7 @@ static void test_forced_hide_animates_and_suppresses_reveal(void)
     reach_bar_begin_reveal_session(&state);
     request.force_hidden = 1;
     request.hold_open = 1;
-    reach_bar_visibility_result hidden =
-        reach_bar_update_visibility(&state, &manager, 0, &request);
+    reach_bar_visibility_result hidden = reach_bar_update_visibility(&state, &manager, 0, &request);
 
     expect_true(state.target_hidden, "manipulation forces a bar hidden even without trespass");
     expect_true(hidden.reveal_transition_active,
@@ -69,8 +68,7 @@ static void test_forced_hide_animates_and_suppresses_reveal(void)
                 "forced hiding does not cut directly to the hidden position");
     expect_true(!hidden.reveal_edge_shown && !hidden.pointer_observation_active,
                 "forced hiding suppresses both reveal inputs");
-    expect_true(!state.reveal_session_active,
-                "forced hiding clears an active edge-reveal session");
+    expect_true(!state.reveal_session_active, "forced hiding clears an active edge-reveal session");
 }
 
 static void test_stage_force_show_precedes_manipulation(void)
@@ -84,8 +82,7 @@ static void test_stage_force_show_precedes_manipulation(void)
     request.force_shown = 1;
     request.force_hidden = 1;
 
-    reach_bar_visibility_result result =
-        reach_bar_update_visibility(&state, &manager, 0, &request);
+    reach_bar_visibility_result result = reach_bar_update_visibility(&state, &manager, 0, &request);
     expect_true(!state.target_hidden && result.visible,
                 "stage force-show takes precedence over manipulation suppression");
 }
@@ -107,10 +104,30 @@ static void test_pointer_observation_wakes_hover_exit(void)
                 "pointer observation includes the bar and edge bridge");
 
     request.pointer = {500, 200};
-    reach_bar_visibility_result left =
-        reach_bar_update_visibility(&state, &manager, 0, &request);
+    reach_bar_visibility_result left = reach_bar_update_visibility(&state, &manager, 0, &request);
     expect_true(state.target_hidden && left.reveal_transition_active,
                 "leaving the observed region starts the hide animation");
+}
+
+static void test_settled_bar_tracks_resized_shown_bounds(void)
+{
+    reach_animation_track track = {};
+    reach_animation_manager manager = {};
+    reach_animation_manager_init(&manager, &track, 1);
+    reach_bar_visibility_state state = {};
+    reach_bar_visibility_request request = base_request();
+    request.edge = REACH_BAR_EDGE_BOTTOM;
+    request.shown_bounds = {100.0f, 718.0f, 800.0f, 64.0f};
+
+    (void)reach_bar_update_visibility(&state, &manager, 0, &request);
+    request.shown_bounds = {100.0f, 750.0f, 800.0f, 32.0f};
+    reach_bar_visibility_result resized =
+        reach_bar_update_visibility(&state, &manager, 0, &request);
+
+    expect_true(resized.animated_bounds.y == 750.0f,
+                "a settled bar follows its resized shown position");
+    expect_true(reach_animation_manager_target(&manager, 0) == 750.0f,
+                "the settled position track adopts the resized shown target");
 }
 
 int main(void)
@@ -119,5 +136,6 @@ int main(void)
     test_forced_hide_animates_and_suppresses_reveal();
     test_stage_force_show_precedes_manipulation();
     test_pointer_observation_wakes_hover_exit();
+    test_settled_bar_tracks_resized_shown_bounds();
     return failures == 0 ? 0 : 1;
 }

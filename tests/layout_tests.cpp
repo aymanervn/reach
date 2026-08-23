@@ -1,5 +1,7 @@
 #include "reach/features/common/layout.h"
+#include "reach/core/ui_layout.h"
 
+#include <math.h>
 #include <stdio.h>
 
 static int failures;
@@ -20,6 +22,40 @@ static void expect_int(int32_t actual, int32_t expected, const char *message)
         ++failures;
         fprintf(stderr, "FAILED: %s (expected %d, got %d)\n", message, (int)expected, (int)actual);
     }
+}
+
+static void expect_near(float actual, float expected, float tolerance, const char *message)
+{
+    if (fabsf(actual - expected) > tolerance)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: %s (expected %.3f, got %.3f)\n", message, expected, actual);
+    }
+}
+
+static void test_dock_reserves_side_safe_margins(void)
+{
+    reach_dock_model dock = {};
+    reach_dock_model_defaults(&dock);
+    reach_ui_layout_input input = {};
+    input.work_area = {100.0f, 50.0f, 1000.0f, 700.0f};
+    input.dpi_scale = 1.5f;
+    reach_dock_layout layout = {};
+
+    expect_true(reach_dock_layout_compute(&dock, &input, &layout) == REACH_OK,
+                "Dock placement accepts a valid work area");
+    expect_true(REACH_DOCK_SIDE_MARGIN_DP > REACH_DOCK_BOTTOM_MARGIN_DP,
+                "Dock side safe margins exceed its bottom margin");
+    expect_near(layout.available_width, 904.0f, 0.001f,
+                "Dock fitting width excludes both DPI-scaled side margins");
+    expect_near(layout.bounds.y + layout.bounds.height, 723.0f, 0.001f,
+                "native Dock bounds preserve the DPI-scaled bottom margin");
+
+    input.work_area.width = 40.0f;
+    expect_true(reach_dock_layout_compute(&dock, &input, &layout) == REACH_OK,
+                "Dock placement accepts a work area narrower than both side margins");
+    expect_near(layout.available_width, 1.0f, 0.001f,
+                "an extremely narrow work area retains a positive fitting width");
 }
 
 static const reach_layout_entry *entry_for(const reach_layout_plan *plan,
@@ -247,6 +283,7 @@ static void test_registration_limits(void)
 
 int main(void)
 {
+    test_dock_reserves_side_safe_margins();
     test_resolve_orders_descending_by_layer();
     test_override_precedence();
     test_set_condition_order_independence();

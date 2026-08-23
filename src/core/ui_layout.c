@@ -33,15 +33,21 @@ reach_result reach_dock_layout_compute(const reach_dock_model *dock,
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     float dock_height = reach_scale(dock->height, scale);
     float dock_x = input->work_area.x + input->work_area.width * 0.5f;
-    float dock_y =
-        input->work_area.y + input->work_area.height - dock_height - reach_scale(18.0f, scale);
+    float dock_y = input->work_area.y + input->work_area.height - dock_height -
+                   reach_scale(REACH_DOCK_BOTTOM_MARGIN_DP, scale);
+    float available_width =
+        input->work_area.width - reach_scale(REACH_DOCK_SIDE_MARGIN_DP * 2.0f, scale);
+    if (available_width < 1.0f)
+    {
+        available_width = input->work_area.width > 0.0f ? 1.0f : 0.0f;
+    }
 
     out_layout->bounds.x = dock_x;
     out_layout->bounds.y = dock_y;
     out_layout->bounds.width = 0.0f;
     out_layout->bounds.height = dock_height;
     out_layout->app_slot_count = 0;
-    out_layout->available_width = input->work_area.width;
+    out_layout->available_width = available_width;
     out_layout->content_scale = 1.0f;
 
     return REACH_OK;

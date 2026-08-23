@@ -1,5 +1,7 @@
 #include "reach/features/common/bar_visibility.h"
 
+#include <math.h>
+
 typedef enum reach_bar_reveal_edge_span
 {
     REACH_BAR_REVEAL_EDGE_THIN = 0,
@@ -143,7 +145,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     }
 
     float hidden_y = reach_bar_hidden_position(request->edge, request->shown_bounds,
-                                              request->monitor_bounds, request->shadow_clearance);
+                                               request->monitor_bounds, request->shadow_clearance);
     reach_rect_f32 current_bounds = request->shown_bounds;
     if (state->animation_initialized)
     {
@@ -218,6 +220,11 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
             request->reveal_seconds > 0.0f ? (double)request->reveal_seconds : 0.25;
         reach_animation_manager_animate_to(manager, y_track, target_y, reveal_seconds,
                                            REACH_EASING_EASE_IN_OUT);
+    }
+    else if (!reach_animation_manager_active(manager, y_track) &&
+             fabsf(reach_animation_manager_target(manager, y_track) - target_y) >= 0.01f)
+    {
+        reach_animation_manager_set(manager, y_track, target_y);
     }
 
     result.reveal_transition_active = reach_animation_manager_active(manager, y_track);
