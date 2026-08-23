@@ -58,11 +58,6 @@ struct reach_top_bar_metrics
     double bluetooth_absence_grace_seconds;
 
     float battery_width;
-    float battery_height;
-    float battery_cap_width;
-    float battery_cap_height;
-    float battery_cap_gap;
-    float battery_fill_inset;
     float battery_low_percent;
 
     float click_feedback_min_opacity;
@@ -124,12 +119,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.power_glyph_scale = 0.50f;
     metrics.bluetooth_absence_grace_seconds = 2.0;
 
-    metrics.battery_width = 22.0f;
-    metrics.battery_height = 11.0f;
-    metrics.battery_cap_width = 2.0f;
-    metrics.battery_cap_height = 5.0f;
-    metrics.battery_cap_gap = 1.5f;
-    metrics.battery_fill_inset = 1.75f;
+    metrics.battery_width = 46.0f;
     metrics.battery_low_percent = 15.0f;
 
     metrics.click_feedback_min_opacity = 0.001f;

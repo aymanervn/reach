@@ -32,6 +32,7 @@ typedef struct reach_top_bar_render_input
     int32_t battery_valid;
     int32_t battery_percent;
     int32_t battery_saver_on;
+    int32_t battery_charging;
     float power_hover;
     size_t click_feedback_index;
     float click_feedback_opacity;
@@ -338,28 +339,15 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
         percent = 100;
     }
 
-    float shell_radius = shell.height * 0.35f;
-    reach_top_bar_push_rect(commands, shell, theme->bar_battery_shell, shell_radius);
-
-    reach_rect_f32 cap = input->layout->battery_cap;
-    reach_top_bar_push_rect(commands, cap, theme->bar_battery_shell, cap.height * 0.35f);
-
-    float inset = metrics.battery_fill_inset * input->dpi_scale;
-    float track_width = shell.width - inset * 2.0f;
-    float fill_height = shell.height - inset * 2.0f;
-    if (track_width <= 0.0f || fill_height <= 0.0f)
-    {
-        return;
-    }
-
-    float fill_width = track_width * (float)percent / 100.0f;
-    if (fill_width < fill_height)
-    {
-        fill_width = fill_height;
-    }
+    float shell_radius = shell.height * 0.5f;
+    reach_top_bar_push_rect(commands, shell, theme->bar_button_background, shell_radius);
 
     reach_color fill_color = theme->bar_battery_fill;
-    if ((float)percent <= metrics.battery_low_percent)
+    if (input->battery_charging)
+    {
+        fill_color = theme->bar_battery_charging;
+    }
+    else if ((float)percent <= metrics.battery_low_percent)
     {
         fill_color = theme->bar_battery_low;
     }
@@ -367,10 +355,36 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
     {
         fill_color = theme->bar_battery_saver;
     }
-    reach_top_bar_push_rect(commands,
-                            reach_top_bar_rect(shell.x + inset, shell.y + inset, fill_width,
-                                               fill_height),
-                            fill_color, fill_height * 0.5f);
+
+    float fill_width = shell.width * (float)percent / 100.0f;
+    if (fill_width > 0.0f)
+    {
+        reach_render_command fill = {};
+        fill.type = REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT;
+        fill.rect = reach_top_bar_rect(shell.x, shell.y, fill_width, shell.height);
+        fill.clip_rect = shell;
+        fill.radius = fill_width < shell.height ? fill_width * 0.5f : shell_radius;
+        fill.clip_radius = shell_radius;
+        fill.color = fill_color;
+        reach_render_command_buffer_push(commands, &fill);
+    }
+
+    uint16_t percentage[5] = {};
+    size_t digit = 0;
+    if (percent == 100)
+    {
+        percentage[digit++] = '1';
+    }
+    if (percent >= 10)
+    {
+        percentage[digit++] = (uint16_t)('0' + (percent / 10) % 10);
+    }
+    percentage[digit++] = (uint16_t)('0' + percent % 10);
+    percentage[digit] = '%';
+    reach_top_bar_push_text(commands, shell, percentage,
+                            metrics.language_text_size * input->dpi_scale,
+                            metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
+                            theme->bar_text_primary);
 
     reach_top_bar_push_button_feedback(input, commands, input->layout->battery_button,
                                        REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON);
@@ -484,6 +498,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.battery_percent = state->battery_percent;
     input.battery_saver_on = state->battery_saver_pending ? state->battery_saver_pending_enabled
                                                           : state->battery_saver_on;
+    input.battery_charging = state->battery_charging;
     input.power_hover =
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
     input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);

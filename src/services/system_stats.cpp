@@ -56,7 +56,8 @@ static int32_t reach_system_stats_snapshot_differs(const reach_system_stats_snap
            a->network_sent_bytes_per_second != b->network_sent_bytes_per_second ||
            a->power_valid != b->power_valid || a->power.has_battery != b->power.has_battery ||
            a->power.battery_percent != b->power.battery_percent ||
-           a->power.battery_saver_on != b->power.battery_saver_on;
+           a->power.battery_saver_on != b->power.battery_saver_on ||
+           a->power.battery_charging != b->power.battery_charging;
 }
 
 static void reach_system_stats_thread_main(reach_system_stats *service)

@@ -45,6 +45,7 @@ extern "C"
         int32_t has_battery;
         int32_t battery_percent;
         int32_t battery_saver_on;
+        int32_t battery_charging;
     } reach_power_state;
 
     typedef struct reach_brightness_state
