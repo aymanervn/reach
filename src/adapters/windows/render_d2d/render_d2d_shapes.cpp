@@ -247,7 +247,7 @@ reach_result reach_d2d_create_notched_rounded_rect_geometry(ID2D1Factory *factor
     return REACH_OK;
 }
 
-reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
+reach_result reach_d2d_fill_notched_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command)
 {
     if (target == nullptr || command == nullptr)
@@ -277,14 +277,7 @@ reach_result reach_d2d_draw_notched_rounded_rect(ID2D1RenderTarget *target,
 
     if (SUCCEEDED(hr))
     {
-        if (command->stroke_width > 0.0f)
-        {
-            target->DrawGeometry(geometry, brush, command->stroke_width);
-        }
-        else
-        {
-            target->FillGeometry(geometry, brush);
-        }
+        target->FillGeometry(geometry, brush);
     }
 
     if (brush != nullptr)
@@ -361,42 +354,7 @@ reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target, const reach_rend
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-reach_result reach_d2d_draw_notch_stroke(ID2D1RenderTarget *target,
-                                         const reach_render_command *command)
-{
-    if (target == nullptr || command == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    ID2D1SolidColorBrush *brush = nullptr;
-    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
-
-    if (FAILED(hr) || brush == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
-    float stroke_width = command->stroke_width > 0.0f ? command->stroke_width : 1.0f;
-
-    float x = command->rect.x;
-    float y = command->rect.y;
-    float w = command->rect.width;
-    float h = command->rect.height;
-
-    D2D1_POINT_2F left = D2D1::Point2F(x, y);
-    D2D1_POINT_2F tip = D2D1::Point2F(x + w * 0.5f, y + h);
-    D2D1_POINT_2F right = D2D1::Point2F(x + w, y);
-
-    target->DrawLine(left, tip, brush, stroke_width);
-    target->DrawLine(tip, right, brush, stroke_width);
-
-    brush->Release();
-
-    return REACH_OK;
-}
-
-reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
+reach_result reach_d2d_fill_rect_or_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command)
 {
     if (target == nullptr || command == nullptr)
@@ -415,8 +373,6 @@ reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
     D2D1_RECT_F bounds =
         D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width,
                     command->rect.y + command->rect.height);
-    float stroke_width = command->stroke_width > 0.0f ? command->stroke_width : 1.0f;
-    int32_t stroke = command->type == REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
 
     if (command->corner_mask != 0 && command->corner_mask != REACH_RENDER_CORNER_ALL)
     {
@@ -425,14 +381,7 @@ reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
                                          &geometry);
         if (geometry != nullptr)
         {
-            if (stroke)
-            {
-                target->DrawGeometry(geometry, brush, stroke_width);
-            }
-            else
-            {
-                target->FillGeometry(geometry, brush);
-            }
+            target->FillGeometry(geometry, brush);
             geometry->Release();
             brush->Release();
             return REACH_OK;
@@ -440,14 +389,7 @@ reach_result reach_d2d_draw_rect_or_rounded_rect(ID2D1RenderTarget *target,
     }
 
     D2D1_ROUNDED_RECT rect = D2D1::RoundedRect(bounds, command->radius, command->radius);
-    if (stroke)
-    {
-        target->DrawRoundedRectangle(rect, brush, stroke_width);
-    }
-    else
-    {
-        target->FillRoundedRectangle(rect, brush);
-    }
+    target->FillRoundedRectangle(rect, brush);
 
     brush->Release();
 

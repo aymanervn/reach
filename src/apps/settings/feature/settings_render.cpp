@@ -22,16 +22,16 @@ static void push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static void push_stroke(reach_render_command_buffer *commands, reach_rect_f32 rect, float radius,
-                        float width, reach_color color)
+static void push_bordered_background(reach_render_command_buffer *commands, reach_rect_f32 rect,
+                                     float radius, float width, reach_color background,
+                                     reach_color border)
 {
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = rect;
-    command.radius = radius;
-    command.stroke_width = width;
-    command.color = color;
-    (void)reach_render_command_buffer_push(commands, &command);
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = rect;
+    shape.radius = radius;
+    (void)reach_render_push_bordered_background(commands, &shape, background, border, width,
+                                                nullptr, 1.0f);
 }
 
 static void push_masked_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
@@ -157,7 +157,7 @@ static reach_ui_selection_item_style settings_pill_style(const reach_settings_re
     style.background = input->theme->settings_pill_background;
     style.accent = accent;
     style.text = input->theme->settings_secondary_text;
-    style.stroke_width = scale_value(input, 1.0f);
+    style.border_width = scale_value(input, 1.0f);
     style.text_size = scale_value(input, 11.0f);
     style.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     return style;
@@ -187,6 +187,13 @@ static void render_account_page(const reach_settings_render_input *input,
               input->theme->settings_card_background);
 
     const reach_rect_f32 avatar = layout->account_avatar;
+    reach_rect_f32 ring = {avatar.x - scale_value(input, 3.0f), avatar.y - scale_value(input, 3.0f),
+                           avatar.width + scale_value(input, 6.0f),
+                           avatar.height + scale_value(input, 6.0f)};
+    reach_color ring_color = reach_theme_color_mix(input->theme->settings_card_background, accent,
+                                                   0.55f);
+    push_bordered_background(commands, ring, ring.width * 0.5f, scale_value(input, 1.5f),
+                             input->theme->settings_card_background, ring_color);
     if (model->account_picture != 0)
     {
         push_avatar_image(commands, avatar, model->account_picture);
@@ -198,11 +205,6 @@ static void render_account_page(const reach_settings_render_input *input,
         push_text(commands, avatar, initial, avatar.width * 0.42f, REACH_TEXT_WEIGHT_DEMIBOLD,
                   REACH_TEXT_ALIGNMENT_CENTER, accent, 0);
     }
-    reach_rect_f32 ring = {avatar.x - scale_value(input, 3.0f), avatar.y - scale_value(input, 3.0f),
-                           avatar.width + scale_value(input, 6.0f),
-                           avatar.height + scale_value(input, 6.0f)};
-    push_stroke(commands, ring, ring.width * 0.5f, scale_value(input, 1.5f),
-                color_with_alpha(accent, 0.55f));
 
     const uint16_t *display_name = model->account_display_name[0] != 0
                                        ? model->account_display_name
@@ -835,13 +837,15 @@ static void render_update_page(const reach_settings_render_input *input,
                       REACH_VECTOR_ICON_CLOSE, 0.06f);
         else
         {
-            push_stroke(commands, checkbox, scale_value(input, input->theme->radius_small),
-                        scale_value(input, 1.5f),
-                        update->selected ? accent : input->theme->settings_secondary_text);
+            reach_color checkbox_background = update->selected ? accent : row_color;
+            reach_color checkbox_border =
+                update->selected ? accent : input->theme->settings_secondary_text;
+            push_bordered_background(commands, checkbox,
+                                     scale_value(input, input->theme->radius_small),
+                                     scale_value(input, 1.5f), checkbox_background,
+                                     checkbox_border);
             if (update->selected)
             {
-                push_rect(commands, checkbox, scale_value(input, input->theme->radius_small),
-                          accent);
                 push_icon(commands, checkbox, input->theme->inverse_text, REACH_VECTOR_ICON_CHECK,
                           0.18f);
             }

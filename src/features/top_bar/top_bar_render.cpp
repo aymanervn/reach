@@ -88,41 +88,19 @@ static reach_rect_f32 reach_top_bar_rect_union(reach_rect_f32 left, reach_rect_f
     return reach_top_bar_rect(left.x, left.y, right.x + right.width - left.x, left.height);
 }
 
-static void reach_top_bar_push_pill_background(const reach_theme *theme,
-                                               reach_render_command_buffer *commands,
-                                               reach_rect_f32 pill, float dpi_scale)
+static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
+                                                       reach_render_command_buffer *commands,
+                                                       reach_rect_f32 pill, float dpi_scale)
 {
     float radius = pill.height * 0.5f;
 
     reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = pill;
     shape.radius = radius;
-    reach_render_push_shadow(commands, &shape, &theme->bar_shadow, dpi_scale);
-
-    reach_top_bar_push_rect(commands, pill, theme->top_bar_background, radius);
-}
-
-static void reach_top_bar_push_pill_border(const reach_theme *theme,
-                                           reach_render_command_buffer *commands,
-                                           reach_rect_f32 pill, float dpi_scale)
-{
-    float radius = pill.height * 0.5f;
-    float border_thickness = reach_theme_border_thickness(theme, dpi_scale);
-
-    if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
-    {
-        return;
-    }
-
-    reach_render_command border = {};
-    border.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    border.rect =
-        reach_top_bar_rect(pill.x + border_thickness * 0.5f, pill.y + border_thickness * 0.5f,
-                           pill.width - border_thickness, pill.height - border_thickness);
-    border.color = theme->bar_border;
-    border.radius = radius;
-    border.stroke_width = border_thickness;
-    reach_render_command_buffer_push(commands, &border);
+    return reach_render_push_bordered_background(
+        commands, &shape, theme->top_bar_background, theme->bar_border,
+        reach_theme_border_thickness(theme, dpi_scale), &theme->bar_shadow, dpi_scale);
 }
 
 static reach_rect_f32 reach_top_bar_render_pill(const reach_top_bar_layout *layout, size_t index)
@@ -486,6 +464,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     }
 
     reach_render_command_buffer_clear(out_commands);
+    reach_result result = REACH_OK;
 
     const reach_top_bar_state *state = &top_bar->state;
     const reach_top_bar_layout *layout = &state->layout;
@@ -496,8 +475,12 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
         {
             continue;
         }
-        reach_top_bar_push_pill_background(ctx->theme, out_commands,
-                                           reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
+        result = reach_top_bar_push_pill_background(
+            ctx->theme, out_commands, reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
     }
 
     reach_top_bar_render_input input = {};
@@ -557,21 +540,12 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;
     now_playing.dpi_scale = ctx->dpi_scale;
-    reach_result result = reach_top_bar_now_playing_append_render_commands(
+    result = reach_top_bar_now_playing_append_render_commands(
         reach_top_bar_now_playing_subfeature(top_bar), &now_playing, out_commands);
     if (result != REACH_OK)
     {
         return result;
     }
 
-    for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
-    {
-        if (!layout->pill_visible[index] || index == REACH_TOP_BAR_PILL_TRAY)
-        {
-            continue;
-        }
-        reach_top_bar_push_pill_border(ctx->theme, out_commands,
-                                       reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
-    }
     return REACH_OK;
 }

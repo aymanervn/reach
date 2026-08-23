@@ -205,41 +205,21 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     }
 }
 
-static void reach_dock_push_background(const reach_dock_render_input *input,
-                                       reach_render_command_buffer *commands, float dock_radius)
+static reach_result reach_dock_push_background(const reach_dock_render_input *input,
+                                               reach_render_command_buffer *commands,
+                                               float dock_radius)
 {
     const reach_theme *theme = input->theme;
     const reach_dock_layout *layout = input->layout;
 
     reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height);
     shape.radius = dock_radius;
-    reach_render_push_shadow(commands, &shape, &theme->bar_shadow, input->dpi_scale);
-
-    reach_dock_push_rect(commands, shape.rect, theme->dock_background, dock_radius);
-}
-
-static void reach_dock_push_border(const reach_dock_render_input *input,
-                                   reach_render_command_buffer *commands, float dock_radius)
-{
-    const reach_theme *theme = input->theme;
-    const reach_dock_layout *layout = input->layout;
-    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
-
-    if (border_thickness <= 0.0f || theme->bar_border.a <= 0.0f)
-    {
-        return;
-    }
-
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = reach_dock_rect(border_thickness * 0.5f, border_thickness * 0.5f,
-                                   layout->bounds.width - border_thickness,
-                                   layout->bounds.height - border_thickness);
-    command.color = theme->bar_border;
-    command.radius = dock_radius;
-    command.stroke_width = border_thickness;
-    reach_render_command_buffer_push(commands, &command);
+    return reach_render_push_bordered_background(
+        commands, &shape, theme->dock_background, theme->bar_border,
+        reach_theme_border_thickness(theme, input->dpi_scale), &theme->bar_shadow,
+        input->dpi_scale);
 }
 
 static void reach_dock_push_trigger_button(const reach_dock_render_input *input,
@@ -278,7 +258,11 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     float icon_box_size = reach_theme_icon_box_size(theme, layout->bounds.height);
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
 
-    reach_dock_push_background(input, out_commands, dock_radius);
+    reach_result result = reach_dock_push_background(input, out_commands, dock_radius);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
     reach_dock_push_trigger_button(input, out_commands, icon_box_size);
 
     for (size_t index = 0; index < layout->app_slot_count; ++index)
@@ -294,8 +278,6 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
         reach_dock_push_item(input, out_commands, input->dragged_render_index, input->dragged_box_x,
                              1, icon_box_size, icon_box_radius);
     }
-
-    reach_dock_push_border(input, out_commands, dock_radius);
 
     return REACH_OK;
 }

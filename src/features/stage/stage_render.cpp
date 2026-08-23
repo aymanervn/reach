@@ -18,6 +18,45 @@ static float reach_stage_scaled(const reach_stage_render_context *ctx, float val
     return value * scale;
 }
 
+static reach_result reach_stage_push_tile_highlight(reach_render_command_buffer *commands,
+                                                    reach_rect_f32 tile, float width,
+                                                    reach_color color)
+{
+    if (commands == nullptr || width <= 0.0f)
+    {
+        return REACH_OK;
+    }
+
+    float half = width * 0.5f;
+    float outer_left = tile.x - width - half;
+    float outer_top = tile.y - width - half;
+    float inner_top = tile.y - half;
+    float inner_right = tile.x + tile.width + half;
+    float inner_bottom = tile.y + tile.height + half;
+    float outer_width = tile.width + width * 3.0f;
+    float inner_height = tile.height + width;
+    reach_rect_f32 strips[] = {
+        {outer_left, outer_top, outer_width, width},
+        {outer_left, inner_bottom, outer_width, width},
+        {outer_left, inner_top, width, inner_height},
+        {inner_right, inner_top, width, inner_height},
+    };
+
+    for (size_t index = 0; index < sizeof(strips) / sizeof(strips[0]); ++index)
+    {
+        reach_render_command command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect = strips[index];
+        command.color = color;
+        reach_result result = reach_render_command_buffer_push(commands, &command);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
+    return REACH_OK;
+}
+
 static reach_result reach_stage_push_tile_placeholder(const reach_stage_render_context *ctx,
                                                       const reach_stage_tile *tile,
                                                       reach_rect_f32 rect, float alpha,
@@ -199,16 +238,9 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
 
         if (state->has_hover && state->hover_index == index)
         {
-            reach_render_command highlight = {};
-            highlight.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-            highlight.rect.x = rect.x - border;
-            highlight.rect.y = rect.y - border;
-            highlight.rect.width = rect.width + border * 2.0f;
-            highlight.rect.height = rect.height + border * 2.0f;
-            highlight.stroke_width = border;
-            highlight.color = ctx->theme->stage_tile_highlight;
-            highlight.color.a *= alpha;
-            result = reach_render_command_buffer_push(out_commands, &highlight);
+            reach_color highlight = ctx->theme->stage_tile_highlight;
+            highlight.a *= alpha;
+            result = reach_stage_push_tile_highlight(out_commands, rect, border, highlight);
             if (result != REACH_OK)
             {
                 return result;

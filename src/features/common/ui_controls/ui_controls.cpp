@@ -13,18 +13,6 @@ static void reach_ui_push_rect(reach_render_command_buffer *commands, reach_rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static void reach_ui_push_stroke(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                                 float radius, float width, reach_color color)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = rect;
-    command.radius = radius;
-    command.stroke_width = width;
-    command.color = color;
-    (void)reach_render_command_buffer_push(commands, &command);
-}
-
 static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                const uint16_t *text, float size, int32_t weight,
                                int32_t alignment, reach_color color)
@@ -80,14 +68,21 @@ void reach_ui_selection_item_backdrop_render(reach_render_command_buffer *comman
         return;
     }
     float radius = bounds.height * 0.5f;
-    reach_ui_push_rect(commands, bounds, radius, style->background);
-    if (selection > 0.0f)
+    if (selection <= 0.0f || style->border_width <= 0.0f)
     {
-        reach_ui_push_rect(commands, bounds, radius,
-                           reach_theme_color_alpha(style->accent, 0.22f * selection));
-        reach_ui_push_stroke(commands, bounds, radius, style->stroke_width,
-                             reach_theme_color_alpha(style->accent, 0.85f * selection));
+        reach_ui_push_rect(commands, bounds, radius, style->background);
+        return;
     }
+
+    reach_color background = reach_theme_color_mix(style->background, style->accent,
+                                                   0.22f * selection);
+    reach_color border = reach_theme_color_mix(background, style->accent, 0.85f * selection);
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = bounds;
+    shape.radius = radius;
+    (void)reach_render_push_bordered_background(commands, &shape, background, border,
+                                                style->border_width, nullptr, 1.0f);
 }
 
 void reach_ui_selection_item_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
@@ -157,7 +152,6 @@ void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f
     command.rect = box;
     command.color = transparent;
     command.radius = 0.0f;
-    command.stroke_width = 0.0f;
     command.text_size = style->text_size;
     command.text_weight = style->text_weight;
     command.text_alignment = state->text_alignment;

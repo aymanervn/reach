@@ -18,10 +18,8 @@ extern "C"
         REACH_RENDER_COMMAND_TEXT = 2,
         REACH_RENDER_COMMAND_ICON = 3,
         REACH_RENDER_COMMAND_BLUR_BACKGROUND = 4,
-        REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE = 5,
         REACH_RENDER_COMMAND_RESERVED_6 = 6,
         REACH_RENDER_COMMAND_TRIANGLE = 7,
-        REACH_RENDER_COMMAND_NOTCH_STROKE = 8,
         REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT = 9,
         REACH_RENDER_COMMAND_VECTOR_ICON = 10,
         REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11,
@@ -143,7 +141,6 @@ extern "C"
         uint16_t text[260];
 
         reach_color text_color;
-        reach_color border_color;
         reach_color placeholder_color;
         reach_color selection_color;
         int32_t caret_index;
@@ -172,6 +169,10 @@ extern "C"
     reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                           const reach_render_command *shape,
                                           const reach_shadow *shadow, float dpi_scale);
+    reach_result reach_render_push_bordered_background(
+        reach_render_command_buffer *buffer, const reach_render_command *shape,
+        reach_color background_color, reach_color border_color, float border_thickness,
+        const reach_shadow *shadow, float dpi_scale);
     void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buffer);
 
 #ifdef __cplusplus

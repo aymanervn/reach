@@ -430,25 +430,6 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
         }
     }
 
-    if (command->stroke_width > 0.0f && command->border_color.a > 0.0f)
-    {
-        ID2D1SolidColorBrush *border = nullptr;
-        if (SUCCEEDED(
-                target->CreateSolidColorBrush(reach_d2d_color(command->border_color), &border)))
-        {
-            if (radius > 0.0f)
-            {
-                target->DrawRoundedRectangle(D2D1::RoundedRect(bounds, radius, radius), border,
-                                             command->stroke_width);
-            }
-            else
-            {
-                target->DrawRectangle(bounds, border, command->stroke_width);
-            }
-            border->Release();
-        }
-    }
-
     const wchar_t *text = reinterpret_cast<const wchar_t *>(command->text);
     const wchar_t *placeholder = reinterpret_cast<const wchar_t *>(command->placeholder);
     const UINT32 text_length = static_cast<UINT32>(wcslen(text));

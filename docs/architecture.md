@@ -22,6 +22,12 @@ the standard library. Surface background colors are semantic theme tokens rather
 value-based aliases: Dock, top bar and switcher each read their named background, while
 all popup capsules share the popup background contract.
 
+Rounded border-bearing shapes use `reach_render_push_bordered_background`: it pixel-aligns
+the outer shape, emits an opaque border-color fill, then emits an opaque background fill
+inset by the border thickness. Features append content after that pair. Normal primitive
+antialiasing stays enabled, and there is no general rounded-rectangle stroke render command.
+Line, arc, and intrinsic vector strokes remain separate drawing semantics.
+
 ## protocol
 
 Cross-process contracts — Reach Service messages, shared-memory layout, kernel object

@@ -38,17 +38,12 @@ static reach_result reach_d2d_execute_command(reach_render_backend *backend,
 
     if (command->type == REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT)
     {
-        return reach_d2d_draw_notched_rounded_rect(target, command);
+        return reach_d2d_fill_notched_rounded_rect(target, command);
     }
 
     if (command->type == REACH_RENDER_COMMAND_TRIANGLE)
     {
         return reach_d2d_draw_triangle(target, command);
-    }
-
-    if (command->type == REACH_RENDER_COMMAND_NOTCH_STROKE)
-    {
-        return reach_d2d_draw_notch_stroke(target, command);
     }
 
     if (command->type == REACH_RENDER_COMMAND_ICON_TINT)
@@ -62,10 +57,9 @@ static reach_result reach_d2d_execute_command(reach_render_backend *backend,
         return REACH_OK;
     }
 
-    if (command->type == REACH_RENDER_COMMAND_RECT ||
-        command->type == REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE)
+    if (command->type == REACH_RENDER_COMMAND_RECT)
     {
-        return reach_d2d_draw_rect_or_rounded_rect(target, command);
+        return reach_d2d_fill_rect_or_rounded_rect(target, command);
     }
 
     if (command->type == REACH_RENDER_COMMAND_ARC_STROKE)
