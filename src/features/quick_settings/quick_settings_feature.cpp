@@ -1571,7 +1571,6 @@ int32_t reach_quick_settings_update_open_animation(reach_quick_settings *quick_s
     {
         reach_popup_placement animated = reach_quick_settings_placement(
             quick_settings, ctx, reach_quick_settings_height_animation_value(quick_settings));
-        animated.bounds.y = floorf(animated.bounds.y + 0.5f);
 
         state->bounds = animated.bounds;
 
