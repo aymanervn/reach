@@ -461,10 +461,12 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     reach_render_command_buffer_clear(commands);
 
     reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
     command.rect = {0.0f, 0.0f, layout->bounds.width, layout->bounds.height};
-    command.color = theme->clipboard_background;
     command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
+    reach_render_push_shadow(commands, &command, &theme->popup_shadow, input->dpi_scale);
+
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.color = theme->clipboard_background;
     reach_render_command_buffer_push(commands, &command);
 
     command = {};
