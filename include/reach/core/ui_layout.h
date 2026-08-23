@@ -3,7 +3,7 @@
 
 #include "reach/core/ui_state.h"
 
-#define REACH_DOCK_BOTTOM_MARGIN_DP 18.0f
+#define REACH_DOCK_BOTTOM_MARGIN_DP 12.0f
 #define REACH_DOCK_SIDE_MARGIN_DP 32.0f
 
 #ifdef __cplusplus
