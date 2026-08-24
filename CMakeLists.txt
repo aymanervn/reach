@@ -653,6 +653,18 @@ target_link_libraries(reach_layout_tests PRIVATE
     reach_features
 )
 
+add_executable(reach_host_layout_tests
+    tests/host_layout_tests.cpp
+)
+
+reach_configure_common(reach_host_layout_tests)
+reach_configure_windows(reach_host_layout_tests)
+target_include_directories(reach_host_layout_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/composition
+)
+target_compile_features(reach_host_layout_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_host_layout_tests PRIVATE reach_composition)
+
 add_executable(reach_quick_settings_feature_tests
     tests/quick_settings_feature_tests.cpp
 )
@@ -852,6 +864,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
 
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
     add_test(NAME reach_layout_tests COMMAND reach_layout_tests)
+    add_test(NAME reach_host_layout_tests COMMAND reach_host_layout_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_battery_feature_tests COMMAND reach_battery_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
