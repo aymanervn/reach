@@ -360,7 +360,11 @@ static void render_power_page(const reach_settings_render_input *input,
             if (option == REACH_SETTINGS_POWER_CUSTOM_OPTION)
             {
                 const reach_rect_f32 slot = layout->power_options[timer][option];
-                reach_ui_selection_item_backdrop_render(commands, slot, &pill_style, selection);
+                reach_ui_selection_item_style custom_style = pill_style;
+                custom_style.background = reach_theme_color_mix(
+                    input->theme->settings_power_custom_time_background,
+                    input->theme->settings_pill_background, selection);
+                reach_ui_selection_item_backdrop_render(commands, slot, &custom_style, selection);
                 const reach_rect_f32 hours =
                     layout->power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_HOURS];
                 const reach_rect_f32 minutes =
@@ -401,7 +405,7 @@ static void render_power_page(const reach_settings_render_input *input,
                     state.suffix_color =
                         color_with_alpha(input->theme->settings_secondary_text, 0.65f);
                     reach_ui_textbox_render(commands, layout->power_custom_fields[timer][field],
-                                            &pill_style, selection, &state);
+                                            &custom_style, selection, &state);
                 }
             }
             else

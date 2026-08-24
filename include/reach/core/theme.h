@@ -162,6 +162,7 @@ extern "C"
         reach_color settings_secondary_text;
         reach_color settings_card_background;
         reach_color settings_pill_background;
+        reach_color settings_power_custom_time_background;
         reach_color settings_input_background;
         reach_color settings_divider;
         reach_color settings_toggle_track_off;
