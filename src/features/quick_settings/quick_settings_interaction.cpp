@@ -91,44 +91,49 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
         return result;
     }
 
-    if (reach_quick_settings_point_in_rect(layout->output_device_button, x, y) ||
-        reach_quick_settings_point_in_rect(layout->output_devices_title_chevron, x, y))
+    if (reach_quick_settings_point_in_rect(layout->output_device_button, x, y))
     {
         result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON;
         return result;
     }
 
-    for (size_t index = 0; index < layout->output_device_row_count; ++index)
+    if (reach_quick_settings_point_in_rect(layout->output_devices_clip, x, y))
     {
-        if (reach_quick_settings_point_in_rect(layout->output_device_rows[index].bounds, x, y))
+        for (size_t index = 0; index < layout->output_device_row_count; ++index)
         {
-            result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW;
-            result.output_device_index = index;
-            if (model != nullptr && index < model->output_devices.count)
+            if (reach_quick_settings_point_in_rect(layout->output_device_rows[index].bounds, x, y))
             {
-                reach_quick_settings_copy_utf16(result.output_device_id,
-                                                REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
-                                                model->output_devices.devices[index].device_id);
+                result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW;
+                result.output_device_index = index;
+                if (model != nullptr && index < model->output_devices.count)
+                {
+                    reach_quick_settings_copy_utf16(
+                        result.output_device_id, REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
+                        model->output_devices.devices[index].device_id);
+                }
+                return result;
             }
-            return result;
         }
     }
 
-    for (size_t index = 0; index < layout->app_volume_row_count; ++index)
+    if (reach_quick_settings_point_in_rect(layout->app_volumes_clip, x, y))
     {
-        if (reach_quick_settings_point_in_app_slider(&layout->app_volume_rows[index], x, y))
+        for (size_t index = 0; index < layout->app_volume_row_count; ++index)
         {
-            result.type = REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER;
-            result.session_index = index;
-            result.volume_level = reach_quick_settings_level_for_slider_line(
-                layout->app_volume_rows[index].slider_full_range_line, x);
-            if (model != nullptr && index < model->sessions.count)
+            if (reach_quick_settings_point_in_app_slider(&layout->app_volume_rows[index], x, y))
             {
-                reach_quick_settings_copy_utf16(
-                    result.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
-                    model->sessions.sessions[index].session_instance_id);
+                result.type = REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER;
+                result.session_index = index;
+                result.volume_level = reach_quick_settings_level_for_slider_line(
+                    layout->app_volume_rows[index].slider_full_range_line, x);
+                if (model != nullptr && index < model->sessions.count)
+                {
+                    reach_quick_settings_copy_utf16(
+                        result.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                        model->sessions.sessions[index].session_instance_id);
+                }
+                return result;
             }
-            return result;
         }
     }
 
