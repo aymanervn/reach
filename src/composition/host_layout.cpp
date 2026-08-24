@@ -117,20 +117,25 @@ void reach_host_apply_layout(reach_host *host)
 
     reach_layout_plan plan = {};
     reach_layout_resolve(&host->layout_manager, &plan);
-    if (host->has_applied_layout_plan && reach_layout_plan_equal(&plan, &host->applied_layout_plan))
+    int32_t plan_changed = !host->has_applied_layout_plan ||
+                           !reach_layout_plan_equal(&plan, &host->applied_layout_plan);
+    if (!plan_changed && !host->dirty.z_order)
     {
         return;
     }
 
-    for (size_t index = 0; index < plan.count; ++index)
+    if (plan_changed)
     {
-        const reach_layout_entry *entry = &plan.entries[index];
-        const reach_layout_entry *applied =
-            reach_host_layout_applied_entry(host, entry->participant);
-        if (applied == nullptr || applied->visible != entry->visible)
+        for (size_t index = 0; index < plan.count; ++index)
         {
-            reach_host_layout_apply_visibility(&host->layout_targets[entry->participant],
-                                               entry->visible);
+            const reach_layout_entry *entry = &plan.entries[index];
+            const reach_layout_entry *applied =
+                reach_host_layout_applied_entry(host, entry->participant);
+            if (applied == nullptr || applied->visible != entry->visible)
+            {
+                reach_host_layout_apply_visibility(&host->layout_targets[entry->participant],
+                                                   entry->visible);
+            }
         }
     }
 
@@ -174,6 +179,25 @@ void reach_host_apply_layout(reach_host *host)
 
     host->applied_layout_plan = plan;
     host->has_applied_layout_plan = 1;
+    host->dirty.z_order = 0;
+}
+
+void reach_host_invalidate_surface_z_order(reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT || !host->has_applied_layout_plan)
+    {
+        return;
+    }
+
+    reach_layout_participant participant = host->surface_participants[id];
+    const reach_layout_entry *entry = reach_host_layout_applied_entry(host, participant);
+    if (entry == nullptr || !entry->visible || entry->layer <= 0)
+    {
+        return;
+    }
+
+    host->dirty.z_order = 1;
+    reach_host_request_update(host);
 }
 
 void reach_host_hide_all_surfaces(reach_host *host)

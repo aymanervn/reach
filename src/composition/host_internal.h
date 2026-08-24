@@ -240,6 +240,7 @@ void reach_host_init_surface_descriptors(reach_host *host);
 
 void reach_host_init_layout(reach_host *host);
 void reach_host_apply_layout(reach_host *host);
+void reach_host_invalidate_surface_z_order(reach_host *host, reach_surface_id id);
 void reach_host_hide_all_surfaces(reach_host *host);
 reach_host_edge_reveal_runtime *reach_host_edge_reveal_for_surface(reach_host *host,
                                                                    reach_surface_id id);
@@ -298,6 +299,7 @@ typedef struct reach_host_deferred_launch
 typedef struct reach_host_dirty_state
 {
     int32_t layout;
+    int32_t z_order;
     int32_t render;
     int32_t update_requested;
     int32_t events_dispatched_this_cycle;

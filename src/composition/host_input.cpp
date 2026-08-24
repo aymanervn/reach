@@ -949,6 +949,15 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return REACH_OK;
     }
 
+    if (event->type == REACH_UI_EVENT_POINTER_DOWN)
+    {
+        const reach_surface_desc *source_desc = reach_host_surface_for_role(host, source);
+        if (source_desc != nullptr)
+        {
+            reach_host_invalidate_surface_z_order(host, source_desc->id);
+        }
+    }
+
     int32_t launcher_was_open = reach_launcher_is_open(host->launcher_capsule);
 
     if (event->type == REACH_UI_EVENT_POINTER_UP)

@@ -540,6 +540,7 @@ void reach_host_init_layout(reach_host *host)
     host->layout_manager = {};
     host->applied_layout_plan = {};
     host->has_applied_layout_plan = 0;
+    host->dirty.z_order = 0;
     for (size_t index = 0; index < REACH_LAYOUT_MAX_PARTICIPANTS; ++index)
     {
         host->layout_targets[index] = {};

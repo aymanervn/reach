@@ -383,8 +383,12 @@ out of the band, never while a participant rests there — `HWND_NOTOPMOST` lift
 window to the top of the app band, so a redundant demote would pop a resting bar
 above whatever covers it. The pass is the sole owner of `show()` / `hide()` for
 these windows; frame steps compute intent and render, and never touch visibility or
-z. It emits nothing when the resolved plan equals the last applied one, and emits
-each op only for the participants whose layer or visibility actually changed.
+z. It emits nothing when the resolved plan equals the last applied one unless native
+pointer interaction invalidated the topmost chain. A pointer-down on a visible banded
+surface schedules an order-only reconciliation because Windows may reorder clicked
+HWNDs inside the topmost band; visibility remains cached and is not replayed. Each
+semantic plan change emits ops only for the participants whose layer or visibility
+actually changed.
 
 Conditions are bits, not triggers: the arrangement is recomputed from the whole
 active set, so setting an already-set condition is a no-op and a missed one heals on
