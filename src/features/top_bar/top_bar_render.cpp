@@ -335,7 +335,7 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
     }
 
     float shell_radius = shell.height * 0.5f;
-    reach_top_bar_push_rect(commands, shell, theme->bar_button_background, shell_radius);
+    reach_top_bar_push_rect(commands, shell, theme->bar_battery_background, shell_radius);
 
     reach_color fill_color = theme->bar_battery_fill;
     if (input->battery_charging)
@@ -364,8 +364,12 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
         reach_render_command_buffer_push(commands, &fill);
     }
 
-    uint16_t percentage[5] = {};
+    uint16_t percentage[6] = {};
     size_t digit = 0;
+    if (input->battery_charging)
+    {
+        percentage[digit++] = '+';
+    }
     if (percent == 100)
     {
         percentage[digit++] = '1';
@@ -377,8 +381,8 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
     percentage[digit++] = (uint16_t)('0' + percent % 10);
     percentage[digit] = '%';
     reach_top_bar_push_text(commands, shell, percentage,
-                            metrics.language_text_size * input->dpi_scale,
-                            metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
+                            metrics.volume_text_size * input->dpi_scale,
+                            metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
                             theme->bar_text_primary);
 
     reach_top_bar_push_button_feedback(input, commands, input->layout->battery_button,

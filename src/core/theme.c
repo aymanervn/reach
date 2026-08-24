@@ -28,6 +28,10 @@
 #define REACH_DARK_ACCENT_ORANGE(a) REACH_RGB8(242, 140, 56, a)
 #define REACH_DARK_ACCENT_YELLOW(a) REACH_RGB8(247, 191, 56, a)
 #define REACH_DARK_ACCENT_RED(a) REACH_RGB8(245, 115, 89, a)
+#define REACH_DARK_BATTERY_BLUE(a) REACH_RGB8(38, 102, 168, a)
+#define REACH_DARK_BATTERY_GREEN(a) REACH_RGB8(29, 128, 66, a)
+#define REACH_DARK_BATTERY_YELLOW(a) REACH_RGB8(137, 97, 7, a)
+#define REACH_DARK_BATTERY_RED(a) REACH_RGB8(174, 55, 55, a)
 
 #define REACH_LIGHT_BASE(a) REACH_RGB8(255, 255, 255, a)
 #define REACH_LIGHT_RAISED(a) REACH_RGB8(245, 245, 244, a)
@@ -46,6 +50,10 @@
 #define REACH_LIGHT_ACCENT_ORANGE(a) REACH_RGB8(194, 97, 20, a)
 #define REACH_LIGHT_ACCENT_YELLOW(a) REACH_RGB8(168, 122, 15, a)
 #define REACH_LIGHT_ACCENT_RED(a) REACH_RGB8(199, 61, 46, a)
+#define REACH_LIGHT_BATTERY_BLUE(a) REACH_RGB8(126, 190, 245, a)
+#define REACH_LIGHT_BATTERY_GREEN(a) REACH_RGB8(106, 214, 143, a)
+#define REACH_LIGHT_BATTERY_YELLOW(a) REACH_RGB8(242, 207, 98, a)
+#define REACH_LIGHT_BATTERY_RED(a) REACH_RGB8(244, 151, 142, a)
 
 #define REACH_SHADOW_AMBIENT(blur_px)                                                              \
     {.offset_x = 0.0f, .offset_y = 0.0f, .blur = (blur_px), .color = REACH_RGB8(0, 0, 0, 0.3f)}
@@ -90,10 +98,11 @@ static const reach_theme reach_theme_dark = {
     .bar_button_background = REACH_DARK_HIGH_CONTRAST_WHITE(0.10f),
     .bar_tray_background = REACH_DARK_STRUCTURE(1.0f),
     .bar_power_hover_background = REACH_DARK_HIGH_CONTRAST_WHITE(0.18f),
-    .bar_battery_fill = REACH_DARK_ACCENT_GREEN(1.0f),
-    .bar_battery_low = REACH_CRITICAL_RED(1.0f),
-    .bar_battery_saver = REACH_DARK_ACCENT_YELLOW(1.0f),
-    .bar_battery_charging = REACH_DARK_ACCENT_BLUE(1.0f),
+    .bar_battery_background = REACH_DARK_HIGH_CONTRAST_WHITE(0.10f),
+    .bar_battery_fill = REACH_DARK_BATTERY_GREEN(1.0f),
+    .bar_battery_low = REACH_DARK_BATTERY_RED(1.0f),
+    .bar_battery_saver = REACH_DARK_BATTERY_YELLOW(1.0f),
+    .bar_battery_charging = REACH_DARK_BATTERY_BLUE(1.0f),
     .bar_stats_cpu = REACH_DARK_ACCENT_CYAN(1.0f),
     .bar_stats_memory = REACH_DARK_ACCENT_LAVENDER(1.0f),
     .bar_stats_download = REACH_DARK_ACCENT_GREEN(1.0f),
@@ -229,10 +238,11 @@ static const reach_theme reach_theme_light = {
     .bar_button_background = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.07f),
     .bar_tray_background = REACH_LIGHT_MIDTONE(1.0f),
     .bar_power_hover_background = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.14f),
-    .bar_battery_fill = REACH_LIGHT_ACCENT_GREEN(1.0f),
-    .bar_battery_low = REACH_LIGHT_ACCENT_RED(1.0f),
-    .bar_battery_saver = REACH_LIGHT_ACCENT_YELLOW(1.0f),
-    .bar_battery_charging = REACH_LIGHT_ACCENT_BLUE(1.0f),
+    .bar_battery_background = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.07f),
+    .bar_battery_fill = REACH_LIGHT_BATTERY_GREEN(1.0f),
+    .bar_battery_low = REACH_LIGHT_BATTERY_RED(1.0f),
+    .bar_battery_saver = REACH_LIGHT_BATTERY_YELLOW(1.0f),
+    .bar_battery_charging = REACH_LIGHT_BATTERY_BLUE(1.0f),
     .bar_stats_cpu = REACH_LIGHT_ACCENT_CYAN(1.0f),
     .bar_stats_memory = REACH_LIGHT_ACCENT_LAVENDER(1.0f),
     .bar_stats_download = REACH_LIGHT_ACCENT_GREEN(1.0f),

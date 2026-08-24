@@ -79,6 +79,7 @@ extern "C"
         reach_color bar_button_background;
         reach_color bar_tray_background;
         reach_color bar_power_hover_background;
+        reach_color bar_battery_background;
         reach_color bar_battery_fill;
         reach_color bar_battery_low;
         reach_color bar_battery_saver;
