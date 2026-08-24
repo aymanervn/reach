@@ -25,7 +25,6 @@ struct reach_quick_settings_metrics
 
     float output_button_gap;
     float output_button_height;
-    float output_title_height;
     float output_panel_gap;
     float output_device_row_height;
     float output_icon_size;
@@ -33,8 +32,6 @@ struct reach_quick_settings_metrics
     float output_row_horizontal_padding;
     float output_row_label_gap;
 
-    float app_title_height;
-    float app_title_gap;
     float app_panel_gap;
     float app_volume_row_height;
     float app_icon_size;
@@ -72,7 +69,6 @@ struct reach_quick_settings_metrics
     float output_button_device_height;
     float output_button_device_text_size;
 
-    float section_title_text_size;
     float app_row_text_size;
     float app_row_percent_text_size;
     float expand_button_text_size;
@@ -102,7 +98,6 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
 
     metrics.output_button_gap = 10.0f;
     metrics.output_button_height = 46.0f;
-    metrics.output_title_height = 18.0f;
     metrics.output_panel_gap = 8.0f;
     metrics.output_device_row_height = 44.0f;
     metrics.output_icon_size = 16.0f;
@@ -110,8 +105,6 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.output_row_horizontal_padding = 12.0f;
     metrics.output_row_label_gap = 8.0f;
 
-    metrics.app_title_height = 18.0f;
-    metrics.app_title_gap = 12.0f;
     metrics.app_panel_gap = 8.0f;
     metrics.app_volume_row_height = 40.0f;
     metrics.app_icon_size = 18.0f;
@@ -149,7 +142,6 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.output_button_device_height = 18.0f;
     metrics.output_button_device_text_size = 13.0f;
 
-    metrics.section_title_text_size = 12.0f;
     metrics.app_row_text_size = 12.0f;
     metrics.app_row_percent_text_size = 12.0f;
     metrics.expand_button_text_size = 13.0f;
@@ -201,8 +193,6 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.output_button_gap, dpi_scale);
     metrics.output_button_height =
         reach_quick_settings_metric_scale_value(metrics.output_button_height, dpi_scale);
-    metrics.output_title_height =
-        reach_quick_settings_metric_scale_value(metrics.output_title_height, dpi_scale);
     metrics.output_panel_gap =
         reach_quick_settings_metric_scale_value(metrics.output_panel_gap, dpi_scale);
     metrics.output_device_row_height =
@@ -215,10 +205,6 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.output_row_horizontal_padding, dpi_scale);
     metrics.output_row_label_gap =
         reach_quick_settings_metric_scale_value(metrics.output_row_label_gap, dpi_scale);
-    metrics.app_title_height =
-        reach_quick_settings_metric_scale_value(metrics.app_title_height, dpi_scale);
-    metrics.app_title_gap =
-        reach_quick_settings_metric_scale_value(metrics.app_title_gap, dpi_scale);
     metrics.app_panel_gap =
         reach_quick_settings_metric_scale_value(metrics.app_panel_gap, dpi_scale);
     metrics.app_volume_row_height =
@@ -281,8 +267,6 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.output_button_device_height, dpi_scale);
     metrics.output_button_device_text_size =
         reach_quick_settings_metric_scale_value(metrics.output_button_device_text_size, dpi_scale);
-    metrics.section_title_text_size =
-        reach_quick_settings_metric_scale_value(metrics.section_title_text_size, dpi_scale);
     metrics.app_row_text_size =
         reach_quick_settings_metric_scale_value(metrics.app_row_text_size, dpi_scale);
     metrics.app_row_percent_text_size =

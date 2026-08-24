@@ -101,15 +101,14 @@ extern "C"
         reach_rect_f32 output_device_button_icon;
         reach_rect_f32 output_device_button_label;
         reach_rect_f32 output_device_button_chevron;
-        reach_rect_f32 output_devices_title;
-        reach_rect_f32 output_devices_title_chevron;
         reach_rect_f32 output_devices_panel;
+        reach_rect_f32 output_devices_clip;
         reach_quick_settings_output_device_row_layout
             output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
         size_t output_device_row_count;
 
-        reach_rect_f32 app_volumes_title;
         reach_rect_f32 app_volumes_panel;
+        reach_rect_f32 app_volumes_clip;
         reach_quick_settings_app_volume_row_layout app_volume_rows[REACH_AUDIO_VOLUME_MAX_SESSIONS];
         size_t app_volume_row_count;
 
@@ -138,6 +137,8 @@ extern "C"
         reach_quick_settings_layout layout;
         reach_theme theme;
         float dpi_scale;
+        float output_devices_expansion;
+        float app_volumes_expansion;
         uint64_t press_feedback_target;
         float press_feedback_opacity;
     } reach_quick_settings_render_input;
@@ -216,6 +217,8 @@ extern "C"
         reach_rect_f32 bounds;
         reach_rect_f32 target_bounds;
         reach_rect_f32 content_bounds;
+        float output_devices_expansion;
+        float app_volumes_expansion;
         float notch_anchor_x;
         int32_t drop_direction;
         reach_quick_settings_drag_state drag;
