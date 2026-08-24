@@ -170,6 +170,8 @@ screen space; the render pass converts to surface-local. Because DWM composites
 thumbnails *on top of* the host surface, stage chrome (labels, selection) must stay
 outside the tile rects — drawing over a tile is not possible from the same surface.
 Minimized windows have no DWM content and fall back to an icon tile.
+The Desktop tile uses the Reach-owned top-level Progman compatibility host as its
+DWM source and crops the virtual-screen thumbnail to the primary monitor.
 Activating a tile suppresses every other tile's thumbnail for the close animation, so
 the chosen window animates alone instead of being covered by a maximized neighbour.
 

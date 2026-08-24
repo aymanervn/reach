@@ -221,21 +221,6 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
             }
         }
 
-        if (tile->desktop && tile->icon_id != 0)
-        {
-            reach_render_command wallpaper = {};
-            wallpaper.type = REACH_RENDER_COMMAND_ICON;
-            wallpaper.icon_id = tile->icon_id;
-            wallpaper.rect = rect;
-            wallpaper.icon_crop_to_fill = 1;
-            wallpaper.color = reach_stage_rgba(1.0f, 1.0f, 1.0f, alpha);
-            result = reach_render_command_buffer_push(out_commands, &wallpaper);
-            if (result != REACH_OK)
-            {
-                return result;
-            }
-        }
-
         if (state->has_hover && state->hover_index == index)
         {
             reach_color highlight = ctx->theme->stage_tile_highlight;

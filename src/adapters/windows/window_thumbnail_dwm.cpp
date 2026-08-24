@@ -107,18 +107,18 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
     return REACH_OK;
 }
 
-static reach_result reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
-                                                         reach_window_thumbnail_id id,
-                                                         reach_rect_f32 destination, float opacity,
-                                                         int32_t visible)
+static reach_result
+reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
+                                     reach_window_thumbnail_id id,
+                                     const reach_window_thumbnail_placement *placement)
 {
     reach_window_thumbnail_entry *entry = reach_window_thumbnail_find(thumbnails, id);
-    if (entry == nullptr)
+    if (entry == nullptr || placement == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    float clamped = opacity;
+    float clamped = placement->opacity;
     if (clamped < 0.0f)
     {
         clamped = 0.0f;
@@ -129,35 +129,66 @@ static reach_result reach_window_thumbnail_set_placement(reach_window_thumbnails
     }
 
     DWM_THUMBNAIL_PROPERTIES props = {};
-    props.dwFlags = DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE | DWM_TNP_OPACITY |
-                    DWM_TNP_SOURCECLIENTAREAONLY;
+    props.dwFlags =
+        DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE | DWM_TNP_OPACITY | DWM_TNP_SOURCECLIENTAREAONLY;
 
     RECT window_rect = {};
-    RECT visible_rect = {};
-    if (entry->source != nullptr && GetWindowRect(entry->source, &window_rect) &&
-        SUCCEEDED(DwmGetWindowAttribute(entry->source, DWMWA_EXTENDED_FRAME_BOUNDS, &visible_rect,
-                                        sizeof(visible_rect))))
+    if (placement->source_screen_valid)
     {
-        RECT crop = {};
-        crop.left = visible_rect.left - window_rect.left;
-        crop.top = visible_rect.top - window_rect.top;
-        crop.right = visible_rect.right - window_rect.left;
-        crop.bottom = visible_rect.bottom - window_rect.top;
-
-        if (crop.left >= 0 && crop.top >= 0 && crop.right > crop.left && crop.bottom > crop.top &&
-            crop.right <= window_rect.right - window_rect.left &&
-            crop.bottom <= window_rect.bottom - window_rect.top)
+        if (entry->source == nullptr || !GetWindowRect(entry->source, &window_rect) ||
+            placement->source_screen.width <= 0.0f || placement->source_screen.height <= 0.0f)
         {
-            props.dwFlags |= DWM_TNP_RECTSOURCE;
-            props.rcSource = crop;
+            return REACH_INVALID_ARGUMENT;
+        }
+
+        RECT crop = {};
+        crop.left = (LONG)placement->source_screen.x - window_rect.left;
+        crop.top = (LONG)placement->source_screen.y - window_rect.top;
+        crop.right =
+            (LONG)(placement->source_screen.x + placement->source_screen.width) - window_rect.left;
+        crop.bottom =
+            (LONG)(placement->source_screen.y + placement->source_screen.height) - window_rect.top;
+
+        if (crop.left < 0 || crop.top < 0 || crop.right <= crop.left || crop.bottom <= crop.top ||
+            crop.right > window_rect.right - window_rect.left ||
+            crop.bottom > window_rect.bottom - window_rect.top)
+        {
+            return REACH_INVALID_ARGUMENT;
+        }
+
+        props.dwFlags |= DWM_TNP_RECTSOURCE;
+        props.rcSource = crop;
+    }
+    else
+    {
+        RECT visible_rect = {};
+        if (entry->source != nullptr && GetWindowRect(entry->source, &window_rect) &&
+            SUCCEEDED(DwmGetWindowAttribute(entry->source, DWMWA_EXTENDED_FRAME_BOUNDS,
+                                            &visible_rect, sizeof(visible_rect))))
+        {
+            RECT crop = {};
+            crop.left = visible_rect.left - window_rect.left;
+            crop.top = visible_rect.top - window_rect.top;
+            crop.right = visible_rect.right - window_rect.left;
+            crop.bottom = visible_rect.bottom - window_rect.top;
+
+            if (crop.left >= 0 && crop.top >= 0 && crop.right > crop.left &&
+                crop.bottom > crop.top && crop.right <= window_rect.right - window_rect.left &&
+                crop.bottom <= window_rect.bottom - window_rect.top)
+            {
+                props.dwFlags |= DWM_TNP_RECTSOURCE;
+                props.rcSource = crop;
+            }
         }
     }
 
-    props.rcDestination.left = (LONG)(destination.x + 0.5f);
-    props.rcDestination.top = (LONG)(destination.y + 0.5f);
-    props.rcDestination.right = (LONG)(destination.x + destination.width + 0.5f);
-    props.rcDestination.bottom = (LONG)(destination.y + destination.height + 0.5f);
-    props.fVisible = visible != 0 ? TRUE : FALSE;
+    props.rcDestination.left = (LONG)(placement->destination.x + 0.5f);
+    props.rcDestination.top = (LONG)(placement->destination.y + 0.5f);
+    props.rcDestination.right =
+        (LONG)(placement->destination.x + placement->destination.width + 0.5f);
+    props.rcDestination.bottom =
+        (LONG)(placement->destination.y + placement->destination.height + 0.5f);
+    props.fVisible = placement->visible != 0 ? TRUE : FALSE;
     props.opacity = (BYTE)(clamped * 255.0f + 0.5f);
     props.fSourceClientAreaOnly = FALSE;
 

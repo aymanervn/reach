@@ -392,11 +392,12 @@ reach_result reach_stage_thumbnail_at(const reach_stage *stage, size_t index,
 
     out_placement->window = tile->window;
     out_placement->destination = tile->current_rect;
+    out_placement->source_screen = tile->source_rect;
     out_placement->opacity = tile->presence;
-    out_placement->visible = state->open && !tile->minimized && !suppressed_by_selection &&
-                                     tile->presence > 0.0f
-                                 ? 1
-                                 : 0;
+    out_placement->visible =
+        state->open && !tile->minimized && !suppressed_by_selection && tile->presence > 0.0f ? 1
+                                                                                             : 0;
+    out_placement->source_screen_valid = tile->desktop;
     out_placement->minimized = tile->minimized;
     out_placement->desktop = tile->desktop;
     return REACH_OK;
@@ -495,13 +496,10 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
 
 const reach_feature_capsule_ops *reach_stage_capsule_ops(void)
 {
-    static const reach_feature_capsule_ops ops = {reach_stage_capsule_reset,
-                                                  reach_stage_capsule_tick,
-                                                  reach_stage_capsule_is_open,
-                                                  reach_stage_capsule_on_game_mode,
-                                                  reach_stage_capsule_needs_frame,
-                                                  reach_stage_capsule_wants_pointer_move,
-                                                  reach_stage_handle_pointer,
-                                                  reach_stage_capsule_pointer_sequence_active};
+    static const reach_feature_capsule_ops ops = {
+        reach_stage_capsule_reset,       reach_stage_capsule_tick,
+        reach_stage_capsule_is_open,     reach_stage_capsule_on_game_mode,
+        reach_stage_capsule_needs_frame, reach_stage_capsule_wants_pointer_move,
+        reach_stage_handle_pointer,      reach_stage_capsule_pointer_sequence_active};
     return &ops;
 }

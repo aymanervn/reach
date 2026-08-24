@@ -18,6 +18,15 @@ extern "C"
 
 #define REACH_WINDOW_THUMBNAIL_NONE ((reach_window_thumbnail_id)0)
 
+    typedef struct reach_window_thumbnail_placement
+    {
+        reach_rect_f32 destination;
+        reach_rect_f32 source_screen;
+        float opacity;
+        int32_t visible;
+        int32_t source_screen_valid;
+    } reach_window_thumbnail_placement;
+
     typedef struct reach_window_thumbnail_ops
     {
         reach_result (*set_target)(reach_window_thumbnails *thumbnails, reach_window_id target);
@@ -26,8 +35,8 @@ extern "C"
                                reach_window_thumbnail_id *out_id);
 
         reach_result (*set_placement)(reach_window_thumbnails *thumbnails,
-                                      reach_window_thumbnail_id id, reach_rect_f32 destination,
-                                      float opacity, int32_t visible);
+                                      reach_window_thumbnail_id id,
+                                      const reach_window_thumbnail_placement *placement);
 
         reach_result (*destroy_all)(reach_window_thumbnails *thumbnails);
 

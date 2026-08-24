@@ -224,11 +224,6 @@ static void reach_host_cleanup(reach_host *host)
         host->window_thumbnails.ops.destroy(host->window_thumbnails.thumbnails);
     }
     reach_host_destroy_edge_reveals(host);
-    if (host->image_loader.ops.release != nullptr && host->wallpaper_image_id != 0)
-    {
-        host->image_loader.ops.release(host->image_loader.loader, host->wallpaper_image_id);
-    }
-    host->wallpaper_image_id = 0;
     if (host->image_loader.ops.destroy != nullptr)
     {
         host->image_loader.ops.destroy(host->image_loader.loader);
@@ -364,8 +359,6 @@ static void reach_host_cleanup(reach_host *host)
     reach_surface_runtime_init(&host->clipboard_surface);
     host->screen_hotspots = {};
     host->image_loader = {};
-    host->wallpaper_image_id = 0;
-    host->wallpaper_image_path[0] = 0;
     host->window_thumbnails = {};
     host->stage_thumbnails_registered = 0;
     host->pointer_move = {};

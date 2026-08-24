@@ -77,8 +77,10 @@ extern "C"
     {
         uintptr_t window;
         reach_rect_f32 destination;
+        reach_rect_f32 source_screen;
         float opacity;
         int32_t visible;
+        int32_t source_screen_valid;
         int32_t minimized;
         int32_t desktop;
     } reach_stage_thumbnail_placement;

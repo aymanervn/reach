@@ -152,7 +152,6 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
             const reach_monitor_info *monitor =
                 reach_host_stage_monitor_for(host, monitor_bounds, &entry->monitor_index);
             entry->monitor_portrait = reach_host_stage_monitor_is_portrait(monitor);
-            entry->icon_id = host->wallpaper_image_id;
             collected++;
         }
     }
@@ -212,8 +211,7 @@ static void reach_host_register_stage_thumbnails(reach_host *host)
     {
         size_t tile_index = index - 1;
         reach_stage_thumbnail_placement placement = {};
-        if (reach_stage_thumbnail_at(host->stage_capsule, tile_index, &placement) != REACH_OK ||
-            placement.desktop)
+        if (reach_stage_thumbnail_at(host->stage_capsule, tile_index, &placement) != REACH_OK)
         {
             continue;
         }
@@ -289,9 +287,15 @@ void reach_host_sync_stage_thumbnails(reach_host *host)
         destination.x -= stage_bounds.x;
         destination.y -= stage_bounds.y;
 
+        reach_window_thumbnail_placement thumbnail_placement = {};
+        thumbnail_placement.destination = destination;
+        thumbnail_placement.source_screen = placement.source_screen;
+        thumbnail_placement.opacity = placement.opacity;
+        thumbnail_placement.visible = placement.visible;
+        thumbnail_placement.source_screen_valid = placement.source_screen_valid;
+
         (void)host->window_thumbnails.ops.set_placement(host->window_thumbnails.thumbnails, id,
-                                                        destination, placement.opacity,
-                                                        placement.visible);
+                                                        &thumbnail_placement);
     }
 }
 
