@@ -16,6 +16,7 @@ extern "C"
         reach_rect_f32 monitor_bounds;
         reach_rect_f32 work_area;
         float dpi_scale;
+        float border_thickness;
 
         size_t pinned_app_count;
     } reach_ui_layout_input;

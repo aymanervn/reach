@@ -72,6 +72,7 @@ extern "C"
 
     typedef struct reach_context_menu_open_context
     {
+        const reach_theme *theme;
         reach_rect_f32 monitor;
         float dpi_scale;
         reach_rect_f32 anchor_button;

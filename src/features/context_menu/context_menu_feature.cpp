@@ -200,23 +200,25 @@ int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
 }
 
 static void reach_context_menu_place(reach_context_menu_state *state,
-                                     const reach_context_menu_open_context *ctx, float popup_width,
-                                     float anchor_ratio)
+                                     const reach_context_menu_open_context *ctx,
+                                     float popup_content_width, float anchor_ratio)
 {
     const reach_context_menu_metrics *metrics =
         reach_context_menu_metrics_for(state->power_open, state->window_list_open);
     state->anchored = ctx->anchored;
     state->drop_direction = ctx->drop_direction;
-    state->anchor_popup_width = popup_width;
+    state->anchor_popup_width = popup_content_width;
     state->anchor_ratio = anchor_ratio;
     state->dpi_scale = ctx->dpi_scale;
-    float scale = ctx->dpi_scale;
+    float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    float border_thickness = reach_theme_border_thickness(ctx->theme, scale);
+    float popup_width = popup_content_width + border_thickness * 2.0f;
     float item_height = metrics->item_height * scale;
     float padding = metrics->padding * scale;
     float margin = metrics->screen_margin * scale;
     float notch_height = reach_popup_notch_height_scaled(scale);
     float popup_body_height = padding * 2.0f + item_height * (float)state->item_count;
-    float popup_height = popup_body_height + notch_height;
+    float popup_height = popup_body_height + notch_height + border_thickness * 2.0f;
 
     float popup_x;
     float popup_y;
@@ -242,12 +244,13 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     }
 
     state->bounds = {popup_x, popup_y, popup_width, popup_height};
-    float items_y =
-        popup_y + padding + (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
+    float items_y = popup_y + border_thickness + padding +
+                    (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
     for (size_t index = 0; index < state->item_count; ++index)
     {
-        state->item_slots[index] = {popup_x + padding, items_y + item_height * (float)index,
-                                    popup_width - padding * 2.0f, item_height};
+        state->item_slots[index] = {
+            popup_x + border_thickness + padding, items_y + item_height * (float)index,
+            popup_content_width - padding * 2.0f, item_height};
     }
 }
 
@@ -277,7 +280,9 @@ static float reach_context_menu_window_list_width(const reach_context_menu_state
                                      REACH_TEXT_WEIGHT_NORMAL, metrics.glyph_advance_ratio);
     const float minimum = chrome + one_letter;
     float maximum = metrics.window_list_max_width * scale;
-    const float monitor_width = ctx->monitor.width - metrics.screen_margin * scale * 2.0f;
+    const float border_thickness = reach_theme_border_thickness(ctx->theme, scale);
+    const float monitor_width = ctx->monitor.width - metrics.screen_margin * scale * 2.0f -
+                                border_thickness * 2.0f;
     if (monitor_width > 0.0f && monitor_width < maximum)
     {
         maximum = monitor_width;

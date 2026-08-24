@@ -171,6 +171,7 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
 {
     const reach_battery_metrics &metrics = reach_battery_metrics_values;
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    float border_thickness = reach_theme_border_thickness(ctx->theme, scale);
 
     state->drop_direction = ctx->drop_direction;
 
@@ -180,12 +181,13 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
     float row_inset = metrics.row_inset * scale;
     float separator_height = metrics.separator_height * scale;
     float separator_inset = metrics.separator_inset * scale;
-    float popup_width = metrics.popup_width * scale;
+    float body_width = metrics.popup_width * scale;
+    float popup_width = body_width + border_thickness * 2.0f;
     float margin = metrics.screen_margin * scale;
     float notch_height = reach_popup_notch_height_scaled(scale);
 
     float body_height = padding * 2.0f + row_height * 2.0f + row_gap * 2.0f + separator_height;
-    float popup_height = body_height + notch_height;
+    float popup_height = body_height + notch_height + border_thickness * 2.0f;
 
     reach_popup_anchor anchor = {};
     anchor.button = ctx->anchor_button;
@@ -197,19 +199,20 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
     state->bounds = placement.bounds;
     state->notch_anchor_x = placement.notch_anchor_x;
 
-    float content_y =
-        padding + (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
-    float content_x = row_inset;
-    float content_width = popup_width - row_inset * 2.0f;
+    float content_y = border_thickness + padding +
+                      (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
+    float content_x = border_thickness + row_inset;
+    float content_width = body_width - row_inset * 2.0f;
 
     state->percent_label = {content_x, content_y, content_width, row_height};
     content_y += row_height + row_gap;
 
-    state->separator = {separator_inset, content_y, popup_width - separator_inset * 2.0f,
-                        separator_height};
+    state->separator = {border_thickness + separator_inset, content_y,
+                        body_width - separator_inset * 2.0f, separator_height};
     content_y += separator_height + row_gap;
 
-    state->saver_row = {padding, content_y, popup_width - padding * 2.0f, row_height};
+    state->saver_row = {border_thickness + padding, content_y,
+                        body_width - padding * 2.0f, row_height};
     state->saver_label = {content_x, content_y, content_width, row_height};
 
     float toggle_width = metrics.toggle_width * scale;

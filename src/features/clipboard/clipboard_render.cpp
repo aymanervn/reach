@@ -581,6 +581,8 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         }
 
         const reach_rect_f32 local_item = reach_clipboard_local(item, layout->bounds);
+        const reach_rect_f32 local_item_content =
+            reach_theme_border_content_rect(theme, input->dpi_scale, local_item);
         const reach_rect_f32 local_visible_item =
             reach_clipboard_local(visible_item, layout->bounds);
         const reach_clipboard_item *item_data = &model->items[index];
@@ -608,9 +610,8 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
 
         const float close_size = metrics.close_button_size;
         const float close_margin = metrics.close_button_margin;
-        const reach_rect_f32 close_rect = {local_item.x + local_item.width - close_size -
-                                               close_margin,
-                                           local_item.y + close_margin, close_size, close_size};
+        const reach_rect_f32 close_rect =
+            reach_clipboard_local(layout->close_buttons[index], layout->bounds);
 
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
@@ -639,20 +640,21 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
 
         const float padding = metrics.thumbnail_padding;
         const float reserved_right = close_size + close_margin * 2.0f;
-        const float text_right = local_item.x + local_item.width - reserved_right;
+        const float text_right = local_item_content.x + local_item_content.width - reserved_right;
         if (item_data->kind == REACH_CLIPBOARD_ITEM_IMAGE && item_data->thumbnail_id != 0)
         {
             const float thumbnail_height =
-                reach_clipboard_min_float(metrics.thumbnail_height, local_item.height);
+                reach_clipboard_min_float(metrics.thumbnail_height, local_item_content.height);
             const float thumbnail_max_width = reach_clipboard_max_float(
-                0.0f, local_item.width * metrics.thumbnail_max_width_ratio);
+                0.0f, local_item_content.width * metrics.thumbnail_max_width_ratio);
             const float thumbnail_width = reach_clipboard_thumbnail_width_for_item(
                 item_data, thumbnail_height, thumbnail_max_width);
 
-            const float thumbnail_x = local_item.x + padding;
+            const float thumbnail_x = local_item_content.x + padding;
             const float thumbnail_y =
-                local_item.y +
-                reach_clipboard_max_float(0.0f, local_item.height - thumbnail_height) * 0.5f;
+                local_item_content.y +
+                reach_clipboard_max_float(0.0f, local_item_content.height - thumbnail_height) *
+                    0.5f;
 
             command = {};
             command.type = REACH_RENDER_COMMAND_ICON;
@@ -669,20 +671,20 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             const float text_x = thumbnail_x + thumbnail_width + metrics.thumbnail_text_gap;
             reach_clipboard_push_preview_text_lines(
                 commands, item_data,
-                {text_x, local_item.y + padding,
+                {text_x, local_item_content.y + padding,
                  reach_clipboard_max_float(0.0f, text_right - text_x),
-                 reach_clipboard_max_float(0.0f, local_item.height - padding * 2.0f)},
+                 reach_clipboard_max_float(0.0f, local_item_content.height - padding * 2.0f)},
                 local_visible_item, theme->clipboard_secondary_text, metrics.items_font_size,
                 input->text_alignment_leading);
         }
         else
         {
-            const float text_x = local_item.x + padding;
+            const float text_x = local_item_content.x + padding;
             reach_clipboard_push_preview_text_lines(
                 commands, item_data,
-                {text_x, local_item.y + padding,
+                {text_x, local_item_content.y + padding,
                  reach_clipboard_max_float(0.0f, text_right - text_x),
-                 reach_clipboard_max_float(0.0f, local_item.height - padding * 2.0f)},
+                 reach_clipboard_max_float(0.0f, local_item_content.height - padding * 2.0f)},
                 local_visible_item, theme->clipboard_primary_text, metrics.items_font_size,
                 input->text_alignment_leading);
         }

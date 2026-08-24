@@ -218,6 +218,7 @@ void reach_host_reanchor_context_menu(reach_host *host)
     }
 
     reach_context_menu_open_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchored = 1;
     ctx.bar_edge_y = host->layout.dock.bounds.y;
@@ -270,6 +271,7 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
         reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->power_button);
 
     reach_context_menu_open_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchor_button = power_button;
     ctx.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
@@ -299,6 +301,7 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
         host->dock_capsule, item_index, item_commands, REACH_CONTEXT_MENU_MAX_ITEMS);
 
     reach_context_menu_open_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.item_commands = item_commands;
     ctx.item_count = item_count;

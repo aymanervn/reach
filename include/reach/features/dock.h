@@ -191,8 +191,8 @@ extern "C"
     } reach_dock_fit_result;
 
     reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_icon_size,
-                                                 float native_gap, float available_width,
-                                                 float app_slot_units);
+                                                 float native_gap, float native_border_thickness,
+                                                 float available_width, float app_slot_units);
 
     void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *ctx,
                                  reach_dock_layout *layout);

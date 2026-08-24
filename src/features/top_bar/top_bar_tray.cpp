@@ -184,6 +184,7 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     float gap = slot_size * 0.22f;
     float padding = slot_size * 0.58f;
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+    float border_thickness = reach_theme_border_thickness(theme, scale);
     float notch_height = reach_popup_notch_height_scaled(scale);
     size_t item_count = reach_tray_service_item_count(top_bar->tray);
     size_t overflow_count =
@@ -193,13 +194,17 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     size_t rows = (visual_count + 4) / 5;
     float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
     float content_height = padding * 2.0f + (float)rows * slot_size + (float)(rows - 1) * gap;
-    popup->placement = reach_popup_place(anchor, ceilf(content_width),
-                                         ceilf(content_height + notch_height), 8.0f * scale);
+    popup->placement = reach_popup_place(anchor, ceilf(content_width + border_thickness * 2.0f),
+                                         ceilf(content_height + notch_height +
+                                               border_thickness * 2.0f),
+                                         8.0f * scale);
 
     reach_rect_f32 bounds = popup->placement.bounds;
+    reach_rect_f32 content_bounds =
+        reach_theme_border_content_rect(theme, scale, bounds);
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
-    float content_top =
-        bounds.y + (anchor->direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
+    float content_top = content_bounds.y +
+                        (anchor->direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
     float grid_y = content_top + (content_height - grid_height) * 0.5f;
     for (size_t index = 0; index < item_count; ++index)
     {
@@ -215,7 +220,7 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
         size_t row_remaining = overflow_count - row_start;
         size_t row_columns = reach_top_bar_tray_min_size(row_remaining, 5);
         float row_width = (float)row_columns * slot_size + (float)(row_columns - 1) * gap;
-        float row_x = bounds.x + (bounds.width - row_width) * 0.5f;
+        float row_x = content_bounds.x + (content_bounds.width - row_width) * 0.5f;
         popup->item_slots[index] = {row_x + (float)column * (slot_size + gap),
                                     grid_y + (float)row * (slot_size + gap), slot_size, slot_size};
     }

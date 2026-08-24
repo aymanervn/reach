@@ -13,6 +13,20 @@ static void expect_true(int condition, const char *message)
     }
 }
 
+static void expect_near(float actual, float expected, float tolerance, const char *message)
+{
+    float difference = actual - expected;
+    if (difference < 0.0f)
+    {
+        difference = -difference;
+    }
+    if (difference > tolerance)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: %s (expected %.3f, got %.3f)\n", message, expected, actual);
+    }
+}
+
 static int text_equals_ascii(const uint16_t *text, const char *expected)
 {
     size_t index = 0;
@@ -153,6 +167,7 @@ static void test_content_stays_in_surface_space(void)
     expect_true(reach_battery_create(&battery) == REACH_OK, "battery capsule is created");
 
     reach_battery_open_context ctx = {};
+    ctx.theme = reach_theme_default();
     ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
     ctx.anchor_button = {1600.0f, 4.0f, 40.0f, 26.0f};
     ctx.bar_edge_y = 38.0f;
@@ -181,6 +196,20 @@ static void test_content_stays_in_surface_space(void)
     expect_true(reach_battery_hit_test(state, (int32_t)row_center_x, (int32_t)row_center_y) ==
                     REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER,
                 "a screen press over the saver row reaches the toggle");
+
+    float narrow_width = state->bounds.width;
+    float content_width = state->percent_label.width;
+    reach_theme wide_border_theme = *reach_theme_default();
+    wide_border_theme.border_thickness = 3.0f;
+    ctx.theme = &wide_border_theme;
+    reach_battery_open(battery, &ctx);
+    state = reach_battery_state_ptr(battery);
+    expect_near(state->bounds.width - narrow_width, 4.0f, 0.001f,
+                "battery popup outer width derives both border sides");
+    expect_near(state->percent_label.width, content_width, 0.001f,
+                "battery popup content width stays stable across border widths");
+    expect_near(state->percent_label.x - wide_border_theme.border_thickness, 12.0f, 0.001f,
+                "battery row inset starts inside the runtime border");
 
     reach_battery_destroy(battery);
 }

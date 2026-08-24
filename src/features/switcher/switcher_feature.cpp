@@ -22,18 +22,23 @@ static float reach_switcher_scale(float value, float dpi_scale)
 
 reach_rect_f32 reach_switcher_bounds_for_count(reach_rect_f32 monitor_bounds, size_t visible_count)
 {
-    return reach_switcher_bounds_for_count_scaled(monitor_bounds, visible_count, 1.0f);
+    return reach_switcher_bounds_for_count_scaled(
+        monitor_bounds, visible_count, 1.0f,
+        reach_theme_border_thickness(reach_theme_default(), 1.0f));
 }
 
 reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bounds,
-                                                      size_t visible_count, float dpi_scale)
+                                                      size_t visible_count, float dpi_scale,
+                                                      float border_thickness)
 {
     float padding = reach_switcher_scale(24.0f, dpi_scale);
     float item_size = reach_switcher_scale(112.0f, dpi_scale);
     float gap = reach_switcher_scale(14.0f, dpi_scale);
     reach_rect_f32 bounds = {};
     size_t count = visible_count > 0 ? visible_count : 1;
-    bounds.width = padding * 2.0f + (float)count * item_size + (float)(count - 1) * gap;
+    border_thickness = border_thickness > 0.0f ? border_thickness : 0.0f;
+    bounds.width = border_thickness * 2.0f + padding * 2.0f + (float)count * item_size +
+                   (float)(count - 1) * gap;
     float max_width = monitor_bounds.width - reach_switcher_scale(48.0f, dpi_scale);
     if (bounds.width > max_width)
     {
@@ -44,7 +49,7 @@ reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bou
     {
         bounds.width = monitor_bounds.width < min_width ? monitor_bounds.width : min_width;
     }
-    bounds.height = reach_switcher_scale(184.0f, dpi_scale);
+    bounds.height = reach_switcher_scale(184.0f, dpi_scale) + border_thickness * 2.0f;
     bounds.x = monitor_bounds.x + (monitor_bounds.width - bounds.width) * 0.5f;
     bounds.y = monitor_bounds.y + (monitor_bounds.height - bounds.height) * 0.5f;
     return bounds;

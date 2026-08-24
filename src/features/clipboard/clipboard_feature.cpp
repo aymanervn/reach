@@ -52,7 +52,8 @@ static int32_t reach_clipboard_contains(reach_rect_f32 rect, int32_t x, int32_t 
 reach_clipboard_layout
 reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect_f32 monitor_bounds,
                                         reach_rect_f32 launcher_bounds, float dpi_scale,
-                                        float animated_height, float animated_item_width)
+                                        float border_thickness, float animated_height,
+                                        float animated_item_width)
 {
     reach_clipboard_layout layout = {};
     if (model == nullptr)
@@ -63,16 +64,19 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
     (void)launcher_bounds;
 
     const reach_clipboard_metrics metrics = reach_clipboard_metrics_for_scale(dpi_scale);
+    border_thickness = reach_clipboard_max_float(0.0f, border_thickness);
     const float screen_edge_margin = metrics.screen_edge_margin;
     const float available_width =
         reach_clipboard_max_float(0.0f, monitor_bounds.width - screen_edge_margin * 2.0f);
     const float available_height =
         reach_clipboard_max_float(0.0f, monitor_bounds.height - screen_edge_margin * 2.0f);
 
-    const float width = reach_clipboard_min_float(metrics.panel_width, available_width);
+    const float width =
+        reach_clipboard_min_float(metrics.panel_width + border_thickness * 2.0f, available_width);
 
     const float max_items_height = metrics.item_large_size * 4.0f + metrics.item_gap * 3.0f;
-    const float chrome_height = 2.0f * metrics.padding + metrics.title_height + metrics.title_gap;
+    const float chrome_height = border_thickness * 2.0f + 2.0f * metrics.padding +
+                                metrics.title_height + metrics.title_gap;
     const float default_height = chrome_height + metrics.item_default_size;
     const float max_height =
         reach_clipboard_min_float(chrome_height + max_items_height, available_height);
@@ -120,24 +124,34 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
     layout.bounds.width = width;
     layout.bounds.height = height;
 
-    const float content_width = reach_clipboard_max_float(0.0f, width - metrics.padding * 2.0f);
+    const float horizontal_border =
+        reach_clipboard_min_float(border_thickness, layout.bounds.width * 0.5f);
+    const float vertical_border =
+        reach_clipboard_min_float(border_thickness, layout.bounds.height * 0.5f);
+    const float content_width = reach_clipboard_max_float(
+        0.0f, width - horizontal_border * 2.0f - metrics.padding * 2.0f);
     const float clear_button_height =
         reach_clipboard_min_float(metrics.clear_button_height, metrics.title_height);
     layout.clear_button = {
-        layout.bounds.x + layout.bounds.width - metrics.padding - metrics.clear_button_width,
-        layout.bounds.y + metrics.padding + (metrics.title_height - clear_button_height) * 0.5f,
+        layout.bounds.x + layout.bounds.width - horizontal_border - metrics.padding -
+            metrics.clear_button_width,
+        layout.bounds.y + vertical_border + metrics.padding +
+            (metrics.title_height - clear_button_height) * 0.5f,
         metrics.clear_button_width, clear_button_height};
 
     const float title_width = reach_clipboard_max_float(
         0.0f, content_width - metrics.clear_button_width - metrics.clear_button_gap);
-    layout.title = {layout.bounds.x + metrics.padding, layout.bounds.y + metrics.padding,
-                    title_width, metrics.title_height};
+    layout.title = {layout.bounds.x + horizontal_border + metrics.padding,
+                    layout.bounds.y + vertical_border + metrics.padding, title_width,
+                    metrics.title_height};
 
     const float target_viewport_height =
         reach_clipboard_max_float(0.0f, target_height - chrome_height);
-    layout.viewport = {layout.bounds.x + metrics.padding,
+    layout.viewport = {layout.bounds.x + horizontal_border + metrics.padding,
                        layout.title.y + metrics.title_height + metrics.title_gap, content_width,
-                       reach_clipboard_max_float(0.0f, height - chrome_height)};
+                       reach_clipboard_max_float(
+                           0.0f, height - vertical_border * 2.0f - metrics.padding * 2.0f -
+                                     metrics.title_height - metrics.title_gap)};
 
     layout.item_large_size = metrics.item_large_size;
     layout.content_height = item_count > 0 ? metrics.item_large_size * (float)item_count +
@@ -169,9 +183,15 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
                                    (metrics.item_large_size + metrics.item_gap) * (float)index -
                                    model->scrollbar.offset,
                                item_width, metrics.item_large_size};
+        float item_border = reach_clipboard_min_float(
+            border_thickness,
+            reach_clipboard_min_float(layout.items[index].width, layout.items[index].height) *
+                0.5f);
         layout.close_buttons[index] = {layout.items[index].x + layout.items[index].width -
-                                           metrics.close_button_size - metrics.close_button_margin,
-                                       layout.items[index].y + metrics.close_button_margin,
+                                           item_border - metrics.close_button_size -
+                                           metrics.close_button_margin,
+                                       layout.items[index].y + item_border +
+                                           metrics.close_button_margin,
                                        metrics.close_button_size, metrics.close_button_size};
     }
 
@@ -191,10 +211,10 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
 reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *model,
                                                       reach_rect_f32 monitor_bounds,
                                                       reach_rect_f32 launcher_bounds,
-                                                      float dpi_scale)
+                                                      float dpi_scale, float border_thickness)
 {
     return reach_clipboard_compute_layout_animated(model, monitor_bounds, launcher_bounds,
-                                                   dpi_scale, 0.0f, 0.0f);
+                                                   dpi_scale, border_thickness, 0.0f, 0.0f);
 }
 
 reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model *model,
@@ -295,6 +315,7 @@ static int32_t reach_clipboard_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
                                          reach_rect_f32 monitor_bounds,
                                          reach_rect_f32 launcher_bounds, float dpi_scale,
+                                         float border_thickness,
                                          int32_t *out_animating)
 {
     if (out_animating != nullptr)
@@ -308,8 +329,8 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
 
     reach_clipboard_state *state = &clipboard->state;
     reach_clipboard_layout previous_layout = state->layout;
-    reach_clipboard_layout target_layout =
-        reach_clipboard_compute_layout(&state->model, monitor_bounds, launcher_bounds, dpi_scale);
+    reach_clipboard_layout target_layout = reach_clipboard_compute_layout(
+        &state->model, monitor_bounds, launcher_bounds, dpi_scale, border_thickness);
 
     int32_t height_active = 0;
     float animated_height = reach_clipboard_feature_animate_layout_value(
@@ -320,7 +341,8 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
 
     state->layout =
         reach_clipboard_compute_layout_animated(&state->model, monitor_bounds, launcher_bounds,
-                                                dpi_scale, animated_height, animated_item_width);
+                                                dpi_scale, border_thickness, animated_height,
+                                                animated_item_width);
 
     if (out_animating != nullptr)
     {

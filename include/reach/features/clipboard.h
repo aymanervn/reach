@@ -67,10 +67,12 @@ extern "C"
     reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *model,
                                                           reach_rect_f32 monitor_bounds,
                                                           reach_rect_f32 launcher_bounds,
-                                                          float dpi_scale);
+                                                          float dpi_scale,
+                                                          float border_thickness);
     reach_clipboard_layout reach_clipboard_compute_layout_animated(
         reach_clipboard_model *model, reach_rect_f32 monitor_bounds, reach_rect_f32 launcher_bounds,
-        float dpi_scale, float animated_height, float animated_item_width);
+        float dpi_scale, float border_thickness, float animated_height,
+        float animated_item_width);
     reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_input *input,
                                                        reach_render_command_buffer *commands);
 
@@ -96,6 +98,7 @@ extern "C"
     int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
                                              reach_rect_f32 monitor_bounds,
                                              reach_rect_f32 launcher_bounds, float dpi_scale,
+                                             float border_thickness,
                                              int32_t *out_animating);
 
     typedef enum reach_clipboard_pointer_action_kind

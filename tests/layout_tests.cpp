@@ -58,6 +58,36 @@ static void test_dock_reserves_side_safe_margins(void)
                 "an extremely narrow work area retains a positive fitting width");
 }
 
+static void test_launcher_border_wraps_stable_content_geometry(void)
+{
+    reach_launcher_model launcher = {};
+    launcher.result_count = 1;
+    reach_ui_layout_input input = {};
+    input.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    input.dpi_scale = 1.0f;
+    input.border_thickness = 1.0f;
+    reach_launcher_layout narrow_border = {};
+    expect_true(reach_launcher_layout_compute(&launcher, &input, &narrow_border) == REACH_OK,
+                "launcher layout accepts a runtime border thickness");
+    expect_near(narrow_border.search_box.width, 642.0f, 0.001f,
+                "launcher outer width includes both 1dp border sides");
+    expect_near(narrow_border.bounds.height, 126.0f, 0.001f,
+                "launcher outer height includes both 1dp border sides");
+
+    input.border_thickness = 3.0f;
+    reach_launcher_layout wide_border = {};
+    expect_true(reach_launcher_layout_compute(&launcher, &input, &wide_border) == REACH_OK,
+                "launcher layout accepts a wider runtime border");
+    expect_near(wide_border.search_box.width, 646.0f, 0.001f,
+                "launcher outer width derives arbitrary border thickness");
+    expect_near(wide_border.bounds.height, 130.0f, 0.001f,
+                "launcher outer height derives arbitrary border thickness");
+    expect_near(wide_border.search_text_input.x, narrow_border.search_text_input.x, 0.001f,
+                "launcher text content stays fixed while the outer border grows");
+    expect_near(wide_border.search_result_items.x, narrow_border.search_result_items.x, 0.001f,
+                "launcher result content stays fixed while the outer border grows");
+}
+
 static const reach_layout_entry *entry_for(const reach_layout_plan *plan,
                                            reach_layout_participant participant)
 {
@@ -284,6 +314,7 @@ static void test_registration_limits(void)
 int main(void)
 {
     test_dock_reserves_side_safe_margins();
+    test_launcher_border_wraps_stable_content_geometry();
     test_resolve_orders_descending_by_layer();
     test_override_precedence();
     test_set_condition_order_independence();

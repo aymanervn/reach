@@ -13,6 +13,20 @@ static void expect_true(int condition, const char *message)
     }
 }
 
+static void expect_near(float actual, float expected, float tolerance, const char *message)
+{
+    float difference = actual - expected;
+    if (difference < 0.0f)
+    {
+        difference = -difference;
+    }
+    if (difference > tolerance)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: %s (expected %.3f, got %.3f)\n", message, expected, actual);
+    }
+}
+
 static reach_clipboard_item make_item(uint64_t id, uint64_t hash)
 {
     reach_clipboard_item item = {};
@@ -114,6 +128,30 @@ static void test_scrollbar_edges()
     expect_true(stepped.target == 150.0f, "stepped scrollbar quantizes target");
 }
 
+static void test_layout_wraps_runtime_border_around_stable_content(void)
+{
+    reach_clipboard_model model = {};
+    reach_clipboard_model_init(&model);
+    (void)reach_clipboard_model_insert(&model, make_item(1, 1));
+    reach_rect_f32 monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+
+    reach_clipboard_layout narrow =
+        reach_clipboard_compute_layout(&model, monitor, {}, 1.0f, 1.0f);
+    reach_clipboard_layout wide =
+        reach_clipboard_compute_layout(&model, monitor, {}, 1.0f, 3.0f);
+
+    expect_near(wide.bounds.width - narrow.bounds.width, 4.0f, 0.001f,
+                "clipboard outer width derives both border sides");
+    expect_near(wide.bounds.height - narrow.bounds.height, 4.0f, 0.001f,
+                "clipboard outer height derives both border sides");
+    expect_near(wide.viewport.width, narrow.viewport.width, 0.001f,
+                "clipboard content width stays stable across border widths");
+    expect_near(narrow.title.x - narrow.bounds.x - 1.0f, 8.0f, 0.001f,
+                "clipboard title padding starts inside the 1dp border");
+    expect_near(wide.title.x - wide.bounds.x - 3.0f, 8.0f, 0.001f,
+                "clipboard title padding starts inside an arbitrary border");
+}
+
 int main()
 {
     test_capacity_and_order();
@@ -121,5 +159,6 @@ int main()
     test_remove();
     test_preview();
     test_scrollbar_edges();
+    test_layout_wraps_runtime_border_around_stable_content();
     return failures == 0 ? 0 : 1;
 }
