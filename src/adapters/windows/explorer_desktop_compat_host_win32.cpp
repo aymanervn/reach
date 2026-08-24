@@ -525,8 +525,7 @@ static void reach_explorer_desktop_compat_resize_host(void)
 
     reach_explorer_desktop_compat_virtual_screen(&x, &y, &width, &height);
 
-    SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
     RECT progman_rect = {};
     if (!GetWindowRect(g_progmanHwnd, &progman_rect) || progman_rect.left != x ||
@@ -618,8 +617,7 @@ static reach_result reach_explorer_desktop_compat_create_host_windows(void)
 
     ShowWindow(g_progmanHwnd, SW_SHOWNOACTIVATE);
 
-    SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     reach_explorer_desktop_compat_register_shell_window(g_progmanHwnd);
 
     DWORD worker_style = WS_CHILD | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
@@ -779,7 +777,7 @@ extern "C" reach_result reach_windows_create_explorer_desktop_compat_host(void)
 
 extern "C" reach_window_id reach_windows_desktop_compat_window(void)
 {
-    return reinterpret_cast<reach_window_id>(g_workerwHwnd);
+    return reinterpret_cast<reach_window_id>(g_progmanHwnd);
 }
 
 void reach_windows_destroy_explorer_desktop_compat_host(void)

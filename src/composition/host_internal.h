@@ -417,8 +417,6 @@ struct reach_host
     reach_window_thumbnail_id stage_thumbnail_ids[REACH_STAGE_MAX_TILES];
     size_t stage_thumbnail_generation;
     int32_t stage_thumbnails_registered;
-    uint64_t wallpaper_image_id;
-    uint16_t wallpaper_image_path[260];
     reach_context_menu *context_menu_capsule;
     reach_launcher *launcher_capsule;
     int32_t running;

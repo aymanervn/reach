@@ -259,51 +259,6 @@ void reach_host_apply_power_config(reach_host *host, const reach_config_snapshot
     reach_idle_watch_set_config(host->idle_watch, &config);
 }
 
-static const uint16_t *reach_host_primary_wallpaper_path(reach_host *host,
-                                                         const reach_config_snapshot *snapshot)
-{
-    if (host->monitors.list != nullptr && host->monitors.ops.count != nullptr &&
-        host->monitors.ops.get != nullptr)
-    {
-        size_t count = host->monitors.ops.count(host->monitors.list);
-        for (size_t index = 0; index < count && index < REACH_MAX_WALLPAPER_MONITORS; ++index)
-        {
-            const reach_monitor_info *monitor = host->monitors.ops.get(host->monitors.list, index);
-            if (monitor != nullptr && monitor->primary &&
-                snapshot->monitor_wallpaper_paths[index][0] != 0)
-            {
-                return snapshot->monitor_wallpaper_paths[index];
-            }
-        }
-    }
-    return snapshot->wallpaper_path;
-}
-
-static void reach_host_refresh_wallpaper_image(reach_host *host, const uint16_t *path)
-{
-    if (host == nullptr || host->image_loader.ops.load == nullptr || path == nullptr)
-    {
-        return;
-    }
-    if (host->wallpaper_image_id != 0 && reach_host_utf16_equal(host->wallpaper_image_path, path))
-    {
-        return;
-    }
-
-    uint64_t image_id = 0;
-    if (path[0] != 0)
-    {
-        (void)host->image_loader.ops.load(host->image_loader.loader, path, 1024, 1024, &image_id);
-    }
-
-    if (host->wallpaper_image_id != 0 && host->image_loader.ops.release != nullptr)
-    {
-        host->image_loader.ops.release(host->image_loader.loader, host->wallpaper_image_id);
-    }
-    host->wallpaper_image_id = image_id;
-    (void)reach_copy_utf16(host->wallpaper_image_path, 260, path);
-}
-
 void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot *snapshot)
 {
     if (host == nullptr || snapshot == nullptr)
@@ -312,11 +267,10 @@ void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot 
     }
     if (reach_wallpaper_apply_snapshot(host->wallpaper, snapshot))
     {
-        (void)reach_config_service_set_wallpapers(
-            host->config_service, snapshot->wallpaper_path,
-            snapshot->monitor_wallpaper_paths, REACH_MAX_WALLPAPER_MONITORS);
+        (void)reach_config_service_set_wallpapers(host->config_service, snapshot->wallpaper_path,
+                                                  snapshot->monitor_wallpaper_paths,
+                                                  REACH_MAX_WALLPAPER_MONITORS);
     }
-    reach_host_refresh_wallpaper_image(host, reach_host_primary_wallpaper_path(host, snapshot));
 }
 
 static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, size_t a_count,
