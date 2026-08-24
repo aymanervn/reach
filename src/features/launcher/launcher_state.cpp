@@ -2,6 +2,7 @@
 
 #include "launcher_common.h"
 
+#include <math.h>
 #include <new>
 
 struct reach_launcher
@@ -14,6 +15,7 @@ struct reach_launcher
     int32_t pointer_layout_valid;
     const reach_pinned_app_model *pointer_pinned_apps;
     size_t pointer_pinned_app_count;
+    reach_transform_f32 pointer_transform;
 };
 
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher)
@@ -37,6 +39,14 @@ void reach_launcher_set_pointer_context(reach_launcher *launcher,
     }
     launcher->pointer_pinned_apps = pinned_apps;
     launcher->pointer_pinned_app_count = pinned_app_count;
+}
+
+void reach_launcher_set_pointer_transform(reach_launcher *launcher, reach_transform_f32 transform)
+{
+    if (launcher != nullptr)
+    {
+        launcher->pointer_transform = transform;
+    }
 }
 
 void reach_launcher_attach_icons(reach_launcher *launcher, reach_icon_service *icons)
@@ -756,6 +766,7 @@ static void reach_launcher_capsule_reset(void *capsule)
     {
         reach_pressable_reset(&launcher->state.pressable, nullptr);
         launcher->pointer_layout_valid = 0;
+        launcher->pointer_transform = {1.0f, 1.0f, 0.0f, 0.0f};
     }
 }
 
@@ -856,29 +867,37 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
 
     reach_launcher_event_context ctx = reach_launcher_capsule_event_context(launcher);
     reach_launcher_event_result event_result = {};
-    switch (event->kind)
+    reach_pointer_event mapped = *event;
+    if (launcher->pointer_transform.scale_x > 0.0f && launcher->pointer_transform.scale_y > 0.0f)
+    {
+        mapped.x = (int32_t)lroundf(((float)event->x - launcher->pointer_transform.offset_x) /
+                                    launcher->pointer_transform.scale_x);
+        mapped.y = (int32_t)lroundf(((float)event->y - launcher->pointer_transform.offset_y) /
+                                    launcher->pointer_transform.scale_y);
+    }
+    switch (mapped.kind)
     {
     case REACH_POINTER_EVENT_DOWN:
-        reach_launcher_pointer_down(launcher, event->x, event->y, event->button, &ctx,
+        reach_launcher_pointer_down(launcher, mapped.x, mapped.y, mapped.button, &ctx,
                                     &event_result);
         break;
     case REACH_POINTER_EVENT_UP:
-        if (event->button == REACH_POINTER_BUTTON_PRIMARY &&
+        if (mapped.button == REACH_POINTER_BUTTON_PRIMARY &&
             launcher->state.launcher_scrollbar_drag.active)
         {
             reach_launcher_scrollbar_release(launcher, &event_result);
         }
         else
         {
-            reach_launcher_pointer_up(launcher, event->x, event->y, event->button, &ctx,
+            reach_launcher_pointer_up(launcher, mapped.x, mapped.y, mapped.button, &ctx,
                                       &event_result);
         }
         break;
     case REACH_POINTER_EVENT_MOVE:
-        reach_launcher_pointer_move(launcher, event->x, event->y, &ctx, &event_result);
+        reach_launcher_pointer_move(launcher, mapped.x, mapped.y, &ctx, &event_result);
         break;
     case REACH_POINTER_EVENT_WHEEL:
-        reach_launcher_wheel(launcher, event->x, event->y, event->wheel_delta, &ctx, &event_result);
+        reach_launcher_wheel(launcher, mapped.x, mapped.y, mapped.wheel_delta, &ctx, &event_result);
         break;
     case REACH_POINTER_EVENT_CANCEL:
         reach_launcher_pointer_cancel(launcher, &event_result);

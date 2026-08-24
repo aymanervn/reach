@@ -206,11 +206,14 @@ reach_result reach_host_render_stage_surface(reach_host *host, reach_rect_f32 bo
 }
 
 reach_result reach_host_render_launcher_surface(reach_host *host,
-                                                const reach_launcher_layout *layout)
+                                                const reach_launcher_layout *layout,
+                                                const reach_host_surface_transition_frame *frame)
 {
     REACH_ASSERT(host != nullptr);
     REACH_ASSERT(layout != nullptr);
-    if (host == nullptr || layout == nullptr || host->launcher.renderer.ops.begin_frame == nullptr)
+    REACH_ASSERT(frame != nullptr);
+    if (host == nullptr || layout == nullptr || frame == nullptr ||
+        host->launcher.renderer.ops.begin_frame == nullptr)
     {
         return REACH_OK;
     }
@@ -228,7 +231,8 @@ reach_result reach_host_render_launcher_surface(reach_host *host,
     {
         return build_result;
     }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_LAUNCHER, commands);
+    reach_render_command_buffer_set_content_transform(commands, frame->content_rect,
+                                                      frame->render_transform);
 
     if (host->launcher.renderer.ops.begin_frame(host->launcher.renderer.backend) != REACH_OK)
     {

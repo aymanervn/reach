@@ -107,8 +107,10 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
     if (has_content_rect)
     {
         (void)reach_wuc_apply_content_clip(backend, commands->content_rect);
-        target->SetTransform(D2D1::Matrix3x2F::Translation(commands->content_rect.x,
-                                                           commands->content_rect.y));
+        target->SetTransform(D2D1::Matrix3x2F::Scale(commands->content_transform.scale_x,
+                                                     commands->content_transform.scale_y) *
+                             D2D1::Matrix3x2F::Translation(commands->content_transform.offset_x,
+                                                           commands->content_transform.offset_y));
     }
 
     reach_result outcome = REACH_OK;

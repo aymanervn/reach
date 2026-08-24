@@ -27,6 +27,14 @@ extern "C"
         float y;
     } reach_point_f32;
 
+    typedef struct reach_transform_f32
+    {
+        float scale_x;
+        float scale_y;
+        float offset_x;
+        float offset_y;
+    } reach_transform_f32;
+
 #ifdef __cplusplus
 }
 #endif

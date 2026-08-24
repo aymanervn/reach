@@ -117,6 +117,10 @@ The Launcher is also fully migrated: it owns result and pinned-app presses,
 scrolling and scrollbar capture, cancellation, and context-hit semantics through
 `handle_pointer`. Composition translates launch/open/reveal actions and retains
 focus restoration plus transient-surface policy.
+Its open/close transition keeps one maximum-size native envelope and applies one
+centered proportional scale to the complete capsule alongside the existing fade and
+Y tracks. Pointer input is inverse-mapped through the same scale, and closing reverses
+all three tracks from their current values.
 The Clipboard is fully migrated as well: it owns item, close, clear, hover,
 scroll, scrollbar-capture, leave, and cancellation behavior. Composition handles
 only restore/provider calls, external resource release, and transient-surface

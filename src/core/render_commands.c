@@ -37,6 +37,7 @@ void reach_render_command_buffer_clear(reach_render_command_buffer *buffer)
         buffer->count = 0;
         buffer->has_scissor = 0;
         buffer->content_rect = empty;
+        buffer->content_transform = (reach_transform_f32){1.0f, 1.0f, 0.0f, 0.0f};
     }
 }
 
@@ -46,6 +47,19 @@ void reach_render_command_buffer_set_content_rect(reach_render_command_buffer *b
     if (buffer != 0)
     {
         buffer->content_rect = content_rect;
+        buffer->content_transform =
+            (reach_transform_f32){1.0f, 1.0f, content_rect.x, content_rect.y};
+    }
+}
+
+void reach_render_command_buffer_set_content_transform(reach_render_command_buffer *buffer,
+                                                       reach_rect_f32 content_rect,
+                                                       reach_transform_f32 content_transform)
+{
+    if (buffer != 0)
+    {
+        buffer->content_rect = content_rect;
+        buffer->content_transform = content_transform;
     }
 }
 
@@ -194,4 +208,3 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
     buffer->count += 1;
     return REACH_OK;
 }
-

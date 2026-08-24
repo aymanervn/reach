@@ -157,6 +157,7 @@ extern "C"
         reach_rect_f32 scissor_rect;
         int32_t has_scissor;
         reach_rect_f32 content_rect;
+        reach_transform_f32 content_transform;
     } reach_render_command_buffer;
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
@@ -166,6 +167,9 @@ extern "C"
                                                  reach_rect_f32 scissor_rect);
     void reach_render_command_buffer_set_content_rect(reach_render_command_buffer *buffer,
                                                       reach_rect_f32 content_rect);
+    void reach_render_command_buffer_set_content_transform(reach_render_command_buffer *buffer,
+                                                           reach_rect_f32 content_rect,
+                                                           reach_transform_f32 content_transform);
     reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                           const reach_render_command *shape,
                                           const reach_shadow *shadow, float dpi_scale);
