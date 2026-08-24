@@ -54,8 +54,11 @@ Includes `ports`, `protocol`, `core`, and platform SDKs.
 ## services
 
 Shared in-process capabilities with state/cache/policy — config, icons, search,
-system status, Now Playing, … Includes `ports`, `protocol`, `core`. Window
-tracking owns the one naming policy for a running app
+system status, Now Playing, … Includes `ports`, `protocol`, `core`. The config service owns
+the live configuration snapshot, publishes typed mutations before persistence, rebases pending
+mutations on the latest stored snapshot, coalesces background writes by generation, and
+reconciles external-change reloads. Features consume snapshot copies and never access the
+config-store port directly. Window tracking owns the one naming policy for a running app
 (`reach_window_tracking_app_display_name`: executable stem, window title as
 fallback); every surface that labels an app — the top bar's current-app pill, the
 switcher — reads it from there. Pinned apps do not persist a title; the Dock derives

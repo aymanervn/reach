@@ -70,32 +70,32 @@ static int32_t reach_host_path_equals(const uint16_t *a, const uint16_t *b)
     return a[index] == b[index];
 }
 
-reach_result reach_host_schedule_config_reload(reach_host *host)
+reach_result reach_host_request_config_reload(reach_host *host)
 {
-    return host != nullptr ? reach_config_service_schedule_reload(host->config_service)
+    return host != nullptr ? reach_config_service_reload(host->config_service)
                            : REACH_INVALID_ARGUMENT;
 }
 
-reach_result reach_host_schedule_pin_app(reach_host *host, const reach_pinned_app_model *app)
+reach_result reach_host_pin_app(reach_host *host, const reach_pinned_app_model *app)
 {
-    return host != nullptr ? reach_config_service_schedule_pin_app(host->config_service, app)
+    return host != nullptr ? reach_config_service_pin_app(host->config_service, app)
                            : REACH_INVALID_ARGUMENT;
 }
 
-reach_result reach_host_schedule_unpin_id(reach_host *host, uint32_t pin_id)
+reach_result reach_host_unpin_id(reach_host *host, uint32_t pin_id)
 {
-    return host != nullptr ? reach_config_service_schedule_unpin(host->config_service, pin_id)
+    return host != nullptr ? reach_config_service_unpin_id(host->config_service, pin_id)
                            : REACH_INVALID_ARGUMENT;
 }
 
-reach_result reach_host_schedule_move_pin(reach_host *host, uint32_t pin_id, size_t target_index)
+reach_result reach_host_move_pin(reach_host *host, uint32_t pin_id, size_t target_index)
 {
     return host != nullptr
-               ? reach_config_service_schedule_move_pin(host->config_service, pin_id, target_index)
+               ? reach_config_service_move_pin(host->config_service, pin_id, target_index)
                : REACH_INVALID_ARGUMENT;
 }
 
-void reach_host_stop_config_reload_worker(reach_host *host)
+void reach_host_stop_config_service(reach_host *host)
 {
     if (host != nullptr)
     {
@@ -103,34 +103,19 @@ void reach_host_stop_config_reload_worker(reach_host *host)
     }
 }
 
-int32_t reach_host_config_reload_work_pending(const reach_host *host)
-{
-    return host != nullptr && reach_config_service_work_pending(host->config_service);
-}
-
-int32_t reach_host_apply_config_reload_result(reach_host *host)
+int32_t reach_host_apply_config_update(reach_host *host)
 {
     if (host == nullptr)
     {
         return 0;
     }
 
-    reach_result result = REACH_OK;
     reach_config_snapshot snapshot = {};
-    int32_t current = 0;
-    if (!reach_config_service_take_completed(host->config_service, &result, &snapshot, &current))
+    if (!reach_config_service_take_snapshot_update(host->config_service, &snapshot))
     {
         return 0;
     }
-    if (!current)
-    {
-        return 1;
-    }
-
-    if (result == REACH_OK)
-    {
-        (void)reach_host_apply_config_snapshot(host, &snapshot, 1, 1);
-    }
+    (void)reach_host_apply_config_snapshot(host, &snapshot, 1, 1);
     return 1;
 }
 
@@ -325,7 +310,12 @@ void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot 
     {
         return;
     }
-    reach_wallpaper_apply_snapshot(host->wallpaper, snapshot);
+    if (reach_wallpaper_apply_snapshot(host->wallpaper, snapshot))
+    {
+        (void)reach_config_service_set_wallpapers(
+            host->config_service, snapshot->wallpaper_path,
+            snapshot->monitor_wallpaper_paths, REACH_MAX_WALLPAPER_MONITORS);
+    }
     reach_host_refresh_wallpaper_image(host, reach_host_primary_wallpaper_path(host, snapshot));
 }
 
@@ -450,5 +440,9 @@ void reach_host_reload_wallpaper(reach_host *host, int32_t force)
     {
         return;
     }
-    reach_wallpaper_reload(host->wallpaper, force);
+    reach_config_snapshot snapshot = {};
+    if (reach_config_service_snapshot(host->config_service, &snapshot) == REACH_OK)
+    {
+        reach_wallpaper_reload(host->wallpaper, &snapshot, force);
+    }
 }

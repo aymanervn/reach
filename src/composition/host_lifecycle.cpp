@@ -2,11 +2,19 @@
 
 #include <new>
 
-static void reach_host_on_config_service_ready(void *user)
+static void reach_host_on_config_service_ready(void *user, reach_config_service_event event)
 {
-
     reach_host *host = static_cast<reach_host *>(user);
     if (host == nullptr)
+    {
+        return;
+    }
+    if (event == REACH_CONFIG_SERVICE_PERSIST_FAILED)
+    {
+        reach_log_error("Could not persist Reach configuration.");
+        return;
+    }
+    if (event != REACH_CONFIG_SERVICE_SNAPSHOT_CHANGED)
     {
         return;
     }
@@ -102,7 +110,7 @@ static void reach_host_cleanup(reach_host *host)
 
     reach_host_set_tray_popup_open(host, 0);
     reach_host_set_quick_settings_open(host, 0);
-    reach_host_stop_config_reload_worker(host);
+    reach_host_stop_config_service(host);
     reach_host_stop_launcher_search_worker(host);
     reach_icon_service_stop(host->icon_service);
     reach_host_stop_app_control(host);
@@ -532,6 +540,10 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
+    else
+    {
+        (void)reach_config_service_ensure_defaults(host->config_service);
+    }
     host->tray_service = nullptr;
     if (reach_tray_service_create(dependencies->tray_provider, &host->tray_service) != REACH_OK)
     {
@@ -565,7 +577,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->wallpaper_surface = dependencies->wallpaper_surface;
     host->wallpaper = nullptr;
     if (reach_wallpaper_create(dependencies->wallpaper_service, dependencies->wallpaper_surface,
-                               dependencies->config_store, &host->wallpaper) != REACH_OK)
+                               &host->wallpaper) != REACH_OK)
     {
         result = REACH_ERROR;
     }
@@ -632,11 +644,10 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         result = REACH_INVALID_ARGUMENT;
     }
 
-    if (result == REACH_OK && host->config_store.ops.load != nullptr)
+    if (result == REACH_OK)
     {
-        (void)reach_pin_config_ensure_defaults(&host->config_store);
         reach_config_snapshot snapshot = {};
-        if (host->config_store.ops.load(host->config_store.store, &snapshot) == REACH_OK)
+        if (reach_config_service_snapshot(host->config_service, &snapshot) == REACH_OK)
         {
             if (snapshot.dock_height > 0.0f)
                 host->dock_config.height = snapshot.dock_height;
@@ -648,10 +659,16 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
             {
                 snapshot.power_shutdown_minutes = 0;
                 snapshot.power_restart_minutes = 0;
-                if (host->config_store.ops.save != nullptr)
-                {
-                    (void)host->config_store.ops.save(host->config_store.store, &snapshot);
-                }
+                reach_config_power_settings power = {};
+                power.screen_off_minutes = snapshot.power_screen_off_minutes;
+                power.sleep_minutes = snapshot.power_sleep_minutes;
+                power.lock_minutes = snapshot.power_lock_minutes;
+                power.shutdown_minutes = snapshot.power_shutdown_minutes;
+                power.restart_minutes = snapshot.power_restart_minutes;
+                power.sleep_wait_apps = snapshot.power_sleep_wait_apps;
+                power.shutdown_wait_apps = snapshot.power_shutdown_wait_apps;
+                power.restart_wait_apps = snapshot.power_restart_wait_apps;
+                (void)reach_config_service_set_power(host->config_service, &power);
             }
             reach_host_apply_power_config(host, &snapshot);
             host->high_refresh_rate = snapshot.high_refresh_rate ? 1 : 0;
@@ -897,7 +914,7 @@ reach_result reach_host_stop(reach_host *host)
     reach_host_set_quick_settings_open(host, 0);
     reach_host_set_battery_open(host, 0);
     reach_launcher_cancel_search(host->launcher_capsule);
-    reach_host_stop_config_reload_worker(host);
+    reach_host_stop_config_service(host);
     reach_host_stop_launcher_search_worker(host);
     reach_icon_service_stop(host->icon_service);
     reach_host_stop_app_control(host);

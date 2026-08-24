@@ -587,6 +587,20 @@ def validate_capsule_state_encapsulation(path: Path, text: str) -> list[str]:
         )
     return violations
 
+
+def validate_feature_config_ownership(path: Path, text: str) -> list[str]:
+    relative = rel(path).replace("\\", "/")
+    if not relative.startswith("src/features/") and not relative.startswith(
+        "include/reach/features/"
+    ):
+        return []
+    if "config_store" not in strip_comments(text):
+        return []
+    return [
+        f"{relative}: features must consume reach_config_service snapshots, not config_store"
+    ]
+
+
 def validate_public_inner_api(path: Path, text: str) -> list[str]:
     violations: list[str] = []
     source_layer = layer_for_path(path)
@@ -674,6 +688,7 @@ def main() -> int:
         violations.extend(validate_windows_boundary(path, text))
         violations.extend(validate_public_inner_api(path, text))
         violations.extend(validate_capsule_state_encapsulation(path, text))
+        violations.extend(validate_feature_config_ownership(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 
     if violations:

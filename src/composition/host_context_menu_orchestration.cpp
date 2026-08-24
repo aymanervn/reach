@@ -143,7 +143,7 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_UNPIN)
     {
-        return pin_id != 0 ? reach_host_schedule_unpin_id(host, pin_id) : REACH_ERROR;
+        return pin_id != 0 ? reach_host_unpin_id(host, pin_id) : REACH_ERROR;
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_PIN)
     {
@@ -169,7 +169,7 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
             (void)reach_copy_utf16(app.icon_ref, 260, item_path);
         }
 
-        return app.path[0] != 0 ? reach_host_schedule_pin_app(host, &app) : REACH_ERROR;
+        return app.path[0] != 0 ? reach_host_pin_app(host, &app) : REACH_ERROR;
     }
     if (command == REACH_CONTEXT_MENU_COMMAND_CLOSE)
     {

@@ -328,8 +328,8 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
         return REACH_OK;
     }
     case REACH_DOCK_POINTER_ACTION_MOVE_PIN:
-        return reach_host_schedule_move_pin(host, static_cast<uint32_t>(result->action.id),
-                                            result->action.index);
+        return reach_host_move_pin(host, static_cast<uint32_t>(result->action.id),
+                                   result->action.index);
     case REACH_DOCK_POINTER_ACTION_HOVER_ITEM:
         reach_host_dock_item_hovered(host, result->action.index);
         return REACH_OK;
@@ -1003,11 +1003,11 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     if (event->type == REACH_UI_EVENT_CONFIG_CHANGED)
     {
-        if (reach_host_apply_config_reload_result(host))
+        if (reach_host_apply_config_update(host))
         {
             return REACH_OK;
         }
-        return reach_host_schedule_config_reload(host);
+        return reach_host_request_config_reload(host);
     }
 
     if (event->type == REACH_UI_EVENT_LAUNCHER_SEARCH_READY)
