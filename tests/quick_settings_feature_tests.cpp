@@ -119,7 +119,20 @@ static void test_expansion_keeps_popup_anchor_position(void)
 
     (void)reach_quick_settings_set_open(quick_settings, 1);
     reach_quick_settings_refresh_layout(quick_settings, &ctx);
-    const float initial_y = reach_quick_settings_state_ptr(quick_settings)->bounds.y;
+    const reach_quick_settings_state *state = reach_quick_settings_state_ptr(quick_settings);
+    const float narrow_width = state->bounds.width;
+    const float content_width = state->content_bounds.width;
+
+    reach_theme wide_border_theme = *reach_theme_default();
+    wide_border_theme.border_thickness = 3.0f;
+    ctx.theme = &wide_border_theme;
+    reach_quick_settings_refresh_layout(quick_settings, &ctx);
+    state = reach_quick_settings_state_ptr(quick_settings);
+    expect_near(state->bounds.width - narrow_width, 5.0f, 0.001f,
+                "quick settings outer width derives both DPI-scaled border sides");
+    expect_near(state->content_bounds.width, content_width, 0.001f,
+                "quick settings content width stays stable across border widths");
+    const float initial_y = state->bounds.y;
 
     (void)reach_quick_settings_toggle_expanded(quick_settings);
     reach_quick_settings_relayout(quick_settings, &ctx, 1);

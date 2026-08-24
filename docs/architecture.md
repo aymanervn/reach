@@ -27,6 +27,8 @@ the outer shape, emits an opaque border-color fill, then emits an opaque backgro
 inset by the border thickness. Features append content after that pair. Normal primitive
 antialiasing stays enabled, and there is no general rounded-rectangle stroke render command.
 Line, arc, and intrinsic vector strokes remain separate drawing semantics.
+Border-bearing layouts treat their padding and content metrics as inner-box geometry and derive
+their outer size and constrained content rectangle from the runtime DPI-scaled theme border.
 
 ## protocol
 

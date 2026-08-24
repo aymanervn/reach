@@ -3,6 +3,7 @@
 static reach_battery_open_context reach_host_battery_open_context(reach_host *host)
 {
     reach_battery_open_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     const reach_top_bar_layout *top_bar_layout =
         &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;

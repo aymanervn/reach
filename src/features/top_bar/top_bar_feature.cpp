@@ -479,13 +479,15 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         reach_top_bar_now_playing_desired_width(top_bar->now_playing_subfeature, ctx->theme,
                                                 scale));
 
-    float power_clock_width = padding + power_button_size + clock_gap + clock_width + dot_gap +
-                              dot_size + dot_gap + now_playing_width + border_thickness;
+    float power_clock_width = border_thickness * 2.0f + padding + power_button_size + clock_gap +
+                              clock_width + dot_gap + dot_size + dot_gap + now_playing_width;
     float left = edge_inset;
     layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK] =
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
-    layout->power_button = reach_top_bar_rect(left + padding, (height - power_button_size) * 0.5f,
-                                              power_button_size, power_button_size);
+    layout->power_button =
+        reach_top_bar_rect(left + border_thickness + padding,
+                           (height - power_button_size) * 0.5f, power_button_size,
+                           power_button_size);
 
     float clock_x = layout->power_button.x + power_button_size + clock_gap;
     layout->clock_time = reach_top_bar_text_run(clock_x, height, time_advance);
@@ -577,8 +579,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         top_bar, REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH, &top_bar->quick_settings_target_width,
         quick_settings_padding * 2.0f + quick_settings_content);
 
-    float quick_settings_width = dot_size * 0.5f + dot_gap + stats_width + language_width +
-                                 language_gap + battery_width + battery_gap +
+    float quick_settings_width = border_thickness + dot_size * 0.5f + dot_gap + stats_width +
+                                 language_width + language_gap + battery_width + battery_gap +
                                  quick_settings_button_width + pill_gap + button_size + padding;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
@@ -661,15 +663,16 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         tray_edge_inset = 0.0f;
     }
 
-    float tray_target_width = tray_edge_inset + tray_background_padding * 2.0f + tray_cells_span +
-                              dot_gap + dot_size * 0.5f;
+    float tray_target_width = border_thickness + tray_edge_inset +
+                              tray_background_padding * 2.0f + tray_cells_span + dot_gap +
+                              dot_size * 0.5f;
     float tray_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_TRAY_WIDTH, &top_bar->tray_target_width, tray_target_width);
     layout->pills[REACH_TOP_BAR_PILL_TRAY] =
         reach_top_bar_rect(right - tray_width, 0.0f, tray_width, height);
 
-    float cells_left =
-        layout->pills[REACH_TOP_BAR_PILL_TRAY].x + tray_edge_inset + tray_background_padding;
+    float cells_left = layout->pills[REACH_TOP_BAR_PILL_TRAY].x + border_thickness +
+                       tray_edge_inset + tray_background_padding;
     float tray_x = cells_left;
     float tray_y = (height - tray_slot) * 0.5f;
     layout->tray_icon_count = tray_count;
@@ -701,7 +704,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float name_advance =
         reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.current_app_name, name_size,
                                    metrics.current_app_name_text_weight);
-    float current_app_chrome = padding * 2.0f + current_app_icon_size + current_app_icon_gap;
+    float current_app_chrome = border_thickness * 2.0f + padding * 2.0f +
+                               current_app_icon_size + current_app_icon_gap;
     float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
     float current_app_target = current_app_chrome + name_advance;
     if (current_app_target > current_app_max_width)
@@ -716,7 +720,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         (layout->bounds.width - current_app_width) * 0.5f, 0.0f, current_app_width, height);
 
     reach_rect_f32 current_app = layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP];
-    float current_app_text_x = current_app.x + padding;
+    float current_app_text_x = current_app.x + border_thickness + padding;
     if (current_app_icon_size > 0.0f)
     {
         layout->current_app_icon =
@@ -724,8 +728,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                current_app_icon_size, current_app_icon_size);
         current_app_text_x += current_app_icon_size + current_app_icon_gap;
     }
-    float current_app_text_advance =
-        current_app.x + current_app.width - padding - current_app_text_x;
+    float current_app_text_advance = current_app.x + current_app.width - border_thickness -
+                                     padding - current_app_text_x;
     if (current_app_text_advance < 0.0f)
     {
         current_app_text_advance = 0.0f;

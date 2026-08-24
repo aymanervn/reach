@@ -55,7 +55,7 @@
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
-    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 1.2f,        \
+    .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 1.0f,        \
     .icon_box_height_ratio = 0.60f, .icon_max_box_ratio = 0.76f,                                   \
     .icon_box_corner_radius_ratio = 0.28f, .icon_box_corner_radius_max = 14.0f,                    \
     .tray_slot_size_ratio = 0.3f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,   \
@@ -389,6 +389,22 @@ float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale)
 {
     const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
     return actual->border_thickness * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+}
+
+reach_rect_f32 reach_theme_border_content_rect(const reach_theme *theme, float dpi_scale,
+                                               reach_rect_f32 bounds)
+{
+    float inset = reach_theme_border_thickness(theme, dpi_scale);
+    inset = inset > 0.0f ? inset : 0.0f;
+    float width = bounds.width > 0.0f ? bounds.width : 0.0f;
+    float height = bounds.height > 0.0f ? bounds.height : 0.0f;
+    float horizontal = inset < width * 0.5f ? inset : width * 0.5f;
+    float vertical = inset < height * 0.5f ? inset : height * 0.5f;
+    bounds.x += horizontal;
+    bounds.y += vertical;
+    bounds.width = width - horizontal * 2.0f;
+    bounds.height = height - vertical * 2.0f;
+    return bounds;
 }
 
 static float reach_shadow_ceil(float value)

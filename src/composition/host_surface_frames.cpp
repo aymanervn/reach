@@ -134,9 +134,12 @@ reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame
 {
     const reach_rect_f32 monitor_bounds = ctx->monitor_bounds;
     int32_t clipboard_animating = 0;
+    float clipboard_border_thickness = reach_theme_border_thickness(
+        host->theme != nullptr ? host->theme : reach_theme_default(),
+        reach_host_layout_dpi_scale(host));
     int32_t clipboard_layout_changed = reach_clipboard_feature_relayout(
         host->clipboard_capsule, monitor_bounds, host->layout.launcher.bounds,
-        reach_host_layout_dpi_scale(host), &clipboard_animating);
+        reach_host_layout_dpi_scale(host), clipboard_border_thickness, &clipboard_animating);
     if (clipboard_animating)
     {
         host->dirty.layout = 1;
@@ -354,8 +357,12 @@ reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_
         return REACH_OK;
     }
 
+    float switcher_dpi_scale = reach_host_layout_dpi_scale(host);
+    float switcher_border_thickness = reach_theme_border_thickness(
+        host->theme != nullptr ? host->theme : reach_theme_default(), switcher_dpi_scale);
     reach_rect_f32 target_switcher_bounds = reach_switcher_bounds_for_count_scaled(
-        monitor_bounds, reach_host_switcher_visible_count(host), reach_host_layout_dpi_scale(host));
+        monitor_bounds, reach_host_switcher_visible_count(host), switcher_dpi_scale,
+        switcher_border_thickness);
     reach_rect_f32 switcher_bounds =
         reach_host_apply_switcher_bounds_animation(host, target_switcher_bounds);
 

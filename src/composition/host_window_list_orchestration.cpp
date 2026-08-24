@@ -53,6 +53,7 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
         reach_dock_rect_to_screen(&host->layout.dock, host->layout.dock.app_slots[item_index]);
 
     reach_context_menu_open_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.anchored = 1;
     ctx.anchor_button = slot;

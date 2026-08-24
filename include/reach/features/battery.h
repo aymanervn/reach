@@ -46,6 +46,7 @@ extern "C"
 
     typedef struct reach_battery_open_context
     {
+        const reach_theme *theme;
         reach_rect_f32 monitor;
         reach_rect_f32 anchor_button;
         float bar_edge_y;

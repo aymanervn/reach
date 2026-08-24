@@ -100,6 +100,8 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     size_t visible_count = reach_switcher_visible_count(input->model->window_count);
 
     float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
+    reach_rect_f32 content_bounds = reach_theme_border_content_rect(
+        theme, input->dpi_scale, {0.0f, 0.0f, input->bounds.width, input->bounds.height});
 
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
@@ -117,12 +119,12 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     if (visible_count > 0)
     {
         float total_width = (float)visible_count * item_size + (float)(visible_count - 1) * gap;
-        float x = (input->bounds.width - total_width) * 0.5f;
-        if (x < padding)
+        float x = content_bounds.x + (content_bounds.width - total_width) * 0.5f;
+        if (x < content_bounds.x + padding)
         {
-            x = padding;
+            x = content_bounds.x + padding;
         }
-        float y = (input->bounds.height - item_size) * 0.5f;
+        float y = content_bounds.y + (content_bounds.height - item_size) * 0.5f;
         for (size_t visible_index = 0; visible_index < visible_count; ++visible_index)
         {
             size_t index = input->model->visible_start + visible_index;

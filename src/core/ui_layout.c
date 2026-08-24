@@ -64,9 +64,12 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     }
 
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
+    float border_thickness = input->border_thickness > 0.0f ? input->border_thickness : 0.0f;
+    float search_content_width = reach_scale(640.0f, scale);
+    float search_content_height = reach_scale(52.0f, scale);
 
-    out_layout->search_box.width = reach_scale(640.0f, scale);
-    out_layout->search_box.height = reach_scale(52.0f, scale);
+    out_layout->search_box.width = search_content_width + border_thickness * 2.0f;
+    out_layout->search_box.height = search_content_height + border_thickness * 2.0f;
     out_layout->search_box.x = input->monitor_bounds.x +
                                (input->monitor_bounds.width - out_layout->search_box.width) * 0.5f;
     out_layout->search_box.y =
@@ -78,17 +81,19 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     float search_icon_size = reach_scale(20.0f, scale);
     out_layout->search_icon.width = search_icon_size;
     out_layout->search_icon.height = search_icon_size;
-    out_layout->search_icon.x = out_layout->search_box.x + out_layout->search_box.width -
-                                search_text_padding_x - search_icon_size;
-    out_layout->search_icon.y = out_layout->search_box.y +
-                                (out_layout->search_box.height - search_icon_size) * 0.5f +
+    out_layout->search_icon.x = out_layout->search_box.x + border_thickness +
+                                search_content_width - search_text_padding_x - search_icon_size;
+    out_layout->search_icon.y = out_layout->search_box.y + border_thickness +
+                                (search_content_height - search_icon_size) * 0.5f +
                                 reach_scale(1.0f, scale);
-    out_layout->search_text_input.x = out_layout->search_box.x + search_text_padding_x;
-    out_layout->search_text_input.y = out_layout->search_box.y + search_text_padding_y;
+    out_layout->search_text_input.x =
+        out_layout->search_box.x + border_thickness + search_text_padding_x;
+    out_layout->search_text_input.y =
+        out_layout->search_box.y + border_thickness + search_text_padding_y;
     out_layout->search_text_input.width =
         out_layout->search_icon.x - search_text_padding_x - out_layout->search_text_input.x;
     out_layout->search_text_input.height =
-        out_layout->search_box.height - search_text_padding_y * 2.0f;
+        search_content_height - search_text_padding_y * 2.0f;
 
     out_layout->pinned_app_slot_count = 0;
 
@@ -111,9 +116,10 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     }
 
     float search_results_top_padding = reach_scale(8.0f, scale);
-    float search_results_bottom_padding = reach_scale(8.0f, scale);
+    float search_results_bottom_padding = reach_scale(8.0f, scale) + border_thickness;
     out_layout->search_results.x = out_layout->search_box.x;
-    out_layout->search_results.y = out_layout->search_box.y + out_layout->search_box.height;
+    out_layout->search_results.y = out_layout->search_box.y + out_layout->search_box.height -
+                                   border_thickness;
     out_layout->search_results.width = out_layout->search_box.width;
     size_t visible_result_count = reach_visible_launcher_result_count(launcher);
     size_t visible_row_count = visible_result_count > 0
@@ -126,6 +132,12 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
                                                                     search_results_bottom_padding
                                                               : 0.0f;
     out_layout->search_result_items = out_layout->search_results;
+    out_layout->search_result_items.x += border_thickness;
+    out_layout->search_result_items.width -= border_thickness * 2.0f;
+    if (out_layout->search_result_items.width < 0.0f)
+    {
+        out_layout->search_result_items.width = 0.0f;
+    }
     out_layout->search_result_items.y += search_results_top_padding;
     out_layout->search_result_items.height = search_results_items_height;
     out_layout->search_result_scrollbar_track = (reach_rect_f32){0};
@@ -136,9 +148,14 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
         float gutter_width = reach_scale(18.0f, scale);
         float track_width = reach_scale(4.0f, scale);
         float track_padding_y = reach_scale(8.0f, scale);
-        out_layout->search_result_items.width = out_layout->search_results.width - gutter_width;
+        out_layout->search_result_items.width -= gutter_width;
+        if (out_layout->search_result_items.width < 0.0f)
+        {
+            out_layout->search_result_items.width = 0.0f;
+        }
         out_layout->search_result_scrollbar_track.x = out_layout->search_results.x +
                                                       out_layout->search_results.width -
+                                                      border_thickness -
                                                       gutter_width * 0.5f - track_width * 0.5f;
         out_layout->search_result_scrollbar_track.y =
             out_layout->search_result_items.y + track_padding_y;

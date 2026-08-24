@@ -212,6 +212,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
             input.monitor_bounds = bounds;
             input.work_area = bounds;
             input.dpi_scale = reach_host_monitor_dpi_scale(monitor);
+            input.border_thickness = reach_theme_border_thickness(
+                host->theme != nullptr ? host->theme : reach_theme_default(), input.dpi_scale);
             input.pinned_app_count = host->pinned_app_count;
             host->layout_dpi_scale = input.dpi_scale;
 

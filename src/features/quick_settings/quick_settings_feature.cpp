@@ -1413,10 +1413,12 @@ float reach_quick_settings_height_animation_value(const reach_quick_settings *qu
 }
 
 static reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bounds,
+                                                              const reach_theme *theme,
                                                               float dpi_scale,
                                                               int32_t drop_direction)
 {
-    reach_rect_f32 bounds = surface_bounds;
+    reach_rect_f32 bounds =
+        reach_theme_border_content_rect(theme, dpi_scale, surface_bounds);
 
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     const float horizontal_padding = 8.0f * scale;
@@ -1441,17 +1443,20 @@ static reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 sur
     return bounds;
 }
 
-static void reach_quick_settings_target_size(reach_quick_settings *quick_settings, float scale,
+static void reach_quick_settings_target_size(reach_quick_settings *quick_settings,
+                                             const reach_theme *theme, float scale,
                                              float *out_width, float *out_height)
 {
+    float border_thickness = reach_theme_border_thickness(theme, scale);
     const float surface_vertical_padding =
-        8.0f * scale + 12.0f * scale + reach_popup_notch_height_scaled(scale);
+        border_thickness * 2.0f + 8.0f * scale + 12.0f * scale +
+        reach_popup_notch_height_scaled(scale);
     float content_height = reach_quick_settings_content_height_for_model_scaled(
         &reach_quick_settings_state_mut(quick_settings)->model, scale);
 
     if (out_width != nullptr)
     {
-        *out_width = 280.0f * scale;
+        *out_width = 280.0f * scale + border_thickness * 2.0f;
     }
     if (out_height != nullptr)
     {
@@ -1476,7 +1481,8 @@ reach_quick_settings_placement(reach_quick_settings *quick_settings,
 {
     float width = 280.0f;
     float target_height = 140.0f;
-    reach_quick_settings_target_size(quick_settings, ctx->dpi_scale, &width, &target_height);
+    reach_quick_settings_target_size(quick_settings, ctx->theme, ctx->dpi_scale, &width,
+                                     &target_height);
 
     reach_popup_anchor anchor = reach_quick_settings_popup_anchor(ctx);
     return reach_popup_place(&anchor, width, height > 0.0f ? height : target_height,
@@ -1515,8 +1521,8 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     reach_rect_f32 surface_bounds = {};
     surface_bounds.width = state->bounds.width;
     surface_bounds.height = state->bounds.height;
-    state->content_bounds = reach_quick_settings_content_bounds_for(surface_bounds, ctx->dpi_scale,
-                                                                    ctx->drop_direction);
+    state->content_bounds = reach_quick_settings_content_bounds_for(
+        surface_bounds, ctx->theme, ctx->dpi_scale, ctx->drop_direction);
     state->layout = reach_quick_settings_layout_for_content_bounds_scaled(
         state->content_bounds, ctx->theme, &state->model, ctx->dpi_scale);
 }

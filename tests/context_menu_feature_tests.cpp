@@ -102,6 +102,7 @@ static void test_window_list_remove(void)
     entries[2].title = (const uint16_t *)L"three";
 
     reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
     ctx.dpi_scale = 1.0f;
     ctx.anchored = 1;
     ctx.anchor_button = {380.0f, 960.0f, 40.0f, 40.0f};
@@ -142,6 +143,7 @@ static void test_window_list_width_fits_and_clamps_measured_titles(void)
     test_text_measure measure = {10.0f};
     reach_context_menu_window_entry entry = {11, (const uint16_t *)L"Reach"};
     reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
     ctx.dpi_scale = 1.0f;
     ctx.anchored = 1;
     ctx.anchor_button = {380.0f, 960.0f, 40.0f, 40.0f};
@@ -154,13 +156,13 @@ static void test_window_list_width_fits_and_clamps_measured_titles(void)
     ctx.text_measure.measure = measure_text;
 
     reach_context_menu_open_window_list(menu, 0, &ctx);
-    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 88.0f, 0.0001f,
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 90.0f, 0.0001f,
                 "window list fits measured title and close-button chrome");
 
     entry.title =
         (const uint16_t *)L"A title long enough to exceed the configured preview maximum width";
     reach_context_menu_open_window_list(menu, 0, &ctx);
-    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 320.0f, 0.0001f,
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 322.0f, 0.0001f,
                 "window list clamps long titles to its maximum width");
 
     ctx.monitor.width = 180.0f;
@@ -171,8 +173,15 @@ static void test_window_list_width_fits_and_clamps_measured_titles(void)
     entry.title = (const uint16_t *)L"A";
     ctx.monitor.width = 1920.0f;
     reach_context_menu_open_window_list(menu, 0, &ctx);
-    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 48.0f, 0.0001f,
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 50.0f, 0.0001f,
                 "window list minimum fits one letter and close-button chrome");
+
+    reach_theme wide_border_theme = *reach_theme_default();
+    wide_border_theme.border_thickness = 3.0f;
+    ctx.theme = &wide_border_theme;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.width, 54.0f, 0.0001f,
+                "window list outer width tracks arbitrary border thickness");
 
     reach_context_menu_destroy(menu);
 }

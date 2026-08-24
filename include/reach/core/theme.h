@@ -214,6 +214,8 @@ extern "C"
     reach_color reach_theme_color_alpha(reach_color color, float alpha);
     reach_color reach_theme_color_mix(reach_color from, reach_color to, float t);
     float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale);
+    reach_rect_f32 reach_theme_border_content_rect(const reach_theme *theme, float dpi_scale,
+                                                   reach_rect_f32 bounds);
     float reach_theme_shadow_extent(const reach_shadow *shadow, float dpi_scale);
     reach_shadow_pad reach_theme_shadow_pad(const reach_shadow *shadow, float dpi_scale);
     float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height);

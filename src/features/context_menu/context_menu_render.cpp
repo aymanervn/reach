@@ -98,7 +98,6 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
 
     reach_render_command_buffer_clear(out_commands);
     reach_render_command command = {};
-    float width = input->bounds.width;
 
     reach_popup_background_input popup = {};
     popup.theme = input->theme;
