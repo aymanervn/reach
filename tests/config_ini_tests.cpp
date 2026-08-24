@@ -27,12 +27,19 @@ int main()
     wchar_t path[260] = {};
     failed += expect(GetTempPathW(260, temp_directory) != 0);
     failed += expect(GetTempFileNameW(temp_directory, L"rch", 0, path) != 0);
+    failed += expect(DeleteFileW(path) != 0);
 
     reach_config_store_port store = {};
     failed += expect(reach_windows_create_config_store(
                          reinterpret_cast<const uint16_t *>(path), &store) == REACH_OK);
 
     reach_config_snapshot snapshot = {};
+    failed += expect(store.ops.load(store.store, &snapshot) == REACH_OK);
+    failed += expect(snapshot.high_refresh_rate == 1);
+    failed += expect(snapshot.bundled_font == 1);
+    failed += expect(snapshot.light_theme == 0);
+
+    snapshot = {};
     snapshot.dock_height = 58.0f;
     snapshot.power_screen_off_minutes = 9;
     snapshot.power_sleep_minutes = 21;

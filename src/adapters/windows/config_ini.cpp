@@ -157,9 +157,9 @@ static reach_result reach_config_store_load(reach_config_store *store,
     out_snapshot->power_restart_wait_apps =
         (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 1, path) != 0;
     out_snapshot->high_refresh_rate =
-        (int32_t)GetPrivateProfileIntW(L"display", L"high_refresh_rate", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"display", L"high_refresh_rate", 1, path) != 0;
     out_snapshot->bundled_font =
-        (int32_t)GetPrivateProfileIntW(L"display", L"bundled_font", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"display", L"bundled_font", 1, path) != 0;
     out_snapshot->light_theme =
         (int32_t)GetPrivateProfileIntW(L"display", L"light_theme", 0, path) != 0;
     out_snapshot->stage_animation_ms =
