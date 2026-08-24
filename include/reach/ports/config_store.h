@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "reach/core/pinned_app.h"
+#include "reach/core/config.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -14,32 +14,10 @@ extern "C"
 
     typedef struct reach_config_store reach_config_store;
 
-#define REACH_MAX_WALLPAPER_MONITORS 8
-
-    typedef struct reach_config_snapshot
-    {
-        uint16_t version[32];
-        reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
-        size_t pinned_app_count;
-        uint16_t wallpaper_path[260];
-        uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
-        float dock_height;
-        int32_t power_screen_off_minutes;
-        int32_t power_sleep_minutes;
-        int32_t power_lock_minutes;
-        int32_t power_shutdown_minutes;
-        int32_t power_restart_minutes;
-        int32_t power_sleep_wait_apps;
-        int32_t power_shutdown_wait_apps;
-        int32_t power_restart_wait_apps;
-        int32_t high_refresh_rate;
-        int32_t bundled_font;
-        int32_t light_theme;
-        int32_t stage_animation_ms;
-    } reach_config_snapshot;
-
     typedef struct reach_config_store_ops
     {
+        reach_result (*begin_transaction)(reach_config_store *store);
+        void (*end_transaction)(reach_config_store *store);
         reach_result (*load)(reach_config_store *store, reach_config_snapshot *out_snapshot);
         reach_result (*save)(reach_config_store *store, const reach_config_snapshot *snapshot);
         void (*destroy)(reach_config_store *store);

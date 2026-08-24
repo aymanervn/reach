@@ -3,6 +3,7 @@
 #include "reach/core/theme.h"
 #include "reach/apps/settings/settings.h"
 #include "reach/platform/windows_adapters.h"
+#include "reach/services/config.h"
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -108,6 +109,7 @@ struct reach_settings_app
     reach_windows_update_port windows_update;
     reach_app_update_port app_update;
     reach_config_store_port config_store;
+    reach_config_service *config_service;
     reach_user_account_port user_account;
     reach_startup_apps_port startup_apps;
     reach_icon_provider_port icon_provider;
@@ -322,13 +324,13 @@ static reach_result reach_settings_render(reach_settings_app *app)
 
 static void reach_settings_load_power_config(reach_settings_app *app)
 {
-    if (app == nullptr || app->config_store.ops.load == nullptr)
+    if (app == nullptr || app->config_service == nullptr)
     {
         return;
     }
     std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
     if (snapshot == nullptr ||
-        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
+        reach_config_service_snapshot(app->config_service, snapshot.get()) != REACH_OK)
     {
         return;
     }
@@ -353,37 +355,28 @@ static void reach_settings_load_power_config(reach_settings_app *app)
 
 static void reach_settings_save_power_config(reach_settings_app *app)
 {
-    if (app == nullptr || app->config_store.ops.load == nullptr ||
-        app->config_store.ops.save == nullptr)
+    if (app == nullptr || app->config_service == nullptr)
     {
         return;
     }
-    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
-    if (snapshot == nullptr ||
-        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
-    {
-        return;
-    }
-    snapshot->power_screen_off_minutes = reach_settings_model_power_minutes(
+    reach_config_power_settings settings = {};
+    settings.screen_off_minutes = reach_settings_model_power_minutes(
         &app->model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF);
-    snapshot->power_sleep_minutes =
+    settings.sleep_minutes =
         reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP);
-    snapshot->power_lock_minutes =
+    settings.lock_minutes =
         reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_LOCK);
-    snapshot->power_shutdown_minutes =
+    settings.shutdown_minutes =
         reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN);
-    snapshot->power_restart_minutes =
+    settings.restart_minutes =
         reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART);
-    snapshot->power_sleep_wait_apps =
+    settings.sleep_wait_apps =
         reach_settings_model_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP);
-    snapshot->power_shutdown_wait_apps =
+    settings.shutdown_wait_apps =
         reach_settings_model_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN);
-    snapshot->power_restart_wait_apps =
+    settings.restart_wait_apps =
         reach_settings_model_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART);
-    if (app->config_store.ops.save(app->config_store.store, snapshot.get()) == REACH_OK)
-    {
-        (void)reach_windows_notify_config_changed();
-    }
+    (void)reach_config_service_set_power(app->config_service, &settings);
 }
 
 static void reach_settings_apply_ui_font(reach_settings_app *app)
@@ -412,13 +405,13 @@ static void reach_settings_apply_theme(reach_settings_app *app)
 
 static void reach_settings_load_display_config(reach_settings_app *app)
 {
-    if (app == nullptr || app->config_store.ops.load == nullptr)
+    if (app == nullptr || app->config_service == nullptr)
     {
         return;
     }
     std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
     if (snapshot == nullptr ||
-        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
+        reach_config_service_snapshot(app->config_service, snapshot.get()) != REACH_OK)
     {
         return;
     }
@@ -431,23 +424,26 @@ static void reach_settings_load_display_config(reach_settings_app *app)
 
 static void reach_settings_save_display_config(reach_settings_app *app)
 {
-    if (app == nullptr || app->config_store.ops.load == nullptr ||
-        app->config_store.ops.save == nullptr)
+    if (app == nullptr || app->config_service == nullptr)
     {
         return;
     }
-    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
-    if (snapshot == nullptr ||
-        app->config_store.ops.load(app->config_store.store, snapshot.get()) != REACH_OK)
-    {
-        return;
-    }
-    snapshot->high_refresh_rate = reach_settings_model_high_refresh_rate(&app->model);
-    snapshot->bundled_font = reach_settings_model_bundled_font(&app->model);
-    snapshot->light_theme = reach_settings_model_light_theme(&app->model);
-    if (app->config_store.ops.save(app->config_store.store, snapshot.get()) == REACH_OK)
+    reach_config_display_settings settings = {};
+    settings.high_refresh_rate = reach_settings_model_high_refresh_rate(&app->model);
+    settings.bundled_font = reach_settings_model_bundled_font(&app->model);
+    settings.light_theme = reach_settings_model_light_theme(&app->model);
+    (void)reach_config_service_set_display(app->config_service, &settings);
+}
+
+static void reach_settings_on_config_service_event(void *, reach_config_service_event event)
+{
+    if (event == REACH_CONFIG_SERVICE_PERSISTED)
     {
         (void)reach_windows_notify_config_changed();
+    }
+    else if (event == REACH_CONFIG_SERVICE_PERSIST_FAILED)
+    {
+        reach_log_error("Could not persist Reach settings.");
     }
 }
 
@@ -1909,7 +1905,9 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
 
     uint16_t config_path[260] = {};
     if (reach_windows_default_config_path(config_path, 260) == REACH_OK &&
-        reach_windows_create_config_store(config_path, &app->config_store) == REACH_OK)
+        reach_windows_create_config_store(config_path, &app->config_store) == REACH_OK &&
+        reach_config_service_create(app->config_store, reach_settings_on_config_service_event, app,
+                                    &app->config_service) == REACH_OK)
     {
         reach_settings_load_power_config(app);
         reach_settings_load_display_config(app);
@@ -2163,6 +2161,9 @@ void reach_settings_app_destroy(reach_settings_app *app)
     {
         app->windows_update.destroy(app->windows_update.userdata);
     }
+    (void)reach_config_service_flush(app->config_service);
+    reach_config_service_destroy(app->config_service);
+    app->config_service = nullptr;
     if (app->config_store.ops.destroy != nullptr)
     {
         app->config_store.ops.destroy(app->config_store.store);

@@ -727,13 +727,12 @@ void reach_host_refresh_switcher_windows(reach_host *host);
 
 reach_result reach_host_handle_switcher_event(reach_host *host, const reach_ui_event *event);
 
-reach_result reach_host_schedule_config_reload(reach_host *host);
-reach_result reach_host_schedule_pin_app(reach_host *host, const reach_pinned_app_model *app);
-reach_result reach_host_schedule_unpin_id(reach_host *host, uint32_t pin_id);
-reach_result reach_host_schedule_move_pin(reach_host *host, uint32_t pin_id, size_t target_index);
-int32_t reach_host_apply_config_reload_result(reach_host *host);
-int32_t reach_host_config_reload_work_pending(const reach_host *host);
-void reach_host_stop_config_reload_worker(reach_host *host);
+reach_result reach_host_request_config_reload(reach_host *host);
+reach_result reach_host_pin_app(reach_host *host, const reach_pinned_app_model *app);
+reach_result reach_host_unpin_id(reach_host *host, uint32_t pin_id);
+reach_result reach_host_move_pin(reach_host *host, uint32_t pin_id, size_t target_index);
+int32_t reach_host_apply_config_update(reach_host *host);
+void reach_host_stop_config_service(reach_host *host);
 reach_result reach_host_apply_config_snapshot(reach_host *host,
                                               const reach_config_snapshot *snapshot,
                                               int32_t apply_pins, int32_t apply_wallpaper);

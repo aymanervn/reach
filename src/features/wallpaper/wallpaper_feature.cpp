@@ -123,7 +123,6 @@ struct reach_wallpaper
 {
     reach_wallpaper_service_port service;
     reach_wallpaper_surface_port surface;
-    reach_config_store_port config_store;
     int32_t bounds_valid;
     reach_rect_f32 bounds;
     uint16_t path[260];
@@ -136,7 +135,6 @@ static int32_t reach_wallpaper_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 
 reach_result reach_wallpaper_create(reach_wallpaper_service_port service,
                                     reach_wallpaper_surface_port surface,
-                                    reach_config_store_port config_store,
                                     reach_wallpaper **out_wallpaper)
 {
     if (out_wallpaper == nullptr)
@@ -150,7 +148,6 @@ reach_result reach_wallpaper_create(reach_wallpaper_service_port service,
     }
     wallpaper->service = service;
     wallpaper->surface = surface;
-    wallpaper->config_store = config_store;
     wallpaper->bounds_valid = 0;
     wallpaper->bounds = {};
     wallpaper->path[0] = 0;
@@ -164,38 +161,30 @@ void reach_wallpaper_destroy(reach_wallpaper *wallpaper)
     delete wallpaper;
 }
 
-void reach_wallpaper_apply_snapshot(reach_wallpaper *wallpaper, reach_config_snapshot *snapshot)
+int32_t reach_wallpaper_apply_snapshot(reach_wallpaper *wallpaper,
+                                       reach_config_snapshot *snapshot)
+{
+    if (wallpaper == nullptr || snapshot == nullptr)
+    {
+        return 0;
+    }
+    return reach_wallpaper_seed_or_apply(
+        &wallpaper->service, &wallpaper->surface, snapshot->wallpaper_path, 260,
+        snapshot->monitor_wallpaper_paths, REACH_MAX_WALLPAPER_MONITORS, wallpaper->path, 260);
+}
+
+void reach_wallpaper_reload(reach_wallpaper *wallpaper, const reach_config_snapshot *snapshot,
+                            int32_t force)
 {
     if (wallpaper == nullptr || snapshot == nullptr)
     {
         return;
     }
-    int32_t changed = reach_wallpaper_seed_or_apply(
-        &wallpaper->service, &wallpaper->surface, snapshot->wallpaper_path, 260,
-        snapshot->monitor_wallpaper_paths, REACH_MAX_WALLPAPER_MONITORS, wallpaper->path, 260);
-    if (changed && wallpaper->config_store.ops.save != nullptr)
-    {
-        (void)wallpaper->config_store.ops.save(wallpaper->config_store.store, snapshot);
-    }
-}
-
-void reach_wallpaper_reload(reach_wallpaper *wallpaper, int32_t force)
-{
-    if (wallpaper == nullptr || wallpaper->config_store.ops.load == nullptr)
-    {
-        return;
-    }
-
-    reach_config_snapshot snapshot = {};
-    if (wallpaper->config_store.ops.load(wallpaper->config_store.store, &snapshot) != REACH_OK)
-    {
-        return;
-    }
 
     uint16_t new_path[260] = {};
-    if (snapshot.wallpaper_path[0] != 0)
+    if (snapshot->wallpaper_path[0] != 0)
     {
-        reach_copy_utf16(new_path, 260, snapshot.wallpaper_path);
+        reach_copy_utf16(new_path, 260, snapshot->wallpaper_path);
     }
 
     if (!force && reach_wallpaper_path_equals(wallpaper->path, new_path))
@@ -217,10 +206,11 @@ void reach_wallpaper_reload(reach_wallpaper *wallpaper, int32_t force)
     {
         for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)
         {
-            if (snapshot.monitor_wallpaper_paths[index][0] != 0)
+            if (snapshot->monitor_wallpaper_paths[index][0] != 0)
             {
                 (void)wallpaper->surface.ops.set_monitor_wallpaper(
-                    wallpaper->surface.surface, index, snapshot.monitor_wallpaper_paths[index]);
+                    wallpaper->surface.surface, index,
+                    snapshot->monitor_wallpaper_paths[index]);
             }
             else
             {

@@ -381,7 +381,6 @@ int32_t reach_host_needs_frame(const reach_host *host)
 
     if (host->dirty.render || reach_host_any_surface_dirty(host) ||
         reach_icon_service_work_pending(host->icon_service) ||
-        reach_host_config_reload_work_pending(host) ||
         reach_animation_manager_any_active(&host->animations) ||
         reach_host_window_list_wants_frames(host) || reach_clock_minute_elapsed(host->clock) ||
         reach_input_language_service_settling(host->input_language))

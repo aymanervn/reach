@@ -4,9 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/config.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
-#include "reach/ports/config_store.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -26,14 +26,14 @@ extern "C"
 
     reach_result reach_wallpaper_create(reach_wallpaper_service_port service,
                                         reach_wallpaper_surface_port surface,
-                                        reach_config_store_port config_store,
                                         reach_wallpaper **out_wallpaper);
     void reach_wallpaper_destroy(reach_wallpaper *wallpaper);
 
-    void reach_wallpaper_apply_snapshot(reach_wallpaper *wallpaper,
-                                        reach_config_snapshot *snapshot);
+    int32_t reach_wallpaper_apply_snapshot(reach_wallpaper *wallpaper,
+                                           reach_config_snapshot *snapshot);
 
-    void reach_wallpaper_reload(reach_wallpaper *wallpaper, int32_t force);
+    void reach_wallpaper_reload(reach_wallpaper *wallpaper,
+                                const reach_config_snapshot *snapshot, int32_t force);
 
     reach_result reach_wallpaper_set_bounds(reach_wallpaper *wallpaper, reach_rect_f32 bounds);
 

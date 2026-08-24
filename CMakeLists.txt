@@ -641,6 +641,31 @@ target_link_libraries(reach_pin_config_tests PRIVATE
     reach_services
 )
 
+add_executable(reach_config_service_tests
+    tests/config_service_tests.cpp
+)
+
+reach_configure_common(reach_config_service_tests)
+target_compile_features(reach_config_service_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_config_service_tests PRIVATE
+    reach_services
+)
+
+add_executable(reach_config_ini_tests
+    tests/config_ini_tests.cpp
+)
+
+reach_configure_common(reach_config_ini_tests)
+reach_configure_windows(reach_config_ini_tests)
+target_compile_features(reach_config_ini_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_config_ini_tests PRIVATE
+    reach_windows_adapters
+)
+
 add_executable(reach_layout_tests
     tests/layout_tests.cpp
 )
@@ -863,6 +888,8 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
 )
 
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
+    add_test(NAME reach_config_service_tests COMMAND reach_config_service_tests)
+    add_test(NAME reach_config_ini_tests COMMAND reach_config_ini_tests)
     add_test(NAME reach_layout_tests COMMAND reach_layout_tests)
     add_test(NAME reach_host_layout_tests COMMAND reach_host_layout_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
