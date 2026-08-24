@@ -21,6 +21,9 @@ extern "C"
         int32_t bounds_valid;
         int32_t opacity_valid;
         int32_t activated;
+        int32_t transition_input_region_active;
+        float last_transition_scale;
+        int32_t transition_scale_valid;
         uint32_t dirty_flags;
     } reach_surface_runtime;
 

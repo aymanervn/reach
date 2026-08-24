@@ -33,6 +33,8 @@ extern "C"
                                             const reach_launcher_layout *layout,
                                             const reach_pinned_app_model *pinned_apps,
                                             size_t pinned_app_count);
+    void reach_launcher_set_pointer_transform(reach_launcher *launcher,
+                                              reach_transform_f32 transform);
 
     reach_result reach_launcher_close(reach_launcher *launcher);
     reach_result reach_launcher_toggle(reach_launcher *launcher);

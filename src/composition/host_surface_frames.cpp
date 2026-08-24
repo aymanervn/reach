@@ -67,14 +67,28 @@ static reach_result reach_host_apply_transient_frame(reach_host *host, reach_sur
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx)
 {
     const int32_t launcher_layout_changed = ctx->launcher_layout_changed;
+    reach_shadow_pad launcher_shadow_pad =
+        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_LAUNCHER);
+    reach_host_surface_transition_frame frame = reach_host_surface_transition_frame_compute(
+        host, &host->launcher_transition, host->layout.launcher.bounds, launcher_shadow_pad);
+    if (frame.scale_envelope_active)
+    {
+        launcher_shadow_pad.left *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
+        launcher_shadow_pad.top *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
+        launcher_shadow_pad.right *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
+        launcher_shadow_pad.bottom *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
+        frame = reach_host_surface_transition_frame_compute(
+            host, &host->launcher_transition, host->layout.launcher.bounds, launcher_shadow_pad);
+    }
+    int32_t launcher_scale_changed =
+        !host->launcher.transition_scale_valid ||
+        !reach_host_scalar_equal(host->launcher.last_transition_scale, frame.scale);
+
     int32_t launcher_window_changed = 0;
-    reach_rect_f32 launcher_bounds = reach_host_surface_transition_bounds(
-        host, &host->launcher_transition, host->layout.launcher.bounds);
     float launcher_opacity =
         reach_host_surface_transition_opacity(host, &host->launcher_transition);
     reach_result result = reach_host_apply_window_state(
-        &host->launcher.window, launcher_bounds,
-        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_LAUNCHER), launcher_opacity,
+        &host->launcher.window, frame.window_bounds, launcher_shadow_pad, launcher_opacity,
         &host->launcher.last_bounds, &host->launcher.last_opacity, &host->launcher.bounds_valid,
         &host->launcher.opacity_valid, &launcher_window_changed);
     if (result != REACH_OK)
@@ -82,10 +96,32 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
         return result;
     }
 
-    if (reach_launcher_is_open(host->launcher_capsule) &&
-        (host->dirty.render || host->launcher.dirty_flags || launcher_layout_changed))
+    reach_launcher_set_pointer_transform(host->launcher_capsule, frame.pointer_transform);
+
+    if (host->launcher.window.ops.set_input_regions != nullptr)
     {
-        (void)reach_host_render_launcher_surface(host, &host->layout.launcher);
+        if (frame.scale_envelope_active)
+        {
+            (void)host->launcher.window.ops.set_input_regions(host->launcher.window.window,
+                                                              &frame.content_rect, 1);
+            host->launcher.transition_input_region_active = 1;
+        }
+        else if (host->launcher.transition_input_region_active)
+        {
+            (void)host->launcher.window.ops.set_input_regions(host->launcher.window.window, nullptr,
+                                                              0);
+            host->launcher.transition_input_region_active = 0;
+        }
+    }
+
+    if (reach_host_surface_transition_visible(&host->launcher_transition) &&
+        (host->dirty.render || host->launcher.dirty_flags || launcher_layout_changed ||
+         launcher_window_changed || launcher_scale_changed ||
+         reach_host_surface_transition_active(host, &host->launcher_transition)))
+    {
+        (void)reach_host_render_launcher_surface(host, &host->layout.launcher, &frame);
+        host->launcher.last_transition_scale = frame.scale;
+        host->launcher.transition_scale_valid = 1;
     }
     reach_host_set_surface_visible(
         host, REACH_SURFACE_ID_LAUNCHER,

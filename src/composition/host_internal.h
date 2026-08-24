@@ -50,6 +50,7 @@ typedef enum reach_host_animation_id
 {
     REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y = 0,
     REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY,
+    REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_SCALE,
     REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
     REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY,
     REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
@@ -69,6 +70,7 @@ typedef enum reach_host_animation_id
 
 static const float REACH_HOST_TRANSITION_SETTLE_FROM_BELOW = 8.0f;
 static const float REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE = -8.0f;
+static const float REACH_HOST_LAUNCHER_TRANSITION_SCALE = 1.08f;
 
 typedef struct reach_host_surface_transition
 {
@@ -76,10 +78,22 @@ typedef struct reach_host_surface_transition
     int32_t target_open;
     size_t y_track;
     size_t opacity_track;
+    size_t scale_track;
     float settle_offset;
+    float start_scale;
     double open_seconds;
     double close_seconds;
 } reach_host_surface_transition;
+
+typedef struct reach_host_surface_transition_frame
+{
+    reach_rect_f32 window_bounds;
+    reach_rect_f32 content_rect;
+    reach_transform_f32 render_transform;
+    reach_transform_f32 pointer_transform;
+    float scale;
+    int32_t scale_envelope_active;
+} reach_host_surface_transition_frame;
 
 typedef enum reach_surface_class
 {
@@ -487,7 +501,7 @@ static inline int32_t reach_host_primary_monitor_bounds(const reach_host *host,
 }
 
 int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
-int32_t reach_host_opacity_equal(float a, float b);
+int32_t reach_host_scalar_equal(float a, float b);
 
 const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surface_id id);
 reach_shadow_pad reach_host_surface_shadow_pad(const reach_host *host, reach_surface_id id);
@@ -500,6 +514,9 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
                                            int32_t *opacity_valid, int32_t *out_changed);
 void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
                                         size_t y_track, size_t opacity_track, float settle_offset);
+void reach_host_surface_transition_set_scale(reach_host *host,
+                                             reach_host_surface_transition *transition,
+                                             size_t scale_track, float start_scale);
 void reach_host_surface_transition_set_settle_offset(reach_host *host,
                                                      reach_host_surface_transition *transition,
                                                      float settle_offset);
@@ -512,6 +529,9 @@ reach_rect_f32 reach_host_surface_transition_bounds(const reach_host *host,
                                                     reach_rect_f32 target_bounds);
 float reach_host_surface_transition_opacity(const reach_host *host,
                                             const reach_host_surface_transition *transition);
+reach_host_surface_transition_frame reach_host_surface_transition_frame_compute(
+    const reach_host *host, const reach_host_surface_transition *transition,
+    reach_rect_f32 target_bounds, reach_shadow_pad shadow_pad);
 int32_t reach_host_surface_transition_visible(const reach_host_surface_transition *transition);
 int32_t reach_host_surface_transition_active(const reach_host *host,
                                              const reach_host_surface_transition *transition);
@@ -756,7 +776,8 @@ reach_result reach_host_render_battery_surface(reach_host *host);
 reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32 bounds);
 
 reach_result reach_host_render_launcher_surface(reach_host *host,
-                                                const reach_launcher_layout *layout);
+                                                const reach_launcher_layout *layout,
+                                                const reach_host_surface_transition_frame *frame);
 
 reach_result reach_host_render_context_menu_surface(reach_host *host);
 int32_t reach_host_game_mode_enabled(const reach_host *host);
