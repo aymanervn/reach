@@ -8,6 +8,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
+#include "reach/features/common/draggable.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/features/popup.h"
@@ -87,12 +88,20 @@ extern "C"
         REACH_TOP_BAR_ANIM_Y = 0,
         REACH_TOP_BAR_ANIM_POWER_HOVER,
         REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY,
+        REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP,
         REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
         REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH,
         REACH_TOP_BAR_ANIM_TRAY_WIDTH,
         REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
-        REACH_TOP_BAR_ANIM_COUNT
+        REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE,
+        REACH_TOP_BAR_ANIM_COUNT =
+            REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE + REACH_TOP_BAR_MAX_TRAY_ICONS
     };
+
+    static inline size_t reach_top_bar_tray_item_x_animation_id(size_t index)
+    {
+        return REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE + index;
+    }
 
     enum reach_top_bar_feedback_slot
     {
@@ -251,9 +260,10 @@ extern "C"
         float dpi_scale;
     } reach_top_bar_tray_render_context;
 
-    reach_result reach_top_bar_append_tray_render_commands(
-        reach_top_bar *top_bar, const reach_top_bar_tray_render_context *ctx,
-        reach_render_command_buffer *out_commands);
+    reach_result
+    reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
+                                              const reach_top_bar_tray_render_context *ctx,
+                                              reach_render_command_buffer *out_commands);
 
     const reach_bar_reveal_ops *reach_top_bar_reveal_ops(void);
 

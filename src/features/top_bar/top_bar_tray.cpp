@@ -3,6 +3,7 @@
 #include "top_bar_common.h"
 
 #include "reach/core/typography.h"
+#include "reach/features/common/icon_feedback.h"
 
 #include <math.h>
 #include <new>
@@ -64,13 +65,142 @@ static size_t reach_top_bar_tray_min_size(size_t a, size_t b)
     return a < b ? a : b;
 }
 
-static const reach_tray_item *reach_top_bar_tray_item(const reach_top_bar *top_bar, size_t index)
+static size_t reach_top_bar_find_provider_tray_item(const reach_top_bar *top_bar, uint32_t id)
 {
-    return top_bar != nullptr ? reach_tray_service_item_at(top_bar->tray, index) : nullptr;
+    size_t count = reach_tray_service_item_count(top_bar != nullptr ? top_bar->tray : nullptr);
+    for (size_t index = 0; index < count; ++index)
+    {
+        const reach_tray_item *item = reach_tray_service_item_at(top_bar->tray, index);
+        if (item != nullptr && item->id == id)
+        {
+            return index;
+        }
+    }
+    return REACH_MAX_TRAY_ITEMS;
 }
 
-static reach_top_bar_tray_hit reach_top_bar_tray_hit_test(const reach_top_bar *top_bar,
-                                                          int32_t x, int32_t y)
+static int32_t reach_top_bar_tray_order_contains(const uint32_t *order, size_t count, uint32_t id)
+{
+    for (size_t index = 0; index < count; ++index)
+    {
+        if (order[index] == id)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void reach_top_bar_reset_tray_drag(reach_top_bar *top_bar)
+{
+    if (top_bar == nullptr)
+    {
+        return;
+    }
+    reach_draggable_init(&top_bar->tray_drag.gesture);
+    top_bar->tray_drag.item_id = 0;
+    reach_animation_manager_reset(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP);
+}
+
+void reach_top_bar_reconcile_tray_order(reach_top_bar *top_bar)
+{
+    if (top_bar == nullptr)
+    {
+        return;
+    }
+
+    uint32_t next[REACH_MAX_TRAY_ITEMS] = {};
+    size_t next_count = 0;
+    for (size_t index = 0; index < top_bar->tray_order_count; ++index)
+    {
+        uint32_t id = top_bar->tray_order[index];
+        if (reach_top_bar_find_provider_tray_item(top_bar, id) < REACH_MAX_TRAY_ITEMS)
+        {
+            next[next_count++] = id;
+        }
+    }
+
+    size_t provider_count = reach_tray_service_item_count(top_bar->tray);
+    for (size_t index = 0; index < provider_count && next_count < REACH_MAX_TRAY_ITEMS; ++index)
+    {
+        const reach_tray_item *item = reach_tray_service_item_at(top_bar->tray, index);
+        if (item != nullptr && !reach_top_bar_tray_order_contains(next, next_count, item->id))
+        {
+            next[next_count++] = item->id;
+        }
+    }
+
+    for (size_t index = 0; index < next_count; ++index)
+    {
+        top_bar->tray_order[index] = next[index];
+    }
+    top_bar->tray_order_count = next_count;
+
+    if (reach_draggable_tracking(&top_bar->tray_drag.gesture) &&
+        !reach_top_bar_tray_order_contains(next, next_count, top_bar->tray_drag.item_id))
+    {
+        reach_top_bar_reset_tray_drag(top_bar);
+    }
+}
+
+size_t reach_top_bar_ordered_tray_item_count(const reach_top_bar *top_bar)
+{
+    return top_bar != nullptr ? top_bar->tray_order_count : 0;
+}
+
+const reach_tray_item *reach_top_bar_ordered_tray_item_at(const reach_top_bar *top_bar,
+                                                          size_t index)
+{
+    if (top_bar == nullptr || index >= top_bar->tray_order_count)
+    {
+        return nullptr;
+    }
+    size_t provider_index =
+        reach_top_bar_find_provider_tray_item(top_bar, top_bar->tray_order[index]);
+    return provider_index < REACH_MAX_TRAY_ITEMS
+               ? reach_tray_service_item_at(top_bar->tray, provider_index)
+               : nullptr;
+}
+
+void reach_top_bar_sync_tray_items(reach_top_bar *top_bar)
+{
+    if (top_bar == nullptr)
+    {
+        return;
+    }
+    reach_top_bar_state *state = &top_bar->state;
+    reach_top_bar_reconcile_tray_order(top_bar);
+    size_t count = reach_top_bar_ordered_tray_item_count(top_bar);
+    state->tray_overflow = count >= REACH_TOP_BAR_TRAY_OVERFLOW_THRESHOLD;
+    if (state->tray_overflow)
+    {
+        count = REACH_TOP_BAR_TRAY_INLINE_ICONS;
+    }
+    else if (count > REACH_TOP_BAR_MAX_TRAY_ICONS)
+    {
+        count = REACH_TOP_BAR_MAX_TRAY_ICONS;
+    }
+    state->tray_item_count = count;
+    state->tray_popup_open = reach_top_bar_tray_popup_is_open(top_bar);
+    for (size_t index = 0; index < count; ++index)
+    {
+        const reach_tray_item *item = reach_top_bar_ordered_tray_item_at(top_bar, index);
+        state->tray_items[index] = {};
+        if (item != nullptr)
+        {
+            state->tray_items[index].id = item->id;
+            state->tray_items[index].icon_id = item->icon_id;
+        }
+    }
+}
+
+static const reach_tray_item *reach_top_bar_tray_item(const reach_top_bar *top_bar, size_t index)
+{
+    return reach_top_bar_ordered_tray_item_at(top_bar, index);
+}
+
+static reach_top_bar_tray_hit reach_top_bar_tray_hit_test(const reach_top_bar *top_bar, int32_t x,
+                                                          int32_t y)
 {
     reach_top_bar_tray_hit hit = {};
     hit.index = REACH_MAX_TRAY_ITEMS;
@@ -80,7 +210,7 @@ static reach_top_bar_tray_hit reach_top_bar_tray_hit_test(const reach_top_bar *t
     }
 
     const reach_top_bar_tray_popup *popup = top_bar->tray_popup;
-    size_t count = reach_tray_service_item_count(top_bar->tray);
+    size_t count = reach_top_bar_ordered_tray_item_count(top_bar);
     for (size_t index = popup->overflow_start; index < count; ++index)
     {
         if (reach_top_bar_tray_contains(popup->item_slots[index], x, y))
@@ -97,13 +227,11 @@ static reach_top_bar_tray_hit reach_top_bar_tray_hit_test(const reach_top_bar *t
     return hit;
 }
 
-static uint64_t reach_top_bar_tray_target(const reach_top_bar *top_bar,
-                                          reach_top_bar_tray_hit hit)
+static uint64_t reach_top_bar_tray_target(const reach_top_bar *top_bar, reach_top_bar_tray_hit hit)
 {
     const reach_tray_item *item = reach_top_bar_tray_item(top_bar, hit.index);
-    return hit.type == REACH_TOP_BAR_TRAY_HIT_ITEM && item != nullptr
-               ? (uint64_t)item->id
-               : REACH_PRESSABLE_TARGET_NONE;
+    return hit.type == REACH_TOP_BAR_TRAY_HIT_ITEM && item != nullptr ? (uint64_t)item->id
+                                                                      : REACH_PRESSABLE_TARGET_NONE;
 }
 
 reach_result reach_top_bar_tray_popup_create(reach_top_bar_tray_popup **out_popup)
@@ -156,12 +284,26 @@ int32_t reach_top_bar_set_tray_popup_open(reach_top_bar *top_bar, int32_t open)
 
 reach_result reach_top_bar_refresh_tray(reach_top_bar *top_bar)
 {
-    return top_bar != nullptr ? reach_tray_service_refresh(top_bar->tray) : REACH_OK;
+    if (top_bar == nullptr)
+    {
+        return REACH_OK;
+    }
+    reach_result result = reach_tray_service_refresh(top_bar->tray);
+    if (result == REACH_OK)
+    {
+        reach_top_bar_reconcile_tray_order(top_bar);
+    }
+    return result;
 }
 
 size_t reach_top_bar_tray_item_count(const reach_top_bar *top_bar)
 {
-    return top_bar != nullptr ? reach_tray_service_item_count(top_bar->tray) : 0;
+    return reach_top_bar_ordered_tray_item_count(top_bar);
+}
+
+size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar)
+{
+    return top_bar != nullptr && top_bar->state.tray_overflow ? top_bar->state.tray_item_count : 0;
 }
 
 uint64_t reach_top_bar_tray_item_icon_id(const reach_top_bar *top_bar, size_t index)
@@ -188,7 +330,7 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     float border_thickness = reach_theme_border_thickness(theme, scale);
     float notch_height = reach_popup_notch_height_scaled(scale);
-    size_t item_count = reach_tray_service_item_count(top_bar->tray);
+    size_t item_count = reach_top_bar_ordered_tray_item_count(top_bar);
     size_t overflow_count =
         item_count > popup->overflow_start ? item_count - popup->overflow_start : 0;
     size_t visual_count = overflow_count > 0 ? overflow_count : 1;
@@ -196,17 +338,15 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     size_t rows = (visual_count + 4) / 5;
     float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
     float content_height = padding * 2.0f + (float)rows * slot_size + (float)(rows - 1) * gap;
-    popup->placement = reach_popup_place(anchor, ceilf(content_width + border_thickness * 2.0f),
-                                         ceilf(content_height + notch_height +
-                                               border_thickness * 2.0f),
-                                         8.0f * scale);
+    popup->placement = reach_popup_place(
+        anchor, ceilf(content_width + border_thickness * 2.0f),
+        ceilf(content_height + notch_height + border_thickness * 2.0f), 8.0f * scale);
 
     reach_rect_f32 bounds = popup->placement.bounds;
-    reach_rect_f32 content_bounds =
-        reach_theme_border_content_rect(theme, scale, bounds);
+    reach_rect_f32 content_bounds = reach_theme_border_content_rect(theme, scale, bounds);
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
-    float content_top = content_bounds.y +
-                        (anchor->direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
+    float content_top =
+        content_bounds.y + (anchor->direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
     float grid_y = content_top + (content_height - grid_height) * 0.5f;
     for (size_t index = 0; index < item_count; ++index)
     {
@@ -261,11 +401,11 @@ static void reach_top_bar_tray_tick(void *capsule, double delta_seconds,
         return;
     }
     reach_top_bar_tray_popup *popup = top_bar->tray_popup;
-    int32_t was_active = reach_animation_manager_active(&popup->animations,
-                                                        REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
+    int32_t was_active =
+        reach_animation_manager_active(&popup->animations, REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
     reach_animation_manager_tick(&popup->animations, delta_seconds);
-    int32_t active = reach_animation_manager_active(&popup->animations,
-                                                    REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
+    int32_t active =
+        reach_animation_manager_active(&popup->animations, REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
     if ((was_active || active) && out != nullptr)
     {
         out->redraw = 1;
@@ -404,14 +544,13 @@ const reach_feature_capsule_ops *reach_top_bar_tray_capsule_ops(void)
 
 reach_animation_manager *reach_top_bar_tray_animation_manager(reach_top_bar *top_bar)
 {
-    return top_bar != nullptr && top_bar->tray_popup != nullptr
-               ? &top_bar->tray_popup->animations
-               : nullptr;
+    return top_bar != nullptr && top_bar->tray_popup != nullptr ? &top_bar->tray_popup->animations
+                                                                : nullptr;
 }
 
-reach_result reach_top_bar_append_tray_render_commands(
-    reach_top_bar *top_bar, const reach_top_bar_tray_render_context *ctx,
-    reach_render_command_buffer *out_commands)
+reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
+                                                       const reach_top_bar_tray_render_context *ctx,
+                                                       reach_render_command_buffer *out_commands)
 {
     if (top_bar == nullptr || top_bar->tray_popup == nullptr || ctx == nullptr ||
         ctx->theme == nullptr || out_commands == nullptr)
@@ -439,7 +578,7 @@ reach_result reach_top_bar_append_tray_render_commands(
     reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);
     size_t feedback_index = reach_pressable_feedback_index(&popup_state->pressable);
     float feedback_opacity = reach_pressable_feedback_value(&popup_state->pressable, &feedback);
-    size_t count = reach_tray_service_item_count(top_bar->tray);
+    size_t count = reach_top_bar_ordered_tray_item_count(top_bar);
     for (size_t index = popup_state->overflow_start; index < count; ++index)
     {
         const reach_tray_item *item = reach_top_bar_tray_item(top_bar, index);
@@ -452,12 +591,14 @@ reach_result reach_top_bar_append_tray_render_commands(
         {
             icon_size = minimum;
         }
+        reach_rect_f32 icon_rect = {slot.x + (slot.width - icon_size) * 0.5f,
+                                    slot.y + (slot.height - icon_size) * 0.5f, icon_size,
+                                    icon_size};
         reach_render_command command = {};
         if (item != nullptr && item->icon_id != 0)
         {
             command.type = REACH_RENDER_COMMAND_ICON;
-            command.rect = {slot.x + (slot.width - icon_size) * 0.5f,
-                            slot.y + (slot.height - icon_size) * 0.5f, icon_size, icon_size};
+            command.rect = icon_rect;
             command.icon_id = item->icon_id;
             command.color.a = 1.0f;
         }
@@ -474,13 +615,10 @@ reach_result reach_top_bar_append_tray_render_commands(
 
         if (feedback_index == index && feedback_opacity > 0.001f)
         {
-            command = {};
-            command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect = slot;
-            command.color =
-                reach_theme_color_alpha(ctx->theme->tray_click_feedback, feedback_opacity);
-            command.radius = icon_box_radius;
-            reach_render_command_buffer_push(out_commands, &command);
+            reach_push_icon_press_feedback(
+                out_commands, item != nullptr && item->icon_id != 0 ? icon_rect : slot,
+                icon_box_radius, item != nullptr ? item->icon_id : 0,
+                ctx->theme->bar_tray_background, feedback_opacity, 0.001f);
         }
     }
     return REACH_OK;

@@ -98,6 +98,12 @@ settings, language — plus its private Now Playing input. Composition translate
 only their semantic actions and cross-feature popup policy. Raw hit types and
 row/index results are feature-private; both bars expose only a semantic
 pointer-region query for the global popup mouse hook.
+Pressable controls that can become horizontal reorders compose the shared
+`reach_draggable` gesture and `reach_horizontal_reorder_target` helper. The common
+layer owns threshold and gesture lifecycle semantics; each capsule retains its item
+identity, model mutation, layout, animation, rendering and persistence policy. Dock
+persists pin moves through its existing semantic action, while top-bar tray order is
+visual state retained only for the current process.
 The Dock also owns its geometry (`reach_dock_local_point` /
 `reach_dock_rect_to_screen` / `reach_dock_layout_to_screen`), converts the
 screen-space pointer stream to dock-local coordinates itself, performs the

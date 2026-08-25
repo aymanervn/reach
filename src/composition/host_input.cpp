@@ -448,7 +448,7 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
         return reach_host_apply_context_menu_pointer_action(host, event, &context_up);
     }
 
-    if (reach_dock_state_ptr(host->dock_capsule)->drag.active)
+    if (reach_draggable_tracking(&reach_dock_state_ptr(host->dock_capsule)->drag.gesture))
     {
         reach_capsule_pointer_result dock_drag =
             reach_host_dispatch_pointer(host, REACH_SURFACE_ID_DOCK, event, REACH_POINTER_EVENT_UP);

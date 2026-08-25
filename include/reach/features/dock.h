@@ -11,6 +11,7 @@
 #include "reach/ports/window_manager.h"
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
+#include "reach/features/common/draggable.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
@@ -236,13 +237,9 @@ extern "C"
 
     typedef struct reach_dock_drag_state
     {
-        int32_t active;
-        int32_t moved;
-        size_t source_index;
+        reach_draggable gesture;
         size_t target_index;
         reach_dock_order_key key;
-        int32_t start_x;
-        int32_t start_y;
         float grab_offset_x;
         float x;
     } reach_dock_drag_state;

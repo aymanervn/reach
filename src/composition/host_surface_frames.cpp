@@ -134,9 +134,9 @@ reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame
 {
     const reach_rect_f32 monitor_bounds = ctx->monitor_bounds;
     int32_t clipboard_animating = 0;
-    float clipboard_border_thickness = reach_theme_border_thickness(
-        host->theme != nullptr ? host->theme : reach_theme_default(),
-        reach_host_layout_dpi_scale(host));
+    float clipboard_border_thickness =
+        reach_theme_border_thickness(host->theme != nullptr ? host->theme : reach_theme_default(),
+                                     reach_host_layout_dpi_scale(host));
     int32_t clipboard_layout_changed = reach_clipboard_feature_relayout(
         host->clipboard_capsule, monitor_bounds, host->layout.launcher.bounds,
         reach_host_layout_dpi_scale(host), clipboard_border_thickness, &clipboard_animating);
@@ -197,7 +197,8 @@ reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_cont
     int32_t dock_reveal_position_only =
         reach_animation_manager_active(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y) &&
         !reach_dock_slots_animating(host->dock_capsule) && !host->dirty.render &&
-        !host->dock.dirty_flags && !reach_dock_state_ptr(host->dock_capsule)->drag.active &&
+        !host->dock.dirty_flags &&
+        !reach_draggable_tracking(&reach_dock_state_ptr(host->dock_capsule)->drag.gesture) &&
         !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
                                         REACH_DOCK_ANIM_DRAG_SNAP) &&
         !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
