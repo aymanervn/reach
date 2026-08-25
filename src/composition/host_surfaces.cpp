@@ -477,6 +477,14 @@ void reach_host_init_surface_descriptors(reach_host *host)
         REACH_SURFACE_ID_BATTERY,    REACH_SURFACE_CLASS_POPUP,        &host->battery,
         &host->battery_transition,   reach_host_surface_battery_close, host->battery_capsule,
         reach_battery_capsule_ops(), REACH_SURFACE_POINTER_NONE};
+    descs[REACH_SURFACE_ID_SYSTEM_HUD] = {REACH_SURFACE_ID_SYSTEM_HUD,
+                                          REACH_SURFACE_CLASS_PERSISTENT,
+                                          &host->system_hud,
+                                          nullptr,
+                                          nullptr,
+                                          host->system_hud_capsule,
+                                          reach_system_hud_capsule_ops(),
+                                          REACH_SURFACE_POINTER_SOURCE_GATED};
     descs[REACH_SURFACE_ID_CONTEXT_MENU] = {REACH_SURFACE_ID_CONTEXT_MENU,
                                             REACH_SURFACE_CLASS_POPUP,
                                             &host->context_menu,
@@ -504,6 +512,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].shadow = REACH_SURFACE_SHADOW_POPUP;
     descs[REACH_SURFACE_ID_BATTERY].shadow = REACH_SURFACE_SHADOW_POPUP;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].shadow = REACH_SURFACE_SHADOW_POPUP;
+    descs[REACH_SURFACE_ID_SYSTEM_HUD].shadow = REACH_SURFACE_SHADOW_POPUP;
 
     descs[REACH_SURFACE_ID_STAGE].layer = 50;
     descs[REACH_SURFACE_ID_LAUNCHER].layer = 100;
@@ -515,6 +524,7 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_TRAY].layer = 180;
     descs[REACH_SURFACE_ID_CLIPBOARD].layer = 190;
     descs[REACH_SURFACE_ID_SWITCHER].layer = 200;
+    descs[REACH_SURFACE_ID_SYSTEM_HUD].layer = 220;
 
     descs[REACH_SURFACE_ID_CONTEXT_MENU].role = REACH_SURFACE_CONTEXT_MENU;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].pointer_priority = 10;
@@ -562,6 +572,9 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_STAGE].dismiss = reach_host_close_stage;
     descs[REACH_SURFACE_ID_STAGE].bar_shown_while_open = 1;
     descs[REACH_SURFACE_ID_STAGE].behavior_flags = REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
+    descs[REACH_SURFACE_ID_SYSTEM_HUD].role = REACH_SURFACE_SYSTEM_HUD;
+    descs[REACH_SURFACE_ID_SYSTEM_HUD].pointer_priority = 0;
+    descs[REACH_SURFACE_ID_SYSTEM_HUD].behavior_flags = REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE;
     descs[REACH_SURFACE_ID_STAGE].edge_reveal = {1,
                                                  REACH_HOST_LAYER_STAGE_EDGE_REVEAL,
                                                  {REACH_EDGE_REVEAL_ANCHOR_TOP_LEFT, 4.0f, 4.0f, 1},
@@ -587,6 +600,8 @@ void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_STAGE].frame_priority = 65;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].frame = reach_host_frame_context_menu;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].frame_priority = 70;
+    descs[REACH_SURFACE_ID_SYSTEM_HUD].frame = reach_host_frame_system_hud;
+    descs[REACH_SURFACE_ID_SYSTEM_HUD].frame_priority = 80;
 
     descs[REACH_SURFACE_ID_LAUNCHER].toggle_events =
         reach_launcher_activation_events(&descs[REACH_SURFACE_ID_LAUNCHER].toggle_event_count);
@@ -661,6 +676,12 @@ void reach_host_init_layout(reach_host *host)
          participant < (reach_layout_participant)host->layout_manager.participant_count;
          ++participant)
     {
+        const reach_host_layout_target *target = &host->layout_targets[participant];
+        if (target->desc != nullptr &&
+            (target->desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0)
+        {
+            continue;
+        }
         reach_layout_register_visibility(&host->layout_manager, participant,
                                          REACH_LAYOUT_CONDITION_GAME_MODE, 0);
     }

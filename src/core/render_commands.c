@@ -81,6 +81,32 @@ void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buff
     }
 }
 
+void reach_render_command_buffer_multiply_opacity(reach_render_command_buffer *buffer,
+                                                  float opacity)
+{
+    size_t index;
+    if (buffer == 0)
+    {
+        return;
+    }
+    if (opacity < 0.0f)
+    {
+        opacity = 0.0f;
+    }
+    if (opacity > 1.0f)
+    {
+        opacity = 1.0f;
+    }
+    for (index = 0; index < buffer->count; ++index)
+    {
+        reach_render_command *command = &buffer->commands[index];
+        command->color.a *= opacity;
+        command->text_color.a *= opacity;
+        command->placeholder_color.a *= opacity;
+        command->selection_color.a *= opacity;
+    }
+}
+
 reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                       const reach_render_command *shape,
                                       const reach_shadow *shadow, float dpi_scale)

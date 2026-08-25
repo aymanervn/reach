@@ -20,6 +20,17 @@ static void reach_host_mark_quick_settings_changed(reach_host *host)
     reach_host_request_update(host);
 }
 
+static void reach_host_mark_system_hud_changed(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    host->system_hud.dirty_flags = 1;
+    host->dirty.render = 1;
+    reach_host_request_update(host);
+}
+
 reach_result reach_host_launch_settings_app(reach_host *host)
 {
     if (host == nullptr || host->settings_launcher.ops.resolve == nullptr)
@@ -47,6 +58,11 @@ reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing
     if (reach_now_playing_service_try_action(host->now_playing_service, action))
     {
         host->dock.dirty_flags = 1;
+        if (host->top_bar_hidden)
+        {
+            reach_system_hud_show_media(host->system_hud_capsule, action);
+            reach_host_mark_system_hud_changed(host);
+        }
         reach_host_request_update(host);
     }
     return REACH_OK;
@@ -79,6 +95,13 @@ reach_result reach_host_step_main_volume(reach_host *host, float delta)
                                                state.muted ? 1 : 0);
         reach_host_mark_quick_settings_changed(host);
     }
+    if (host->top_bar_hidden)
+    {
+        reach_audio_volume_state next = state;
+        next.level = level;
+        reach_system_hud_show_volume(host->system_hud_capsule, &next);
+        reach_host_mark_system_hud_changed(host);
+    }
 
     return REACH_OK;
 }
@@ -109,6 +132,13 @@ reach_result reach_host_toggle_main_volume_mute(reach_host *host)
         reach_quick_settings_apply_main_volume(host->quick_settings_capsule,
                                                reach_host_clamp01(state.level), muted);
         reach_host_mark_quick_settings_changed(host);
+    }
+    if (host->top_bar_hidden)
+    {
+        reach_audio_volume_state next = state;
+        next.muted = muted;
+        reach_system_hud_show_volume(host->system_hud_capsule, &next);
+        reach_host_mark_system_hud_changed(host);
     }
 
     return REACH_OK;
@@ -179,6 +209,13 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
         reach_quick_settings_refresh_system(host->quick_settings_capsule,
                                             REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS);
         reach_host_mark_quick_settings_changed(host);
+    }
+    if (host->top_bar_hidden)
+    {
+        reach_brightness_state brightness = state;
+        brightness.level = level;
+        reach_system_hud_show_brightness(host->system_hud_capsule, &brightness);
+        reach_host_mark_system_hud_changed(host);
     }
 
     return REACH_OK;

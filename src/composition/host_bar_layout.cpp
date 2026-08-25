@@ -89,7 +89,11 @@ static void reach_host_apply_pointer_move_subscriptions(reach_host *host, int32_
         {
             wants = 1;
         }
-        reach_host_sync_pointer_move_enabled(&desc->surface->window, enabled && wants,
+        int32_t game_mode_visible =
+            reach_host_game_mode_enabled(host) &&
+            (desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0;
+        reach_host_sync_pointer_move_enabled(&desc->surface->window,
+                                             (enabled || game_mode_visible) && wants,
                                              &host->pointer_move.move_enabled[desc->id], force);
     }
     if (force)
@@ -172,6 +176,17 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     reach_bar_visibility_result result =
         desc->bar_reveal.ops->update_visibility(desc->capsule, &request);
+
+    if (id == REACH_SURFACE_ID_TOP_BAR)
+    {
+        host->top_bar_hidden = result.visible ? 0 : 1;
+        if (!host->top_bar_hidden && host->system_hud_capsule != nullptr &&
+            reach_system_hud_state_ptr(host->system_hud_capsule)->open)
+        {
+            reach_system_hud_hide(host->system_hud_capsule);
+            host->system_hud.dirty_flags = 1;
+        }
+    }
 
     reach_host_apply_bar_pointer_observation(host, id, &result);
 

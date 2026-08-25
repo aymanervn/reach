@@ -96,6 +96,72 @@ static reach_result reach_host_finish_update(reach_host *host)
     return REACH_OK;
 }
 
+static reach_result reach_host_update_game_mode_surfaces(reach_host *host, double delta_seconds)
+{
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_desc *desc = &host->surface_descs[index];
+        if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0 ||
+            desc->capsule_ops == nullptr || desc->capsule_ops->tick == nullptr)
+        {
+            continue;
+        }
+        reach_feature_tick_result tick = {};
+        desc->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
+        if (tick.redraw && desc->surface != nullptr)
+        {
+            desc->surface->dirty_flags = 1;
+        }
+        if (tick.request_update)
+        {
+            reach_host_request_update(host);
+        }
+    }
+
+    if (host->monitors.ops.primary != nullptr)
+    {
+        const reach_monitor_info *monitor = host->monitors.ops.primary(host->monitors.list);
+        if (monitor != nullptr)
+        {
+            reach_rect_f32 bounds = {(float)monitor->bounds.left, (float)monitor->bounds.top,
+                                     (float)(monitor->bounds.right - monitor->bounds.left),
+                                     (float)(monitor->bounds.bottom - monitor->bounds.top)};
+            host->layout_dpi_scale = reach_host_monitor_dpi_scale(monitor);
+            if (!host->dock_shown_bounds_valid)
+            {
+                reach_ui_layout_input input = {};
+                input.monitor_bounds = bounds;
+                input.work_area = bounds;
+                input.dpi_scale = host->layout_dpi_scale;
+                reach_dock_layout dock = {};
+                if (reach_dock_layout_compute(&host->dock_config, &input, &dock) == REACH_OK)
+                {
+                    host->dock_shown_bounds = dock.bounds;
+                    host->dock_shown_bounds_valid = 1;
+                }
+            }
+            reach_host_frame_context frame = {};
+            frame.monitor_bounds = bounds;
+            for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+            {
+                const reach_surface_desc *desc = &host->surface_descs[index];
+                if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
+                {
+                    continue;
+                }
+                reach_result result = desc->frame != nullptr ? desc->frame(host, &frame) : REACH_OK;
+                if (result != REACH_OK)
+                {
+                    return result;
+                }
+                reach_host_sync_surface_input_regions(host, desc);
+            }
+        }
+    }
+    reach_host_sync_pointer_move_subscriptions(host);
+    return reach_host_finish_update(host);
+}
+
 reach_result reach_host_update(reach_host *host, double delta_seconds)
 {
     if (host == nullptr)
@@ -127,7 +193,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     (void)reach_host_update_game_mode(host);
     if (reach_host_game_mode_enabled(host))
     {
-        return reach_host_finish_update(host);
+        return reach_host_update_game_mode_surfaces(host, delta_seconds);
     }
 
     reach_host_tick_animations(host, delta_seconds);
@@ -241,6 +307,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                     host->dock.dirty_flags = 1;
                 }
                 reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
+                host->dock_shown_bounds = shown_dock_bounds;
+                host->dock_shown_bounds_valid = 1;
                 reach_rect_f32 animated_dock_bounds = reach_host_reconcile_bar_visibility(
                     host, REACH_SURFACE_ID_DOCK, shown_dock_bounds, bounds);
 
@@ -378,6 +446,16 @@ int32_t reach_host_needs_frame(const reach_host *host)
 
     if (reach_host_game_mode_enabled(host))
     {
+        for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+        {
+            const reach_surface_desc *desc = &host->surface_descs[index];
+            if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0 &&
+                desc->capsule_ops != nullptr && desc->capsule_ops->needs_frame != nullptr &&
+                desc->capsule_ops->needs_frame(desc->capsule))
+            {
+                return 1;
+            }
+        }
         return 0;
     }
 
@@ -404,9 +482,14 @@ int32_t reach_host_needs_frame(const reach_host *host)
 
 uint32_t reach_host_idle_wait_ms(const reach_host *host)
 {
-    if (host == nullptr || reach_host_game_mode_enabled(host))
+    if (host == nullptr)
     {
         return REACH_CLOCK_WAIT_FOREVER;
+    }
+    if (reach_host_game_mode_enabled(host))
+    {
+        return reach_host_needs_frame(host) ? (uint32_t)reach_host_frame_interval_ms(host)
+                                            : REACH_CLOCK_WAIT_FOREVER;
     }
     return reach_clock_next_minute_delay_ms(host->clock);
 }

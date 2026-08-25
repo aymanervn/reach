@@ -170,6 +170,8 @@ extern "C"
     void reach_render_command_buffer_set_content_transform(reach_render_command_buffer *buffer,
                                                            reach_rect_f32 content_rect,
                                                            reach_transform_f32 content_transform);
+    void reach_render_command_buffer_multiply_opacity(reach_render_command_buffer *buffer,
+                                                      float opacity);
     reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                           const reach_render_command *shape,
                                           const reach_shadow *shadow, float dpi_scale);
