@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/app_update.h"
+#include "reach/core/config.h"
 #include "reach/core/loader.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/scrollbar.h"
@@ -35,6 +36,7 @@ extern "C"
 #define REACH_SETTINGS_ACCOUNT_FIELD_NEW 1
 #define REACH_SETTINGS_ACCOUNT_FIELD_CONFIRM 2
 #define REACH_SETTINGS_ACCOUNT_FIELD_COUNT 3
+#define REACH_SETTINGS_THEME_OPTION_COUNT 3
 
     typedef enum reach_settings_page
     {
@@ -66,6 +68,8 @@ extern "C"
         REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE,
         REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE,
         REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE,
+        REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME,
+        REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
         REACH_SETTINGS_HIT_STARTUP_TOGGLE,
@@ -178,6 +182,8 @@ extern "C"
         int32_t display_light_theme;
         reach_animation_track display_theme_track;
         reach_animation_manager display_theme_animation;
+        reach_config_theme_preference display_windows_system_theme;
+        reach_config_theme_preference display_windows_app_theme;
         int32_t hovered_button;
         reach_animation_track button_press_track;
         reach_animation_manager button_press_animation;
@@ -261,6 +267,15 @@ extern "C"
         reach_rect_f32 display_theme_title;
         reach_rect_f32 display_theme_subtitle;
         reach_rect_f32 display_theme_toggle;
+        reach_rect_f32 display_windows_section_title;
+        reach_rect_f32 display_windows_system_card;
+        reach_rect_f32 display_windows_system_title;
+        reach_rect_f32 display_windows_system_subtitle;
+        reach_rect_f32 display_windows_system_options[REACH_SETTINGS_THEME_OPTION_COUNT];
+        reach_rect_f32 display_windows_app_card;
+        reach_rect_f32 display_windows_app_title;
+        reach_rect_f32 display_windows_app_subtitle;
+        reach_rect_f32 display_windows_app_options[REACH_SETTINGS_THEME_OPTION_COUNT];
         reach_rect_f32 account_card;
         reach_rect_f32 account_avatar;
         reach_rect_f32 account_name;
@@ -288,6 +303,7 @@ extern "C"
         size_t power_custom_field;
         size_t account_field;
         size_t startup_index;
+        reach_config_theme_preference display_theme_preference;
     } reach_settings_hit_result;
 
     typedef struct reach_settings_render_input
@@ -327,7 +343,8 @@ extern "C"
     void reach_settings_model_apply_reach_download(reach_settings_model *model, int32_t success);
     int32_t reach_settings_model_reach_update_action_enabled(const reach_settings_model *model);
     const uint16_t *reach_settings_model_reach_update_status(const reach_settings_model *model);
-    const uint16_t *reach_settings_model_reach_update_button_label(const reach_settings_model *model);
+    const uint16_t *
+    reach_settings_model_reach_update_button_label(const reach_settings_model *model);
 
     int32_t reach_settings_power_option_minutes(size_t timer, size_t option);
     const uint16_t *reach_settings_power_option_label(size_t timer, size_t option);
@@ -376,6 +393,19 @@ extern "C"
     void reach_settings_model_set_light_theme(reach_settings_model *model, int32_t enabled);
     int32_t reach_settings_model_light_theme(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_light_theme(reach_settings_model *model);
+    void reach_settings_model_set_windows_system_theme(reach_settings_model *model,
+                                                       reach_config_theme_preference preference);
+    reach_config_theme_preference
+    reach_settings_model_windows_system_theme(const reach_settings_model *model);
+    int32_t
+    reach_settings_model_select_windows_system_theme(reach_settings_model *model,
+                                                     reach_config_theme_preference preference);
+    void reach_settings_model_set_windows_app_theme(reach_settings_model *model,
+                                                    reach_config_theme_preference preference);
+    reach_config_theme_preference
+    reach_settings_model_windows_app_theme(const reach_settings_model *model);
+    int32_t reach_settings_model_select_windows_app_theme(reach_settings_model *model,
+                                                          reach_config_theme_preference preference);
     int32_t reach_settings_model_tick_display_animations(reach_settings_model *model,
                                                          double delta_seconds);
     int32_t reach_settings_model_display_animations_active(const reach_settings_model *model);

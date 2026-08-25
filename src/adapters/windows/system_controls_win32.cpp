@@ -506,10 +506,9 @@ static void reach_system_controls_copy_ssid(uint16_t *dst, size_t dst_count, con
         source_count = sizeof(ssid->ucSSID);
     }
 
-    int converted =
-        MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char *>(ssid->ucSSID),
-                            (int)source_count, reinterpret_cast<wchar_t *>(dst),
-                            (int)(dst_count - 1));
+    int converted = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char *>(ssid->ucSSID),
+                                        (int)source_count, reinterpret_cast<wchar_t *>(dst),
+                                        (int)(dst_count - 1));
     if (converted <= 0)
     {
         converted = MultiByteToWideChar(CP_ACP, 0, reinterpret_cast<const char *>(ssid->ucSSID),
@@ -834,6 +833,89 @@ static reach_result reach_system_controls_request_bluetooth_enabled(void *userda
     LeaveCriticalSection(&adapter->bluetooth_lock);
     SetEvent(adapter->bluetooth_request);
     return REACH_OK;
+}
+
+static int32_t reach_system_controls_read_theme_value(HKEY key, const wchar_t *name,
+                                                      DWORD *out_value)
+{
+    DWORD value = 0;
+    DWORD type = 0;
+    DWORD size = sizeof(value);
+    LONG status =
+        RegQueryValueExW(key, name, nullptr, &type, reinterpret_cast<BYTE *>(&value), &size);
+    if (status != ERROR_SUCCESS || type != REG_DWORD || size != sizeof(value))
+    {
+        return 0;
+    }
+    *out_value = value;
+    return 1;
+}
+
+static reach_result reach_system_controls_set_theme_modes(void *userdata,
+                                                          reach_theme_mode system_mode,
+                                                          reach_theme_mode app_mode)
+{
+    (void)userdata;
+    if ((system_mode != REACH_THEME_MODE_DARK && system_mode != REACH_THEME_MODE_LIGHT) ||
+        (app_mode != REACH_THEME_MODE_DARK && app_mode != REACH_THEME_MODE_LIGHT))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER,
+                        L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0,
+                        nullptr, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, nullptr, &key,
+                        nullptr) != ERROR_SUCCESS)
+    {
+        return REACH_ERROR;
+    }
+
+    struct reach_theme_registry_value
+    {
+        const wchar_t *name;
+        DWORD target;
+    } values[] = {
+        {L"SystemUsesLightTheme", system_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u},
+        {L"AppsUseLightTheme", app_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u},
+    };
+
+    int32_t changed = 0;
+    reach_result result = REACH_OK;
+    for (const reach_theme_registry_value &value : values)
+    {
+        DWORD current = 0;
+        if (reach_system_controls_read_theme_value(key, value.name, &current) &&
+            current == value.target)
+        {
+            continue;
+        }
+        if (RegSetValueExW(key, value.name, 0, REG_DWORD,
+                           reinterpret_cast<const BYTE *>(&value.target),
+                           sizeof(value.target)) != ERROR_SUCCESS)
+        {
+            result = REACH_ERROR;
+            continue;
+        }
+        changed = 1;
+    }
+    RegCloseKey(key);
+
+    if (changed)
+    {
+        DWORD_PTR broadcast_result = 0;
+        (void)SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
+                                  reinterpret_cast<LPARAM>(L"ImmersiveColorSet"),
+                                  SMTO_ABORTIFHUNG | SMTO_NORMAL, 2000, &broadcast_result);
+        UINT taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
+        if (taskbar_created != 0)
+        {
+            broadcast_result = 0;
+            (void)SendMessageTimeoutW(HWND_BROADCAST, taskbar_created, 0, 0,
+                                      SMTO_ABORTIFHUNG | SMTO_NORMAL, 2000, &broadcast_result);
+        }
+    }
+    return result;
 }
 
 static reach_result reach_system_controls_get_power_state(void *userdata,
@@ -1555,6 +1637,7 @@ extern "C" reach_result reach_windows_create_system_controls(reach_system_contro
     out_port->set_brightness_level = reach_system_controls_set_brightness_level;
     out_port->open_project_menu = reach_system_controls_open_project_menu;
     out_port->open_system_quick_settings = reach_system_controls_open_system_quick_settings;
+    out_port->set_theme_modes = reach_system_controls_set_theme_modes;
     out_port->start_watching = reach_system_controls_start_watching;
     out_port->stop_watching = reach_system_controls_stop_watching;
     out_port->destroy = reach_system_controls_destroy;

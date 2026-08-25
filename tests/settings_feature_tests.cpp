@@ -187,8 +187,8 @@ static void test_power_timers(void)
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
 
-    expect_true(reach_settings_model_power_minutes(
-                    model.get(), REACH_SETTINGS_POWER_TIMER_SCREEN_OFF) == 10,
+    expect_true(reach_settings_model_power_minutes(model.get(),
+                                                   REACH_SETTINGS_POWER_TIMER_SCREEN_OFF) == 10,
                 "screen-off timer defaults to 10 minutes");
     expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
                     30,
@@ -330,9 +330,8 @@ static void test_power_wait_apps_toggle(void)
                 "sleep, shutdown, and restart offer the wait-for-apps toggle");
     expect_true(!reach_settings_power_timer_supports_wait(REACH_SETTINGS_POWER_TIMER_LOCK),
                 "lock has no wait-for-apps toggle");
-    expect_true(
-        reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
-        "sleep wait-for-apps default matches the active configuration");
+    expect_true(reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
+                "sleep wait-for-apps default matches the active configuration");
 
     expect_true(
         reach_settings_model_toggle_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP),
@@ -360,8 +359,8 @@ static void test_power_wait_apps_toggle(void)
     expect_true(
         !reach_settings_model_toggle_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK),
         "toggling the lock row is rejected");
-    expect_true(!reach_settings_model_toggle_power_wait_apps(
-                    model.get(), REACH_SETTINGS_POWER_TIMER_SCREEN_OFF),
+    expect_true(!reach_settings_model_toggle_power_wait_apps(model.get(),
+                                                             REACH_SETTINGS_POWER_TIMER_SCREEN_OFF),
                 "toggling the screen-off row is rejected");
     reach_settings_model_set_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK, 1);
     expect_true(!reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK),
@@ -417,6 +416,33 @@ static void test_account_model_and_layout(void)
     hit = reach_settings_hit_test(&layout, 500.0f, 300.0f);
     expect_true(hit.type != REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
                 "account controls are absent on other pages");
+}
+
+static void test_display_theme_preferences(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    expect_true(reach_settings_model_windows_system_theme(model.get()) ==
+                    REACH_CONFIG_THEME_FOLLOW_REACH,
+                "Windows mode follows Reach by default");
+    expect_true(reach_settings_model_windows_app_theme(model.get()) ==
+                    REACH_CONFIG_THEME_FOLLOW_REACH,
+                "app mode follows Reach by default");
+    expect_true(
+        reach_settings_model_select_windows_system_theme(model.get(), REACH_CONFIG_THEME_LIGHT),
+        "Windows mode accepts an explicit light override");
+    expect_true(reach_settings_model_select_windows_app_theme(model.get(), REACH_CONFIG_THEME_DARK),
+                "app mode accepts an explicit dark override");
+    expect_true(reach_settings_model_windows_system_theme(model.get()) == REACH_CONFIG_THEME_LIGHT,
+                "Windows mode stores its independent override");
+    expect_true(reach_settings_model_windows_app_theme(model.get()) == REACH_CONFIG_THEME_DARK,
+                "app mode stores its independent override");
+    expect_true(!reach_settings_model_select_windows_app_theme(model.get(),
+                                                               (reach_config_theme_preference)99),
+                "invalid app theme preferences are rejected");
+    expect_true(reach_settings_model_select_windows_system_theme(model.get(),
+                                                                 REACH_CONFIG_THEME_FOLLOW_REACH),
+                "Windows mode can return to Reach synchronization");
 }
 
 static void test_account_password_form(void)
@@ -477,8 +503,8 @@ static void test_button_press_feedback(void)
     feedback.release_easing = REACH_EASING_EASE_OUT;
     reach_pressable_result result = {};
     reach_pressable_press(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
-                          REACH_SETTINGS_HIT_POWER_APPLY, REACH_SETTINGS_HIT_POWER_APPLY,
-                          &feedback, &result);
+                          REACH_SETTINGS_HIT_POWER_APPLY, REACH_SETTINGS_HIT_POWER_APPLY, &feedback,
+                          &result);
     expect_true(reach_settings_model_button_press_value(model.get(),
                                                         REACH_SETTINGS_HIT_POWER_APPLY) == 1.0f,
                 "pressed button reports full press");
@@ -516,6 +542,7 @@ int main(void)
     test_power_custom_textbox();
     test_power_wait_apps_toggle();
     test_account_model_and_layout();
+    test_display_theme_preferences();
     test_account_password_form();
     test_button_press_feedback();
     return failures == 0 ? 0 : 1;

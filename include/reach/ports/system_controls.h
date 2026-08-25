@@ -1,6 +1,7 @@
 #ifndef REACH_PORTS_SYSTEM_CONTROLS_H
 #define REACH_PORTS_SYSTEM_CONTROLS_H
 
+#include "reach/core/theme.h"
 #include "reach/support/util.h"
 
 #include <stdint.h>
@@ -77,6 +78,9 @@ extern "C"
         reach_result (*open_project_menu)(void *userdata);
 
         reach_result (*open_system_quick_settings)(void *userdata);
+
+        reach_result (*set_theme_modes)(void *userdata, reach_theme_mode system_mode,
+                                        reach_theme_mode app_mode);
 
         reach_result (*start_watching)(void *userdata,
                                        reach_system_controls_change_callback callback,

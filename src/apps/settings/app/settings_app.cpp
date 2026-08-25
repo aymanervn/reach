@@ -360,8 +360,8 @@ static void reach_settings_save_power_config(reach_settings_app *app)
         return;
     }
     reach_config_power_settings settings = {};
-    settings.screen_off_minutes = reach_settings_model_power_minutes(
-        &app->model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF);
+    settings.screen_off_minutes =
+        reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF);
     settings.sleep_minutes =
         reach_settings_model_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP);
     settings.lock_minutes =
@@ -419,6 +419,8 @@ static void reach_settings_load_display_config(reach_settings_app *app)
     reach_settings_model_set_bundled_font(&app->model, snapshot->bundled_font);
     reach_settings_apply_ui_font(app);
     reach_settings_model_set_light_theme(&app->model, snapshot->light_theme);
+    reach_settings_model_set_windows_system_theme(&app->model, snapshot->windows_system_theme);
+    reach_settings_model_set_windows_app_theme(&app->model, snapshot->windows_app_theme);
     reach_settings_apply_theme(app);
 }
 
@@ -432,6 +434,8 @@ static void reach_settings_save_display_config(reach_settings_app *app)
     settings.high_refresh_rate = reach_settings_model_high_refresh_rate(&app->model);
     settings.bundled_font = reach_settings_model_bundled_font(&app->model);
     settings.light_theme = reach_settings_model_light_theme(&app->model);
+    settings.windows_system_theme = reach_settings_model_windows_system_theme(&app->model);
+    settings.windows_app_theme = reach_settings_model_windows_app_theme(&app->model);
     (void)reach_config_service_set_display(app->config_service, &settings);
 }
 
@@ -1358,6 +1362,10 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_STARTUP_TOGGLE:
         detail = (uint32_t)hit.startup_index;
         break;
+    case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME:
+    case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME:
+        detail = (uint32_t)hit.display_theme_preference;
+        break;
     case REACH_SETTINGS_HIT_NONE:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB:
@@ -1564,6 +1572,24 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             (void)reach_settings_model_toggle_light_theme(&app->model);
             reach_settings_save_display_config(app);
             reach_settings_apply_theme(app);
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME)
+        {
+            if (reach_settings_model_select_windows_system_theme(&app->model,
+                                                                 hit.display_theme_preference))
+            {
+                reach_settings_save_display_config(app);
+                app->dirty = 1;
+            }
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME)
+        {
+            if (reach_settings_model_select_windows_app_theme(&app->model,
+                                                              hit.display_theme_preference))
+            {
+                reach_settings_save_display_config(app);
+                app->dirty = 1;
+            }
         }
     }
 }

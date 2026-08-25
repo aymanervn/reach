@@ -36,6 +36,8 @@ extern "C"
         int32_t high_refresh_rate;
         int32_t bundled_font;
         int32_t light_theme;
+        reach_config_theme_preference windows_system_theme;
+        reach_config_theme_preference windows_app_theme;
     } reach_config_display_settings;
 
     typedef void (*reach_config_service_notify)(void *user, reach_config_service_event event);
@@ -54,8 +56,7 @@ extern "C"
 
     reach_result reach_config_service_reload(reach_config_service *service);
     reach_result reach_config_service_ensure_defaults(reach_config_service *service);
-    reach_result reach_config_service_pin_path(reach_config_service *service,
-                                               const uint16_t *path);
+    reach_result reach_config_service_pin_path(reach_config_service *service, const uint16_t *path);
     reach_result reach_config_service_pin_app(reach_config_service *service,
                                               const reach_pinned_app_model *app);
     reach_result reach_config_service_unpin_id(reach_config_service *service, uint32_t pin_id);
@@ -67,9 +68,10 @@ extern "C"
                                                 const reach_config_power_settings *settings);
     reach_result reach_config_service_set_display(reach_config_service *service,
                                                   const reach_config_display_settings *settings);
-    reach_result reach_config_service_set_wallpapers(
-        reach_config_service *service, const uint16_t *wallpaper_path,
-        const uint16_t monitor_wallpaper_paths[][260], size_t monitor_count);
+    reach_result reach_config_service_set_wallpapers(reach_config_service *service,
+                                                     const uint16_t *wallpaper_path,
+                                                     const uint16_t monitor_wallpaper_paths[][260],
+                                                     size_t monitor_count);
     reach_result reach_config_service_set_monitor_wallpaper(reach_config_service *service,
                                                             size_t monitor_index,
                                                             const uint16_t *path);

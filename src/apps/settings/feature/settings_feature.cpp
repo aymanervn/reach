@@ -79,8 +79,8 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
 
 float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)
 {
-    if (model == nullptr || reach_pressable_feedback_index(&model->button_pressable) !=
-                                (size_t)hit_type)
+    if (model == nullptr ||
+        reach_pressable_feedback_index(&model->button_pressable) != (size_t)hit_type)
     {
         return 0.0f;
     }
@@ -127,8 +127,8 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
          REACH_THEME_ACCENT_TEAL},
         {REACH_SETTINGS_PAGE_STARTUP_APPS, REACH_VECTOR_ICON_QUICK_SETTINGS,
          (const uint16_t *)L"Startup Apps", REACH_THEME_ACCENT_PURPLE},
-        {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP,
-         (const uint16_t *)L"Energy", REACH_THEME_ACCENT_ORANGE},
+        {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy",
+         REACH_THEME_ACCENT_ORANGE},
         {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
          REACH_THEME_ACCENT_YELLOW},
         {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates",
@@ -219,12 +219,60 @@ static void reach_settings_layout_toggle_card(const reach_settings_toggle_card_r
     float text_width = toggle_x - 14.0f * scale - text_x;
 
     *rects->card = reach_settings_rect(x, y, width, height);
-    *rects->icon = reach_settings_rect(x + 16.0f * scale, y + (height - icon_box) * 0.5f, icon_box,
-                                       icon_box);
+    *rects->icon =
+        reach_settings_rect(x + 16.0f * scale, y + (height - icon_box) * 0.5f, icon_box, icon_box);
     *rects->toggle = reach_settings_rect(toggle_x, y + (height - toggle_height) * 0.5f,
                                          toggle_width, toggle_height);
     *rects->title = reach_settings_rect(text_x, y + 15.0f * scale, text_width, 20.0f * scale);
     *rects->subtitle = reach_settings_rect(text_x, y + 37.0f * scale, text_width, 16.0f * scale);
+}
+
+static void
+reach_settings_layout_theme_choice_card(reach_rect_f32 *card, reach_rect_f32 *title,
+                                        reach_rect_f32 *subtitle,
+                                        reach_rect_f32 options[REACH_SETTINGS_THEME_OPTION_COUNT],
+                                        float x, float y, float width, float height, float scale)
+{
+    *card = reach_settings_rect(x, y, width, height);
+    float option_gap = 6.0f * scale;
+    float option_height = 28.0f * scale;
+    if (width >= 440.0f * scale)
+    {
+        float options_width = 258.0f * scale;
+        float options_x = x + width - 16.0f * scale - options_width;
+        float text_x = x + 18.0f * scale;
+        *title = reach_settings_rect(text_x, y + 15.0f * scale, options_x - text_x - 16.0f * scale,
+                                     20.0f * scale);
+        *subtitle = reach_settings_rect(text_x, y + 37.0f * scale,
+                                        options_x - text_x - 16.0f * scale, 16.0f * scale);
+        float option_width =
+            (options_width - option_gap * (REACH_SETTINGS_THEME_OPTION_COUNT - 1)) /
+            REACH_SETTINGS_THEME_OPTION_COUNT;
+        float option_y = y + (height - option_height) * 0.5f;
+        for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
+        {
+            options[option] =
+                reach_settings_rect(options_x + (float)option * (option_width + option_gap),
+                                    option_y, option_width, option_height);
+        }
+        return;
+    }
+
+    float text_x = x + 16.0f * scale;
+    *title = reach_settings_rect(text_x, y + 11.0f * scale, width - 32.0f * scale, 20.0f * scale);
+    *subtitle =
+        reach_settings_rect(text_x, y + 31.0f * scale, width - 32.0f * scale, 16.0f * scale);
+    float options_x = text_x;
+    float options_width = width - 32.0f * scale;
+    float option_width = (options_width - option_gap * (REACH_SETTINGS_THEME_OPTION_COUNT - 1)) /
+                         REACH_SETTINGS_THEME_OPTION_COUNT;
+    float option_y = y + height - option_height - 10.0f * scale;
+    for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
+    {
+        options[option] =
+            reach_settings_rect(options_x + (float)option * (option_width + option_gap), option_y,
+                                option_width, option_height);
+    }
 }
 
 static int32_t reach_settings_update_in_select_section(reach_windows_update_state state)
@@ -471,8 +519,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         float area_y = layout.content_title.y + layout.content_title.height + 12.0f * scale;
         float area_width = layout.content.width - 64.0f * scale - scrollbar_width;
 
-        layout.startup_summary =
-            reach_settings_rect(area_x, area_y, area_width, 16.0f * scale);
+        layout.startup_summary = reach_settings_rect(area_x, area_y, area_width, 16.0f * scale);
 
         float viewport_y = area_y + 16.0f * scale + 12.0f * scale;
         float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
@@ -542,6 +589,22 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                               area_y + (float)index * (card_height + card_spacing),
                                               area_width, card_height, scale);
         }
+
+        float section_y = area_y + 3.0f * card_height + 2.0f * card_spacing + 18.0f * scale;
+        layout.display_windows_section_title =
+            reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
+        float appearance_y = section_y + 26.0f * scale;
+        float appearance_card_height =
+            area_width >= 440.0f * scale ? 76.0f * scale : 104.0f * scale;
+        reach_settings_layout_theme_choice_card(
+            &layout.display_windows_system_card, &layout.display_windows_system_title,
+            &layout.display_windows_system_subtitle, layout.display_windows_system_options, area_x,
+            appearance_y, area_width, appearance_card_height, scale);
+        reach_settings_layout_theme_choice_card(
+            &layout.display_windows_app_card, &layout.display_windows_app_title,
+            &layout.display_windows_app_subtitle, layout.display_windows_app_options, area_x,
+            appearance_y + appearance_card_height + card_spacing, area_width,
+            appearance_card_height, scale);
     }
 
     if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
@@ -577,11 +640,11 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_rect(layout.content_title.x, reach_row_y, content_width, reach_row_height);
     float reach_button_width = 128.0f * scale;
     float reach_button_height = 32.0f * scale;
-    layout.reach_update_button = reach_settings_rect(
-        layout.reach_update_row.x + layout.reach_update_row.width - 14.0f * scale -
-            reach_button_width,
-        reach_row_y + (reach_row_height - reach_button_height) * 0.5f, reach_button_width,
-        reach_button_height);
+    layout.reach_update_button =
+        reach_settings_rect(layout.reach_update_row.x + layout.reach_update_row.width -
+                                14.0f * scale - reach_button_width,
+                            reach_row_y + (reach_row_height - reach_button_height) * 0.5f,
+                            reach_button_width, reach_button_height);
 
     float windows_title_y = reach_row_y + reach_row_height + 16.0f * scale;
     layout.windows_section_title = reach_settings_rect(layout.content_title.x, windows_title_y,
@@ -589,9 +652,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
 
     float viewport_y = windows_title_y + section_header_height + 6.0f * scale;
     float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
-    layout.update_viewport =
-        reach_settings_rect(layout.content_title.x, viewport_y, content_width,
-                            viewport_bottom - viewport_y);
+    layout.update_viewport = reach_settings_rect(layout.content_title.x, viewport_y, content_width,
+                                                 viewport_bottom - viewport_y);
     layout.update_scrollbar_track = reach_settings_rect(
         layout.update_viewport.x + layout.update_viewport.width + 11.0f * scale,
         layout.update_viewport.y, scrollbar_width, layout.update_viewport.height);
@@ -802,6 +864,23 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
              reach_settings_rect_contains(display_cards[index].card, x, y)))
         {
             result.type = display_cards[index].type;
+            return result;
+        }
+    }
+    for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
+    {
+        if (layout->display_windows_system_options[option].width > 0.0f &&
+            reach_settings_rect_contains(layout->display_windows_system_options[option], x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME;
+            result.display_theme_preference = (reach_config_theme_preference)option;
+            return result;
+        }
+        if (layout->display_windows_app_options[option].width > 0.0f &&
+            reach_settings_rect_contains(layout->display_windows_app_options[option], x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME;
+            result.display_theme_preference = (reach_config_theme_preference)option;
             return result;
         }
     }
