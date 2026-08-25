@@ -18,12 +18,18 @@ void reach_host_release_render_icon(reach_host *host, uint64_t icon_id)
         return;
     }
 
+    // Every surface owns its own render backend and therefore its own icon cache, so a surface
+    // left out here holds its cached bitmap for the rest of the process.
     reach_host_release_render_icon_from_surface(&host->launcher, icon_id);
     reach_host_release_render_icon_from_surface(&host->dock, icon_id);
+    reach_host_release_render_icon_from_surface(&host->top_bar, icon_id);
     reach_host_release_render_icon_from_surface(&host->tray, icon_id);
     reach_host_release_render_icon_from_surface(&host->switcher, icon_id);
+    reach_host_release_render_icon_from_surface(&host->stage, icon_id);
     reach_host_release_render_icon_from_surface(&host->context_menu, icon_id);
     reach_host_release_render_icon_from_surface(&host->quick_settings, icon_id);
+    reach_host_release_render_icon_from_surface(&host->battery, icon_id);
+    reach_host_release_render_icon_from_surface(&host->system_hud, icon_id);
     reach_host_release_render_icon_from_surface(&host->clipboard_surface, icon_id);
 }
 
