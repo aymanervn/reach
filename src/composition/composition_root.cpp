@@ -159,6 +159,16 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_platform_window(REACH_SURFACE_SYSTEM_HUD,
+                                                      &dependencies.system_hud_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.system_hud_window.window,
+                                                           &dependencies.system_hud_renderer);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_platform_window(REACH_SURFACE_CLIPBOARD,
                                                       &dependencies.clipboard_window);
     }
@@ -260,6 +270,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.quick_settings_renderer = {};
             dependencies.battery_window = {};
             dependencies.battery_renderer = {};
+            dependencies.system_hud_window = {};
+            dependencies.system_hud_renderer = {};
             dependencies.clipboard_window = {};
             dependencies.clipboard_renderer = {};
             dependencies.clipboard = {};
@@ -287,6 +299,14 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.clipboard_window.ops.destroy != nullptr)
         {
             dependencies.clipboard_window.ops.destroy(dependencies.clipboard_window.window);
+        }
+        if (dependencies.system_hud_window.ops.destroy != nullptr)
+        {
+            dependencies.system_hud_window.ops.destroy(dependencies.system_hud_window.window);
+        }
+        if (dependencies.system_hud_renderer.ops.destroy != nullptr)
+        {
+            dependencies.system_hud_renderer.ops.destroy(dependencies.system_hud_renderer.backend);
         }
         if (dependencies.clipboard_renderer.ops.destroy != nullptr)
         {

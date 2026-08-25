@@ -64,6 +64,15 @@ extern "C"
         reach_color popup_background;
         reach_color popup_border;
         reach_color popup_separator;
+        reach_color system_hud_background;
+        reach_color system_hud_border;
+        reach_color system_hud_primary_text;
+        reach_color system_hud_secondary_text;
+        reach_color system_hud_icon_background;
+        reach_color system_hud_glyph;
+        reach_color system_hud_track;
+        reach_color system_hud_fill;
+        reach_color system_hud_muted_fill;
         reach_color toggle_track_off;
         reach_color toggle_knob;
         reach_shadow popup_shadow;

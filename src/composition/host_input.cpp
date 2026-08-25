@@ -908,6 +908,11 @@ void reach_host_on_battery_window_event(void *user, const reach_ui_event *event)
     reach_host_on_surface_event(user, event, REACH_SURFACE_BATTERY);
 }
 
+void reach_host_on_system_hud_window_event(void *user, const reach_ui_event *event)
+{
+    reach_host_on_surface_event(user, event, REACH_SURFACE_SYSTEM_HUD);
+}
+
 void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *event)
 {
     reach_host_on_surface_event(user, event, REACH_SURFACE_CLIPBOARD);
@@ -940,6 +945,16 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     if (event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED ||
         event->type == REACH_UI_EVENT_SYSTEM_STATS_CHANGED)
     {
+        if (event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED &&
+            host->system_hud_capsule != nullptr)
+        {
+            reach_system_hud_refresh_media(host->system_hud_capsule);
+            if (reach_system_hud_state_ptr(host->system_hud_capsule)->kind ==
+                REACH_SYSTEM_HUD_MEDIA)
+            {
+                host->system_hud.dirty_flags = 1;
+            }
+        }
         reach_host_request_update(host);
         return REACH_OK;
     }

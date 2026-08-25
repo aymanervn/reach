@@ -330,6 +330,54 @@ reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_c
     return REACH_OK;
 }
 
+reach_result reach_host_frame_system_hud(reach_host *host, const reach_host_frame_context *ctx)
+{
+    if (host == nullptr || ctx == nullptr || host->system_hud.window.ops.set_bounds == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    const reach_system_hud_state *state = reach_system_hud_state_ptr(host->system_hud_capsule);
+    reach_host_set_surface_visible(host, REACH_SURFACE_ID_SYSTEM_HUD, state->open);
+    if (!state->open)
+    {
+        return REACH_OK;
+    }
+
+    reach_system_hud_arrange_context arrange = {};
+    arrange.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    arrange.monitor_bounds = ctx->monitor_bounds;
+    arrange.dock_shown_bounds =
+        host->dock_shown_bounds_valid ? host->dock_shown_bounds : reach_rect_f32{};
+    arrange.dpi_scale = reach_host_layout_dpi_scale(host);
+    int32_t layout_changed = reach_system_hud_arrange(host->system_hud_capsule, &arrange);
+    state = reach_system_hud_state_ptr(host->system_hud_capsule);
+
+    int32_t window_changed = 0;
+    reach_result result = reach_host_apply_window_state(
+        &host->system_hud.window, state->layout.bounds,
+        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_SYSTEM_HUD), 1.0f,
+        &host->system_hud.last_bounds, &host->system_hud.last_opacity,
+        &host->system_hud.bounds_valid, &host->system_hud.opacity_valid, &window_changed);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    if ((window_changed || layout_changed) &&
+        host->system_hud.window.ops.apply_rounded_corners != nullptr)
+    {
+        (void)host->system_hud.window.ops.apply_rounded_corners(
+            host->system_hud.window.window, 18.0f * reach_host_layout_dpi_scale(host));
+    }
+
+    if (host->dirty.render || host->system_hud.dirty_flags || window_changed || layout_changed)
+    {
+        return reach_host_render_system_hud_surface(host);
+    }
+    return REACH_OK;
+}
+
 static reach_rect_f32 reach_host_apply_switcher_bounds_animation(reach_host *host,
                                                                  reach_rect_f32 target)
 {

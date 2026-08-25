@@ -68,6 +68,8 @@ extern "C"
         reach_render_backend_port quick_settings_renderer;
         reach_platform_window_port battery_window;
         reach_render_backend_port battery_renderer;
+        reach_platform_window_port system_hud_window;
+        reach_render_backend_port system_hud_renderer;
         reach_platform_window_port clipboard_window;
         reach_render_backend_port clipboard_renderer;
         reach_input_source_port input_source;

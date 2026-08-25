@@ -299,6 +299,38 @@ reach_result reach_host_render_battery_surface(reach_host *host)
                                            reach_popup_notch_side(state->drop_direction), content);
 }
 
+reach_result reach_host_render_system_hud_surface(reach_host *host)
+{
+    if (host == nullptr || host->system_hud.renderer.ops.begin_frame == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    reach_system_hud_render_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
+    reach_result result =
+        reach_system_hud_append_render_commands(host->system_hud_capsule, &ctx, commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_SYSTEM_HUD, commands);
+
+    result = host->system_hud.renderer.ops.begin_frame(host->system_hud.renderer.backend);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    result = host->system_hud.renderer.ops.execute(host->system_hud.renderer.backend, commands);
+    reach_result end_result =
+        host->system_hud.renderer.ops.end_frame(host->system_hud.renderer.backend);
+    return result != REACH_OK ? result : end_result;
+}
+
 reach_result reach_host_render_context_menu_surface(reach_host *host)
 {
     if (host == nullptr || host->context_menu.renderer.ops.begin_frame == nullptr)

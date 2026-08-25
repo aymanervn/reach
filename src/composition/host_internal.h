@@ -20,6 +20,7 @@
 #include "reach/features/quick_settings.h"
 #include "reach/features/stage.h"
 #include "reach/features/switcher.h"
+#include "reach/features/system_hud.h"
 #include "reach/features/top_bar.h"
 #include "reach/features/wallpaper.h"
 
@@ -115,6 +116,7 @@ typedef enum reach_surface_id
     REACH_SURFACE_ID_SWITCHER,
     REACH_SURFACE_ID_STAGE,
     REACH_SURFACE_ID_BATTERY,
+    REACH_SURFACE_ID_SYSTEM_HUD,
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
 
@@ -142,7 +144,8 @@ typedef enum reach_surface_behavior_flags
 
     REACH_SURFACE_BEHAVIOR_ACTIVATES = 1u << 0,
 
-    REACH_SURFACE_BEHAVIOR_EXCLUSIVE = 1u << 1
+    REACH_SURFACE_BEHAVIOR_EXCLUSIVE = 1u << 1,
+    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE = 1u << 2
 } reach_surface_behavior_flags;
 
 typedef enum reach_edge_reveal_anchor
@@ -295,6 +298,7 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
 reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_context *ctx);
+reach_result reach_host_frame_system_hud(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx);
@@ -355,6 +359,7 @@ struct reach_host
     reach_surface_runtime context_menu;
     reach_surface_runtime quick_settings;
     reach_surface_runtime battery;
+    reach_surface_runtime system_hud;
     reach_surface_runtime clipboard_surface;
     reach_render_command_buffer render_commands;
     reach_render_command_buffer popup_render_commands;
@@ -404,6 +409,10 @@ struct reach_host
     reach_wallpaper *wallpaper;
     reach_dock *dock_capsule;
     reach_top_bar *top_bar_capsule;
+    reach_system_hud *system_hud_capsule;
+    reach_rect_f32 dock_shown_bounds;
+    int32_t dock_shown_bounds_valid;
+    int32_t top_bar_hidden;
     reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;
     reach_host_window_list_state window_list;
@@ -545,6 +554,7 @@ void reach_host_on_switcher_window_event(void *user, const reach_ui_event *event
 void reach_host_on_context_menu_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_quick_settings_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_battery_window_event(void *user, const reach_ui_event *event);
+void reach_host_on_system_hud_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *event);
 void reach_host_on_stage_window_event(void *user, const reach_ui_event *event);
 
@@ -770,6 +780,7 @@ reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bou
 
 reach_result reach_host_render_quick_settings_surface(reach_host *host);
 reach_result reach_host_render_battery_surface(reach_host *host);
+reach_result reach_host_render_system_hud_surface(reach_host *host);
 
 reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32 bounds);
 

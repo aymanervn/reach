@@ -614,7 +614,7 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
            role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
            role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
            role == REACH_SURFACE_BATTERY || role == REACH_SURFACE_CLIPBOARD ||
-           role == REACH_SURFACE_STAGE;
+           role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD;
 }
 
 static DWORD reach_window_ex_style(reach_surface_role role)
@@ -625,7 +625,7 @@ static DWORD reach_window_ex_style(reach_surface_role role)
         role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
         role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_BATTERY ||
         role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
-        role == REACH_SURFACE_STAGE)
+        role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
@@ -817,7 +817,7 @@ static reach_result reach_platform_window_apply_rounded_corners(reach_platform_w
         window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
         window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_BATTERY ||
         window->role == REACH_SURFACE_CLIPBOARD || window->role == REACH_SURFACE_SETTINGS ||
-        window->role == REACH_SURFACE_STAGE)
+        window->role == REACH_SURFACE_STAGE || window->role == REACH_SURFACE_SYSTEM_HUD)
     {
         return REACH_OK;
     }
@@ -860,7 +860,7 @@ static reach_result reach_platform_window_set_opacity(reach_platform_window *win
         window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
         window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_BATTERY ||
         window->role == REACH_SURFACE_CLIPBOARD || window->role == REACH_SURFACE_SETTINGS ||
-        window->role == REACH_SURFACE_STAGE)
+        window->role == REACH_SURFACE_STAGE || window->role == REACH_SURFACE_SYSTEM_HUD)
     {
         return REACH_OK;
     }

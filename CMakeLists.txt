@@ -108,6 +108,7 @@ target_compile_features(reach_core PUBLIC
 add_library(reach_features STATIC
     src/features/common/bar_visibility/bar_visibility.cpp
     src/features/common/layout/layout.cpp
+    src/features/common/level_presentation/level_presentation.cpp
     src/features/common/loader/loader_render.cpp
     src/features/common/marquee/marquee.cpp
     src/features/common/progress_bar/progress_bar_render.cpp
@@ -141,6 +142,8 @@ add_library(reach_features STATIC
     src/features/stage/stage_interaction.cpp
     src/features/stage/stage_layout.cpp
     src/features/stage/stage_render.cpp
+    src/features/system_hud/system_hud_feature.cpp
+    src/features/system_hud/system_hud_render.cpp
     src/features/top_bar/top_bar_feature.cpp
     src/features/top_bar/top_bar_now_playing.cpp
     src/features/top_bar/top_bar_window_push.cpp
@@ -714,6 +717,18 @@ target_link_libraries(reach_battery_feature_tests PRIVATE
     reach_features
 )
 
+add_executable(reach_system_hud_feature_tests
+    tests/system_hud_feature_tests.cpp
+)
+
+reach_configure_common(reach_system_hud_feature_tests)
+target_compile_features(reach_system_hud_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_system_hud_feature_tests PRIVATE
+    reach_features
+)
+
 add_executable(reach_context_menu_feature_tests
     tests/context_menu_feature_tests.cpp
 )
@@ -894,6 +909,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_host_layout_tests COMMAND reach_host_layout_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_battery_feature_tests COMMAND reach_battery_feature_tests)
+    add_test(NAME reach_system_hud_feature_tests COMMAND reach_system_hud_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)
     add_test(NAME reach_wallpaper_feature_tests COMMAND reach_wallpaper_feature_tests)

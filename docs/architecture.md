@@ -368,6 +368,16 @@ close rules) and true capture pre-emption (dock drag, QS slider, launcher
 scrollbar) stay as named, commented exceptions ahead of the loops. Hotkey and
 action→port translators for media transport, volume, and brightness live in
 `host_system_actions.cpp`, out of the input routing path.
+The system HUD consumes the final top-bar visibility result cached by that same
+bar reconciliation, so keyboard media, volume, and brightness actions never
+reconstruct the hiding predicate. Successful level changes hand the capsule the
+exact post-action state; media actions refresh their presentation snapshot from
+the Now Playing service. The HUD is a persistent, source-gated surface at layer
+220, above every other Reach layer. Its visual card is one blocking input region:
+presses are consumed without actions or capture, while pointer enter pauses its
+dismissal dwell and pointer leave releases it. It is centered above the Dock's
+shown-position geometry even when the Dock itself is hidden, and its whole render
+command buffer is faded by the shared animation manager.
 Per-frame layout resolves in dependency order in `reach_host_update` (monitor →
 dock cluster → launcher → clipboard → switcher); the per-surface frame steps
 (`host_surface_frames.cpp`, layout refresh → transition → window state →
@@ -381,7 +391,7 @@ apply pass (idempotent via `surface->activated`) and never through a raw `show()
 a fullscreen surface re-asserting `HWND_TOPMOST` every frame makes the desktop
 unusable.
 
-Z-order and visibility for the twelve windows reach owns are decided in one place:
+Z-order and visibility for the windows Reach owns are decided in one place:
 the `features/common/layout` manager plus the apply pass in `host_layout.cpp`. Each
 participant registers a base layer and, optionally, per-condition layer and
 visibility overrides; `reach_layout_resolve` is a pure function of registrations,
@@ -403,11 +413,14 @@ actually changed.
 
 Conditions are bits, not triggers: the arrangement is recomputed from the whole
 active set, so setting an already-set condition is a no-op and a missed one heals on
-the next resolve. `GAME_MODE` resolves every participant hidden and is the only
-game-mode branch in composition outside `host_game_mode.cpp`, which owns the state,
-and the one gate in `reach_host_update` — in game mode nothing below that gate runs
-at all, rather than running and having its output suppressed. The top bar is the
-only participant whose layer moves: it rests at 0 and rises to 130 while its reveal
+the next resolve. `GAME_MODE` resolves every participant hidden except a descriptor
+that declares `BEHAVIOR_GAME_MODE_VISIBLE`. The system HUD is the only such
+participant because hardware media and level keys remain active while the top bar
+is suppressed. `host_game_mode.cpp` owns the state and the main gate in
+`reach_host_update`; the game-mode path runs only behavior-flagged capsules and
+their frames, leaving all ordinary composition work below the gate dormant.
+The top bar is the only participant whose layer moves: it rests at 0 and rises to
+130 while its reveal
 transition is live, while a `bar_shown_while_open` surface is open, or while a popup
 holds the bars. Starting that Y animation and reporting the transition are the same
 act, performed by `reach_bar_update_visibility` alone — nothing else may write
@@ -477,8 +490,10 @@ everything.
 
 ### Adding a feature
 
-Everything a new interactive surface needs is authored in its own directory
-plus one descriptor row; no other feature's code changes.
+The generic target is that everything a new interactive surface needs is authored
+in its own directory plus one descriptor row; no other feature's code changes.
+Until the open composition-registry migration is complete, a scoped exception must
+be recorded in `docs/repo-analysis.md` rather than hidden behind another ad hoc path.
 
 1. **Capsule** (`src/features/<name>/`, header in `include/reach/features/`):
    implement `reach_feature_capsule_ops` (null-skip the hooks you don't need;

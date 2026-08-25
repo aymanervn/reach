@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/features/common/level_presentation.h"
 #include "reach/features/common/pressable.h"
 
 typedef struct reach_quick_settings reach_quick_settings;
@@ -102,15 +103,7 @@ size_t reach_quick_settings_pressable_target_index(uint64_t target);
 
 static inline float reach_quick_settings_clamp01(float value)
 {
-    if (value < 0.0f)
-    {
-        return 0.0f;
-    }
-    if (value > 1.0f)
-    {
-        return 1.0f;
-    }
-    return value;
+    return reach_level_clamp01(value);
 }
 
 static inline float reach_quick_settings_clamp_min0(float value)

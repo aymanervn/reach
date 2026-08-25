@@ -111,16 +111,7 @@ void reach_quick_settings_model_set_main_volume(reach_quick_settings_model *mode
 
 uint32_t reach_quick_settings_volume_icon_id(float volume_level, int32_t muted)
 {
-    float level = reach_quick_settings_clamp01(volume_level);
-    if (muted || level <= 0.0f)
-    {
-        return REACH_VECTOR_ICON_VOLUME_ZERO;
-    }
-    if (level < 0.5f)
-    {
-        return REACH_VECTOR_ICON_VOLUME_LOW;
-    }
-    return REACH_VECTOR_ICON_VOLUME_HIGH;
+    return reach_volume_level_icon(volume_level, muted);
 }
 
 void reach_quick_settings_model_set_sessions(reach_quick_settings_model *model,
