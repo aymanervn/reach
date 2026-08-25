@@ -1,5 +1,6 @@
 #include "system_hud_common.h"
 
+#include "reach/core/typography.h"
 #include "reach/features/common/level_presentation.h"
 #include "reach/features/common/progress_bar_render.h"
 
@@ -81,11 +82,12 @@ static void reach_system_hud_render_media(const reach_system_hud_state *state,
 
     static const uint16_t fallback_title[] = {'M', 'e', 'd', 'i', 'a', 0};
     const uint16_t *title = state->media.title[0] != 0 ? state->media.title : fallback_title;
-    reach_system_hud_push_text(commands, state->layout.title, title, 15.0f * ctx->dpi_scale,
+    reach_system_hud_push_text(commands, state->layout.title, title,
+                               REACH_TEXT_SIZE_HEADING * ctx->dpi_scale,
                                REACH_TEXT_WEIGHT_DEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
                                theme->system_hud_primary_text);
     reach_system_hud_push_text(commands, state->layout.subtitle, state->media.artist,
-                               12.5f * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
+                               REACH_TEXT_SIZE_SMALL * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
                                REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_secondary_text);
     reach_system_hud_push_vector_icon(
         commands, state->layout.media_action,
@@ -110,13 +112,15 @@ static void reach_system_hud_render_level(const reach_system_hud_state *state,
     static const uint16_t brightness_label[] = {'B', 'r', 'i', 'g', 'h', 't',
                                                 'n', 'e', 's', 's', 0};
     const uint16_t *label = volume ? (muted ? muted_label : volume_label) : brightness_label;
-    reach_system_hud_push_text(commands, state->layout.title, label, 14.0f * ctx->dpi_scale,
+    reach_system_hud_push_text(commands, state->layout.title, label,
+                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale,
                                REACH_TEXT_WEIGHT_DEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
                                theme->system_hud_primary_text);
 
     uint16_t percent[8] = {};
     reach_level_format_percent(percent, 8, level);
-    reach_system_hud_push_text(commands, state->layout.value, percent, 13.0f * ctx->dpi_scale,
+    reach_system_hud_push_text(commands, state->layout.value, percent,
+                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale,
                                REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_TRAILING,
                                theme->system_hud_secondary_text);
 

@@ -37,7 +37,12 @@ extern "C"
         REACH_TOP_BAR_PILL_COUNT = 4
     } reach_top_bar_pill;
 
-#define REACH_TOP_BAR_MAX_TRAY_ICONS 11
+// Every icon stays inline until the tray reaches the overflow threshold; past that the bar keeps
+// REACH_TOP_BAR_TRAY_INLINE_ICONS inline and moves the rest into the dropdown. The dropdown button
+// takes the cell the hidden icons vacate, so the pill never spans more than MAX_TRAY_ICONS cells.
+#define REACH_TOP_BAR_MAX_TRAY_ICONS 5
+#define REACH_TOP_BAR_TRAY_OVERFLOW_THRESHOLD 6
+#define REACH_TOP_BAR_TRAY_INLINE_ICONS 4
 
     typedef struct reach_top_bar_tray_item
     {

@@ -43,6 +43,8 @@ extern "C"
         float notch_center_x;
         int32_t notch_side;
         float dpi_scale;
+        reach_color background_color_override;
+        int32_t has_background_color_override;
     } reach_popup_background_input;
 
     float reach_popup_radius(const reach_theme *theme);

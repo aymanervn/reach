@@ -157,19 +157,27 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
                             input->theme->bar_text_secondary);
 }
 
-static void reach_top_bar_push_button_feedback(const reach_top_bar_render_input *input,
-                                               reach_render_command_buffer *commands,
-                                               reach_rect_f32 button, size_t feedback_slot)
+static void reach_top_bar_push_button_feedback_colored(const reach_top_bar_render_input *input,
+                                                       reach_render_command_buffer *commands,
+                                                       reach_rect_f32 button, size_t feedback_slot,
+                                                       reach_color color)
 {
     if (input->click_feedback_index != feedback_slot ||
         input->click_feedback_opacity <= reach_top_bar_metrics_values.click_feedback_min_opacity)
     {
         return;
     }
-    reach_top_bar_push_rect(
-        commands, button,
-        reach_theme_color_alpha(input->theme->bar_click_feedback, input->click_feedback_opacity),
-        button.height * 0.5f);
+    reach_top_bar_push_rect(commands, button,
+                            reach_theme_color_alpha(color, input->click_feedback_opacity),
+                            button.height * 0.5f);
+}
+
+static void reach_top_bar_push_button_feedback(const reach_top_bar_render_input *input,
+                                               reach_render_command_buffer *commands,
+                                               reach_rect_f32 button, size_t feedback_slot)
+{
+    reach_top_bar_push_button_feedback_colored(input, commands, button, feedback_slot,
+                                               input->theme->bar_click_feedback);
 }
 
 static void reach_top_bar_push_separator_dot(const reach_top_bar_render_input *input,
@@ -252,15 +260,14 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     }
 
     reach_rect_f32 overflow = layout->tray_overflow_button;
-    reach_top_bar_push_rect(commands, overflow, input->theme->bar_button_background,
-                            overflow.height * 0.5f);
     reach_top_bar_push_vector_icon(
         commands,
         reach_top_bar_center_square(overflow, overflow.height * metrics.tray_overflow_glyph_scale),
         input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP : REACH_VECTOR_ICON_ARROW_DOWN,
         input->theme->system_glyph);
-    reach_top_bar_push_button_feedback(input, commands, overflow,
-                                       REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW);
+    reach_top_bar_push_button_feedback_colored(input, commands, overflow,
+                                               REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW,
+                                               input->theme->bar_tray_background);
 }
 
 static void reach_top_bar_push_stat(const reach_top_bar_render_input *input,

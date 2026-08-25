@@ -66,10 +66,10 @@
     .accent_tint_alpha = 0.20f, .dock_corner_radius_ratio = 0.5f, .border_thickness = 1.0f,        \
     .icon_box_height_ratio = 0.60f, .icon_max_box_ratio = 0.76f,                                   \
     .icon_box_corner_radius_ratio = 0.28f, .icon_box_corner_radius_max = 14.0f,                    \
-    .tray_slot_size_ratio = 0.3f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,   \
+    .tray_slot_size_ratio = 0.605f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f,  \
     .now_playing_width = 220.0f, .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,             \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
-    .now_playing_prev_next_button_width = 13.2f, .now_playing_title_text_size = 13.5f,             \
+    .now_playing_prev_next_button_width = 13.2f,                                                  \
     .surface_open_seconds = 0.16f, .surface_close_seconds = 0.12f, .bar_reveal_seconds = 0.25f,    \
     .stage_animation_seconds = 0.28f, .stage_close_hover_seconds = 0.14f,                          \
     .stage_reflow_seconds = 0.34f
@@ -125,7 +125,7 @@ static const reach_theme reach_theme_dark = {
     .quick_settings_slider_track = REACH_DARK_MIDTONE(1.0f),
     .quick_settings_slider_fill = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .quick_settings_slider_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.38f),
-    .quick_settings_button_background = REACH_DARK_MIDTONE(1.0f),
+    .quick_settings_button_background = REACH_DARK_HIGH_CONTRAST_WHITE(0.10f),
     .quick_settings_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_separator = REACH_DARK_MIDTONE(1.0f),
     .quick_settings_app_volume_track = REACH_DARK_HIGH_CONTRAST_WHITE(0.32f),
@@ -275,7 +275,7 @@ static const reach_theme reach_theme_light = {
     .quick_settings_slider_track = REACH_LIGHT_MIDTONE(1.0f),
     .quick_settings_slider_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
     .quick_settings_slider_muted_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.36f),
-    .quick_settings_button_background = REACH_LIGHT_MIDTONE(1.0f),
+    .quick_settings_button_background = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.07f),
     .quick_settings_secondary_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_separator = REACH_LIGHT_STRUCTURE(1.0f),
     .quick_settings_app_volume_track = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.26f),

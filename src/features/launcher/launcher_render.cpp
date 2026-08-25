@@ -2,6 +2,7 @@
 
 #include "launcher_common.h"
 
+#include "reach/core/typography.h"
 #include "reach/features/common/scrollbar_render.h"
 
 static uint64_t reach_launcher_fallback_icon(reach_search_result_kind kind)
@@ -74,10 +75,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float row_text_right_padding = reach_launcher_scale(input, 16.0f);
     float row_title_y = reach_launcher_scale(input, 6.0f);
     float row_title_height = reach_launcher_scale(input, 24.0f);
-    float row_title_size = reach_launcher_scale(input, 15.0f);
+    float row_title_size = reach_launcher_scale(input, REACH_TEXT_SIZE_LARGE);
     float row_path_y = reach_launcher_scale(input, 28.0f);
     float row_path_height = reach_launcher_scale(input, 20.0f);
-    float row_path_size = reach_launcher_scale(input, 12.0f);
+    float row_path_size = reach_launcher_scale(input, REACH_TEXT_SIZE_SMALL);
     int32_t error_row_visible = reach_launcher_error_row_visible(model);
     int32_t results_attached = model->result_count > 0 || error_row_visible ? 1 : 0;
     float outer_height = layout->search_box.height;
@@ -113,7 +114,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.rect.height = layout->search_text_input.height;
         command.color = transparent;
         command.radius = 0.0f;
-        command.text_size = reach_launcher_scale(input, 18.0f);
+        command.text_size = reach_launcher_scale(input, REACH_TEXT_SIZE_HEADING);
         command.text_weight = REACH_TEXT_WEIGHT_NORMAL;
         command.text_alignment = input->text_alignment_leading;
         command.text_color = theme->launcher_search_text;

@@ -1,5 +1,7 @@
 #include "windows_adapters_internal.h"
 
+#include "reach/core/typography.h"
+
 #include <dwmapi.h>
 #include <windows.h>
 #include <windowsx.h>
@@ -149,20 +151,16 @@ static HICON reach_load_window_icon(reach_surface_role role, int width, int heig
     return icon;
 }
 
-static HFONT reach_create_windows_menu_font()
+static HFONT reach_create_windows_menu_font(HWND hwnd)
 {
     NONCLIENTMETRICSW metrics = {};
     metrics.cbSize = sizeof(metrics);
     if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0))
     {
-        if (metrics.lfMenuFont.lfHeight < 0)
-        {
-            metrics.lfMenuFont.lfHeight += 2;
-        }
-        else if (metrics.lfMenuFont.lfHeight > 2)
-        {
-            metrics.lfMenuFont.lfHeight -= 2;
-        }
+        UINT dpi = GetDpiForWindow(hwnd);
+        dpi = dpi > 0 ? dpi : 96;
+        metrics.lfMenuFont.lfHeight =
+            -MulDiv((int)REACH_TEXT_SIZE_MEDIUM, (int)dpi, 96);
         return CreateFontIndirectW(&metrics.lfMenuFont);
     }
     return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
@@ -514,7 +512,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             HDC dc = GetDC(hwnd);
             if (dc != nullptr && text != nullptr)
             {
-                HFONT font = reach_create_windows_menu_font();
+                HFONT font = reach_create_windows_menu_font(hwnd);
                 HGDIOBJ old_font = SelectObject(dc, font);
                 GetTextExtentPoint32W(dc, text, (int)wcslen(text), &size);
                 SelectObject(dc, old_font);
@@ -549,7 +547,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             SetBkMode(draw->hDC, TRANSPARENT);
             SetTextColor(draw->hDC, RGB(218, 216, 212));
 
-            HFONT font = reach_create_windows_menu_font();
+            HFONT font = reach_create_windows_menu_font(hwnd);
             HGDIOBJ old_font = SelectObject(draw->hDC, font);
 
             RECT text_rect = draw->rcItem;

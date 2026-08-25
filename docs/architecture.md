@@ -167,7 +167,7 @@ the thumbnail port — it publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
 into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in
 screen space; the render pass converts to surface-local. Because DWM composites
-thumbnails *on top of* the host surface, stage chrome (labels, selection) must stay
+thumbnails _on top of_ the host surface, stage chrome (labels, selection) must stay
 outside the tile rects — drawing over a tile is not possible from the same surface.
 Minimized windows have no DWM content and fall back to an icon tile.
 The Desktop tile uses the Reach-owned top-level Progman compatibility host as its
@@ -206,6 +206,7 @@ feature policy while allowing the top bar and Dock window-list popup to size bef
 Applying a different UI font invalidates both rendering and layout so the next normal frame
 remeasures every text-sized surface. The Dock window-list popup fits its widest measured title
 between one-letter-plus-close-control chrome and a monitor-bounded maximum, ellipsizing beyond it.
+All Reach-rendered text selects from the shared scale in `reach/core/typography.h`
 
 The window push is the top bar's second private subfeature: while the bar can
 hide and is sliding in, it moves the windows the bar would cover down by the
@@ -330,9 +331,9 @@ move/size-loop events.
 
 Two separate inputs decide how another open surface affects the bars, and both
 apply to both bars identically. A surface that declares `bar_shown_while_open`
-*forces* them shown for as long as it is open; stage is the only one, because it
+_forces_ them shown for as long as it is open; stage is the only one, because it
 is a window overview and wants the bars in frame. Any open popup instead only
-*holds* them: a bar already shown stays shown, but opening a popup never summons
+_holds_ them: a bar already shown stays shown, but opening a popup never summons
 a hidden bar, and the hold lifts the frame the last popup closes. Everything else
 leaves the bars to hide on their own rules — the launcher and the clipboard are
 pure transients that own the screen while they are up, and the switcher is the

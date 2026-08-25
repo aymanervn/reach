@@ -1,6 +1,7 @@
 #include "top_bar_now_playing.h"
 
 #include "top_bar_metrics.h"
+#include "reach/core/typography.h"
 
 #include <math.h>
 #include <new>
@@ -176,7 +177,7 @@ reach_top_bar_now_playing_layout reach_top_bar_now_playing_compute_layout(
     layout.cover = reach_top_bar_now_playing_rect(
         bounds.x, bounds.y, bounds.width * REACH_TOP_BAR_NOW_PLAYING_COVER_WIDTH, bounds.height);
 
-    float text_size = actual->now_playing_title_text_size * dpi_scale;
+    float text_size = REACH_TEXT_SIZE_MEDIUM * dpi_scale;
     layout.text = reach_top_bar_now_playing_rect(text_x, bounds.y, text_width, bounds.height);
     layout.text_advance =
         reach_top_bar_now_playing_text_advance(text_measure, model->line, text_size);
@@ -299,7 +300,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     text.width =
         input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
     reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
-                                        theme->now_playing_title_text_size * dpi_scale,
+                                        REACH_TEXT_SIZE_MEDIUM * dpi_scale,
                                         REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING,
                                         theme->now_playing_title, input->layout->text);
 
