@@ -1,49 +1,45 @@
 #include "windows_icon_handle_internal.h"
 
+#include <mutex>
 #include <new>
+#include <vector>
 
-static reach_windows_icon *reach_windows_icon_from_hicon(HICON hicon)
+static std::mutex &reach_windows_icon_lock(void)
 {
-    if (hicon == nullptr)
-    {
-        return nullptr;
-    }
-
-    reach_windows_icon *icon = new (std::nothrow) reach_windows_icon();
-    if (icon == nullptr)
-    {
-        DestroyIcon(hicon);
-        return nullptr;
-    }
-
-    icon->references.store(1);
-    icon->magic = REACH_WINDOWS_ICON_MAGIC;
-    icon->kind = REACH_WINDOWS_ICON_KIND_HICON;
-    icon->hicon = hicon;
-    icon->hbitmap = nullptr;
-    return icon;
+    static std::mutex lock;
+    return lock;
 }
 
-static reach_windows_icon *reach_windows_icon_from_hbitmap(HBITMAP hbitmap)
+static std::vector<reach_windows_icon *> &reach_windows_icon_registry(void)
 {
-    if (hbitmap == nullptr)
+    static std::vector<reach_windows_icon *> registry;
+    return registry;
+}
+
+static reach_windows_icon *reach_windows_icon_find(uint64_t icon_id)
+{
+    for (reach_windows_icon *icon : reach_windows_icon_registry())
     {
-        return nullptr;
+        if (icon->id == icon_id)
+        {
+            return icon;
+        }
     }
 
-    reach_windows_icon *icon = new (std::nothrow) reach_windows_icon();
-    if (icon == nullptr)
+    return nullptr;
+}
+
+static void reach_windows_icon_destroy_handles(HICON hicon, HBITMAP hbitmap)
+{
+    if (hicon != nullptr)
+    {
+        DestroyIcon(hicon);
+    }
+
+    if (hbitmap != nullptr)
     {
         DeleteObject(hbitmap);
-        return nullptr;
     }
-
-    icon->references.store(1);
-    icon->magic = REACH_WINDOWS_ICON_MAGIC;
-    icon->kind = REACH_WINDOWS_ICON_KIND_HBITMAP;
-    icon->hicon = nullptr;
-    icon->hbitmap = hbitmap;
-    return icon;
 }
 
 static void reach_windows_icon_destroy(reach_windows_icon *icon)
@@ -53,33 +49,92 @@ static void reach_windows_icon_destroy(reach_windows_icon *icon)
         return;
     }
 
-    icon->magic = 0;
-
-    if (icon->hicon != nullptr)
-    {
-        DestroyIcon(icon->hicon);
-        icon->hicon = nullptr;
-    }
-
-    if (icon->hbitmap != nullptr)
-    {
-        DeleteObject(icon->hbitmap);
-        icon->hbitmap = nullptr;
-    }
-
+    reach_windows_icon_destroy_handles(icon->hicon, icon->hbitmap);
     delete icon;
+}
+
+static uint64_t reach_windows_icon_register(reach_windows_icon_kind kind, HICON hicon,
+                                            HBITMAP hbitmap)
+{
+    reach_windows_icon *icon = new (std::nothrow) reach_windows_icon();
+    if (icon == nullptr)
+    {
+        reach_windows_icon_destroy_handles(hicon, hbitmap);
+        return 0;
+    }
+
+    icon->references = 1;
+    icon->kind = kind;
+    icon->hicon = hicon;
+    icon->hbitmap = hbitmap;
+
+    {
+        std::lock_guard<std::mutex> guard(reach_windows_icon_lock());
+
+        // Never reused, so a released id resolves to nothing instead of to whichever icon later
+        // takes its place. Render backends cache bitmaps by id and would otherwise serve a dead
+        // icon's bitmap for a live one.
+        static uint64_t next_id = 0;
+        icon->id = ++next_id;
+
+        try
+        {
+            reach_windows_icon_registry().push_back(icon);
+        }
+        catch (...)
+        {
+            reach_windows_icon_destroy(icon);
+            return 0;
+        }
+    }
+
+    return icon->id;
 }
 
 uint64_t reach_windows_icon_id_from_hicon(HICON hicon)
 {
-    reach_windows_icon *icon = reach_windows_icon_from_hicon(hicon);
-    return icon != nullptr ? reinterpret_cast<uint64_t>(icon) : 0;
+    if (hicon == nullptr)
+    {
+        return 0;
+    }
+
+    return reach_windows_icon_register(REACH_WINDOWS_ICON_KIND_HICON, hicon, nullptr);
 }
 
 uint64_t reach_windows_icon_id_from_hbitmap(HBITMAP hbitmap)
 {
-    reach_windows_icon *icon = reach_windows_icon_from_hbitmap(hbitmap);
-    return icon != nullptr ? reinterpret_cast<uint64_t>(icon) : 0;
+    if (hbitmap == nullptr)
+    {
+        return 0;
+    }
+
+    return reach_windows_icon_register(REACH_WINDOWS_ICON_KIND_HBITMAP, nullptr, hbitmap);
+}
+
+reach_windows_icon *reach_windows_icon_lookup(uint64_t icon_id)
+{
+    if (icon_id == 0)
+    {
+        return nullptr;
+    }
+
+    std::lock_guard<std::mutex> guard(reach_windows_icon_lock());
+    return reach_windows_icon_find(icon_id);
+}
+
+void reach_windows_icon_id_retain(uint64_t icon_id)
+{
+    if (icon_id == 0)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> guard(reach_windows_icon_lock());
+    reach_windows_icon *icon = reach_windows_icon_find(icon_id);
+    if (icon != nullptr)
+    {
+        ++icon->references;
+    }
 }
 
 void reach_windows_icon_id_release(uint64_t icon_id)
@@ -89,17 +144,27 @@ void reach_windows_icon_id_release(uint64_t icon_id)
         return;
     }
 
-    reach_windows_icon *icon = reinterpret_cast<reach_windows_icon *>(icon_id);
-    if (icon->references.fetch_sub(1) == 1)
+    reach_windows_icon *retired = nullptr;
     {
-        reach_windows_icon_destroy(icon);
-    }
-}
+        std::lock_guard<std::mutex> guard(reach_windows_icon_lock());
+        std::vector<reach_windows_icon *> &registry = reach_windows_icon_registry();
+        for (size_t index = 0; index < registry.size(); ++index)
+        {
+            if (registry[index]->id != icon_id)
+            {
+                continue;
+            }
 
-void reach_windows_icon_id_retain(uint64_t icon_id)
-{
-    if (icon_id != 0)
-    {
-        reinterpret_cast<reach_windows_icon *>(icon_id)->references.fetch_add(1);
+            if (--registry[index]->references > 0)
+            {
+                return;
+            }
+
+            retired = registry[index];
+            registry.erase(registry.begin() + index);
+            break;
+        }
     }
+
+    reach_windows_icon_destroy(retired);
 }
