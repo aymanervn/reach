@@ -2,6 +2,8 @@
 #include "reach/features/common/progress_bar_render.h"
 
 #include "quick_settings_common.h"
+
+#include "reach/features/common/level_presentation.h"
 #include "quick_settings_metrics.h"
 
 static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *commands,
@@ -240,15 +242,7 @@ static uint32_t reach_quick_settings_network_icon_id(const reach_network_state *
     {
         return REACH_VECTOR_ICON_ETHERNET;
     }
-    if (state->signal_strength < 34)
-    {
-        return REACH_VECTOR_ICON_WIFI_LOW;
-    }
-    if (state->signal_strength < 67)
-    {
-        return REACH_VECTOR_ICON_WIFI_MEDIUM;
-    }
-    return REACH_VECTOR_ICON_WIFI_HIGH;
+    return reach_wifi_signal_icon(state->signal_strength);
 }
 
 static void reach_quick_settings_network_label(const reach_network_state *state,

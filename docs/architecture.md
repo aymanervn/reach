@@ -530,6 +530,40 @@ If the feature needs cross-feature policy the class rules don't cover, add a
 named, commented exception in composition — and treat a growing exception
 list as a missing class rule.
 
+### Wi-Fi and Bluetooth (Settings app)
+
+The Settings app owns two radio pages, each backed by a service over a port and a Windows adapter.
+Both follow the "ongoing OS state belongs behind a service" rule rather than the app's older
+worker-per-page pattern, so `settings_app.cpp` gained no fourth and fifth bespoke worker.
+
+`reach_wifi_service` and `reach_bluetooth_service` (`src/services/`) each own one worker thread, a
+serialized command queue, a published snapshot with a generation, and the drain of their port's
+off-thread change callback. Commands are typed (`refresh`, `scan`, `connect`, `disconnect`,
+`forget`, `set_radio` / `refresh`, `set_scan`, `pair`, `respond_pairing`, `unpair`); a refresh
+raised by an OS change never displaces a queued user action. The app consumes them with
+`take` on the UI tick and folds their `*_pending` into `needs_frame`. Port ops may block, so the
+port carries an optional `thread_attach`/`thread_detach` pair that the adapter uses for its
+per-thread WinRT apartment — that keeps `winrt` out of `reach_services`.
+
+`wifi_wlanapi.cpp` drives WLAN API: `WlanRegisterNotification` for scan/connection/profile
+changes, `WlanGetAvailableNetworkList` unioned with `WlanGetProfileList` so saved-but-out-of-range
+networks still appear, and a profile XML built by the pure `wifi_profile.cpp` helper. Radio power
+goes through WinRT `Radio` with `RadioKind::WiFi`, matching the Bluetooth precedent already in
+`system_controls_win32.cpp`. `bluetooth_winrt.cpp` runs two `DeviceWatcher`s — classic and LE
+association endpoints — and drives `DeviceInformationCustomPairing`, holding the deferral for a
+`ConfirmPinMatch` request until the page answers. Device icons come from the `System.Devices.Icon`
+property, environment-expanded, and resolve through the existing `icon_provider` resource-ref path.
+
+List policy is pure and lives in core: `reach_wifi_network_list_normalize` merges one SSID
+advertised by several access points, keeps the strongest signal and the union of the
+connected/saved/in-range facts, and orders connected → in range → saved → signal.
+`reach_bluetooth_device_list_normalize` does the same across the two watchers, dropping unnamed
+endpoints. Bluetooth radio power reuses `system_controls`; there is no second path.
+
+Both pages render as an accordion: one row expands in place, driven by one animation track per
+row, and every action lives inside the expanded row, so neither page opens a popup. The Wi-Fi
+"Known networks" view is a sub-view of the same page, not an eighth nav row.
+
 ## tools
 
 The executables — reach shell, Reach Service, watchdog, reachctl, update helper,

@@ -4,6 +4,7 @@
 #include "reach/ports/app_launcher.h"
 #include "reach/ports/app_update.h"
 #include "reach/ports/audio_volume.h"
+#include "reach/ports/bluetooth.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/image_loader.h"
 #include "reach/ports/clock.h"
@@ -27,6 +28,7 @@
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/user_account.h"
 #include "reach/ports/wallpaper_service.h"
+#include "reach/ports/wifi.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
 #include "reach/ports/window_thumbnail.h"
@@ -64,6 +66,8 @@ extern "C"
     reach_result reach_windows_create_power_session(reach_power_session_port *out_port);
     reach_result reach_windows_create_audio_volume(reach_audio_volume_port *out_port);
     reach_result reach_windows_create_system_controls(reach_system_controls_port *out_port);
+    reach_result reach_windows_create_wifi(reach_wifi_port *out_port);
+    reach_result reach_windows_create_bluetooth(reach_bluetooth_port *out_port);
     reach_result
     reach_windows_create_screen_hotspot_factory(reach_screen_hotspot_factory_port *out_port);
     reach_result reach_windows_create_image_loader(reach_image_loader_port *out_port);

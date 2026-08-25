@@ -83,7 +83,7 @@ static void reach_system_hud_render_media(const reach_system_hud_state *state,
     static const uint16_t fallback_title[] = {'M', 'e', 'd', 'i', 'a', 0};
     const uint16_t *title = state->media.title[0] != 0 ? state->media.title : fallback_title;
     reach_system_hud_push_text(commands, state->layout.title, title,
-                               REACH_TEXT_SIZE_HEADING * ctx->dpi_scale,
+                               REACH_TEXT_SIZE_LARGE * ctx->dpi_scale,
                                REACH_TEXT_WEIGHT_DEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
                                theme->system_hud_primary_text);
     reach_system_hud_push_text(commands, state->layout.subtitle, state->media.artist,

@@ -19,6 +19,15 @@ reach_vector_icon_id reach_volume_level_icon(float level, int32_t muted)
     return level < 0.5f ? REACH_VECTOR_ICON_VOLUME_LOW : REACH_VECTOR_ICON_VOLUME_HIGH;
 }
 
+reach_vector_icon_id reach_wifi_signal_icon(int32_t signal_strength)
+{
+    if (signal_strength < 34)
+    {
+        return REACH_VECTOR_ICON_WIFI_LOW;
+    }
+    return signal_strength < 67 ? REACH_VECTOR_ICON_WIFI_MEDIUM : REACH_VECTOR_ICON_WIFI_HIGH;
+}
+
 void reach_level_format_percent(uint16_t *dst, size_t dst_count, float level)
 {
     if (dst == nullptr || dst_count == 0)

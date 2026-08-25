@@ -6,75 +6,13 @@
 #include "reach/features/common/ui_controls.h"
 
 #include "settings_pages_internal.h"
+#include "settings_render_internal.h"
 
-static float scale_value(const reach_settings_render_input *input, float value)
-{
-    return value * (input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f);
-}
 
-static void push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect, float radius,
-                      reach_color color)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect = rect;
-    command.radius = radius;
-    command.color = color;
-    (void)reach_render_command_buffer_push(commands, &command);
-}
 
-static void push_bordered_background(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                                     float radius, float width, reach_color background,
-                                     reach_color border)
-{
-    reach_render_command shape = {};
-    shape.type = REACH_RENDER_COMMAND_RECT;
-    shape.rect = rect;
-    shape.radius = radius;
-    (void)reach_render_push_bordered_background(commands, &shape, background, border, width,
-                                                nullptr, 1.0f);
-}
 
-static void push_masked_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                             float radius, int32_t corner_mask, reach_color color)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect = rect;
-    command.radius = radius;
-    command.corner_mask = corner_mask;
-    command.color = color;
-    (void)reach_render_command_buffer_push(commands, &command);
-}
 
-static void push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                      const uint16_t *text, float size, int32_t weight, int32_t alignment,
-                      reach_color color, int32_t ellipsis)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_TEXT;
-    command.rect = rect;
-    command.text_size = size;
-    command.text_weight = weight;
-    command.text_alignment = alignment;
-    command.text_ellipsis = ellipsis;
-    command.color = color;
-    reach_copy_utf16(command.text, 260, text);
-    (void)reach_render_command_buffer_push(commands, &command);
-}
 
-static void push_icon(reach_render_command_buffer *commands, reach_rect_f32 rect, reach_color color,
-                      reach_vector_icon_id icon_id, float inset_ratio)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-    float inset = rect.width * inset_ratio;
-    command.rect = {rect.x + inset, rect.y + inset, rect.width - inset * 2.0f,
-                    rect.height - inset * 2.0f};
-    command.icon_id = icon_id;
-    command.color = color;
-    (void)reach_render_command_buffer_push(commands, &command);
-}
 
 static void append_text(uint16_t *destination, size_t capacity, const uint16_t *source)
 {
@@ -130,39 +68,8 @@ static void build_status_text(const reach_windows_update_item *update, uint16_t 
                                                : (const uint16_t *)u"No");
 }
 
-static reach_color color_with_alpha(reach_color color, float alpha)
-{
-    color.a = alpha;
-    return color;
-}
 
-static reach_ui_button_style settings_button_style(const reach_settings_render_input *input,
-                                                   reach_color background)
-{
-    reach_ui_button_style style = {};
-    style.background = background;
-    style.radius = scale_value(input, input->theme->radius_small);
-    style.disabled_background = input->theme->settings_button_disabled_background;
-    style.text = input->theme->settings_button_text;
-    style.disabled_text = input->theme->settings_secondary_text;
-    style.text_size = scale_value(input, REACH_TEXT_SIZE_MEDIUM);
-    style.pressed_darken = input->theme->button_pressed_darken;
-    style.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
-    return style;
-}
 
-static reach_ui_selection_item_style settings_pill_style(const reach_settings_render_input *input,
-                                                         reach_color accent)
-{
-    reach_ui_selection_item_style style = {};
-    style.background = input->theme->settings_pill_background;
-    style.accent = accent;
-    style.text = input->theme->settings_secondary_text;
-    style.border_width = scale_value(input, 1.0f);
-    style.text_size = scale_value(input, REACH_TEXT_SIZE_MEDIUM);
-    style.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
-    return style;
-}
 
 static void push_avatar_image(reach_render_command_buffer *commands, reach_rect_f32 rect,
                               uint64_t icon_id)
@@ -184,16 +91,16 @@ static void render_account_page(const reach_settings_render_input *input,
     const reach_settings_layout *layout = input->layout;
     reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_TEAL);
 
-    push_rect(commands, layout->account_card, scale_value(input, input->theme->radius_small),
+    reach_settings_push_rect(commands, layout->account_card, reach_settings_scale(input, input->theme->radius_small),
               input->theme->settings_card_background);
 
     const reach_rect_f32 avatar = layout->account_avatar;
-    reach_rect_f32 ring = {avatar.x - scale_value(input, 3.0f), avatar.y - scale_value(input, 3.0f),
-                           avatar.width + scale_value(input, 6.0f),
-                           avatar.height + scale_value(input, 6.0f)};
+    reach_rect_f32 ring = {avatar.x - reach_settings_scale(input, 3.0f), avatar.y - reach_settings_scale(input, 3.0f),
+                           avatar.width + reach_settings_scale(input, 6.0f),
+                           avatar.height + reach_settings_scale(input, 6.0f)};
     reach_color ring_color =
         reach_theme_color_mix(input->theme->settings_card_background, accent, 0.55f);
-    push_bordered_background(commands, ring, ring.width * 0.5f, scale_value(input, 1.5f),
+    reach_settings_push_bordered_background(commands, ring, ring.width * 0.5f, reach_settings_scale(input, 1.5f),
                              input->theme->settings_card_background, ring_color);
     if (model->account_picture != 0)
     {
@@ -201,43 +108,43 @@ static void render_account_page(const reach_settings_render_input *input,
     }
     else
     {
-        push_rect(commands, avatar, avatar.width * 0.5f, color_with_alpha(accent, 0.22f));
+        reach_settings_push_rect(commands, avatar, avatar.width * 0.5f, reach_settings_color_with_alpha(accent, 0.22f));
         uint16_t initial[2] = {reach_settings_account_initial(model), 0};
-        push_text(commands, avatar, initial, scale_value(input, REACH_TEXT_SIZE_XLARGE),
+        reach_settings_push_text(commands, avatar, initial, reach_settings_scale(input, REACH_TEXT_SIZE_XLARGE),
                   REACH_TEXT_WEIGHT_DEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, accent, 0);
     }
 
     const uint16_t *display_name = model->account_display_name[0] != 0
                                        ? model->account_display_name
                                        : (const uint16_t *)L"Windows user";
-    push_text(commands, layout->account_name, display_name,
-              scale_value(input, REACH_TEXT_SIZE_HEADING), REACH_TEXT_WEIGHT_DEMIBOLD,
+    reach_settings_push_text(commands, layout->account_name, display_name,
+              reach_settings_scale(input, REACH_TEXT_SIZE_HEADING), REACH_TEXT_WEIGHT_DEMIBOLD,
               input->text_alignment_leading, input->theme->settings_text, 1);
     if (model->account_user_name[0] != 0)
     {
-        push_text(commands, layout->account_user, model->account_user_name,
-                  scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+        reach_settings_push_text(commands, layout->account_user, model->account_user_name,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     }
-    reach_ui_selection_item_style badge_style = settings_pill_style(input, accent);
+    reach_ui_selection_item_style badge_style = reach_settings_pill_style(input, accent);
     reach_ui_selection_item_render(commands, layout->account_type_badge,
                                    reach_settings_account_type_label(model->account_is_admin),
                                    &badge_style, 1.0f);
 
-    push_rect(commands, layout->account_password_card,
-              scale_value(input, input->theme->radius_small),
+    reach_settings_push_rect(commands, layout->account_password_card,
+              reach_settings_scale(input, input->theme->radius_small),
               input->theme->settings_card_background);
-    push_rect(commands, layout->account_password_icon,
-              scale_value(input, input->theme->radius_small),
-              input->theme->settings_input_background);
-    push_icon(commands, layout->account_password_icon, input->theme->settings_secondary_text,
+    reach_settings_push_rect(commands, layout->account_password_icon,
+              reach_settings_scale(input, input->theme->radius_small),
+              input->theme->settings_icon_box_background);
+    reach_settings_push_icon(commands, layout->account_password_icon, input->theme->settings_secondary_text,
               REACH_VECTOR_ICON_LOCK, 0.22f);
-    push_text(commands, layout->account_password_title, (const uint16_t *)L"Password",
-              scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+    reach_settings_push_text(commands, layout->account_password_title, (const uint16_t *)L"Password",
+              reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
               input->text_alignment_leading, input->theme->settings_text, 1);
-    push_text(commands, layout->account_password_subtitle,
+    reach_settings_push_text(commands, layout->account_password_subtitle,
               (const uint16_t *)L"Change the password you use to sign in to Windows",
-              scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+              reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
               input->text_alignment_leading, input->theme->settings_secondary_text, 1);
 
     if (model->account_status != REACH_SETTINGS_ACCOUNT_STATUS_NONE)
@@ -245,18 +152,18 @@ static void render_account_page(const reach_settings_render_input *input,
         reach_color status_color = model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS
                                        ? input->theme->settings_status_success
                                        : input->theme->settings_status_error;
-        push_text(commands, layout->account_password_status,
+        reach_settings_push_text(commands, layout->account_password_status,
                   reach_settings_account_status_message(model->account_status),
-                  scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
                   REACH_TEXT_ALIGNMENT_TRAILING, status_color, 1);
     }
 
     static const uint16_t *placeholders[REACH_SETTINGS_ACCOUNT_FIELD_COUNT] = {
         (const uint16_t *)L"Current password", (const uint16_t *)L"New password",
         (const uint16_t *)L"Confirm password"};
-    reach_ui_selection_item_style field_style = settings_pill_style(input, accent);
+    reach_ui_selection_item_style field_style = reach_settings_pill_style(input, accent);
     field_style.background = input->theme->settings_input_background;
-    field_style.text_size = scale_value(input, REACH_TEXT_SIZE_XSMALL);
+    field_style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
     {
         const reach_text_edit *edit = &model->account_password_edits[field];
@@ -285,16 +192,16 @@ static void render_account_page(const reach_settings_render_input *input,
             state.selection_end = 0;
         }
         state.text_color = input->theme->settings_text;
-        state.placeholder_color = color_with_alpha(input->theme->settings_secondary_text, 0.55f);
-        state.selection_color = color_with_alpha(accent, 0.30f);
-        float text_inset = scale_value(input, 13.0f);
+        state.placeholder_color = reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
+        state.selection_color = reach_settings_color_with_alpha(accent, 0.30f);
+        float text_inset = reach_settings_scale(input, 13.0f);
         reach_rect_f32 text_rect = {field_rect.x + text_inset, field_rect.y,
                                     field_rect.width - text_inset * 2.0f, field_rect.height};
         reach_ui_textbox_render(commands, text_rect, &field_style, focused ? 1.0f : 0.0f, &state);
     }
 
     reach_ui_button_style change_style =
-        settings_button_style(input, input->theme->settings_button_primary);
+        reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->account_password_button, (const uint16_t *)L"Change", &change_style, 1,
         reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_ACCOUNT_PASSWORD));
@@ -311,35 +218,35 @@ static void render_power_page(const reach_settings_render_input *input,
     {
         const reach_settings_power_row_style *style = &styles[timer];
         const reach_color accent = reach_theme_accent_color(input->theme, style->accent);
-        push_rect(commands, layout->power_cards[timer],
-                  scale_value(input, input->theme->radius_small),
+        reach_settings_push_rect(commands, layout->power_cards[timer],
+                  reach_settings_scale(input, input->theme->radius_small),
                   input->theme->settings_card_background);
-        push_rect(commands, layout->power_icon_boxes[timer],
-                  scale_value(input, input->theme->radius_small),
-                  input->theme->settings_input_background);
-        push_icon(commands, layout->power_icon_boxes[timer], input->theme->settings_secondary_text,
+        reach_settings_push_rect(commands, layout->power_icon_boxes[timer],
+                  reach_settings_scale(input, input->theme->radius_small),
+                  input->theme->settings_icon_box_background);
+        reach_settings_push_icon(commands, layout->power_icon_boxes[timer], input->theme->settings_secondary_text,
                   (reach_vector_icon_id)style->icon_id, 0.22f);
-        push_text(commands, layout->power_titles[timer], style->title,
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+        reach_settings_push_text(commands, layout->power_titles[timer], style->title,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
                   input->text_alignment_leading, input->theme->settings_text, 1);
         if (layout->power_subtitles[timer].height > 0.0f)
         {
-            push_text(commands, layout->power_subtitles[timer], style->subtitle,
-                      scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+            reach_settings_push_text(commands, layout->power_subtitles[timer], style->subtitle,
+                      reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
                       input->text_alignment_leading, input->theme->settings_secondary_text, 1);
         }
         if (layout->power_wait_toggles[timer].width > 0.0f)
         {
             float wait_t = reach_animation_manager_value(&model->power_wait_animations, timer);
-            push_text(commands, layout->power_wait_labels[timer],
+            reach_settings_push_text(commands, layout->power_wait_labels[timer],
                       (const uint16_t *)L"Wait for apps keeping the PC awake",
-                      scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+                      reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
                       REACH_TEXT_ALIGNMENT_TRAILING,
-                      color_with_alpha(input->theme->settings_secondary_text, 0.7f + 0.3f * wait_t),
+                      reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.7f + 0.3f * wait_t),
                       1);
             reach_ui_toggle_style toggle_style = {};
             toggle_style.track_off = input->theme->settings_toggle_track_off;
-            toggle_style.track_on = color_with_alpha(accent, 0.85f);
+            toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
             toggle_style.knob = input->theme->settings_toggle_knob;
             reach_ui_toggle_render(commands, layout->power_wait_toggles[timer], &toggle_style,
                                    wait_t);
@@ -348,7 +255,7 @@ static void render_power_page(const reach_settings_render_input *input,
         float t = reach_animation_manager_value(&model->power_animations, timer);
         size_t selected = model->power_selected[timer];
         size_t previous = model->power_previous[timer];
-        reach_ui_selection_item_style pill_style = settings_pill_style(input, accent);
+        reach_ui_selection_item_style pill_style = reach_settings_pill_style(input, accent);
         for (size_t option = 0; option < REACH_SETTINGS_POWER_OPTION_COUNT; ++option)
         {
             float selection = 0.0f;
@@ -365,7 +272,7 @@ static void render_power_page(const reach_settings_render_input *input,
                 const reach_rect_f32 slot = layout->power_options[timer][option];
                 reach_ui_selection_item_style custom_style = pill_style;
                 custom_style.background =
-                    reach_theme_color_mix(input->theme->settings_power_custom_time_background,
+                    reach_theme_color_mix(input->theme->settings_input_background,
                                           input->theme->settings_pill_background, selection);
                 reach_ui_selection_item_backdrop_render(commands, slot, &custom_style, selection);
                 const reach_rect_f32 hours =
@@ -373,8 +280,8 @@ static void render_power_page(const reach_settings_render_input *input,
                 const reach_rect_f32 minutes =
                     layout->power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_MINUTES];
                 float divider_x = (hours.x + hours.width + minutes.x) * 0.5f;
-                push_rect(commands,
-                          {divider_x, slot.y + slot.height * 0.25f, scale_value(input, 1.0f),
+                reach_settings_push_rect(commands,
+                          {divider_x, slot.y + slot.height * 0.25f, reach_settings_scale(input, 1.0f),
                            slot.height * 0.5f},
                           0.0f, input->theme->settings_divider);
 
@@ -389,7 +296,7 @@ static void render_power_page(const reach_settings_render_input *input,
                     state.text = edit->text;
                     state.placeholder = (const uint16_t *)L"0";
                     state.suffix = suffixes[field];
-                    state.suffix_width = scale_value(
+                    state.suffix_width = reach_settings_scale(
                         input, field == REACH_SETTINGS_POWER_FIELD_HOURS ? 16.0f : 24.0f);
                     state.text_alignment = REACH_TEXT_ALIGNMENT_TRAILING;
                     state.caret_index = edit->caret;
@@ -403,10 +310,10 @@ static void render_power_page(const reach_settings_render_input *input,
                     }
                     state.text_color = input->theme->settings_secondary_text;
                     state.placeholder_color =
-                        color_with_alpha(input->theme->settings_secondary_text, 0.55f);
-                    state.selection_color = color_with_alpha(accent, 0.30f);
+                        reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
+                    state.selection_color = reach_settings_color_with_alpha(accent, 0.30f);
                     state.suffix_color =
-                        color_with_alpha(input->theme->settings_secondary_text, 0.65f);
+                        reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.65f);
                     reach_ui_textbox_render(commands, layout->power_custom_fields[timer][field],
                                             &custom_style, selection, &state);
                 }
@@ -421,7 +328,7 @@ static void render_power_page(const reach_settings_render_input *input,
     }
 
     reach_ui_button_style apply_style =
-        settings_button_style(input, input->theme->settings_button_primary);
+        reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->power_apply_button, (const uint16_t *)L"Apply", &apply_style,
         reach_settings_model_power_dirty(model),
@@ -447,25 +354,25 @@ static void render_display_toggle_card(const reach_settings_render_input *input,
                                        const reach_ui_toggle_style *toggle_style,
                                        const display_toggle_card *card)
 {
-    float radius = scale_value(input, input->theme->radius_small);
-    push_rect(commands, card->card, radius, input->theme->settings_card_background);
-    push_rect(commands, card->icon, radius, input->theme->settings_input_background);
+    float radius = reach_settings_scale(input, input->theme->radius_small);
+    reach_settings_push_rect(commands, card->card, radius, input->theme->settings_card_background);
+    reach_settings_push_rect(commands, card->icon, radius, input->theme->settings_icon_box_background);
     if (card->icon_text != nullptr)
     {
-        push_text(commands, card->icon, (const uint16_t *)card->icon_text,
-                  scale_value(input, REACH_TEXT_SIZE_HEADING), REACH_TEXT_WEIGHT_EXTRABOLD,
+        reach_settings_push_text(commands, card->icon, (const uint16_t *)card->icon_text,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_HEADING), REACH_TEXT_WEIGHT_EXTRABOLD,
                   REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 0);
     }
     else
     {
-        push_icon(commands, card->icon, input->theme->settings_secondary_text, card->icon_id,
+        reach_settings_push_icon(commands, card->icon, input->theme->settings_secondary_text, card->icon_id,
                   0.22f);
     }
-    push_text(commands, card->title, (const uint16_t *)card->title_text,
-              scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+    reach_settings_push_text(commands, card->title, (const uint16_t *)card->title_text,
+              reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
               input->text_alignment_leading, input->theme->settings_text, 1);
-    push_text(commands, card->subtitle, (const uint16_t *)card->subtitle_text,
-              scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+    reach_settings_push_text(commands, card->subtitle, (const uint16_t *)card->subtitle_text,
+              reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
               input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     reach_ui_toggle_render(commands, card->toggle, toggle_style, card->position);
 }
@@ -476,19 +383,19 @@ static void render_display_theme_choice_card(
     const reach_rect_f32 options[REACH_SETTINGS_THEME_OPTION_COUNT], const uint16_t *title_text,
     const uint16_t *subtitle_text, reach_config_theme_preference selected, reach_color accent)
 {
-    push_rect(commands, card, scale_value(input, input->theme->radius_small),
+    reach_settings_push_rect(commands, card, reach_settings_scale(input, input->theme->radius_small),
               input->theme->settings_card_background);
-    push_text(commands, title, title_text, scale_value(input, REACH_TEXT_SIZE_MEDIUM),
+    reach_settings_push_text(commands, title, title_text, reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
               REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
               input->theme->settings_text, 1);
-    push_text(commands, subtitle, subtitle_text, scale_value(input, REACH_TEXT_SIZE_XSMALL),
+    reach_settings_push_text(commands, subtitle, subtitle_text, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
               REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
               input->theme->settings_secondary_text, 1);
 
     const uint16_t *labels[REACH_SETTINGS_THEME_OPTION_COUNT] = {
         (const uint16_t *)u"Follow Reach", (const uint16_t *)u"Light", (const uint16_t *)u"Dark"};
-    reach_ui_selection_item_style style = settings_pill_style(input, accent);
-    style.text_size = scale_value(input, REACH_TEXT_SIZE_XSMALL);
+    reach_ui_selection_item_style style = reach_settings_pill_style(input, accent);
+    style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL);
     for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
     {
         reach_ui_selection_item_render(commands, options[option], labels[option], &style,
@@ -506,7 +413,7 @@ static void render_display_page(const reach_settings_render_input *input,
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
-    toggle_style.track_on = color_with_alpha(accent, 0.85f);
+    toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
     toggle_style.knob = input->theme->settings_toggle_knob;
 
     const display_toggle_card cards[] = {
@@ -528,32 +435,22 @@ static void render_display_page(const reach_settings_render_input *input,
         render_display_toggle_card(input, commands, &toggle_style, &cards[index]);
     }
 
-    push_text(commands, layout->display_windows_section_title,
-              (const uint16_t *)u"Windows appearance", scale_value(input, REACH_TEXT_SIZE_XSMALL),
+    reach_settings_push_text(commands, layout->display_windows_section_title,
+              (const uint16_t *)u"System appearance", reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
               REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
               input->theme->settings_secondary_text, 1);
     render_display_theme_choice_card(
         input, commands, layout->display_windows_system_card, layout->display_windows_system_title,
         layout->display_windows_system_subtitle, layout->display_windows_system_options,
-        (const uint16_t *)u"Windows mode", (const uint16_t *)u"Taskbar, Start, and system surfaces",
+        (const uint16_t *)u"System theme", (const uint16_t *)u"Taskbar, Start, and system surfaces",
         reach_settings_model_windows_system_theme(model), accent);
     render_display_theme_choice_card(
         input, commands, layout->display_windows_app_card, layout->display_windows_app_title,
         layout->display_windows_app_subtitle, layout->display_windows_app_options,
-        (const uint16_t *)u"App mode", (const uint16_t *)u"Supported apps and Windows dialogs",
+        (const uint16_t *)u"Application theme", (const uint16_t *)u"Supported apps and Windows dialogs",
         reach_settings_model_windows_app_theme(model), accent);
 }
 
-static void push_app_icon(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                          uint64_t icon_id, float opacity)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_ICON;
-    command.rect = rect;
-    command.icon_id = icon_id;
-    command.color = {1.0f, 1.0f, 1.0f, opacity};
-    (void)reach_render_command_buffer_push(commands, &command);
-}
 
 static void build_startup_summary(const reach_settings_model *model, uint16_t *text,
                                   size_t capacity)
@@ -579,8 +476,8 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
 
     uint16_t summary[160] = {};
     build_startup_summary(model, summary, 160);
-    push_text(commands, layout->startup_summary, summary,
-              scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+    reach_settings_push_text(commands, layout->startup_summary, summary,
+              reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
               input->text_alignment_leading, input->theme->settings_secondary_text, 1);
 
     if (model->startup_status != REACH_SETTINGS_STARTUP_STATUS_NONE)
@@ -588,24 +485,24 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
         reach_color status_color = model->startup_status == REACH_SETTINGS_STARTUP_STATUS_FAILED
                                        ? input->theme->settings_status_error
                                        : input->theme->settings_secondary_text;
-        push_text(commands, layout->startup_summary,
+        reach_settings_push_text(commands, layout->startup_summary,
                   reach_settings_startup_status_message(model->startup_status),
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
                   REACH_TEXT_ALIGNMENT_TRAILING, status_color, 1);
     }
 
     if (layout->startup_row_count == 0)
     {
-        push_text(commands, layout->startup_viewport,
-                  model->startup_loaded ? (const uint16_t *)u"Nothing runs at sign-in."
+        reach_settings_push_text(commands, layout->startup_viewport,
+                  model->startup_loaded ? (const uint16_t *)u"Nothing runs at sign-in"
                                         : (const uint16_t *)u"Reading startup apps...",
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
                   REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
         return;
     }
 
     reach_ui_selection_item_style badge_style =
-        settings_pill_style(input, input->theme->settings_secondary_text);
+        reach_settings_pill_style(input, input->theme->settings_secondary_text);
     reach_render_command_buffer_set_scissor(commands, layout->startup_viewport);
     for (size_t index = 0; index < layout->startup_row_count; ++index)
     {
@@ -617,32 +514,32 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
         const reach_rect_f32 row = layout->startup_rows[index];
 
         float on = reach_animation_manager_value(&model->startup_animations, index);
-        push_rect(commands, row, scale_value(input, input->theme->radius_small),
+        reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
                   input->theme->settings_card_background);
 
-        float icon_box_size = scale_value(input, 36.0f);
-        reach_rect_f32 icon_box = {row.x + scale_value(input, 14.0f),
+        float icon_box_size = reach_settings_scale(input, 36.0f);
+        reach_rect_f32 icon_box = {row.x + reach_settings_scale(input, 14.0f),
                                    row.y + (row.height - icon_box_size) * 0.5f, icon_box_size,
                                    icon_box_size};
-        push_rect(commands, icon_box, scale_value(input, input->theme->radius_small),
-                  input->theme->settings_input_background);
+        reach_settings_push_rect(commands, icon_box, reach_settings_scale(input, input->theme->radius_small),
+                  input->theme->settings_icon_box_background);
         if (model->startup_icons[index] != 0)
         {
-            float inset = scale_value(input, 6.0f);
+            float inset = reach_settings_scale(input, 6.0f);
             reach_rect_f32 image = {icon_box.x + inset, icon_box.y + inset,
                                     icon_box.width - inset * 2.0f, icon_box.height - inset * 2.0f};
-            push_app_icon(commands, image, model->startup_icons[index], 1.0f);
+            reach_settings_push_app_icon(commands, image, model->startup_icons[index], 1.0f);
         }
         else
         {
-            push_icon(commands, icon_box, input->theme->settings_secondary_text,
+            reach_settings_push_icon(commands, icon_box, input->theme->settings_secondary_text,
                       REACH_VECTOR_ICON_EXECUTABLE, 0.26f);
         }
 
         const reach_rect_f32 toggle = layout->startup_toggles[index];
-        float badge_width = scale_value(input, 86.0f);
-        float badge_height = scale_value(input, 22.0f);
-        reach_rect_f32 badge = {toggle.x - scale_value(input, 16.0f) - badge_width,
+        float badge_width = reach_settings_scale(input, 86.0f);
+        float badge_height = reach_settings_scale(input, 22.0f);
+        reach_rect_f32 badge = {toggle.x - reach_settings_scale(input, 16.0f) - badge_width,
                                 row.y + (row.height - badge_height) * 0.5f, badge_width,
                                 badge_height};
         float badge_accent = reach_startup_app_source_is_machine(entry->source) ? 0.0f : 1.0f;
@@ -650,29 +547,29 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
                                        reach_startup_app_source_label(entry->source), &badge_style,
                                        badge_accent);
 
-        float text_x = icon_box.x + icon_box.width + scale_value(input, 14.0f);
-        float text_width = badge.x - scale_value(input, 14.0f) - text_x;
+        float text_x = icon_box.x + icon_box.width + reach_settings_scale(input, 14.0f);
+        float text_width = badge.x - reach_settings_scale(input, 14.0f) - text_x;
         if (text_width < 0.0f)
         {
             text_width = 0.0f;
         }
-        push_text(
+        reach_settings_push_text(
             commands,
-            {text_x, row.y + scale_value(input, 12.0f), text_width, scale_value(input, 18.0f)},
-            entry->display_name, scale_value(input, REACH_TEXT_SIZE_MEDIUM),
+            {text_x, row.y + reach_settings_scale(input, 12.0f), text_width, reach_settings_scale(input, 18.0f)},
+            entry->display_name, reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
             REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading, input->theme->settings_text,
             1);
 
         const uint16_t *detail = entry->executable[0] != 0 ? entry->executable : entry->command;
-        push_text(
+        reach_settings_push_text(
             commands,
-            {text_x, row.y + scale_value(input, 33.0f), text_width, scale_value(input, 15.0f)},
-            detail, scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+            {text_x, row.y + reach_settings_scale(input, 33.0f), text_width, reach_settings_scale(input, 15.0f)},
+            detail, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
             input->text_alignment_leading, input->theme->settings_secondary_text, 1);
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
-        toggle_style.track_on = color_with_alpha(accent, 0.85f);
+        toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_render(commands, toggle, &toggle_style, on);
     }
@@ -711,28 +608,28 @@ static void render_reach_section(const reach_settings_render_input *input,
     const reach_settings_layout *layout = input->layout;
     reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_CYAN);
 
-    push_text(commands, layout->reach_section_title, (const uint16_t *)u"Reach",
-              scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
+    reach_settings_push_text(commands, layout->reach_section_title, (const uint16_t *)u"Reach",
+              reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
               input->text_alignment_leading, input->theme->settings_secondary_text, 1);
 
     const reach_rect_f32 row = layout->reach_update_row;
-    push_rect(commands, row, scale_value(input, input->theme->radius_small),
+    reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
               input->theme->settings_card_background);
 
-    reach_rect_f32 icon_box = {row.x + scale_value(input, 12.0f),
-                               row.y + (row.height - scale_value(input, 34.0f)) * 0.5f,
-                               scale_value(input, 34.0f), scale_value(input, 34.0f)};
-    push_rect(commands, icon_box, scale_value(input, input->theme->radius_small),
-              input->theme->settings_input_background);
-    push_icon(commands, icon_box, input->theme->settings_secondary_text, REACH_VECTOR_ICON_RESTART,
+    reach_rect_f32 icon_box = {row.x + reach_settings_scale(input, 12.0f),
+                               row.y + (row.height - reach_settings_scale(input, 34.0f)) * 0.5f,
+                               reach_settings_scale(input, 34.0f), reach_settings_scale(input, 34.0f)};
+    reach_settings_push_rect(commands, icon_box, reach_settings_scale(input, input->theme->radius_small),
+              input->theme->settings_icon_box_background);
+    reach_settings_push_icon(commands, icon_box, input->theme->settings_secondary_text, REACH_VECTOR_ICON_RESTART,
               0.22f);
 
-    float left = icon_box.x + icon_box.width + scale_value(input, 12.0f);
-    float width = layout->reach_update_button.x - left - scale_value(input, 12.0f);
+    float left = icon_box.x + icon_box.width + reach_settings_scale(input, 12.0f);
+    float width = layout->reach_update_button.x - left - reach_settings_scale(input, 12.0f);
     uint16_t version_line[128] = {};
     build_reach_version_line(model, version_line, 128);
-    push_text(commands, {left, row.y + scale_value(input, 12.0f), width, scale_value(input, 18.0f)},
-              version_line, scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+    reach_settings_push_text(commands, {left, row.y + reach_settings_scale(input, 12.0f), width, reach_settings_scale(input, 18.0f)},
+              version_line, reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
               input->text_alignment_leading, input->theme->settings_text, 1);
 
     const uint16_t *status = reach_settings_model_reach_update_status(model);
@@ -759,8 +656,8 @@ static void render_reach_section(const reach_settings_render_input *input,
         append_text(status_line, 128, (const uint16_t *)u"%");
         status = status_line;
     }
-    push_text(commands, {left, row.y + scale_value(input, 34.0f), width, scale_value(input, 14.0f)},
-              status, scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+    reach_settings_push_text(commands, {left, row.y + reach_settings_scale(input, 34.0f), width, reach_settings_scale(input, 14.0f)},
+              status, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
               input->text_alignment_leading, input->theme->settings_secondary_text, 1);
 
     int32_t busy = model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_CHECKING ||
@@ -769,7 +666,7 @@ static void render_reach_section(const reach_settings_render_input *input,
     reach_color button_color = model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_AVAILABLE
                                    ? input->theme->settings_button_success
                                    : input->theme->settings_card_background;
-    reach_ui_button_style reach_style = settings_button_style(input, button_color);
+    reach_ui_button_style reach_style = reach_settings_button_style(input, button_color);
     reach_style.disabled_background = input->theme->settings_card_background;
     reach_ui_button_render(
         commands, layout->reach_update_button,
@@ -793,18 +690,18 @@ static void render_update_page(const reach_settings_render_input *input,
         scan_button_text = model->update_scan_completed ? (const uint16_t *)u"Refreshing\u2026"
                                                         : (const uint16_t *)u"Searching\u2026";
     reach_ui_button_style refresh_style =
-        settings_button_style(input, input->theme->settings_button_success);
+        reach_settings_button_style(input, input->theme->settings_button_success);
     reach_ui_button_render(
         commands, layout->update_refresh_button, scan_button_text, &refresh_style, !busy,
         reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_UPDATE_REFRESH));
     reach_ui_button_style install_style =
-        settings_button_style(input, input->theme->settings_button_primary);
+        reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->update_install_button, (const uint16_t *)u"Install selected",
         &install_style, install_enabled,
         reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_UPDATE_INSTALL));
     reach_ui_button_style restart_style =
-        settings_button_style(input, input->theme->settings_button_danger);
+        reach_settings_button_style(input, input->theme->settings_button_danger);
     reach_ui_button_render(
         commands, layout->update_restart_button, (const uint16_t *)u"Restart now", &restart_style,
         restart_enabled,
@@ -812,27 +709,27 @@ static void render_update_page(const reach_settings_render_input *input,
 
     render_reach_section(input, commands);
 
-    push_text(commands, layout->windows_section_title, (const uint16_t *)u"Windows updates",
-              scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
+    reach_settings_push_text(commands, layout->windows_section_title, (const uint16_t *)u"Windows updates",
+              reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
               input->text_alignment_leading, input->theme->settings_secondary_text, 1);
 
     reach_rect_f32 update_status_message = layout->update_viewport;
 
     if (model->update_page_state == REACH_SETTINGS_UPDATE_SCANNING)
     {
-        push_text(commands, update_status_message, (const uint16_t *)u"Searching for updates\u2026",
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
+        reach_settings_push_text(commands, update_status_message, (const uint16_t *)u"Searching for updates\u2026",
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
                   REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
 
-        float loader_width = scale_value(input, 220.0f);
-        float loader_height = scale_value(input, 4.0f);
+        float loader_width = reach_settings_scale(input, 220.0f);
+        float loader_height = reach_settings_scale(input, 4.0f);
         if (loader_width > update_status_message.width)
             loader_width = update_status_message.width;
 
         reach_rect_f32 loader_container = {
             update_status_message.x + (update_status_message.width - loader_width) * 0.5f,
             update_status_message.y + update_status_message.height * 0.5f +
-                scale_value(input, 18.0f),
+                reach_settings_scale(input, 18.0f),
             loader_width, loader_height};
 
         reach_rect_f32 loader_bar = reach_loader_bar_rect(&model->update_loader, loader_container);
@@ -843,17 +740,17 @@ static void render_update_page(const reach_settings_render_input *input,
     }
     else if (model->update_page_state == REACH_SETTINGS_UPDATE_ERROR &&
              layout->update_row_count == 0)
-        push_text(commands, layout->update_viewport,
-                  (const uint16_t *)u"Unable to refresh Windows updates.",
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
+        reach_settings_push_text(commands, layout->update_viewport,
+                  (const uint16_t *)u"Unable to refresh Windows updates",
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_status_error, 1);
     else if (model->update_scan_completed && layout->update_row_count == 0)
-        push_text(commands, update_status_message, (const uint16_t *)u"Windows is up to date.",
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
+        reach_settings_push_text(commands, update_status_message, (const uint16_t *)u"Windows is up to date",
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
                   REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
     else if (!model->update_scan_completed && layout->update_row_count == 0)
-        push_text(commands, update_status_message, (const uint16_t *)u"Search for updates",
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
+        reach_settings_push_text(commands, update_status_message, (const uint16_t *)u"Search for updates",
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
                   REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
 
     static const uint16_t *section_titles[] = {(const uint16_t *)u"Select updates",
@@ -863,8 +760,8 @@ static void render_update_page(const reach_settings_render_input *input,
     for (size_t index = 0; index < layout->update_section_count; ++index)
     {
         const reach_rect_f32 title = layout->update_section_titles[index];
-        push_text(commands, title, section_titles[layout->update_section_ids[index]],
-                  scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
+        reach_settings_push_text(commands, title, section_titles[layout->update_section_ids[index]],
+                  reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     }
 
@@ -877,46 +774,46 @@ static void render_update_page(const reach_settings_render_input *input,
         const reach_rect_f32 row = layout->update_rows[index];
         const reach_rect_f32 checkbox = layout->update_checkboxes[index];
         reach_color row_color = input->theme->settings_card_background;
-        push_rect(commands, row, scale_value(input, input->theme->radius_small), row_color);
+        reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small), row_color);
         if (update->state == REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED)
-            push_icon(commands, checkbox, input->theme->settings_status_success,
+            reach_settings_push_icon(commands, checkbox, input->theme->settings_status_success,
                       REACH_VECTOR_ICON_CHECK, 0.06f);
         else if (update->state == REACH_WINDOWS_UPDATE_FAILED)
-            push_icon(commands, checkbox, input->theme->settings_status_error,
+            reach_settings_push_icon(commands, checkbox, input->theme->settings_status_error,
                       REACH_VECTOR_ICON_CLOSE, 0.06f);
         else
         {
             reach_color checkbox_background = update->selected ? accent : row_color;
             reach_color checkbox_border =
                 update->selected ? accent : input->theme->settings_secondary_text;
-            push_bordered_background(
-                commands, checkbox, scale_value(input, input->theme->radius_small),
-                scale_value(input, 1.5f), checkbox_background, checkbox_border);
+            reach_settings_push_bordered_background(
+                commands, checkbox, reach_settings_scale(input, input->theme->radius_small),
+                reach_settings_scale(input, 1.5f), checkbox_background, checkbox_border);
             if (update->selected)
             {
-                push_icon(commands, checkbox, input->theme->inverse_text, REACH_VECTOR_ICON_CHECK,
+                reach_settings_push_icon(commands, checkbox, input->theme->inverse_text, REACH_VECTOR_ICON_CHECK,
                           0.18f);
             }
         }
 
-        float left = checkbox.x + checkbox.width + scale_value(input, 10.0f);
-        float width = row.x + row.width - left - scale_value(input, 10.0f);
-        push_text(commands,
-                  {left, row.y + scale_value(input, 6.0f), width, scale_value(input, 18.0f)},
-                  update->identity.title, scale_value(input, REACH_TEXT_SIZE_MEDIUM),
+        float left = checkbox.x + checkbox.width + reach_settings_scale(input, 10.0f);
+        float width = row.x + row.width - left - reach_settings_scale(input, 10.0f);
+        reach_settings_push_text(commands,
+                  {left, row.y + reach_settings_scale(input, 6.0f), width, reach_settings_scale(input, 18.0f)},
+                  update->identity.title, reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                   REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
                   input->theme->settings_text, 1);
         uint16_t metadata[260] = {};
         build_metadata_text(update, metadata, 260);
-        push_text(commands,
-                  {left, row.y + scale_value(input, 30.0f), width, scale_value(input, 14.0f)},
-                  metadata, scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+        reach_settings_push_text(commands,
+                  {left, row.y + reach_settings_scale(input, 30.0f), width, reach_settings_scale(input, 14.0f)},
+                  metadata, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
         uint16_t status[260] = {};
         build_status_text(update, status, 260);
-        push_text(commands,
-                  {left, row.y + scale_value(input, 47.0f), width, scale_value(input, 14.0f)},
-                  status, scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+        reach_settings_push_text(commands,
+                  {left, row.y + reach_settings_scale(input, 47.0f), width, reach_settings_scale(input, 14.0f)},
+                  status, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     }
     reach_render_command_buffer_clear_scissor(commands);
@@ -939,22 +836,22 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         return REACH_INVALID_ARGUMENT;
     reach_render_command_buffer_clear(commands);
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
-    push_rect(commands, input->layout->bounds, scale_value(input, input->theme->radius_large),
+    reach_settings_push_rect(commands, input->layout->bounds, reach_settings_scale(input, input->theme->radius_large),
               input->theme->settings_background);
-    push_masked_rect(commands, input->layout->nav, scale_value(input, input->theme->radius_large),
+    reach_settings_push_masked_rect(commands, input->layout->nav, reach_settings_scale(input, input->theme->radius_large),
                      REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT,
                      input->theme->settings_nav_background);
-    push_rect(commands, input->layout->close_button, input->layout->close_button.width * 0.5f,
+    reach_settings_push_rect(commands, input->layout->close_button, input->layout->close_button.width * 0.5f,
               input->model->hovered_button == REACH_SETTINGS_HIT_CLOSE
                   ? input->theme->settings_window_close_hover
                   : input->theme->settings_window_button_background);
-    push_rect(commands, input->layout->minimize_button, input->layout->minimize_button.width * 0.5f,
+    reach_settings_push_rect(commands, input->layout->minimize_button, input->layout->minimize_button.width * 0.5f,
               input->model->hovered_button == REACH_SETTINGS_HIT_MINIMIZE
                   ? input->theme->settings_window_minimize_hover
                   : input->theme->settings_window_button_background);
-    push_icon(commands, input->layout->close_button, input->theme->inverse_text,
+    reach_settings_push_icon(commands, input->layout->close_button, input->theme->inverse_text,
               REACH_VECTOR_ICON_CLOSE, 0.24f);
-    push_icon(commands, input->layout->minimize_button, input->theme->inverse_text,
+    reach_settings_push_icon(commands, input->layout->minimize_button, input->theme->inverse_text,
               REACH_VECTOR_ICON_MINIMIZE, 0.24f);
 
     size_t nav_count = 0;
@@ -965,15 +862,15 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         const reach_settings_nav_item *item = &items[index];
         const reach_color accent = reach_theme_accent_color(input->theme, item->accent);
         const reach_color accent_background =
-            color_with_alpha(accent, input->theme->accent_tint_alpha);
+            reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha);
         if (input->model->selected_page == item->page)
-            push_rect(commands, item_layout->bounds, scale_value(input, input->theme->radius_small),
+            reach_settings_push_rect(commands, item_layout->bounds, reach_settings_scale(input, input->theme->radius_small),
                       accent_background);
-        push_rect(commands, item_layout->icon_background,
-                  scale_value(input, input->theme->radius_small), accent_background);
-        push_icon(commands, item_layout->icon, accent, (reach_vector_icon_id)item->icon_id, 0.0f);
-        push_text(commands, item_layout->label, item->label,
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+        reach_settings_push_rect(commands, item_layout->icon_background,
+                  reach_settings_scale(input, input->theme->radius_small), accent_background);
+        reach_settings_push_icon(commands, item_layout->icon, accent, (reach_vector_icon_id)item->icon_id, 0.0f);
+        reach_settings_push_text(commands, item_layout->label, item->label,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
                   input->text_alignment_leading, input->theme->settings_text, 1);
     }
 
@@ -982,14 +879,14 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
     append_text(footer_text, 64,
                 input->model->reach_current_version[0] != 0 ? input->model->reach_current_version
                                                             : (const uint16_t *)u"?");
-    push_text(commands, input->layout->nav_footer, footer_text,
-              scale_value(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+    reach_settings_push_text(commands, input->layout->nav_footer, footer_text,
+              reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
               input->text_alignment_leading,
-              color_with_alpha(input->theme->settings_secondary_text, 0.7f), 1);
+              reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.7f), 1);
 
-    push_text(commands, input->layout->content_title,
+    reach_settings_push_text(commands, input->layout->content_title,
               reach_settings_page_title(input->model->selected_page),
-              scale_value(input, REACH_TEXT_SIZE_XLARGE), REACH_TEXT_WEIGHT_DEMIBOLD,
+              reach_settings_scale(input, REACH_TEXT_SIZE_XLARGE), REACH_TEXT_WEIGHT_DEMIBOLD,
               input->text_alignment_leading, input->theme->settings_text, 1);
     if (input->model->selected_page == REACH_SETTINGS_PAGE_UPDATE)
         render_update_page(input, commands);
@@ -1001,10 +898,14 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         render_display_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS)
         render_startup_apps_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_WIFI)
+        reach_settings_render_wifi_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_BLUETOOTH)
+        reach_settings_render_bluetooth_page(input, commands);
     else
-        push_text(commands, input->layout->content_placeholder,
+        reach_settings_push_text(commands, input->layout->content_placeholder,
                   reach_settings_page_placeholder(input->model->selected_page),
-                  scale_value(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
+                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
                   input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     return REACH_OK;
 }

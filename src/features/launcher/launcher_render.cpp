@@ -114,7 +114,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.rect.height = layout->search_text_input.height;
         command.color = transparent;
         command.radius = 0.0f;
-        command.text_size = reach_launcher_scale(input, REACH_TEXT_SIZE_HEADING);
+        command.text_size = reach_launcher_scale(input, REACH_TEXT_SIZE_LARGE);
         command.text_weight = REACH_TEXT_WEIGHT_NORMAL;
         command.text_alignment = input->text_alignment_leading;
         command.text_color = theme->launcher_search_text;

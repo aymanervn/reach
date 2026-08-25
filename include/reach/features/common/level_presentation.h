@@ -13,6 +13,7 @@ extern "C"
 
     float reach_level_clamp01(float value);
     reach_vector_icon_id reach_volume_level_icon(float level, int32_t muted);
+    reach_vector_icon_id reach_wifi_signal_icon(int32_t signal_strength);
     void reach_level_format_percent(uint16_t *dst, size_t dst_count, float level);
 
 #ifdef __cplusplus
