@@ -43,7 +43,10 @@ OS controls, filesystem, clipboard, media, icons, the Reach Service client. The
 `screen_hotspot` abstracts the platform capability for an invisible rectangular
 trigger window. Composition presents those windows as descriptor-declared edge
 reveals; the Win32 adapter registers its window class idempotently so further
-instances cost nothing.
+instances cost nothing. The `system_controls` port also exposes system-surface and
+application theme modes. Display config stores each as Follow Reach, Light, or Dark;
+composition resolves Follow Reach against the active Reach theme, while the Windows
+adapter owns personalization persistence and change broadcasts.
 The media
 port separates fast core-state reads from generation-checked cover reads so image I/O
 cannot block transport state. Interfaces only. Includes `core`, `protocol`.

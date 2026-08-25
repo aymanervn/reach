@@ -13,6 +13,13 @@ extern "C"
 
 #define REACH_MAX_WALLPAPER_MONITORS 8
 
+    typedef enum reach_config_theme_preference
+    {
+        REACH_CONFIG_THEME_FOLLOW_REACH = 0,
+        REACH_CONFIG_THEME_LIGHT = 1,
+        REACH_CONFIG_THEME_DARK = 2
+    } reach_config_theme_preference;
+
     typedef struct reach_config_snapshot
     {
         uint16_t version[32];
@@ -32,6 +39,8 @@ extern "C"
         int32_t high_refresh_rate;
         int32_t bundled_font;
         int32_t light_theme;
+        reach_config_theme_preference windows_system_theme;
+        reach_config_theme_preference windows_app_theme;
         int32_t stage_animation_ms;
     } reach_config_snapshot;
 

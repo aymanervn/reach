@@ -204,6 +204,21 @@ int main()
     failed += expect(reach_config_service_snapshot(service, &live) == REACH_OK);
     failed += expect(live.light_theme == 1);
     failed += expect(live.pinned_app_count == 1);
+
+    reach_config_display_settings display = {};
+    display.high_refresh_rate = 1;
+    display.bundled_font = 1;
+    display.light_theme = 1;
+    display.windows_system_theme = REACH_CONFIG_THEME_LIGHT;
+    display.windows_app_theme = REACH_CONFIG_THEME_DARK;
+    failed += expect(reach_config_service_set_display(service, &display) == REACH_OK);
+    failed += expect(reach_config_service_flush(service) == REACH_OK);
+    live = {};
+    failed += expect(reach_config_service_snapshot(service, &live) == REACH_OK);
+    failed += expect(live.windows_system_theme == REACH_CONFIG_THEME_LIGHT);
+    failed += expect(live.windows_app_theme == REACH_CONFIG_THEME_DARK);
+    display.windows_app_theme = (reach_config_theme_preference)99;
+    failed += expect(reach_config_service_set_display(service, &display) == REACH_INVALID_ARGUMENT);
     reach_config_service_destroy(service);
 
     static test_config_store failed_store = {};

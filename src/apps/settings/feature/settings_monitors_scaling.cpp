@@ -97,6 +97,65 @@ int32_t reach_settings_model_toggle_light_theme(reach_settings_model *model)
     return 1;
 }
 
+static int32_t reach_settings_theme_preference_valid(reach_config_theme_preference preference)
+{
+    return preference >= REACH_CONFIG_THEME_FOLLOW_REACH && preference <= REACH_CONFIG_THEME_DARK;
+}
+
+void reach_settings_model_set_windows_system_theme(reach_settings_model *model,
+                                                   reach_config_theme_preference preference)
+{
+    if (model != nullptr && reach_settings_theme_preference_valid(preference))
+    {
+        model->display_windows_system_theme = preference;
+    }
+}
+
+reach_config_theme_preference
+reach_settings_model_windows_system_theme(const reach_settings_model *model)
+{
+    return model != nullptr ? model->display_windows_system_theme : REACH_CONFIG_THEME_FOLLOW_REACH;
+}
+
+int32_t reach_settings_model_select_windows_system_theme(reach_settings_model *model,
+                                                         reach_config_theme_preference preference)
+{
+    if (model == nullptr || !reach_settings_theme_preference_valid(preference) ||
+        model->display_windows_system_theme == preference)
+    {
+        return 0;
+    }
+    model->display_windows_system_theme = preference;
+    return 1;
+}
+
+void reach_settings_model_set_windows_app_theme(reach_settings_model *model,
+                                                reach_config_theme_preference preference)
+{
+    if (model != nullptr && reach_settings_theme_preference_valid(preference))
+    {
+        model->display_windows_app_theme = preference;
+    }
+}
+
+reach_config_theme_preference
+reach_settings_model_windows_app_theme(const reach_settings_model *model)
+{
+    return model != nullptr ? model->display_windows_app_theme : REACH_CONFIG_THEME_FOLLOW_REACH;
+}
+
+int32_t reach_settings_model_select_windows_app_theme(reach_settings_model *model,
+                                                      reach_config_theme_preference preference)
+{
+    if (model == nullptr || !reach_settings_theme_preference_valid(preference) ||
+        model->display_windows_app_theme == preference)
+    {
+        return 0;
+    }
+    model->display_windows_app_theme = preference;
+    return 1;
+}
+
 int32_t reach_settings_model_tick_display_animations(reach_settings_model *model,
                                                      double delta_seconds)
 {

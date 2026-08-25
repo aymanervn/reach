@@ -326,9 +326,7 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
         reach_host_seed_or_apply_wallpaper(host, writable_snapshot.get());
     }
     reach_host_apply_power_config(host, snapshot);
-    host->high_refresh_rate = snapshot->high_refresh_rate ? 1 : 0;
-    reach_host_apply_ui_font(host, snapshot->bundled_font);
-    reach_host_apply_theme_mode(host, snapshot->light_theme);
+    reach_host_apply_display_config(host, snapshot);
     if (snapshot->stage_animation_ms > 0)
     {
         reach_stage_set_animation_seconds(host->stage_capsule,
@@ -386,6 +384,44 @@ void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme)
         }
     }
     reach_host_request_update(host);
+}
+
+static reach_theme_mode reach_host_resolve_system_theme(reach_config_theme_preference preference,
+                                                        reach_theme_mode reach_mode)
+{
+    if (preference == REACH_CONFIG_THEME_LIGHT)
+    {
+        return REACH_THEME_MODE_LIGHT;
+    }
+    if (preference == REACH_CONFIG_THEME_DARK)
+    {
+        return REACH_THEME_MODE_DARK;
+    }
+    return reach_mode;
+}
+
+void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot)
+{
+    if (host == nullptr || snapshot == nullptr)
+    {
+        return;
+    }
+
+    host->high_refresh_rate = snapshot->high_refresh_rate ? 1 : 0;
+    reach_host_apply_ui_font(host, snapshot->bundled_font);
+    reach_host_apply_theme_mode(host, snapshot->light_theme);
+
+    if (host->system_controls.set_theme_modes == nullptr)
+    {
+        return;
+    }
+    reach_theme_mode reach_mode = reach_host_theme_mode(host);
+    reach_theme_mode system_mode =
+        reach_host_resolve_system_theme(snapshot->windows_system_theme, reach_mode);
+    reach_theme_mode app_mode =
+        reach_host_resolve_system_theme(snapshot->windows_app_theme, reach_mode);
+    (void)host->system_controls.set_theme_modes(host->system_controls.userdata, system_mode,
+                                                app_mode);
 }
 
 void reach_host_reload_wallpaper(reach_host *host, int32_t force)

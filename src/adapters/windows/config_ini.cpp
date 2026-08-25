@@ -35,8 +35,8 @@ static reach_result reach_config_write_utf16_atomic(const wchar_t *path, const s
     int32_t ok = WriteFile(file, output.data(), byte_count, &written, nullptr) &&
                  written == byte_count && FlushFileBuffers(file);
     CloseHandle(file);
-    if (!ok || !MoveFileExW(temp_path.c_str(), path,
-                            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    if (!ok ||
+        !MoveFileExW(temp_path.c_str(), path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     {
         DeleteFileW(temp_path.c_str());
         return REACH_ERROR;
@@ -162,6 +162,18 @@ static reach_result reach_config_store_load(reach_config_store *store,
         (int32_t)GetPrivateProfileIntW(L"display", L"bundled_font", 1, path) != 0;
     out_snapshot->light_theme =
         (int32_t)GetPrivateProfileIntW(L"display", L"light_theme", 0, path) != 0;
+    int32_t windows_system_theme =
+        (int32_t)GetPrivateProfileIntW(L"display", L"windows_system_theme", 0, path);
+    out_snapshot->windows_system_theme = windows_system_theme >= REACH_CONFIG_THEME_FOLLOW_REACH &&
+                                                 windows_system_theme <= REACH_CONFIG_THEME_DARK
+                                             ? (reach_config_theme_preference)windows_system_theme
+                                             : REACH_CONFIG_THEME_FOLLOW_REACH;
+    int32_t windows_app_theme =
+        (int32_t)GetPrivateProfileIntW(L"display", L"windows_app_theme", 0, path);
+    out_snapshot->windows_app_theme = windows_app_theme >= REACH_CONFIG_THEME_FOLLOW_REACH &&
+                                              windows_app_theme <= REACH_CONFIG_THEME_DARK
+                                          ? (reach_config_theme_preference)windows_app_theme
+                                          : REACH_CONFIG_THEME_FOLLOW_REACH;
     out_snapshot->stage_animation_ms =
         (int32_t)GetPrivateProfileIntW(L"stage", L"animation_ms", 280, path);
     GetPrivateProfileStringW(L"wallpaper", L"path", L"",
@@ -242,6 +254,10 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring(snapshot->bundled_font ? 1 : 0));
     text.append(L"\r\nlight_theme=");
     text.append(std::to_wstring(snapshot->light_theme ? 1 : 0));
+    text.append(L"\r\nwindows_system_theme=");
+    text.append(std::to_wstring((int32_t)snapshot->windows_system_theme));
+    text.append(L"\r\nwindows_app_theme=");
+    text.append(std::to_wstring((int32_t)snapshot->windows_app_theme));
     text.append(L"\r\n\r\n[stage]\r\nanimation_ms=");
     text.append(std::to_wstring(snapshot->stage_animation_ms));
     text.append(L"\r\n\r\n[wallpaper]\r\npath=");
@@ -254,8 +270,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
             text.append(L"\r\n[wallpaper.monitor.");
             text.append(std::to_wstring(index + 1));
             text.append(L"]\r\npath=");
-            text.append(reinterpret_cast<const wchar_t *>(
-                snapshot->monitor_wallpaper_paths[index]));
+            text.append(
+                reinterpret_cast<const wchar_t *>(snapshot->monitor_wallpaper_paths[index]));
             text.append(L"\r\n");
         }
     }

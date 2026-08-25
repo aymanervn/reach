@@ -108,15 +108,14 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         return reach_pin_config_move_id(snapshot, operation->pin_id, operation->target_index,
                                         out_changed);
     case REACH_CONFIG_OPERATION_SET_POWER:
-        *out_changed =
-            snapshot->power_screen_off_minutes != operation->power.screen_off_minutes ||
-            snapshot->power_sleep_minutes != operation->power.sleep_minutes ||
-            snapshot->power_lock_minutes != operation->power.lock_minutes ||
-            snapshot->power_shutdown_minutes != operation->power.shutdown_minutes ||
-            snapshot->power_restart_minutes != operation->power.restart_minutes ||
-            snapshot->power_sleep_wait_apps != operation->power.sleep_wait_apps ||
-            snapshot->power_shutdown_wait_apps != operation->power.shutdown_wait_apps ||
-            snapshot->power_restart_wait_apps != operation->power.restart_wait_apps;
+        *out_changed = snapshot->power_screen_off_minutes != operation->power.screen_off_minutes ||
+                       snapshot->power_sleep_minutes != operation->power.sleep_minutes ||
+                       snapshot->power_lock_minutes != operation->power.lock_minutes ||
+                       snapshot->power_shutdown_minutes != operation->power.shutdown_minutes ||
+                       snapshot->power_restart_minutes != operation->power.restart_minutes ||
+                       snapshot->power_sleep_wait_apps != operation->power.sleep_wait_apps ||
+                       snapshot->power_shutdown_wait_apps != operation->power.shutdown_wait_apps ||
+                       snapshot->power_restart_wait_apps != operation->power.restart_wait_apps;
         snapshot->power_screen_off_minutes = operation->power.screen_off_minutes;
         snapshot->power_sleep_minutes = operation->power.sleep_minutes;
         snapshot->power_lock_minutes = operation->power.lock_minutes;
@@ -129,10 +128,14 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
     case REACH_CONFIG_OPERATION_SET_DISPLAY:
         *out_changed = snapshot->high_refresh_rate != operation->display.high_refresh_rate ||
                        snapshot->bundled_font != operation->display.bundled_font ||
-                       snapshot->light_theme != operation->display.light_theme;
+                       snapshot->light_theme != operation->display.light_theme ||
+                       snapshot->windows_system_theme != operation->display.windows_system_theme ||
+                       snapshot->windows_app_theme != operation->display.windows_app_theme;
         snapshot->high_refresh_rate = operation->display.high_refresh_rate;
         snapshot->bundled_font = operation->display.bundled_font;
         snapshot->light_theme = operation->display.light_theme;
+        snapshot->windows_system_theme = operation->display.windows_system_theme;
+        snapshot->windows_app_theme = operation->display.windows_app_theme;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_WALLPAPERS:
         *out_changed = !reach_config_text_equal(snapshot->wallpaper_path, operation->path);
@@ -163,8 +166,9 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
     }
 }
 
-static reach_result reach_config_apply_operations(
-    reach_config_snapshot *snapshot, const std::vector<reach_config_operation> &operations)
+static reach_result
+reach_config_apply_operations(reach_config_snapshot *snapshot,
+                              const std::vector<reach_config_operation> &operations)
 {
     for (const reach_config_operation &operation : operations)
     {
@@ -225,9 +229,9 @@ static void reach_config_service_thread_main(reach_config_service *service)
         std::vector<reach_config_operation> operations;
         {
             std::unique_lock<std::mutex> lock(service->mutex);
-            service->cv.wait(lock, [service]() {
-                return service->stop || service->save_pending || service->reload_pending;
-            });
+            service->cv.wait(
+                lock, [service]()
+                { return service->stop || service->save_pending || service->reload_pending; });
             if (service->stop && !service->save_pending && !service->reload_pending)
             {
                 return;
@@ -334,8 +338,9 @@ static void reach_config_service_thread_main(reach_config_service *service)
         }
         if (work == REACH_CONFIG_WORK_SAVE)
         {
-            reach_config_service_emit(service, result == REACH_OK ? REACH_CONFIG_SERVICE_PERSISTED
-                                                                  : REACH_CONFIG_SERVICE_PERSIST_FAILED);
+            reach_config_service_emit(service, result == REACH_OK
+                                                   ? REACH_CONFIG_SERVICE_PERSISTED
+                                                   : REACH_CONFIG_SERVICE_PERSIST_FAILED);
         }
         service->cv.notify_all();
     }
@@ -472,9 +477,7 @@ reach_result reach_config_service_flush(reach_config_service *service)
         return REACH_INVALID_ARGUMENT;
     }
     std::unique_lock<std::mutex> lock(service->mutex);
-    service->cv.wait(lock, [service]() {
-        return !service->save_pending && !service->in_flight;
-    });
+    service->cv.wait(lock, [service]() { return !service->save_pending && !service->in_flight; });
     return service->dirty ? service->last_persist_result : REACH_OK;
 }
 
@@ -609,7 +612,10 @@ reach_result reach_config_service_set_power(reach_config_service *service,
 reach_result reach_config_service_set_display(reach_config_service *service,
                                               const reach_config_display_settings *settings)
 {
-    if (settings == nullptr)
+    if (settings == nullptr || settings->windows_system_theme < REACH_CONFIG_THEME_FOLLOW_REACH ||
+        settings->windows_system_theme > REACH_CONFIG_THEME_DARK ||
+        settings->windows_app_theme < REACH_CONFIG_THEME_FOLLOW_REACH ||
+        settings->windows_app_theme > REACH_CONFIG_THEME_DARK)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -619,9 +625,10 @@ reach_result reach_config_service_set_display(reach_config_service *service,
     return reach_config_service_commit(service, &operation);
 }
 
-reach_result reach_config_service_set_wallpapers(
-    reach_config_service *service, const uint16_t *wallpaper_path,
-    const uint16_t monitor_wallpaper_paths[][260], size_t monitor_count)
+reach_result reach_config_service_set_wallpapers(reach_config_service *service,
+                                                 const uint16_t *wallpaper_path,
+                                                 const uint16_t monitor_wallpaper_paths[][260],
+                                                 size_t monitor_count)
 {
     if (wallpaper_path == nullptr || monitor_wallpaper_paths == nullptr ||
         monitor_count > REACH_MAX_WALLPAPER_MONITORS)
@@ -641,8 +648,7 @@ reach_result reach_config_service_set_wallpapers(
 }
 
 reach_result reach_config_service_set_monitor_wallpaper(reach_config_service *service,
-                                                        size_t monitor_index,
-                                                        const uint16_t *path)
+                                                        size_t monitor_index, const uint16_t *path)
 {
     if (path == nullptr || monitor_index >= REACH_MAX_WALLPAPER_MONITORS)
     {
