@@ -368,8 +368,12 @@ static void reach_top_bar_update_tray_items(reach_top_bar *top_bar)
 {
     reach_top_bar_state *state = &top_bar->state;
     size_t count = reach_tray_service_item_count(top_bar->tray);
-    state->tray_overflow = count > REACH_TOP_BAR_MAX_TRAY_ICONS;
-    if (count > REACH_TOP_BAR_MAX_TRAY_ICONS)
+    state->tray_overflow = count >= REACH_TOP_BAR_TRAY_OVERFLOW_THRESHOLD;
+    if (state->tray_overflow)
+    {
+        count = REACH_TOP_BAR_TRAY_INLINE_ICONS;
+    }
+    else if (count > REACH_TOP_BAR_MAX_TRAY_ICONS)
     {
         count = REACH_TOP_BAR_MAX_TRAY_ICONS;
     }
@@ -397,9 +401,12 @@ static int32_t reach_top_bar_has_current_app_icon(const reach_top_bar *top_bar)
     return top_bar->state.current_app_icon_ref[0] != 0;
 }
 
+// Rounded to whole pixels because the renderer snaps pill rects the same way. Left unrounded, the
+// pill's bottom edge lands up to half a pixel away from the full-height elements sitting flush
+// inside it, and the pill's own background shows through the difference.
 static float reach_top_bar_height(float dpi_scale)
 {
-    return reach_top_bar_metrics_values.height * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+    return roundf(reach_top_bar_metrics_values.height * (dpi_scale > 0.0f ? dpi_scale : 1.0f));
 }
 
 static float reach_top_bar_stats_slot_advance(const reach_text_measure_port *measure,
@@ -481,7 +488,12 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     float power_clock_width = border_thickness * 2.0f + padding + power_button_size + clock_gap +
                               clock_width + dot_gap + dot_size + dot_gap + now_playing_width;
-    float left = edge_inset;
+    // Now playing sits flush against the pill's inner border, so the pill's right edge has to be on
+    // the same pixel the chip's is. The renderer rounds pill rects but not the chip, and
+    // `power_clock_width` is fractional (text advances, scaled button sizes), so snapping the edge
+    // here is what keeps the two in agreement.
+    float left = roundf(edge_inset);
+    power_clock_width = roundf(edge_inset + power_clock_width) - left;
     layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK] =
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
     layout->power_button =

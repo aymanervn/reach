@@ -2,6 +2,7 @@
 #define REACH_FEATURES_TOP_BAR_METRICS_H
 
 #include "reach/core/render_commands.h"
+#include "reach/core/typography.h"
 
 struct reach_top_bar_metrics
 {
@@ -76,9 +77,9 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.width_animation_seconds = 0.22;
 
     metrics.clock_gap = 9.0f;
-    metrics.clock_time_text_size = 13.0f;
+    metrics.clock_time_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.clock_time_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
-    metrics.clock_date_text_size = 11.5f;
+    metrics.clock_date_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.clock_date_text_weight = REACH_TEXT_WEIGHT_NORMAL;
 
     metrics.now_playing_collapsed_width = 44.0f;
@@ -86,7 +87,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 
     metrics.current_app_icon_scale = 0.55f;
     metrics.current_app_gap = 8.0f;
-    metrics.current_app_name_text_size = 12.5f;
+    metrics.current_app_name_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.current_app_name_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     metrics.current_app_max_width_ratio = 0.28f;
 
@@ -100,18 +101,18 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.bar_button_glyph_scale = 0.52f;
     metrics.quick_settings_padding = 8.0f;
     metrics.quick_settings_content_gap = 6.0f;
-    metrics.network_name_text_size = 11.0f;
+    metrics.network_name_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.network_name_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     metrics.network_name_max_width = 96.0f;
-    metrics.volume_text_size = 11.0f;
+    metrics.volume_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.volume_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     metrics.language_padding = 6.0f;
-    metrics.language_text_size = 11.0f;
+    metrics.language_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.language_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
 
     metrics.stats_gap = 8.0f;
     metrics.stats_group_gap = 12.0f;
-    metrics.stats_text_size = 11.0f;
+    metrics.stats_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.stats_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
 
     metrics.power_glyph_scale = 0.50f;

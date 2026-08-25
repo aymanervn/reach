@@ -142,8 +142,10 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     }
 
     reach_render_command shape = reach_popup_shape(input);
+    reach_color background = input->has_background_color_override ? input->background_color_override
+                                                                   : input->theme->popup_background;
     return reach_render_push_bordered_background(
-        out_commands, &shape, input->theme->popup_background, input->theme->popup_border,
+        out_commands, &shape, background, input->theme->popup_border,
         reach_theme_border_thickness(input->theme, input->dpi_scale),
         &input->theme->popup_shadow, input->dpi_scale);
 }

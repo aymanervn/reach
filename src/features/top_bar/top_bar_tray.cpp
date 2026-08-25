@@ -2,6 +2,8 @@
 
 #include "top_bar_common.h"
 
+#include "reach/core/typography.h"
+
 #include <math.h>
 #include <new>
 
@@ -182,7 +184,7 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     popup->anchor = *anchor;
     float slot_size = reach_theme_tray_slot_size(theme, anchor->bar_height);
     float gap = slot_size * 0.22f;
-    float padding = slot_size * 0.58f;
+    float padding = slot_size * 0.3f;
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     float border_thickness = reach_theme_border_thickness(theme, scale);
     float notch_height = reach_popup_notch_height_scaled(scale);
@@ -424,6 +426,8 @@ reach_result reach_top_bar_append_tray_render_commands(
     popup.notch_center_x = popup_state->placement.notch_anchor_x - ctx->bounds.x;
     popup.notch_side = popup_state->placement.notch_side;
     popup.dpi_scale = ctx->dpi_scale;
+    popup.background_color_override = ctx->theme->bar_tray_background;
+    popup.has_background_color_override = 1;
     reach_result result = reach_popup_push_background(&popup, out_commands);
     if (result != REACH_OK)
     {
@@ -462,6 +466,7 @@ reach_result reach_top_bar_append_tray_render_commands(
             command.type = REACH_RENDER_COMMAND_TEXT;
             command.rect = slot;
             command.color = ctx->theme->fallback_icon_text;
+            command.text_size = REACH_TEXT_SIZE_HEADING * ctx->dpi_scale;
             command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
             command.text[0] = item != nullptr && item->title[0] != 0 ? item->title[0] : '?';
         }

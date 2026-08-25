@@ -1,5 +1,7 @@
 #include "render_d2d_internal.h"
 
+#include "reach/core/typography.h"
+
 static const wchar_t reach_d2d_font_fallback[] = L"Segoe UI";
 static const wchar_t reach_d2d_bundled_font_family[] = L"JetBrains Mono";
 static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend);
@@ -326,7 +328,7 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_rend
                                     ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
                                     : DWRITE_FONT_WEIGHT_NORMAL;
 
-    float text_size = command->text_size > 0.0f ? command->text_size : 16.0f;
+    float text_size = command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
 
     HRESULT hr = backend->text_factory->CreateTextFormat(
         reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
@@ -437,7 +439,8 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
     const wchar_t *display = showing_placeholder ? placeholder : text;
     const UINT32 display_length = static_cast<UINT32>(wcslen(display));
 
-    const float font_size = command->text_size > 0.0f ? command->text_size : 16.0f;
+    const float font_size =
+        command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
     const DWRITE_FONT_WEIGHT weight = command->text_weight > 0
                                           ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
                                           : DWRITE_FONT_WEIGHT_NORMAL;

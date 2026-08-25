@@ -2,6 +2,8 @@
 
 #include "switcher_common.h"
 
+#include "reach/core/typography.h"
+
 static float reach_switcher_input_scale(const reach_switcher_render_input *input, float value)
 {
     float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
@@ -94,7 +96,7 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     float icon_top_offset = reach_switcher_input_scale(input, 4.0f);
     float label_top = reach_switcher_input_scale(input, 104.0f);
     float label_height = reach_switcher_input_scale(input, 20.0f);
-    float label_text_size = reach_switcher_input_scale(input, 13.0f);
+    float label_text_size = reach_switcher_input_scale(input, REACH_TEXT_SIZE_MEDIUM);
     const reach_theme *theme = input->theme;
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
     size_t visible_count = reach_switcher_visible_count(input->model->window_count);

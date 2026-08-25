@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "reach/core/typography.h"
+
 struct reach_context_menu_metrics
 {
     float item_height;
@@ -26,9 +28,8 @@ struct reach_context_menu_metrics
     float window_list_max_width;
 };
 
-static constexpr float reach_context_menu_hover_text_size = 11.0f;
-static constexpr float reach_context_menu_item_scale =
-    reach_context_menu_hover_text_size / 14.0f;
+static constexpr float reach_context_menu_hover_text_size = REACH_TEXT_SIZE_MEDIUM;
+static constexpr float reach_context_menu_popup_scale = 0.9285714f;
 
 static constexpr reach_context_menu_metrics reach_context_menu_make_large_metrics()
 {
@@ -38,7 +39,7 @@ static constexpr reach_context_menu_metrics reach_context_menu_make_large_metric
     metrics.padding = 8.0f;
     metrics.screen_margin = 8.0f;
 
-    metrics.text_size = 14.0f;
+    metrics.text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.text_leading_inset = 14.0f;
     metrics.text_trailing_inset = 14.0f;
     metrics.text_trailing_inset_with_close = 14.0f;
@@ -75,45 +76,43 @@ static constexpr reach_context_menu_metrics reach_context_menu_make_small_metric
     return metrics;
 }
 
-static constexpr reach_context_menu_metrics reach_context_menu_make_item_metrics()
+static constexpr reach_context_menu_metrics reach_context_menu_make_popup_metrics()
 {
     reach_context_menu_metrics metrics = reach_context_menu_make_large_metrics();
     metrics.text_size = reach_context_menu_hover_text_size;
-    metrics.item_height *= reach_context_menu_item_scale;
-    metrics.padding *= reach_context_menu_item_scale;
-    metrics.text_leading_inset *= reach_context_menu_item_scale;
-    metrics.text_trailing_inset *= reach_context_menu_item_scale;
-    metrics.text_trailing_inset_with_close *= reach_context_menu_item_scale;
-    metrics.icon_size *= reach_context_menu_item_scale;
-    metrics.icon_inset *= reach_context_menu_item_scale;
-    metrics.icon_text_inset *= reach_context_menu_item_scale;
-    metrics.close_button_size *= reach_context_menu_item_scale;
-    metrics.close_button_inset *= reach_context_menu_item_scale;
+    metrics.item_height *= reach_context_menu_popup_scale;
+    metrics.padding *= reach_context_menu_popup_scale;
+    metrics.text_leading_inset *= reach_context_menu_popup_scale;
+    metrics.text_trailing_inset *= reach_context_menu_popup_scale;
+    metrics.text_trailing_inset_with_close *= reach_context_menu_popup_scale;
+    metrics.icon_size *= reach_context_menu_popup_scale;
+    metrics.icon_inset *= reach_context_menu_popup_scale;
+    metrics.icon_text_inset *= reach_context_menu_popup_scale;
+    metrics.close_button_size *= reach_context_menu_popup_scale;
+    metrics.close_button_inset *= reach_context_menu_popup_scale;
     return metrics;
 }
 
-static constexpr reach_context_menu_metrics reach_context_menu_large_metrics =
-    reach_context_menu_make_large_metrics();
 static constexpr reach_context_menu_metrics reach_context_menu_small_metrics =
     reach_context_menu_make_small_metrics();
-static constexpr reach_context_menu_metrics reach_context_menu_item_metrics =
-    reach_context_menu_make_item_metrics();
+static constexpr reach_context_menu_metrics reach_context_menu_popup_metrics =
+    reach_context_menu_make_popup_metrics();
 
-static constexpr float reach_context_menu_power_popup_width = 176.0f;
+static constexpr float reach_context_menu_power_popup_width =
+    176.0f * reach_context_menu_popup_scale;
 static constexpr float reach_context_menu_power_anchor_ratio = 0.72f;
 static constexpr float reach_context_menu_item_popup_width =
-    224.0f * reach_context_menu_item_scale;
+    224.0f * reach_context_menu_popup_scale;
 static constexpr float reach_context_menu_item_anchor_ratio = 0.30f;
 static constexpr float reach_context_menu_window_list_anchor_ratio = 0.5f;
 
-static inline const reach_context_menu_metrics *reach_context_menu_metrics_for(int32_t power_menu,
-                                                                               int32_t window_list)
+static inline const reach_context_menu_metrics *reach_context_menu_metrics_for(int32_t window_list)
 {
     if (window_list)
     {
         return &reach_context_menu_small_metrics;
     }
-    return power_menu ? &reach_context_menu_large_metrics : &reach_context_menu_item_metrics;
+    return &reach_context_menu_popup_metrics;
 }
 
 #endif

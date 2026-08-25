@@ -94,7 +94,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     }
 
     const reach_context_menu_metrics *metrics =
-        reach_context_menu_metrics_for(input->power_menu, input->window_list);
+        reach_context_menu_metrics_for(input->window_list);
 
     reach_render_command_buffer_clear(out_commands);
     reach_render_command command = {};

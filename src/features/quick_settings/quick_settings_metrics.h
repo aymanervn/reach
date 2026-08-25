@@ -2,6 +2,7 @@
 #define REACH_FEATURES_QUICK_SETTINGS_METRICS_H
 
 #include "reach/core/render_commands.h"
+#include "reach/core/typography.h"
 
 struct reach_quick_settings_metrics
 {
@@ -123,28 +124,28 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.expand_button_height = 34.0f;
     metrics.chevron_icon_size = 14.0f;
 
-    metrics.system_tile_text_size = 12.0f;
-    metrics.default_pill_label_text_size = 13.0f;
-    metrics.master_pill_label_text_size = 14.0f;
+    metrics.system_tile_text_size = REACH_TEXT_SIZE_SMALL;
+    metrics.default_pill_label_text_size = REACH_TEXT_SIZE_MEDIUM;
+    metrics.master_pill_label_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.pill_label_text_weight = REACH_TEXT_WEIGHT_DEMIBOLD;
 
     metrics.output_row_primary_top = 5.0f;
     metrics.output_row_primary_height = 18.0f;
-    metrics.output_row_primary_text_size = 12.0f;
+    metrics.output_row_primary_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.output_row_secondary_top = 22.0f;
     metrics.output_row_secondary_height = 15.0f;
-    metrics.output_row_secondary_text_size = 10.0f;
+    metrics.output_row_secondary_text_size = REACH_TEXT_SIZE_XSMALL;
 
     metrics.output_button_title_top = 6.0f;
     metrics.output_button_title_height = 16.0f;
-    metrics.output_button_title_text_size = 11.0f;
+    metrics.output_button_title_text_size = REACH_TEXT_SIZE_XSMALL;
     metrics.output_button_device_top = 23.0f;
     metrics.output_button_device_height = 18.0f;
-    metrics.output_button_device_text_size = 13.0f;
+    metrics.output_button_device_text_size = REACH_TEXT_SIZE_MEDIUM;
 
-    metrics.app_row_text_size = 12.0f;
-    metrics.app_row_percent_text_size = 12.0f;
-    metrics.expand_button_text_size = 13.0f;
+    metrics.app_row_text_size = REACH_TEXT_SIZE_SMALL;
+    metrics.app_row_percent_text_size = REACH_TEXT_SIZE_MEDIUM;
+    metrics.expand_button_text_size = REACH_TEXT_SIZE_MEDIUM;
 
     return metrics;
 }

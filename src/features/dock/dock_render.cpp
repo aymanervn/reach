@@ -4,6 +4,7 @@
 
 #include "dock_common.h"
 #include "dock_metrics.h"
+#include "reach/core/typography.h"
 
 static uint16_t reach_dock_pinned_fallback_initial(const reach_pinned_app_model *app)
 {
@@ -186,6 +187,7 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
         command.rect = icon_box;
         command.color = theme->fallback_icon_text;
         command.text_weight = REACH_TEXT_WEIGHT_BOLD;
+        command.text_size = REACH_TEXT_SIZE_HEADING * input->dpi_scale;
         command.color.a *= reveal;
         command.text_alignment = input->text_alignment_center;
         command.text[0] = fallback_initial;

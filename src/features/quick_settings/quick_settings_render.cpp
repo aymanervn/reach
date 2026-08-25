@@ -312,7 +312,7 @@ static void reach_quick_settings_push_system_tile_commands(
 
     reach_quick_settings_push_text(
         commands, layout->label, label, values->system_tile_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-        0, active ? theme->primary_text : theme->quick_settings_secondary_text);
+        0, foreground);
 }
 
 static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *commands,

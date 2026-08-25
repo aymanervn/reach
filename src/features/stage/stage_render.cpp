@@ -2,6 +2,8 @@
 
 #include "stage_common.h"
 
+#include "reach/core/typography.h"
+
 static reach_color reach_stage_rgba(float r, float g, float b, float a)
 {
     reach_color color = {};
@@ -181,7 +183,7 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
     float border = reach_stage_tile_border(state);
     float label_height = reach_stage_scaled(ctx, 22.0f);
     float label_gap = reach_stage_scaled(ctx, 6.0f);
-    float label_size = reach_stage_scaled(ctx, 12.0f);
+    float label_size = reach_stage_scaled(ctx, REACH_TEXT_SIZE_MEDIUM);
 
     for (size_t index = 0; index < state->tile_count; ++index)
     {
