@@ -29,7 +29,7 @@ using Microsoft::WRL::ComPtr;
 
 struct reach_d2d_icon_cache_entry
 {
-    uintptr_t icon_id;
+    uint64_t icon_id;
     ID2D1Bitmap *bitmap;
 };
 
