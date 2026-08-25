@@ -8,6 +8,14 @@
 #include "top_bar_tray.h"
 #include "top_bar_window_push.h"
 
+typedef struct reach_top_bar_tray_drag_state
+{
+    reach_draggable gesture;
+    uint32_t item_id;
+    float grab_offset_x;
+    float x;
+} reach_top_bar_tray_drag_state;
+
 struct reach_top_bar
 {
     reach_animation_manager manager;
@@ -25,6 +33,9 @@ struct reach_top_bar
     reach_input_language_service *input_language;
     reach_system_status *status;
     reach_tray_service *tray;
+    uint32_t tray_order[REACH_MAX_TRAY_ITEMS];
+    size_t tray_order_count;
+    reach_top_bar_tray_drag_state tray_drag;
     float now_playing_target_width;
     float current_app_target_width;
     float tray_target_width;
@@ -48,6 +59,14 @@ reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *t
 reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar);
 int32_t reach_top_bar_bluetooth_absence_pending(const reach_top_bar *top_bar);
 reach_pressable_feedback_style reach_top_bar_pressable_feedback(reach_top_bar *top_bar);
+void reach_top_bar_reconcile_tray_order(reach_top_bar *top_bar);
+void reach_top_bar_sync_tray_items(reach_top_bar *top_bar);
+void reach_top_bar_reset_tray_drag(reach_top_bar *top_bar);
+size_t reach_top_bar_ordered_tray_item_count(const reach_top_bar *top_bar);
+const reach_tray_item *reach_top_bar_ordered_tray_item_at(const reach_top_bar *top_bar,
+                                                          size_t index);
+float reach_top_bar_tray_item_current_x(const reach_top_bar *top_bar, size_t index);
+size_t reach_top_bar_tray_dragged_index(const reach_top_bar *top_bar);
 
 reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *layout,
                                                     int32_t local_x, int32_t local_y);

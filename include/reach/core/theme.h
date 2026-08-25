@@ -101,8 +101,6 @@ extern "C"
         reach_color bar_click_feedback;
         reach_color bar_separator_dot;
 
-        reach_color tray_click_feedback;
-
         reach_color quick_settings_slider_track;
         reach_color quick_settings_slider_fill;
         reach_color quick_settings_slider_muted_fill;

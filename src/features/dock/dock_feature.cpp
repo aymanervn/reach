@@ -152,7 +152,7 @@ reach_result reach_dock_create(reach_dock **out_animations)
         return REACH_ERROR;
     }
     reach_animation_manager_init(&animations->manager, animations->tracks, REACH_DOCK_ANIM_COUNT);
-    animations->state.drag.source_index = REACH_MAX_DOCK_ITEMS;
+    reach_draggable_init(&animations->state.drag.gesture);
     animations->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
     animations->state.hovered_item = REACH_MAX_DOCK_ITEMS;
     reach_pressable_init(&animations->state.pressable);
@@ -221,7 +221,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     if (drag_snap_was_active && !reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
     {
-        state->drag.source_index = REACH_MAX_DOCK_ITEMS;
         state->drag.target_index = REACH_MAX_DOCK_ITEMS;
         state->drag.key = {};
     }
@@ -401,6 +400,9 @@ static void reach_dock_capsule_reset(void *capsule)
     {
         dock->pointer_layout_valid = 0;
         dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
+        reach_draggable_init(&dock->state.drag.gesture);
+        dock->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
+        dock->state.drag.key = {};
         reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
         reach_pressable_reset(&dock->state.pressable, &feedback);
 
@@ -431,8 +433,8 @@ static void reach_dock_capsule_on_game_mode(void *capsule, int32_t enabled)
 static int32_t reach_dock_capsule_needs_frame(const void *capsule)
 {
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
-    return dock != nullptr &&
-           (reach_animation_manager_any_active(&dock->manager) || dock->state.drag.active);
+    return dock != nullptr && (reach_animation_manager_any_active(&dock->manager) ||
+                               reach_draggable_tracking(&dock->state.drag.gesture));
 }
 
 static int32_t reach_dock_capsule_pointer_sequence_active(const void *capsule)
@@ -602,9 +604,11 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     }
     if (event->kind == REACH_POINTER_EVENT_UP)
     {
-        int32_t moved = event->button == REACH_POINTER_BUTTON_PRIMARY && state->drag.active &&
-                        state->drag.moved;
-        if (event->button == REACH_POINTER_BUTTON_PRIMARY && state->drag.active)
+        int32_t moved = event->button == REACH_POINTER_BUTTON_PRIMARY &&
+                        reach_draggable_tracking(&state->drag.gesture) &&
+                        reach_draggable_moved(&state->drag.gesture);
+        if (event->button == REACH_POINTER_BUTTON_PRIMARY &&
+            reach_draggable_tracking(&state->drag.gesture))
         {
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
@@ -669,7 +673,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             reach_dock_pressable_target(dock, hit, reach_pressable_button(&state->pressable)),
             &pressable);
         reach_dock_capsule_apply_pressable_result(&pressable, out);
-        if (!state->drag.active)
+        if (!reach_draggable_tracking(&state->drag.gesture))
         {
             size_t hovered_item =
                 hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
@@ -682,15 +686,15 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                 out->action.index = hovered_item;
             }
         }
-        if (state->drag.active)
+        if (reach_draggable_tracking(&state->drag.gesture))
         {
-            int32_t was_moved = state->drag.moved;
+            int32_t was_moved = reach_draggable_moved(&state->drag.gesture);
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_update(dock, reach_dock_capsule_screen_x(dock, event->x),
                                    reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
                                    &interaction);
             reach_dock_capsule_apply_interaction_result(&interaction, out);
-            if (!was_moved && state->drag.moved)
+            if (!was_moved && reach_draggable_moved(&state->drag.gesture))
             {
                 reach_pressable_disarm(&state->pressable, &feedback, &pressable);
                 reach_dock_capsule_apply_pressable_result(&pressable, out);
@@ -715,7 +719,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     }
     if (event->kind == REACH_POINTER_EVENT_CANCEL)
     {
-        if (state->drag.active)
+        if (reach_draggable_tracking(&state->drag.gesture))
         {
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
@@ -842,7 +846,7 @@ static reach_bar_reveal_animation reach_dock_bar_animation(const void *capsule)
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
     animation.animated_y = reach_animation_manager_value(&dock->manager, REACH_DOCK_ANIM_Y);
     animation.content_animating =
-        reach_dock_slots_animating(dock) || dock->state.drag.active ||
+        reach_dock_slots_animating(dock) || reach_draggable_tracking(&dock->state.drag.gesture) ||
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP) ||
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
     return animation;
@@ -1532,8 +1536,7 @@ reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_i
 
     const float native_outer_padding = native_gap * REACH_DOCK_OUTER_PADDING_SCALE;
     const float native_width = native_border_thickness * 2.0f + native_outer_padding * 2.0f +
-                               native_icon_size +
-                               app_slot_units * (native_icon_size + native_gap);
+                               native_icon_size + app_slot_units * (native_icon_size + native_gap);
     result.scale = 1.0f;
     if (available_width > 0.0f && native_width > available_width)
     {
@@ -1574,9 +1577,9 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     const float native_height =
         layout->native_height > 0.0f ? layout->native_height : layout->bounds.height;
     const float native_border_thickness = reach_theme_border_thickness(ctx->theme, dpi_scale);
-    const reach_dock_fit_result fit = reach_dock_fit_metrics(
-        native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale,
-        native_border_thickness, layout->available_width, app_slot_units);
+    const reach_dock_fit_result fit =
+        reach_dock_fit_metrics(native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale,
+                               native_border_thickness, layout->available_width, app_slot_units);
     const float center_x = layout->bounds.x + layout->bounds.width * 0.5f;
     const float bottom = layout->bounds.y + layout->bounds.height;
     layout->bounds.x = center_x - fit.width * 0.5f;
@@ -1765,7 +1768,7 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
         }
         state->item_x_keys[index] = item_key;
         if (reach_dock_key_equal(&state->drag.key, &item_key) &&
-            (state->drag.active ||
+            (reach_draggable_tracking(&state->drag.gesture) ||
              reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP)))
         {
             reach_dock_start_item_x_animation(dock, index, target_x, target_x);

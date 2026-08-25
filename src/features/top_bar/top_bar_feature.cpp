@@ -51,6 +51,7 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
 
     reach_animation_manager_init(&top_bar->manager, top_bar->tracks, REACH_TOP_BAR_ANIM_COUNT);
     reach_pressable_init(&top_bar->state.pressable);
+    reach_top_bar_reset_tray_drag(top_bar);
     *out_top_bar = top_bar;
     return REACH_OK;
 }
@@ -364,38 +365,6 @@ reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *t
     return top_bar != nullptr ? top_bar->now_playing_subfeature : nullptr;
 }
 
-static void reach_top_bar_update_tray_items(reach_top_bar *top_bar)
-{
-    reach_top_bar_state *state = &top_bar->state;
-    size_t count = reach_tray_service_item_count(top_bar->tray);
-    state->tray_overflow = count >= REACH_TOP_BAR_TRAY_OVERFLOW_THRESHOLD;
-    if (state->tray_overflow)
-    {
-        count = REACH_TOP_BAR_TRAY_INLINE_ICONS;
-    }
-    else if (count > REACH_TOP_BAR_MAX_TRAY_ICONS)
-    {
-        count = REACH_TOP_BAR_MAX_TRAY_ICONS;
-    }
-    state->tray_item_count = count;
-    state->tray_popup_open = reach_top_bar_tray_popup_is_open(top_bar);
-    for (size_t index = 0; index < count; ++index)
-    {
-        const reach_tray_item *item = reach_tray_service_item_at(top_bar->tray, index);
-        state->tray_items[index] = {};
-        if (item != nullptr)
-        {
-            state->tray_items[index].id = item->id;
-            state->tray_items[index].icon_id = item->icon_id;
-        }
-    }
-}
-
-size_t reach_top_bar_tray_overflow_start(const reach_top_bar *top_bar)
-{
-    return top_bar != nullptr && top_bar->state.tray_overflow ? top_bar->state.tray_item_count : 0;
-}
-
 static int32_t reach_top_bar_has_current_app_icon(const reach_top_bar *top_bar)
 {
     return top_bar->state.current_app_icon_ref[0] != 0;
@@ -497,9 +466,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK] =
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
     layout->power_button =
-        reach_top_bar_rect(left + border_thickness + padding,
-                           (height - power_button_size) * 0.5f, power_button_size,
-                           power_button_size);
+        reach_top_bar_rect(left + border_thickness + padding, (height - power_button_size) * 0.5f,
+                           power_button_size, power_button_size);
 
     float clock_x = layout->power_button.x + power_button_size + clock_gap;
     layout->clock_time = reach_top_bar_text_run(clock_x, height, time_advance);
@@ -656,7 +624,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f, button_size, button_size);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x;
 
-    reach_top_bar_update_tray_items(top_bar);
+    reach_top_bar_sync_tray_items(top_bar);
     const float tray_slot = height * metrics.tray_icon_scale;
     const float tray_gap = metrics.tray_icon_gap * scale;
     const size_t tray_count = top_bar->state.tray_item_count;
@@ -675,9 +643,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         tray_edge_inset = 0.0f;
     }
 
-    float tray_target_width = border_thickness + tray_edge_inset +
-                              tray_background_padding * 2.0f + tray_cells_span + dot_gap +
-                              dot_size * 0.5f;
+    float tray_target_width = border_thickness + tray_edge_inset + tray_background_padding * 2.0f +
+                              tray_cells_span + dot_gap + dot_size * 0.5f;
     float tray_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_TRAY_WIDTH, &top_bar->tray_target_width, tray_target_width);
     layout->pills[REACH_TOP_BAR_PILL_TRAY] =
@@ -716,8 +683,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float name_advance =
         reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.current_app_name, name_size,
                                    metrics.current_app_name_text_weight);
-    float current_app_chrome = border_thickness * 2.0f + padding * 2.0f +
-                               current_app_icon_size + current_app_icon_gap;
+    float current_app_chrome =
+        border_thickness * 2.0f + padding * 2.0f + current_app_icon_size + current_app_icon_gap;
     float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
     float current_app_target = current_app_chrome + name_advance;
     if (current_app_target > current_app_max_width)
@@ -740,8 +707,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                current_app_icon_size, current_app_icon_size);
         current_app_text_x += current_app_icon_size + current_app_icon_gap;
     }
-    float current_app_text_advance = current_app.x + current_app.width - border_thickness -
-                                     padding - current_app_text_x;
+    float current_app_text_advance =
+        current_app.x + current_app.width - border_thickness - padding - current_app_text_x;
     if (current_app_text_advance < 0.0f)
     {
         current_app_text_advance = 0.0f;
@@ -1026,6 +993,28 @@ static int32_t reach_top_bar_width_animation_active(const reach_top_bar *top_bar
                                           REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH);
 }
 
+static int32_t reach_top_bar_tray_motion_active(const reach_top_bar *top_bar)
+{
+    if (top_bar == nullptr)
+    {
+        return 0;
+    }
+    if (reach_draggable_tracking(&top_bar->tray_drag.gesture) ||
+        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP))
+    {
+        return 1;
+    }
+    for (size_t index = 0; index < REACH_TOP_BAR_MAX_TRAY_ICONS; ++index)
+    {
+        if (reach_animation_manager_active(&top_bar->manager,
+                                           reach_top_bar_tray_item_x_animation_id(index)))
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static reach_bar_reveal_animation reach_top_bar_bar_animation(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
@@ -1041,6 +1030,7 @@ static reach_bar_reveal_animation reach_top_bar_bar_animation(const void *capsul
     animation.content_animating =
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
+        reach_top_bar_tray_motion_active(top_bar) ||
         reach_top_bar_width_animation_active(top_bar) ||
         reach_top_bar_now_playing_scroll_active(top_bar);
     return animation;
@@ -1073,6 +1063,12 @@ static void reach_top_bar_capsule_reset(void *capsule)
     reach_top_bar_now_playing_reset(top_bar->now_playing_subfeature);
     reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
     reach_pressable_reset(&top_bar->state.pressable, &feedback);
+    reach_top_bar_reset_tray_drag(top_bar);
+    for (size_t index = 0; index < REACH_TOP_BAR_MAX_TRAY_ICONS; ++index)
+    {
+        reach_animation_manager_reset(&top_bar->manager,
+                                      reach_top_bar_tray_item_x_animation_id(index));
+    }
     top_bar->state.power_hovered = 0;
     top_bar->state.power_release_suppressed = 0;
     top_bar->state.bluetooth_absent_seconds = 0.0;
@@ -1090,6 +1086,7 @@ static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
     reach_top_bar_invalidate_occlusion(top_bar);
     reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
     reach_pressable_reset(&top_bar->state.pressable, &feedback);
+    reach_top_bar_reset_tray_drag(top_bar);
 }
 
 static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
@@ -1142,6 +1139,9 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
 
     int32_t width_was_active = reach_top_bar_width_animation_active(top_bar);
+    int32_t tray_motion_was_active = reach_top_bar_tray_motion_active(top_bar);
+    int32_t tray_snap_was_active =
+        reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP);
 
     reach_animation_manager_tick(manager, delta_seconds);
 
@@ -1149,6 +1149,16 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
                      reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
                      power_hover_was_active ||
                      reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
+
+    if (tray_motion_was_active || reach_top_bar_tray_motion_active(top_bar))
+    {
+        redraw = 1;
+    }
+    if (tray_snap_was_active &&
+        !reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP))
+    {
+        top_bar->tray_drag.item_id = 0;
+    }
 
     if (width_was_active || reach_top_bar_width_animation_active(top_bar))
     {
@@ -1184,6 +1194,7 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
     return reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_Y) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
+           reach_top_bar_tray_motion_active(top_bar) ||
            reach_top_bar_width_animation_active(top_bar) ||
            reach_top_bar_bluetooth_absence_pending(top_bar) ||
            reach_top_bar_now_playing_scroll_active(top_bar);

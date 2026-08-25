@@ -107,6 +107,8 @@ target_compile_features(reach_core PUBLIC
 
 add_library(reach_features STATIC
     src/features/common/bar_visibility/bar_visibility.cpp
+    src/features/common/draggable/draggable.cpp
+    src/features/common/icon_feedback/icon_feedback.cpp
     src/features/common/layout/layout.cpp
     src/features/common/level_presentation/level_presentation.cpp
     src/features/common/loader/loader_render.cpp

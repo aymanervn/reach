@@ -1,4 +1,5 @@
 #include "reach/features/common/pressable.h"
+#include "reach/features/common/draggable.h"
 
 #include <stdio.h>
 
@@ -155,6 +156,53 @@ static void test_release_requires_the_pressed_button(void)
     expect_true(result.capture == -1, "the pressed button release gives up pointer capture");
 }
 
+static void test_draggable_starts_only_after_threshold(void)
+{
+    reach_draggable draggable = {};
+    reach_draggable_init(&draggable);
+    reach_draggable_begin(&draggable, 31, 10, 20);
+
+    reach_draggable_result result = {};
+    reach_draggable_update(&draggable, 13, 24, 36, &result);
+    expect_true(!result.started && !result.moved,
+                "movement below the drag threshold remains a click candidate");
+
+    reach_draggable_update(&draggable, 16, 20, 36, &result);
+    expect_true(result.started && result.moved,
+                "movement at the drag threshold starts the drag once");
+
+    reach_draggable_update(&draggable, 18, 20, 36, &result);
+    expect_true(!result.started && result.moved,
+                "continued drag movement does not restart the gesture");
+}
+
+static void test_draggable_end_reports_and_clears_state(void)
+{
+    reach_draggable draggable = {};
+    reach_draggable_init(&draggable);
+    reach_draggable_begin(&draggable, 37, 0, 0);
+    reach_draggable_result result = {};
+    reach_draggable_update(&draggable, 6, 0, 36, &result);
+    reach_draggable_end(&draggable, &result);
+
+    expect_true(result.ended && result.moved && result.target == 37,
+                "drag end reports the completed target and movement");
+    expect_true(!reach_draggable_tracking(&draggable) && !reach_draggable_moved(&draggable),
+                "drag end clears reusable gesture state");
+}
+
+static void test_horizontal_reorder_uses_neighbor_thresholds(void)
+{
+    reach_rect_f32 slots[3] = {
+        {0.0f, 0.0f, 20.0f, 20.0f}, {24.0f, 0.0f, 20.0f, 20.0f}, {48.0f, 0.0f, 20.0f, 20.0f}};
+    expect_true(reach_horizontal_reorder_target(slots, 3, 1, 2.0f, 0.25f) == 0,
+                "dragging through the left neighbor threshold reorders left");
+    expect_true(reach_horizontal_reorder_target(slots, 3, 1, 66.0f, 0.25f) == 2,
+                "dragging through the right neighbor threshold reorders right");
+    expect_true(reach_horizontal_reorder_target(slots, 3, 1, 24.0f, 0.25f) == 1,
+                "remaining between neighbor thresholds retains the current slot");
+}
+
 int main(void)
 {
     test_release_on_original_target_activates();
@@ -163,5 +211,8 @@ int main(void)
     test_drag_start_disarms_before_release();
     test_cancel_clears_feedback_and_capture();
     test_release_requires_the_pressed_button();
+    test_draggable_starts_only_after_threshold();
+    test_draggable_end_reports_and_clears_state();
+    test_horizontal_reorder_uses_neighbor_thresholds();
     return failures == 0 ? 0 : 1;
 }

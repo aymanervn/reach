@@ -100,6 +100,199 @@ static uint32_t reach_top_bar_pressable_detail(uint64_t target)
     return static_cast<uint32_t>(target);
 }
 
+static size_t reach_top_bar_inline_tray_index(const reach_top_bar *top_bar, uint32_t id)
+{
+    if (top_bar == nullptr)
+    {
+        return REACH_TOP_BAR_MAX_TRAY_ICONS;
+    }
+    for (size_t index = 0; index < top_bar->state.tray_item_count; ++index)
+    {
+        if (top_bar->state.tray_items[index].id == id)
+        {
+            return index;
+        }
+    }
+    return REACH_TOP_BAR_MAX_TRAY_ICONS;
+}
+
+static size_t reach_top_bar_tray_order_index(const reach_top_bar *top_bar, uint32_t id)
+{
+    if (top_bar == nullptr)
+    {
+        return REACH_MAX_TRAY_ITEMS;
+    }
+    for (size_t index = 0; index < top_bar->tray_order_count; ++index)
+    {
+        if (top_bar->tray_order[index] == id)
+        {
+            return index;
+        }
+    }
+    return REACH_MAX_TRAY_ITEMS;
+}
+
+float reach_top_bar_tray_item_current_x(const reach_top_bar *top_bar, size_t index)
+{
+    if (top_bar == nullptr || index >= top_bar->state.layout.tray_icon_count)
+    {
+        return 0.0f;
+    }
+    size_t track = reach_top_bar_tray_item_x_animation_id(index);
+    return reach_animation_manager_active(&top_bar->manager, track)
+               ? reach_animation_manager_value(&top_bar->manager, track)
+               : top_bar->state.layout.tray_icons[index].x;
+}
+
+size_t reach_top_bar_tray_dragged_index(const reach_top_bar *top_bar)
+{
+    return top_bar != nullptr && (reach_draggable_tracking(&top_bar->tray_drag.gesture) ||
+                                  reach_animation_manager_active(&top_bar->manager,
+                                                                 REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP))
+               ? reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id)
+               : REACH_TOP_BAR_MAX_TRAY_ICONS;
+}
+
+typedef struct reach_top_bar_tray_x_snapshot
+{
+    uint32_t ids[REACH_TOP_BAR_MAX_TRAY_ICONS];
+    float x[REACH_TOP_BAR_MAX_TRAY_ICONS];
+    size_t count;
+} reach_top_bar_tray_x_snapshot;
+
+static reach_top_bar_tray_x_snapshot reach_top_bar_tray_x_snapshot_take(reach_top_bar *top_bar)
+{
+    reach_top_bar_tray_x_snapshot snapshot = {};
+    if (top_bar == nullptr)
+    {
+        return snapshot;
+    }
+    snapshot.count = top_bar->state.tray_item_count;
+    for (size_t index = 0; index < snapshot.count; ++index)
+    {
+        snapshot.ids[index] = top_bar->state.tray_items[index].id;
+        snapshot.x[index] = reach_top_bar_tray_item_current_x(top_bar, index);
+    }
+    return snapshot;
+}
+
+static float reach_top_bar_tray_x_snapshot_find(const reach_top_bar_tray_x_snapshot *snapshot,
+                                                uint32_t id, float fallback)
+{
+    if (snapshot == nullptr)
+    {
+        return fallback;
+    }
+    for (size_t index = 0; index < snapshot->count; ++index)
+    {
+        if (snapshot->ids[index] == id)
+        {
+            return snapshot->x[index];
+        }
+    }
+    return fallback;
+}
+
+static void reach_top_bar_move_tray_item(reach_top_bar *top_bar, size_t source, size_t target)
+{
+    if (top_bar == nullptr || source >= top_bar->state.tray_item_count ||
+        target >= top_bar->state.tray_item_count || source == target)
+    {
+        return;
+    }
+
+    reach_top_bar_tray_x_snapshot snapshot = reach_top_bar_tray_x_snapshot_take(top_bar);
+    reach_top_bar_tray_item moved = top_bar->state.tray_items[source];
+    if (source < target)
+    {
+        for (size_t index = source; index < target; ++index)
+        {
+            top_bar->state.tray_items[index] = top_bar->state.tray_items[index + 1];
+        }
+    }
+    else
+    {
+        for (size_t index = source; index > target; --index)
+        {
+            top_bar->state.tray_items[index] = top_bar->state.tray_items[index - 1];
+        }
+    }
+    top_bar->state.tray_items[target] = moved;
+
+    size_t order_source = reach_top_bar_tray_order_index(top_bar, moved.id);
+    if (order_source < top_bar->tray_order_count)
+    {
+        uint32_t ordered_id = top_bar->tray_order[order_source];
+        if (order_source < target)
+        {
+            for (size_t index = order_source; index < target; ++index)
+            {
+                top_bar->tray_order[index] = top_bar->tray_order[index + 1];
+            }
+        }
+        else
+        {
+            for (size_t index = order_source; index > target; --index)
+            {
+                top_bar->tray_order[index] = top_bar->tray_order[index - 1];
+            }
+        }
+        top_bar->tray_order[target] = ordered_id;
+    }
+
+    for (size_t index = 0; index < top_bar->state.tray_item_count; ++index)
+    {
+        size_t track = reach_top_bar_tray_item_x_animation_id(index);
+        float target_x = top_bar->state.layout.tray_icons[index].x;
+        if (top_bar->state.tray_items[index].id == top_bar->tray_drag.item_id)
+        {
+            reach_animation_manager_reset(&top_bar->manager, track);
+            continue;
+        }
+        float start_x = reach_top_bar_tray_x_snapshot_find(
+            &snapshot, top_bar->state.tray_items[index].id, target_x);
+        reach_animation_manager_start(&top_bar->manager, track, start_x, target_x, 0.12,
+                                      REACH_EASING_EASE_IN_OUT);
+    }
+}
+
+static void reach_top_bar_tray_drag_begin(reach_top_bar *top_bar, size_t index, int32_t x,
+                                          int32_t y, uint64_t target)
+{
+    if (top_bar == nullptr || index >= top_bar->state.tray_item_count ||
+        reach_draggable_tracking(&top_bar->tray_drag.gesture))
+    {
+        return;
+    }
+    reach_draggable_begin(&top_bar->tray_drag.gesture, target, x, y);
+    top_bar->tray_drag.item_id = top_bar->state.tray_items[index].id;
+    top_bar->tray_drag.grab_offset_x = (float)x - top_bar->state.layout.tray_icons[index].x;
+    top_bar->tray_drag.x = top_bar->state.layout.tray_icons[index].x;
+    reach_animation_manager_reset(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP);
+}
+
+static int32_t reach_top_bar_tray_drag_end(reach_top_bar *top_bar)
+{
+    if (top_bar == nullptr || !reach_draggable_tracking(&top_bar->tray_drag.gesture))
+    {
+        return 0;
+    }
+    int32_t moved = reach_draggable_moved(&top_bar->tray_drag.gesture);
+    reach_draggable_end(&top_bar->tray_drag.gesture, nullptr);
+    size_t index = reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id);
+    if (moved && index < top_bar->state.layout.tray_icon_count)
+    {
+        reach_animation_manager_start(
+            &top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP, top_bar->tray_drag.x,
+            top_bar->state.layout.tray_icons[index].x, 0.12, REACH_EASING_EASE_IN_OUT);
+    }
+    else
+    {
+        top_bar->tray_drag.item_id = 0;
+    }
+    return moved;
+}
+
 static uint64_t reach_top_bar_pressable_target_at(reach_top_bar *top_bar, int32_t local_x,
                                                   int32_t local_y, reach_pointer_button button)
 {
@@ -240,6 +433,12 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
                           &pressable);
     reach_top_bar_apply_pressable_result(&pressable, out);
     out->handled = 1;
+    if (button == REACH_POINTER_BUTTON_PRIMARY && region == REACH_TOP_BAR_POINTER_REGION_TRAY_ICON)
+    {
+        size_t index =
+            reach_top_bar_inline_tray_index(top_bar, reach_top_bar_pressable_detail(target));
+        reach_top_bar_tray_drag_begin(top_bar, index, local_x, local_y, target);
+    }
     if (button == REACH_POINTER_BUTTON_SECONDARY)
     {
         return;
@@ -283,12 +482,20 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         return;
     }
 
+    int32_t dragged =
+        button == REACH_POINTER_BUTTON_PRIMARY ? reach_top_bar_tray_drag_end(top_bar) : 0;
     reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
     reach_pressable_result pressable = {};
     reach_pressable_release(&state->pressable, button,
                             reach_top_bar_pressable_target_at(top_bar, local_x, local_y, button),
                             &feedback, &pressable);
     reach_top_bar_apply_pressable_result(&pressable, out);
+    if (dragged)
+    {
+        out->handled = 1;
+        out->redraw = 1;
+        return;
+    }
     if (!pressable.activated)
     {
         if (button == REACH_POINTER_BUTTON_PRIMARY)
@@ -361,6 +568,36 @@ void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t
         &pressable);
     reach_top_bar_apply_pressable_result(&pressable, out);
 
+    if (reach_draggable_tracking(&top_bar->tray_drag.gesture))
+    {
+        int32_t was_moved = reach_draggable_moved(&top_bar->tray_drag.gesture);
+        reach_draggable_result gesture = {};
+        reach_draggable_update(&top_bar->tray_drag.gesture, local_x, local_y, 36, &gesture);
+        if (!was_moved && gesture.started)
+        {
+            reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
+            reach_pressable_disarm(&state->pressable, &feedback, &pressable);
+            reach_top_bar_apply_pressable_result(&pressable, out);
+        }
+        if (gesture.moved && state->layout.tray_icon_count > 0)
+        {
+            float wanted_x = (float)local_x - top_bar->tray_drag.grab_offset_x;
+            float min_x = state->layout.tray_icons[0].x;
+            float max_x = state->layout.tray_icons[state->layout.tray_icon_count - 1].x;
+            top_bar->tray_drag.x = wanted_x < min_x ? min_x : wanted_x > max_x ? max_x : wanted_x;
+            size_t current = reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id);
+            size_t target = reach_horizontal_reorder_target(state->layout.tray_icons,
+                                                            state->layout.tray_icon_count, current,
+                                                            top_bar->tray_drag.x, 0.25f);
+            if (target < state->layout.tray_icon_count && target != current)
+            {
+                reach_top_bar_move_tray_item(top_bar, current, target);
+            }
+            out->redraw = 1;
+        }
+        out->handled = 1;
+    }
+
     int32_t hovered = reach_top_bar_hit_test(&state->layout, local_x, local_y) ==
                       REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
     if (hovered == state->power_hovered)
@@ -388,6 +625,7 @@ void reach_top_bar_pointer_cancel(reach_top_bar *top_bar, reach_top_bar_event_re
     reach_pressable_result pressable = {};
     reach_pressable_cancel(&state->pressable, &feedback, &pressable);
     reach_top_bar_apply_pressable_result(&pressable, out);
+    (void)reach_top_bar_tray_drag_end(top_bar);
     state->power_release_suppressed = 0;
 }
 

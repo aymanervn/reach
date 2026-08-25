@@ -119,19 +119,16 @@ static void reach_dock_drag_begin(reach_dock *dock, size_t index, int32_t x, int
 {
     reach_dock_state *state = reach_dock_state_mut(dock);
 
-    if (index >= state->model.item_count)
+    if (index >= state->model.item_count || reach_draggable_tracking(&state->drag.gesture))
     {
         return;
     }
 
-    state->drag.active = 1;
-
-    state->drag.moved = 0;
-    state->drag.source_index = index;
+    reach_dock_order_key key = reach_dock_item_key_at(&state->model, index);
+    uint64_t target = ((uint64_t)(key.pinned ? 1 : 0) << 32) | key.app_id;
+    reach_draggable_begin(&state->drag.gesture, target, x, y);
     state->drag.target_index = index;
-    state->drag.key = reach_dock_item_key_at(&state->model, index);
-    state->drag.start_x = x;
-    state->drag.start_y = y;
+    state->drag.key = key;
 
     float box_x = reach_dock_slot_box_x(ctx->theme, ctx->layout, index);
     state->drag.grab_offset_x = (float)x - (ctx->layout->bounds.x + box_x);
@@ -165,20 +162,14 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
 
     reach_dock_state *state = reach_dock_state_mut(dock);
 
-    if (!state->drag.active)
+    if (!reach_draggable_tracking(&state->drag.gesture))
     {
         return;
     }
 
-    int32_t dx = x - state->drag.start_x;
-    int32_t dy = y - state->drag.start_y;
-
-    if (!state->drag.moved && (dx * dx + dy * dy) >= 36)
-    {
-        state->drag.moved = 1;
-    }
-
-    if (!state->drag.moved)
+    reach_draggable_result gesture = {};
+    reach_draggable_update(&state->drag.gesture, x, y, 36, &gesture);
+    if (!gesture.moved)
     {
         return;
     }
@@ -224,22 +215,21 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
 
     reach_dock_state *state = reach_dock_state_mut(dock);
 
-    if (!state->drag.active)
+    if (!reach_draggable_tracking(&state->drag.gesture))
     {
         return;
     }
 
     uint32_t pin_id = state->drag.key.pinned ? state->drag.key.app_id : 0;
     int32_t dragged_pinned = state->drag.key.pinned;
-    int32_t moved = state->drag.moved;
+    int32_t moved = reach_draggable_moved(&state->drag.gesture);
     size_t target_pinned_index =
         dragged_pinned ? reach_dock_feature_model_pinned_order_index(&state->model, pin_id)
                        : REACH_MAX_DOCK_ITEMS;
 
     size_t target_index = reach_dock_feature_model_find_item_key(&state->model, state->drag.key);
 
-    state->drag.active = 0;
-    state->drag.moved = 0;
+    reach_draggable_end(&state->drag.gesture, nullptr);
     out->redraw = 1;
 
     if (moved && target_index < ctx->layout->app_slot_count)
@@ -251,7 +241,6 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     }
     else
     {
-        state->drag.source_index = REACH_MAX_DOCK_ITEMS;
         state->drag.target_index = REACH_MAX_DOCK_ITEMS;
         state->drag.key = {};
         reach_animation_manager_reset(reach_dock_manager(dock), REACH_DOCK_ANIM_DRAG_SNAP);
@@ -283,31 +272,8 @@ size_t reach_dock_reorder_target(const reach_dock_feature_model *model,
         return REACH_MAX_DOCK_ITEMS;
     }
 
-    size_t target = current_index;
-
-    while (target > 0)
-    {
-        float threshold = layout->app_slots[target - 1].x +
-                          layout->app_slots[target - 1].width *
-                              reach_dock_metrics_values.reorder_neighbor_threshold_ratio;
-        if (dragged_box_x > threshold)
-        {
-            break;
-        }
-        --target;
-    }
-
-    while (target + 1 < count)
-    {
-        float threshold = layout->app_slots[target + 1].x -
-                          layout->app_slots[target + 1].width *
-                              reach_dock_metrics_values.reorder_neighbor_threshold_ratio;
-        if (dragged_box_x < threshold)
-        {
-            break;
-        }
-        ++target;
-    }
-
-    return target;
+    size_t target =
+        reach_horizontal_reorder_target(layout->app_slots, count, current_index, dragged_box_x,
+                                        reach_dock_metrics_values.reorder_neighbor_threshold_ratio);
+    return target == SIZE_MAX ? REACH_MAX_DOCK_ITEMS : target;
 }

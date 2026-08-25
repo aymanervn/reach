@@ -4,6 +4,7 @@
 
 #include "dock_common.h"
 #include "dock_metrics.h"
+#include "reach/features/common/icon_feedback.h"
 #include "reach/core/typography.h"
 
 static uint16_t reach_dock_pinned_fallback_initial(const reach_pinned_app_model *app)
@@ -54,42 +55,6 @@ static void reach_dock_push_icon(reach_render_command_buffer *commands, reach_re
     command.icon_id = icon_id;
     command.color = color;
     reach_render_command_buffer_push(commands, &command);
-}
-
-static void reach_dock_push_click_feedback(const reach_theme *theme,
-                                           reach_render_command_buffer *commands,
-                                           reach_rect_f32 rect, float radius, float opacity)
-{
-    if (opacity <= reach_dock_metrics_values.click_feedback_min_opacity)
-    {
-        return;
-    }
-    reach_dock_push_rect(commands, rect,
-                         reach_theme_color_alpha(theme->bar_click_feedback, opacity), radius);
-}
-
-static void reach_dock_push_item_feedback(const reach_theme *theme,
-                                          reach_render_command_buffer *commands,
-                                          reach_rect_f32 rect, float radius, reach_icon_handle icon,
-                                          float opacity)
-{
-    if (opacity <= reach_dock_metrics_values.click_feedback_min_opacity)
-    {
-        return;
-    }
-
-    if (icon.id != 0)
-    {
-        reach_render_command command = {};
-        command.type = REACH_RENDER_COMMAND_ICON_TINT;
-        command.rect = rect;
-        command.icon_id = icon.id;
-        command.color = reach_theme_color_alpha(theme->bar_click_feedback, opacity);
-        reach_render_command_buffer_push(commands, &command);
-        return;
-    }
-
-    reach_dock_push_click_feedback(theme, commands, rect, radius, opacity);
 }
 
 static void reach_dock_push_running_indicator(const reach_dock_render_input *input,
@@ -202,8 +167,9 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
 
     if (input->click_feedback_index == index)
     {
-        reach_dock_push_item_feedback(theme, commands, icon_box, icon_box_radius, icon,
-                                      input->click_feedback_opacity);
+        reach_push_icon_press_feedback(commands, icon_box, icon_box_radius, icon.id,
+                                       theme->bar_click_feedback, input->click_feedback_opacity,
+                                       reach_dock_metrics_values.click_feedback_min_opacity);
     }
 }
 
@@ -300,7 +266,7 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
         return 0.0f;
     }
 
-    if ((state->drag.active ||
+    if ((reach_draggable_tracking(&state->drag.gesture) ||
          reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)) &&
         reach_dock_feature_model_item_matches_key(&state->model, index, state->drag.key))
     {
@@ -342,7 +308,8 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     }
 
     size_t dragged_render_index =
-        (state->drag.active || reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
+        (reach_draggable_tracking(&state->drag.gesture) ||
+         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
             ? reach_dock_feature_model_find_item_key(&state->model, state->drag.key)
             : REACH_MAX_DOCK_ITEMS;
     float dragged_x = reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
