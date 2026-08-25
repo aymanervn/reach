@@ -4,6 +4,8 @@
 #include "quick_settings_common.h"
 #include "quick_settings_metrics.h"
 
+#include "reach/features/common/section_reveal.h"
+
 #include <math.h>
 #include <new>
 
@@ -658,7 +660,6 @@ enum
 };
 
 static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
-static const double REACH_QUICK_SETTINGS_EXPANSION_SECONDS = 0.16;
 static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_REFRESH_SECONDS = 0.35;
 static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_TIMEOUT_SECONDS = 8.0;
 
@@ -748,7 +749,7 @@ static void reach_quick_settings_animate_expansion(reach_quick_settings *quick_s
     {
         reach_animation_manager_animate_to(&quick_settings->animations, track,
                                            expanded ? 1.0f : 0.0f,
-                                           REACH_QUICK_SETTINGS_EXPANSION_SECONDS,
+                                           REACH_SECTION_REVEAL_SECONDS,
                                            REACH_EASING_EASE_OUT);
     }
 }
@@ -1404,7 +1405,7 @@ void reach_quick_settings_start_height_animation(reach_quick_settings *quick_set
     }
     reach_animation_manager_start(&quick_settings->animations,
                                   REACH_QUICK_SETTINGS_ANIMATION_HEIGHT, from_height, to_height,
-                                  REACH_QUICK_SETTINGS_EXPANSION_SECONDS, REACH_EASING_EASE_OUT);
+                                  REACH_SECTION_REVEAL_SECONDS, REACH_EASING_EASE_OUT);
 }
 
 void reach_quick_settings_reset_height_animation(reach_quick_settings *quick_settings)

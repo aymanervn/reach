@@ -132,6 +132,10 @@ Its open/close transition keeps one maximum-size native envelope and applies one
 centered proportional scale to the complete capsule alongside the existing fade and
 Y tracks. Pointer input is inverse-mapped through the same scale, and closing reverses
 all three tracks from their current values.
+Attaching the first search results keeps that native envelope fixed while the visible
+wrapper expands downward on a feature-owned track. The capsule publishes both rectangles
+through the generic `surface_geometry` hook. Result commands use the shared cropped reveal
+treatment also used by Quick Settings expansion sections.
 The Clipboard is fully migrated as well: it owns item, close, clear, hover,
 scroll, scrollbar-capture, leave, and cancellation behavior. Composition handles
 only restore/provider calls, external resource release, and transient-surface

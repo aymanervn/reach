@@ -539,6 +539,9 @@ float reach_host_surface_transition_opacity(const reach_host *host,
 reach_host_surface_transition_frame reach_host_surface_transition_frame_compute(
     const reach_host *host, const reach_host_surface_transition *transition,
     reach_rect_f32 target_bounds, reach_shadow_pad shadow_pad);
+reach_host_surface_transition_frame reach_host_surface_transition_frame_compute_in_envelope(
+    const reach_host *host, const reach_host_surface_transition *transition,
+    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad);
 int32_t reach_host_surface_transition_visible(const reach_host_surface_transition *transition);
 int32_t reach_host_surface_transition_active(const reach_host *host,
                                              const reach_host_surface_transition *transition);

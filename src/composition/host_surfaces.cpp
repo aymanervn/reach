@@ -292,6 +292,14 @@ reach_host_surface_transition_frame reach_host_surface_transition_frame_compute(
     const reach_host *host, const reach_host_surface_transition *transition,
     reach_rect_f32 target_bounds, reach_shadow_pad shadow_pad)
 {
+    return reach_host_surface_transition_frame_compute_in_envelope(
+        host, transition, target_bounds, target_bounds, shadow_pad);
+}
+
+reach_host_surface_transition_frame reach_host_surface_transition_frame_compute_in_envelope(
+    const reach_host *host, const reach_host_surface_transition *transition,
+    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad)
+{
     reach_host_surface_transition_frame frame = {};
     frame.window_bounds = reach_host_surface_transition_bounds(host, transition, target_bounds);
     frame.content_rect = {shadow_pad.left, shadow_pad.top, target_bounds.width,
@@ -314,17 +322,19 @@ reach_host_surface_transition_frame reach_host_surface_transition_frame_compute(
     float y_offset = reach_animation_manager_value(&host->animations, transition->y_track) *
                      reach_host_layout_dpi_scale(host);
 
-    frame.window_bounds.width = target_bounds.width * max_scale;
-    frame.window_bounds.height = target_bounds.height * max_scale;
-    frame.window_bounds.x = center_x - frame.window_bounds.width * 0.5f;
-    frame.window_bounds.y = center_y - frame.window_bounds.height * 0.5f + y_offset;
+    float envelope_center_x = envelope_bounds.x + envelope_bounds.width * 0.5f;
+    float envelope_center_y = envelope_bounds.y + envelope_bounds.height * 0.5f;
+    frame.window_bounds.width = envelope_bounds.width * max_scale;
+    frame.window_bounds.height = envelope_bounds.height * max_scale;
+    frame.window_bounds.x = envelope_center_x - frame.window_bounds.width * 0.5f;
+    frame.window_bounds.y = envelope_center_y - frame.window_bounds.height * 0.5f + y_offset;
 
     frame.content_rect.width = target_bounds.width * scale;
     frame.content_rect.height = target_bounds.height * scale;
-    frame.content_rect.x =
-        shadow_pad.left + (frame.window_bounds.width - frame.content_rect.width) * 0.5f;
-    frame.content_rect.y =
-        shadow_pad.top + (frame.window_bounds.height - frame.content_rect.height) * 0.5f;
+    float transformed_x = center_x - frame.content_rect.width * 0.5f;
+    float transformed_y = center_y - frame.content_rect.height * 0.5f + y_offset;
+    frame.content_rect.x = shadow_pad.left + transformed_x - frame.window_bounds.x;
+    frame.content_rect.y = shadow_pad.top + transformed_y - frame.window_bounds.y;
     frame.render_transform = {scale, scale, frame.content_rect.x, frame.content_rect.y};
     frame.pointer_transform = {scale, scale, center_x - center_x * scale,
                                center_y + y_offset - center_y * scale};

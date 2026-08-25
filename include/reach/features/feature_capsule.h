@@ -59,6 +59,12 @@ extern "C"
         reach_capsule_action action;
     } reach_capsule_pointer_result;
 
+    typedef struct reach_feature_surface_geometry
+    {
+        reach_rect_f32 visible_bounds;
+        reach_rect_f32 envelope_bounds;
+    } reach_feature_surface_geometry;
+
     typedef struct reach_feature_capsule_ops
     {
 
@@ -80,6 +86,8 @@ extern "C"
 
         size_t (*input_regions)(const void *capsule, reach_rect_f32 *out_regions,
                                 size_t max_regions);
+
+        void (*surface_geometry)(const void *capsule, reach_feature_surface_geometry *out);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

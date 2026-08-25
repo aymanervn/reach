@@ -6,6 +6,7 @@
 reach_launcher_state *reach_launcher_state_mut(reach_launcher *launcher);
 reach_icon_service *reach_launcher_icons(reach_launcher *launcher);
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher);
+float reach_launcher_results_expansion(const reach_launcher *launcher);
 
 typedef enum reach_launcher_hit_type
 {

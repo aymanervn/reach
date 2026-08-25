@@ -73,6 +73,9 @@ static void test_launcher_border_wraps_stable_content_geometry(void)
                 "launcher outer width includes both 1dp border sides");
     expect_near(narrow_border.bounds.height, 126.0f, 0.001f,
                 "launcher outer height includes both 1dp border sides");
+    expect_near(narrow_border.envelope_bounds.height,
+                70.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS, 0.001f,
+                "launcher reserves one stable maximum-results envelope");
 
     input.border_thickness = 3.0f;
     reach_launcher_layout wide_border = {};
@@ -82,6 +85,9 @@ static void test_launcher_border_wraps_stable_content_geometry(void)
                 "launcher outer width derives arbitrary border thickness");
     expect_near(wide_border.bounds.height, 130.0f, 0.001f,
                 "launcher outer height derives arbitrary border thickness");
+    expect_near(wide_border.envelope_bounds.height,
+                74.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS, 0.001f,
+                "launcher envelope includes arbitrary border thickness");
     expect_near(wide_border.search_text_input.x, narrow_border.search_text_input.x, 0.001f,
                 "launcher text content stays fixed while the outer border grows");
     expect_near(wide_border.search_result_items.x, narrow_border.search_result_items.x, 0.001f,
