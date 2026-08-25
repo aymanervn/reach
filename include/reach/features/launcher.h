@@ -94,6 +94,7 @@ extern "C"
         int32_t caret_visible;
         int32_t selection_start;
         int32_t selection_end;
+        float results_expansion;
     } reach_launcher_render_input;
 
     typedef enum reach_launcher_pointer_action_kind

@@ -35,6 +35,7 @@ extern "C"
     typedef struct reach_launcher_layout
     {
         reach_rect_f32 bounds;
+        reach_rect_f32 envelope_bounds;
         reach_rect_f32 search_box;
         reach_rect_f32 search_text_input;
         reach_rect_f32 search_icon;

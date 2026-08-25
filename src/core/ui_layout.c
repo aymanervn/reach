@@ -75,6 +75,9 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     out_layout->search_box.y =
         input->monitor_bounds.y +
         (input->monitor_bounds.height - out_layout->search_box.height) * 0.5f;
+    out_layout->envelope_bounds = out_layout->search_box;
+    out_layout->envelope_bounds.height +=
+        reach_scale(16.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS, scale);
 
     float search_text_padding_x = reach_scale(12.0f, scale);
     float search_text_padding_y = reach_scale(8.0f, scale);

@@ -5,8 +5,19 @@
 #include <math.h>
 #include <new>
 
+#include "reach/features/common/section_reveal.h"
+#include "reach/support/animation.h"
+
+enum
+{
+    REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION = 0,
+    REACH_LAUNCHER_ANIMATION_COUNT
+};
+
 struct reach_launcher
 {
+    reach_animation_manager animations;
+    reach_animation_track animation_tracks[REACH_LAUNCHER_ANIMATION_COUNT];
     reach_launcher_state state;
     reach_search_service *search;
     uint32_t search_generation;
@@ -17,6 +28,50 @@ struct reach_launcher
     size_t pointer_pinned_app_count;
     reach_transform_f32 pointer_transform;
 };
+
+static int32_t reach_launcher_results_attached(const reach_launcher_state *state)
+{
+    return state != nullptr &&
+           (state->model.result_count > 0 ||
+            (state->model.search_error && state->model.query_length > 0));
+}
+
+float reach_launcher_results_expansion(const reach_launcher *launcher)
+{
+    if (launcher == nullptr)
+    {
+        return 0.0f;
+    }
+    float value = reach_animation_manager_value(&launcher->animations,
+                                                REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION);
+    if (value < 0.0f)
+    {
+        return 0.0f;
+    }
+    return value > 1.0f ? 1.0f : value;
+}
+
+static void reach_launcher_sync_results_expansion(reach_launcher *launcher,
+                                                  int32_t was_attached)
+{
+    if (launcher == nullptr)
+    {
+        return;
+    }
+    int32_t attached = reach_launcher_results_attached(&launcher->state);
+    if (attached && !was_attached)
+    {
+        reach_animation_manager_start(&launcher->animations,
+                                      REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION, 0.0f, 1.0f,
+                                      REACH_SECTION_REVEAL_SECONDS,
+                                      REACH_EASING_EASE_OUT);
+    }
+    else if (!attached)
+    {
+        reach_animation_manager_set(&launcher->animations,
+                                    REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION, 0.0f);
+    }
+}
 
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher)
 {
@@ -429,6 +484,10 @@ reach_result reach_launcher_create(reach_launcher **out_launcher)
     {
         return REACH_ERROR;
     }
+    reach_animation_manager_init(&launcher->animations, launcher->animation_tracks,
+                                 REACH_LAUNCHER_ANIMATION_COUNT);
+    reach_animation_manager_set(&launcher->animations,
+                                REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION, 0.0f);
     reach_launcher_state_init(&launcher->state);
     *out_launcher = launcher;
     return REACH_OK;
@@ -511,19 +570,41 @@ reach_result reach_launcher_set_query(reach_launcher *launcher, const uint16_t *
 reach_result reach_launcher_set_results(reach_launcher *launcher,
                                         const reach_search_candidate *results, size_t count)
 {
-    return reach_launcher_set_results_state(reach_launcher_state_mut(launcher), results, count);
+    if (launcher == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    int32_t was_attached = reach_launcher_results_attached(&launcher->state);
+    reach_result result = reach_launcher_set_results_state(&launcher->state, results, count);
+    if (result == REACH_OK)
+    {
+        reach_launcher_sync_results_expansion(launcher, was_attached);
+    }
+    return result;
 }
 
 reach_result reach_launcher_clear_results(reach_launcher *launcher)
 {
-    return reach_launcher_clear_results_state(reach_launcher_state_mut(launcher));
+    if (launcher == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    int32_t was_attached = reach_launcher_results_attached(&launcher->state);
+    reach_result result = reach_launcher_clear_results_state(&launcher->state);
+    if (result == REACH_OK)
+    {
+        reach_launcher_sync_results_expansion(launcher, was_attached);
+    }
+    return result;
 }
 
 void reach_launcher_set_search_error(reach_launcher *launcher, int32_t error)
 {
     if (launcher != nullptr)
     {
+        int32_t was_attached = reach_launcher_results_attached(&launcher->state);
         launcher->state.model.search_error = error ? 1 : 0;
+        reach_launcher_sync_results_expansion(launcher, was_attached);
     }
 }
 
@@ -748,7 +829,7 @@ void reach_launcher_handle_text_event(reach_launcher *launcher, const reach_ui_e
         if (reach_launcher_query_length(launcher) == 0)
         {
             reach_launcher_cancel_search(launcher);
-            (void)reach_launcher_clear_results_state(&launcher->state);
+            (void)reach_launcher_clear_results(launcher);
         }
         else
         {
@@ -773,8 +854,22 @@ static void reach_launcher_capsule_reset(void *capsule)
 static void reach_launcher_capsule_tick(void *capsule, double delta_seconds,
                                         reach_feature_tick_result *out)
 {
-    if (reach_launcher_tick_caret(static_cast<reach_launcher *>(capsule), delta_seconds) &&
-        out != nullptr)
+    reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
+    int32_t expansion_was_active =
+        launcher != nullptr &&
+        reach_animation_manager_active(&launcher->animations,
+                                       REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION);
+    if (launcher != nullptr)
+    {
+        reach_animation_manager_tick(&launcher->animations, delta_seconds);
+    }
+    int32_t expansion_active =
+        launcher != nullptr &&
+        reach_animation_manager_active(&launcher->animations,
+                                       REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION);
+    if (out != nullptr &&
+        (reach_launcher_tick_caret(launcher, delta_seconds) || expansion_was_active ||
+         expansion_active))
     {
         out->redraw = 1;
     }
@@ -912,6 +1007,31 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     reach_launcher_capsule_apply_event_result(&event_result, out);
 }
 
+static void reach_launcher_capsule_surface_geometry(const void *capsule,
+                                                    reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    const reach_launcher *launcher = static_cast<const reach_launcher *>(capsule);
+    if (launcher == nullptr || !launcher->pointer_layout_valid)
+    {
+        return;
+    }
+
+    const reach_launcher_layout *layout = &launcher->pointer_layout;
+    out->visible_bounds = layout->bounds;
+    out->envelope_bounds = layout->envelope_bounds;
+    float collapsed_height = layout->search_box.height;
+    float expanded_height =
+        out->visible_bounds.height > collapsed_height ? out->visible_bounds.height
+                                                      : collapsed_height;
+    out->visible_bounds.height =
+        collapsed_height + (expanded_height - collapsed_height) *
+                               reach_launcher_results_expansion(launcher);
+}
+
 const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
@@ -919,6 +1039,7 @@ const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
         reach_launcher_capsule_is_open,        nullptr,
         reach_launcher_capsule_needs_frame,    reach_launcher_capsule_wants_pointer_move,
         reach_launcher_capsule_handle_pointer, reach_launcher_capsule_pointer_sequence_active,
+        nullptr,                               reach_launcher_capsule_surface_geometry,
     };
     return &ops;
 }

@@ -1,9 +1,32 @@
 #include "reach/features/launcher.h"
 
-static int expect(int condition)
+#include <math.h>
+#include <stdio.h>
+
+static int expect_at(int condition, int line)
 {
-    return condition ? 0 : 1;
+    if (!condition)
+    {
+        printf("launcher feature expectation failed at line %d\n", line);
+        return 1;
+    }
+    return 0;
 }
+
+#define expect(condition) expect_at(condition, __LINE__)
+
+static int expect_close_at(float actual, float expected, int line)
+{
+    if (fabsf(actual - expected) >= 0.01f)
+    {
+        printf("launcher feature expectation failed at line %d: %.3f != %.3f\n", line, actual,
+               expected);
+        return 1;
+    }
+    return 0;
+}
+
+#define expect_close(actual, expected) expect_close_at(actual, expected, __LINE__)
 
 int main()
 {
@@ -34,11 +57,37 @@ int main()
     failed += expect(state->model.result_count == 2);
     failed += expect(state->model.selected_result_index == 0);
 
+    reach_launcher_layout expansion_layout = {};
+    expansion_layout.search_box = {100.0f, 200.0f, 640.0f, 52.0f};
+    expansion_layout.bounds = {100.0f, 200.0f, 640.0f, 180.0f};
+    expansion_layout.envelope_bounds = {
+        100.0f, 200.0f, 640.0f, 68.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS};
+    reach_launcher_set_pointer_context(capsule, &expansion_layout, nullptr, 0);
+
+    const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
+    reach_feature_surface_geometry geometry = {};
+    capsule_ops->surface_geometry(capsule, &geometry);
+    failed += expect_close(geometry.visible_bounds.height, 52.0f);
+    failed += expect_close(geometry.envelope_bounds.x, expansion_layout.bounds.x);
+    failed += expect_close(geometry.envelope_bounds.y, expansion_layout.bounds.y);
+    failed += expect_close(geometry.envelope_bounds.height,
+                           expansion_layout.envelope_bounds.height);
+
+    reach_feature_tick_result tick = {};
+    capsule_ops->tick(capsule, 0.08, &tick);
+    capsule_ops->surface_geometry(capsule, &geometry);
+    failed += expect(geometry.visible_bounds.height > 52.0f &&
+                     geometry.visible_bounds.height < 180.0f);
+    failed += expect(tick.redraw == 1);
+    tick = {};
+    capsule_ops->tick(capsule, 0.16, &tick);
+    capsule_ops->surface_geometry(capsule, &geometry);
+    failed += expect_close(geometry.visible_bounds.height, 180.0f);
+
     reach_launcher_layout pointer_layout = {};
     pointer_layout.bounds = {0.0f, 0.0f, 200.0f, 112.0f};
     pointer_layout.search_result_items = pointer_layout.bounds;
     reach_launcher_set_pointer_context(capsule, &pointer_layout, nullptr, 0);
-    const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
     reach_pointer_event pointer = {};
     pointer.kind = REACH_POINTER_EVENT_DOWN;
     pointer.button = REACH_POINTER_BUTTON_SECONDARY;

@@ -69,16 +69,28 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
     const int32_t launcher_layout_changed = ctx->launcher_layout_changed;
     reach_shadow_pad launcher_shadow_pad =
         reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_LAUNCHER);
-    reach_host_surface_transition_frame frame = reach_host_surface_transition_frame_compute(
-        host, &host->launcher_transition, host->layout.launcher.bounds, launcher_shadow_pad);
+    reach_feature_surface_geometry launcher_geometry = {};
+    launcher_geometry.visible_bounds = host->layout.launcher.bounds;
+    launcher_geometry.envelope_bounds = host->layout.launcher.envelope_bounds;
+    const reach_feature_capsule_ops *launcher_ops =
+        host->surface_descs[REACH_SURFACE_ID_LAUNCHER].capsule_ops;
+    if (launcher_ops != nullptr && launcher_ops->surface_geometry != nullptr)
+    {
+        launcher_ops->surface_geometry(host->launcher_capsule, &launcher_geometry);
+    }
+    reach_host_surface_transition_frame frame =
+        reach_host_surface_transition_frame_compute_in_envelope(
+            host, &host->launcher_transition, launcher_geometry.visible_bounds,
+            launcher_geometry.envelope_bounds, launcher_shadow_pad);
     if (frame.scale_envelope_active)
     {
         launcher_shadow_pad.left *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
         launcher_shadow_pad.top *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
         launcher_shadow_pad.right *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
         launcher_shadow_pad.bottom *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
-        frame = reach_host_surface_transition_frame_compute(
-            host, &host->launcher_transition, host->layout.launcher.bounds, launcher_shadow_pad);
+        frame = reach_host_surface_transition_frame_compute_in_envelope(
+            host, &host->launcher_transition, launcher_geometry.visible_bounds,
+            launcher_geometry.envelope_bounds, launcher_shadow_pad);
     }
     int32_t launcher_scale_changed =
         !host->launcher.transition_scale_valid ||

@@ -1,5 +1,6 @@
 #include "reach/features/quick_settings.h"
 #include "reach/features/common/progress_bar_render.h"
+#include "reach/features/common/section_reveal.h"
 
 #include "quick_settings_common.h"
 
@@ -22,25 +23,6 @@ static reach_color reach_quick_settings_color_opacity(reach_color color, float o
 {
     color.a *= reach_quick_settings_clamp01(opacity);
     return color;
-}
-
-static float reach_quick_settings_section_opacity(float progress)
-{
-    return reach_quick_settings_clamp01((progress - 0.10f) / 0.65f);
-}
-
-static void reach_quick_settings_apply_section_transition(
-    reach_render_command_buffer *commands, size_t first_command, float opacity, float y_offset)
-{
-    if (commands == nullptr)
-    {
-        return;
-    }
-    for (size_t index = first_command; index < commands->count; ++index)
-    {
-        commands->commands[index].rect.y += y_offset;
-        commands->commands[index].color.a *= opacity;
-    }
 }
 
 static void reach_quick_settings_push_chevron_crossfade(reach_render_command_buffer *commands,
@@ -768,9 +750,8 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
                 return result;
             }
         }
-        float opacity = reach_quick_settings_section_opacity(input->output_devices_expansion);
-        reach_quick_settings_apply_section_transition(commands, first_command, opacity,
-                                                      (1.0f - opacity) * 4.0f * scale);
+        reach_section_reveal_apply(commands, first_command, input->output_devices_expansion,
+                                   4.0f * scale);
         reach_render_command_buffer_clear_scissor(commands);
     }
 
@@ -820,9 +801,8 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
                 return result;
             }
         }
-        float opacity = reach_quick_settings_section_opacity(input->app_volumes_expansion);
-        reach_quick_settings_apply_section_transition(commands, first_command, opacity,
-                                                      (1.0f - opacity) * 4.0f * scale);
+        reach_section_reveal_apply(commands, first_command, input->app_volumes_expansion,
+                                   4.0f * scale);
         reach_render_command_buffer_clear_scissor(commands);
     }
 

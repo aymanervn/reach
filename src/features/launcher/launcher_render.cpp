@@ -4,6 +4,7 @@
 
 #include "reach/core/typography.h"
 #include "reach/features/common/scrollbar_render.h"
+#include "reach/features/common/section_reveal.h"
 
 static uint64_t reach_launcher_fallback_icon(reach_search_result_kind kind)
 {
@@ -84,8 +85,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float outer_height = layout->search_box.height;
     if (results_attached)
     {
-        outer_height =
+        float expanded_height =
             (layout->search_results.y - layout->bounds.y) + layout->search_results.height;
+        outer_height += (expanded_height - outer_height) * input->results_expansion;
     }
     float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
 
@@ -142,8 +144,19 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         reach_render_command_buffer_push(out_commands, &command);
     }
 
-    if (results_attached)
+    if (results_attached && input->results_expansion > 0.001f)
     {
+        reach_rect_f32 results_clip = {};
+        results_clip.x = 0.0f;
+        results_clip.y = layout->search_results.y - layout->bounds.y;
+        results_clip.width = layout->bounds.width;
+        results_clip.height = outer_height - results_clip.y;
+        if (results_clip.height < 0.0f)
+        {
+            results_clip.height = 0.0f;
+        }
+        reach_render_command_buffer_set_scissor(out_commands, results_clip);
+        size_t first_result_command = out_commands->count;
         size_t visible_count = reach_launcher_visible_result_count(model);
         float row_height = reach_launcher_scale(input, 56.0f);
 
@@ -293,6 +306,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                              (const uint16_t *)L"Could not connect to retriever. Is it installed?");
             reach_render_command_buffer_push(out_commands, &command);
         }
+
+        reach_section_reveal_apply(out_commands, first_result_command, input->results_expansion,
+                                   reach_launcher_scale(input, 4.0f));
+        reach_render_command_buffer_clear_scissor(out_commands);
     }
 
     return REACH_OK;
@@ -340,6 +357,7 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     input.caret_visible = state->launcher_caret_visible;
     reach_text_edit_selection_range(&state->launcher_text_edit, &input.selection_start,
                                     &input.selection_end);
+    input.results_expansion = reach_launcher_results_expansion(launcher);
 
     return reach_launcher_build_render_commands(&input, out_commands);
 }
