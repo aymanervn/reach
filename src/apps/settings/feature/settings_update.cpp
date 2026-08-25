@@ -87,16 +87,16 @@ const uint16_t *reach_settings_model_reach_update_status(const reach_settings_mo
     case REACH_SETTINGS_REACH_UPDATE_CHECKING:
         return (const uint16_t *)u"Checking for updates...";
     case REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE:
-        return (const uint16_t *)u"Reach is up to date.";
+        return (const uint16_t *)u"Reach is up to date";
     case REACH_SETTINGS_REACH_UPDATE_AVAILABLE:
-        return (const uint16_t *)u"A new version is available.";
+        return (const uint16_t *)u"A new version is available";
     case REACH_SETTINGS_REACH_UPDATE_DOWNLOADING:
         return (const uint16_t *)u"Downloading update...";
     case REACH_SETTINGS_REACH_UPDATE_ERROR:
-        return (const uint16_t *)u"Unable to check for updates.";
+        return (const uint16_t *)u"Unable to check for updates";
     case REACH_SETTINGS_REACH_UPDATE_IDLE:
     default:
-        return (const uint16_t *)u"Check for the latest Reach release.";
+        return (const uint16_t *)u"Check for the latest Reach release";
     }
 }
 

@@ -4,6 +4,7 @@
 #include "reach/ports/app_launcher.h"
 #include "reach/ports/app_update.h"
 #include "reach/ports/audio_volume.h"
+#include "reach/ports/bluetooth.h"
 #include "reach/ports/clock.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/image_loader.h"
@@ -28,6 +29,7 @@
 #include "reach/ports/user_account.h"
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
+#include "reach/ports/wifi.h"
 #include "reach/ports/window_manager.h"
 #include "reach/ports/window_thumbnail.h"
 #include "reach/ports/windows_update.h"
@@ -74,6 +76,8 @@ extern "C"
     reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
                                                            reach_render_backend_port *out_port);
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
+    reach_result reach_windows_create_wifi(reach_wifi_port *out_port);
+    reach_result reach_windows_create_bluetooth(reach_bluetooth_port *out_port);
 
     typedef struct reach_windows_search_catalog reach_windows_search_catalog;
 

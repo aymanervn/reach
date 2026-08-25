@@ -26,7 +26,24 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->startup_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_scrollbar_model_init(&model->wifi_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_scrollbar_model_init(&model->bluetooth_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_loader_model_init(&model->update_loader, 0.7f);
+    reach_loader_model_init(&model->wifi_loader, 0.7f);
+    reach_loader_model_init(&model->bluetooth_loader, 0.7f);
+    reach_animation_manager_init(&model->wifi_row_animations, model->wifi_row_tracks,
+                                 REACH_WIFI_MAX_NETWORKS + 1);
+    reach_animation_manager_init(&model->wifi_view_animation, &model->wifi_view_track, 1);
+    reach_animation_manager_init(&model->bluetooth_row_animations, model->bluetooth_row_tracks,
+                                 REACH_BLUETOOTH_MAX_DEVICES);
+    model->wifi_expanded_row = REACH_SETTINGS_WIFI_ROW_NONE;
+    model->wifi_focused_field = REACH_SETTINGS_WIFI_FIELD_NONE;
+    model->wifi_add_security = REACH_WIFI_SECURITY_WPA2_PERSONAL;
+    model->wifi_connect_automatically = 1;
+    model->bluetooth_expanded_row = REACH_SETTINGS_BLUETOOTH_ROW_NONE;
+    reach_text_edit_init(&model->wifi_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
+    reach_text_edit_init(&model->wifi_add_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
+    reach_text_edit_init(&model->wifi_add_name_edit, REACH_WIFI_SSID_CAPACITY - 1);
     reach_animation_manager_init(&model->startup_animations, model->startup_tracks,
                                  REACH_STARTUP_APP_MAX_ENTRIES);
     reach_animation_manager_init(&model->power_animations, model->power_tracks,
@@ -227,6 +244,9 @@ static void reach_settings_layout_toggle_card(const reach_settings_toggle_card_r
     *rects->subtitle = reach_settings_rect(text_x, y + 37.0f * scale, text_width, 16.0f * scale);
 }
 
+#define REACH_SETTINGS_THEME_CHOICE_OPTIONS_WIDTH 318.0f
+#define REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH 520.0f
+
 static void
 reach_settings_layout_theme_choice_card(reach_rect_f32 *card, reach_rect_f32 *title,
                                         reach_rect_f32 *subtitle,
@@ -236,9 +256,9 @@ reach_settings_layout_theme_choice_card(reach_rect_f32 *card, reach_rect_f32 *ti
     *card = reach_settings_rect(x, y, width, height);
     float option_gap = 6.0f * scale;
     float option_height = 28.0f * scale;
-    if (width >= 440.0f * scale)
+    if (width >= REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH * scale)
     {
-        float options_width = 258.0f * scale;
+        float options_width = REACH_SETTINGS_THEME_CHOICE_OPTIONS_WIDTH * scale;
         float options_x = x + width - 16.0f * scale - options_width;
         float text_x = x + 18.0f * scale;
         *title = reach_settings_rect(text_x, y + 15.0f * scale, options_x - text_x - 16.0f * scale,
@@ -595,7 +615,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
         float appearance_y = section_y + 26.0f * scale;
         float appearance_card_height =
-            area_width >= 440.0f * scale ? 76.0f * scale : 104.0f * scale;
+            area_width >= REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH * scale ? 76.0f * scale
+                                                                        : 104.0f * scale;
         reach_settings_layout_theme_choice_card(
             &layout.display_windows_system_card, &layout.display_windows_system_title,
             &layout.display_windows_system_subtitle, layout.display_windows_system_options, area_x,
@@ -605,6 +626,18 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             &layout.display_windows_app_subtitle, layout.display_windows_app_options, area_x,
             appearance_y + appearance_card_height + card_spacing, area_width,
             appearance_card_height, scale);
+    }
+
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_WIFI)
+    {
+        reach_settings_layout_wifi(&layout, model, scale);
+        return layout;
+    }
+
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_BLUETOOTH)
+    {
+        reach_settings_layout_bluetooth(&layout, model, scale);
+        return layout;
     }
 
     if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
@@ -920,6 +953,126 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             {
                 result.type = REACH_SETTINGS_HIT_STARTUP_TOGGLE;
                 result.startup_index = index;
+                return result;
+            }
+        }
+    }
+
+    const struct
+    {
+        reach_rect_f32 rect;
+        reach_settings_hit_type type;
+    } wifi_controls[] = {
+        {layout->wifi_radio_toggle, REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE},
+        {layout->wifi_scan_button, REACH_SETTINGS_HIT_WIFI_SCAN},
+        {layout->wifi_add_button, REACH_SETTINGS_HIT_WIFI_ADD},
+        {layout->wifi_known_button, REACH_SETTINGS_HIT_WIFI_KNOWN},
+        {layout->wifi_back_button, REACH_SETTINGS_HIT_WIFI_BACK},
+        {layout->wifi_key_field, REACH_SETTINGS_HIT_WIFI_KEY_FIELD},
+        {layout->wifi_show_button, REACH_SETTINGS_HIT_WIFI_SHOW_KEY},
+        {layout->wifi_auto_toggle, REACH_SETTINGS_HIT_WIFI_AUTO_TOGGLE},
+        {layout->wifi_connect_button, REACH_SETTINGS_HIT_WIFI_CONNECT},
+        {layout->wifi_disconnect_button, REACH_SETTINGS_HIT_WIFI_DISCONNECT},
+        {layout->wifi_forget_button, REACH_SETTINGS_HIT_WIFI_FORGET},
+        {layout->wifi_add_name_field, REACH_SETTINGS_HIT_WIFI_ADD_NAME_FIELD},
+        {layout->wifi_add_key_field, REACH_SETTINGS_HIT_WIFI_ADD_KEY_FIELD},
+        {layout->wifi_add_show_button, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY},
+        {layout->wifi_add_auto_toggle, REACH_SETTINGS_HIT_WIFI_ADD_AUTO_TOGGLE},
+        {layout->wifi_add_submit_button, REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT},
+    };
+    for (size_t index = 0; index < sizeof(wifi_controls) / sizeof(wifi_controls[0]); ++index)
+    {
+        if (wifi_controls[index].rect.width > 0.0f &&
+            reach_settings_rect_contains(wifi_controls[index].rect, x, y))
+        {
+            result.type = wifi_controls[index].type;
+            return result;
+        }
+    }
+    for (size_t option = 0; option < REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT; ++option)
+    {
+        if (layout->wifi_add_security_options[option].width > 0.0f &&
+            reach_settings_rect_contains(layout->wifi_add_security_options[option], x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_WIFI_ADD_SECURITY;
+            result.wifi_security_option = option;
+            return result;
+        }
+    }
+    if (layout->wifi_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->wifi_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (layout->wifi_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->wifi_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_WIFI_SCROLLBAR_TRACK;
+        return result;
+    }
+    if (layout->wifi_viewport.width > 0.0f &&
+        reach_settings_rect_contains(layout->wifi_viewport, x, y))
+    {
+        if (layout->wifi_add_row.width > 0.0f &&
+            reach_settings_rect_contains(layout->wifi_add_row, x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_WIFI_ADD;
+            return result;
+        }
+        for (size_t index = 0; index < layout->wifi_row_count; ++index)
+        {
+            if (reach_settings_rect_contains(layout->wifi_rows[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_WIFI_ROW;
+                result.wifi_index = layout->wifi_row_indices[index];
+                return result;
+            }
+        }
+    }
+
+    const struct
+    {
+        reach_rect_f32 rect;
+        reach_settings_hit_type type;
+    } bluetooth_controls[] = {
+        {layout->bluetooth_radio_toggle, REACH_SETTINGS_HIT_BLUETOOTH_RADIO_TOGGLE},
+        {layout->bluetooth_scan_button, REACH_SETTINGS_HIT_BLUETOOTH_SCAN},
+        {layout->bluetooth_action_button, REACH_SETTINGS_HIT_BLUETOOTH_ACTION},
+        {layout->bluetooth_pin_accept_button, REACH_SETTINGS_HIT_BLUETOOTH_PIN_ACCEPT},
+        {layout->bluetooth_pin_reject_button, REACH_SETTINGS_HIT_BLUETOOTH_PIN_REJECT},
+    };
+    for (size_t index = 0; index < sizeof(bluetooth_controls) / sizeof(bluetooth_controls[0]);
+         ++index)
+    {
+        if (bluetooth_controls[index].rect.width > 0.0f &&
+            reach_settings_rect_contains(bluetooth_controls[index].rect, x, y))
+        {
+            result.type = bluetooth_controls[index].type;
+            return result;
+        }
+    }
+    if (layout->bluetooth_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->bluetooth_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (layout->bluetooth_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->bluetooth_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK;
+        return result;
+    }
+    if (layout->bluetooth_viewport.width > 0.0f &&
+        reach_settings_rect_contains(layout->bluetooth_viewport, x, y))
+    {
+        for (size_t index = 0; index < layout->bluetooth_row_count; ++index)
+        {
+            if (reach_settings_rect_contains(layout->bluetooth_rows[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_BLUETOOTH_ROW;
+                result.bluetooth_index = layout->bluetooth_row_indices[index];
                 return result;
             }
         }

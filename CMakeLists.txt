@@ -64,6 +64,7 @@ target_link_libraries(reach_protocol PUBLIC
 
 add_library(reach_services STATIC
     src/services/app_control.cpp
+    src/services/bluetooth.cpp
     src/services/config.cpp
     src/services/icon_service.cpp
     src/services/idle_watch.cpp
@@ -75,6 +76,7 @@ add_library(reach_services STATIC
     src/services/system_stats.cpp
     src/services/system_status.cpp
     src/services/tray.cpp
+    src/services/wifi.cpp
     src/services/window_tracking.cpp
 )
 
@@ -88,6 +90,7 @@ target_link_libraries(reach_services PUBLIC
 
 add_library(reach_core STATIC
     src/core/app_update.c
+    src/core/bluetooth.c
     src/core/clipboard.c
     src/core/loader.c
     src/core/scrollbar.cpp
@@ -97,6 +100,7 @@ add_library(reach_core STATIC
     src/core/runtime_policy.c
     src/core/startup_apps.c
     src/core/theme.c
+    src/core/wifi.c
 )
 
 reach_configure_common(reach_core)
@@ -208,6 +212,9 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/audio_volume_win32.cpp
     src/adapters/windows/system_controls_network.cpp
     src/adapters/windows/system_controls_win32.cpp
+    src/adapters/windows/wifi_profile.cpp
+    src/adapters/windows/wifi_wlanapi.cpp
+    src/adapters/windows/bluetooth_winrt.cpp
     src/adapters/windows/clock_win32.cpp
     src/adapters/windows/system_stats_win32.cpp
     src/adapters/windows/image_loader_win32.cpp
@@ -362,14 +369,19 @@ target_link_libraries(reach PRIVATE
 add_library(reach_settings_feature STATIC
     src/apps/settings/feature/settings_account.cpp
     src/apps/settings/feature/settings_bluetooth.cpp
+    src/apps/settings/feature/settings_bluetooth_layout.cpp
+    src/apps/settings/feature/settings_bluetooth_render.cpp
     src/apps/settings/feature/settings_feature.cpp
     src/apps/settings/feature/settings_monitors_scaling.cpp
     src/apps/settings/feature/settings_power_sleep.cpp
     src/apps/settings/feature/settings_render.cpp
+    src/apps/settings/feature/settings_render_common.cpp
     src/apps/settings/feature/settings_startup_apps.cpp
     src/apps/settings/feature/settings_update.cpp
     src/apps/settings/feature/windows_update_policy.cpp
     src/apps/settings/feature/settings_wifi.cpp
+    src/apps/settings/feature/settings_wifi_layout.cpp
+    src/apps/settings/feature/settings_wifi_render.cpp
 )
 reach_configure_common(reach_settings_feature)
 target_compile_features(reach_settings_feature PUBLIC cxx_std_17)
@@ -893,6 +905,23 @@ reach_configure_common(reach_window_tracking_tests)
 target_compile_features(reach_window_tracking_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_window_tracking_tests PRIVATE reach_services)
 
+add_executable(reach_wifi_tests
+    tests/wifi_tests.cpp
+    src/adapters/windows/wifi_profile.cpp
+)
+
+reach_configure_common(reach_wifi_tests)
+target_compile_features(reach_wifi_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_wifi_tests PRIVATE reach_core)
+
+add_executable(reach_bluetooth_tests
+    tests/bluetooth_tests.cpp
+)
+
+reach_configure_common(reach_bluetooth_tests)
+target_compile_features(reach_bluetooth_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_bluetooth_tests PRIVATE reach_core)
+
 add_executable(reach_system_controls_network_tests
     tests/system_controls_network_tests.cpp
     src/adapters/windows/system_controls_network.cpp
@@ -904,6 +933,8 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     cxx_std_17
 )
 
+    add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
+    add_test(NAME reach_bluetooth_tests COMMAND reach_bluetooth_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
     add_test(NAME reach_config_service_tests COMMAND reach_config_service_tests)
     add_test(NAME reach_config_ini_tests COMMAND reach_config_ini_tests)

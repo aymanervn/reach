@@ -3,7 +3,9 @@
 #include "reach/core/theme.h"
 #include "reach/apps/settings/settings.h"
 #include "reach/platform/windows_adapters.h"
+#include "reach/services/bluetooth.h"
 #include "reach/services/config.h"
+#include "reach/services/wifi.h"
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -113,6 +115,10 @@ struct reach_settings_app
     reach_user_account_port user_account;
     reach_startup_apps_port startup_apps;
     reach_icon_provider_port icon_provider;
+    reach_system_controls_port system_controls;
+    reach_wifi_service *wifi_service;
+    reach_bluetooth_service *bluetooth_service;
+    std::atomic<int32_t> radio_notify;
     reach_settings_model model;
     reach_settings_layout layout;
     reach_render_command_buffer render_commands;
@@ -123,9 +129,13 @@ struct reach_settings_app
     reach_settings_startup_worker startup_worker;
     reach_icon_handle startup_icon_handles[REACH_STARTUP_APP_MAX_ENTRIES];
     size_t startup_icon_count;
+    reach_icon_handle bluetooth_icon_handles[REACH_BLUETOOTH_MAX_DEVICES];
+    size_t bluetooth_icon_count;
     uint16_t app_update_zip[260];
     reach_scrollbar_drag update_scrollbar_drag;
     reach_scrollbar_drag startup_scrollbar_drag;
+    reach_scrollbar_drag wifi_scrollbar_drag;
+    reach_scrollbar_drag bluetooth_scrollbar_drag;
     int32_t running;
     int32_t dirty;
 };
@@ -1280,6 +1290,211 @@ static void reach_settings_apply_startup_result(reach_settings_app *app)
     app->dirty = 1;
 }
 
+static void reach_settings_radio_notify(void *user)
+{
+    reach_settings_app *app = static_cast<reach_settings_app *>(user);
+    if (app != nullptr)
+    {
+        app->radio_notify.store(1);
+    }
+}
+
+static void reach_settings_refresh_bluetooth_radio(reach_settings_app *app)
+{
+    reach_bluetooth_state state = {};
+    if (app->system_controls.get_bluetooth_state != nullptr)
+    {
+        (void)app->system_controls.get_bluetooth_state(app->system_controls.userdata, &state);
+    }
+    reach_settings_model_set_bluetooth_radio(&app->model, state);
+}
+
+static void reach_settings_enter_wifi_page(reach_settings_app *app)
+{
+    if (app->wifi_service == nullptr)
+    {
+        return;
+    }
+    reach_bluetooth_service_set_scan_enabled(app->bluetooth_service, 0);
+    reach_wifi_service_refresh(app->wifi_service);
+    app->dirty = 1;
+}
+
+static void reach_settings_enter_bluetooth_page(reach_settings_app *app)
+{
+    if (app->bluetooth_service == nullptr)
+    {
+        return;
+    }
+    reach_settings_refresh_bluetooth_radio(app);
+    reach_bluetooth_service_refresh(app->bluetooth_service);
+    app->dirty = 1;
+}
+
+static void reach_settings_leave_radio_pages(reach_settings_app *app, reach_settings_page page)
+{
+    if (page != REACH_SETTINGS_PAGE_BLUETOOTH && app->bluetooth_service != nullptr &&
+        app->model.bluetooth_scanning)
+    {
+        reach_bluetooth_service_set_scan_enabled(app->bluetooth_service, 0);
+        reach_settings_model_set_bluetooth_status(&app->model,
+                                                  REACH_SETTINGS_BLUETOOTH_STATUS_IDLE, nullptr);
+    }
+    if (page != REACH_SETTINGS_PAGE_WIFI)
+    {
+        reach_settings_model_wifi_clear_secrets(&app->model);
+    }
+}
+
+static void reach_settings_apply_wifi_snapshot(reach_settings_app *app)
+{
+    reach_wifi_snapshot snapshot = {};
+    if (app->wifi_service == nullptr || !reach_wifi_service_take(app->wifi_service, &snapshot))
+    {
+        return;
+    }
+
+    reach_settings_model_apply_wifi(&app->model, snapshot.radio, &snapshot.networks);
+
+    switch (snapshot.completed_command)
+    {
+    case REACH_WIFI_SERVICE_COMMAND_SCAN:
+        reach_settings_model_set_wifi_status(
+            &app->model,
+            snapshot.scan_result == REACH_WIFI_SCAN_RESULT_SUCCEEDED
+                ? REACH_SETTINGS_WIFI_STATUS_IDLE
+                : REACH_SETTINGS_WIFI_STATUS_SCAN_FAILED,
+            nullptr);
+        break;
+    case REACH_WIFI_SERVICE_COMMAND_CONNECT:
+    {
+        int32_t status = REACH_SETTINGS_WIFI_STATUS_FAILED;
+        if (snapshot.connect_result == REACH_WIFI_CONNECT_RESULT_SUCCEEDED)
+        {
+            status = REACH_SETTINGS_WIFI_STATUS_CONNECTED;
+        }
+        else if (snapshot.connect_result == REACH_WIFI_CONNECT_RESULT_INVALID_KEY)
+        {
+            status = REACH_SETTINGS_WIFI_STATUS_INVALID_KEY;
+        }
+        else if (snapshot.connect_result == REACH_WIFI_CONNECT_RESULT_NOT_FOUND)
+        {
+            status = REACH_SETTINGS_WIFI_STATUS_NOT_FOUND;
+        }
+        reach_settings_model_set_wifi_status(&app->model, status, snapshot.connect_ssid);
+        if (status == REACH_SETTINGS_WIFI_STATUS_CONNECTED)
+        {
+            reach_settings_model_wifi_clear_secrets(&app->model);
+            reach_settings_model_wifi_expand_row(&app->model, REACH_SETTINGS_WIFI_ROW_NONE);
+        }
+        break;
+    }
+    case REACH_WIFI_SERVICE_COMMAND_FORGET:
+        reach_settings_model_set_wifi_status(
+            &app->model,
+            snapshot.command_succeeded ? REACH_SETTINGS_WIFI_STATUS_IDLE
+                                       : REACH_SETTINGS_WIFI_STATUS_FORGET_FAILED,
+            nullptr);
+        break;
+    case REACH_WIFI_SERVICE_COMMAND_DISCONNECT:
+    case REACH_WIFI_SERVICE_COMMAND_SET_RADIO:
+        reach_settings_model_set_wifi_status(&app->model, REACH_SETTINGS_WIFI_STATUS_IDLE,
+                                             nullptr);
+        break;
+    default:
+        break;
+    }
+    app->dirty = 1;
+}
+
+static void reach_settings_release_bluetooth_icons(reach_settings_app *app)
+{
+    if (app->icon_provider.ops.release != nullptr)
+    {
+        for (size_t index = 0; index < app->bluetooth_icon_count; ++index)
+        {
+            if (app->bluetooth_icon_handles[index].id != 0)
+            {
+                (void)app->icon_provider.ops.release(app->icon_provider.provider,
+                                                     app->bluetooth_icon_handles[index]);
+            }
+        }
+    }
+    memset(app->bluetooth_icon_handles, 0, sizeof(app->bluetooth_icon_handles));
+    app->bluetooth_icon_count = 0;
+}
+
+static void reach_settings_load_bluetooth_icons(reach_settings_app *app)
+{
+    reach_settings_release_bluetooth_icons(app);
+    if (app->icon_provider.ops.load == nullptr)
+    {
+        return;
+    }
+
+    app->bluetooth_icon_count = app->model.bluetooth_devices.count;
+    for (size_t index = 0; index < app->bluetooth_icon_count; ++index)
+    {
+        const uint16_t *path = app->model.bluetooth_devices.devices[index].icon_path;
+        if (path[0] == 0)
+        {
+            continue;
+        }
+        reach_icon_request request = {};
+        request.size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
+        reach_copy_utf16(request.path, 260, path);
+        reach_icon_handle handle = {};
+        if (app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) == REACH_OK)
+        {
+            app->bluetooth_icon_handles[index] = handle;
+            reach_settings_model_set_bluetooth_icon(&app->model, index, handle.id);
+        }
+    }
+}
+
+static void reach_settings_apply_bluetooth_snapshot(reach_settings_app *app)
+{
+    reach_bluetooth_snapshot snapshot = {};
+    if (app->bluetooth_service == nullptr ||
+        !reach_bluetooth_service_take(app->bluetooth_service, &snapshot))
+    {
+        return;
+    }
+
+    reach_settings_model_apply_bluetooth(&app->model, &snapshot.devices, &snapshot.pairing,
+                                         snapshot.scanning);
+    reach_settings_load_bluetooth_icons(app);
+    reach_settings_refresh_bluetooth_radio(app);
+
+    if (snapshot.pair_result != REACH_BLUETOOTH_PAIR_RESULT_NONE)
+    {
+        int32_t status = REACH_SETTINGS_BLUETOOTH_STATUS_FAILED;
+        if (snapshot.pair_result == REACH_BLUETOOTH_PAIR_RESULT_SUCCEEDED)
+        {
+            status = REACH_SETTINGS_BLUETOOTH_STATUS_PAIRED;
+        }
+        else if (snapshot.pair_result == REACH_BLUETOOTH_PAIR_RESULT_REJECTED)
+        {
+            status = REACH_SETTINGS_BLUETOOTH_STATUS_REJECTED;
+        }
+        reach_settings_model_set_bluetooth_status(&app->model, status, snapshot.pair_device_id);
+    }
+    else if (snapshot.pairing.active)
+    {
+        reach_settings_model_set_bluetooth_status(
+            &app->model, REACH_SETTINGS_BLUETOOTH_STATUS_CONFIRM_PIN, snapshot.pairing.device_id);
+    }
+    else if (snapshot.completed_command == REACH_BLUETOOTH_SERVICE_COMMAND_SET_SCAN)
+    {
+        reach_settings_model_set_bluetooth_status(
+            &app->model,
+            snapshot.scanning ? REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING
+                              : REACH_SETTINGS_BLUETOOTH_STATUS_IDLE,
+            nullptr);
+    }
+    app->dirty = 1;
+}
+
 static void reach_settings_submit_password_change(reach_settings_app *app)
 {
     if (app->user_account.ops.verify_password != nullptr)
@@ -1330,7 +1545,17 @@ static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
 {
     return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
            type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_REACH_UPDATE ||
-           type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD;
+           type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD ||
+           type == REACH_SETTINGS_HIT_WIFI_SCAN || type == REACH_SETTINGS_HIT_WIFI_ADD ||
+           type == REACH_SETTINGS_HIT_WIFI_KNOWN || type == REACH_SETTINGS_HIT_WIFI_BACK ||
+           type == REACH_SETTINGS_HIT_WIFI_SHOW_KEY || type == REACH_SETTINGS_HIT_WIFI_CONNECT ||
+           type == REACH_SETTINGS_HIT_WIFI_DISCONNECT || type == REACH_SETTINGS_HIT_WIFI_FORGET ||
+           type == REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY ||
+           type == REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT ||
+           type == REACH_SETTINGS_HIT_BLUETOOTH_SCAN ||
+           type == REACH_SETTINGS_HIT_BLUETOOTH_ACTION ||
+           type == REACH_SETTINGS_HIT_BLUETOOTH_PIN_ACCEPT ||
+           type == REACH_SETTINGS_HIT_BLUETOOTH_PIN_REJECT;
 }
 
 static int32_t reach_settings_hit_is_window_button(reach_settings_hit_type type)
@@ -1366,11 +1591,24 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME:
         detail = (uint32_t)hit.display_theme_preference;
         break;
+    case REACH_SETTINGS_HIT_WIFI_ROW:
+        detail = (uint32_t)hit.wifi_index;
+        break;
+    case REACH_SETTINGS_HIT_WIFI_ADD_SECURITY:
+        detail = (uint32_t)hit.wifi_security_option;
+        break;
+    case REACH_SETTINGS_HIT_BLUETOOTH_ROW:
+        detail = (uint32_t)hit.bluetooth_index;
+        break;
     case REACH_SETTINGS_HIT_NONE:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB:
+    case REACH_SETTINGS_HIT_WIFI_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB:
+    case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB:
         return REACH_PRESSABLE_TARGET_NONE;
     default:
         break;
@@ -1403,12 +1641,175 @@ static void reach_settings_apply_pressable_result(reach_settings_app *app,
     }
 }
 
+static void reach_settings_handle_wifi_action(reach_settings_app *app,
+                                              reach_settings_hit_result hit)
+{
+    reach_settings_model *model = &app->model;
+    switch (hit.type)
+    {
+    case REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE:
+        if (model->wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE)
+        {
+            reach_wifi_service_set_radio_enabled(app->wifi_service,
+                                                 model->wifi_radio == REACH_WIFI_RADIO_ON ? 0 : 1);
+        }
+        break;
+    case REACH_SETTINGS_HIT_WIFI_SCAN:
+        if (!reach_settings_model_wifi_busy(model))
+        {
+            reach_settings_model_set_wifi_status(model, REACH_SETTINGS_WIFI_STATUS_SCANNING,
+                                                 nullptr);
+            reach_wifi_service_scan(app->wifi_service);
+        }
+        break;
+    case REACH_SETTINGS_HIT_WIFI_ADD:
+        reach_settings_model_wifi_expand_row(model, REACH_SETTINGS_WIFI_ROW_ADD);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_KNOWN:
+        reach_settings_model_set_wifi_view(model, REACH_SETTINGS_WIFI_VIEW_KNOWN);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_BACK:
+        reach_settings_model_set_wifi_view(model, REACH_SETTINGS_WIFI_VIEW_AVAILABLE);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_ROW:
+        reach_settings_model_wifi_expand_row(model, (int32_t)hit.wifi_index);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_KEY_FIELD:
+        reach_settings_model_wifi_focus_field(model, REACH_SETTINGS_WIFI_FIELD_KEY);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_ADD_NAME_FIELD:
+        reach_settings_model_wifi_focus_field(model, REACH_SETTINGS_WIFI_FIELD_ADD_NAME);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_ADD_KEY_FIELD:
+        reach_settings_model_wifi_focus_field(model, REACH_SETTINGS_WIFI_FIELD_ADD_KEY);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_SHOW_KEY:
+    case REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY:
+        (void)reach_settings_model_wifi_toggle_show_key(model);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_AUTO_TOGGLE:
+    case REACH_SETTINGS_HIT_WIFI_ADD_AUTO_TOGGLE:
+        (void)reach_settings_model_wifi_toggle_auto(model);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_ADD_SECURITY:
+        reach_settings_model_wifi_select_security(model, hit.wifi_security_option);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_CONNECT:
+    {
+        reach_wifi_connect_request request = {};
+        if (!reach_settings_model_wifi_busy(model) &&
+            reach_settings_model_wifi_connect_ready(model) &&
+            reach_settings_model_wifi_build_connect(model, (size_t)model->wifi_expanded_row,
+                                                    &request))
+        {
+            reach_settings_model_wifi_blur(model);
+            reach_settings_model_set_wifi_status(model, REACH_SETTINGS_WIFI_STATUS_CONNECTING,
+                                                 request.ssid);
+            reach_wifi_service_connect(app->wifi_service, &request);
+        }
+        break;
+    }
+    case REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT:
+    {
+        reach_wifi_connect_request request = {};
+        if (reach_settings_model_wifi_build_add(model, &request))
+        {
+            reach_settings_model_wifi_blur(model);
+            reach_settings_model_set_wifi_status(model, REACH_SETTINGS_WIFI_STATUS_CONNECTING,
+                                                 request.ssid);
+            reach_wifi_service_connect(app->wifi_service, &request);
+        }
+        break;
+    }
+    case REACH_SETTINGS_HIT_WIFI_DISCONNECT:
+        reach_wifi_service_disconnect(app->wifi_service);
+        break;
+    case REACH_SETTINGS_HIT_WIFI_FORGET:
+        if (model->wifi_expanded_row >= 0 &&
+            (size_t)model->wifi_expanded_row < model->wifi_networks.count)
+        {
+            reach_wifi_service_forget(
+                app->wifi_service, model->wifi_networks.networks[model->wifi_expanded_row].ssid);
+            reach_settings_model_wifi_expand_row(model, REACH_SETTINGS_WIFI_ROW_NONE);
+        }
+        break;
+    default:
+        reach_settings_model_wifi_blur(model);
+        break;
+    }
+    app->dirty = 1;
+}
+
+static void reach_settings_handle_bluetooth_action(reach_settings_app *app,
+                                                   reach_settings_hit_result hit)
+{
+    reach_settings_model *model = &app->model;
+    switch (hit.type)
+    {
+    case REACH_SETTINGS_HIT_BLUETOOTH_RADIO_TOGGLE:
+        if (model->bluetooth_radio.available &&
+            app->system_controls.request_bluetooth_enabled != nullptr)
+        {
+            (void)app->system_controls.request_bluetooth_enabled(
+                app->system_controls.userdata, model->bluetooth_radio.enabled ? 0 : 1);
+            model->bluetooth_radio.enabled = model->bluetooth_radio.enabled ? 0 : 1;
+        }
+        break;
+    case REACH_SETTINGS_HIT_BLUETOOTH_SCAN:
+    {
+        int32_t enable = model->bluetooth_scanning ? 0 : 1;
+        reach_settings_model_set_bluetooth_status(
+            model,
+            enable ? REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING
+                   : REACH_SETTINGS_BLUETOOTH_STATUS_IDLE,
+            nullptr);
+        reach_bluetooth_service_set_scan_enabled(app->bluetooth_service, enable);
+        break;
+    }
+    case REACH_SETTINGS_HIT_BLUETOOTH_ROW:
+        reach_settings_model_bluetooth_expand_row(model, (int32_t)hit.bluetooth_index);
+        break;
+    case REACH_SETTINGS_HIT_BLUETOOTH_ACTION:
+        if (model->bluetooth_expanded_row >= 0 &&
+            (size_t)model->bluetooth_expanded_row < model->bluetooth_devices.count)
+        {
+            const reach_bluetooth_device *device =
+                &model->bluetooth_devices.devices[model->bluetooth_expanded_row];
+            if (device->paired)
+            {
+                reach_bluetooth_service_unpair(app->bluetooth_service, device->id);
+            }
+            else
+            {
+                reach_settings_model_set_bluetooth_status(
+                    model, REACH_SETTINGS_BLUETOOTH_STATUS_PAIRING, device->id);
+                reach_bluetooth_service_pair(app->bluetooth_service, device->id);
+            }
+        }
+        break;
+    case REACH_SETTINGS_HIT_BLUETOOTH_PIN_ACCEPT:
+        reach_settings_model_set_bluetooth_status(model, REACH_SETTINGS_BLUETOOTH_STATUS_PAIRING,
+                                                  nullptr);
+        reach_bluetooth_service_respond_pairing(app->bluetooth_service, 1);
+        break;
+    case REACH_SETTINGS_HIT_BLUETOOTH_PIN_REJECT:
+        reach_bluetooth_service_respond_pairing(app->bluetooth_service, 0);
+        break;
+    default:
+        break;
+    }
+    app->dirty = 1;
+}
+
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active)
+    if (app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
+        app->wifi_scrollbar_drag.active || app->bluetooth_scrollbar_drag.active)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
         reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->wifi_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->bluetooth_scrollbar_drag);
         if (app->window.ops.set_pointer_capture != nullptr)
         {
             (void)app->window.ops.set_pointer_capture(app->window.window, 0);
@@ -1437,6 +1838,11 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             reach_settings_model_power_blur(&app->model);
             app->dirty = 1;
         }
+        else if (app->model.selected_page == REACH_SETTINGS_PAGE_WIFI)
+        {
+            reach_settings_model_wifi_blur(&app->model);
+            app->dirty = 1;
+        }
         return;
     }
     if (hit.type == REACH_SETTINGS_HIT_CLOSE)
@@ -1452,12 +1858,29 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     }
     else if (hit.type == REACH_SETTINGS_HIT_NAV_ITEM)
     {
+        reach_settings_leave_radio_pages(app, hit.page);
         reach_settings_model_select_page(&app->model, hit.page);
         if (hit.page == REACH_SETTINGS_PAGE_STARTUP_APPS && !app->model.startup_loaded)
         {
             reach_settings_schedule_startup_refresh(app);
         }
+        else if (hit.page == REACH_SETTINGS_PAGE_WIFI)
+        {
+            reach_settings_enter_wifi_page(app);
+        }
+        else if (hit.page == REACH_SETTINGS_PAGE_BLUETOOTH)
+        {
+            reach_settings_enter_bluetooth_page(app);
+        }
         app->dirty = 1;
+    }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_WIFI)
+    {
+        reach_settings_handle_wifi_action(app, hit);
+    }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_BLUETOOTH)
+    {
+        reach_settings_handle_bluetooth_action(app, hit);
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_UPDATE)
     {
@@ -1627,8 +2050,36 @@ static void reach_settings_handle_text_event(reach_settings_app *app, const reac
                             app->model.power_focused_timer >= 0;
     int32_t account_focused = app->model.selected_page == REACH_SETTINGS_PAGE_ACCOUNT &&
                               app->model.account_focused_field >= 0;
-    if (!power_focused && !account_focused)
+    int32_t wifi_focused = app->model.selected_page == REACH_SETTINGS_PAGE_WIFI &&
+                           app->model.wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE;
+    if (!power_focused && !account_focused && !wifi_focused)
     {
+        return;
+    }
+    if (wifi_focused)
+    {
+        int32_t handled = 0;
+        if (event->type == REACH_UI_EVENT_TEXT_CHAR)
+        {
+            handled = reach_settings_model_wifi_insert_char(&app->model, (uint16_t)event->id);
+        }
+        else
+        {
+            reach_text_edit_modifiers modifiers = {};
+            modifiers.shift = (event->modifiers & REACH_UI_EVENT_MODIFIER_SHIFT) ? 1 : 0;
+            modifiers.ctrl = (event->modifiers & REACH_UI_EVENT_MODIFIER_CTRL) ? 1 : 0;
+            int32_t select_all = 0;
+            reach_text_edit_key key = reach_settings_map_edit_key(event, &select_all);
+            if (key != REACH_TEXT_EDIT_KEY_NONE)
+            {
+                handled =
+                    reach_settings_model_wifi_handle_edit_key(&app->model, key, modifiers);
+            }
+        }
+        if (handled)
+        {
+            app->dirty = 1;
+        }
         return;
     }
     int32_t handled = 0;
@@ -1715,6 +2166,23 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
                                    &layout, y,
                                    hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB);
     }
+    else if (hit.type == REACH_SETTINGS_HIT_WIFI_SCROLLBAR_TRACK ||
+             hit.type == REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB)
+    {
+        reach_scrollbar_layout layout = {app->layout.wifi_scrollbar_track,
+                                         app->layout.wifi_scrollbar_thumb};
+        reach_scrollbar_begin_drag(&app->model.wifi_scrollbar, &app->wifi_scrollbar_drag, &layout,
+                                   y, hit.type == REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB);
+    }
+    else if (hit.type == REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK ||
+             hit.type == REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB)
+    {
+        reach_scrollbar_layout layout = {app->layout.bluetooth_scrollbar_track,
+                                         app->layout.bluetooth_scrollbar_thumb};
+        reach_scrollbar_begin_drag(&app->model.bluetooth_scrollbar, &app->bluetooth_scrollbar_drag,
+                                   &layout, y,
+                                   hit.type == REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB);
+    }
     else
     {
         return;
@@ -1748,7 +2216,8 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
         app->dirty = 1;
     }
 
-    if (!app->update_scrollbar_drag.active && !app->startup_scrollbar_drag.active)
+    if (!app->update_scrollbar_drag.active && !app->startup_scrollbar_drag.active &&
+        !app->wifi_scrollbar_drag.active && !app->bluetooth_scrollbar_drag.active)
     {
         return;
     }
@@ -1760,6 +2229,20 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
                                          app->layout.update_scrollbar_thumb};
         reach_scrollbar_update_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag,
                                     &layout, y);
+    }
+    else if (app->wifi_scrollbar_drag.active)
+    {
+        reach_scrollbar_layout layout = {app->layout.wifi_scrollbar_track,
+                                         app->layout.wifi_scrollbar_thumb};
+        reach_scrollbar_update_drag(&app->model.wifi_scrollbar, &app->wifi_scrollbar_drag, &layout,
+                                    y);
+    }
+    else if (app->bluetooth_scrollbar_drag.active)
+    {
+        reach_scrollbar_layout layout = {app->layout.bluetooth_scrollbar_track,
+                                         app->layout.bluetooth_scrollbar_thumb};
+        reach_scrollbar_update_drag(&app->model.bluetooth_scrollbar,
+                                    &app->bluetooth_scrollbar_drag, &layout, y);
     }
     else
     {
@@ -1810,6 +2293,8 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_settings_apply_pressable_result(app, &result);
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
         reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->wifi_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->bluetooth_scrollbar_drag);
         if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
         {
             app->dirty = 1;
@@ -1854,6 +2339,24 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_settings_model_scroll_startup(
             &app->model, event->wheel_delta > 0 ? -86.0f * reach_settings_app_scale(app)
                                                 : 86.0f * reach_settings_app_scale(app));
+        app->dirty = 1;
+    }
+    else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
+             app->model.selected_page == REACH_SETTINGS_PAGE_WIFI && event->wheel_delta != 0)
+    {
+        reach_settings_model_scroll_wifi(&app->model,
+                                         event->wheel_delta > 0
+                                             ? -86.0f * reach_settings_app_scale(app)
+                                             : 86.0f * reach_settings_app_scale(app));
+        app->dirty = 1;
+    }
+    else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
+             app->model.selected_page == REACH_SETTINGS_PAGE_BLUETOOTH && event->wheel_delta != 0)
+    {
+        reach_settings_model_scroll_bluetooth(&app->model,
+                                              event->wheel_delta > 0
+                                                  ? -86.0f * reach_settings_app_scale(app)
+                                                  : 86.0f * reach_settings_app_scale(app));
         app->dirty = 1;
     }
     else if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED ||
@@ -1917,6 +2420,20 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     (void)reach_windows_create_app_update(&app->app_update);
     (void)reach_windows_create_startup_apps(&app->startup_apps);
     (void)reach_windows_create_icon_provider(&app->icon_provider);
+    (void)reach_windows_create_system_controls(&app->system_controls);
+
+    reach_wifi_port wifi_port = {};
+    if (reach_windows_create_wifi(&wifi_port) == REACH_OK)
+    {
+        (void)reach_wifi_service_create(wifi_port, reach_settings_radio_notify, app,
+                                        &app->wifi_service);
+    }
+    reach_bluetooth_port bluetooth_port = {};
+    if (reach_windows_create_bluetooth(&bluetooth_port) == REACH_OK)
+    {
+        (void)reach_bluetooth_service_create(bluetooth_port, reach_settings_radio_notify, app,
+                                             &app->bluetooth_service);
+    }
 
     if (reach_windows_create_user_account(&app->user_account) == REACH_OK &&
         app->user_account.ops.query != nullptr)
@@ -1977,6 +2494,10 @@ reach_result reach_settings_app_start(reach_settings_app *app)
         reach_settings_schedule_verification(app);
     }
     reach_settings_schedule_reach_check(app);
+    if (app->model.selected_page == REACH_SETTINGS_PAGE_WIFI)
+    {
+        reach_settings_enter_wifi_page(app);
+    }
     return REACH_OK;
 }
 
@@ -1991,6 +2512,40 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     reach_settings_apply_reach_progress(app);
     reach_settings_apply_reach_result(app);
     reach_settings_apply_startup_result(app);
+    if (app->radio_notify.exchange(0) != 0)
+    {
+        app->dirty = 1;
+    }
+    reach_settings_apply_wifi_snapshot(app);
+    reach_settings_apply_bluetooth_snapshot(app);
+    if (reach_settings_model_wifi_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_bluetooth_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_wifi_loader(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_bluetooth_loader(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_tick_wifi_animations(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_tick_bluetooth_animations(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_tick_wifi_caret(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
     if (reach_settings_model_update_scroll(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -2089,7 +2644,17 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_power_animations_active(&app->model) ||
            reach_settings_model_button_press_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
-           app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0;
+           app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||
+           app->model.wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE ||
+           app->radio_notify.load() != 0 || reach_wifi_service_pending(app->wifi_service) ||
+           reach_bluetooth_service_pending(app->bluetooth_service) ||
+           app->model.wifi_scrollbar.offset != app->model.wifi_scrollbar.target ||
+           app->model.bluetooth_scrollbar.offset != app->model.bluetooth_scrollbar.target ||
+           app->wifi_scrollbar_drag.active || app->bluetooth_scrollbar_drag.active ||
+           reach_settings_model_wifi_animations_active(&app->model) ||
+           reach_settings_model_bluetooth_animations_active(&app->model) ||
+           app->model.wifi_status == REACH_SETTINGS_WIFI_STATUS_SCANNING ||
+           app->model.bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING;
 }
 
 int32_t reach_settings_app_running(const reach_settings_app *app)
@@ -2169,6 +2734,16 @@ void reach_settings_app_destroy(reach_settings_app *app)
     if (app->startup_worker.thread_started)
     {
         app->startup_worker.thread.join();
+    }
+    reach_settings_model_wifi_clear_secrets(&app->model);
+    reach_settings_release_bluetooth_icons(app);
+    reach_wifi_service_destroy(app->wifi_service);
+    app->wifi_service = nullptr;
+    reach_bluetooth_service_destroy(app->bluetooth_service);
+    app->bluetooth_service = nullptr;
+    if (app->system_controls.destroy != nullptr)
+    {
+        app->system_controls.destroy(app->system_controls.userdata);
     }
     reach_settings_release_startup_icons(app);
     if (app->startup_apps.ops.destroy != nullptr)
