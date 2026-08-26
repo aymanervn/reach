@@ -3,6 +3,7 @@
 #include "reach/features/common/level_presentation.h"
 #include "reach/features/common/loader_render.h"
 #include "reach/features/common/scrollbar_render.h"
+#include "reach/features/common/section_reveal.h"
 #include "reach/features/common/ui_controls.h"
 
 #include "settings_pages_internal.h"
@@ -92,14 +93,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
                              reach_settings_scale(input, input->theme->radius_small),
                              input->theme->settings_card_background);
 
-    float icon_size = reach_settings_scale(input, 18.0f);
-    reach_rect_f32 icon = {row.x + reach_settings_scale(input, 16.0f),
-                           row.y + (reach_settings_scale(input, 46.0f) - icon_size) * 0.5f,
-                           icon_size, icon_size};
-    reach_settings_push_icon(commands, icon, input->theme->settings_secondary_text,
-                             REACH_VECTOR_ICON_WIFI_HIGH, 0.0f);
-
-    float text_x = icon.x + icon_size + reach_settings_scale(input, 14.0f);
+    float text_x = row.x + reach_settings_scale(input, 16.0f);
     reach_settings_push_text(
         commands,
         {text_x, row.y + reach_settings_scale(input, 14.0f),
@@ -391,7 +385,7 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
         toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_render(commands, layout->wifi_radio_toggle, &toggle_style,
-                               model->wifi_radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f);
+                               reach_animation_manager_value(&model->wifi_radio_animation, 0));
 
         int32_t enabled = model->wifi_radio == REACH_WIFI_RADIO_ON;
         reach_ui_button_style scan_style =
@@ -403,13 +397,11 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
                 : (const uint16_t *)u"Scan",
             &scan_style, enabled && !reach_settings_model_wifi_busy(model),
             reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_SCAN));
-        reach_ui_button_style add_style =
-            reach_settings_button_style(input, input->theme->settings_card_background);
+        reach_ui_button_style add_style = reach_settings_muted_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_add_button, (const uint16_t *)u"Add network", &add_style,
             enabled, reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_ADD));
-        reach_ui_button_style known_style =
-            reach_settings_button_style(input, input->theme->settings_button_success);
+        reach_ui_button_style known_style = reach_settings_muted_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_known_button, (const uint16_t *)u"Known networks", &known_style,
             1, reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_KNOWN));
@@ -449,7 +441,17 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
     }
 
     reach_render_command_buffer_set_scissor(commands, layout->wifi_viewport);
-    reach_settings_wifi_render_add_row(input, commands, accent);
+    if (layout->wifi_add_clip.height > 0.0f)
+    {
+        reach_render_command_buffer_set_scissor(commands, layout->wifi_add_clip);
+        size_t first_command = commands->count;
+        reach_settings_wifi_render_add_row(input, commands, accent);
+        float progress =
+            reach_animation_manager_value(&model->wifi_row_animations, REACH_WIFI_MAX_NETWORKS);
+        reach_section_reveal_apply(commands, first_command, progress,
+                                   reach_settings_scale(input, 4.0f));
+        reach_render_command_buffer_set_scissor(commands, layout->wifi_viewport);
+    }
     for (size_t row_index = 0; row_index < layout->wifi_row_count; ++row_index)
     {
         reach_settings_wifi_render_row(input, commands, row_index, accent);

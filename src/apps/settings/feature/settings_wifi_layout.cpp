@@ -186,8 +186,9 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
         float known_width = 148.0f * scale;
         layout->wifi_scan_button =
             reach_settings_wifi_rect(area_x, button_y, scan_width, button_height);
-        layout->wifi_add_button = reach_settings_wifi_rect(area_x + scan_width + gap, button_y,
-                                                           add_width, button_height);
+        layout->wifi_add_button = reach_settings_wifi_rect(
+            area_x + area_width - known_width - gap - add_width, button_y, add_width,
+            button_height);
         layout->wifi_known_button = reach_settings_wifi_rect(
             area_x + area_width - known_width, button_y, known_width, button_height);
         viewport_y = button_y + button_height + 12.0f * scale;
@@ -213,16 +214,30 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
     {
         float progress =
             reach_animation_manager_value(&model->wifi_row_animations, REACH_WIFI_MAX_NETWORKS);
-        float expansion = REACH_SETTINGS_WIFI_ADD_FORM * scale * progress;
-        float height = REACH_SETTINGS_WIFI_ADD_ROW_HEIGHT * scale + expansion;
-        layout->wifi_add_row = reach_settings_wifi_rect(
-            layout->wifi_viewport.x, layout->wifi_viewport.y + content_y - model->wifi_scrollbar.offset,
-            layout->wifi_viewport.width, height);
-        if (progress > 0.99f)
+        if (progress > 0.0f)
         {
+            float full_height =
+                (REACH_SETTINGS_WIFI_ADD_ROW_HEIGHT + REACH_SETTINGS_WIFI_ADD_FORM) * scale;
+            float visible_height = full_height * progress;
+            layout->wifi_add_row = reach_settings_wifi_rect(
+                layout->wifi_viewport.x,
+                layout->wifi_viewport.y + content_y - model->wifi_scrollbar.offset,
+                layout->wifi_viewport.width, full_height);
+            float clip_top = layout->wifi_add_row.y > layout->wifi_viewport.y
+                                 ? layout->wifi_add_row.y
+                                 : layout->wifi_viewport.y;
+            float clip_bottom = layout->wifi_add_row.y + visible_height;
+            float viewport_bottom = layout->wifi_viewport.y + layout->wifi_viewport.height;
+            if (clip_bottom > viewport_bottom)
+            {
+                clip_bottom = viewport_bottom;
+            }
+            layout->wifi_add_clip = reach_settings_wifi_rect(
+                layout->wifi_add_row.x, clip_top, layout->wifi_add_row.width,
+                clip_bottom - clip_top);
             reach_settings_wifi_layout_add_form(layout, model, layout->wifi_add_row, scale);
+            content_y += visible_height + row_gap;
         }
-        content_y += height + row_gap;
     }
 
     for (size_t index = 0;

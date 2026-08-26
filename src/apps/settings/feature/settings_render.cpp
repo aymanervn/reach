@@ -836,9 +836,33 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         return REACH_INVALID_ARGUMENT;
     reach_render_command_buffer_clear(commands);
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
-    reach_settings_push_rect(commands, input->layout->bounds, reach_settings_scale(input, input->theme->radius_large),
-              input->theme->settings_background);
-    reach_settings_push_masked_rect(commands, input->layout->nav, reach_settings_scale(input, input->theme->radius_large),
+    float border_thickness = reach_theme_border_thickness(input->theme, scale);
+    reach_render_command background = {};
+    background.type = REACH_RENDER_COMMAND_RECT;
+    background.rect = input->layout->bounds;
+    background.radius = reach_settings_scale(input, input->theme->radius_large);
+    (void)reach_render_push_bordered_background(
+        commands, &background, input->theme->settings_background, input->theme->bar_border,
+        border_thickness, nullptr, scale);
+
+    reach_rect_f32 content_bounds =
+        reach_theme_border_content_rect(input->theme, scale, input->layout->bounds);
+    reach_rect_f32 nav = input->layout->nav;
+    nav.x = content_bounds.x;
+    nav.y = content_bounds.y;
+    nav.width -= nav.x - input->layout->nav.x;
+    nav.height = content_bounds.height;
+    if (nav.width < 0.0f)
+    {
+        nav.width = 0.0f;
+    }
+    float nav_radius = reach_settings_scale(input, input->theme->radius_large) - border_thickness;
+    if (nav_radius < 0.0f)
+    {
+        nav_radius = 0.0f;
+    }
+    reach_settings_push_masked_rect(commands, nav,
+                     nav_radius,
                      REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT,
                      input->theme->settings_nav_background);
     reach_settings_push_rect(commands, input->layout->close_button, input->layout->close_button.width * 0.5f,

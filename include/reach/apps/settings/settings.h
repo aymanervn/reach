@@ -279,6 +279,8 @@ extern "C"
         reach_animation_manager wifi_row_animations;
         reach_animation_track wifi_view_track;
         reach_animation_manager wifi_view_animation;
+        reach_animation_track wifi_radio_track;
+        reach_animation_manager wifi_radio_animation;
         reach_bluetooth_device_list bluetooth_devices;
         uint64_t bluetooth_icons[REACH_BLUETOOTH_MAX_DEVICES];
         reach_bluetooth_pairing_request bluetooth_pairing;
@@ -292,6 +294,8 @@ extern "C"
         reach_loader_model bluetooth_loader;
         reach_animation_track bluetooth_row_tracks[REACH_BLUETOOTH_MAX_DEVICES];
         reach_animation_manager bluetooth_row_animations;
+        reach_animation_track bluetooth_radio_track;
+        reach_animation_manager bluetooth_radio_animation;
     } reach_settings_model;
 
     typedef struct reach_settings_nav_item
@@ -410,6 +414,7 @@ extern "C"
         size_t wifi_row_count;
         float wifi_content_height;
         reach_rect_f32 wifi_add_row;
+        reach_rect_f32 wifi_add_clip;
         reach_rect_f32 wifi_add_name_field;
         reach_rect_f32 wifi_add_security_options[REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT];
         reach_rect_f32 wifi_add_key_field;
@@ -603,6 +608,9 @@ extern "C"
     void reach_settings_model_apply_wifi(reach_settings_model *model,
                                          reach_wifi_radio_state radio,
                                          const reach_wifi_network_list *networks);
+    void reach_settings_model_set_wifi_radio(reach_settings_model *model,
+                                             reach_wifi_radio_state radio);
+    int32_t reach_settings_model_toggle_wifi_radio(reach_settings_model *model);
     void reach_settings_model_set_wifi_view(reach_settings_model *model,
                                             reach_settings_wifi_view view);
     void reach_settings_model_set_wifi_status(reach_settings_model *model, int32_t status,
@@ -643,6 +651,7 @@ extern "C"
                                               int32_t scanning);
     void reach_settings_model_set_bluetooth_radio(reach_settings_model *model,
                                                   reach_bluetooth_state state);
+    int32_t reach_settings_model_toggle_bluetooth_radio(reach_settings_model *model);
     void reach_settings_model_set_bluetooth_status(reach_settings_model *model, int32_t status,
                                                    const uint16_t *device_id);
     const uint16_t *reach_settings_bluetooth_status_message(int32_t status);

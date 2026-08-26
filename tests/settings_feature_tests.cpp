@@ -529,6 +529,47 @@ static void test_button_press_feedback(void)
                 "completed fade clears the feedback target");
 }
 
+static void test_bluetooth_radio_stops_scan(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    model->bluetooth_scanning = 1;
+    reach_settings_model_set_bluetooth_status(model.get(), REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING,
+                                              nullptr);
+
+    reach_bluetooth_state state = {};
+    state.available = 1;
+    reach_settings_model_set_bluetooth_radio(model.get(), state);
+    expect_true(!model->bluetooth_scanning, "turning Bluetooth off stops scanning");
+    expect_true(model->bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_IDLE,
+                "turning Bluetooth off clears the scan loader");
+}
+
+static void test_radio_toggle_animations(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+
+    reach_settings_model_set_wifi_radio(model.get(), REACH_WIFI_RADIO_ON);
+    expect_true(reach_settings_model_toggle_wifi_radio(model.get()), "Wi-Fi radio can toggle");
+    reach_settings_model_tick_wifi_animations(model.get(), 0.09);
+    float wifi_position = reach_animation_manager_value(&model->wifi_radio_animation, 0);
+    expect_true(wifi_position > 0.0f && wifi_position < 1.0f,
+                "Wi-Fi radio toggle animates between states");
+
+    reach_bluetooth_state bluetooth_state = {};
+    bluetooth_state.available = 1;
+    bluetooth_state.enabled = 1;
+    reach_settings_model_set_bluetooth_radio(model.get(), bluetooth_state);
+    expect_true(reach_settings_model_toggle_bluetooth_radio(model.get()),
+                "Bluetooth radio can toggle");
+    reach_settings_model_tick_bluetooth_animations(model.get(), 0.09);
+    float bluetooth_position =
+        reach_animation_manager_value(&model->bluetooth_radio_animation, 0);
+    expect_true(bluetooth_position > 0.0f && bluetooth_position < 1.0f,
+                "Bluetooth radio toggle animates between states");
+}
+
 int main(void)
 {
     test_policy();
@@ -545,5 +586,7 @@ int main(void)
     test_display_theme_preferences();
     test_account_password_form();
     test_button_press_feedback();
+    test_bluetooth_radio_stops_scan();
+    test_radio_toggle_animations();
     return failures == 0 ? 0 : 1;
 }

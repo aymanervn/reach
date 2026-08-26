@@ -25,6 +25,7 @@ void reach_settings_push_app_icon(reach_render_command_buffer *commands, reach_r
 
 reach_ui_button_style reach_settings_button_style(const reach_settings_render_input *input,
                                                   reach_color background);
+reach_ui_button_style reach_settings_muted_button_style(const reach_settings_render_input *input);
 reach_ui_selection_item_style reach_settings_pill_style(const reach_settings_render_input *input,
                                                         reach_color accent);
 

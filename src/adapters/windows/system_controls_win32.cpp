@@ -1537,7 +1537,8 @@ reach_system_controls_start_watching(void *userdata, reach_system_controls_chang
             CreateThread(nullptr, 0, reach_system_controls_addr_change_thread, adapter, 0, nullptr);
     }
 
-    if (adapter->wlan == nullptr && adapter->addr_change_thread == nullptr)
+    if (adapter->wlan == nullptr && adapter->addr_change_thread == nullptr &&
+        adapter->bluetooth_thread == nullptr)
     {
         if (adapter->addr_change != nullptr)
         {
