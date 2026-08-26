@@ -433,6 +433,10 @@ participant because hardware media and level keys remain active while the top ba
 is suppressed. `host_game_mode.cpp` owns the state and the main gate in
 `reach_host_update`; the game-mode path runs only behavior-flagged capsules and
 their frames, leaving all ordinary composition work below the gate dormant.
+Game-mode Alt-Tab is one Reach Service window transition: it transfers foreground
+to the registered shell desktop, requires that handoff to succeed, minimizes the
+game, and then clears the shared cursor clip once. The Reach-owned Progman host
+permits that explicit activation while continuing to reject pointer activation.
 The top bar is the only participant whose layer moves: it rests at 0 and rises to
 130 while its reveal
 transition is live, while a `bar_shown_while_open` surface is open, or while a popup

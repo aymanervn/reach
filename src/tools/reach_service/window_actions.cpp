@@ -198,7 +198,6 @@ static int32_t reach_window_management_focus_target(HWND target)
     (void)SetActiveWindow(target);
     (void)SetFocus(target);
     BOOL foreground_ok = SetForegroundWindow(target);
-    BringWindowToTop(target);
 
     if (attached_foreground)
     {
@@ -283,6 +282,31 @@ reach_result reach_window_management_minimize(HWND hwnd)
     reach_window_action_state after = reach_window_management_capture_state(target);
     reach_window_management_log_failure("minimize", target, &before, &after);
     return REACH_ERROR;
+}
+
+reach_result reach_window_management_leave_game_to_desktop(HWND game)
+{
+    if (game == nullptr || !IsWindow(game))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND desktop = GetShellWindow();
+    if (desktop == nullptr || !IsWindow(desktop) || desktop == game)
+    {
+        return REACH_ERROR;
+    }
+
+    if (!reach_window_management_focus_target(desktop))
+    {
+        reach_window_action_state state = reach_window_management_capture_state(game);
+        reach_window_management_log_failure("leave_game.foreground", game, &state, &state);
+        return REACH_ERROR;
+    }
+
+    reach_result result = reach_window_management_minimize(game);
+    (void)ClipCursor(nullptr);
+    return result;
 }
 
 static int32_t reach_window_management_frame_bounds(HWND hwnd, RECT *out_frame)

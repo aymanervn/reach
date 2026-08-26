@@ -604,7 +604,7 @@ static reach_result reach_explorer_desktop_compat_create_host_windows(void)
 
     DWORD progman_style = WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 
-    DWORD progman_ex_style = WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+    DWORD progman_ex_style = WS_EX_TOOLWINDOW;
 
     g_progmanHwnd = CreateWindowExW(progman_ex_style, reach_explorer_desktop_compat_progman_class(),
                                     L"Program Manager", progman_style, x, y, width, height, nullptr,
