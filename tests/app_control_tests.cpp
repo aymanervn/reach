@@ -26,6 +26,8 @@ static size_t fake_closed_count;
 static size_t fake_minimized_count;
 static size_t fake_activated_count;
 static std::atomic<int> fake_notified;
+static std::atomic<int> fake_terminal_called;
+static reach_terminal_launch_request fake_terminal_request;
 
 static reach_result fake_close(reach_window_manager *manager, reach_window_id window_id)
 {
@@ -65,6 +67,33 @@ static void fake_notify(void *user)
     fake_notified.store(1);
 }
 
+static reach_result fake_terminal_launch(reach_terminal_launcher *launcher,
+                                         const reach_terminal_launch_request *request)
+{
+    (void)launcher;
+    if (request == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    fake_terminal_request = *request;
+    fake_terminal_called.store(1);
+    return REACH_OK;
+}
+
+static int utf16_equals_ascii(const uint16_t *text, const char *ascii)
+{
+    size_t index = 0;
+    while (text[index] != 0 && ascii[index] != 0)
+    {
+        if (text[index] != (uint16_t)(unsigned char)ascii[index])
+        {
+            return 0;
+        }
+        ++index;
+    }
+    return text[index] == 0 && ascii[index] == 0;
+}
+
 static int wait_for_completion(reach_app_control *service, reach_result *out_result)
 {
     for (int attempt = 0; attempt < 500; ++attempt)
@@ -94,8 +123,9 @@ static void test_schedule_windows_closes_every_window(void)
     reach_app_control *service = nullptr;
     reach_app_launcher_port launcher = {};
     reach_explorer_service_port explorer = {};
-    if (reach_app_control_create(launcher, explorer, window_manager, fake_notify, nullptr,
-                                 &service) != REACH_OK ||
+    reach_terminal_launcher_port terminal_launcher = {};
+    if (reach_app_control_create(launcher, terminal_launcher, explorer, window_manager, fake_notify,
+                                 nullptr, &service) != REACH_OK ||
         service == nullptr)
     {
         ++failures;
@@ -120,8 +150,49 @@ static void test_schedule_windows_closes_every_window(void)
     reach_app_control_destroy(service);
 }
 
+static void test_terminal_command_is_queued_unchanged(void)
+{
+    fake_terminal_called.store(0);
+    fake_terminal_request = {};
+
+    reach_terminal_launcher_port terminal_launcher = {};
+    terminal_launcher.ops.launch = fake_terminal_launch;
+    reach_app_control *service = nullptr;
+    reach_app_launcher_port launcher = {};
+    reach_explorer_service_port explorer = {};
+    reach_window_manager_port window_manager = {};
+    if (reach_app_control_create(launcher, terminal_launcher, explorer, window_manager, nullptr,
+                                 nullptr, &service) != REACH_OK ||
+        service == nullptr)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: terminal app control creation\n");
+        return;
+    }
+
+    reach_terminal_launch_request request = {};
+    const char *command = "ls | Where-Object { $_.Length -gt 0 }; Write-Output \"done\"";
+    for (size_t index = 0; command[index] != 0; ++index)
+    {
+        request.command[index] = (uint16_t)(unsigned char)command[index];
+    }
+
+    expect_true(reach_app_control_schedule_terminal_launch(service, &request) == REACH_OK,
+                "terminal command scheduling succeeds");
+    for (int attempt = 0; attempt < 500 && !fake_terminal_called.load(); ++attempt)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    expect_true(fake_terminal_called.load(), "terminal command reaches the launch port");
+    expect_true(utf16_equals_ascii(fake_terminal_request.command, command),
+                "terminal command reaches the launch port unchanged");
+
+    reach_app_control_destroy(service);
+}
+
 int main(void)
 {
     test_schedule_windows_closes_every_window();
+    test_terminal_command_is_queued_unchanged();
     return failures == 0 ? 0 : 1;
 }

@@ -25,6 +25,7 @@
 #include "reach/ports/startup_apps.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/system_stats.h"
+#include "reach/ports/terminal_launcher.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/user_account.h"
 #include "reach/ports/wallpaper_service.h"
@@ -88,6 +89,7 @@ extern "C"
                                                 reach_search_candidate *out_candidates,
                                                 size_t capacity);
     reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
+    reach_result reach_windows_create_terminal_launcher(reach_terminal_launcher_port *out_port);
     reach_result reach_windows_create_settings_launcher(reach_settings_launcher_port *out_port);
     reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
     reach_result reach_windows_create_icon_provider(reach_icon_provider_port *out_port);

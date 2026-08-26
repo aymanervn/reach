@@ -48,6 +48,7 @@ extern "C"
     void reach_launcher_attach_search(reach_launcher *launcher, reach_search_service *search);
 
     void reach_launcher_attach_icons(reach_launcher *launcher, reach_icon_service *icons);
+    void reach_launcher_set_terminal_icon_ref(reach_launcher *launcher, const uint16_t *icon_ref);
     void reach_launcher_cancel_search(reach_launcher *launcher);
     int32_t reach_launcher_take_search_results(reach_launcher *launcher,
                                                reach_search_candidate *out_results,
@@ -71,7 +72,7 @@ extern "C"
 
     int32_t reach_launcher_is_open(reach_launcher *launcher);
     size_t reach_launcher_result_count(reach_launcher *launcher);
-    const reach_search_candidate *reach_launcher_result_at(reach_launcher *launcher, size_t index);
+    const reach_launcher_result *reach_launcher_result_at(reach_launcher *launcher, size_t index);
     size_t reach_launcher_selected_result_index(reach_launcher *launcher);
     const uint16_t *reach_launcher_query_text(reach_launcher *launcher);
 

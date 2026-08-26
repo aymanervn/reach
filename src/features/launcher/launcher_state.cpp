@@ -22,6 +22,7 @@ struct reach_launcher
     reach_search_service *search;
     uint32_t search_generation;
     reach_icon_service *icons;
+    uint16_t terminal_icon_ref[REACH_SEARCH_RESULT_PATH_CAPACITY];
     reach_launcher_layout pointer_layout;
     int32_t pointer_layout_valid;
     const reach_pinned_app_model *pointer_pinned_apps;
@@ -109,6 +110,15 @@ void reach_launcher_attach_icons(reach_launcher *launcher, reach_icon_service *i
     if (launcher != nullptr)
     {
         launcher->icons = icons;
+    }
+}
+
+void reach_launcher_set_terminal_icon_ref(reach_launcher *launcher, const uint16_t *icon_ref)
+{
+    if (launcher != nullptr)
+    {
+        reach_copy_utf16(launcher->terminal_icon_ref, REACH_SEARCH_RESULT_PATH_CAPACITY,
+                         icon_ref != nullptr ? icon_ref : (const uint16_t *)L"");
     }
 }
 
@@ -296,7 +306,7 @@ reach_result reach_launcher_clear_results_state(reach_launcher_state *state)
 
     for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index)
     {
-        state->model.results[index] = reach_search_candidate{};
+        state->model.results[index] = reach_launcher_result{};
     }
     state->model.result_count = 0;
     state->model.selected_result_index = 0;
@@ -322,12 +332,44 @@ reach_result reach_launcher_set_results_state(reach_launcher_state *state,
     (void)reach_launcher_clear_results_state(state);
     for (size_t index = 0; index < count; ++index)
     {
-        state->model.results[index] = results[index];
+        reach_launcher_result *result = &state->model.results[index];
+        reach_copy_utf16(result->title, REACH_SEARCH_RESULT_NAME_CAPACITY, results[index].name);
+        reach_copy_utf16(result->subtitle, REACH_SEARCH_RESULT_PATH_CAPACITY, results[index].path);
+        reach_copy_utf16(result->icon_path, REACH_SEARCH_RESULT_PATH_CAPACITY, results[index].path);
+        result->visual_kind = results[index].kind;
+        result->action = REACH_LAUNCHER_RESULT_OPEN_SEARCH;
+        result->payload.search = results[index];
     }
     state->model.result_count = count;
     reach_scrollbar_set_extents(&state->model.result_scrollbar, (float)count,
                                 (float)reach_launcher_visible_count(state));
     state->model.selected_result_index = 0;
+    reach_launcher_set_scroll_immediate(state, 0);
+    return REACH_OK;
+}
+
+reach_result reach_launcher_set_terminal_command_result_state(reach_launcher_state *state,
+                                                              const uint16_t *command,
+                                                              const uint16_t *icon_ref)
+{
+    if (state == nullptr || command == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    (void)reach_launcher_clear_results_state(state);
+    reach_launcher_result *result = &state->model.results[0];
+    reach_copy_utf16(result->title, REACH_SEARCH_RESULT_NAME_CAPACITY,
+                     (const uint16_t *)L"Run in Windows Terminal");
+    reach_copy_utf16(result->subtitle, REACH_SEARCH_RESULT_PATH_CAPACITY, command);
+    reach_copy_utf16(result->icon_path, REACH_SEARCH_RESULT_PATH_CAPACITY,
+                     icon_ref != nullptr ? icon_ref : (const uint16_t *)L"");
+    result->visual_kind = REACH_SEARCH_RESULT_APP;
+    result->action = REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND;
+    reach_copy_utf16(result->payload.terminal_command, REACH_MAX_SEARCH_CHARS + 1, command);
+    state->model.result_count = 1;
+    state->model.selected_result_index = 0;
+    reach_scrollbar_set_extents(&state->model.result_scrollbar, 1.0f, 1.0f);
     reach_launcher_set_scroll_immediate(state, 0);
     return REACH_OK;
 }
@@ -518,7 +560,7 @@ size_t reach_launcher_result_count(reach_launcher *launcher)
     return launcher != nullptr ? reach_launcher_state_ptr(launcher)->model.result_count : 0;
 }
 
-const reach_search_candidate *reach_launcher_result_at(reach_launcher *launcher, size_t index)
+const reach_launcher_result *reach_launcher_result_at(reach_launcher *launcher, size_t index)
 {
     if (launcher == nullptr || index >= reach_launcher_state_ptr(launcher)->model.result_count)
     {
@@ -541,6 +583,17 @@ const uint16_t *reach_launcher_query_text(reach_launcher *launcher)
 static size_t reach_launcher_query_length(reach_launcher *launcher)
 {
     return launcher != nullptr ? reach_launcher_state_ptr(launcher)->model.query_length : 0;
+}
+
+static int32_t reach_launcher_terminal_command_mode(const reach_launcher *launcher)
+{
+    return launcher != nullptr && launcher->state.model.query[0] == '!';
+}
+
+static int32_t reach_launcher_has_terminal_command_result(const reach_launcher *launcher)
+{
+    return launcher != nullptr && launcher->state.model.result_count == 1 &&
+           launcher->state.model.results[0].action == REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND;
 }
 
 void reach_launcher_clear_query(reach_launcher *launcher)
@@ -831,8 +884,20 @@ void reach_launcher_handle_text_event(reach_launcher *launcher, const reach_ui_e
             reach_launcher_cancel_search(launcher);
             (void)reach_launcher_clear_results(launcher);
         }
+        else if (reach_launcher_terminal_command_mode(launcher))
+        {
+            reach_launcher_cancel_search(launcher);
+            int32_t was_attached = reach_launcher_results_attached(&launcher->state);
+            (void)reach_launcher_set_terminal_command_result_state(&launcher->state, edit->text + 1,
+                                                                   launcher->terminal_icon_ref);
+            reach_launcher_sync_results_expansion(launcher, was_attached);
+        }
         else
         {
+            if (reach_launcher_has_terminal_command_result(launcher))
+            {
+                (void)reach_launcher_clear_results(launcher);
+            }
             (void)reach_launcher_submit_search(launcher);
         }
         out_result->relayout = 1;

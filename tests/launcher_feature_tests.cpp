@@ -28,6 +28,81 @@ static int expect_close_at(float actual, float expected, int line)
 
 #define expect_close(actual, expected) expect_close_at(actual, expected, __LINE__)
 
+static int utf16_equals_ascii(const uint16_t *text, const char *ascii)
+{
+    size_t index = 0;
+    while (text[index] != 0 && ascii[index] != 0)
+    {
+        if (text[index] != (uint16_t)(unsigned char)ascii[index])
+        {
+            return 0;
+        }
+        ++index;
+    }
+    return text[index] == 0 && ascii[index] == 0;
+}
+
+static void type_ascii(reach_launcher *launcher, const char *text)
+{
+    for (size_t index = 0; text[index] != 0; ++index)
+    {
+        reach_ui_event event = {};
+        event.type = REACH_UI_EVENT_TEXT_CHAR;
+        event.id = (uint32_t)(unsigned char)text[index];
+        reach_launcher_text_event_result result = {};
+        reach_launcher_handle_text_event(launcher, &event, &result);
+    }
+}
+
+static int test_terminal_command_mode(void)
+{
+    int failed = 0;
+    reach_launcher *launcher = nullptr;
+    failed += expect(reach_launcher_create(&launcher) == REACH_OK);
+    failed += expect(reach_launcher_toggle(launcher) == REACH_OK);
+
+    const uint16_t terminal_icon_ref[] = {'w', 't', '.', 'e', 'x', 'e', 0};
+    reach_launcher_set_terminal_icon_ref(launcher, terminal_icon_ref);
+
+    type_ascii(launcher, "!");
+    failed += expect(reach_launcher_result_count(launcher) == 1);
+    failed += expect(reach_launcher_selected_result_index(launcher) == 0);
+    const reach_launcher_result *result = reach_launcher_result_at(launcher, 0);
+    failed += expect(result != nullptr);
+    failed +=
+        expect(result != nullptr && result->action == REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND);
+    failed +=
+        expect(result != nullptr && utf16_equals_ascii(result->title, "Run in Windows Terminal"));
+    failed += expect(result != nullptr && utf16_equals_ascii(result->icon_path, "wt.exe"));
+    failed += expect(result != nullptr && result->payload.terminal_command[0] == 0);
+
+    const char *command = "ls | Where-Object { $_.Length -gt 0 }; Write-Output \"done\"";
+    type_ascii(launcher, command);
+    result = reach_launcher_result_at(launcher, 0);
+    failed += expect(reach_launcher_result_count(launcher) == 1);
+    failed += expect(reach_launcher_selected_result_index(launcher) == 0);
+    failed += expect(result != nullptr && utf16_equals_ascii(result->subtitle, command));
+    failed +=
+        expect(result != nullptr && utf16_equals_ascii(result->payload.terminal_command, command));
+
+    reach_ui_event event = {};
+    reach_ui_intent intent = {};
+    event.type = REACH_UI_EVENT_ENTER;
+    failed += expect(reach_launcher_handle_event(launcher, &event, &intent) == REACH_OK);
+    failed += expect(intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT);
+
+    event = {};
+    event.type = REACH_UI_EVENT_TEXT_EDIT;
+    event.id = REACH_UI_EDIT_KEY_SELECT_ALL;
+    reach_launcher_text_event_result text_result = {};
+    reach_launcher_handle_text_event(launcher, &event, &text_result);
+    type_ascii(launcher, "b");
+    failed += expect(reach_launcher_result_count(launcher) == 0);
+
+    reach_launcher_destroy(launcher);
+    return failed;
+}
+
 int main()
 {
     int failed = 0;
@@ -123,5 +198,6 @@ int main()
     failed += expect(state->model.result_count == 0);
 
     reach_launcher_destroy(capsule);
+    failed += test_terminal_command_mode();
     return failed == 0 ? 0 : 1;
 }

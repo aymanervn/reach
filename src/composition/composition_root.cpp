@@ -187,6 +187,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_terminal_launcher(&dependencies.terminal_launcher);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_settings_launcher(&dependencies.settings_launcher);
     }
     if (result == REACH_OK)
@@ -390,6 +394,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.app_launcher.ops.destroy != nullptr)
         {
             dependencies.app_launcher.ops.destroy(dependencies.app_launcher.launcher);
+        }
+        if (dependencies.terminal_launcher.ops.destroy != nullptr)
+        {
+            dependencies.terminal_launcher.ops.destroy(dependencies.terminal_launcher.launcher);
         }
         if (dependencies.settings_launcher.ops.destroy != nullptr)
         {

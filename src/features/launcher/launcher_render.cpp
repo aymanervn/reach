@@ -239,7 +239,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.width = icon_size;
                 command.rect.height = icon_size;
                 command.color = theme->launcher_row_icon_glyph;
-                command.icon_id = reach_launcher_fallback_icon(model->results[index].kind);
+                command.icon_id = reach_launcher_fallback_icon(model->results[index].visual_kind);
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
@@ -255,7 +255,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
-            reach_copy_utf16(command.text, 260, model->results[index].name);
+            reach_copy_utf16(command.text, 260, model->results[index].title);
             reach_render_command_buffer_push(out_commands, &command);
 
             command = {};
@@ -268,7 +268,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_size = row_path_size;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
-            reach_copy_utf16(command.text, 260, model->results[index].path);
+            reach_copy_utf16(command.text, 260, model->results[index].subtitle);
             reach_render_command_buffer_push(out_commands, &command);
         }
 
@@ -338,7 +338,7 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
                                     index < REACH_SEARCH_MAX_RESULTS;
          ++index)
     {
-        const uint16_t *path = state->model.results[index].path;
+        const uint16_t *path = state->model.results[index].icon_path;
         if (path[0] != 0)
         {
             result_icon_ids[index] =

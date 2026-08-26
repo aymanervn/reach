@@ -258,6 +258,7 @@ static void reach_host_cleanup(reach_host *host)
     }
     reach_launcher_attach_search(host->launcher_capsule, nullptr);
     reach_launcher_attach_icons(host->launcher_capsule, nullptr);
+    reach_launcher_set_terminal_icon_ref(host->launcher_capsule, nullptr);
     reach_dock_attach_services(host->dock_capsule, nullptr, nullptr);
     reach_top_bar_attach_app_control(host->top_bar_capsule, nullptr);
     reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr, nullptr,
@@ -288,6 +289,10 @@ static void reach_host_cleanup(reach_host *host)
     if (host->app_launcher.ops.destroy != nullptr)
     {
         host->app_launcher.ops.destroy(host->app_launcher.launcher);
+    }
+    if (host->terminal_launcher.ops.destroy != nullptr)
+    {
+        host->terminal_launcher.ops.destroy(host->terminal_launcher.launcher);
     }
     if (host->settings_launcher.ops.destroy != nullptr)
     {
@@ -381,6 +386,7 @@ static void reach_host_cleanup(reach_host *host)
     host->tray_service = nullptr;
     host->search_provider = {};
     host->app_launcher = {};
+    host->terminal_launcher = {};
     host->settings_launcher = {};
     host->icon_service = nullptr;
     host->explorer_service = {};
@@ -571,9 +577,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         result = REACH_ERROR;
     }
     host->app_launcher = dependencies->app_launcher;
+    host->terminal_launcher = dependencies->terminal_launcher;
     host->app_control = nullptr;
-    if (reach_app_control_create(host->app_launcher, dependencies->explorer_service,
-                                 host->window_manager, reach_host_on_app_control_notify, host,
+    if (reach_app_control_create(host->app_launcher, host->terminal_launcher,
+                                 dependencies->explorer_service, host->window_manager,
+                                 reach_host_on_app_control_notify, host,
                                  &host->app_control) != REACH_OK)
     {
         result = REACH_ERROR;
@@ -639,6 +647,13 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     reach_launcher_attach_search(host->launcher_capsule, host->search_service);
     reach_launcher_attach_icons(host->launcher_capsule, host->icon_service);
+    uint16_t terminal_icon_ref[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
+    if (host->terminal_launcher.ops.icon_ref != nullptr)
+    {
+        (void)host->terminal_launcher.ops.icon_ref(
+            host->terminal_launcher.launcher, terminal_icon_ref, REACH_SEARCH_RESULT_PATH_CAPACITY);
+    }
+    reach_launcher_set_terminal_icon_ref(host->launcher_capsule, terminal_icon_ref);
     reach_dock_attach_services(host->dock_capsule, host->icon_service, host->window_tracking);
     reach_top_bar_attach_services(host->top_bar_capsule, host->now_playing_service,
                                   host->icon_service, host->window_tracking, host->system_stats,

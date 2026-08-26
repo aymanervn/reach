@@ -11,6 +11,7 @@
 #include "reach/ports/clock.h"
 #include "reach/ports/input_language.h"
 #include "reach/ports/system_stats.h"
+#include "reach/ports/terminal_launcher.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/media_controls.h"
 #include "reach/ports/monitor.h"
@@ -83,6 +84,7 @@ extern "C"
         reach_tray_provider_port tray_provider;
         reach_search_provider_port search_provider;
         reach_app_launcher_port app_launcher;
+        reach_terminal_launcher_port terminal_launcher;
         reach_settings_launcher_port settings_launcher;
         reach_icon_provider_port icon_provider;
         reach_explorer_service_port explorer_service;
