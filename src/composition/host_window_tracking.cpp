@@ -1,7 +1,6 @@
 #include "host_internal.h"
 
-static int32_t reach_host_window_manipulation_relevant(reach_host *host,
-                                                       reach_window_id window)
+static int32_t reach_host_window_center_on_primary_monitor(reach_host *host, reach_window_id window)
 {
     if (host == nullptr || window == 0)
     {
@@ -25,8 +24,29 @@ static int32_t reach_host_window_manipulation_relevant(reach_host *host,
 
     float center_x = bounds.x + bounds.width * 0.5f;
     float center_y = bounds.y + bounds.height * 0.5f;
-    return center_x >= monitor.x && center_x < monitor.x + monitor.width &&
-           center_y >= monitor.y && center_y < monitor.y + monitor.height;
+    return center_x >= monitor.x && center_x < monitor.x + monitor.width && center_y >= monitor.y &&
+           center_y < monitor.y + monitor.height;
+}
+
+static int32_t reach_host_pointer_primary_membership(reach_host *host, int32_t *out_inside)
+{
+    if (out_inside == nullptr)
+    {
+        return 0;
+    }
+    *out_inside = 0;
+
+    reach_rect_f32 monitor = {};
+    reach_point_i32 pointer = {};
+    if (!reach_host_primary_monitor_bounds(host, &monitor) ||
+        !reach_host_get_pointer_position(host, &pointer))
+    {
+        return 0;
+    }
+
+    *out_inside = (float)pointer.x >= monitor.x && (float)pointer.x < monitor.x + monitor.width &&
+                  (float)pointer.y >= monitor.y && (float)pointer.y < monitor.y + monitor.height;
+    return 1;
 }
 
 static void reach_host_update_window_manipulation(reach_host *host)
@@ -38,24 +58,21 @@ static void reach_host_update_window_manipulation(reach_host *host)
 
     reach_window_id active_window = 0;
     if (host->window_manipulation.programmatic.active &&
-        reach_host_window_manipulation_relevant(
-            host, host->window_manipulation.programmatic.window))
+        host->window_manipulation.programmatic_relevant)
     {
         active_window = host->window_manipulation.programmatic.window;
     }
-    else if (host->window_manipulation.manual.active &&
-             reach_host_window_manipulation_relevant(host,
-                                                     host->window_manipulation.manual.window))
+    else if (host->window_manipulation.manual.active && host->window_manipulation.manual_relevant)
     {
         active_window = host->window_manipulation.manual.window;
     }
-    int32_t bars_suppressed = active_window != 0;
-    int32_t began = bars_suppressed && !host->window_manipulation.bars_suppressed;
-    int32_t changed = bars_suppressed != host->window_manipulation.bars_suppressed ||
+    int32_t relevant = active_window != 0;
+    int32_t began = relevant && !host->window_manipulation.relevant;
+    int32_t changed = relevant != host->window_manipulation.relevant ||
                       active_window != host->window_manipulation.active_window;
 
     host->window_manipulation.active_window = active_window;
-    host->window_manipulation.bars_suppressed = bars_suppressed;
+    host->window_manipulation.relevant = relevant;
     if (!changed)
     {
         return;
@@ -63,8 +80,8 @@ static void reach_host_update_window_manipulation(reach_host *host)
 
     if (began)
     {
-        reach_host_close_surface_classes(
-            host, reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP), 0);
+        reach_host_close_surface_classes(host, reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP),
+                                         0);
     }
     reach_host_invalidate_bar_coverage(host);
     reach_host_request_bar_visibility_update(host);
@@ -83,7 +100,27 @@ void reach_host_sync_window_manipulation(reach_host *host)
         (void)host->input_source.ops.get_window_manipulation(host->input_source.source,
                                                              &manipulation);
     }
+    int32_t started =
+        manipulation.active && (!host->window_manipulation.manual.active ||
+                                host->window_manipulation.manual.window != manipulation.window);
+    int32_t pointer_inside = 0;
+    int32_t pointer_valid =
+        manipulation.active && reach_host_pointer_primary_membership(host, &pointer_inside);
     host->window_manipulation.manual = manipulation;
+    if (started)
+    {
+        host->window_manipulation.manual_relevant =
+            pointer_valid ? pointer_inside
+                          : reach_host_window_center_on_primary_monitor(host, manipulation.window);
+    }
+    else if (!manipulation.active)
+    {
+        host->window_manipulation.manual_relevant = 0;
+    }
+    else if (pointer_valid)
+    {
+        host->window_manipulation.manual_relevant = pointer_inside;
+    }
     reach_host_update_window_manipulation(host);
 }
 
@@ -95,6 +132,8 @@ void reach_host_begin_programmatic_window_manipulation(reach_host *host, reach_w
     }
     host->window_manipulation.programmatic.window = window;
     host->window_manipulation.programmatic.active = 1;
+    host->window_manipulation.programmatic_relevant =
+        reach_host_window_center_on_primary_monitor(host, window);
     reach_host_update_window_manipulation(host);
 }
 
@@ -105,6 +144,7 @@ void reach_host_end_programmatic_window_manipulation(reach_host *host)
         return;
     }
     host->window_manipulation.programmatic = {};
+    host->window_manipulation.programmatic_relevant = 0;
     reach_host_update_window_manipulation(host);
 }
 

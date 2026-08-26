@@ -1,5 +1,13 @@
 #include "host_internal.h"
 
+int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32 *out_pointer)
+{
+    return host != nullptr && out_pointer != nullptr &&
+           host->input_source.ops.get_pointer_position != nullptr &&
+           host->input_source.ops.get_pointer_position(host->input_source.source, out_pointer) ==
+               REACH_OK;
+}
+
 static void reach_host_mark_dirty_for_event(reach_host *host, const reach_ui_event *event)
 {
     REACH_ASSERT(host != nullptr);

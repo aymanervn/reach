@@ -142,9 +142,7 @@ void reach_host_dock_item_hovered(reach_host *host, size_t item_index)
 static int32_t reach_host_window_list_pointer_inside(reach_host *host)
 {
     reach_point_i32 pointer = {};
-    if (host->input_source.ops.get_pointer_position == nullptr ||
-        host->input_source.ops.get_pointer_position(host->input_source.source, &pointer) !=
-            REACH_OK)
+    if (!reach_host_get_pointer_position(host, &pointer))
     {
         return 1;
     }

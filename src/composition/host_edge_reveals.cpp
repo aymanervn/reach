@@ -7,6 +7,10 @@ static void reach_host_on_edge_reveal_event(void *user, reach_screen_hotspot_eve
     {
         return;
     }
+    if (runtime->host->window_manipulation.relevant)
+    {
+        return;
+    }
 
     const reach_surface_desc *owner = runtime->owner;
     if (owner->bar_reveal.ops != nullptr)
@@ -224,5 +228,6 @@ void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal
     {
         return;
     }
-    reach_layout_set_visible(&host->layout_manager, runtime->participant, visible);
+    reach_layout_set_visible(&host->layout_manager, runtime->participant,
+                             visible && !host->window_manipulation.relevant);
 }

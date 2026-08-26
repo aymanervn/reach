@@ -243,8 +243,10 @@ typedef struct reach_host_window_manipulation_state
 {
     reach_window_manipulation manual;
     reach_window_manipulation programmatic;
+    int32_t manual_relevant;
+    int32_t programmatic_relevant;
     reach_window_id active_window;
-    int32_t bars_suppressed;
+    int32_t relevant;
 } reach_host_window_manipulation_state;
 
 typedef struct reach_host_layout_target
@@ -693,6 +695,7 @@ void reach_host_refresh_window_world(reach_host *host);
 void reach_host_sync_window_manipulation(reach_host *host);
 void reach_host_begin_programmatic_window_manipulation(reach_host *host, reach_window_id window);
 void reach_host_end_programmatic_window_manipulation(reach_host *host);
+int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32 *out_pointer);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
 void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);

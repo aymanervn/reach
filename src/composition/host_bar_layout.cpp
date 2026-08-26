@@ -112,14 +112,6 @@ void reach_host_suspend_pointer_move_subscriptions(reach_host *host)
     reach_host_apply_pointer_move_subscriptions(host, 0);
 }
 
-static int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32 *out_pointer)
-{
-    return host != nullptr && out_pointer != nullptr &&
-           host->input_source.ops.get_pointer_position != nullptr &&
-           host->input_source.ops.get_pointer_position(host->input_source.source, out_pointer) ==
-               REACH_OK;
-}
-
 static void reach_host_apply_edge_reveal(reach_host *host, reach_host_edge_reveal_runtime *runtime,
                                          int32_t shown, reach_rect_f32 edge_bounds)
 {
@@ -164,7 +156,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.monitor_bounds = monitor_bounds;
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
     request.force_shown = reach_host_bar_forced_shown(host);
-    request.force_hidden = host->window_manipulation.bars_suppressed;
+    request.force_hidden = host->window_manipulation.relevant;
     request.hold_open = reach_host_popup_open(host);
     request.excluded_window = host->window_manipulation.active_window;
     request.reveal_seconds =
