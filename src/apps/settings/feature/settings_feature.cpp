@@ -34,8 +34,11 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_animation_manager_init(&model->wifi_row_animations, model->wifi_row_tracks,
                                  REACH_WIFI_MAX_NETWORKS + 1);
     reach_animation_manager_init(&model->wifi_view_animation, &model->wifi_view_track, 1);
+    reach_animation_manager_init(&model->wifi_radio_animation, &model->wifi_radio_track, 1);
     reach_animation_manager_init(&model->bluetooth_row_animations, model->bluetooth_row_tracks,
                                  REACH_BLUETOOTH_MAX_DEVICES);
+    reach_animation_manager_init(&model->bluetooth_radio_animation,
+                                 &model->bluetooth_radio_track, 1);
     model->wifi_expanded_row = REACH_SETTINGS_WIFI_ROW_NONE;
     model->wifi_focused_field = REACH_SETTINGS_WIFI_FIELD_NONE;
     model->wifi_add_security = REACH_WIFI_SECURITY_WPA2_PERSONAL;
@@ -974,11 +977,6 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         {layout->wifi_connect_button, REACH_SETTINGS_HIT_WIFI_CONNECT},
         {layout->wifi_disconnect_button, REACH_SETTINGS_HIT_WIFI_DISCONNECT},
         {layout->wifi_forget_button, REACH_SETTINGS_HIT_WIFI_FORGET},
-        {layout->wifi_add_name_field, REACH_SETTINGS_HIT_WIFI_ADD_NAME_FIELD},
-        {layout->wifi_add_key_field, REACH_SETTINGS_HIT_WIFI_ADD_KEY_FIELD},
-        {layout->wifi_add_show_button, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY},
-        {layout->wifi_add_auto_toggle, REACH_SETTINGS_HIT_WIFI_ADD_AUTO_TOGGLE},
-        {layout->wifi_add_submit_button, REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT},
     };
     for (size_t index = 0; index < sizeof(wifi_controls) / sizeof(wifi_controls[0]); ++index)
     {
@@ -989,14 +987,41 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             return result;
         }
     }
-    for (size_t option = 0; option < REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT; ++option)
+    int32_t wifi_add_form_visible = layout->wifi_add_row.height > 0.0f &&
+                                    layout->wifi_add_clip.height >=
+                                        layout->wifi_add_row.height * 0.99f;
+    if (wifi_add_form_visible)
     {
-        if (layout->wifi_add_security_options[option].width > 0.0f &&
-            reach_settings_rect_contains(layout->wifi_add_security_options[option], x, y))
+        const struct
         {
-            result.type = REACH_SETTINGS_HIT_WIFI_ADD_SECURITY;
-            result.wifi_security_option = option;
-            return result;
+            reach_rect_f32 rect;
+            reach_settings_hit_type type;
+        } wifi_add_controls[] = {
+            {layout->wifi_add_name_field, REACH_SETTINGS_HIT_WIFI_ADD_NAME_FIELD},
+            {layout->wifi_add_key_field, REACH_SETTINGS_HIT_WIFI_ADD_KEY_FIELD},
+            {layout->wifi_add_show_button, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY},
+            {layout->wifi_add_auto_toggle, REACH_SETTINGS_HIT_WIFI_ADD_AUTO_TOGGLE},
+            {layout->wifi_add_submit_button, REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT},
+        };
+        for (size_t index = 0; index < sizeof(wifi_add_controls) / sizeof(wifi_add_controls[0]);
+             ++index)
+        {
+            if (wifi_add_controls[index].rect.width > 0.0f &&
+                reach_settings_rect_contains(wifi_add_controls[index].rect, x, y))
+            {
+                result.type = wifi_add_controls[index].type;
+                return result;
+            }
+        }
+        for (size_t option = 0; option < REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT; ++option)
+        {
+            if (layout->wifi_add_security_options[option].width > 0.0f &&
+                reach_settings_rect_contains(layout->wifi_add_security_options[option], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_WIFI_ADD_SECURITY;
+                result.wifi_security_option = option;
+                return result;
+            }
         }
     }
     if (layout->wifi_scrollbar_thumb.height > 0.0f &&
@@ -1014,8 +1039,8 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
     if (layout->wifi_viewport.width > 0.0f &&
         reach_settings_rect_contains(layout->wifi_viewport, x, y))
     {
-        if (layout->wifi_add_row.width > 0.0f &&
-            reach_settings_rect_contains(layout->wifi_add_row, x, y))
+        if (layout->wifi_add_clip.width > 0.0f &&
+            reach_settings_rect_contains(layout->wifi_add_clip, x, y))
         {
             result.type = REACH_SETTINGS_HIT_WIFI_ADD;
             return result;

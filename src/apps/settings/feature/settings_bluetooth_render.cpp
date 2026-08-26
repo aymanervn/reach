@@ -193,10 +193,10 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
     toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_render(commands, layout->bluetooth_radio_toggle, &toggle_style,
-                           enabled ? 1.0f : 0.0f);
+                           reach_animation_manager_value(&model->bluetooth_radio_animation, 0));
 
     reach_ui_button_style scan_style =
-        reach_settings_button_style(input, input->theme->settings_button_success);
+        reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->bluetooth_scan_button,
         model->bluetooth_scanning ? (const uint16_t *)u"Stop scanning"

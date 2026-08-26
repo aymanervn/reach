@@ -99,13 +99,55 @@ void reach_settings_model_set_bluetooth_icon(reach_settings_model *model, size_t
     }
 }
 
+static void reach_settings_model_apply_bluetooth_radio(reach_settings_model *model,
+                                                        reach_bluetooth_state state)
+{
+    model->bluetooth_radio = state;
+    if (!state.available || !state.enabled)
+    {
+        model->bluetooth_scanning = 0;
+        if (model->bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING)
+        {
+            reach_settings_model_set_bluetooth_status(model, REACH_SETTINGS_BLUETOOTH_STATUS_IDLE,
+                                                      nullptr);
+        }
+    }
+}
+
 void reach_settings_model_set_bluetooth_radio(reach_settings_model *model,
                                               reach_bluetooth_state state)
 {
-    if (model != nullptr)
+    if (model == nullptr)
     {
-        model->bluetooth_radio = state;
+        return;
     }
+    reach_settings_model_apply_bluetooth_radio(model, state);
+    float target = state.available && state.enabled ? 1.0f : 0.0f;
+    if (!model->bluetooth_loaded)
+    {
+        reach_animation_manager_set(&model->bluetooth_radio_animation, 0, target);
+    }
+    else if (reach_animation_manager_target(&model->bluetooth_radio_animation, 0) != target)
+    {
+        float current = reach_animation_manager_value(&model->bluetooth_radio_animation, 0);
+        reach_animation_manager_start(&model->bluetooth_radio_animation, 0, current, target, 0.18,
+                                      REACH_EASING_EASE_OUT);
+    }
+}
+
+int32_t reach_settings_model_toggle_bluetooth_radio(reach_settings_model *model)
+{
+    if (model == nullptr || !model->bluetooth_radio.available)
+    {
+        return 0;
+    }
+    reach_bluetooth_state state = model->bluetooth_radio;
+    state.enabled = state.enabled ? 0 : 1;
+    reach_settings_model_apply_bluetooth_radio(model, state);
+    float current = reach_animation_manager_value(&model->bluetooth_radio_animation, 0);
+    reach_animation_manager_start(&model->bluetooth_radio_animation, 0, current,
+                                  state.enabled ? 1.0f : 0.0f, 0.18, REACH_EASING_EASE_OUT);
+    return 1;
 }
 
 void reach_settings_model_set_bluetooth_status(reach_settings_model *model, int32_t status,
@@ -206,16 +248,19 @@ int32_t reach_settings_model_tick_bluetooth_animations(reach_settings_model *mod
                                                        double delta_seconds)
 {
     if (model == nullptr ||
-        !reach_animation_manager_any_active(&model->bluetooth_row_animations))
+        (!reach_animation_manager_any_active(&model->bluetooth_row_animations) &&
+         !reach_animation_manager_any_active(&model->bluetooth_radio_animation)))
     {
         return 0;
     }
     reach_animation_manager_tick(&model->bluetooth_row_animations, delta_seconds);
+    reach_animation_manager_tick(&model->bluetooth_radio_animation, delta_seconds);
     return 1;
 }
 
 int32_t reach_settings_model_bluetooth_animations_active(const reach_settings_model *model)
 {
     return model != nullptr &&
-           reach_animation_manager_any_active(&model->bluetooth_row_animations);
+           (reach_animation_manager_any_active(&model->bluetooth_row_animations) ||
+            reach_animation_manager_any_active(&model->bluetooth_radio_animation));
 }

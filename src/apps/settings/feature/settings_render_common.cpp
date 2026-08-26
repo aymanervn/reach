@@ -103,6 +103,14 @@ reach_ui_button_style reach_settings_button_style(const reach_settings_render_in
     return style;
 }
 
+reach_ui_button_style reach_settings_muted_button_style(const reach_settings_render_input *input)
+{
+    reach_ui_button_style style =
+        reach_settings_button_style(input, input->theme->settings_input_background);
+    style.text = input->theme->settings_text;
+    return style;
+}
+
 reach_ui_selection_item_style reach_settings_pill_style(const reach_settings_render_input *input,
                                                         reach_color accent)
 {
