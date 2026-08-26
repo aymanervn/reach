@@ -389,6 +389,7 @@ struct reach_host
     reach_tray_service *tray_service;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
+    reach_terminal_launcher_port terminal_launcher;
     reach_settings_launcher_port settings_launcher;
     reach_icon_service *icon_service;
     reach_explorer_service_port explorer_service;
@@ -679,6 +680,7 @@ reach_result reach_host_schedule_window_control(reach_host *host,
                                                 uintptr_t window_id);
 reach_result reach_host_schedule_minimize_open_windows(reach_host *host);
 reach_result reach_host_schedule_open_terminal(reach_host *host);
+reach_result reach_host_schedule_terminal_command(reach_host *host, const uint16_t *command);
 reach_result reach_host_schedule_window_controls(reach_host *host,
                                                  reach_window_control_action action,
                                                  const uintptr_t *window_ids, size_t window_count);

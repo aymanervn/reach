@@ -47,6 +47,13 @@ instances cost nothing. The `system_controls` port also exposes system-surface a
 application theme modes. Display config stores each as Follow Reach, Light, or Dark;
 composition resolves Follow Reach against the active Reach theme, while the Windows
 adapter owns personalization persistence and change broadcasts.
+`terminal_launcher` opens an interactive terminal with an optional opaque command. The Windows
+adapter resolves Windows Terminal's configured default profile from its own settings, opens that
+profile in the user's home directory, and appends encoded command-execution arguments without
+selecting a shell executable. The shell remains interactive after the command. The adapter also
+publishes the resolved executable as the terminal icon reference and falls back to an interactive
+Command Prompt in the same directory when `wt.exe` is absent from `PATH`; launcher features never
+construct platform command lines.
 The media
 port separates fast core-state reads from generation-checked cover reads so image I/O
 cannot block transport state. Interfaces only. Includes `core`, `protocol`.
@@ -128,6 +135,10 @@ The Launcher is also fully migrated: it owns result and pinned-app presses,
 scrolling and scrollbar capture, cancellation, and context-hit semantics through
 `handle_pointer`. Composition translates launch/open/reveal actions and retains
 focus restoration plus transient-surface policy.
+Launcher rows carry typed actions independently from their display fields. A leading `!` switches
+the capsule synchronously into terminal-command mode, cancels indexed search, and publishes one
+selected row whose opaque payload is every UTF-16 code unit after the prefix. Removing the prefix
+returns to normal search; composition submits terminal actions through `app_control`.
 Its open/close transition keeps one maximum-size native envelope and applies one
 centered proportional scale to the complete capsule alongside the existing fade and
 Y tracks. Pointer input is inverse-mapped through the same scale, and closing reverses

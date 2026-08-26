@@ -87,6 +87,9 @@ reach_result reach_launcher_toggle_state(reach_launcher_state *state);
 reach_result reach_launcher_set_query_state(reach_launcher_state *state, const uint16_t *query);
 reach_result reach_launcher_set_results_state(reach_launcher_state *state,
                                               const reach_search_candidate *results, size_t count);
+reach_result reach_launcher_set_terminal_command_result_state(reach_launcher_state *state,
+                                                              const uint16_t *command,
+                                                              const uint16_t *icon_ref);
 reach_result reach_launcher_set_selected_result_state(reach_launcher_state *state, size_t index);
 reach_result reach_launcher_select_next_result_state(reach_launcher_state *state);
 reach_result reach_launcher_select_previous_result_state(reach_launcher_state *state);

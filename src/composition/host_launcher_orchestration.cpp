@@ -83,7 +83,7 @@ void reach_host_toggle_launcher(reach_host *host)
         host->launcher_restore_pending = 0;
         reach_host_remember_launcher_restore_window(host);
         reach_host_surface_opening(host, REACH_SURFACE_ID_LAUNCHER,
-                               REACH_SURFACE_ORIGIN_NONE);
+                                   REACH_SURFACE_ORIGIN_NONE);
     }
     (void)reach_launcher_toggle(host->launcher_capsule);
 }
@@ -177,7 +177,7 @@ void reach_host_close_launcher_without_focus_restore(reach_host *host)
 reach_result reach_host_open_launcher_result(reach_host *host)
 {
     REACH_ASSERT(host != nullptr);
-    if (host == nullptr || host->explorer_service.service == nullptr)
+    if (host == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -186,21 +186,32 @@ reach_result reach_host_open_launcher_result(reach_host *host)
         reach_launcher_selected_result_index(host->launcher_capsule) <
             reach_launcher_result_count(host->launcher_capsule))
     {
-        const reach_search_candidate *result = reach_launcher_result_at(
+        const reach_launcher_result *result = reach_launcher_result_at(
             host->launcher_capsule, reach_launcher_selected_result_index(host->launcher_capsule));
-        if (result->path[0] == 0)
+        if (result->action == REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND)
+        {
+            return reach_host_schedule_terminal_command(host, result->payload.terminal_command);
+        }
+
+        const reach_search_candidate *search = &result->payload.search;
+        if (search->path[0] == 0)
         {
             return REACH_OK;
         }
-        const uint16_t *arguments = result->arguments[0] != 0 ? result->arguments : nullptr;
-        if (result->kind == REACH_SEARCH_RESULT_APP)
+        const uint16_t *arguments = search->arguments[0] != 0 ? search->arguments : nullptr;
+        if (search->kind == REACH_SEARCH_RESULT_APP)
         {
-            return reach_host_open_app(host, result->path, arguments, nullptr, 0,
+            return reach_host_open_app(host, search->path, arguments, nullptr, 0,
                                        reach_launcher_is_open(host->launcher_capsule));
         }
 
-        return reach_host_launch_app(host, result->path, arguments, 0, 0,
+        return reach_host_launch_app(host, search->path, arguments, 0, 0,
                                      reach_launcher_is_open(host->launcher_capsule));
+    }
+
+    if (host->explorer_service.service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
     }
 
     const uint16_t *query = reach_launcher_query_text(host->launcher_capsule);
@@ -247,12 +258,18 @@ reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_i
         return REACH_INVALID_ARGUMENT;
     }
 
-    const reach_search_candidate *result =
+    const reach_launcher_result *result =
         reach_launcher_result_at(host->launcher_capsule, result_index);
-    if (result->kind != REACH_SEARCH_RESULT_APP || result->path[0] == 0)
+    if (result->action != REACH_LAUNCHER_RESULT_OPEN_SEARCH)
     {
         return REACH_OK;
     }
 
-    return reach_host_schedule_reveal_path(host, result->path);
+    const reach_search_candidate *search = &result->payload.search;
+    if (search->kind != REACH_SEARCH_RESULT_APP || search->path[0] == 0)
+    {
+        return REACH_OK;
+    }
+
+    return reach_host_schedule_reveal_path(host, search->path);
 }

@@ -83,6 +83,11 @@ static uint64_t reach_launcher_pressable_target(const reach_launcher *launcher,
         hit.index < state->model.result_count &&
         (button == REACH_POINTER_BUTTON_PRIMARY || button == REACH_POINTER_BUTTON_SECONDARY))
     {
+        if (button == REACH_POINTER_BUTTON_SECONDARY &&
+            state->model.results[hit.index].action != REACH_LAUNCHER_RESULT_OPEN_SEARCH)
+        {
+            return REACH_PRESSABLE_TARGET_NONE;
+        }
         return (static_cast<uint64_t>(hit.type) << 56) |
                (static_cast<uint64_t>(reach_launcher_search_generation(launcher)) << 24) |
                static_cast<uint32_t>(hit.index);

@@ -314,7 +314,22 @@ reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
 
 reach_result reach_host_schedule_open_terminal(reach_host *host)
 {
-    static const uint16_t terminal_path[] = {'w', 't', '.', 'e', 'x', 'e', 0};
+    return reach_host_schedule_terminal_command(host, (const uint16_t *)L"");
+}
 
-    return reach_host_open_app(host, terminal_path, nullptr, nullptr, 1, 0);
+reach_result reach_host_schedule_terminal_command(reach_host *host, const uint16_t *command)
+{
+    if (host == nullptr || command == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_terminal_launch_request request = {};
+    reach_copy_utf16(request.command, REACH_TERMINAL_COMMAND_CAPACITY, command);
+    reach_result result = reach_app_control_schedule_terminal_launch(host->app_control, &request);
+    if (result == REACH_OK)
+    {
+        reach_host_request_update(host);
+    }
+    return result;
 }

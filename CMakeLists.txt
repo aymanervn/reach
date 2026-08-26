@@ -255,6 +255,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     shlwapi
     shcore
     advapi32
+    crypt32
     ole32
     oleaut32
     taskschd

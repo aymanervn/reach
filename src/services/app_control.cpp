@@ -20,13 +20,15 @@ static const int64_t REACH_APP_CONTROL_LAUNCH_IDLE_EXIT_MILLISECONDS = 10000;
 enum reach_app_control_launch_item_kind
 {
     REACH_APP_CONTROL_ITEM_LAUNCH = 0,
-    REACH_APP_CONTROL_ITEM_REVEAL = 1
+    REACH_APP_CONTROL_ITEM_REVEAL = 1,
+    REACH_APP_CONTROL_ITEM_TERMINAL = 2
 };
 
 struct reach_app_control_launch_item
 {
     int32_t kind;
     reach_app_launch_request launch;
+    reach_terminal_launch_request terminal;
 };
 
 struct reach_app_control_launch_state
@@ -34,6 +36,7 @@ struct reach_app_control_launch_state
     std::mutex mutex;
     std::condition_variable cv;
     reach_app_launcher_port launcher = {};
+    reach_terminal_launcher_port terminal_launcher = {};
     reach_explorer_service_port explorer = {};
     reach_app_control_launch_item queue[REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = {};
     size_t queue_head = 0;
@@ -99,6 +102,14 @@ static void reach_app_control_launch_worker_main(reach_app_control_launch_state 
             if (state->explorer.ops.reveal_path != nullptr)
             {
                 (void)state->explorer.ops.reveal_path(state->explorer.service, item.launch.path);
+            }
+        }
+        else if (item.kind == REACH_APP_CONTROL_ITEM_TERMINAL)
+        {
+            if (state->terminal_launcher.ops.launch != nullptr)
+            {
+                (void)state->terminal_launcher.ops.launch(state->terminal_launcher.launcher,
+                                                          &item.terminal);
             }
         }
         else if (state->launcher.ops.launch != nullptr)
@@ -311,6 +322,7 @@ static reach_result reach_app_control_start_window_worker(reach_app_control *ser
 }
 
 reach_result reach_app_control_create(reach_app_launcher_port launcher,
+                                      reach_terminal_launcher_port terminal_launcher,
                                       reach_explorer_service_port explorer,
                                       reach_window_manager_port window_manager,
                                       void (*notify)(void *user), void *notify_user,
@@ -329,6 +341,7 @@ reach_result reach_app_control_create(reach_app_launcher_port launcher,
         return REACH_ERROR;
     }
     launch->launcher = launcher;
+    launch->terminal_launcher = terminal_launcher;
     launch->explorer = explorer;
     service->launch = launch;
     service->window_manager = window_manager;
@@ -465,6 +478,25 @@ reach_result reach_app_control_schedule_launch(reach_app_control *service,
     reach_app_control_launch_item item = {};
     item.kind = REACH_APP_CONTROL_ITEM_LAUNCH;
     item.launch = *request;
+    return reach_app_control_enqueue(service->launch, &item);
+}
+
+reach_result
+reach_app_control_schedule_terminal_launch(reach_app_control *service,
+                                           const reach_terminal_launch_request *request)
+{
+    if (service == nullptr || service->launch == nullptr || request == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->launch->terminal_launcher.ops.launch == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_app_control_launch_item item = {};
+    item.kind = REACH_APP_CONTROL_ITEM_TERMINAL;
+    item.terminal = *request;
     return reach_app_control_enqueue(service->launch, &item);
 }
 
