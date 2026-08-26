@@ -23,6 +23,47 @@ static size_t call_count;
 static int failures;
 static reach_host order_repair_host;
 static reach_host app_band_host;
+static reach_host manipulation_host;
+static reach_host monitor_entry_host;
+static reach_window_manipulation observed_manipulation;
+static reach_point_i32 observed_pointer;
+static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
+
+static reach_result fake_get_window_manipulation(reach_input_source *source,
+                                                 reach_window_manipulation *out_manipulation)
+{
+    (void)source;
+    if (out_manipulation == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out_manipulation = observed_manipulation;
+    return REACH_OK;
+}
+
+static reach_result fake_get_pointer_position(reach_input_source *source,
+                                              reach_point_i32 *out_position)
+{
+    (void)source;
+    if (out_position == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out_position = observed_pointer;
+    return REACH_OK;
+}
+
+static size_t fake_monitor_count(const reach_monitor_list *list)
+{
+    (void)list;
+    return 1;
+}
+
+static const reach_monitor_info *fake_primary_monitor(const reach_monitor_list *list)
+{
+    (void)list;
+    return &primary_monitor;
+}
 
 static reach_window_id fake_window_id(const reach_platform_window *window)
 {
@@ -176,10 +217,75 @@ static void test_app_band_surface_does_not_invalidate_topmost_order(void)
     expect_true(!host->dirty.update_requested, "an app-band press schedules no order repair");
 }
 
+static void test_window_manipulation_relevance_survives_unavailable_pointer(void)
+{
+    reach_host *host = &manipulation_host;
+    host->input_source.ops.get_window_manipulation = fake_get_window_manipulation;
+    host->window_manipulation.manual = {501, 1};
+    host->window_manipulation.manual_relevant = 1;
+    host->window_manipulation.active_window = 501;
+    host->window_manipulation.relevant = 1;
+
+    observed_manipulation = {501, 1};
+    reach_host_sync_window_manipulation(host);
+    expect_true(host->window_manipulation.manual_relevant,
+                "a failed pointer read retains the last known manipulation relevance");
+    expect_true(host->window_manipulation.relevant &&
+                    host->window_manipulation.active_window == 501,
+                "an active manipulation retains its last known relevant state");
+
+    observed_manipulation = {};
+    reach_host_sync_window_manipulation(host);
+    expect_true(!host->window_manipulation.manual_relevant && !host->window_manipulation.relevant &&
+                    host->window_manipulation.active_window == 0,
+                "manipulation end clears the retained relevance");
+}
+
+static void test_window_manipulation_tracks_pointer_monitor_membership(void)
+{
+    reach_host *host = &monitor_entry_host;
+    host->input_source.ops.get_pointer_position = fake_get_pointer_position;
+    host->input_source.ops.get_window_manipulation = fake_get_window_manipulation;
+    host->monitors.list = reinterpret_cast<reach_monitor_list *>(&primary_monitor);
+    host->monitors.ops.count = fake_monitor_count;
+    host->monitors.ops.primary = fake_primary_monitor;
+    host->window_manipulation.manual = {502, 1};
+
+    observed_manipulation = {502, 1};
+    observed_pointer = {1500, 400};
+    reach_host_sync_window_manipulation(host);
+    expect_true(!host->window_manipulation.relevant,
+                "an off-monitor drag remains irrelevant while its pointer stays away");
+
+    observed_pointer = {0, 400};
+    reach_host_sync_window_manipulation(host);
+    expect_true(host->window_manipulation.manual_relevant && host->window_manipulation.relevant &&
+                    host->window_manipulation.active_window == 502,
+                "the primary monitor's left boundary makes the active drag relevant");
+
+    observed_pointer = {-1, 400};
+    reach_host_sync_window_manipulation(host);
+    expect_true(!host->window_manipulation.relevant && host->window_manipulation.active_window == 0,
+                "leaving the primary monitor releases manipulation suppression");
+
+    observed_pointer = {500, 400};
+    reach_host_sync_window_manipulation(host);
+    expect_true(host->window_manipulation.relevant &&
+                    host->window_manipulation.active_window == 502,
+                "re-entering the primary monitor restores manipulation suppression");
+
+    observed_manipulation = {};
+    reach_host_sync_window_manipulation(host);
+    expect_true(!host->window_manipulation.relevant,
+                "ending a drag that entered the monitor releases suppression");
+}
+
 int main(void)
 {
     test_order_invalidation_rechains_without_replaying_visibility();
     test_app_band_surface_does_not_invalidate_topmost_order();
+    test_window_manipulation_relevance_survives_unavailable_pointer();
+    test_window_manipulation_tracks_pointer_monitor_membership();
 
     if (failures != 0)
     {

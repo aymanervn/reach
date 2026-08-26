@@ -320,8 +320,9 @@ and uses `reach_bar_reveal_ops.position_frame` to push trespassing windows, whil
 the permanently-topmost Dock reveals over them without a side effect. A single
 screen-hotspot factory creates every
 descriptor-declared edge reveal. Fixed triggers declare an anchor and DP size;
-Stage is an always-enabled 4dp top-left square. Animated bars publish managed
-bounds from the shared visibility result. Generic runtime loops own geometry,
+Stage is a normally enabled 4dp top-left square. Animated bars publish managed
+bounds from the shared visibility result. Every trigger is suppressed while a relevant
+window manipulation is active. Generic runtime loops own geometry,
 callback binding, event dispatch, bounds caching, layout registration and teardown.
 The `bar_reveal` capability also owns pointer-exit wake-up. Surface leave remains
 a wake-up, but a hideable shown bar additionally publishes its bar-plus-bridge
@@ -343,12 +344,13 @@ prevent: it leaves the bars deciding from a stale answer, and only an unrelated
 foreground change heals it.
 
 Window manipulation is a separate shared-service state, versioned with its own
-sequence. Interactive move/resize start publishes the manipulated app, location
-changes wake only the relevance check needed for monitor crossing, and end
-publishes the final window snapshot while atomically clearing manipulation. The
-host suppresses both bars only for a tracked app centred on their monitor,
-dismisses open popups, excludes that window from top-bar push, and keeps both edge
-reveals disabled until the manipulation ends. Reach consumes Win+Arrow and snaps
+sequence. Interactive move/resize start publishes the manipulated app and every location
+change republishes the active session. On each event, the host reads the pointer once and
+makes a tracked app relevant exactly while that pointer is inside the primary monitor;
+failed pointer reads retain the previous answer. Entering suppresses both bars,
+dismisses open popups, excludes that window from top-bar push, and keeps all edge
+reveals disabled; leaving re-enables them under normal policy. Manipulation end publishes
+the final window snapshot and clears the state. Reach consumes Win+Arrow and snaps
 asynchronously with `ShowWindow` / `SetWindowPos`, so it explicitly brackets that
 operation with the same host suppression lifecycle instead of expecting Windows
 move/size-loop events.
