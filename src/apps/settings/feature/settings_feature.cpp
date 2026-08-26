@@ -6,6 +6,26 @@
 
 #include "settings_pages_internal.h"
 
+static const double reach_settings_nav_selection_duration_seconds = 0.22;
+
+static int32_t reach_settings_nav_index_for_page(reach_settings_page page, float *out_index)
+{
+    size_t nav_count = 0;
+    const reach_settings_nav_item *items = reach_settings_nav_items(&nav_count);
+    for (size_t index = 0; index < nav_count; ++index)
+    {
+        if (items[index].page == page)
+        {
+            if (out_index != nullptr)
+            {
+                *out_index = (float)index;
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void reach_settings_model_init(reach_settings_model *model)
 {
     if (model == nullptr)
@@ -14,6 +34,9 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     memset(model, 0, sizeof(*model));
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
+    reach_animation_manager_init(&model->nav_selection_animation,
+                                 &model->nav_selection_track, 1);
+    reach_animation_manager_set(&model->nav_selection_animation, 0, 0.0f);
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
     model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_IDLE;
     {
@@ -90,11 +113,33 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
     {
         return;
     }
-    if (page < REACH_SETTINGS_PAGE_WIFI || page > REACH_SETTINGS_PAGE_UPDATE)
+    float target_index = 0.0f;
+    if (!reach_settings_nav_index_for_page(page, &target_index) || model->selected_page == page)
     {
         return;
     }
     model->selected_page = page;
+    reach_animation_manager_animate_to(&model->nav_selection_animation, 0, target_index,
+                                       reach_settings_nav_selection_duration_seconds,
+                                       REACH_EASING_EASE_IN_OUT);
+}
+
+int32_t reach_settings_model_tick_nav_selection(reach_settings_model *model,
+                                                double delta_seconds)
+{
+    if (model == nullptr ||
+        !reach_animation_manager_any_active(&model->nav_selection_animation))
+    {
+        return 0;
+    }
+    reach_animation_manager_tick(&model->nav_selection_animation, delta_seconds);
+    return 1;
+}
+
+int32_t reach_settings_model_nav_selection_active(const reach_settings_model *model)
+{
+    return model != nullptr &&
+           reach_animation_manager_any_active(&model->nav_selection_animation);
 }
 
 float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)
