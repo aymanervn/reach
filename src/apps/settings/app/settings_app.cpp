@@ -2621,6 +2621,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    if (reach_settings_model_tick_nav_selection(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
     if (reach_settings_model_tick_display_animations(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -2686,6 +2690,7 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_startup_animations_active(&app->model) ||
            reach_settings_model_power_animations_active(&app->model) ||
            reach_settings_model_button_press_active(&app->model) ||
+           reach_settings_model_nav_selection_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
            app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||
            app->model.wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE ||

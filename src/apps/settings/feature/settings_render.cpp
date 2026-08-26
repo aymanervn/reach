@@ -42,6 +42,59 @@ static void append_number(uint16_t *destination, size_t capacity, size_t value)
     }
 }
 
+static reach_rect_f32 reach_settings_lerp_rect(reach_rect_f32 from, reach_rect_f32 to,
+                                               float progress)
+{
+    return {from.x + (to.x - from.x) * progress,
+            from.y + (to.y - from.y) * progress,
+            from.width + (to.width - from.width) * progress,
+            from.height + (to.height - from.height) * progress};
+}
+
+static void render_nav_selection_indicator(const reach_settings_render_input *input,
+                                           reach_render_command_buffer *commands,
+                                           const reach_settings_nav_item *items, size_t nav_count)
+{
+    if (input->layout->nav_item_count == 0 || nav_count == 0)
+    {
+        return;
+    }
+
+    size_t available_count = input->layout->nav_item_count < nav_count
+                                 ? input->layout->nav_item_count
+                                 : nav_count;
+    float position = reach_animation_manager_value(&input->model->nav_selection_animation, 0);
+    float maximum_position = (float)(available_count - 1);
+    if (position < 0.0f)
+    {
+        position = 0.0f;
+    }
+    if (position > maximum_position)
+    {
+        position = maximum_position;
+    }
+
+    size_t from_index = (size_t)position;
+    size_t to_index = from_index + 1 < available_count ? from_index + 1 : from_index;
+    reach_rect_f32 indicator = reach_settings_lerp_rect(
+        input->layout->nav_items[from_index].bounds, input->layout->nav_items[to_index].bounds,
+        position - (float)from_index);
+
+    reach_theme_accent accent = items[0].accent;
+    for (size_t index = 0; index < available_count; ++index)
+    {
+        if (items[index].page == input->model->selected_page)
+        {
+            accent = items[index].accent;
+            break;
+        }
+    }
+    reach_color color = reach_settings_color_with_alpha(
+        reach_theme_accent_color(input->theme, accent), input->theme->accent_tint_alpha);
+    reach_settings_push_rect(commands, indicator,
+                             reach_settings_scale(input, input->theme->radius_small), color);
+}
+
 static void build_metadata_text(const reach_windows_update_item *update, uint16_t *text,
                                 size_t capacity)
 {
@@ -880,6 +933,7 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
 
     size_t nav_count = 0;
     const reach_settings_nav_item *items = reach_settings_nav_items(&nav_count);
+    render_nav_selection_indicator(input, commands, items, nav_count);
     for (size_t index = 0; index < input->layout->nav_item_count && index < nav_count; ++index)
     {
         const reach_settings_nav_item_layout *item_layout = &input->layout->nav_items[index];
@@ -887,9 +941,6 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         const reach_color accent = reach_theme_accent_color(input->theme, item->accent);
         const reach_color accent_background =
             reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha);
-        if (input->model->selected_page == item->page)
-            reach_settings_push_rect(commands, item_layout->bounds, reach_settings_scale(input, input->theme->radius_small),
-                      accent_background);
         reach_settings_push_rect(commands, item_layout->icon_background,
                   reach_settings_scale(input, input->theme->radius_small), accent_background);
         reach_settings_push_icon(commands, item_layout->icon, accent, (reach_vector_icon_id)item->icon_id, 0.0f);

@@ -199,6 +199,8 @@ extern "C"
     typedef struct reach_settings_model
     {
         reach_settings_page selected_page;
+        reach_animation_track nav_selection_track;
+        reach_animation_manager nav_selection_animation;
         reach_settings_update_page_state update_page_state;
         int32_t update_scan_completed;
         reach_windows_update_list update_list;
@@ -479,6 +481,9 @@ extern "C"
 
     void reach_settings_model_init(reach_settings_model *model);
     void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page);
+    int32_t reach_settings_model_tick_nav_selection(reach_settings_model *model,
+                                                    double delta_seconds);
+    int32_t reach_settings_model_nav_selection_active(const reach_settings_model *model);
     void reach_settings_model_begin_update_scan(reach_settings_model *model);
     void reach_settings_model_apply_update_scan(reach_settings_model *model,
                                                 const reach_windows_update_list *updates,
