@@ -46,32 +46,6 @@ void reach_host_relayout_quick_settings(reach_host *host, int32_t animate_height
     reach_quick_settings_relayout(host->quick_settings_capsule, &ctx, animate_height);
 }
 
-void reach_host_refresh_quick_settings_layout(reach_host *host)
-{
-    if (host == nullptr || !host->has_layout)
-    {
-        return;
-    }
-
-    reach_quick_settings_layout_context ctx = reach_host_quick_settings_layout_context(host);
-    reach_quick_settings_refresh_layout(host->quick_settings_capsule, &ctx);
-}
-
-void reach_host_update_quick_settings_animation(reach_host *host)
-{
-    if (host == nullptr || !host->has_layout)
-    {
-        return;
-    }
-
-    reach_quick_settings_layout_context ctx = reach_host_quick_settings_layout_context(host);
-    if (reach_quick_settings_update_open_animation(host->quick_settings_capsule, &ctx))
-    {
-        host->quick_settings.dirty_flags = 1;
-        host->dirty.render = 1;
-    }
-}
-
 void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
 {
     if (host == nullptr)
@@ -87,8 +61,7 @@ void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
 
     if (next_open)
     {
-        reach_host_surface_opening(host, REACH_SURFACE_ID_QUICK_SETTINGS,
-                                   REACH_SURFACE_ID_TOP_BAR);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_ID_TOP_BAR);
     }
 
     (void)reach_quick_settings_set_open(host->quick_settings_capsule, next_open);

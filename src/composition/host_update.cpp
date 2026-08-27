@@ -226,6 +226,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     }
 
     reach_host_process_quick_settings_changes(host, delta_seconds);
+    reach_host_sync_battery_saver_pending(host);
 
     host->popup_hook_reassert_seconds += delta_seconds;
     if (host->popup_hook_reassert_seconds >= 2.0)

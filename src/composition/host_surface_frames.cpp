@@ -96,12 +96,29 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
     surface_ctx.icon_size_px = reach_host_icon_size_px(host);
     surface_ctx.transition_visible = visible;
     surface_ctx.bounds_valid = desc->surface->bounds_valid;
-    if (desc->layout_anchor < REACH_HOST_SURFACE_COUNT)
+    const reach_feature_definition *definition = desc->definition;
+    reach_surface_id anchor_id =
+        definition != nullptr ? definition->layout.anchor : desc->layout_anchor;
+    if (anchor_id < REACH_HOST_SURFACE_COUNT)
     {
-        const reach_surface_desc *anchor = &host->surface_descs[desc->layout_anchor];
+        const reach_surface_desc *anchor = &host->surface_descs[anchor_id];
         if (anchor->resolved_bounds_valid)
         {
             surface_ctx.anchor_bounds = anchor->resolved_bounds;
+        }
+        if (anchor->definition != nullptr && anchor->definition->resolve_anchor != nullptr &&
+            definition != nullptr)
+        {
+            reach_feature_anchor resolved = {};
+            if (anchor->definition->resolve_anchor(anchor->capsule, definition->layout.anchor_slot,
+                                                   0, &resolved))
+            {
+                surface_ctx.anchor_button = resolved.button;
+                surface_ctx.anchor_bar_edge_y = resolved.bar_edge_y;
+                surface_ctx.anchor_bar_height = resolved.bar_height;
+                surface_ctx.anchor_direction = resolved.direction;
+                surface_ctx.anchor_valid = 1;
+            }
         }
     }
 
@@ -115,6 +132,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
     desc->capsule_ops->surface_geometry(desc->capsule, &geometry);
     desc->resolved_bounds = geometry.visible_bounds;
     desc->resolved_bounds_valid = 1;
+    surface_ctx.visible_bounds = geometry.visible_bounds;
 
     reach_rect_f32 bounds = geometry.visible_bounds;
     float opacity = 1.0f;
@@ -142,6 +160,12 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
     if (result != REACH_OK)
     {
         return result;
+    }
+    if (definition != nullptr && definition->surface.popup_chrome)
+    {
+        return reach_host_render_popup_surface(host, desc->id, desc->surface,
+                                               geometry.visible_bounds, geometry.notch_anchor_x,
+                                               geometry.notch_side, commands);
     }
     reach_host_stamp_surface_content(host, desc->id, commands);
 
@@ -310,88 +334,6 @@ reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_c
     if (host->dirty.render || host->top_bar.dirty_flags || window_changed)
     {
         (void)reach_host_render_top_bar_surface(host);
-    }
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_context *ctx)
-{
-    (void)ctx;
-    if (host->tray.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_rect_f32 tray_bounds = {};
-    reach_host_compute_tray_popup_layout(host, &tray_bounds);
-
-    reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_TRAY, &host->tray_transition, tray_bounds, &frame);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    if (frame.visible && reach_top_bar_tray_popup_is_open(host->top_bar_capsule) &&
-        (host->dirty.render || host->tray.dirty_flags))
-    {
-        (void)reach_host_render_tray_surface(host, tray_bounds);
-    }
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_frame_context *ctx)
-{
-    (void)ctx;
-    if (host->quick_settings.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_host_refresh_quick_settings_layout(host);
-    reach_host_update_quick_settings_animation(host);
-
-    const reach_rect_f32 quick_settings_bounds =
-        reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds;
-    reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(host, REACH_SURFACE_ID_QUICK_SETTINGS,
-                                                           &host->quick_settings_transition,
-                                                           quick_settings_bounds, &frame);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    if (frame.visible && reach_quick_settings_is_open(host->quick_settings_capsule) &&
-        (host->dirty.render || host->quick_settings.dirty_flags))
-    {
-        (void)reach_host_render_quick_settings_surface(host);
-    }
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_context *ctx)
-{
-    (void)ctx;
-    if (host->battery.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_host_sync_battery_saver_pending(host);
-    reach_host_relayout_battery(host);
-
-    const reach_rect_f32 battery_bounds = reach_battery_state_ptr(host->battery_capsule)->bounds;
-    reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_BATTERY, &host->battery_transition, battery_bounds, &frame);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    if (frame.visible && reach_battery_is_open(host->battery_capsule) &&
-        (host->dirty.render || host->battery.dirty_flags))
-    {
-        (void)reach_host_render_battery_surface(host);
     }
     return REACH_OK;
 }
