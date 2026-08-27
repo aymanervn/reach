@@ -294,7 +294,6 @@ add_library(reach_composition STATIC
     src/composition/host_popup_surface.cpp
     src/composition/host_battery.cpp
     src/composition/host_quick_settings.cpp
-    src/composition/host_render.cpp
     src/composition/host_surface_frames.cpp
     src/composition/host_surfaces.cpp
     src/composition/host_system_actions.cpp

@@ -132,6 +132,10 @@ extern "C"
     reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
                                                        const reach_launcher_render_context *ctx,
                                                        reach_render_command_buffer *out_commands);
+    reach_result
+    reach_launcher_append_surface_render_commands(reach_launcher *launcher,
+                                                  const reach_theme *theme, float dpi_scale,
+                                                  reach_render_command_buffer *out_commands);
 #ifdef __cplusplus
 }
 #endif

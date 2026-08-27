@@ -46,6 +46,7 @@
 #include <thread>
 
 #define REACH_HOST_MAX_ITEM_WINDOWS 16
+#define REACH_SURFACE_NATIVE_OVERLAY_CAPACITY (REACH_MAX_OPEN_WINDOWS + 1)
 
 typedef enum reach_host_animation_id
 {
@@ -198,6 +199,8 @@ typedef struct reach_feature_surface_context
     reach_rect_f32 last_bounds;
     reach_rect_f32 visible_bounds;
     reach_rect_f32 render_bounds;
+    reach_rect_f32 content_rect;
+    reach_transform_f32 render_transform;
     reach_text_measure_port text_measure;
     float dpi_scale;
     int32_t icon_size_px;
@@ -208,13 +211,37 @@ typedef struct reach_feature_surface_context
     float anchor_bar_height;
     int32_t anchor_direction;
     int32_t anchor_valid;
+    int32_t content_transform_active;
 } reach_feature_surface_context;
+
+typedef struct reach_feature_layout_anchor
+{
+    reach_surface_id surface;
+    uint32_t slot;
+    size_t index;
+} reach_feature_layout_anchor;
+
+typedef struct reach_feature_native_overlay_item
+{
+    reach_window_id source;
+    reach_window_thumbnail_placement placement;
+} reach_feature_native_overlay_item;
+
+typedef struct reach_feature_native_overlay_ops
+{
+    size_t (*generation)(const void *capsule);
+    size_t (*count)(const void *capsule);
+    reach_result (*item)(const void *capsule, size_t index, reach_feature_native_overlay_item *out);
+} reach_feature_native_overlay_ops;
 
 typedef struct reach_feature_surface_ops
 {
     int32_t (*arrange)(void *capsule, const reach_feature_surface_context *ctx);
     reach_result (*append_render_commands)(void *capsule, const reach_feature_surface_context *ctx,
                                            reach_render_command_buffer *out_commands);
+    int32_t (*layout_anchor)(const void *capsule, reach_feature_layout_anchor *out);
+    void (*set_pointer_transform)(void *capsule, reach_transform_f32 transform);
+    const reach_feature_native_overlay_ops *native_overlay;
 } reach_feature_surface_ops;
 
 typedef struct reach_surface_spec
@@ -227,6 +254,7 @@ typedef struct reach_surface_spec
     reach_surface_role role;
     int32_t pointer_priority;
     int32_t has_transition;
+    int32_t scale_in_envelope;
     int32_t popup_chrome;
     int32_t bar_shown_while_open;
     reach_surface_edge_reveal_spec edge_reveal;
@@ -288,6 +316,7 @@ typedef struct reach_surface_desc
 
     reach_surface_shadow shadow;
     int32_t popup_chrome;
+    int32_t scale_in_envelope;
 
     uint32_t behavior_flags;
 
@@ -322,6 +351,9 @@ typedef struct reach_surface_desc
     uint32_t layout_anchor_slot;
     reach_rect_f32 resolved_bounds;
     int32_t resolved_bounds_valid;
+    reach_window_thumbnail_id native_overlay_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
+    size_t native_overlay_generation;
+    int32_t native_overlay_registered;
     const reach_feature_definition *definition;
 } reach_surface_desc;
 
@@ -384,15 +416,11 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening,
 struct reach_host_frame_context
 {
     reach_rect_f32 monitor_bounds;
-    int32_t launcher_layout_changed;
 };
 typedef struct reach_host_frame_context reach_host_frame_context;
 
 void reach_host_sync_surface_input_regions(const reach_host *host, const reach_surface_desc *desc);
 
-reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface_desc *desc,
                                                  const reach_host_frame_context *ctx);
 reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id);
@@ -517,9 +545,6 @@ struct reach_host
     reach_host_deferred_launch deferred_launch;
     reach_switcher *switcher_capsule;
     reach_stage *stage_capsule;
-    reach_window_thumbnail_id stage_thumbnail_ids[REACH_STAGE_MAX_TILES];
-    size_t stage_thumbnail_generation;
-    int32_t stage_thumbnails_registered;
     reach_context_menu *context_menu_capsule;
     reach_launcher *launcher_capsule;
     int32_t running;
@@ -679,15 +704,12 @@ void reach_host_remember_launcher_restore_window(reach_host *host);
 void reach_host_toggle_launcher(reach_host *host);
 
 void reach_host_open_stage(reach_host *host);
-void reach_host_sync_stage_thumbnails(reach_host *host);
 void reach_host_sync_stage_window_states(reach_host *host);
-void reach_host_cleanup_closed_stage(reach_host *host);
 void reach_host_on_stage_edge_reveal(reach_host *host, reach_screen_hotspot_event event);
 void reach_host_close_stage(reach_host *host);
 void reach_host_toggle_stage(reach_host *host);
 reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach_ui_event *event,
                                                    const reach_capsule_pointer_result *result);
-reach_result reach_host_render_stage_surface(reach_host *host, reach_rect_f32 bounds);
 void reach_host_clear_launcher_restore_window(reach_host *host);
 void reach_host_restore_launcher_focus(reach_host *host);
 void reach_host_request_launcher_focus_restore(reach_host *host);
@@ -743,7 +765,6 @@ reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_
                                                   const reach_capsule_pointer_result *result);
 
 void reach_host_close_context_menu(reach_host *host);
-void reach_host_reanchor_context_menu(reach_host *host);
 reach_result reach_host_execute_context_command(reach_host *host, uint32_t command);
 reach_result reach_host_show_power_context_menu(reach_host *host);
 
@@ -870,11 +891,6 @@ void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme);
 
 void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot);
 
-reach_result reach_host_render_launcher_surface(reach_host *host,
-                                                const reach_launcher_layout *layout,
-                                                const reach_host_surface_transition_frame *frame);
-
-reach_result reach_host_render_context_menu_surface(reach_host *host);
 int32_t reach_host_game_mode_enabled(const reach_host *host);
 reach_result reach_host_update_game_mode(reach_host *host);
 #endif

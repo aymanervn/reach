@@ -1715,6 +1715,20 @@ reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout)
     return layout;
 }
 
+int32_t reach_dock_item_anchor(const reach_dock *dock, size_t index, reach_rect_f32 *out_button,
+                               float *out_bar_edge_y)
+{
+    if (dock == nullptr || !dock->pointer_layout_valid || out_button == nullptr ||
+        out_bar_edge_y == nullptr || index >= dock->pointer_layout.app_slot_count)
+    {
+        return 0;
+    }
+    *out_button =
+        reach_dock_rect_to_screen(&dock->pointer_layout, dock->pointer_layout.app_slots[index]);
+    *out_bar_edge_y = dock->pointer_layout.bounds.y;
+    return 1;
+}
+
 void reach_dock_rebuild_items(reach_dock *dock, const reach_dock_build_context *ctx,
                               const reach_dock_layout *old_layout, reach_dock_layout *out_layout)
 {

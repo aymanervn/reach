@@ -1,11 +1,5 @@
 #include "host_internal.h"
 
-typedef struct reach_host_frame_state
-{
-    int32_t window_changed;
-    int32_t visible;
-} reach_host_frame_state;
-
 void reach_host_sync_surface_input_regions(const reach_host *host, const reach_surface_desc *desc)
 {
     if (desc->surface == nullptr || desc->capsule_ops == nullptr ||
@@ -34,31 +28,6 @@ static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id
     reach_layout_set_visible(&host->layout_manager, host->surface_participants[id], visible);
 }
 
-static reach_result reach_host_apply_transient_frame(reach_host *host, reach_surface_id id,
-                                                     reach_host_surface_transition *transition,
-                                                     reach_rect_f32 target_bounds,
-                                                     reach_host_frame_state *out)
-{
-    *out = {};
-
-    reach_surface_runtime *surface = host->surface_descs[id].surface;
-    reach_rect_f32 bounds = reach_host_surface_transition_bounds(host, transition, target_bounds);
-    float opacity = reach_host_surface_transition_opacity(host, transition);
-    reach_result result = reach_host_apply_window_state(
-        &surface->window, bounds, reach_host_surface_shadow_pad(host, id), opacity,
-        &surface->last_bounds, &surface->last_opacity, &surface->bounds_valid,
-        &surface->opacity_valid, &out->window_changed);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    out->visible = reach_host_surface_transition_visible(transition);
-    reach_host_set_surface_visible(host, id, out->visible);
-
-    return REACH_OK;
-}
-
 static void reach_host_fill_surface_context(reach_host *host, const reach_surface_desc *desc,
                                             const reach_host_frame_context *ctx,
                                             reach_feature_surface_context *out)
@@ -85,6 +54,11 @@ reach_host_execute_registered_surface(reach_host *host, reach_surface_desc *desc
     if (result != REACH_OK)
     {
         return result;
+    }
+    if (ctx->content_transform_active)
+    {
+        reach_render_command_buffer_set_content_transform(commands, ctx->content_rect,
+                                                          ctx->render_transform);
     }
 
     const reach_feature_definition *definition = desc->definition;
@@ -119,6 +93,104 @@ static int32_t reach_host_bar_position_only(const reach_surface_desc *desc)
     }
     reach_bar_reveal_animation animation = desc->bar_reveal.ops->animation(desc->capsule);
     return animation.position_animating && !animation.content_animating;
+}
+
+static void reach_host_release_native_overlay(reach_host *host, reach_surface_desc *desc)
+{
+    if (!desc->native_overlay_registered)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_SURFACE_NATIVE_OVERLAY_CAPACITY; ++index)
+    {
+        desc->native_overlay_ids[index] = REACH_WINDOW_THUMBNAIL_NONE;
+    }
+    desc->native_overlay_registered = 0;
+    if (host->window_thumbnails.ops.destroy_all != nullptr)
+    {
+        (void)host->window_thumbnails.ops.destroy_all(host->window_thumbnails.thumbnails);
+    }
+}
+
+static void reach_host_register_native_overlay(reach_host *host, reach_surface_desc *desc,
+                                               const reach_feature_native_overlay_ops *ops)
+{
+    if (host->window_thumbnails.ops.create == nullptr ||
+        host->window_thumbnails.ops.set_target == nullptr ||
+        desc->surface->window.ops.native_id == nullptr)
+    {
+        return;
+    }
+
+    reach_host_release_native_overlay(host, desc);
+    desc->native_overlay_generation = ops->generation(desc->capsule);
+    reach_window_id target = desc->surface->window.ops.native_id(desc->surface->window.window);
+    if (target == 0 || host->window_thumbnails.ops.set_target(host->window_thumbnails.thumbnails,
+                                                              target) != REACH_OK)
+    {
+        return;
+    }
+
+    size_t count = ops->count(desc->capsule);
+    if (count > REACH_SURFACE_NATIVE_OVERLAY_CAPACITY)
+    {
+        count = REACH_SURFACE_NATIVE_OVERLAY_CAPACITY;
+    }
+    for (size_t index = count; index > 0; --index)
+    {
+        size_t item_index = index - 1;
+        reach_feature_native_overlay_item item = {};
+        if (ops->item(desc->capsule, item_index, &item) != REACH_OK)
+        {
+            continue;
+        }
+        reach_window_thumbnail_id id = REACH_WINDOW_THUMBNAIL_NONE;
+        if (host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails, item.source,
+                                               &id) == REACH_OK)
+        {
+            desc->native_overlay_ids[item_index] = id;
+            desc->native_overlay_registered = 1;
+        }
+    }
+}
+
+static void reach_host_sync_native_overlay(reach_host *host, reach_surface_desc *desc,
+                                           reach_rect_f32 visible_bounds)
+{
+    const reach_feature_native_overlay_ops *ops = desc->surface_ops->native_overlay;
+    if (ops == nullptr || ops->generation == nullptr || ops->count == nullptr ||
+        ops->item == nullptr || host->window_thumbnails.ops.set_placement == nullptr)
+    {
+        return;
+    }
+    if (!desc->native_overlay_registered ||
+        desc->native_overlay_generation != ops->generation(desc->capsule))
+    {
+        reach_host_register_native_overlay(host, desc, ops);
+    }
+
+    size_t count = ops->count(desc->capsule);
+    if (count > REACH_SURFACE_NATIVE_OVERLAY_CAPACITY)
+    {
+        count = REACH_SURFACE_NATIVE_OVERLAY_CAPACITY;
+    }
+    for (size_t index = 0; index < count; ++index)
+    {
+        reach_window_thumbnail_id id = desc->native_overlay_ids[index];
+        if (id == REACH_WINDOW_THUMBNAIL_NONE)
+        {
+            continue;
+        }
+        reach_feature_native_overlay_item item = {};
+        if (ops->item(desc->capsule, index, &item) != REACH_OK)
+        {
+            continue;
+        }
+        item.placement.destination.x -= visible_bounds.x;
+        item.placement.destination.y -= visible_bounds.y;
+        (void)host->window_thumbnails.ops.set_placement(host->window_thumbnails.thumbnails, id,
+                                                        &item.placement);
+    }
 }
 
 reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id)
@@ -165,12 +237,25 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
 
     int32_t open =
         desc->capsule_ops->is_open == nullptr ? 1 : desc->capsule_ops->is_open(desc->capsule);
+    int32_t needs_frame =
+        desc->capsule_ops->needs_frame != nullptr && desc->capsule_ops->needs_frame(desc->capsule);
+    int32_t active = open || needs_frame;
+    if (desc->transition != nullptr && !active)
+    {
+        reach_host_surface_transition_set(host, desc->transition, 0);
+    }
     int32_t visible = desc->transition != nullptr
                           ? reach_host_surface_transition_visible(desc->transition)
-                          : open;
+                          : active;
+    int32_t frame_active = active || (desc->scale_in_envelope && visible);
+    if (!active && desc->surface_ops->native_overlay != nullptr)
+    {
+        reach_host_release_native_overlay(host, desc);
+    }
     reach_host_set_surface_visible(host, desc->id, visible);
     if (!visible)
     {
+        reach_host_release_native_overlay(host, desc);
         return REACH_OK;
     }
 
@@ -178,8 +263,15 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
     reach_host_fill_surface_context(host, desc, ctx, &surface_ctx);
     surface_ctx.transition_visible = visible;
     const reach_feature_definition *definition = desc->definition;
-    reach_surface_id anchor_id =
-        definition != nullptr ? definition->layout.anchor : desc->layout_anchor;
+    reach_feature_layout_anchor layout_anchor = {};
+    layout_anchor.surface = definition != nullptr ? definition->layout.anchor : desc->layout_anchor;
+    layout_anchor.slot =
+        definition != nullptr ? definition->layout.anchor_slot : desc->layout_anchor_slot;
+    if (desc->surface_ops->layout_anchor != nullptr)
+    {
+        (void)desc->surface_ops->layout_anchor(desc->capsule, &layout_anchor);
+    }
+    reach_surface_id anchor_id = layout_anchor.surface;
     if (anchor_id < REACH_HOST_SURFACE_COUNT)
     {
         const reach_surface_desc *anchor = &host->surface_descs[anchor_id];
@@ -191,8 +283,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
             definition != nullptr)
         {
             reach_feature_anchor resolved = {};
-            if (anchor->definition->resolve_anchor(anchor->capsule, definition->layout.anchor_slot,
-                                                   0, &resolved))
+            if (anchor->definition->resolve_anchor(anchor->capsule, layout_anchor.slot,
+                                                   layout_anchor.index, &resolved))
             {
                 surface_ctx.anchor_button = resolved.button;
                 surface_ctx.anchor_bar_edge_y = resolved.bar_edge_y;
@@ -204,7 +296,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
     }
 
     int32_t layout_changed = desc->surface_ops->arrange(desc->capsule, &surface_ctx);
-    if (desc->capsule_ops->needs_frame != nullptr && desc->capsule_ops->needs_frame(desc->capsule))
+    if (needs_frame)
     {
         desc->surface->dirty_flags = 1;
         reach_host_request_update(host);
@@ -224,190 +316,90 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
         bounds = reach_host_reconcile_bar_visibility(host, desc->id, geometry.visible_bounds,
                                                      ctx->monitor_bounds);
     }
+    reach_shadow_pad shadow_pad = reach_host_surface_shadow_pad(host, desc->id);
     float opacity = 1.0f;
-    if (desc->transition != nullptr)
+    float applied_scale = 1.0f;
+    int32_t scale_changed = 0;
+    int32_t transition_frame_active = 0;
+    if (definition != nullptr && definition->surface.scale_in_envelope &&
+        desc->transition != nullptr)
+    {
+        reach_host_surface_transition_frame frame =
+            reach_host_surface_transition_frame_compute_in_envelope(
+                host, desc->transition, geometry.visible_bounds, geometry.envelope_bounds,
+                shadow_pad);
+        if (frame.scale_envelope_active)
+        {
+            float shadow_scale =
+                desc->transition->start_scale > 1.0f ? desc->transition->start_scale : 1.0f;
+            shadow_pad.left *= shadow_scale;
+            shadow_pad.top *= shadow_scale;
+            shadow_pad.right *= shadow_scale;
+            shadow_pad.bottom *= shadow_scale;
+            frame = reach_host_surface_transition_frame_compute_in_envelope(
+                host, desc->transition, geometry.visible_bounds, geometry.envelope_bounds,
+                shadow_pad);
+        }
+        bounds = frame.window_bounds;
+        surface_ctx.content_rect = frame.content_rect;
+        surface_ctx.render_transform = frame.render_transform;
+        surface_ctx.content_transform_active = frame.scale_envelope_active;
+        applied_scale = frame.scale;
+        scale_changed = !desc->surface->transition_scale_valid ||
+                        !reach_host_scalar_equal(desc->surface->last_transition_scale, frame.scale);
+        transition_frame_active = reach_host_surface_transition_active(host, desc->transition);
+        if (desc->surface_ops->set_pointer_transform != nullptr)
+        {
+            desc->surface_ops->set_pointer_transform(desc->capsule, frame.pointer_transform);
+        }
+        if (desc->surface->window.ops.set_input_regions != nullptr)
+        {
+            if (frame.scale_envelope_active)
+            {
+                (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window,
+                                                                  &frame.content_rect, 1);
+                desc->surface->transition_input_region_active = 1;
+            }
+            else if (desc->surface->transition_input_region_active)
+            {
+                (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window,
+                                                                  nullptr, 0);
+                desc->surface->transition_input_region_active = 0;
+            }
+        }
+    }
+    else if (desc->transition != nullptr)
     {
         bounds = reach_host_surface_transition_bounds(host, desc->transition, bounds);
+    }
+    if (desc->transition != nullptr)
+    {
         opacity = reach_host_surface_transition_opacity(host, desc->transition);
     }
     surface_ctx.render_bounds = bounds;
 
     int32_t window_changed = 0;
     reach_result result = reach_host_apply_window_state(
-        &desc->surface->window, bounds, reach_host_surface_shadow_pad(host, desc->id), opacity,
-        &desc->surface->last_bounds, &desc->surface->last_opacity, &desc->surface->bounds_valid,
-        &desc->surface->opacity_valid, &window_changed);
+        &desc->surface->window, bounds, shadow_pad, opacity, &desc->surface->last_bounds,
+        &desc->surface->last_opacity, &desc->surface->bounds_valid, &desc->surface->opacity_valid,
+        &window_changed);
     int32_t position_only = reach_host_bar_position_only(desc);
     int32_t render_needed = host->dirty.render || desc->surface->dirty_flags || layout_changed ||
-                            geometry_changed || (window_changed && !position_only);
-    if (result != REACH_OK || !open || !render_needed)
+                            geometry_changed || scale_changed || transition_frame_active ||
+                            (window_changed && !position_only);
+    if (result == REACH_OK && active && desc->surface_ops->native_overlay != nullptr)
+    {
+        reach_host_sync_native_overlay(host, desc, geometry.visible_bounds);
+    }
+    if (result != REACH_OK || !frame_active || !render_needed)
     {
         return result;
     }
-    return reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
-}
-
-reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx)
-{
-    const int32_t launcher_layout_changed = ctx->launcher_layout_changed;
-    reach_shadow_pad launcher_shadow_pad =
-        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_LAUNCHER);
-    reach_feature_surface_geometry launcher_geometry = {};
-    launcher_geometry.visible_bounds = host->layout.launcher.bounds;
-    launcher_geometry.envelope_bounds = host->layout.launcher.envelope_bounds;
-    const reach_feature_capsule_ops *launcher_ops =
-        host->surface_descs[REACH_SURFACE_ID_LAUNCHER].capsule_ops;
-    if (launcher_ops != nullptr && launcher_ops->surface_geometry != nullptr)
+    result = reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
+    if (result == REACH_OK && definition != nullptr && definition->surface.scale_in_envelope)
     {
-        launcher_ops->surface_geometry(host->launcher_capsule, &launcher_geometry);
+        desc->surface->last_transition_scale = applied_scale;
+        desc->surface->transition_scale_valid = 1;
     }
-    reach_surface_desc *launcher_desc = &host->surface_descs[REACH_SURFACE_ID_LAUNCHER];
-    launcher_desc->resolved_bounds = launcher_geometry.visible_bounds;
-    launcher_desc->resolved_bounds_valid = 1;
-    reach_host_surface_transition_frame frame =
-        reach_host_surface_transition_frame_compute_in_envelope(
-            host, &host->launcher_transition, launcher_geometry.visible_bounds,
-            launcher_geometry.envelope_bounds, launcher_shadow_pad);
-    if (frame.scale_envelope_active)
-    {
-        launcher_shadow_pad.left *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
-        launcher_shadow_pad.top *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
-        launcher_shadow_pad.right *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
-        launcher_shadow_pad.bottom *= REACH_HOST_LAUNCHER_TRANSITION_SCALE;
-        frame = reach_host_surface_transition_frame_compute_in_envelope(
-            host, &host->launcher_transition, launcher_geometry.visible_bounds,
-            launcher_geometry.envelope_bounds, launcher_shadow_pad);
-    }
-    int32_t launcher_scale_changed =
-        !host->launcher.transition_scale_valid ||
-        !reach_host_scalar_equal(host->launcher.last_transition_scale, frame.scale);
-
-    int32_t launcher_window_changed = 0;
-    float launcher_opacity =
-        reach_host_surface_transition_opacity(host, &host->launcher_transition);
-    reach_result result = reach_host_apply_window_state(
-        &host->launcher.window, frame.window_bounds, launcher_shadow_pad, launcher_opacity,
-        &host->launcher.last_bounds, &host->launcher.last_opacity, &host->launcher.bounds_valid,
-        &host->launcher.opacity_valid, &launcher_window_changed);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    reach_launcher_set_pointer_transform(host->launcher_capsule, frame.pointer_transform);
-
-    if (host->launcher.window.ops.set_input_regions != nullptr)
-    {
-        if (frame.scale_envelope_active)
-        {
-            (void)host->launcher.window.ops.set_input_regions(host->launcher.window.window,
-                                                              &frame.content_rect, 1);
-            host->launcher.transition_input_region_active = 1;
-        }
-        else if (host->launcher.transition_input_region_active)
-        {
-            (void)host->launcher.window.ops.set_input_regions(host->launcher.window.window, nullptr,
-                                                              0);
-            host->launcher.transition_input_region_active = 0;
-        }
-    }
-
-    if (reach_host_surface_transition_visible(&host->launcher_transition) &&
-        (host->dirty.render || host->launcher.dirty_flags || launcher_layout_changed ||
-         launcher_window_changed || launcher_scale_changed ||
-         reach_host_surface_transition_active(host, &host->launcher_transition)))
-    {
-        (void)reach_host_render_launcher_surface(host, &host->layout.launcher, &frame);
-        host->launcher.last_transition_scale = frame.scale;
-        host->launcher.transition_scale_valid = 1;
-    }
-    reach_host_set_surface_visible(
-        host, REACH_SURFACE_ID_LAUNCHER,
-        reach_host_surface_transition_visible(&host->launcher_transition));
-
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx)
-{
-    if (host->stage.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    const reach_stage_state *state = reach_stage_state_ptr(host->stage_capsule);
-    if (state == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_host_set_surface_visible(
-        host, REACH_SURFACE_ID_STAGE,
-        state->open || reach_host_surface_transition_visible(&host->stage_transition));
-
-    if (!state->open && reach_host_surface_transition_visible(&host->stage_transition))
-    {
-        reach_host_surface_transition_set(host, &host->stage_transition, 0);
-    }
-
-    reach_rect_f32 stage_bounds = state->open ? state->bounds : ctx->monitor_bounds;
-
-    int32_t window_changed = 0;
-    reach_rect_f32 bounds =
-        reach_host_surface_transition_bounds(host, &host->stage_transition, stage_bounds);
-    float opacity = reach_host_surface_transition_opacity(host, &host->stage_transition);
-    reach_result result = reach_host_apply_window_state(
-        &host->stage.window, bounds, reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_STAGE),
-        opacity, &host->stage.last_bounds, &host->stage.last_opacity, &host->stage.bounds_valid,
-        &host->stage.opacity_valid, &window_changed);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    if (state->open)
-    {
-        if (reach_stage_is_open(host->stage_capsule))
-        {
-            reach_host_sync_stage_thumbnails(host);
-            if (host->dirty.render || host->stage.dirty_flags || window_changed)
-            {
-                (void)reach_host_render_stage_surface(host, stage_bounds);
-            }
-        }
-    }
-    else
-    {
-        reach_host_cleanup_closed_stage(host);
-    }
-
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx)
-{
-    (void)ctx;
-    if (host->context_menu.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_host_reanchor_context_menu(host);
-
-    const reach_rect_f32 context_menu_bounds =
-        reach_context_menu_state_ptr(host->context_menu_capsule)->bounds;
-    reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(host, REACH_SURFACE_ID_CONTEXT_MENU,
-                                                           &host->context_menu_transition,
-                                                           context_menu_bounds, &frame);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    if (frame.visible && reach_context_menu_is_open(host->context_menu_capsule) &&
-        (host->dirty.render || host->context_menu.dirty_flags))
-    {
-        (void)reach_host_render_context_menu_surface(host);
-    }
-    return REACH_OK;
+    return result;
 }
