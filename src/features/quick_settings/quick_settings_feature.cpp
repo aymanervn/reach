@@ -670,6 +670,8 @@ struct reach_quick_settings
 
     reach_system_status *status;
 
+    int32_t relayout_animate_pending;
+
     int32_t bluetooth_pending_active;
     double bluetooth_pending_elapsed_seconds;
     double bluetooth_pending_refresh_elapsed_seconds;
@@ -987,45 +989,135 @@ reach_quick_settings_capsule_apply_pressable_result(const reach_pressable_result
     out->sync_pointer_subscriptions |= pressable->sync_pointer_subscriptions;
 }
 
-static void reach_quick_settings_capsule_apply_action(const reach_quick_settings_action *action,
-                                                      reach_capsule_pointer_result *out)
+static void reach_quick_settings_toggle_bluetooth(reach_quick_settings *quick_settings,
+                                                  reach_capsule_pointer_result *out)
 {
-    if (action == nullptr || out == nullptr)
+    if (quick_settings->state.model.bluetooth_pending)
     {
         return;
     }
-    out->action.value = action->volume_level;
-    out->action.index = action->session_index;
+
+    out->redraw = 1;
+
+    if (!reach_quick_settings_bluetooth_available(quick_settings))
+    {
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        return;
+    }
+
+    int32_t target_enabled = reach_quick_settings_bluetooth_enabled(quick_settings) ? 0 : 1;
+    reach_quick_settings_set_bluetooth_pending(quick_settings, 1, target_enabled);
+
+    switch (reach_system_status_set_bluetooth_enabled(quick_settings->status, target_enabled))
+    {
+    case REACH_SYSTEM_STATUS_BLUETOOTH_PENDING:
+        break;
+    case REACH_SYSTEM_STATUS_BLUETOOTH_REJECTED:
+        reach_quick_settings_set_bluetooth_pending(quick_settings, 0, 0);
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        break;
+    case REACH_SYSTEM_STATUS_BLUETOOTH_APPLIED:
+    case REACH_SYSTEM_STATUS_BLUETOOTH_UNSUPPORTED:
+    default:
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        reach_quick_settings_set_bluetooth_pending(quick_settings, 0, 0);
+        break;
+    }
+}
+
+static void reach_quick_settings_capsule_perform_action(reach_quick_settings *quick_settings,
+                                                        const reach_quick_settings_action *action,
+                                                        reach_capsule_pointer_result *out)
+{
+    if (quick_settings == nullptr || action == nullptr || out == nullptr)
+    {
+        return;
+    }
+
     switch (action->type)
     {
     case REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_SET_MAIN_VOLUME;
+    {
+        int32_t muted = quick_settings->state.model.main_muted;
+        (void)reach_system_status_set_main_volume(quick_settings->status, action->volume_level,
+                                                  &muted);
+        reach_quick_settings_apply_main_volume(quick_settings, action->volume_level, muted);
+        out->redraw = 1;
         break;
+    }
     case REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_SET_SESSION_VOLUME;
+    {
+        const uint16_t *session_instance_id = reach_quick_settings_set_session_level(
+            quick_settings, action->session_index, action->volume_level);
+        if (session_instance_id != nullptr)
+        {
+            (void)reach_system_status_set_session_volume(quick_settings->status,
+                                                         session_instance_id,
+                                                         action->volume_level);
+        }
+        out->redraw = 1;
         break;
+    }
     case REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_SET_BRIGHTNESS;
+        (void)reach_system_status_set_brightness(quick_settings->status, action->volume_level);
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        out->redraw = 1;
         break;
+
     case REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_NETWORK_TILE;
+        (void)reach_system_status_open_system_quick_settings(quick_settings->status);
+        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_CLOSE;
         break;
+
     case REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BLUETOOTH;
+        reach_quick_settings_toggle_bluetooth(quick_settings, out);
         break;
+
     case REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_OPEN_PROJECT;
+        (void)reach_system_status_open_project_menu(quick_settings->status);
+        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_CLOSE;
         break;
+
     case REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_OUTPUT_DEVICES;
+        (void)reach_quick_settings_toggle_output_devices(quick_settings);
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        reach_quick_settings_refresh_audio(quick_settings);
+        quick_settings->relayout_animate_pending = 1;
+        out->redraw = 1;
+        out->relayout = 1;
         break;
+
     case REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_SET_OUTPUT_DEVICE;
-        out->action.index = action->output_device_index;
+    {
+        const uint16_t *output_device_id =
+            reach_quick_settings_output_device_id(quick_settings, action->output_device_index);
+        int32_t changed =
+            output_device_id != nullptr &&
+            reach_system_status_set_default_output_device(quick_settings->status,
+                                                          output_device_id) == REACH_OK;
+        if (changed)
+        {
+            reach_quick_settings_collapse_output_devices(quick_settings);
+        }
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        reach_quick_settings_refresh_audio(quick_settings);
+        if (changed)
+        {
+            quick_settings->relayout_animate_pending = 1;
+            out->relayout = 1;
+        }
+        out->redraw = 1;
         break;
+    }
     case REACH_QUICK_SETTINGS_ACTION_EXPAND:
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_EXPAND;
+        (void)reach_quick_settings_toggle_expanded(quick_settings);
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        reach_quick_settings_refresh_audio(quick_settings);
+        quick_settings->relayout_animate_pending = 1;
+        out->redraw = 1;
+        out->relayout = 1;
         break;
+
     case REACH_QUICK_SETTINGS_ACTION_NONE:
     default:
         break;
@@ -1054,7 +1146,7 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
         if (reach_quick_settings_drag_active(quick_settings))
         {
             out->handled = 1;
-            reach_quick_settings_capsule_apply_action(&action, out);
+            reach_quick_settings_capsule_perform_action(quick_settings, &action, out);
             out->capture = 1;
             out->sync_pointer_subscriptions = 1;
             return;
@@ -1095,7 +1187,7 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
         if (pressable.activated && reach_quick_settings_press_actions_match(
                                        &quick_settings->press_action, &released_action))
         {
-            reach_quick_settings_capsule_apply_action(&released_action, out);
+            reach_quick_settings_capsule_perform_action(quick_settings, &released_action, out);
         }
         quick_settings->press_action = {};
         return;
@@ -1137,7 +1229,7 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
             return;
         }
         out->handled = 1;
-        reach_quick_settings_capsule_apply_action(&action, out);
+        reach_quick_settings_capsule_perform_action(quick_settings, &action, out);
         return;
     }
     if (((event->kind == REACH_POINTER_EVENT_UP && event->button == REACH_POINTER_BUTTON_PRIMARY) ||
@@ -1522,8 +1614,23 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
 
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
 
+    reach_rect_f32 previous_target = state->target_bounds;
+    float current_height = state->bounds.height;
     reach_popup_placement placement = reach_quick_settings_placement(quick_settings, ctx, 0.0f);
     state->target_bounds = placement.bounds;
+
+    /* A content change requests an animated relayout; the next arrange resolves it against the
+       live anchor instead of composition re-deriving the popup's layout context. */
+    if (quick_settings->relayout_animate_pending)
+    {
+        quick_settings->relayout_animate_pending = 0;
+        if (reach_quick_settings_height_changed(previous_target.height, placement.bounds.height))
+        {
+            reach_quick_settings_start_height_animation(quick_settings, current_height,
+                                                        placement.bounds.height);
+        }
+    }
+
     if (!reach_quick_settings_height_animation_active(quick_settings))
     {
         state->bounds = state->target_bounds;
@@ -1556,24 +1663,7 @@ void reach_quick_settings_relayout(reach_quick_settings *quick_settings,
         return;
     }
 
-    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-
-    reach_rect_f32 old_target = state->target_bounds;
-    reach_rect_f32 current_bounds = state->bounds;
-    reach_rect_f32 new_target = reach_quick_settings_placement(quick_settings, ctx, 0.0f).bounds;
-
-    state->target_bounds = new_target;
-
-    if (animate_height && reach_quick_settings_height_changed(old_target.height, new_target.height))
-    {
-        reach_quick_settings_start_height_animation(quick_settings, current_bounds.height,
-                                                    new_target.height);
-    }
-    else if (!reach_quick_settings_height_animation_active(quick_settings))
-    {
-        state->bounds = new_target;
-    }
-
+    quick_settings->relayout_animate_pending = animate_height ? 1 : 0;
     reach_quick_settings_refresh_layout(quick_settings, ctx);
 }
 
@@ -1614,12 +1704,6 @@ int32_t reach_quick_settings_update_open_animation(reach_quick_settings *quick_s
     }
 
     return 0;
-}
-
-int32_t reach_quick_settings_bluetooth_pending(reach_quick_settings *quick_settings)
-{
-    return quick_settings != nullptr &&
-           reach_quick_settings_state_mut(quick_settings)->model.bluetooth_pending;
 }
 
 int32_t reach_quick_settings_bluetooth_available(reach_quick_settings *quick_settings)

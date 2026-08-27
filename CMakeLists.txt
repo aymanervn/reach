@@ -959,6 +959,18 @@ target_link_libraries(reach_bluetooth_tests PRIVATE
     reach_support
 )
 
+add_executable(reach_system_status_tests
+    tests/system_status_tests.cpp
+)
+
+reach_configure_common(reach_system_status_tests)
+target_compile_features(reach_system_status_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_system_status_tests PRIVATE
+    reach_services
+    reach_core
+    reach_support
+)
+
 add_executable(reach_system_controls_network_tests
     tests/system_controls_network_tests.cpp
     src/adapters/windows/system_controls_network.cpp
@@ -981,6 +993,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_host_layout_tests COMMAND reach_host_layout_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_battery_feature_tests COMMAND reach_battery_feature_tests)
+    add_test(NAME reach_system_status_tests COMMAND reach_system_status_tests)
     add_test(NAME reach_system_hud_feature_tests COMMAND reach_system_hud_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)

@@ -118,6 +118,32 @@ void reach_battery_format_percent(uint16_t *dst, size_t dst_count, int32_t perce
     dst[length] = 0;
 }
 
+void reach_battery_attach_services(reach_battery *battery, reach_system_stats *stats,
+                                   reach_system_status *status)
+{
+    if (battery != nullptr)
+    {
+        battery->stats = stats;
+        battery->status = status;
+    }
+}
+
+int32_t reach_battery_refresh_power(reach_battery *battery)
+{
+    if (battery == nullptr)
+    {
+        return 0;
+    }
+
+    reach_system_stats_snapshot snapshot = {};
+    reach_system_stats_snapshot_take(battery->stats, &snapshot);
+
+    int32_t has_reading =
+        snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
+    return reach_battery_set_power(battery, has_reading ? snapshot.power.battery_percent : 0,
+                                   snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0);
+}
+
 int32_t reach_battery_set_power(reach_battery *battery, int32_t percent, int32_t saver_on)
 {
     if (battery == nullptr)
@@ -331,6 +357,14 @@ static uint64_t reach_battery_pressable_target(reach_battery_pointer_action_kind
                : REACH_PRESSABLE_TARGET_NONE;
 }
 
+static void reach_battery_toggle_saver(reach_battery *battery)
+{
+    int32_t target_enabled = reach_battery_model_saver_effective(&battery->state.model) ? 0 : 1;
+    reach_battery_set_saver_pending(battery, 1, target_enabled);
+    (void)reach_system_status_set_battery_saver_enabled(battery->status, target_enabled);
+    (void)reach_battery_refresh_power(battery);
+}
+
 static void reach_battery_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
                                                  reach_capsule_pointer_result *out)
 {
@@ -378,7 +412,8 @@ static void reach_battery_capsule_handle_pointer(void *capsule, const reach_poin
         out->handled = 1;
         if (pressable.activated)
         {
-            out->action.kind = REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER;
+            reach_battery_toggle_saver(battery);
+            out->redraw = 1;
         }
         return;
     }
