@@ -491,15 +491,35 @@ static int32_t reach_stage_capsule_pointer_sequence_active(const void *capsule)
     return stage != nullptr && reach_pressable_tracking(&stage->pressable);
 }
 
+static void reach_stage_capsule_surface_geometry(const void *capsule,
+                                                 reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_stage *stage = static_cast<const reach_stage *>(capsule);
+    if (stage != nullptr)
+    {
+        out->visible_bounds = stage->state.bounds;
+    }
+}
+
 void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
                                 reach_capsule_pointer_result *out);
 
 const reach_feature_capsule_ops *reach_stage_capsule_ops(void)
 {
-    static const reach_feature_capsule_ops ops = {
-        reach_stage_capsule_reset,       reach_stage_capsule_tick,
-        reach_stage_capsule_is_open,     reach_stage_capsule_on_game_mode,
-        reach_stage_capsule_needs_frame, reach_stage_capsule_wants_pointer_move,
-        reach_stage_handle_pointer,      reach_stage_capsule_pointer_sequence_active};
+    static const reach_feature_capsule_ops ops = {reach_stage_capsule_reset,
+                                                  reach_stage_capsule_tick,
+                                                  reach_stage_capsule_is_open,
+                                                  reach_stage_capsule_on_game_mode,
+                                                  reach_stage_capsule_needs_frame,
+                                                  reach_stage_capsule_wants_pointer_move,
+                                                  reach_stage_handle_pointer,
+                                                  reach_stage_capsule_pointer_sequence_active,
+                                                  nullptr,
+                                                  reach_stage_capsule_surface_geometry};
     return &ops;
 }

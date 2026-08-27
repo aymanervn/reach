@@ -109,7 +109,7 @@ extern "C"
                                                      int32_t drop_direction, float margin, float x,
                                                      float y);
 
-    const reach_context_menu_state *reach_context_menu_state_ptr(reach_context_menu *menu);
+    const reach_context_menu_state *reach_context_menu_state_ptr(const reach_context_menu *menu);
 
     typedef struct reach_context_menu_render_context
     {

@@ -319,10 +319,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 {
                     host->dock.dirty_flags = 1;
                 }
-                int32_t launcher_layout_changed =
-                    !host->has_layout ||
-                    !reach_host_rect_equal(host->layout.launcher.bounds, layout.launcher.bounds);
-
                 host->layout = layout;
                 host->has_layout = 1;
                 reach_launcher_set_pointer_context(host->launcher_capsule, &host->layout.launcher,
@@ -330,7 +326,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
 
                 reach_host_frame_context frame_ctx = {};
                 frame_ctx.monitor_bounds = bounds;
-                frame_ctx.launcher_layout_changed = launcher_layout_changed;
                 reach_host_sync_edge_reveals(host, bounds);
                 reach_surface_id frame_order[REACH_HOST_SURFACE_COUNT];
                 size_t frame_count = 0;

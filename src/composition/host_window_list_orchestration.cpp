@@ -227,7 +227,6 @@ reach_result reach_host_window_list_close_window(reach_host *host, uintptr_t win
     }
     else
     {
-        reach_host_reanchor_context_menu(host);
         host->context_menu.dirty_flags = 1;
         host->dirty.render = 1;
         host->window_list.grace_seconds = 0.0;

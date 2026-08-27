@@ -29,11 +29,15 @@ static reach_host transition_host;
 static reach_host transition_frame_host;
 static reach_host registry_host;
 static reach_host generic_frame_host;
+static reach_host native_overlay_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
 static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
 static reach_rect_f32 observed_bounds;
 static size_t render_count;
+static size_t thumbnail_create_count;
+static size_t thumbnail_place_count;
+static size_t thumbnail_destroy_count;
 
 static reach_result fake_get_window_manipulation(reach_input_source *source,
                                                  reach_window_manipulation *out_manipulation)
@@ -74,6 +78,45 @@ static const reach_monitor_info *fake_primary_monitor(const reach_monitor_list *
 static reach_window_id fake_window_id(const reach_platform_window *window)
 {
     return (reach_window_id)(uintptr_t)window;
+}
+
+static reach_result fake_thumbnail_set_target(reach_window_thumbnails *thumbnails,
+                                              reach_window_id target)
+{
+    (void)thumbnails;
+    return target != 0 ? REACH_OK : REACH_ERROR;
+}
+
+static reach_result fake_thumbnail_create(reach_window_thumbnails *thumbnails,
+                                          reach_window_id source, reach_window_thumbnail_id *out_id)
+{
+    (void)thumbnails;
+    if (source == 0 || out_id == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out_id = ++thumbnail_create_count;
+    return REACH_OK;
+}
+
+static reach_result fake_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
+                                                 reach_window_thumbnail_id id,
+                                                 const reach_window_thumbnail_placement *placement)
+{
+    (void)thumbnails;
+    if (id == REACH_WINDOW_THUMBNAIL_NONE || placement == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    thumbnail_place_count++;
+    return REACH_OK;
+}
+
+static reach_result fake_thumbnail_destroy_all(reach_window_thumbnails *thumbnails)
+{
+    (void)thumbnails;
+    thumbnail_destroy_count++;
+    return REACH_OK;
 }
 
 static void record_call(fake_window_call_kind kind, const reach_platform_window *window,
@@ -422,6 +465,9 @@ static void test_registered_feature_lifecycle(void)
                     "every definition has the runtime's stable surface id");
         expect_true(definition != nullptr && definition->capsule_ops == runtime->capsule_ops,
                     "every definition owns the capsule operation contract");
+        expect_true(definition != nullptr && definition->surface_ops != nullptr &&
+                        runtime->frame == nullptr,
+                    "every registered surface uses the generic frame contract");
         expect_true(definition != nullptr && definition->surface.cls == runtime->cls &&
                         definition->surface.role == runtime->role &&
                         definition->surface.layer == runtime->layer,
@@ -431,12 +477,23 @@ static void test_registered_feature_lifecycle(void)
                     "every definition owns the layout specification");
     }
 
-    expect_true(host->surface_descs[REACH_SURFACE_ID_DOCK].frame == nullptr &&
-                    host->surface_descs[REACH_SURFACE_ID_DOCK].surface_ops != nullptr,
-                "Dock uses the generic registered surface frame");
-    expect_true(host->surface_descs[REACH_SURFACE_ID_TOP_BAR].frame == nullptr &&
-                    host->surface_descs[REACH_SURFACE_ID_TOP_BAR].surface_ops != nullptr,
-                "Top Bar uses the generic registered surface frame");
+    const reach_feature_definition *launcher =
+        host->surface_descs[REACH_SURFACE_ID_LAUNCHER].definition;
+    expect_true(launcher->surface.scale_in_envelope &&
+                    launcher->surface_ops->set_pointer_transform != nullptr,
+                "Launcher declares its envelope transform contract");
+    expect_true(
+        host->surface_descs[REACH_SURFACE_ID_CONTEXT_MENU].definition->surface_ops->layout_anchor !=
+            nullptr,
+        "Context Menu declares runtime-selected layout anchoring");
+    expect_true(
+        host->surface_descs[REACH_SURFACE_ID_STAGE].definition->surface_ops->native_overlay !=
+            nullptr,
+        "Stage declares its native overlay contract");
+    expect_true(host->surface_descs[REACH_SURFACE_ID_DOCK].definition->resolve_anchor != nullptr &&
+                    host->surface_descs[REACH_SURFACE_ID_TOP_BAR].definition->resolve_anchor !=
+                        nullptr,
+                "dynamic anchor owners publish generic anchor resolvers");
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
@@ -505,6 +562,59 @@ static void test_registered_surface_frame_uses_declared_anchor(void)
     reach_host_destroy_registered_features(host);
 }
 
+static void test_registered_surface_frame_syncs_native_overlay(void)
+{
+    reach_host *host = &native_overlay_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered native-overlay feature is available");
+    reach_host_init_layout(host);
+    host->layout_dpi_scale = 1.0f;
+
+    static const uint16_t label[] = {'W', 'i', 'n', 'd', 'o', 'w', 0};
+    reach_stage_open_window window = {};
+    window.window = 42;
+    window.label = label;
+    window.frame = {100.0f, 100.0f, 800.0f, 600.0f};
+    reach_rect_f32 monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    expect_true(reach_stage_open(host->stage_capsule, monitor, 1.0f, &window, 1) == REACH_OK,
+                "Stage opens for native-overlay frame testing");
+
+    reach_surface_desc *stage = &host->surface_descs[REACH_SURFACE_ID_STAGE];
+    stage->transition = nullptr;
+    stage->surface->window.window = reinterpret_cast<reach_platform_window *>(9);
+    stage->surface->window.ops.set_bounds = fake_set_bounds;
+    stage->surface->window.ops.native_id = fake_window_id;
+    stage->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+    stage->surface->renderer.ops.begin_frame = fake_begin_frame;
+    stage->surface->renderer.ops.end_frame = fake_end_frame;
+    stage->surface->renderer.ops.execute = fake_execute;
+    stage->surface->dirty_flags = 1;
+    host->window_thumbnails.thumbnails = reinterpret_cast<reach_window_thumbnails *>(1);
+    host->window_thumbnails.ops.set_target = fake_thumbnail_set_target;
+    host->window_thumbnails.ops.create = fake_thumbnail_create;
+    host->window_thumbnails.ops.set_placement = fake_thumbnail_set_placement;
+    host->window_thumbnails.ops.destroy_all = fake_thumbnail_destroy_all;
+
+    thumbnail_create_count = 0;
+    thumbnail_place_count = 0;
+    thumbnail_destroy_count = 0;
+    reach_host_frame_context frame = {};
+    frame.monitor_bounds = monitor;
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "generic frame renders a native-overlay surface");
+    expect_true(thumbnail_create_count == 1 && thumbnail_place_count == 1,
+                "generic frame registers and places the Stage thumbnail");
+
+    reach_stage_force_close(host->stage_capsule);
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "generic frame handles native-overlay closure");
+    expect_true(thumbnail_destroy_count == 1,
+                "generic frame releases native overlays when the capsule closes");
+
+    reach_host_destroy_registered_features(host);
+}
+
 static void test_switcher_publishes_arranged_surface_geometry(void)
 {
     reach_switcher *switcher = nullptr;
@@ -540,6 +650,7 @@ int main(void)
     test_popup_pointer_coordinates_are_surface_local();
     test_registered_feature_lifecycle();
     test_registered_surface_frame_uses_declared_anchor();
+    test_registered_surface_frame_syncs_native_overlay();
     test_switcher_publishes_arranged_surface_geometry();
 
     if (failures != 0)

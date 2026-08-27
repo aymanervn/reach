@@ -159,73 +159,6 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
     return collected;
 }
 
-static void reach_host_release_stage_thumbnails(reach_host *host)
-{
-    if (host == nullptr || !host->stage_thumbnails_registered)
-    {
-        return;
-    }
-
-    for (size_t index = 0; index < REACH_STAGE_MAX_TILES; ++index)
-    {
-        host->stage_thumbnail_ids[index] = REACH_WINDOW_THUMBNAIL_NONE;
-    }
-    host->stage_thumbnails_registered = 0;
-
-    if (host->window_thumbnails.ops.destroy_all == nullptr)
-    {
-        return;
-    }
-    (void)host->window_thumbnails.ops.destroy_all(host->window_thumbnails.thumbnails);
-}
-
-static void reach_host_register_stage_thumbnails(reach_host *host)
-{
-    if (host == nullptr || host->window_thumbnails.ops.create == nullptr ||
-        host->window_thumbnails.ops.set_target == nullptr)
-    {
-        return;
-    }
-
-    reach_host_release_stage_thumbnails(host);
-    host->stage_thumbnail_generation = reach_stage_tile_generation(host->stage_capsule);
-
-    reach_window_id target = 0;
-    if (host->stage.window.ops.native_id != nullptr)
-    {
-        target = host->stage.window.ops.native_id(host->stage.window.window);
-    }
-    if (target == 0)
-    {
-        return;
-    }
-
-    (void)host->window_thumbnails.ops.set_target(host->window_thumbnails.thumbnails, target);
-
-    size_t count = reach_stage_thumbnail_count(host->stage_capsule);
-    if (count > REACH_STAGE_MAX_TILES)
-    {
-        count = REACH_STAGE_MAX_TILES;
-    }
-    for (size_t index = count; index > 0; --index)
-    {
-        size_t tile_index = index - 1;
-        reach_stage_thumbnail_placement placement = {};
-        if (reach_stage_thumbnail_at(host->stage_capsule, tile_index, &placement) != REACH_OK)
-        {
-            continue;
-        }
-
-        reach_window_thumbnail_id id = REACH_WINDOW_THUMBNAIL_NONE;
-        if (host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails, placement.window,
-                                               &id) == REACH_OK)
-        {
-            host->stage_thumbnail_ids[tile_index] = id;
-            host->stage_thumbnails_registered = 1;
-        }
-    }
-}
-
 void reach_host_sync_stage_window_states(reach_host *host)
 {
     if (host == nullptr || host->stage_capsule == nullptr)
@@ -241,61 +174,9 @@ void reach_host_sync_stage_window_states(reach_host *host)
     size_t count = reach_host_collect_stage_windows(host, windows, REACH_STAGE_MAX_TILES);
     if (reach_stage_update_windows(host->stage_capsule, windows, count))
     {
-        reach_host_sync_stage_thumbnails(host);
         host->stage.dirty_flags = 1;
         host->dirty.render = 1;
         reach_host_request_update(host);
-    }
-}
-
-void reach_host_sync_stage_thumbnails(reach_host *host)
-{
-    if (host == nullptr || host->window_thumbnails.ops.set_placement == nullptr)
-    {
-        return;
-    }
-
-    const reach_stage_state *state = reach_stage_state_ptr(host->stage_capsule);
-    if (state == nullptr)
-    {
-        return;
-    }
-
-    if (host->stage_thumbnail_generation != reach_stage_tile_generation(host->stage_capsule))
-    {
-        reach_host_register_stage_thumbnails(host);
-    }
-
-    reach_rect_f32 stage_bounds = state->bounds;
-
-    size_t count = reach_stage_thumbnail_count(host->stage_capsule);
-    for (size_t index = 0; index < count && index < REACH_STAGE_MAX_TILES; ++index)
-    {
-        reach_window_thumbnail_id id = host->stage_thumbnail_ids[index];
-        if (id == REACH_WINDOW_THUMBNAIL_NONE)
-        {
-            continue;
-        }
-
-        reach_stage_thumbnail_placement placement = {};
-        if (reach_stage_thumbnail_at(host->stage_capsule, index, &placement) != REACH_OK)
-        {
-            continue;
-        }
-
-        reach_rect_f32 destination = placement.destination;
-        destination.x -= stage_bounds.x;
-        destination.y -= stage_bounds.y;
-
-        reach_window_thumbnail_placement thumbnail_placement = {};
-        thumbnail_placement.destination = destination;
-        thumbnail_placement.source_screen = placement.source_screen;
-        thumbnail_placement.opacity = placement.opacity;
-        thumbnail_placement.visible = placement.visible;
-        thumbnail_placement.source_screen_valid = placement.source_screen_valid;
-
-        (void)host->window_thumbnails.ops.set_placement(host->window_thumbnails.thumbnails, id,
-                                                        &thumbnail_placement);
     }
 }
 
@@ -341,8 +222,6 @@ void reach_host_open_stage(reach_host *host)
 
     reach_host_surface_opening(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_ORIGIN_NONE);
     reach_host_surface_transition_set(host, &host->stage_transition, 1);
-    reach_host_register_stage_thumbnails(host);
-    reach_host_sync_stage_thumbnails(host);
     reach_host_request_update(host);
 }
 
@@ -376,20 +255,6 @@ void reach_host_toggle_stage(reach_host *host)
     reach_host_open_stage(host);
 }
 
-void reach_host_cleanup_closed_stage(reach_host *host)
-{
-    if (host == nullptr || host->stage_capsule == nullptr)
-    {
-        return;
-    }
-    if (reach_stage_is_open(host->stage_capsule))
-    {
-        return;
-    }
-
-    reach_host_release_stage_thumbnails(host);
-}
-
 reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach_ui_event *event,
                                                    const reach_capsule_pointer_result *result)
 {
@@ -421,7 +286,6 @@ reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach
     {
         host->stage.dirty_flags = 1;
         host->dirty.render = 1;
-        reach_host_sync_stage_thumbnails(host);
         reach_host_request_update(host);
         return result->action.window != 0
                    ? reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE,

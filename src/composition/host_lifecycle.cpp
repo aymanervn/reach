@@ -358,7 +358,6 @@ static void reach_host_cleanup(reach_host *host)
     host->screen_hotspots = {};
     host->image_loader = {};
     host->window_thumbnails = {};
-    host->stage_thumbnails_registered = 0;
     host->pointer_move = {};
     host->input_source = {};
     host->window_manager = {};

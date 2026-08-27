@@ -52,7 +52,9 @@ enum reach_host_anchor_slot
     REACH_HOST_ANCHOR_WHOLE_SURFACE = 0,
     REACH_HOST_ANCHOR_TOP_BAR_TRAY,
     REACH_HOST_ANCHOR_TOP_BAR_QUICK_SETTINGS,
-    REACH_HOST_ANCHOR_TOP_BAR_BATTERY
+    REACH_HOST_ANCHOR_TOP_BAR_BATTERY,
+    REACH_HOST_ANCHOR_TOP_BAR_POWER,
+    REACH_HOST_ANCHOR_DOCK_ITEM
 };
 
 static void reach_host_init_surface_descriptors(reach_host *host)
@@ -186,6 +188,7 @@ static void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_LAUNCHER].dismiss = reach_host_close_launcher;
     descs[REACH_SURFACE_ID_LAUNCHER].behavior_flags =
         REACH_SURFACE_BEHAVIOR_ACTIVATES | REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
+    descs[REACH_SURFACE_ID_LAUNCHER].scale_in_envelope = 1;
     descs[REACH_SURFACE_ID_TRAY].role = REACH_SURFACE_TRAY_MENU;
     descs[REACH_SURFACE_ID_TRAY].pointer_priority = 40;
     descs[REACH_SURFACE_ID_TRAY].apply_pointer_action = reach_host_apply_tray_pointer_action;
@@ -234,7 +237,6 @@ static void reach_host_init_surface_descriptors(reach_host *host)
                                                  {REACH_EDGE_REVEAL_ANCHOR_TOP_LEFT, 4.0f, 4.0f, 1},
                                                  reach_host_on_stage_edge_reveal};
 
-    descs[REACH_SURFACE_ID_LAUNCHER].frame = reach_host_frame_launcher;
     descs[REACH_SURFACE_ID_LAUNCHER].frame_priority = 10;
     descs[REACH_SURFACE_ID_CLIPBOARD].frame_priority = 20;
     descs[REACH_SURFACE_ID_DOCK].frame_priority = 30;
@@ -243,9 +245,7 @@ static void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame_priority = 50;
     descs[REACH_SURFACE_ID_BATTERY].frame_priority = 55;
     descs[REACH_SURFACE_ID_SWITCHER].frame_priority = 60;
-    descs[REACH_SURFACE_ID_STAGE].frame = reach_host_frame_stage;
     descs[REACH_SURFACE_ID_STAGE].frame_priority = 65;
-    descs[REACH_SURFACE_ID_CONTEXT_MENU].frame = reach_host_frame_context_menu;
     descs[REACH_SURFACE_ID_CONTEXT_MENU].frame_priority = 70;
     descs[REACH_SURFACE_ID_SYSTEM_HUD].frame_priority = 80;
 
@@ -260,7 +260,8 @@ static void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_SWITCHER].handle_routed = reach_host_handle_switcher_event;
 }
 
-static int32_t reach_dock_surface_arrange(void *capsule, const reach_feature_surface_context *ctx)
+static int32_t reach_prearranged_surface_arrange(void *capsule,
+                                                 const reach_feature_surface_context *ctx)
 {
     (void)capsule;
     (void)ctx;
@@ -281,9 +282,29 @@ static reach_result reach_dock_surface_render(void *capsule,
 }
 
 static const reach_feature_surface_ops reach_dock_surface_ops = {
-    reach_dock_surface_arrange,
+    reach_prearranged_surface_arrange,
     reach_dock_surface_render,
 };
+
+static int32_t reach_dock_resolve_anchor(const void *capsule, uint32_t slot, size_t index,
+                                         reach_feature_anchor *out)
+{
+    if (slot != REACH_HOST_ANCHOR_DOCK_ITEM || out == nullptr)
+    {
+        return 0;
+    }
+    reach_rect_f32 button = {};
+    float bar_edge_y = 0.0f;
+    if (!reach_dock_item_anchor(static_cast<const reach_dock *>(capsule), index, &button,
+                                &bar_edge_y))
+    {
+        return 0;
+    }
+    out->button = button;
+    out->bar_edge_y = bar_edge_y;
+    out->direction = REACH_POPUP_DROP_UP;
+    return 1;
+}
 
 static int32_t reach_top_bar_surface_arrange(void *capsule,
                                              const reach_feature_surface_context *ctx)
@@ -314,6 +335,137 @@ static reach_result reach_top_bar_surface_render(void *capsule,
 static const reach_feature_surface_ops reach_top_bar_surface_ops = {
     reach_top_bar_surface_arrange,
     reach_top_bar_surface_render,
+};
+
+static reach_result reach_launcher_surface_render(void *capsule,
+                                                  const reach_feature_surface_context *ctx,
+                                                  reach_render_command_buffer *out_commands)
+{
+    return reach_launcher_append_surface_render_commands(static_cast<reach_launcher *>(capsule),
+                                                         ctx->theme, ctx->dpi_scale, out_commands);
+}
+
+static void reach_launcher_surface_set_pointer_transform(void *capsule,
+                                                         reach_transform_f32 transform)
+{
+    reach_launcher_set_pointer_transform(static_cast<reach_launcher *>(capsule), transform);
+}
+
+static const reach_feature_surface_ops reach_launcher_surface_ops = {
+    reach_prearranged_surface_arrange,
+    reach_launcher_surface_render,
+    nullptr,
+    reach_launcher_surface_set_pointer_transform,
+};
+
+static int32_t reach_context_menu_surface_layout_anchor(const void *capsule,
+                                                        reach_feature_layout_anchor *out)
+{
+    const reach_context_menu_state *state =
+        reach_context_menu_state_ptr(static_cast<const reach_context_menu *>(capsule));
+    if (state == nullptr || out == nullptr || !state->open || !state->anchored)
+    {
+        return 0;
+    }
+    out->surface = state->power_open ? REACH_SURFACE_ID_TOP_BAR : REACH_SURFACE_ID_DOCK;
+    out->slot = state->power_open ? REACH_HOST_ANCHOR_TOP_BAR_POWER : REACH_HOST_ANCHOR_DOCK_ITEM;
+    out->index = state->target_index;
+    return 1;
+}
+
+static int32_t reach_context_menu_surface_arrange(void *capsule,
+                                                  const reach_feature_surface_context *ctx)
+{
+    if (!ctx->anchor_valid)
+    {
+        return 0;
+    }
+    reach_context_menu *menu = static_cast<reach_context_menu *>(capsule);
+    reach_rect_f32 before = reach_context_menu_state_ptr(menu)->bounds;
+    reach_context_menu_open_context arrange = {};
+    arrange.theme = ctx->theme;
+    arrange.monitor = ctx->monitor_bounds;
+    arrange.dpi_scale = ctx->dpi_scale;
+    arrange.anchor_button = ctx->anchor_button;
+    arrange.bar_edge_y = ctx->anchor_bar_edge_y;
+    arrange.drop_direction = ctx->anchor_direction;
+    arrange.anchored = 1;
+    arrange.text_measure = ctx->text_measure;
+    reach_context_menu_reanchor(menu, &arrange);
+    return !reach_host_rect_equal(before, reach_context_menu_state_ptr(menu)->bounds);
+}
+
+static reach_result reach_context_menu_surface_render(void *capsule,
+                                                      const reach_feature_surface_context *ctx,
+                                                      reach_render_command_buffer *out_commands)
+{
+    reach_context_menu_render_context render = {};
+    render.theme = ctx->theme;
+    render.dpi_scale = ctx->dpi_scale;
+    return reach_context_menu_append_render_commands(static_cast<reach_context_menu *>(capsule),
+                                                     &render, out_commands);
+}
+
+static const reach_feature_surface_ops reach_context_menu_surface_ops = {
+    reach_context_menu_surface_arrange,
+    reach_context_menu_surface_render,
+    reach_context_menu_surface_layout_anchor,
+};
+
+static reach_result reach_stage_surface_render(void *capsule,
+                                               const reach_feature_surface_context *ctx,
+                                               reach_render_command_buffer *out_commands)
+{
+    reach_stage_render_context render = {};
+    render.theme = ctx->theme;
+    render.bounds = ctx->visible_bounds;
+    render.dpi_scale = ctx->dpi_scale;
+    return reach_stage_append_render_commands(static_cast<reach_stage *>(capsule), &render,
+                                              out_commands);
+}
+
+static size_t reach_stage_native_overlay_generation(const void *capsule)
+{
+    return reach_stage_tile_generation(static_cast<const reach_stage *>(capsule));
+}
+
+static size_t reach_stage_native_overlay_count(const void *capsule)
+{
+    return reach_stage_thumbnail_count(static_cast<const reach_stage *>(capsule));
+}
+
+static reach_result reach_stage_native_overlay_item(const void *capsule, size_t index,
+                                                    reach_feature_native_overlay_item *out)
+{
+    if (out == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_stage_thumbnail_placement placement = {};
+    reach_result result =
+        reach_stage_thumbnail_at(static_cast<const reach_stage *>(capsule), index, &placement);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    out->source = placement.window;
+    out->placement.destination = placement.destination;
+    out->placement.source_screen = placement.source_screen;
+    out->placement.opacity = placement.opacity;
+    out->placement.visible = placement.visible;
+    out->placement.source_screen_valid = placement.source_screen_valid;
+    return REACH_OK;
+}
+
+static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {
+    reach_stage_native_overlay_generation,
+    reach_stage_native_overlay_count,
+    reach_stage_native_overlay_item,
+};
+
+static const reach_feature_surface_ops reach_stage_surface_ops = {
+    reach_prearranged_surface_arrange, reach_stage_surface_render, nullptr, nullptr,
+    &reach_stage_native_overlay_ops,
 };
 
 static int32_t reach_system_hud_surface_arrange(void *capsule,
@@ -419,6 +571,10 @@ static int32_t reach_top_bar_resolve_anchor(const void *capsule, uint32_t slot, 
     else if (slot == REACH_HOST_ANCHOR_TOP_BAR_BATTERY)
     {
         button = state->layout.battery_button;
+    }
+    else if (slot == REACH_HOST_ANCHOR_TOP_BAR_POWER)
+    {
+        button = state->layout.power_button;
     }
     else
     {
@@ -601,6 +757,7 @@ static void reach_host_publish_feature_definitions(reach_host *host)
                                desc->role,
                                desc->pointer_priority,
                                desc->transition != nullptr,
+                               desc->scale_in_envelope,
                                desc->popup_chrome,
                                desc->bar_shown_while_open,
                                desc->edge_reveal,
@@ -660,6 +817,9 @@ void reach_host_init_feature_registry(reach_host *host)
         reach_feature_destroy<reach_stage, reach_stage_destroy>};
     descs[REACH_SURFACE_ID_DOCK].surface_ops = &reach_dock_surface_ops;
     descs[REACH_SURFACE_ID_TOP_BAR].surface_ops = &reach_top_bar_surface_ops;
+    descs[REACH_SURFACE_ID_LAUNCHER].surface_ops = &reach_launcher_surface_ops;
+    descs[REACH_SURFACE_ID_CONTEXT_MENU].surface_ops = &reach_context_menu_surface_ops;
+    descs[REACH_SURFACE_ID_STAGE].surface_ops = &reach_stage_surface_ops;
     descs[REACH_SURFACE_ID_SYSTEM_HUD].surface_ops = &reach_system_hud_surface_ops;
     descs[REACH_SURFACE_ID_SYSTEM_HUD].layout_anchor = REACH_SURFACE_ID_DOCK;
     descs[REACH_SURFACE_ID_SWITCHER].surface_ops = &reach_switcher_surface_ops;
@@ -669,6 +829,7 @@ void reach_host_init_feature_registry(reach_host *host)
     descs[REACH_SURFACE_ID_BATTERY].surface_ops = &reach_battery_surface_ops;
     descs[REACH_SURFACE_ID_TRAY].surface_ops = &reach_tray_surface_ops;
     reach_host_publish_feature_definitions(host);
+    host->feature_definitions[REACH_SURFACE_ID_DOCK].resolve_anchor = reach_dock_resolve_anchor;
     host->feature_definitions[REACH_SURFACE_ID_TOP_BAR].resolve_anchor =
         reach_top_bar_resolve_anchor;
 }

@@ -102,6 +102,22 @@ void reach_launcher_set_pointer_transform(reach_launcher *launcher, reach_transf
     }
 }
 
+reach_result
+reach_launcher_append_surface_render_commands(reach_launcher *launcher, const reach_theme *theme,
+                                              float dpi_scale,
+                                              reach_render_command_buffer *out_commands)
+{
+    if (launcher == nullptr || !launcher->pointer_layout_valid)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_launcher_render_context render = {};
+    render.theme = theme;
+    render.layout = &launcher->pointer_layout;
+    render.dpi_scale = dpi_scale;
+    return reach_launcher_append_render_commands(launcher, &render, out_commands);
+}
+
 void reach_launcher_attach_icons(reach_launcher *launcher, reach_icon_service *icons)
 {
     if (launcher != nullptr)

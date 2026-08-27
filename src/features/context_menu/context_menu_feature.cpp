@@ -103,7 +103,7 @@ enum
     REACH_CONTEXT_MENU_PRESSABLE_CLOSE = 3
 };
 
-const reach_context_menu_state *reach_context_menu_state_ptr(reach_context_menu *menu)
+const reach_context_menu_state *reach_context_menu_state_ptr(const reach_context_menu *menu)
 {
     return menu != nullptr ? &menu->state : nullptr;
 }
@@ -720,6 +720,23 @@ static int32_t reach_context_menu_capsule_pointer_sequence_active(const void *ca
     return menu != nullptr && reach_pressable_tracking(&menu->pressable);
 }
 
+static void reach_context_menu_capsule_surface_geometry(const void *capsule,
+                                                        reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
+    if (menu != nullptr)
+    {
+        out->visible_bounds = menu->state.bounds;
+        out->notch_anchor_x = menu->state.notch_anchor_x;
+        out->notch_side = reach_popup_notch_side(menu->state.drop_direction);
+    }
+}
+
 const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
@@ -731,6 +748,8 @@ const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
         reach_context_menu_capsule_wants_pointer_move,
         reach_context_menu_capsule_handle_pointer,
         reach_context_menu_capsule_pointer_sequence_active,
+        nullptr,
+        reach_context_menu_capsule_surface_geometry,
     };
     return &ops;
 }
