@@ -268,6 +268,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
     reach_quick_settings_attach_status(host->quick_settings_capsule, nullptr);
     reach_battery_attach_services(host->battery_capsule, nullptr, nullptr);
+    reach_host_clear_interfeature_routes(host);
     reach_system_hud_attach_now_playing(host->system_hud_capsule, nullptr);
     reach_search_service_destroy(host->search_service);
     host->search_service = nullptr;
@@ -597,6 +598,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                    host->window_tracking);
     reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);
     reach_battery_attach_services(host->battery_capsule, host->system_stats, host->system_status);
+    reach_host_bind_interfeature_routes(host);
     reach_top_bar_attach_status(host->top_bar_capsule, host->system_status);
     reach_system_hud_attach_now_playing(host->system_hud_capsule, host->now_playing_service);
     reach_system_status_refresh_system(host->system_status, 0);

@@ -121,13 +121,24 @@ extern "C"
         REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED = 6,
         REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW = 7,
         REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE = 8,
-        REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT = 9,
         REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS = 16,
         REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17,
-        REACH_DOCK_POINTER_ACTION_HOVER_ITEM = 18,
         REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER = 19,
         REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER = 20
     } reach_dock_pointer_action_kind;
+
+    /* Outbound slots for effects the Dock cannot express as its own state. The Dock never
+       learns what they reach; composition assigns them in interfeature_routes.cpp. */
+    typedef struct reach_dock_routes
+    {
+        void *user;
+
+        /* A secondary click activated on `item_index`, at screen point (x, y). */
+        void (*item_context_menu)(void *user, size_t item_index, int32_t x, int32_t y);
+
+        /* The hovered item changed. `REACH_MAX_DOCK_ITEMS` means no item is hovered. */
+        void (*item_hovered)(void *user, size_t item_index);
+    } reach_dock_routes;
 
 #define REACH_DOCK_TRIGGER_PRIMARY 0
 
@@ -159,6 +170,8 @@ extern "C"
 
     void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
                                     reach_window_tracking *windows);
+
+    void reach_dock_set_routes(reach_dock *dock, const reach_dock_routes *routes);
 
     reach_animation_manager *reach_dock_manager(reach_dock *animations);
 

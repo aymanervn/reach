@@ -309,15 +309,6 @@ static reach_result reach_host_handle_pointer_wheel(reach_host *host, const reac
     return REACH_OK;
 }
 
-static reach_result reach_host_activate_dock_trigger(reach_host *host, size_t trigger)
-{
-    if (trigger == REACH_DOCK_TRIGGER_PRIMARY)
-    {
-        reach_host_toggle_stage(host);
-    }
-    return REACH_OK;
-}
-
 reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_ui_event *event,
                                                   const reach_capsule_pointer_result *result)
 {
@@ -334,24 +325,12 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
         return reach_host_focus_window(host, result->action.window, 1);
     case REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE:
         return reach_host_launch_dock_item(host, result->action.index, 1);
-    case REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT:
-    {
-        if (event == nullptr)
-        {
-            return REACH_INVALID_ARGUMENT;
-        }
-        (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
-        reach_result show_result =
-            reach_host_show_dock_app_context_menu(host, result->action.index, event->x, event->y);
-        if (reach_dock_retain_context_feedback(host->dock_capsule))
-        {
-            host->dock.dirty_flags = 1;
-        }
-        (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
-        return show_result;
-    }
     case REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER:
-        return reach_host_activate_dock_trigger(host, result->action.index);
+        if (result->action.index == REACH_DOCK_TRIGGER_PRIMARY)
+        {
+            reach_host_toggle_stage(host);
+        }
+        return REACH_OK;
     case REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS:
     {
         reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
@@ -362,9 +341,6 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
     case REACH_DOCK_POINTER_ACTION_MOVE_PIN:
         return reach_host_move_pin(host, static_cast<uint32_t>(result->action.id),
                                    result->action.index);
-    case REACH_DOCK_POINTER_ACTION_HOVER_ITEM:
-        reach_host_dock_item_hovered(host, result->action.index);
-        return REACH_OK;
     default:
         return REACH_OK;
     }
@@ -381,8 +357,6 @@ reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const rea
 
     switch ((reach_top_bar_pointer_action_kind)result->action.kind)
     {
-    case REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER:
-        return reach_host_show_power_context_menu(host);
     case REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS:
         return reach_host_execute_media_action(host, REACH_NOW_PLAYING_ACTION_PREVIOUS);
     case REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE:
