@@ -354,6 +354,15 @@ PUBLIC_INNER_FORBIDDEN_INCLUDE_PATTERNS = [
     r"(^|/)(qt|gtk|wx|imgui|sdl)(/|\.|$)",
 ]
 
+REGISTERED_FEATURE_LIFECYCLE_RE = re.compile(
+    r"\breach_(dock|top_bar|launcher|clipboard_feature|quick_settings|battery|"
+    r"system_hud|context_menu|switcher|stage)_(create|destroy)\s*\("
+)
+
+MIGRATED_SURFACE_FRAME_RE = re.compile(
+    r"\breach_host_(frame|render)_(system_hud|switcher|clipboard)(?:_surface)?\b"
+)
+
 @dataclass(frozen=True)
 class Include:
     delimiter: str
@@ -601,6 +610,31 @@ def validate_feature_config_ownership(path: Path, text: str) -> list[str]:
     ]
 
 
+def validate_registered_feature_lifecycle(path: Path, text: str) -> list[str]:
+    relative = rel(path).replace("\\", "/")
+    if not relative.startswith("src/composition/") or relative == (
+        "src/composition/feature_registry.cpp"
+    ):
+        return []
+    if REGISTERED_FEATURE_LIFECYCLE_RE.search(strip_comments(text)) is None:
+        return []
+    return [
+        f"{relative}: registered feature create/destroy calls belong only in "
+        "feature_registry.cpp"
+    ]
+
+
+def validate_migrated_surface_frames(path: Path, text: str) -> list[str]:
+    relative = rel(path).replace("\\", "/")
+    if not relative.startswith("src/composition/"):
+        return []
+    if MIGRATED_SURFACE_FRAME_RE.search(strip_comments(text)) is None:
+        return []
+    return [
+        f"{relative}: migrated features must use the registered generic surface frame operations"
+    ]
+
+
 def validate_public_inner_api(path: Path, text: str) -> list[str]:
     violations: list[str] = []
     source_layer = layer_for_path(path)
@@ -689,6 +723,8 @@ def main() -> int:
         violations.extend(validate_public_inner_api(path, text))
         violations.extend(validate_capsule_state_encapsulation(path, text))
         violations.extend(validate_feature_config_ownership(path, text))
+        violations.extend(validate_registered_feature_lifecycle(path, text))
+        violations.extend(validate_migrated_surface_frames(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 
     if violations:

@@ -294,16 +294,6 @@ static void reach_settings_refresh_layout(reach_settings_app *app)
     reach_settings_apply_caption(app);
 }
 
-static reach_result reach_settings_apply_window_style(reach_settings_app *app)
-{
-    if (app == nullptr || app->window.ops.apply_rounded_corners == nullptr)
-    {
-        return REACH_OK;
-    }
-    return app->window.ops.apply_rounded_corners(app->window.window,
-                                                 18.0f * reach_settings_app_scale(app));
-}
-
 static reach_result reach_settings_render(reach_settings_app *app)
 {
     if (app == nullptr || app->renderer.ops.begin_frame == nullptr)
@@ -2400,7 +2390,6 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         }
         reach_settings_refresh_bounds(app);
         reach_settings_refresh_layout(app);
-        (void)reach_settings_apply_window_style(app);
         app->dirty = 1;
         if (reach_settings_render(app) == REACH_OK)
         {
@@ -2506,10 +2495,6 @@ reach_result reach_settings_app_start(reach_settings_app *app)
     if (result == REACH_OK)
     {
         result = app->window.ops.set_bounds(app->window.window, app->bounds);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_settings_apply_window_style(app);
     }
     if (result == REACH_OK && app->window.ops.show != nullptr)
     {

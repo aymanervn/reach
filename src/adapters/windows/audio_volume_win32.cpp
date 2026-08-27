@@ -68,42 +68,18 @@ static float reach_audio_volume_clamp01(float value)
     return value;
 }
 
-static void reach_audio_volume_copy_utf16(uint16_t *dst, size_t dst_count, const wchar_t *src)
+static void reach_audio_volume_copy_wide(uint16_t *dst, size_t dst_count, const wchar_t *src)
 {
     if (dst == nullptr || dst_count == 0)
     {
         return;
     }
-
-    size_t index = 0;
-    if (src != nullptr)
+    if (src == nullptr)
     {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)src[index];
-            ++index;
-        }
+        dst[0] = 0;
+        return;
     }
-    dst[index] = 0;
-}
-
-static int reach_audio_volume_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-
-    size_t index = 0;
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
+    (void)reach_copy_utf16(dst, dst_count, reinterpret_cast<const uint16_t *>(src));
 }
 
 static const wchar_t *reach_audio_volume_basename(const wchar_t *path)
@@ -298,8 +274,7 @@ static void reach_audio_volume_label_for_process(DWORD process_id, uint16_t *out
     wchar_t path[MAX_PATH] = {};
     if (reach_audio_volume_path_for_process(process_id, path, MAX_PATH))
     {
-        reach_audio_volume_copy_utf16(out_label, out_label_count,
-                                      reach_audio_volume_basename(path));
+        reach_audio_volume_copy_wide(out_label, out_label_count, reach_audio_volume_basename(path));
     }
 }
 
@@ -331,7 +306,7 @@ static HICON reach_audio_volume_icon_for_process(DWORD process_id)
 
 static void reach_audio_volume_copy_device_id(uint16_t *dst, size_t dst_count, const wchar_t *src)
 {
-    reach_audio_volume_copy_utf16(dst, dst_count, src);
+    reach_audio_volume_copy_wide(dst, dst_count, src);
 }
 
 static void reach_audio_volume_utf16_to_wchar(wchar_t *dst, size_t dst_count, const uint16_t *src)
@@ -360,8 +335,8 @@ static void reach_audio_volume_fill_fallback_device_label(reach_audio_output_dev
         return;
     }
 
-    reach_audio_volume_copy_utf16(device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
-                                  L"Output device");
+    reach_audio_volume_copy_wide(device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+                                 L"Output device");
 }
 
 static void reach_audio_volume_read_property_string(IPropertyStore *store, const PROPERTYKEY &key,
@@ -436,13 +411,12 @@ static void reach_audio_volume_fill_fallback_label(reach_audio_volume_session *s
 
     if (session->is_system_sounds)
     {
-        reach_audio_volume_copy_utf16(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
-                                      L"System Sounds");
+        reach_audio_volume_copy_wide(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
+                                     L"System Sounds");
         return;
     }
 
-    reach_audio_volume_copy_utf16(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
-                                  L"App");
+    reach_audio_volume_copy_wide(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, L"App");
 }
 
 static reach_result reach_audio_volume_read_session(IAudioSessionControl *control,
@@ -479,8 +453,8 @@ static reach_result reach_audio_volume_read_session(IAudioSessionControl *contro
 
     if (SUCCEEDED(hr) && instance_id != nullptr && instance_id[0] != 0)
     {
-        reach_audio_volume_copy_utf16(out_session->session_instance_id,
-                                      REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY, instance_id);
+        reach_audio_volume_copy_wide(out_session->session_instance_id,
+                                     REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY, instance_id);
     }
     else if (SUCCEEDED(hr))
     {
@@ -511,14 +485,14 @@ static reach_result reach_audio_volume_read_session(IAudioSessionControl *contro
 
         if (out_session->is_system_sounds)
         {
-            reach_audio_volume_copy_utf16(
+            reach_audio_volume_copy_wide(
                 out_session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, L"System Sounds");
         }
         else if (SUCCEEDED(control->GetDisplayName(&display_name)) && display_name != nullptr &&
                  display_name[0] != 0)
         {
-            reach_audio_volume_copy_utf16(out_session->label,
-                                          REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, display_name);
+            reach_audio_volume_copy_wide(out_session->label,
+                                         REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, display_name);
         }
         else
         {
@@ -753,8 +727,8 @@ static reach_result reach_audio_volume_read_output_device(reach_audio_volume_ada
         wchar_t label[REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY] = {};
         reach_audio_volume_read_property_string(store, PKEY_Device_FriendlyName, label,
                                                 REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY);
-        reach_audio_volume_copy_utf16(out_device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
-                                      label);
+        reach_audio_volume_copy_wide(out_device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+                                     label);
 
         wchar_t icon_path[512] = {};
         reach_audio_volume_read_property_string(store, PKEY_DeviceClass_IconPath, icon_path,
@@ -915,7 +889,7 @@ static reach_result reach_audio_volume_with_session_volume(const uint16_t *sessi
 
         reach_audio_volume_session session = {};
         if (reach_audio_volume_read_session(control, &session) == REACH_OK &&
-            reach_audio_volume_utf16_equal(session.session_instance_id, session_instance_id))
+            reach_utf16_equal(session.session_instance_id, session_instance_id))
         {
             ISimpleAudioVolume *volume = nullptr;
             hr = control->QueryInterface(IID_PPV_ARGS(&volume));
@@ -1121,7 +1095,7 @@ class reach_audio_volume_device_watcher : public IMMNotificationClient
     }
 
     HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged(EDataFlow flow, ERole role,
-                                                      LPCWSTR device_id) override
+                                                     LPCWSTR device_id) override
     {
         (void)role;
         (void)device_id;
@@ -1208,8 +1182,8 @@ static DWORD WINAPI reach_audio_volume_watch_thread(LPVOID parameter)
     if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                    IID_PPV_ARGS(&enumerator))))
     {
-        device_watcher = new (std::nothrow)
-            reach_audio_volume_device_watcher(adapter->watch_rebind);
+        device_watcher =
+            new (std::nothrow) reach_audio_volume_device_watcher(adapter->watch_rebind);
         if (device_watcher != nullptr &&
             FAILED(enumerator->RegisterEndpointNotificationCallback(device_watcher)))
         {

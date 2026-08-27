@@ -22,54 +22,6 @@ reach_result reach_host_set_pinned_apps(reach_host *host, const reach_pinned_app
     return REACH_OK;
 }
 
-static int32_t reach_host_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
-static int32_t reach_host_path_equals(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr || b == nullptr)
-    {
-        return 0;
-    }
-
-    size_t index = 0;
-    while (a[index] != 0 && b[index] != 0)
-    {
-        uint16_t ca = a[index];
-        uint16_t cb = b[index];
-        if (ca >= 'A' && ca <= 'Z')
-        {
-            ca = (uint16_t)(ca + ('a' - 'A'));
-        }
-        if (cb >= 'A' && cb <= 'Z')
-        {
-            cb = (uint16_t)(cb + ('a' - 'A'));
-        }
-        if (ca != cb)
-        {
-            return 0;
-        }
-        ++index;
-    }
-
-    return a[index] == b[index];
-}
-
 reach_result reach_host_request_config_reload(reach_host *host)
 {
     return host != nullptr ? reach_config_service_reload(host->config_service)
@@ -185,8 +137,7 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
             int32_t still_pinned = 0;
             for (size_t pin_index = 0; pin_index < host->pinned_app_count; ++pin_index)
             {
-                if (reach_host_path_equals(host->pinned_apps[pin_index].path,
-                                           old_order_paths[pin_slot]))
+                if (reach_path_equals(host->pinned_apps[pin_index].path, old_order_paths[pin_slot]))
                 {
                     old_order[order_index].app_id = host->pinned_apps[pin_index].id;
                     still_pinned = 1;
@@ -283,10 +234,10 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
 
     for (size_t index = 0; index < a_count; ++index)
     {
-        if (a[index].id != b[index].id || !reach_host_utf16_equal(a[index].path, b[index].path) ||
-            !reach_host_utf16_equal(a[index].arguments, b[index].arguments) ||
-            !reach_host_utf16_equal(a[index].icon_ref, b[index].icon_ref) ||
-            !reach_host_utf16_equal(a[index].app_user_model_id, b[index].app_user_model_id))
+        if (a[index].id != b[index].id || !reach_utf16_equal(a[index].path, b[index].path) ||
+            !reach_utf16_equal(a[index].arguments, b[index].arguments) ||
+            !reach_utf16_equal(a[index].icon_ref, b[index].icon_ref) ||
+            !reach_utf16_equal(a[index].app_user_model_id, b[index].app_user_model_id))
         {
             return 0;
         }

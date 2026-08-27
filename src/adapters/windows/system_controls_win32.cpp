@@ -289,25 +289,6 @@ static void WINAPI reach_system_controls_wlan_notification(PWLAN_NOTIFICATION_DA
                                  REACH_SYSTEM_CONTROLS_CHANGE_NETWORK);
 }
 
-static void reach_system_controls_copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)(unsigned char)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
 static DWORD WINAPI reach_system_controls_addr_change_thread(void *context)
 {
     reach_system_controls_adapter *adapter = static_cast<reach_system_controls_adapter *>(context);
@@ -468,25 +449,6 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
     return 0;
 }
 
-static void reach_system_controls_copy_utf16(uint16_t *dst, size_t dst_count, const wchar_t *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
 static void reach_system_controls_copy_ssid(uint16_t *dst, size_t dst_count, const DOT11_SSID *ssid)
 {
     if (dst == nullptr || dst_count == 0)
@@ -527,8 +489,7 @@ static void reach_system_controls_set_disconnected_network(reach_network_state *
 
     *state = {};
     state->kind = REACH_NETWORK_KIND_NONE;
-    reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY,
-                                     "No internet");
+    reach_copy_ascii_to_utf16(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "No internet");
 }
 
 static void reach_system_controls_set_ethernet_network(reach_network_state *state)
@@ -542,7 +503,7 @@ static void reach_system_controls_set_ethernet_network(reach_network_state *stat
     state->kind = REACH_NETWORK_KIND_ETHERNET;
     state->connected = 1;
     state->signal_strength = 100;
-    reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "Ethernet");
+    reach_copy_ascii_to_utf16(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "Ethernet");
 }
 
 static void reach_system_controls_set_wifi_network(reach_network_state *state,
@@ -568,8 +529,7 @@ static void reach_system_controls_set_wifi_network(reach_network_state *state,
     reach_system_controls_copy_ssid(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, ssid);
     if (state->label[0] == 0)
     {
-        reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY,
-                                         "Wi-Fi");
+        reach_copy_ascii_to_utf16(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "Wi-Fi");
     }
 }
 

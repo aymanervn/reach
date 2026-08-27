@@ -1,33 +1,5 @@
 #include "reach/services/pin_config.h"
 
-static int32_t reach_pin_path_equals(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr || b == nullptr)
-    {
-        return 0;
-    }
-    size_t index = 0;
-    while (a[index] != 0 && b[index] != 0)
-    {
-        uint16_t ca = a[index];
-        uint16_t cb = b[index];
-        if (ca >= 'A' && ca <= 'Z')
-        {
-            ca = (uint16_t)(ca + ('a' - 'A'));
-        }
-        if (cb >= 'A' && cb <= 'Z')
-        {
-            cb = (uint16_t)(cb + ('a' - 'A'));
-        }
-        if (ca != cb)
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return a[index] == b[index];
-}
-
 static int32_t reach_pin_id_used_before(const reach_config_snapshot *snapshot, size_t before_index,
                                         uint32_t id)
 {
@@ -116,8 +88,7 @@ static void reach_pin_set_changed(int32_t *out_changed, int32_t changed)
     }
 }
 
-reach_result reach_pin_config_ensure_defaults(reach_config_snapshot *snapshot,
-                                              int32_t *out_changed)
+reach_result reach_pin_config_ensure_defaults(reach_config_snapshot *snapshot, int32_t *out_changed)
 {
     reach_pin_set_changed(out_changed, 0);
     if (snapshot == nullptr)
@@ -158,7 +129,7 @@ reach_result reach_pin_config_pin_path(reach_config_snapshot *snapshot, const ui
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        if (reach_pin_path_equals(snapshot->pinned_apps[index].path, path))
+        if (reach_path_equals(snapshot->pinned_apps[index].path, path))
         {
             reach_pin_set_changed(out_changed, changed);
             return REACH_OK;
@@ -198,7 +169,7 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        if (!reach_pin_path_equals(snapshot->pinned_apps[index].path, app->path))
+        if (!reach_path_equals(snapshot->pinned_apps[index].path, app->path))
         {
             continue;
         }
@@ -290,17 +261,17 @@ reach_result reach_pin_config_set_app_user_model_id(reach_config_snapshot *snaps
                                                     int32_t *out_changed)
 {
     reach_pin_set_changed(out_changed, 0);
-    if (snapshot == nullptr || path == nullptr || path[0] == 0 ||
-        app_user_model_id == nullptr || app_user_model_id[0] == 0)
+    if (snapshot == nullptr || path == nullptr || path[0] == 0 || app_user_model_id == nullptr ||
+        app_user_model_id[0] == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        if (reach_pin_path_equals(snapshot->pinned_apps[index].path, path))
+        if (reach_path_equals(snapshot->pinned_apps[index].path, path))
         {
-            if (!reach_pin_path_equals(snapshot->pinned_apps[index].app_user_model_id,
-                                       app_user_model_id))
+            if (!reach_utf16_equal_ascii_case_insensitive(
+                    snapshot->pinned_apps[index].app_user_model_id, app_user_model_id))
             {
                 (void)reach_copy_utf16(snapshot->pinned_apps[index].app_user_model_id, 260,
                                        app_user_model_id);
@@ -351,7 +322,7 @@ reach_result reach_pin_config_unpin_path(reach_config_snapshot *snapshot, const 
     size_t write_index = 0;
     for (size_t read_index = 0; read_index < snapshot->pinned_app_count; ++read_index)
     {
-        if (!reach_pin_path_equals(snapshot->pinned_apps[read_index].path, path))
+        if (!reach_path_equals(snapshot->pinned_apps[read_index].path, path))
         {
             if (write_index != read_index)
             {

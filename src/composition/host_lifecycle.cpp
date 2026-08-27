@@ -302,26 +302,7 @@ static void reach_host_cleanup(reach_host *host)
     host->icon_service = nullptr;
     reach_wallpaper_destroy(host->wallpaper);
     host->wallpaper = nullptr;
-    reach_switcher_destroy(host->switcher_capsule);
-    host->switcher_capsule = nullptr;
-    reach_stage_destroy(host->stage_capsule);
-    host->stage_capsule = nullptr;
-    reach_quick_settings_destroy(host->quick_settings_capsule);
-    host->quick_settings_capsule = nullptr;
-    reach_battery_destroy(host->battery_capsule);
-    host->battery_capsule = nullptr;
-    reach_system_hud_destroy(host->system_hud_capsule);
-    host->system_hud_capsule = nullptr;
-    reach_clipboard_feature_destroy(host->clipboard_capsule);
-    host->clipboard_capsule = nullptr;
-    reach_dock_destroy(host->dock_capsule);
-    host->dock_capsule = nullptr;
-    reach_top_bar_destroy(host->top_bar_capsule);
-    host->top_bar_capsule = nullptr;
-    reach_context_menu_destroy(host->context_menu_capsule);
-    host->context_menu_capsule = nullptr;
-    reach_launcher_destroy(host->launcher_capsule);
-    host->launcher_capsule = nullptr;
+    reach_host_destroy_registered_features(host);
     if (host->explorer_service.ops.destroy != nullptr)
     {
         host->explorer_service.ops.destroy(host->explorer_service.service);
@@ -429,57 +410,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     reach_result result = REACH_OK;
 
-    host->switcher_capsule = nullptr;
-    if (reach_switcher_create(&host->switcher_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->stage_capsule = nullptr;
-    if (reach_stage_create(&host->stage_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->quick_settings_capsule = nullptr;
-    if (reach_quick_settings_create(&host->quick_settings_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->battery_capsule = nullptr;
-    if (reach_battery_create(&host->battery_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->system_hud_capsule = nullptr;
-    if (reach_system_hud_create(&host->system_hud_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->clipboard_capsule = nullptr;
-    if (reach_clipboard_feature_create(&host->clipboard_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->dock_capsule = nullptr;
-    if (reach_dock_create(&host->dock_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->top_bar_capsule = nullptr;
-    if (reach_top_bar_create(&host->top_bar_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->context_menu_capsule = nullptr;
-    if (reach_context_menu_create(&host->context_menu_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-    host->launcher_capsule = nullptr;
-    if (reach_launcher_create(&host->launcher_capsule) != REACH_OK)
-    {
-        result = REACH_ERROR;
-    }
-
     reach_dock_model_defaults(&host->dock_config);
     reach_surface_runtime_init(&host->launcher);
     reach_surface_runtime_init(&host->dock);
@@ -495,7 +425,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_animation_manager_init(&host->animations, host->animation_tracks,
                                  REACH_HOST_ANIMATION_COUNT);
     reach_host_surface_transitions_init(host);
-    reach_host_init_surface_descriptors(host);
+    reach_host_init_feature_registry(host);
+    if (reach_host_create_registered_features(host) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {

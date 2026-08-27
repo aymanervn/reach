@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/core/bluetooth.h"
 
 #include <stdio.h>
@@ -13,23 +14,12 @@ static void expect_true(int value, const char *message)
     }
 }
 
-static void copy_ascii(uint16_t *destination, size_t capacity, const char *source)
-{
-    size_t index = 0;
-    while (source[index] != 0 && index + 1 < capacity)
-    {
-        destination[index] = (uint16_t)(unsigned char)source[index];
-        ++index;
-    }
-    destination[index] = 0;
-}
-
 static reach_bluetooth_device make_device(const char *id, const char *name, int32_t paired,
                                           int32_t connected)
 {
     reach_bluetooth_device device = {};
-    copy_ascii(device.id, REACH_BLUETOOTH_DEVICE_ID_CAPACITY, id);
-    copy_ascii(device.name, REACH_BLUETOOTH_NAME_CAPACITY, name);
+    reach_copy_ascii_to_utf16(device.id, REACH_BLUETOOTH_DEVICE_ID_CAPACITY, id);
+    reach_copy_ascii_to_utf16(device.name, REACH_BLUETOOTH_NAME_CAPACITY, name);
     device.paired = paired;
     device.connected = connected;
     return device;
@@ -45,8 +35,8 @@ static void test_normalize_merges_duplicate_ids(void)
     ++list.count;
     list.devices[list.count] = make_device("bt#aa", "Headphones", 1, 1);
     list.devices[list.count].kind = REACH_BLUETOOTH_DEVICE_AUDIO;
-    copy_ascii(list.devices[list.count].icon_path, REACH_BLUETOOTH_ICON_PATH_CAPACITY,
-               "C:\\icons.dll,-3");
+    reach_copy_ascii_to_utf16(list.devices[list.count].icon_path,
+                              REACH_BLUETOOTH_ICON_PATH_CAPACITY, "C:\\icons.dll,-3");
     ++list.count;
 
     reach_bluetooth_device_list_normalize(&list);

@@ -10,20 +10,6 @@ static int32_t reach_search_char_equal_ci(uint16_t a, uint16_t b)
     return reach_search_ascii_lower(a) == reach_search_ascii_lower(b);
 }
 
-static size_t reach_search_strlen(const uint16_t *text)
-{
-    size_t length = 0;
-    if (text == nullptr)
-    {
-        return 0;
-    }
-    while (text[length] != 0)
-    {
-        ++length;
-    }
-    return length;
-}
-
 static const uint16_t *reach_search_basename(const uint16_t *path)
 {
     const uint16_t *name = path;
@@ -328,10 +314,11 @@ static int32_t reach_search_path_contains_ascii_ci(const uint16_t *path, const c
 reach_search_location_rank reach_search_classify_location(const uint16_t *path)
 {
     static const char *const transient_fragments[] = {
-        "\\temp\\",     "\\$recycle.bin\\", "\\node_modules\\", "\\.cache\\",
-        "\\winsxs\\",   "\\packagecache\\", "\\installer\\",    "\\package cache\\",
-        "\\.git\\",     "\\obj\\",          "\\.nuget\\"};
-    static const char *const system_fragments[] = {"\\windows\\system32\\", "\\windows\\syswow64\\"};
+        "\\temp\\",   "\\$recycle.bin\\", "\\node_modules\\", "\\.cache\\",
+        "\\winsxs\\", "\\packagecache\\", "\\installer\\",    "\\package cache\\",
+        "\\.git\\",   "\\obj\\",          "\\.nuget\\"};
+    static const char *const system_fragments[] = {"\\windows\\system32\\",
+                                                   "\\windows\\syswow64\\"};
     static const char *const program_fragments[] = {"\\program files\\", "\\program files (x86)\\"};
 
     if (path == nullptr)
@@ -354,7 +341,8 @@ reach_search_location_rank reach_search_classify_location(const uint16_t *path)
             return REACH_SEARCH_LOCATION_SYSTEM;
         }
     }
-    for (size_t index = 0; index < sizeof(program_fragments) / sizeof(program_fragments[0]); ++index)
+    for (size_t index = 0; index < sizeof(program_fragments) / sizeof(program_fragments[0]);
+         ++index)
     {
         if (reach_search_path_contains_ascii_ci(path, program_fragments[index]))
         {

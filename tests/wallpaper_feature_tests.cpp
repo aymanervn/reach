@@ -1,3 +1,5 @@
+#include "reach/support/util.h"
+#include "test_utf16.h"
 #include "reach/features/wallpaper.h"
 
 #include <stdio.h>
@@ -37,36 +39,6 @@ static void expect_true(int condition, const char *message)
         ++failures;
         fprintf(stderr, "FAILED: %s\n", message);
     }
-}
-
-static void copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-
-    size_t index = 0;
-    while (src != nullptr && src[index] != 0 && index + 1 < dst_count)
-    {
-        dst[index] = (uint16_t)(unsigned char)src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
-static int text_equals_ascii(const uint16_t *text, const char *expected)
-{
-    size_t index = 0;
-    while (expected[index] != 0)
-    {
-        if (text[index] != (uint16_t)(unsigned char)expected[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return text[index] == 0;
 }
 
 static reach_result fake_service_set_wallpaper(reach_wallpaper_service *service,
@@ -198,36 +170,40 @@ static void test_configured_wallpaper_applies_to_service_surface_and_monitors(vo
     uint16_t wallpaper_path[260] = {};
     uint16_t monitor_paths[3][260] = {};
     uint16_t cached_path[260] = {};
-    copy_ascii(wallpaper_path, 260, "C:\\Wallpapers\\main.jpg");
-    copy_ascii(monitor_paths[0], 260, "C:\\Wallpapers\\left.jpg");
-    copy_ascii(monitor_paths[2], 260, "C:\\Wallpapers\\right.jpg");
+    reach_copy_ascii_to_utf16(wallpaper_path, 260, "C:\\Wallpapers\\main.jpg");
+    reach_copy_ascii_to_utf16(monitor_paths[0], 260, "C:\\Wallpapers\\left.jpg");
+    reach_copy_ascii_to_utf16(monitor_paths[2], 260, "C:\\Wallpapers\\right.jpg");
 
     int32_t changed = reach_wallpaper_seed_or_apply(&service_port, &surface_port, wallpaper_path,
                                                     260, monitor_paths, 3, cached_path, 260);
 
     expect_true(changed == 0, "configured wallpaper does not report seeded config change");
-    expect_true(text_equals_ascii(cached_path, "C:\\Wallpapers\\main.jpg"),
+    expect_true(reach_test_utf16_equals_ascii(cached_path, "C:\\Wallpapers\\main.jpg"),
                 "configured wallpaper is cached");
     expect_true(fake.current_query_count == 0, "configured wallpaper does not query current OS");
-    expect_true(fake.service_set_count == 1 &&
-                    text_equals_ascii(fake.service_set_path, "C:\\Wallpapers\\main.jpg"),
-                "configured wallpaper applies to service");
-    expect_true(fake.surface_set_count == 1 &&
-                    text_equals_ascii(fake.surface_set_path, "C:\\Wallpapers\\main.jpg"),
-                "configured wallpaper applies to surface");
+    expect_true(
+        fake.service_set_count == 1 &&
+            reach_test_utf16_equals_ascii(fake.service_set_path, "C:\\Wallpapers\\main.jpg"),
+        "configured wallpaper applies to service");
+    expect_true(
+        fake.surface_set_count == 1 &&
+            reach_test_utf16_equals_ascii(fake.surface_set_path, "C:\\Wallpapers\\main.jpg"),
+        "configured wallpaper applies to surface");
     expect_true(fake.monitor_set_count == 2, "configured monitor wallpapers apply to surface");
-    expect_true(fake.monitor_indices[0] == 0 &&
-                    text_equals_ascii(fake.monitor_paths[0], "C:\\Wallpapers\\left.jpg"),
-                "first configured monitor wallpaper is applied");
-    expect_true(fake.monitor_indices[1] == 2 &&
-                    text_equals_ascii(fake.monitor_paths[1], "C:\\Wallpapers\\right.jpg"),
-                "sparse configured monitor wallpaper keeps monitor index");
+    expect_true(
+        fake.monitor_indices[0] == 0 &&
+            reach_test_utf16_equals_ascii(fake.monitor_paths[0], "C:\\Wallpapers\\left.jpg"),
+        "first configured monitor wallpaper is applied");
+    expect_true(
+        fake.monitor_indices[1] == 2 &&
+            reach_test_utf16_equals_ascii(fake.monitor_paths[1], "C:\\Wallpapers\\right.jpg"),
+        "sparse configured monitor wallpaper keeps monitor index");
 }
 
 static void test_empty_config_seeds_from_current_wallpaper(void)
 {
     fake_wallpaper_ports fake = {};
-    copy_ascii(fake.current_path, 260, "C:\\Wallpapers\\current.jpg");
+    reach_copy_ascii_to_utf16(fake.current_path, 260, "C:\\Wallpapers\\current.jpg");
     reach_wallpaper_service service = {};
     reach_wallpaper_surface surface = {};
     reach_wallpaper_service_port service_port = service_port_for(&fake, &service);
@@ -236,21 +212,22 @@ static void test_empty_config_seeds_from_current_wallpaper(void)
     uint16_t wallpaper_path[260] = {};
     uint16_t monitor_paths[2][260] = {};
     uint16_t cached_path[260] = {};
-    copy_ascii(monitor_paths[1], 260, "C:\\Wallpapers\\second.jpg");
+    reach_copy_ascii_to_utf16(monitor_paths[1], 260, "C:\\Wallpapers\\second.jpg");
 
     int32_t changed = reach_wallpaper_seed_or_apply(&service_port, &surface_port, wallpaper_path,
                                                     260, monitor_paths, 2, cached_path, 260);
 
     expect_true(changed == 1, "empty wallpaper config reports seeded config change");
-    expect_true(text_equals_ascii(wallpaper_path, "C:\\Wallpapers\\current.jpg"),
+    expect_true(reach_test_utf16_equals_ascii(wallpaper_path, "C:\\Wallpapers\\current.jpg"),
                 "current OS wallpaper seeds config");
-    expect_true(text_equals_ascii(cached_path, "C:\\Wallpapers\\current.jpg"),
+    expect_true(reach_test_utf16_equals_ascii(cached_path, "C:\\Wallpapers\\current.jpg"),
                 "current OS wallpaper is cached");
     expect_true(fake.current_query_count == 1, "empty config queries current OS wallpaper");
     expect_true(fake.service_set_count == 0, "seeding does not set service wallpaper");
-    expect_true(fake.surface_set_count == 1 &&
-                    text_equals_ascii(fake.surface_set_path, "C:\\Wallpapers\\current.jpg"),
-                "seeded wallpaper applies to surface");
+    expect_true(
+        fake.surface_set_count == 1 &&
+            reach_test_utf16_equals_ascii(fake.surface_set_path, "C:\\Wallpapers\\current.jpg"),
+        "seeded wallpaper applies to surface");
     expect_true(fake.monitor_set_count == 1 && fake.monitor_indices[0] == 1,
                 "seeded path still applies configured monitor overrides");
 }
@@ -266,7 +243,7 @@ static void test_empty_config_without_current_wallpaper_only_applies_monitors(vo
     uint16_t wallpaper_path[260] = {};
     uint16_t monitor_paths[1][260] = {};
     uint16_t cached_path[260] = {};
-    copy_ascii(monitor_paths[0], 260, "C:\\Wallpapers\\monitor.jpg");
+    reach_copy_ascii_to_utf16(monitor_paths[0], 260, "C:\\Wallpapers\\monitor.jpg");
 
     int32_t changed = reach_wallpaper_seed_or_apply(&service_port, &surface_port, wallpaper_path,
                                                     260, monitor_paths, 1, cached_path, 260);
@@ -281,10 +258,10 @@ static void test_empty_config_without_current_wallpaper_only_applies_monitors(vo
 static void test_empty_config_seeds_per_monitor_wallpapers(void)
 {
     fake_wallpaper_ports fake = {};
-    copy_ascii(fake.current_path, 260, "C:\\Wallpapers\\stitched.jpg");
+    reach_copy_ascii_to_utf16(fake.current_path, 260, "C:\\Wallpapers\\stitched.jpg");
     fake.current_monitor_count = 2;
-    copy_ascii(fake.current_monitor_paths[0], 260, "C:\\Wallpapers\\primary.jpg");
-    copy_ascii(fake.current_monitor_paths[1], 260, "C:\\Wallpapers\\secondary.jpg");
+    reach_copy_ascii_to_utf16(fake.current_monitor_paths[0], 260, "C:\\Wallpapers\\primary.jpg");
+    reach_copy_ascii_to_utf16(fake.current_monitor_paths[1], 260, "C:\\Wallpapers\\secondary.jpg");
 
     reach_wallpaper_service service = {};
     reach_wallpaper_surface surface = {};
@@ -300,21 +277,50 @@ static void test_empty_config_seeds_per_monitor_wallpapers(void)
                                                     260, monitor_paths, 4, cached_path, 260);
 
     expect_true(changed == 1, "per-monitor seeding reports config change");
-    expect_true(text_equals_ascii(wallpaper_path, "C:\\Wallpapers\\primary.jpg"),
+    expect_true(reach_test_utf16_equals_ascii(wallpaper_path, "C:\\Wallpapers\\primary.jpg"),
                 "first monitor wallpaper seeds global config");
-    expect_true(text_equals_ascii(cached_path, "C:\\Wallpapers\\primary.jpg"),
+    expect_true(reach_test_utf16_equals_ascii(cached_path, "C:\\Wallpapers\\primary.jpg"),
                 "first monitor wallpaper is cached");
     expect_true(fake.current_query_count == 0,
                 "per-monitor seeding skips stitched global wallpaper query");
-    expect_true(fake.surface_set_count == 1 &&
-                    text_equals_ascii(fake.surface_set_path, "C:\\Wallpapers\\primary.jpg"),
-                "first monitor wallpaper applies to surface");
-    expect_true(text_equals_ascii(monitor_paths[1], "C:\\Wallpapers\\secondary.jpg"),
+    expect_true(
+        fake.surface_set_count == 1 &&
+            reach_test_utf16_equals_ascii(fake.surface_set_path, "C:\\Wallpapers\\primary.jpg"),
+        "first monitor wallpaper applies to surface");
+    expect_true(reach_test_utf16_equals_ascii(monitor_paths[1], "C:\\Wallpapers\\secondary.jpg"),
                 "differing monitor wallpaper seeds monitor config");
     expect_true(monitor_paths[0][0] == 0, "monitor matching global is not seeded as override");
-    expect_true(fake.monitor_set_count == 1 && fake.monitor_indices[0] == 1 &&
-                    text_equals_ascii(fake.monitor_paths[0], "C:\\Wallpapers\\secondary.jpg"),
-                "seeded monitor wallpaper applies to surface");
+    expect_true(
+        fake.monitor_set_count == 1 && fake.monitor_indices[0] == 1 &&
+            reach_test_utf16_equals_ascii(fake.monitor_paths[0], "C:\\Wallpapers\\secondary.jpg"),
+        "seeded monitor wallpaper applies to surface");
+}
+
+static void test_case_only_monitor_path_does_not_seed_override(void)
+{
+    fake_wallpaper_ports fake = {};
+    fake.current_monitor_count = 2;
+    reach_copy_ascii_to_utf16(fake.current_monitor_paths[0], 260, "C:\\Wallpapers\\shared.jpg");
+    reach_copy_ascii_to_utf16(fake.current_monitor_paths[1], 260, "c:/wallpapers/SHARED.JPG");
+
+    reach_wallpaper_service service = {};
+    reach_wallpaper_surface surface = {};
+    reach_wallpaper_service_port service_port = service_port_for(&fake, &service);
+    service_port.ops.current_monitor_wallpaper = fake_service_current_monitor_wallpaper;
+    reach_wallpaper_surface_port surface_port = surface_port_for(&fake, &surface);
+
+    uint16_t wallpaper_path[260] = {};
+    uint16_t monitor_paths[2][260] = {};
+    uint16_t cached_path[260] = {};
+
+    int32_t changed = reach_wallpaper_seed_or_apply(&service_port, &surface_port, wallpaper_path,
+                                                    260, monitor_paths, 2, cached_path, 260);
+
+    expect_true(changed == 1, "case-only monitor paths still seed global config");
+    expect_true(monitor_paths[1][0] == 0,
+                "case-only monitor path does not create a redundant override");
+    expect_true(fake.monitor_set_count == 0,
+                "case-only monitor path does not apply a redundant override");
 }
 
 int main(void)
@@ -323,5 +329,6 @@ int main(void)
     test_empty_config_seeds_from_current_wallpaper();
     test_empty_config_without_current_wallpaper_only_applies_monitors();
     test_empty_config_seeds_per_monitor_wallpapers();
+    test_case_only_monitor_path_does_not_seed_override();
     return failures == 0 ? 0 : 1;
 }

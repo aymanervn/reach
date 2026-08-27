@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/apps/settings/settings.h"
 
 #include <memory>
@@ -12,16 +13,6 @@ static void expect_true(int value, const char *message)
         printf("FAIL: %s\n", message);
     }
 }
-static void copy_ascii(uint16_t *destination, size_t capacity, const char *source)
-{
-    size_t index = 0;
-    while (source[index] != 0 && index + 1 < capacity)
-    {
-        destination[index] = (uint16_t)(unsigned char)source[index];
-        ++index;
-    }
-    destination[index] = 0;
-}
 static int equals_ascii(const uint16_t *value, const char *expected)
 {
     size_t index = 0;
@@ -35,16 +26,18 @@ static reach_windows_update_list sample_updates(size_t count)
     updates.count = count;
     for (size_t index = 0; index < count; ++index)
     {
-        copy_ascii(updates.updates[index].identity.update_id, REACH_WINDOWS_UPDATE_ID_CAPACITY,
-                   index == 0 ? "security-id" : "optional-id");
+        reach_copy_ascii_to_utf16(updates.updates[index].identity.update_id,
+                                  REACH_WINDOWS_UPDATE_ID_CAPACITY,
+                                  index == 0 ? "security-id" : "optional-id");
         updates.updates[index].identity.revision_number = (int32_t)index + 1;
-        copy_ascii(updates.updates[index].identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
-                   index == 0 ? "2026-06 Cumulative Update for Windows 11"
-                              : "Optional language feature");
-        copy_ascii(updates.updates[index].identity.kb_article_ids,
-                   REACH_WINDOWS_UPDATE_METADATA_CAPACITY, "KB123456");
-        copy_ascii(updates.updates[index].categories, REACH_WINDOWS_UPDATE_METADATA_CAPACITY,
-                   index == 0 ? "Products; Security Updates" : "Feature Packs");
+        reach_copy_ascii_to_utf16(
+            updates.updates[index].identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
+            index == 0 ? "2026-06 Cumulative Update for Windows 11" : "Optional language feature");
+        reach_copy_ascii_to_utf16(updates.updates[index].identity.kb_article_ids,
+                                  REACH_WINDOWS_UPDATE_METADATA_CAPACITY, "KB123456");
+        reach_copy_ascii_to_utf16(updates.updates[index].categories,
+                                  REACH_WINDOWS_UPDATE_METADATA_CAPACITY,
+                                  index == 0 ? "Products; Security Updates" : "Feature Packs");
     }
     return updates;
 }
@@ -68,25 +61,28 @@ static void test_required_security_maintenance_classifications(void)
     for (const char *kb_id : kb_ids)
     {
         reach_windows_update_item update = {};
-        copy_ascii(update.identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
-                   "Update with no classification metadata");
-        copy_ascii(update.identity.kb_article_ids, REACH_WINDOWS_UPDATE_METADATA_CAPACITY, kb_id);
+        reach_copy_ascii_to_utf16(update.identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
+                                  "Update with no classification metadata");
+        reach_copy_ascii_to_utf16(update.identity.kb_article_ids,
+                                  REACH_WINDOWS_UPDATE_METADATA_CAPACITY, kb_id);
         expect_true(reach_windows_update_matches_security_maintenance(&update),
                     "required security-maintenance KB is selected explicitly");
     }
 
     reach_windows_update_item os_security_update = {};
-    copy_ascii(os_security_update.identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
-               "2026-06 Security Update");
-    copy_ascii(os_security_update.identity.kb_article_ids, REACH_WINDOWS_UPDATE_METADATA_CAPACITY,
-               "5094126");
+    reach_copy_ascii_to_utf16(os_security_update.identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
+                              "2026-06 Security Update");
+    reach_copy_ascii_to_utf16(os_security_update.identity.kb_article_ids,
+                              REACH_WINDOWS_UPDATE_METADATA_CAPACITY, "5094126");
     expect_true(reach_windows_update_matches_security_maintenance(&os_security_update),
                 "OS security update is selected by title");
 
     reach_windows_update_item unrelated = {};
-    copy_ascii(unrelated.identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY, "Optional update");
-    copy_ascii(unrelated.identity.kb_article_ids, REACH_WINDOWS_UPDATE_METADATA_CAPACITY,
-               "1890830, 50076510, 12267602");
+    reach_copy_ascii_to_utf16(unrelated.identity.title, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
+                              "Optional update");
+    reach_copy_ascii_to_utf16(unrelated.identity.kb_article_ids,
+                              REACH_WINDOWS_UPDATE_METADATA_CAPACITY,
+                              "1890830, 50076510, 12267602");
     expect_true(!reach_windows_update_matches_security_maintenance(&unrelated),
                 "partial KB matches are rejected");
 }
@@ -114,14 +110,13 @@ static void test_navigation_pages(void)
                 "page selection starts the navigation indicator animation");
     expect_true(reach_settings_model_tick_nav_selection(model.get(), 0.11),
                 "navigation indicator tick reports activity");
-    float interrupted_position =
-        reach_animation_manager_value(&model->nav_selection_animation, 0);
+    float interrupted_position = reach_animation_manager_value(&model->nav_selection_animation, 0);
     expect_true(interrupted_position > 0.0f && interrupted_position < 6.0f,
                 "navigation indicator travels between rows");
 
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_ACCOUNT);
     expect_true(reach_animation_manager_value(&model->nav_selection_animation, 0) ==
-                    interrupted_position &&
+                        interrupted_position &&
                     reach_animation_manager_target(&model->nav_selection_animation, 0) == 2.0f,
                 "navigation indicator retargets from its current position");
     double retarget_elapsed = model->nav_selection_track.elapsed_seconds;
@@ -404,8 +399,8 @@ static void test_account_model_and_layout(void)
 
     uint16_t display[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY] = {};
     uint16_t user[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY] = {};
-    copy_ascii(display, REACH_SETTINGS_ACCOUNT_NAME_CAPACITY, "aymane");
-    copy_ascii(user, REACH_SETTINGS_ACCOUNT_NAME_CAPACITY, "aymane");
+    reach_copy_ascii_to_utf16(display, REACH_SETTINGS_ACCOUNT_NAME_CAPACITY, "aymane");
+    reach_copy_ascii_to_utf16(user, REACH_SETTINGS_ACCOUNT_NAME_CAPACITY, "aymane");
     reach_settings_model_set_account(model.get(), display, user, 1, 42);
     expect_true(equals_ascii(model->account_display_name, "aymane"),
                 "account display name is stored");
@@ -592,8 +587,7 @@ static void test_radio_toggle_animations(void)
     expect_true(reach_settings_model_toggle_bluetooth_radio(model.get()),
                 "Bluetooth radio can toggle");
     reach_settings_model_tick_bluetooth_animations(model.get(), 0.09);
-    float bluetooth_position =
-        reach_animation_manager_value(&model->bluetooth_radio_animation, 0);
+    float bluetooth_position = reach_animation_manager_value(&model->bluetooth_radio_animation, 0);
     expect_true(bluetooth_position > 0.0f && bluetooth_position < 1.0f,
                 "Bluetooth radio toggle animates between states");
 }

@@ -115,8 +115,6 @@ void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *st
     }
 }
 
-static void reach_top_bar_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src);
-static int32_t reach_top_bar_utf16_equal(const uint16_t *a, const uint16_t *b);
 static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);
 static void reach_top_bar_update_language(reach_top_bar *top_bar);
 
@@ -134,7 +132,7 @@ static void reach_top_bar_format_percent(uint16_t *dst, size_t dst_count, const 
         value = 100;
     }
     snprintf(text, sizeof(text), "%s %d%%", label, value);
-    reach_top_bar_copy_ascii_to_utf16(dst, dst_count, text);
+    reach_copy_ascii_to_utf16(dst, dst_count, text);
 }
 
 static void reach_top_bar_format_rate(uint16_t *dst, size_t dst_count, uint16_t prefix,
@@ -163,7 +161,7 @@ static void reach_top_bar_format_rate(uint16_t *dst, size_t dst_count, uint16_t 
         return;
     }
     dst[0] = prefix;
-    reach_top_bar_copy_ascii_to_utf16(dst + 1, dst_count - 1, text);
+    reach_copy_ascii_to_utf16(dst + 1, dst_count - 1, text);
 }
 
 static void reach_top_bar_update_stats(reach_top_bar *top_bar)
@@ -278,7 +276,7 @@ static void reach_top_bar_format_volume(uint16_t *dst, size_t dst_count, float l
 
     char text[8] = {};
     snprintf(text, sizeof(text), "%d%%", percent);
-    reach_top_bar_copy_ascii_to_utf16(dst, dst_count, text);
+    reach_copy_ascii_to_utf16(dst, dst_count, text);
 }
 
 static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double delta_seconds)
@@ -315,9 +313,8 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double
     if (state->network_icon_id == network_icon && state->bluetooth_icon_id == bluetooth_icon &&
         state->network_connected == network_connected &&
         state->bluetooth_enabled == bluetooth_enabled && state->volume_valid == audio.state_valid &&
-        state->volume_muted == volume_muted &&
-        reach_top_bar_utf16_equal(state->volume_text, volume_text) &&
-        reach_top_bar_utf16_equal(state->network_name, name))
+        state->volume_muted == volume_muted && reach_utf16_equal(state->volume_text, volume_text) &&
+        reach_utf16_equal(state->network_name, name))
     {
         return 0;
     }
@@ -763,42 +760,6 @@ void reach_top_bar_suppress_power_release(reach_top_bar *top_bar)
     }
 }
 
-static void reach_top_bar_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)(unsigned char)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
-static int32_t reach_top_bar_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
 static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
 {
     reach_top_bar_state *state = &top_bar->state;
@@ -830,10 +791,10 @@ static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
 
     uint16_t next_time[32] = {};
     uint16_t next_date[64] = {};
-    reach_top_bar_copy_ascii_to_utf16(next_time, 32, time_text);
-    reach_top_bar_copy_ascii_to_utf16(next_date, 64, date_text);
-    if (state->clock_initialized && reach_top_bar_utf16_equal(state->clock_time_text, next_time) &&
-        reach_top_bar_utf16_equal(state->clock_date_text, next_date))
+    reach_copy_ascii_to_utf16(next_time, 32, time_text);
+    reach_copy_ascii_to_utf16(next_date, 64, date_text);
+    if (state->clock_initialized && reach_utf16_equal(state->clock_time_text, next_time) &&
+        reach_utf16_equal(state->clock_date_text, next_date))
     {
         return 0;
     }

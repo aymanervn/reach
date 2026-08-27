@@ -34,26 +34,15 @@ static float reach_clipboard_clamp_float(float value, float minimum, float maxim
     return value;
 }
 
-static size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    return model->count <= REACH_CLIPBOARD_MAX_ITEMS ? model->count : REACH_CLIPBOARD_MAX_ITEMS;
-}
-
 static int32_t reach_clipboard_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
     return rect.width > 0.0f && rect.height > 0.0f && (float)x >= rect.x &&
            (float)x < rect.x + rect.width && (float)y >= rect.y && (float)y < rect.y + rect.height;
 }
 
-reach_clipboard_layout
-reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect_f32 monitor_bounds,
-                                        reach_rect_f32 launcher_bounds, float dpi_scale,
-                                        float border_thickness, float animated_height,
-                                        float animated_item_width)
+reach_clipboard_layout reach_clipboard_compute_layout_animated(
+    reach_clipboard_model *model, reach_rect_f32 monitor_bounds, reach_rect_f32 launcher_bounds,
+    float dpi_scale, float border_thickness, float animated_height, float animated_item_width)
 {
     reach_clipboard_layout layout = {};
     if (model == nullptr)
@@ -75,8 +64,8 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
         reach_clipboard_min_float(metrics.panel_width + border_thickness * 2.0f, available_width);
 
     const float max_items_height = metrics.item_large_size * 4.0f + metrics.item_gap * 3.0f;
-    const float chrome_height = border_thickness * 2.0f + 2.0f * metrics.padding +
-                                metrics.title_height + metrics.title_gap;
+    const float chrome_height =
+        border_thickness * 2.0f + 2.0f * metrics.padding + metrics.title_height + metrics.title_gap;
     const float default_height = chrome_height + metrics.item_default_size;
     const float max_height =
         reach_clipboard_min_float(chrome_height + max_items_height, available_height);
@@ -128,16 +117,15 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
         reach_clipboard_min_float(border_thickness, layout.bounds.width * 0.5f);
     const float vertical_border =
         reach_clipboard_min_float(border_thickness, layout.bounds.height * 0.5f);
-    const float content_width = reach_clipboard_max_float(
-        0.0f, width - horizontal_border * 2.0f - metrics.padding * 2.0f);
+    const float content_width =
+        reach_clipboard_max_float(0.0f, width - horizontal_border * 2.0f - metrics.padding * 2.0f);
     const float clear_button_height =
         reach_clipboard_min_float(metrics.clear_button_height, metrics.title_height);
-    layout.clear_button = {
-        layout.bounds.x + layout.bounds.width - horizontal_border - metrics.padding -
-            metrics.clear_button_width,
-        layout.bounds.y + vertical_border + metrics.padding +
-            (metrics.title_height - clear_button_height) * 0.5f,
-        metrics.clear_button_width, clear_button_height};
+    layout.clear_button = {layout.bounds.x + layout.bounds.width - horizontal_border -
+                               metrics.padding - metrics.clear_button_width,
+                           layout.bounds.y + vertical_border + metrics.padding +
+                               (metrics.title_height - clear_button_height) * 0.5f,
+                           metrics.clear_button_width, clear_button_height};
 
     const float title_width = reach_clipboard_max_float(
         0.0f, content_width - metrics.clear_button_width - metrics.clear_button_gap);
@@ -147,11 +135,11 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
 
     const float target_viewport_height =
         reach_clipboard_max_float(0.0f, target_height - chrome_height);
-    layout.viewport = {layout.bounds.x + horizontal_border + metrics.padding,
-                       layout.title.y + metrics.title_height + metrics.title_gap, content_width,
-                       reach_clipboard_max_float(
-                           0.0f, height - vertical_border * 2.0f - metrics.padding * 2.0f -
-                                     metrics.title_height - metrics.title_gap)};
+    layout.viewport = {
+        layout.bounds.x + horizontal_border + metrics.padding,
+        layout.title.y + metrics.title_height + metrics.title_gap, content_width,
+        reach_clipboard_max_float(0.0f, height - vertical_border * 2.0f - metrics.padding * 2.0f -
+                                            metrics.title_height - metrics.title_gap)};
 
     layout.item_large_size = metrics.item_large_size;
     layout.content_height = item_count > 0 ? metrics.item_large_size * (float)item_count +
@@ -187,12 +175,11 @@ reach_clipboard_compute_layout_animated(reach_clipboard_model *model, reach_rect
             border_thickness,
             reach_clipboard_min_float(layout.items[index].width, layout.items[index].height) *
                 0.5f);
-        layout.close_buttons[index] = {layout.items[index].x + layout.items[index].width -
-                                           item_border - metrics.close_button_size -
-                                           metrics.close_button_margin,
-                                       layout.items[index].y + item_border +
-                                           metrics.close_button_margin,
-                                       metrics.close_button_size, metrics.close_button_size};
+        layout.close_buttons[index] = {
+            layout.items[index].x + layout.items[index].width - item_border -
+                metrics.close_button_size - metrics.close_button_margin,
+            layout.items[index].y + item_border + metrics.close_button_margin,
+            metrics.close_button_size, metrics.close_button_size};
     }
 
     if (needs_scrollbar)
@@ -315,8 +302,7 @@ static int32_t reach_clipboard_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
                                          reach_rect_f32 monitor_bounds,
                                          reach_rect_f32 launcher_bounds, float dpi_scale,
-                                         float border_thickness,
-                                         int32_t *out_animating)
+                                         float border_thickness, int32_t *out_animating)
 {
     if (out_animating != nullptr)
     {
@@ -339,10 +325,9 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
     float animated_item_width = reach_clipboard_feature_animate_layout_value(
         clipboard, REACH_CLIPBOARD_LAYOUT_ITEM_WIDTH, target_layout.item_width, &item_width_active);
 
-    state->layout =
-        reach_clipboard_compute_layout_animated(&state->model, monitor_bounds, launcher_bounds,
-                                                dpi_scale, border_thickness, animated_height,
-                                                animated_item_width);
+    state->layout = reach_clipboard_compute_layout_animated(
+        &state->model, monitor_bounds, launcher_bounds, dpi_scale, border_thickness,
+        animated_height, animated_item_width);
 
     if (out_animating != nullptr)
     {
@@ -491,6 +476,24 @@ static void reach_clipboard_capsule_handle_pointer(void *capsule, const reach_po
     reach_clipboard_capsule_apply_event_result(&event_result, out);
 }
 
+static void reach_clipboard_capsule_surface_geometry(const void *capsule,
+                                                     reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_clipboard_feature *clipboard =
+        static_cast<const reach_clipboard_feature *>(capsule);
+    if (clipboard == nullptr)
+    {
+        return;
+    }
+    out->visible_bounds = clipboard->state.layout.bounds;
+    out->envelope_bounds = clipboard->state.layout.bounds;
+}
+
 const reach_ui_event_type *reach_clipboard_activation_events(size_t *out_count)
 {
     static const reach_ui_event_type events[] = {REACH_UI_EVENT_CLIPBOARD_TOGGLE};
@@ -518,6 +521,8 @@ const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void)
             return clipboard != nullptr && (clipboard->state.scrollbar_drag.active ||
                                             reach_pressable_tracking(&clipboard->state.pressable));
         },
+        nullptr,
+        reach_clipboard_capsule_surface_geometry,
     };
     return &ops;
 }

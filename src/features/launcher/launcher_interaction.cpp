@@ -12,16 +12,6 @@ static int32_t reach_launcher_rect_contains(reach_rect_f32 rect, int32_t x, int3
            (float)y <= rect.y + rect.height;
 }
 
-static size_t reach_launcher_visible_result_count(const reach_launcher_model *model)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    return model->result_count < REACH_SEARCH_VISIBLE_RESULTS ? model->result_count
-                                                              : REACH_SEARCH_VISIBLE_RESULTS;
-}
-
 reach_launcher_hit_result reach_launcher_hit_test(const reach_launcher_model *model,
                                                   const reach_launcher_layout *layout, int32_t x,
                                                   int32_t y)

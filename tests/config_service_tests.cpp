@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/services/config.h"
 
 #include <atomic>
@@ -29,17 +30,6 @@ struct test_notifications
 static int expect(int condition)
 {
     return condition ? 0 : 1;
-}
-
-static void copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    size_t index = 0;
-    while (index + 1 < dst_count && src[index] != 0)
-    {
-        dst[index] = (uint16_t)src[index];
-        ++index;
-    }
-    dst[index] = 0;
 }
 
 static reach_result test_load(reach_config_store *store, reach_config_snapshot *out_snapshot)
@@ -134,8 +124,8 @@ static reach_config_store_port test_port(test_config_store *store)
 static void seed_pin(reach_config_snapshot *snapshot, size_t index, uint32_t id, const char *path)
 {
     snapshot->pinned_apps[index].id = id;
-    copy_ascii(snapshot->pinned_apps[index].path, 260, path);
-    copy_ascii(snapshot->pinned_apps[index].icon_ref, 260, path);
+    reach_copy_ascii_to_utf16(snapshot->pinned_apps[index].path, 260, path);
+    reach_copy_ascii_to_utf16(snapshot->pinned_apps[index].icon_ref, 260, path);
 }
 
 int main()

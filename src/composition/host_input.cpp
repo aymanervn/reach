@@ -66,6 +66,39 @@ static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 
 static reach_result reach_host_open_launcher_result_and_close_transients(reach_host *host);
 
+reach_pointer_event reach_host_surface_pointer_event(const reach_surface_desc *desc,
+                                                     const reach_ui_event *event,
+                                                     reach_pointer_event_kind kind)
+{
+    reach_pointer_event pointer = {};
+    pointer.kind = kind;
+    if (desc == nullptr)
+    {
+        return pointer;
+    }
+
+    pointer.coordinate_space = desc->cls == REACH_SURFACE_CLASS_POPUP
+                                   ? REACH_POINTER_COORDINATE_SURFACE_LOCAL
+                                   : REACH_POINTER_COORDINATE_SCREEN;
+    if (event == nullptr)
+    {
+        return pointer;
+    }
+
+    pointer.x = event->x;
+    pointer.y = event->y;
+    pointer.wheel_delta = event->wheel_delta;
+    pointer.modifiers = event->modifiers;
+    pointer.button = event->button;
+    if (desc->cls == REACH_SURFACE_CLASS_POPUP && desc->surface != nullptr &&
+        desc->surface->bounds_valid)
+    {
+        pointer.x -= (int32_t)desc->surface->last_bounds.x;
+        pointer.y -= (int32_t)desc->surface->last_bounds.y;
+    }
+    return pointer;
+}
+
 static reach_capsule_pointer_result reach_host_dispatch_pointer(reach_host *host,
                                                                 reach_surface_id surface_id,
                                                                 const reach_ui_event *event,
@@ -83,16 +116,7 @@ static reach_capsule_pointer_result reach_host_dispatch_pointer(reach_host *host
         return result;
     }
 
-    reach_pointer_event pointer = {};
-    pointer.kind = kind;
-    if (event != nullptr)
-    {
-        pointer.x = event->x;
-        pointer.y = event->y;
-        pointer.wheel_delta = event->wheel_delta;
-        pointer.modifiers = event->modifiers;
-        pointer.button = event->button;
-    }
+    reach_pointer_event pointer = reach_host_surface_pointer_event(desc, event, kind);
     ops->handle_pointer(desc->capsule, &pointer, &result);
     if (result.redraw && desc->surface != nullptr)
     {

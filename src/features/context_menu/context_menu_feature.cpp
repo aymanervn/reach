@@ -244,13 +244,13 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     }
 
     state->bounds = {popup_x, popup_y, popup_width, popup_height};
-    float items_y = popup_y + border_thickness + padding +
+    float items_y = border_thickness + padding +
                     (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
     for (size_t index = 0; index < state->item_count; ++index)
     {
-        state->item_slots[index] = {
-            popup_x + border_thickness + padding, items_y + item_height * (float)index,
-            popup_content_width - padding * 2.0f, item_height};
+        state->item_slots[index] = {border_thickness + padding,
+                                    items_y + item_height * (float)index,
+                                    popup_content_width - padding * 2.0f, item_height};
     }
 }
 
@@ -281,8 +281,8 @@ static float reach_context_menu_window_list_width(const reach_context_menu_state
     const float minimum = chrome + one_letter;
     float maximum = metrics.window_list_max_width * scale;
     const float border_thickness = reach_theme_border_thickness(ctx->theme, scale);
-    const float monitor_width = ctx->monitor.width - metrics.screen_margin * scale * 2.0f -
-                                border_thickness * 2.0f;
+    const float monitor_width =
+        ctx->monitor.width - metrics.screen_margin * scale * 2.0f - border_thickness * 2.0f;
     if (monitor_width > 0.0f && monitor_width < maximum)
     {
         maximum = monitor_width;
@@ -489,9 +489,8 @@ static int32_t reach_context_menu_capsule_wants_pointer_move(const void *capsule
 static int32_t reach_context_menu_point_in_bounds(const reach_context_menu_state *state, int32_t x,
                                                   int32_t y)
 {
-    return state != nullptr && (float)x >= state->bounds.x &&
-           (float)x <= state->bounds.x + state->bounds.width && (float)y >= state->bounds.y &&
-           (float)y <= state->bounds.y + state->bounds.height;
+    return state != nullptr && x >= 0 && (float)x <= state->bounds.width && y >= 0 &&
+           (float)y <= state->bounds.height;
 }
 
 static uint64_t reach_context_menu_pressable_target(const reach_context_menu *menu, int32_t x,
@@ -567,7 +566,8 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     *out = {};
 
     reach_context_menu *menu = static_cast<reach_context_menu *>(capsule);
-    if (menu == nullptr || event == nullptr || !menu->state.open)
+    if (menu == nullptr || event == nullptr || !menu->state.open ||
+        event->coordinate_space != REACH_POINTER_COORDINATE_SURFACE_LOCAL)
     {
         return;
     }

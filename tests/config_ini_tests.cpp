@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/platform/windows_adapters.h"
 
 #include <windows.h>
@@ -8,17 +9,6 @@
 static int expect(int condition)
 {
     return condition ? 0 : 1;
-}
-
-static void copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    size_t index = 0;
-    while (index + 1 < dst_count && src[index] != 0)
-    {
-        dst[index] = (uint16_t)src[index];
-        ++index;
-    }
-    dst[index] = 0;
 }
 
 int main()
@@ -57,11 +47,11 @@ int main()
     snapshot->stage_animation_ms = 345;
     snapshot->pinned_app_count = 2;
     snapshot->pinned_apps[0].id = 4;
-    copy_ascii(snapshot->pinned_apps[0].path, 260, "C:\\Apps\\one.exe");
+    reach_copy_ascii_to_utf16(snapshot->pinned_apps[0].path, 260, "C:\\Apps\\one.exe");
     snapshot->pinned_apps[0].arguments[0] = 0x03A9;
     snapshot->pinned_apps[0].arguments[1] = 0;
     snapshot->pinned_apps[1].id = 9;
-    copy_ascii(snapshot->pinned_apps[1].path, 260, "C:\\Apps\\two.exe");
+    reach_copy_ascii_to_utf16(snapshot->pinned_apps[1].path, 260, "C:\\Apps\\two.exe");
     failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
 
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);

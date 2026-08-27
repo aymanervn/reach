@@ -1,4 +1,5 @@
 #include "reach/features/battery.h"
+#include "test_utf16.h"
 
 #include <stdio.h>
 
@@ -27,41 +28,29 @@ static void expect_near(float actual, float expected, float tolerance, const cha
     }
 }
 
-static int text_equals_ascii(const uint16_t *text, const char *expected)
-{
-    size_t index = 0;
-    while (expected[index] != 0)
-    {
-        if (text[index] != (uint16_t)(unsigned char)expected[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return text[index] == 0;
-}
-
 static void test_percent_formatting(void)
 {
     uint16_t text[8] = {};
 
     reach_battery_format_percent(text, 8, 72);
-    expect_true(text_equals_ascii(text, "72%"), "two digit percent formats with a suffix");
+    expect_true(reach_test_utf16_equals_ascii(text, "72%"),
+                "two digit percent formats with a suffix");
 
     reach_battery_format_percent(text, 8, 100);
-    expect_true(text_equals_ascii(text, "100%"), "full charge formats as three digits");
+    expect_true(reach_test_utf16_equals_ascii(text, "100%"), "full charge formats as three digits");
 
     reach_battery_format_percent(text, 8, 0);
-    expect_true(text_equals_ascii(text, "0%"), "empty battery formats as zero");
+    expect_true(reach_test_utf16_equals_ascii(text, "0%"), "empty battery formats as zero");
 
     reach_battery_format_percent(text, 8, 7);
-    expect_true(text_equals_ascii(text, "7%"), "single digit percent has no padding");
+    expect_true(reach_test_utf16_equals_ascii(text, "7%"), "single digit percent has no padding");
 
     reach_battery_format_percent(text, 8, -5);
-    expect_true(text_equals_ascii(text, "0%"), "negative percent clamps to zero");
+    expect_true(reach_test_utf16_equals_ascii(text, "0%"), "negative percent clamps to zero");
 
     reach_battery_format_percent(text, 8, 250);
-    expect_true(text_equals_ascii(text, "100%"), "percent above full clamps to one hundred");
+    expect_true(reach_test_utf16_equals_ascii(text, "100%"),
+                "percent above full clamps to one hundred");
 }
 
 static void test_saver_effective_state(void)
@@ -102,16 +91,14 @@ static void test_pending_reconciles_with_system(void)
     (void)reach_battery_set_power(battery, 55, 0);
     expect_true(reach_battery_saver_pending(battery),
                 "pending survives a snapshot that still disagrees");
-    expect_true(
-        reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 1,
-        "the requested state keeps showing while pending");
+    expect_true(reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 1,
+                "the requested state keeps showing while pending");
 
     (void)reach_battery_set_power(battery, 55, 1);
     expect_true(!reach_battery_saver_pending(battery),
                 "pending clears once the system agrees with the request");
-    expect_true(
-        reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 1,
-        "the system state carries the value after reconciling");
+    expect_true(reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 1,
+                "the system state carries the value after reconciling");
 
     reach_battery_destroy(battery);
 }
@@ -135,9 +122,8 @@ static void test_pending_expires(void)
     expect_true(!reach_battery_saver_pending(battery),
                 "pending expires when the system never agrees");
     expect_true(tick.redraw, "expiring the request asks for a redraw");
-    expect_true(
-        reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 0,
-        "the model falls back to the system state after expiry");
+    expect_true(reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 0,
+                "the model falls back to the system state after expiry");
 
     reach_battery_destroy(battery);
 }
@@ -191,11 +177,11 @@ static void test_content_stays_in_surface_space(void)
                     "content rects stay within the surface height");
     }
 
-    float row_center_x = state->bounds.x + state->saver_row.x + state->saver_row.width * 0.5f;
-    float row_center_y = state->bounds.y + state->saver_row.y + state->saver_row.height * 0.5f;
+    float row_center_x = state->saver_row.x + state->saver_row.width * 0.5f;
+    float row_center_y = state->saver_row.y + state->saver_row.height * 0.5f;
     expect_true(reach_battery_hit_test(state, (int32_t)row_center_x, (int32_t)row_center_y) ==
                     REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER,
-                "a screen press over the saver row reaches the toggle");
+                "a surface-local press over the saver row reaches the toggle");
 
     float narrow_width = state->bounds.width;
     float content_width = state->percent_label.width;
@@ -221,16 +207,15 @@ static void test_hit_test_maps_regions(void)
     state.bounds = {100.0f, 40.0f, 200.0f, 90.0f};
     state.saver_row = {10.0f, 50.0f, 180.0f, 30.0f};
 
-    expect_true(reach_battery_hit_test(&state, 150, 100) ==
-                    REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER,
+    expect_true(reach_battery_hit_test(&state, 50, 60) == REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER,
                 "a press on the saver row toggles saver");
-    expect_true(reach_battery_hit_test(&state, 150, 60) == REACH_BATTERY_POINTER_ACTION_NONE,
+    expect_true(reach_battery_hit_test(&state, 50, 20) == REACH_BATTERY_POINTER_ACTION_NONE,
                 "a press elsewhere inside the popup does nothing");
-    expect_true(reach_battery_hit_test(&state, 10, 10) == REACH_BATTERY_POINTER_ACTION_DISMISS,
+    expect_true(reach_battery_hit_test(&state, -1, 10) == REACH_BATTERY_POINTER_ACTION_DISMISS,
                 "a press outside the popup dismisses it");
 
     state.open = 0;
-    expect_true(reach_battery_hit_test(&state, 150, 100) == REACH_BATTERY_POINTER_ACTION_NONE,
+    expect_true(reach_battery_hit_test(&state, 50, 60) == REACH_BATTERY_POINTER_ACTION_NONE,
                 "a closed popup ignores presses");
     expect_true(reach_battery_hit_test(nullptr, 0, 0) == REACH_BATTERY_POINTER_ACTION_NONE,
                 "a missing state ignores presses");

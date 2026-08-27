@@ -68,20 +68,6 @@ static float reach_top_bar_now_playing_text_advance(const reach_text_measure_por
                                         reach_top_bar_metrics_values.glyph_advance_ratio);
 }
 
-static int32_t reach_top_bar_now_playing_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
 // The scissor clips flush against the text slot, so the first glyph is drawn hard on the edge and
 // reads as clipped until it has scrolled clear. A leading space gives it that clearance up front.
 static void reach_top_bar_now_playing_compose_line(reach_top_bar_now_playing_model *model)
@@ -300,9 +286,9 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     text.width =
         input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
     reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
-                                        REACH_TEXT_SIZE_MEDIUM * dpi_scale,
-                                        REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                                        theme->now_playing_title, input->layout->text);
+                                        REACH_TEXT_SIZE_MEDIUM * dpi_scale, REACH_TEXT_WEIGHT_BOLD,
+                                        REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title,
+                                        input->layout->text);
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
                                      input->model->playback == REACH_MEDIA_PLAYBACK_PLAYING
@@ -422,7 +408,7 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     next.previous_enabled = snapshot.previous_enabled;
     next.play_pause_enabled = snapshot.play_pause_enabled;
     next.next_enabled = snapshot.next_enabled;
-    if (!reach_top_bar_now_playing_utf16_equal(now_playing->model.line, next.line))
+    if (!reach_utf16_equal(now_playing->model.line, next.line))
     {
         reach_marquee_reset(&now_playing->marquee);
         now_playing->text_offset_x = 0.0f;

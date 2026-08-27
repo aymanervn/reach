@@ -131,50 +131,6 @@ reach_result reach_host_render_quick_settings_surface(reach_host *host)
         reach_popup_notch_side(quick_settings_state->drop_direction), commands);
 }
 
-size_t reach_host_switcher_visible_count(const reach_host *host)
-{
-    if (host == nullptr)
-    {
-        return 0;
-    }
-    size_t window_count = reach_host_surface_transition_visible(&host->switcher_transition)
-                              ? reach_switcher_state_ptr(host->switcher_capsule)->window_count
-                              : reach_host_open_window_count(host);
-    return reach_switcher_visible_count(window_count);
-}
-
-reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32 bounds)
-{
-    if (host == nullptr || host->switcher.renderer.ops.begin_frame == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_switcher_render_context ctx = {};
-    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    ctx.bounds = bounds;
-    ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.icon_size_px = reach_host_icon_size_px(host);
-
-    reach_render_command_buffer *commands = &host->render_commands;
-    reach_render_command_buffer_clear(commands);
-    reach_result build_result =
-        reach_switcher_append_render_commands(host->switcher_capsule, &ctx, commands);
-    if (build_result != REACH_OK)
-    {
-        return build_result;
-    }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_SWITCHER, commands);
-
-    if (host->switcher.renderer.ops.begin_frame(host->switcher.renderer.backend) != REACH_OK)
-    {
-        return REACH_ERROR;
-    }
-
-    (void)host->switcher.renderer.ops.execute(host->switcher.renderer.backend, commands);
-    return host->switcher.renderer.ops.end_frame(host->switcher.renderer.backend);
-}
-
 reach_result reach_host_render_stage_surface(reach_host *host, reach_rect_f32 bounds)
 {
     if (host == nullptr || host->stage.renderer.ops.begin_frame == nullptr)
@@ -243,36 +199,6 @@ reach_result reach_host_render_launcher_surface(reach_host *host,
     return host->launcher.renderer.ops.end_frame(host->launcher.renderer.backend);
 }
 
-reach_result reach_host_render_clipboard_surface(reach_host *host)
-{
-    if (host == nullptr || host->clipboard_surface.renderer.ops.begin_frame == nullptr)
-    {
-        return REACH_OK;
-    }
-    reach_render_command_buffer *commands = &host->render_commands;
-    reach_render_command_buffer_clear(commands);
-    reach_result result = reach_clipboard_append_render_commands(
-        host->clipboard_capsule, host->theme != nullptr ? host->theme : reach_theme_default(),
-        reach_host_layout_dpi_scale(host), commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_CLIPBOARD, commands);
-    result =
-        host->clipboard_surface.renderer.ops.begin_frame(host->clipboard_surface.renderer.backend);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    result = host->clipboard_surface.renderer.ops.execute(host->clipboard_surface.renderer.backend,
-                                                          commands);
-    reach_result end_result =
-        host->clipboard_surface.renderer.ops.end_frame(host->clipboard_surface.renderer.backend);
-    return result != REACH_OK ? result : end_result;
-}
-
 reach_result reach_host_render_battery_surface(reach_host *host)
 {
     if (host == nullptr || host->battery.renderer.ops.begin_frame == nullptr)
@@ -297,38 +223,6 @@ reach_result reach_host_render_battery_surface(reach_host *host)
     return reach_host_render_popup_surface(host, REACH_SURFACE_ID_BATTERY, &host->battery,
                                            state->bounds, state->notch_anchor_x,
                                            reach_popup_notch_side(state->drop_direction), content);
-}
-
-reach_result reach_host_render_system_hud_surface(reach_host *host)
-{
-    if (host == nullptr || host->system_hud.renderer.ops.begin_frame == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_system_hud_render_context ctx = {};
-    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-
-    reach_render_command_buffer *commands = &host->render_commands;
-    reach_render_command_buffer_clear(commands);
-    reach_result result =
-        reach_system_hud_append_render_commands(host->system_hud_capsule, &ctx, commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    reach_host_stamp_surface_content(host, REACH_SURFACE_ID_SYSTEM_HUD, commands);
-
-    result = host->system_hud.renderer.ops.begin_frame(host->system_hud.renderer.backend);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    result = host->system_hud.renderer.ops.execute(host->system_hud.renderer.backend, commands);
-    reach_result end_result =
-        host->system_hud.renderer.ops.end_frame(host->system_hud.renderer.backend);
-    return result != REACH_OK ? result : end_result;
 }
 
 reach_result reach_host_render_context_menu_surface(reach_host *host)

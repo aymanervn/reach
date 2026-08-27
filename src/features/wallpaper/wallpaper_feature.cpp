@@ -2,20 +2,6 @@
 
 #include <new>
 
-static int32_t reach_wallpaper_path_equals(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    while (a[index] != 0 && b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return a[index] == b[index];
-}
-
 int32_t reach_wallpaper_seed_or_apply(reach_wallpaper_service_port *wallpaper_service,
                                       reach_wallpaper_surface_port *wallpaper_surface,
                                       uint16_t *wallpaper_path, size_t wallpaper_path_count,
@@ -78,7 +64,7 @@ int32_t reach_wallpaper_seed_or_apply(reach_wallpaper_service_port *wallpaper_se
                 reach_copy_utf16(current, 260, monitor_current);
             }
             else if (monitor_wallpaper_paths[index][0] == 0 &&
-                     !reach_wallpaper_path_equals(monitor_current, current) &&
+                     !reach_path_equals(monitor_current, current) &&
                      reach_copy_utf16(monitor_wallpaper_paths[index], 260, monitor_current) ==
                          REACH_OK)
             {
@@ -161,8 +147,7 @@ void reach_wallpaper_destroy(reach_wallpaper *wallpaper)
     delete wallpaper;
 }
 
-int32_t reach_wallpaper_apply_snapshot(reach_wallpaper *wallpaper,
-                                       reach_config_snapshot *snapshot)
+int32_t reach_wallpaper_apply_snapshot(reach_wallpaper *wallpaper, reach_config_snapshot *snapshot)
 {
     if (wallpaper == nullptr || snapshot == nullptr)
     {
@@ -187,7 +172,7 @@ void reach_wallpaper_reload(reach_wallpaper *wallpaper, const reach_config_snaps
         reach_copy_utf16(new_path, 260, snapshot->wallpaper_path);
     }
 
-    if (!force && reach_wallpaper_path_equals(wallpaper->path, new_path))
+    if (!force && reach_path_equals(wallpaper->path, new_path))
     {
         return;
     }
@@ -209,8 +194,7 @@ void reach_wallpaper_reload(reach_wallpaper *wallpaper, const reach_config_snaps
             if (snapshot->monitor_wallpaper_paths[index][0] != 0)
             {
                 (void)wallpaper->surface.ops.set_monitor_wallpaper(
-                    wallpaper->surface.surface, index,
-                    snapshot->monitor_wallpaper_paths[index]);
+                    wallpaper->surface.surface, index, snapshot->monitor_wallpaper_paths[index]);
             }
             else
             {

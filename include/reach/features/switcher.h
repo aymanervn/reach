@@ -61,6 +61,7 @@ extern "C"
     typedef struct reach_switcher_state
     {
         int32_t open;
+        reach_rect_f32 bounds;
         size_t selected_index;
         size_t visible_start;
         uintptr_t windows[REACH_MAX_OPEN_WINDOWS];
@@ -68,6 +69,16 @@ extern "C"
     } reach_switcher_state;
 
     typedef struct reach_switcher reach_switcher;
+
+    typedef struct reach_switcher_arrange_context
+    {
+        const reach_theme *theme;
+        reach_rect_f32 monitor_bounds;
+        reach_rect_f32 last_bounds;
+        float dpi_scale;
+        int32_t transition_visible;
+        int32_t bounds_valid;
+    } reach_switcher_arrange_context;
 
     reach_result reach_switcher_create(reach_switcher **out_switcher);
 
@@ -92,6 +103,8 @@ extern "C"
     reach_rect_f32 reach_switcher_apply_width_animation(
         reach_switcher *switcher, int32_t transition_visible, int32_t open, int32_t bounds_valid,
         float last_bounds_width, reach_rect_f32 target, int32_t *out_request_redraw);
+    int32_t reach_switcher_arrange(reach_switcher *switcher,
+                                   const reach_switcher_arrange_context *ctx);
 
     typedef enum reach_switcher_action_type
     {

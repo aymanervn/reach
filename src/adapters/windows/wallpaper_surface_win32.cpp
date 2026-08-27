@@ -407,20 +407,6 @@ static void reach_wallpaper_apply_prepared_bitmap(reach_wallpaper_surface *surfa
     reach_wallpaper_destroy_prepared_bitmap(&orphan);
 }
 
-static int32_t reach_wallpaper_path_equal(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr && b == nullptr)
-    {
-        return 1;
-    }
-    if (a == nullptr || b == nullptr)
-    {
-        return 0;
-    }
-    return lstrcmpW(reinterpret_cast<const wchar_t *>(a), reinterpret_cast<const wchar_t *>(b)) ==
-           0;
-}
-
 static reach_result reach_wallpaper_target_size(reach_wallpaper_monitor *monitor, int *out_width,
                                                 int *out_height)
 {
@@ -666,8 +652,7 @@ static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *sur
     }
 
     if (monitor->bitmap != nullptr && monitor->bitmap_width == target_width &&
-        monitor->bitmap_height == target_height &&
-        reach_wallpaper_path_equal(monitor->bitmap_path, path))
+        monitor->bitmap_height == target_height && reach_path_equals(monitor->bitmap_path, path))
     {
         return REACH_OK;
     }
@@ -684,7 +669,7 @@ static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *sur
         {
             if (job.monitor == monitor && job.monitor_index == monitor_index &&
                 job.generation == monitor->render_generation && job.target_width == target_width &&
-                job.target_height == target_height && reach_wallpaper_path_equal(job.path, path))
+                job.target_height == target_height && reach_path_equals(job.path, path))
             {
                 return REACH_OK;
             }
@@ -1184,7 +1169,7 @@ static int32_t reach_wallpaper_apply_render_results(reach_wallpaper_surface *sur
             const uint16_t *current_path =
                 reach_wallpaper_path_for_monitor(surface, result.monitor_index);
 
-            if (current_path != nullptr && reach_wallpaper_path_equal(current_path, result.path))
+            if (current_path != nullptr && reach_path_equals(current_path, result.path))
             {
                 reach_wallpaper_apply_prepared_bitmap(surface, result.monitor, &result.bitmap,
                                                       result.path);

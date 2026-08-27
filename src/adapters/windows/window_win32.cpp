@@ -9,17 +9,9 @@
 #include <new>
 #include <wchar.h>
 
-#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
-#define DWMWA_WINDOW_CORNER_PREFERENCE 33
-#endif
-
 #define IDI_ICON1 101
 #define IDI_SETTINGS_ICON 102
 #define REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS 128
-
-#ifndef DWMWCP_ROUND
-#define DWMWCP_ROUND 2
-#endif
 
 struct reach_platform_window
 {
@@ -30,7 +22,6 @@ struct reach_platform_window
     reach_ui_event pending_events[REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS];
     size_t pending_event_count;
     reach_platform_window_caption caption;
-    float corner_radius;
     int tracking_mouse_leave;
     int pointer_move_enabled;
     int suppress_capture_changed;
@@ -800,53 +791,6 @@ static reach_result reach_platform_window_get_bounds(const reach_platform_window
     return REACH_OK;
 }
 
-static reach_result reach_platform_window_apply_rounded_corners(reach_platform_window *window,
-                                                                float radius)
-{
-    if (window == nullptr || window->hwnd == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    window->corner_radius = radius;
-
-    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TOP_BAR ||
-        window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_TRAY_MENU ||
-        window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_BATTERY ||
-        window->role == REACH_SURFACE_CLIPBOARD || window->role == REACH_SURFACE_SETTINGS ||
-        window->role == REACH_SURFACE_STAGE || window->role == REACH_SURFACE_SYSTEM_HUD)
-    {
-        return REACH_OK;
-    }
-
-    int preference = DWMWCP_ROUND;
-    (void)DwmSetWindowAttribute(window->hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference,
-                                sizeof(preference));
-
-    RECT client = {};
-    if (!GetClientRect(window->hwnd, &client) || client.right <= client.left ||
-        client.bottom <= client.top)
-    {
-        return REACH_OK;
-    }
-
-    int diameter = radius > 0.0f ? (int)(radius * 2.0f) : 18;
-    if (diameter < 18)
-    {
-        diameter = 18;
-    }
-
-    HRGN region = CreateRoundRectRgn(0, 0, client.right - client.left + 1,
-                                     client.bottom - client.top + 1, diameter, diameter);
-
-    if (region == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
-    return SetWindowRgn(window->hwnd, region, TRUE) ? REACH_OK : REACH_ERROR;
-}
 static reach_result reach_platform_window_set_opacity(reach_platform_window *window, float opacity)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -1216,7 +1160,6 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.get_bounds = reach_platform_window_get_bounds;
     out_port->ops.set_opacity = reach_platform_window_set_opacity;
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
-    out_port->ops.apply_rounded_corners = reach_platform_window_apply_rounded_corners;
     out_port->ops.set_caption = reach_platform_window_set_caption;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
     out_port->ops.has_pending_events = reach_platform_window_has_pending_events;

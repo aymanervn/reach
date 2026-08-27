@@ -26,15 +26,6 @@ static float reach_clipboard_clamp01(float value)
     return value;
 }
 
-static size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    return model->count <= REACH_CLIPBOARD_MAX_ITEMS ? model->count : REACH_CLIPBOARD_MAX_ITEMS;
-}
-
 static constexpr size_t REACH_CLIPBOARD_RENDER_ITEM_LIMIT = 5;
 static constexpr size_t REACH_CLIPBOARD_PREVIEW_LINE_LIMIT = 4;
 static constexpr float REACH_CLIPBOARD_PREVIEW_LINE_HEIGHT_RATIO = 1.25f;

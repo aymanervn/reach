@@ -23,7 +23,11 @@ extern "C"
     void reach_log_info(const char *message);
     void reach_log_error(const char *message);
     size_t reach_strlen_utf16(const uint16_t *text);
+    int32_t reach_utf16_equal(const uint16_t *a, const uint16_t *b);
+    int32_t reach_utf16_equal_ascii_case_insensitive(const uint16_t *a, const uint16_t *b);
+    int32_t reach_path_equals(const uint16_t *a, const uint16_t *b);
     reach_result reach_copy_utf16(uint16_t *dst, size_t dst_count, const uint16_t *src);
+    reach_result reach_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src);
     void reach_copy_path_stem_utf16(uint16_t *dst, size_t dst_count, const uint16_t *path);
 
 #ifdef __cplusplus

@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/features/dock.h"
 
 #include <math.h>
@@ -23,25 +24,14 @@ static void expect_near(float actual, float expected, float tolerance, const cha
     }
 }
 
-static void copy_ascii(uint16_t *dst, size_t cap, const char *src)
-{
-    size_t index = 0;
-    while (src != nullptr && src[index] != 0 && index + 1 < cap)
-    {
-        dst[index] = (uint16_t)(unsigned char)src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
 static reach_window_snapshot make_window(uintptr_t id, const char *path, const char *aumid)
 {
     reach_window_snapshot window = {};
     window.id = id;
     window.visible = 1;
-    copy_ascii(window.title, 260, "window");
-    copy_ascii(window.path, 260, path);
-    copy_ascii(window.app_user_model_id, 260, aumid);
+    reach_copy_ascii_to_utf16(window.title, 260, "window");
+    reach_copy_ascii_to_utf16(window.path, 260, path);
+    reach_copy_ascii_to_utf16(window.app_user_model_id, 260, aumid);
     return window;
 }
 
@@ -49,7 +39,7 @@ static reach_pinned_app_model make_pin(uint32_t id, const char *path)
 {
     reach_pinned_app_model app = {};
     app.id = id;
-    copy_ascii(app.path, 260, path);
+    reach_copy_ascii_to_utf16(app.path, 260, path);
     return app;
 }
 
@@ -232,8 +222,7 @@ static void test_capacity_keeps_all_pinned_and_running_groups(void)
 
 static void test_fit_metrics_keep_native_size_until_overflow(void)
 {
-    reach_dock_fit_result fit =
-        reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 600.0f, 10.0f);
+    reach_dock_fit_result fit = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 600.0f, 10.0f);
     expect_near(fit.scale, 1.0f, 0.0001f, "fitting content stays at native scale");
     expect_near(fit.width, 589.6f, 0.0001f,
                 "native width includes border and equal enlarged outer padding");
@@ -247,16 +236,14 @@ static void test_fit_metrics_keep_native_size_until_overflow(void)
 
 static void test_fit_metrics_scale_every_dimension_without_a_minimum(void)
 {
-    reach_dock_fit_result half =
-        reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 294.8f, 10.0f);
+    reach_dock_fit_result half = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 294.8f, 10.0f);
     expect_near(half.scale, 0.5f, 0.0001f, "overflow resolves to the exact fit scale");
     expect_near(half.width, 294.8f, 0.0001f, "overflow width exactly fits the monitor");
     expect_near(half.height, 32.0f, 0.0001f, "Dock height scales uniformly");
     expect_near(half.icon_size, 20.0f, 0.0001f, "icons scale uniformly");
     expect_near(half.gap, 6.0f, 0.0001f, "gaps scale uniformly");
 
-    reach_dock_fit_result tiny =
-        reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 1.0f, 10.0f);
+    reach_dock_fit_result tiny = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 1.0f, 10.0f);
     expect_near(tiny.width, 1.0f, 0.0001f, "arbitrarily narrow monitors still fit exactly");
     expect_true(tiny.scale > 0.0f && tiny.scale < half.scale,
                 "fit calculation has no minimum scale clamp");
@@ -305,8 +292,7 @@ static void test_adaptive_layout_rebuild_keeps_native_height(void)
     reach_dock_build_layout(dock, &context, &layout);
 
     expect_near(first_scale, 0.5f, 0.0001f, "test Dock enters adaptive fitting");
-    expect_near(layout.native_height, 64.0f, 0.0001f,
-                "adaptive rebuild preserves native height");
+    expect_near(layout.native_height, 64.0f, 0.0001f, "adaptive rebuild preserves native height");
     expect_near(layout.bounds.x, first_bounds.x, 0.0001f,
                 "adaptive rebuild preserves fitted horizontal position");
     expect_near(layout.bounds.y, first_bounds.y, 0.0001f,

@@ -56,7 +56,7 @@ static constexpr reach_clipboard_metrics reach_clipboard_make_metrics()
 
     metrics.title_height = 32.0f;
     metrics.title_gap = 8.0f;
-    metrics.title_font_size = REACH_TEXT_SIZE_HEADING;
+    metrics.title_font_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.title_font_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
     metrics.items_font_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.clear_button_width = 54.0f;

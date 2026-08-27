@@ -2,15 +2,6 @@
 
 #include "clipboard_common.h"
 
-static size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    return model->count <= REACH_CLIPBOARD_MAX_ITEMS ? model->count : REACH_CLIPBOARD_MAX_ITEMS;
-}
-
 static void reach_clipboard_clamp_count(reach_clipboard_model *model)
 {
     if (model != nullptr && model->count > REACH_CLIPBOARD_MAX_ITEMS)

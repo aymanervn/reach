@@ -183,6 +183,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_frame.cpp
     src/adapters/windows/render_d2d/render_d2d_icons.cpp
     src/adapters/windows/render_d2d/render_d2d_svg.cpp
+    src/adapters/windows/render_d2d/render_d2d_svg_document.cpp
     src/adapters/windows/render_d2d/render_d2d_shapes.cpp
     src/adapters/windows/render_d2d/render_d2d_shadow.cpp
     src/adapters/windows/render_d2d/render_d2d_text.cpp
@@ -272,6 +273,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
 )
 
 add_library(reach_composition STATIC
+    src/composition/feature_registry.cpp
     src/composition/host_clipboard.cpp
     src/composition/host_app_control.cpp
     src/composition/host_context_menu_orchestration.cpp
@@ -648,6 +650,34 @@ target_link_libraries(reach_tray_probe PRIVATE
 )
 
 if(REACH_BUILD_TESTS)
+add_executable(reach_svg_document_tests
+    tests/svg_document_tests.cpp
+    src/adapters/windows/render_d2d/render_d2d_svg_document.cpp
+)
+
+reach_configure_common(reach_svg_document_tests)
+target_compile_features(reach_svg_document_tests PRIVATE
+    cxx_std_17
+)
+target_include_directories(reach_svg_document_tests PRIVATE
+    src/adapters/windows/render_d2d
+)
+target_compile_definitions(reach_svg_document_tests PRIVATE
+    REACH_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_executable(reach_util_tests
+    tests/util_tests.cpp
+)
+
+reach_configure_common(reach_util_tests)
+target_compile_features(reach_util_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_util_tests PRIVATE
+    reach_support
+)
+
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
 )
@@ -914,7 +944,10 @@ add_executable(reach_wifi_tests
 
 reach_configure_common(reach_wifi_tests)
 target_compile_features(reach_wifi_tests PRIVATE cxx_std_17)
-target_link_libraries(reach_wifi_tests PRIVATE reach_core)
+target_link_libraries(reach_wifi_tests PRIVATE
+    reach_core
+    reach_support
+)
 
 add_executable(reach_bluetooth_tests
     tests/bluetooth_tests.cpp
@@ -922,7 +955,10 @@ add_executable(reach_bluetooth_tests
 
 reach_configure_common(reach_bluetooth_tests)
 target_compile_features(reach_bluetooth_tests PRIVATE cxx_std_17)
-target_link_libraries(reach_bluetooth_tests PRIVATE reach_core)
+target_link_libraries(reach_bluetooth_tests PRIVATE
+    reach_core
+    reach_support
+)
 
 add_executable(reach_system_controls_network_tests
     tests/system_controls_network_tests.cpp
@@ -935,6 +971,8 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     cxx_std_17
 )
 
+    add_test(NAME reach_svg_document_tests COMMAND reach_svg_document_tests)
+    add_test(NAME reach_util_tests COMMAND reach_util_tests)
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
     add_test(NAME reach_bluetooth_tests COMMAND reach_bluetooth_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)

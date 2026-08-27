@@ -249,6 +249,23 @@ static size_t reach_system_hud_capsule_input_regions(const void *capsule,
     return 1;
 }
 
+static void reach_system_hud_capsule_surface_geometry(const void *capsule,
+                                                      reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_system_hud *hud = static_cast<const reach_system_hud *>(capsule);
+    if (hud == nullptr)
+    {
+        return;
+    }
+    out->visible_bounds = hud->state.layout.bounds;
+    out->envelope_bounds = hud->state.layout.bounds;
+}
+
 const reach_feature_capsule_ops *reach_system_hud_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
@@ -256,7 +273,7 @@ const reach_feature_capsule_ops *reach_system_hud_capsule_ops(void)
         reach_system_hud_capsule_is_open,        nullptr,
         reach_system_hud_capsule_needs_frame,    reach_system_hud_capsule_wants_pointer_move,
         reach_system_hud_capsule_handle_pointer, nullptr,
-        reach_system_hud_capsule_input_regions,
+        reach_system_hud_capsule_input_regions,  reach_system_hud_capsule_surface_geometry,
     };
     return &ops;
 }

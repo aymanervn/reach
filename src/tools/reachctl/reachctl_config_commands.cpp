@@ -38,8 +38,7 @@ static int32_t reachctl_is_supported_wallpaper_path(const uint16_t *path)
 static reach_result reachctl_path_is_already_pinned(reach_config_service *service,
                                                     const uint16_t *path, int32_t *out_pinned)
 {
-    if (service == nullptr || path == nullptr || path[0] == 0 ||
-        out_pinned == nullptr)
+    if (service == nullptr || path == nullptr || path[0] == 0 || out_pinned == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -55,7 +54,7 @@ static reach_result reachctl_path_is_already_pinned(reach_config_service *servic
 
     for (size_t index = 0; index < snapshot.pinned_app_count; ++index)
     {
-        if (reachctl_path_equals_ci(snapshot.pinned_apps[index].path, path))
+        if (reach_path_equals(snapshot.pinned_apps[index].path, path))
         {
             *out_pinned = 1;
             return REACH_OK;
@@ -220,7 +219,7 @@ int reachctl_wallpaper_monitor_command(const wchar_t *index_text, const wchar_t 
 
     uint16_t *target_path = snapshot.monitor_wallpaper_paths[monitor_index];
 
-    if (reachctl_path_equals_ci(target_path, absolute_path))
+    if (reach_path_equals(target_path, absolute_path))
     {
         reach_config_service_destroy(service);
         if (store.ops.destroy != nullptr)

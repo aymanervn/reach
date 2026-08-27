@@ -1,4 +1,5 @@
 #include "reach/features/context_menu.h"
+#include "test_utf16.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -46,20 +47,6 @@ static reach_result measure_text(void *context, const uint16_t *text, float text
     return REACH_OK;
 }
 
-static int text_equals_ascii(const uint16_t *text, const char *expected)
-{
-    size_t index = 0;
-    while (expected[index] != 0)
-    {
-        if (text[index] != (uint16_t)(unsigned char)expected[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return text[index] == 0;
-}
-
 static void test_power_commands_and_text(void)
 {
     uint32_t commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
@@ -75,11 +62,12 @@ static void test_power_commands_and_text(void)
                 "sign out is the last command");
     expect_true(icons[0] == REACH_VECTOR_ICON_LOCK, "lock command has lock icon");
     expect_true(icons[4] == REACH_VECTOR_ICON_SIGN_OUT, "sign out command has sign out icon");
-    expect_true(text_equals_ascii(reach_context_menu_command_text(commands[0]), "Lock"),
+    expect_true(reach_test_utf16_equals_ascii(reach_context_menu_command_text(commands[0]), "Lock"),
                 "lock command text is stable");
-    expect_true(text_equals_ascii(reach_context_menu_command_text(commands[4]), "Sign out"),
-                "sign out command text is stable");
-    expect_true(text_equals_ascii(reach_context_menu_command_text(0), ""),
+    expect_true(
+        reach_test_utf16_equals_ascii(reach_context_menu_command_text(commands[4]), "Sign out"),
+        "sign out command text is stable");
+    expect_true(reach_test_utf16_equals_ascii(reach_context_menu_command_text(0), ""),
                 "unknown command text is empty");
 }
 
@@ -115,12 +103,16 @@ static void test_window_list_remove(void)
 
     const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
     expect_true(state->item_count == 3, "window list opens with every entry");
+    expect_true(state->item_slots[0].x >= 0.0f && state->item_slots[0].y >= 0.0f &&
+                    state->item_slots[0].x + state->item_slots[0].width <= state->bounds.width &&
+                    state->item_slots[0].y + state->item_slots[0].height <= state->bounds.height,
+                "window-list items use surface-local coordinates");
 
     size_t remaining = reach_context_menu_window_list_remove(menu, 22);
     expect_true(remaining == 2, "removing an entry drops the item count");
     expect_true(state->item_windows[0] == 11 && state->item_windows[1] == 33,
                 "remaining entries keep their order");
-    expect_true(text_equals_ascii(state->item_titles[1], "three"),
+    expect_true(reach_test_utf16_equals_ascii(state->item_titles[1], "three"),
                 "titles shift with their windows");
     expect_true(state->item_windows[2] == 0, "trailing entry is cleared");
 

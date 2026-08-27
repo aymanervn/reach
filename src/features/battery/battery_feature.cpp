@@ -211,8 +211,8 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
                         body_width - separator_inset * 2.0f, separator_height};
     content_y += separator_height + row_gap;
 
-    state->saver_row = {border_thickness + padding, content_y,
-                        body_width - padding * 2.0f, row_height};
+    state->saver_row = {border_thickness + padding, content_y, body_width - padding * 2.0f,
+                        row_height};
     state->saver_label = {content_x, content_y, content_width, row_height};
 
     float toggle_width = metrics.toggle_width * scale;
@@ -341,7 +341,8 @@ static void reach_battery_capsule_handle_pointer(void *capsule, const reach_poin
     *out = {};
 
     reach_battery *battery = static_cast<reach_battery *>(capsule);
-    if (battery == nullptr || event == nullptr || !battery->state.open)
+    if (battery == nullptr || event == nullptr || !battery->state.open ||
+        event->coordinate_space != REACH_POINTER_COORDINATE_SURFACE_LOCAL)
     {
         return;
     }

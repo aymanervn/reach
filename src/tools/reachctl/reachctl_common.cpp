@@ -183,36 +183,3 @@ reach_result reachctl_notify_config_changed(void)
 
     return state.posted ? REACH_OK : REACH_ERROR;
 }
-
-int32_t reachctl_path_equals_ci(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr || b == nullptr)
-    {
-        return 0;
-    }
-
-    size_t index = 0;
-    while (a[index] != 0 && b[index] != 0)
-    {
-        uint16_t ca = a[index];
-        uint16_t cb = b[index];
-
-        if (ca >= 'A' && ca <= 'Z')
-        {
-            ca = (uint16_t)(ca + ('a' - 'A'));
-        }
-        if (cb >= 'A' && cb <= 'Z')
-        {
-            cb = (uint16_t)(cb + ('a' - 'A'));
-        }
-
-        if (ca != cb)
-        {
-            return 0;
-        }
-
-        ++index;
-    }
-
-    return a[index] == b[index];
-}

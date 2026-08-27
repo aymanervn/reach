@@ -25,9 +25,15 @@ static reach_host order_repair_host;
 static reach_host app_band_host;
 static reach_host manipulation_host;
 static reach_host monitor_entry_host;
+static reach_host transition_host;
+static reach_host transition_frame_host;
+static reach_host registry_host;
+static reach_host generic_frame_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
 static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
+static reach_rect_f32 observed_bounds;
+static size_t render_count;
 
 static reach_result fake_get_window_manipulation(reach_input_source *source,
                                                  reach_window_manipulation *out_manipulation)
@@ -88,6 +94,36 @@ static reach_result fake_show(reach_platform_window *window)
 static reach_result fake_hide(reach_platform_window *window)
 {
     record_call(FAKE_WINDOW_CALL_HIDE, window, 0);
+    return REACH_OK;
+}
+
+static reach_result fake_set_bounds(reach_platform_window *window, reach_rect_f32 bounds)
+{
+    (void)window;
+    observed_bounds = bounds;
+    return REACH_OK;
+}
+
+static reach_result fake_begin_frame(reach_render_backend *backend)
+{
+    (void)backend;
+    return REACH_OK;
+}
+
+static reach_result fake_end_frame(reach_render_backend *backend)
+{
+    (void)backend;
+    return REACH_OK;
+}
+
+static reach_result fake_execute(reach_render_backend *backend,
+                                 const reach_render_command_buffer *commands)
+{
+    (void)backend;
+    if (commands != nullptr && commands->count > 0)
+    {
+        ++render_count;
+    }
     return REACH_OK;
 }
 
@@ -280,12 +316,206 @@ static void test_window_manipulation_tracks_pointer_monitor_membership(void)
                 "ending a drag that entered the monitor releases suppression");
 }
 
+static void test_descriptor_transition_completion(void)
+{
+    reach_host *host = &transition_host;
+    reach_animation_track tracks[REACH_HOST_ANIMATION_COUNT] = {};
+    reach_animation_manager_init(&host->animations, tracks, REACH_HOST_ANIMATION_COUNT);
+
+    reach_host_surface_transition transition = {};
+    transition.visible = 1;
+    transition.y_track = 0;
+    transition.opacity_track = 1;
+    transition.scale_track = REACH_HOST_ANIMATION_COUNT;
+    host->surface_descs[REACH_SURFACE_ID_SYSTEM_HUD].transition = &transition;
+
+    reach_host_finish_surface_transitions(host);
+
+    expect_true(!transition.visible,
+                "a transition registered only in the descriptor table completes");
+    expect_true(host->dirty.update_requested,
+                "finishing a descriptor transition schedules reconciliation");
+}
+
+static void test_scaled_transition_keeps_native_envelope_stationary(void)
+{
+    reach_host *host = &transition_frame_host;
+    reach_animation_track tracks[REACH_HOST_ANIMATION_COUNT] = {};
+    reach_animation_manager_init(&host->animations, tracks, REACH_HOST_ANIMATION_COUNT);
+    host->layout_dpi_scale = 1.25f;
+
+    reach_host_surface_transition transition = {};
+    transition.visible = 1;
+    transition.y_track = 0;
+    transition.opacity_track = 1;
+    transition.scale_track = 2;
+    transition.start_scale = REACH_HOST_LAUNCHER_TRANSITION_SCALE;
+
+    reach_animation_manager_set(&host->animations, transition.scale_track, 1.04f);
+    reach_animation_manager_set(&host->animations, transition.y_track, 8.0f);
+    reach_host_surface_transition_frame offset_frame =
+        reach_host_surface_transition_frame_compute_in_envelope(
+            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f},
+            {710.0f, 900.0f, 500.0f, 300.0f}, {});
+
+    reach_animation_manager_set(&host->animations, transition.y_track, 0.0f);
+    reach_host_surface_transition_frame settled_frame =
+        reach_host_surface_transition_frame_compute_in_envelope(
+            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f},
+            {710.0f, 900.0f, 500.0f, 300.0f}, {});
+
+    expect_true(reach_host_scalar_equal(offset_frame.window_bounds.y,
+                                        settled_frame.window_bounds.y),
+                "a scaled transition keeps its native window envelope stationary");
+    expect_true(reach_host_scalar_equal(offset_frame.render_transform.offset_y -
+                                            settled_frame.render_transform.offset_y,
+                                        10.0f),
+                "a scaled transition applies vertical motion in the render transform");
+    expect_true(reach_host_scalar_equal(offset_frame.pointer_transform.offset_y -
+                                            settled_frame.pointer_transform.offset_y,
+                                        10.0f),
+                "a scaled transition keeps pointer motion aligned with rendered content");
+}
+
+static void test_popup_pointer_coordinates_are_surface_local(void)
+{
+    reach_surface_runtime surface = {};
+    surface.bounds_valid = 1;
+    surface.last_bounds = {120.0f, 45.0f, 300.0f, 200.0f};
+
+    reach_surface_desc popup = {};
+    popup.cls = REACH_SURFACE_CLASS_POPUP;
+    popup.surface = &surface;
+
+    reach_ui_event event = {};
+    event.x = 155;
+    event.y = 81;
+    event.wheel_delta = 120;
+    event.button = REACH_POINTER_BUTTON_PRIMARY;
+
+    reach_pointer_event pointer =
+        reach_host_surface_pointer_event(&popup, &event, REACH_POINTER_EVENT_DOWN);
+    expect_true(pointer.coordinate_space == REACH_POINTER_COORDINATE_SURFACE_LOCAL,
+                "popup pointer events declare surface-local coordinates");
+    expect_true(pointer.x == 35 && pointer.y == 36,
+                "popup pointer events are translated from screen to surface coordinates");
+
+    popup.cls = REACH_SURFACE_CLASS_PERSISTENT;
+    pointer = reach_host_surface_pointer_event(&popup, &event, REACH_POINTER_EVENT_DOWN);
+    expect_true(pointer.coordinate_space == REACH_POINTER_COORDINATE_SCREEN,
+                "non-popup pointer events retain screen coordinates");
+    expect_true(pointer.x == event.x && pointer.y == event.y,
+                "non-popup pointer positions remain unchanged");
+}
+
+static void test_registered_feature_lifecycle(void)
+{
+    reach_host *host = &registry_host;
+    reach_host_init_feature_registry(host);
+
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered feature factories create every capsule");
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        expect_true(host->surface_descs[index].capsule != nullptr,
+                    "every registered surface receives its capsule");
+    }
+    expect_true(host->surface_descs[REACH_SURFACE_ID_TRAY].capsule ==
+                    host->surface_descs[REACH_SURFACE_ID_TOP_BAR].capsule,
+                "the tray surface reuses its registered top-bar owner");
+
+    reach_host_destroy_registered_features(host);
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        expect_true(host->surface_descs[index].capsule == nullptr,
+                    "destroying registered features clears every surface capsule");
+    }
+}
+
+static void test_registered_surface_frame_uses_declared_anchor(void)
+{
+    reach_host *host = &generic_frame_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered features are available to the generic frame");
+    reach_host_init_layout(host);
+    host->layout_dpi_scale = 1.0f;
+
+    reach_surface_desc *dock = &host->surface_descs[REACH_SURFACE_ID_DOCK];
+    dock->resolved_bounds = {710.0f, 1000.0f, 500.0f, 64.0f};
+    dock->resolved_bounds_valid = 1;
+
+    reach_brightness_state brightness = {};
+    brightness.available = 1;
+    brightness.level = 0.75f;
+    reach_system_hud_show_brightness(host->system_hud_capsule, &brightness);
+
+    reach_surface_desc *hud = &host->surface_descs[REACH_SURFACE_ID_SYSTEM_HUD];
+    hud->surface->window.window = reinterpret_cast<reach_platform_window *>(1);
+    hud->surface->window.ops.set_bounds = fake_set_bounds;
+    hud->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+    hud->surface->renderer.ops.begin_frame = fake_begin_frame;
+    hud->surface->renderer.ops.end_frame = fake_end_frame;
+    hud->surface->renderer.ops.execute = fake_execute;
+    hud->surface->dirty_flags = 1;
+
+    observed_bounds = {};
+    render_count = 0;
+    reach_host_frame_context frame = {};
+    frame.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    expect_true(reach_host_frame_registered_surface(host, hud, &frame) == REACH_OK,
+                "the generic registered surface frame succeeds");
+
+    const reach_system_hud_state *state = reach_system_hud_state_ptr(host->system_hud_capsule);
+    expect_true(
+        reach_host_scalar_equal(state->layout.bounds.y + state->layout.bounds.height, 988.0f),
+        "the generic frame arranges from the declared Dock anchor");
+    expect_true(hud->resolved_bounds_valid &&
+                    reach_host_rect_equal(hud->resolved_bounds, state->layout.bounds),
+                "the generic frame publishes the resolved HUD bounds");
+    expect_true(observed_bounds.width >= state->layout.bounds.width,
+                "the generic frame applies native bounds with surface padding");
+    expect_true(render_count == 1, "the generic frame executes the feature command buffer");
+
+    reach_host_destroy_registered_features(host);
+}
+
+static void test_switcher_publishes_arranged_surface_geometry(void)
+{
+    reach_switcher *switcher = nullptr;
+    expect_true(reach_switcher_create(&switcher) == REACH_OK, "switcher is created");
+
+    reach_switcher_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {100.0f, 50.0f, 1200.0f, 800.0f};
+    arrange.dpi_scale = 1.0f;
+    arrange.transition_visible = 1;
+    expect_true(reach_switcher_arrange(switcher, &arrange),
+                "initial switcher arrangement publishes a layout change");
+
+    reach_feature_surface_geometry geometry = {};
+    reach_switcher_capsule_ops()->surface_geometry(switcher, &geometry);
+    expect_true(geometry.visible_bounds.width > 0.0f && geometry.visible_bounds.height > 0.0f,
+                "switcher publishes non-empty surface geometry");
+    expect_true(reach_host_scalar_equal(
+                    geometry.visible_bounds.x + geometry.visible_bounds.width * 0.5f, 700.0f),
+                "switcher surface geometry is centered on the monitor");
+
+    reach_switcher_destroy(switcher);
+}
+
 int main(void)
 {
     test_order_invalidation_rechains_without_replaying_visibility();
     test_app_band_surface_does_not_invalidate_topmost_order();
     test_window_manipulation_relevance_survives_unavailable_pointer();
     test_window_manipulation_tracks_pointer_monitor_membership();
+    test_descriptor_transition_completion();
+    test_scaled_transition_keeps_native_envelope_stationary();
+    test_popup_pointer_coordinates_are_surface_local();
+    test_registered_feature_lifecycle();
+    test_registered_surface_frame_uses_declared_anchor();
+    test_switcher_publishes_arranged_surface_geometry();
 
     if (failures != 0)
     {

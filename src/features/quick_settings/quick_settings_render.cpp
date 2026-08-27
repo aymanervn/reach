@@ -237,21 +237,21 @@ static void reach_quick_settings_network_label(const reach_network_state *state,
 
     if (state == nullptr || !state->connected)
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, no_internet);
+        reach_copy_utf16(out_label, out_label_count, no_internet);
         return;
     }
     if (state->kind == REACH_NETWORK_KIND_ETHERNET)
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, ethernet);
+        reach_copy_utf16(out_label, out_label_count, ethernet);
         return;
     }
     if (state->label[0] != 0)
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, state->label);
+        reach_copy_utf16(out_label, out_label_count, state->label);
     }
     else
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, wifi);
+        reach_copy_utf16(out_label, out_label_count, wifi);
     }
 }
 
@@ -286,9 +286,8 @@ static void reach_quick_settings_push_system_tile_commands(
     icon.color = foreground;
     (void)reach_render_command_buffer_push(commands, &icon);
 
-    reach_quick_settings_push_text(
-        commands, layout->label, label, values->system_tile_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-        0, foreground);
+    reach_quick_settings_push_text(commands, layout->label, label, values->system_tile_text_size,
+                                   REACH_TEXT_WEIGHT_SEMIBOLD, 0, foreground);
 }
 
 static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *commands,
@@ -314,7 +313,7 @@ static void reach_quick_settings_push_text(reach_render_command_buffer *commands
     command.text_weight = weight;
     command.text_alignment = alignment;
     command.color = color;
-    reach_quick_settings_copy_utf16(command.text, 260, text);
+    reach_copy_utf16(command.text, 260, text);
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
@@ -331,7 +330,7 @@ static void reach_quick_settings_push_ellipsized_text(reach_render_command_buffe
     command.text_alignment = alignment;
     command.text_ellipsis = 1;
     command.color = color;
-    reach_quick_settings_copy_utf16(command.text, 260, text);
+    reach_copy_utf16(command.text, 260, text);
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
@@ -602,9 +601,9 @@ static void reach_quick_settings_push_press_feedback(const reach_quick_settings_
     }
     reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f * input->press_feedback_opacity};
     float radius = input->theme.radius_small * (input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f);
-    int32_t clip_output_row = reach_quick_settings_pressable_target_kind(
-                                  input->press_feedback_target) ==
-                              REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW;
+    int32_t clip_output_row =
+        reach_quick_settings_pressable_target_kind(input->press_feedback_target) ==
+        REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW;
     if (clip_output_row)
     {
         reach_render_command_buffer_set_scissor(commands, input->layout.output_devices_clip);
@@ -695,9 +694,9 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         reach_quick_settings_pill_radius(input->layout.output_device_button, &input->theme),
         input->theme.quick_settings_button_background);
 
-    reach_quick_settings_push_output_icon(
-        commands, input->layout.output_device_button_icon,
-        current_device != nullptr ? current_device->icon_id : 0, &input->theme);
+    reach_quick_settings_push_output_icon(commands, input->layout.output_device_button_icon,
+                                          current_device != nullptr ? current_device->icon_id : 0,
+                                          &input->theme);
 
     static const uint16_t output_title_label[] = {'O', 'u', 't', 'p', 'u', 't', 0};
 
@@ -710,9 +709,9 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     output_title_rect.y += metrics.output_button_title_top;
     output_title_rect.height = metrics.output_button_title_height;
 
-    reach_quick_settings_push_text(
-        commands, output_title_rect, output_title_label, metrics.output_button_title_text_size,
-        REACH_TEXT_WEIGHT_NORMAL, 0, input->theme.quick_settings_section_label);
+    reach_quick_settings_push_text(commands, output_title_rect, output_title_label,
+                                   metrics.output_button_title_text_size, REACH_TEXT_WEIGHT_NORMAL,
+                                   0, input->theme.quick_settings_section_label);
 
     reach_rect_f32 output_device_rect = input->layout.output_device_button_label;
     output_device_rect.y += metrics.output_button_device_top;
@@ -723,12 +722,11 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
                                    REACH_TEXT_WEIGHT_SEMIBOLD, 0, input->theme.primary_text);
 
     reach_quick_settings_push_chevron_crossfade(
-        commands, input->layout.output_device_button_chevron,
-        input->output_devices_expansion, input->theme.system_glyph);
+        commands, input->layout.output_device_button_chevron, input->output_devices_expansion,
+        input->theme.system_glyph);
 
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
-    if (input->output_devices_expansion > 0.001f &&
-        input->layout.output_devices_clip.height > 0.0f)
+    if (input->output_devices_expansion > 0.001f && input->layout.output_devices_clip.height > 0.0f)
     {
         reach_render_command_buffer_set_scissor(commands, input->layout.output_devices_clip);
         size_t first_command = commands->count;
@@ -770,11 +768,10 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         REACH_TEXT_WEIGHT_NORMAL, 0,
         reach_quick_settings_color_opacity(input->theme.primary_text,
                                            1.0f - input->app_volumes_expansion));
-    reach_quick_settings_push_text(
-        commands, input->layout.expand_button_label, collapse_label,
-        metrics.expand_button_text_size, REACH_TEXT_WEIGHT_NORMAL, 0,
-        reach_quick_settings_color_opacity(input->theme.primary_text,
-                                           input->app_volumes_expansion));
+    reach_quick_settings_push_text(commands, input->layout.expand_button_label, collapse_label,
+                                   metrics.expand_button_text_size, REACH_TEXT_WEIGHT_NORMAL, 0,
+                                   reach_quick_settings_color_opacity(
+                                       input->theme.primary_text, input->app_volumes_expansion));
 
     reach_quick_settings_push_chevron_crossfade(commands, input->layout.expand_button_icon,
                                                 input->app_volumes_expansion,
