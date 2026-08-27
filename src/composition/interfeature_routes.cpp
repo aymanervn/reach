@@ -1,7 +1,3 @@
-/* The only composition code allowed to know which feature action affects another feature.
-   Features expose neutral outbound slots describing what they did; the routes below decide
-   what that reaches. Everything else in composition stays generic. */
-
 #include "host_internal.h"
 
 static void reach_host_route_dock_item_context_menu(void *user, size_t item_index, int32_t x,
@@ -13,8 +9,6 @@ static void reach_host_route_dock_item_context_menu(void *user, size_t item_inde
         return;
     }
 
-    /* The Dock repaints around the opening menu so the pressed item keeps its feedback while
-       the context menu takes over pointer ownership. */
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
     (void)reach_host_show_dock_app_context_menu(host, item_index, x, y);
     if (reach_dock_retain_context_feedback(host->dock_capsule))

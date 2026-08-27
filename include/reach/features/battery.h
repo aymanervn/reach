@@ -22,8 +22,6 @@ extern "C"
         REACH_BATTERY_POINTER_ACTION_NONE = 0,
         REACH_BATTERY_POINTER_ACTION_DISMISS = 1,
 
-        /* Hit region only. The capsule applies the saver change through its attached
-           status service and never reports it as an outbound action. */
         REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER = 2
     } reach_battery_pointer_action_kind;
 

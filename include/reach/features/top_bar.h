@@ -213,13 +213,10 @@ extern "C"
 
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);
 
-    /* Outbound slots for effects the Top Bar cannot express as its own state. The Top Bar never
-       learns what they reach; composition assigns them in interfeature_routes.cpp. */
     typedef struct reach_top_bar_routes
     {
         void *user;
 
-        /* The power button completed a primary activation. */
         void (*power_activated)(void *user);
     } reach_top_bar_routes;
 
