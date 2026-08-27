@@ -404,13 +404,33 @@ static void reach_battery_capsule_handle_pointer(void *capsule, const reach_poin
     }
 }
 
+static void reach_battery_capsule_surface_geometry(const void *capsule,
+                                                   reach_feature_surface_geometry *out)
+{
+    if (capsule == nullptr || out == nullptr)
+    {
+        return;
+    }
+    const reach_battery *battery = static_cast<const reach_battery *>(capsule);
+    out->visible_bounds = battery->state.bounds;
+    out->envelope_bounds = battery->state.bounds;
+    out->notch_anchor_x = battery->state.notch_anchor_x;
+    out->notch_side = reach_popup_notch_side(battery->state.drop_direction);
+}
+
 const reach_feature_capsule_ops *reach_battery_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_battery_capsule_reset,          reach_battery_capsule_tick,
-        reach_battery_capsule_is_open,        nullptr,
-        reach_battery_capsule_needs_frame,    reach_battery_capsule_wants_pointer_move,
-        reach_battery_capsule_handle_pointer, reach_battery_capsule_pointer_sequence_active,
+        reach_battery_capsule_reset,
+        reach_battery_capsule_tick,
+        reach_battery_capsule_is_open,
+        nullptr,
+        reach_battery_capsule_needs_frame,
+        reach_battery_capsule_wants_pointer_move,
+        reach_battery_capsule_handle_pointer,
+        reach_battery_capsule_pointer_sequence_active,
+        nullptr,
+        reach_battery_capsule_surface_geometry,
     };
     return &ops;
 }

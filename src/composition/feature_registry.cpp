@@ -47,6 +47,14 @@ static void reach_host_surface_switcher_close(reach_host *host)
 #define REACH_HOST_LAYER_TOP_BAR_EDGE_REVEAL 140
 #define REACH_HOST_LAYER_STAGE_EDGE_REVEAL 150
 
+enum reach_host_anchor_slot
+{
+    REACH_HOST_ANCHOR_WHOLE_SURFACE = 0,
+    REACH_HOST_ANCHOR_TOP_BAR_TRAY,
+    REACH_HOST_ANCHOR_TOP_BAR_QUICK_SETTINGS,
+    REACH_HOST_ANCHOR_TOP_BAR_BATTERY
+};
+
 static void reach_host_init_surface_descriptors(reach_host *host)
 {
     if (host == nullptr)
@@ -212,6 +220,15 @@ static void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_SYSTEM_HUD].role = REACH_SURFACE_SYSTEM_HUD;
     descs[REACH_SURFACE_ID_SYSTEM_HUD].pointer_priority = 0;
     descs[REACH_SURFACE_ID_SYSTEM_HUD].behavior_flags = REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE;
+    descs[REACH_SURFACE_ID_QUICK_SETTINGS].layout_anchor = REACH_SURFACE_ID_TOP_BAR;
+    descs[REACH_SURFACE_ID_QUICK_SETTINGS].layout_anchor_slot =
+        REACH_HOST_ANCHOR_TOP_BAR_QUICK_SETTINGS;
+    descs[REACH_SURFACE_ID_QUICK_SETTINGS].popup_chrome = 1;
+    descs[REACH_SURFACE_ID_BATTERY].layout_anchor = REACH_SURFACE_ID_TOP_BAR;
+    descs[REACH_SURFACE_ID_BATTERY].layout_anchor_slot = REACH_HOST_ANCHOR_TOP_BAR_BATTERY;
+    descs[REACH_SURFACE_ID_BATTERY].popup_chrome = 1;
+    descs[REACH_SURFACE_ID_TRAY].layout_anchor = REACH_SURFACE_ID_TOP_BAR;
+    descs[REACH_SURFACE_ID_TRAY].layout_anchor_slot = REACH_HOST_ANCHOR_TOP_BAR_TRAY;
     descs[REACH_SURFACE_ID_STAGE].edge_reveal = {1,
                                                  REACH_HOST_LAYER_STAGE_EDGE_REVEAL,
                                                  {REACH_EDGE_REVEAL_ANCHOR_TOP_LEFT, 4.0f, 4.0f, 1},
@@ -224,11 +241,8 @@ static void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_DOCK].frame_priority = 30;
     descs[REACH_SURFACE_ID_TOP_BAR].frame = reach_host_frame_top_bar;
     descs[REACH_SURFACE_ID_TOP_BAR].frame_priority = 35;
-    descs[REACH_SURFACE_ID_TRAY].frame = reach_host_frame_tray;
     descs[REACH_SURFACE_ID_TRAY].frame_priority = 40;
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame = reach_host_frame_quick_settings;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame_priority = 50;
-    descs[REACH_SURFACE_ID_BATTERY].frame = reach_host_frame_battery;
     descs[REACH_SURFACE_ID_BATTERY].frame_priority = 55;
     descs[REACH_SURFACE_ID_SWITCHER].frame_priority = 60;
     descs[REACH_SURFACE_ID_STAGE].frame = reach_host_frame_stage;
@@ -328,6 +342,150 @@ static const reach_feature_surface_ops reach_clipboard_surface_ops = {
     reach_clipboard_surface_render,
 };
 
+static int32_t reach_top_bar_resolve_anchor(const void *capsule, uint32_t slot, size_t index,
+                                            reach_feature_anchor *out)
+{
+    (void)index;
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    const reach_top_bar_state *state = reach_top_bar_state_ptr(top_bar);
+    if (state == nullptr || out == nullptr)
+    {
+        return 0;
+    }
+
+    reach_rect_f32 button = {};
+    if (slot == REACH_HOST_ANCHOR_TOP_BAR_TRAY)
+    {
+        button = state->layout.tray_overflow_button;
+    }
+    else if (slot == REACH_HOST_ANCHOR_TOP_BAR_QUICK_SETTINGS)
+    {
+        button = state->layout.quick_settings_button;
+    }
+    else if (slot == REACH_HOST_ANCHOR_TOP_BAR_BATTERY)
+    {
+        button = state->layout.battery_button;
+    }
+    else
+    {
+        return 0;
+    }
+
+    out->button = reach_top_bar_rect_to_screen(&state->layout, button);
+    out->bar_edge_y = state->layout.bounds.y + state->layout.bounds.height;
+    out->bar_height = state->layout.bounds.height;
+    out->direction = REACH_POPUP_DROP_DOWN;
+    return 1;
+}
+
+static int32_t reach_quick_settings_surface_arrange(void *capsule,
+                                                    const reach_feature_surface_context *ctx)
+{
+    if (!ctx->anchor_valid)
+    {
+        return 0;
+    }
+    reach_quick_settings *quick_settings = static_cast<reach_quick_settings *>(capsule);
+    reach_rect_f32 before = reach_quick_settings_state_ptr(quick_settings)->bounds;
+    reach_quick_settings_layout_context layout = {};
+    layout.theme = ctx->theme;
+    layout.dpi_scale = ctx->dpi_scale;
+    layout.anchor_button = ctx->anchor_button;
+    layout.monitor = ctx->monitor_bounds;
+    layout.bar_edge_y = ctx->anchor_bar_edge_y;
+    layout.drop_direction = ctx->anchor_direction;
+    reach_quick_settings_refresh_layout(quick_settings, &layout);
+    int32_t animation_changed = reach_quick_settings_update_open_animation(quick_settings, &layout);
+    return animation_changed ||
+           !reach_host_rect_equal(before, reach_quick_settings_state_ptr(quick_settings)->bounds);
+}
+
+static reach_result reach_quick_settings_surface_render(void *capsule,
+                                                        const reach_feature_surface_context *ctx,
+                                                        reach_render_command_buffer *out_commands)
+{
+    return reach_quick_settings_append_render_commands(static_cast<reach_quick_settings *>(capsule),
+                                                       ctx->theme, ctx->dpi_scale, out_commands);
+}
+
+static const reach_feature_surface_ops reach_quick_settings_surface_ops = {
+    reach_quick_settings_surface_arrange,
+    reach_quick_settings_surface_render,
+};
+
+static int32_t reach_battery_surface_arrange(void *capsule,
+                                             const reach_feature_surface_context *ctx)
+{
+    if (!ctx->anchor_valid)
+    {
+        return 0;
+    }
+    reach_battery *battery = static_cast<reach_battery *>(capsule);
+    reach_rect_f32 before = reach_battery_state_ptr(battery)->bounds;
+    reach_battery_open_context layout = {};
+    layout.theme = ctx->theme;
+    layout.monitor = ctx->monitor_bounds;
+    layout.anchor_button = ctx->anchor_button;
+    layout.bar_edge_y = ctx->anchor_bar_edge_y;
+    layout.dpi_scale = ctx->dpi_scale;
+    layout.drop_direction = ctx->anchor_direction;
+    reach_battery_relayout(battery, &layout);
+    return !reach_host_rect_equal(before, reach_battery_state_ptr(battery)->bounds);
+}
+
+static reach_result reach_battery_surface_render(void *capsule,
+                                                 const reach_feature_surface_context *ctx,
+                                                 reach_render_command_buffer *out_commands)
+{
+    reach_battery_render_context render = {};
+    render.theme = ctx->theme;
+    render.dpi_scale = ctx->dpi_scale;
+    return reach_battery_append_render_commands(static_cast<const reach_battery *>(capsule),
+                                                &render, out_commands);
+}
+
+static const reach_feature_surface_ops reach_battery_surface_ops = {
+    reach_battery_surface_arrange,
+    reach_battery_surface_render,
+};
+
+static int32_t reach_tray_surface_arrange(void *capsule, const reach_feature_surface_context *ctx)
+{
+    if (!ctx->anchor_valid)
+    {
+        return 0;
+    }
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
+    reach_feature_surface_geometry before = {};
+    reach_top_bar_tray_capsule_ops()->surface_geometry(top_bar, &before);
+    reach_popup_anchor anchor = {};
+    anchor.button = ctx->anchor_button;
+    anchor.monitor = ctx->monitor_bounds;
+    anchor.bar_edge_y = ctx->anchor_bar_edge_y;
+    anchor.bar_height = ctx->anchor_bar_height;
+    anchor.direction = ctx->anchor_direction;
+    reach_rect_f32 bounds = {};
+    reach_top_bar_layout_tray_popup(top_bar, ctx->theme, &anchor, ctx->dpi_scale, &bounds);
+    return !reach_host_rect_equal(before.visible_bounds, bounds);
+}
+
+static reach_result reach_tray_surface_render(void *capsule,
+                                              const reach_feature_surface_context *ctx,
+                                              reach_render_command_buffer *out_commands)
+{
+    reach_top_bar_tray_render_context render = {};
+    render.theme = ctx->theme;
+    render.bounds = ctx->visible_bounds;
+    render.dpi_scale = ctx->dpi_scale;
+    return reach_top_bar_append_tray_render_commands(static_cast<reach_top_bar *>(capsule), &render,
+                                                     out_commands);
+}
+
+static const reach_feature_surface_ops reach_tray_surface_ops = {
+    reach_tray_surface_arrange,
+    reach_tray_surface_render,
+};
+
 template <typename Feature, reach_result (*Create)(Feature **)>
 static reach_result reach_feature_create(void **out_capsule)
 {
@@ -389,10 +547,11 @@ static void reach_host_publish_feature_definitions(reach_host *host)
                                desc->role,
                                desc->pointer_priority,
                                desc->transition != nullptr,
+                               desc->popup_chrome,
                                desc->bar_shown_while_open,
                                desc->edge_reveal,
                                desc->bar_reveal};
-        definition->layout = {desc->layout_anchor, desc->frame_priority};
+        definition->layout = {desc->layout_anchor, desc->layout_anchor_slot, desc->frame_priority};
         definition->force_close = desc->force_close;
         definition->apply_pointer_action = desc->apply_pointer_action;
         definition->dismiss = desc->dismiss;
@@ -450,7 +609,12 @@ void reach_host_init_feature_registry(reach_host *host)
     descs[REACH_SURFACE_ID_SWITCHER].surface_ops = &reach_switcher_surface_ops;
     descs[REACH_SURFACE_ID_CLIPBOARD].surface_ops = &reach_clipboard_surface_ops;
     descs[REACH_SURFACE_ID_CLIPBOARD].layout_anchor = REACH_SURFACE_ID_LAUNCHER;
+    descs[REACH_SURFACE_ID_QUICK_SETTINGS].surface_ops = &reach_quick_settings_surface_ops;
+    descs[REACH_SURFACE_ID_BATTERY].surface_ops = &reach_battery_surface_ops;
+    descs[REACH_SURFACE_ID_TRAY].surface_ops = &reach_tray_surface_ops;
     reach_host_publish_feature_definitions(host);
+    host->feature_definitions[REACH_SURFACE_ID_TOP_BAR].resolve_anchor =
+        reach_top_bar_resolve_anchor;
 }
 
 reach_result reach_host_create_registered_features(reach_host *host)

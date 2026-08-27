@@ -434,6 +434,20 @@ static int32_t reach_top_bar_tray_wants_pointer_move(const void *capsule)
            reach_pressable_tracking(&top_bar->tray_popup->pressable);
 }
 
+static void reach_top_bar_tray_surface_geometry(const void *capsule,
+                                                reach_feature_surface_geometry *out)
+{
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    if (top_bar == nullptr || top_bar->tray_popup == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->visible_bounds = top_bar->tray_popup->placement.bounds;
+    out->envelope_bounds = top_bar->tray_popup->placement.bounds;
+    out->notch_anchor_x = top_bar->tray_popup->placement.notch_anchor_x;
+    out->notch_side = top_bar->tray_popup->placement.notch_side;
+}
+
 static void reach_top_bar_tray_apply_pressable(const reach_pressable_result *result,
                                                reach_capsule_pointer_result *out)
 {
@@ -536,11 +550,16 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
 
 const reach_feature_capsule_ops *reach_top_bar_tray_capsule_ops(void)
 {
-    static const reach_feature_capsule_ops ops = {
-        reach_top_bar_tray_reset,          reach_top_bar_tray_tick,
-        reach_top_bar_tray_is_open,        nullptr,
-        reach_top_bar_tray_needs_frame,    reach_top_bar_tray_wants_pointer_move,
-        reach_top_bar_tray_handle_pointer, reach_top_bar_tray_wants_pointer_move};
+    static const reach_feature_capsule_ops ops = {reach_top_bar_tray_reset,
+                                                  reach_top_bar_tray_tick,
+                                                  reach_top_bar_tray_is_open,
+                                                  nullptr,
+                                                  reach_top_bar_tray_needs_frame,
+                                                  reach_top_bar_tray_wants_pointer_move,
+                                                  reach_top_bar_tray_handle_pointer,
+                                                  reach_top_bar_tray_wants_pointer_move,
+                                                  nullptr,
+                                                  reach_top_bar_tray_surface_geometry};
     return &ops;
 }
 

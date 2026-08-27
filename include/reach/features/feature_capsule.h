@@ -70,6 +70,8 @@ extern "C"
     {
         reach_rect_f32 visible_bounds;
         reach_rect_f32 envelope_bounds;
+        float notch_anchor_x;
+        int32_t notch_side;
     } reach_feature_surface_geometry;
 
     typedef struct reach_feature_capsule_ops

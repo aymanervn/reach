@@ -32,42 +32,14 @@ void reach_host_toggle_tray_popup(reach_host *host)
 {
     if (host != nullptr)
     {
-        reach_host_set_tray_popup_open(
-            host, !reach_top_bar_tray_popup_is_open(host->top_bar_capsule));
+        reach_host_set_tray_popup_open(host,
+                                       !reach_top_bar_tray_popup_is_open(host->top_bar_capsule));
     }
 }
 
 reach_result reach_host_refresh_tray_items(reach_host *host)
 {
-    return host != nullptr ? reach_top_bar_refresh_tray(host->top_bar_capsule)
-                           : REACH_OK;
-}
-
-void reach_host_compute_tray_popup_layout(reach_host *host, reach_rect_f32 *out_bounds)
-{
-    if (host == nullptr || out_bounds == nullptr)
-    {
-        return;
-    }
-
-    const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    const reach_top_bar_layout *top_bar_layout =
-        &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
-
-    reach_popup_anchor anchor = {};
-    anchor.button =
-        reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->tray_overflow_button);
-    reach_rect_f32 monitor = {};
-    if (reach_host_primary_monitor_bounds(host, &monitor))
-    {
-        anchor.monitor = monitor;
-    }
-    anchor.bar_edge_y = top_bar_layout->bounds.y + top_bar_layout->bounds.height;
-    anchor.bar_height = top_bar_layout->bounds.height;
-    anchor.direction = REACH_POPUP_DROP_DOWN;
-
-    reach_top_bar_layout_tray_popup(host->top_bar_capsule, theme, &anchor,
-                                    reach_host_layout_dpi_scale(host), out_bounds);
+    return host != nullptr ? reach_top_bar_refresh_tray(host->top_bar_capsule) : REACH_OK;
 }
 
 reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,

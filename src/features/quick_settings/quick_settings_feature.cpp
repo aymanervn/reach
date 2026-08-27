@@ -930,6 +930,20 @@ static int32_t reach_quick_settings_capsule_pointer_sequence_active(const void *
     return reach_quick_settings_capsule_wants_pointer_move(capsule);
 }
 
+static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
+                                                          reach_feature_surface_geometry *out)
+{
+    if (capsule == nullptr || out == nullptr)
+    {
+        return;
+    }
+    const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
+    out->visible_bounds = quick_settings->state.bounds;
+    out->envelope_bounds = quick_settings->state.target_bounds;
+    out->notch_anchor_x = quick_settings->state.notch_anchor_x;
+    out->notch_side = reach_popup_notch_side(quick_settings->state.drop_direction);
+}
+
 static reach_quick_settings_hit_result
 reach_quick_settings_capsule_hit_test(reach_quick_settings *quick_settings, int32_t x, int32_t y)
 {
@@ -1148,6 +1162,8 @@ const reach_feature_capsule_ops *reach_quick_settings_capsule_ops(void)
         reach_quick_settings_capsule_wants_pointer_move,
         reach_quick_settings_capsule_handle_pointer,
         reach_quick_settings_capsule_pointer_sequence_active,
+        nullptr,
+        reach_quick_settings_capsule_surface_geometry,
     };
     return &ops;
 }

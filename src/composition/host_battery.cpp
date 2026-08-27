@@ -29,8 +29,8 @@ void reach_host_refresh_battery_power(reach_host *host)
     reach_system_stats_snapshot snapshot = {};
     reach_system_stats_snapshot_take(host->system_stats, &snapshot);
 
-    int32_t has_reading = snapshot.power_valid && snapshot.power.has_battery &&
-                          snapshot.power.battery_percent >= 0;
+    int32_t has_reading =
+        snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
     int32_t percent = has_reading ? snapshot.power.battery_percent : 0;
     int32_t saver_on = snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0;
 
@@ -63,17 +63,6 @@ void reach_host_sync_battery_saver_pending(reach_host *host)
                                             model->saver_pending_enabled);
     host->top_bar.dirty_flags = 1;
     host->dirty.render = 1;
-}
-
-void reach_host_relayout_battery(reach_host *host)
-{
-    if (host == nullptr || !host->has_layout || host->battery_capsule == nullptr)
-    {
-        return;
-    }
-
-    reach_battery_open_context ctx = reach_host_battery_open_context(host);
-    reach_battery_relayout(host->battery_capsule, &ctx);
 }
 
 void reach_host_set_battery_open(reach_host *host, int32_t open)
@@ -120,8 +109,7 @@ void reach_host_toggle_battery(reach_host *host)
     reach_host_set_battery_open(host, reach_battery_is_open(host->battery_capsule) ? 0 : 1);
 }
 
-reach_result reach_host_apply_battery_pointer_action(reach_host *host,
-                                                     const reach_ui_event *event,
+reach_result reach_host_apply_battery_pointer_action(reach_host *host, const reach_ui_event *event,
                                                      const reach_capsule_pointer_result *result)
 {
     (void)event;
