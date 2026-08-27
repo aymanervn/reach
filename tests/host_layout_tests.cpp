@@ -355,18 +355,18 @@ static void test_scaled_transition_keeps_native_envelope_stationary(void)
     reach_animation_manager_set(&host->animations, transition.y_track, 8.0f);
     reach_host_surface_transition_frame offset_frame =
         reach_host_surface_transition_frame_compute_in_envelope(
-            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f},
-            {710.0f, 900.0f, 500.0f, 300.0f}, {});
+            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f},
+            {});
 
     reach_animation_manager_set(&host->animations, transition.y_track, 0.0f);
     reach_host_surface_transition_frame settled_frame =
         reach_host_surface_transition_frame_compute_in_envelope(
-            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f},
-            {710.0f, 900.0f, 500.0f, 300.0f}, {});
+            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f},
+            {});
 
-    expect_true(reach_host_scalar_equal(offset_frame.window_bounds.y,
-                                        settled_frame.window_bounds.y),
-                "a scaled transition keeps its native window envelope stationary");
+    expect_true(
+        reach_host_scalar_equal(offset_frame.window_bounds.y, settled_frame.window_bounds.y),
+        "a scaled transition keeps its native window envelope stationary");
     expect_true(reach_host_scalar_equal(offset_frame.render_transform.offset_y -
                                             settled_frame.render_transform.offset_y,
                                         10.0f),
@@ -412,6 +412,24 @@ static void test_registered_feature_lifecycle(void)
 {
     reach_host *host = &registry_host;
     reach_host_init_feature_registry(host);
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_desc *runtime = &host->surface_descs[index];
+        const reach_feature_definition *definition = runtime->definition;
+        expect_true(definition != nullptr, "every runtime references an immutable definition");
+        expect_true(definition != nullptr && definition->id == runtime->id,
+                    "every definition has the runtime's stable surface id");
+        expect_true(definition != nullptr && definition->capsule_ops == runtime->capsule_ops,
+                    "every definition owns the capsule operation contract");
+        expect_true(definition != nullptr && definition->surface.cls == runtime->cls &&
+                        definition->surface.role == runtime->role &&
+                        definition->surface.layer == runtime->layer,
+                    "every definition owns the surface specification");
+        expect_true(definition != nullptr && definition->layout.anchor == runtime->layout_anchor &&
+                        definition->layout.priority == runtime->frame_priority,
+                    "every definition owns the layout specification");
+    }
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");

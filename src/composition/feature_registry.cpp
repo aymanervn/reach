@@ -370,6 +370,43 @@ static void reach_host_bind_feature_capsules(reach_host *host)
     host->stage_capsule = static_cast<reach_stage *>(descs[REACH_SURFACE_ID_STAGE].capsule);
 }
 
+static void reach_host_publish_feature_definitions(reach_host *host)
+{
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_desc *desc = &host->surface_descs[index];
+        reach_feature_definition *definition = &host->feature_definitions[index];
+        *definition = {};
+        definition->id = desc->id;
+        definition->factory = desc->factory;
+        definition->capsule_ops = desc->capsule_ops;
+        definition->surface_ops = desc->surface_ops;
+        definition->surface = {desc->cls,
+                               desc->pointer_flags,
+                               desc->shadow,
+                               desc->behavior_flags,
+                               desc->layer,
+                               desc->role,
+                               desc->pointer_priority,
+                               desc->transition != nullptr,
+                               desc->bar_shown_while_open,
+                               desc->edge_reveal,
+                               desc->bar_reveal};
+        definition->layout = {desc->layout_anchor, desc->frame_priority};
+        definition->force_close = desc->force_close;
+        definition->apply_pointer_action = desc->apply_pointer_action;
+        definition->dismiss = desc->dismiss;
+        definition->frame = desc->frame;
+        definition->toggle_events = desc->toggle_events;
+        definition->toggle_event_count = desc->toggle_event_count;
+        definition->toggle = desc->toggle;
+        definition->routed_events = desc->routed_events;
+        definition->routed_event_count = desc->routed_event_count;
+        definition->handle_routed = desc->handle_routed;
+        desc->definition = definition;
+    }
+}
+
 void reach_host_init_feature_registry(reach_host *host)
 {
     if (host == nullptr)
@@ -413,6 +450,7 @@ void reach_host_init_feature_registry(reach_host *host)
     descs[REACH_SURFACE_ID_SWITCHER].surface_ops = &reach_switcher_surface_ops;
     descs[REACH_SURFACE_ID_CLIPBOARD].surface_ops = &reach_clipboard_surface_ops;
     descs[REACH_SURFACE_ID_CLIPBOARD].layout_anchor = REACH_SURFACE_ID_LAUNCHER;
+    reach_host_publish_feature_definitions(host);
 }
 
 reach_result reach_host_create_registered_features(reach_host *host)
@@ -426,11 +464,12 @@ reach_result reach_host_create_registered_features(reach_host *host)
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->factory.create == nullptr)
+        const reach_feature_definition *definition = desc->definition;
+        if (definition == nullptr || definition->factory.create == nullptr)
         {
             continue;
         }
-        reach_result create_result = desc->factory.create(&desc->capsule);
+        reach_result create_result = definition->factory.create(&desc->capsule);
         if (create_result != REACH_OK)
         {
             result = create_result;
@@ -450,9 +489,11 @@ void reach_host_destroy_registered_features(reach_host *host)
     for (size_t index = REACH_HOST_SURFACE_COUNT; index > 0; --index)
     {
         reach_surface_desc *desc = &host->surface_descs[index - 1];
-        if (desc->factory.destroy != nullptr && desc->capsule != nullptr)
+        const reach_feature_definition *definition = desc->definition;
+        if (definition != nullptr && definition->factory.destroy != nullptr &&
+            desc->capsule != nullptr)
         {
-            desc->factory.destroy(desc->capsule);
+            definition->factory.destroy(desc->capsule);
         }
         desc->capsule = nullptr;
     }
