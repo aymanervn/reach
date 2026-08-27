@@ -101,14 +101,6 @@ extern "C"
                                              float border_thickness,
                                              int32_t *out_animating);
 
-    typedef enum reach_clipboard_pointer_action_kind
-    {
-        REACH_CLIPBOARD_POINTER_ACTION_NONE = 0,
-        REACH_CLIPBOARD_POINTER_ACTION_CLEAR_ALL = 1,
-        REACH_CLIPBOARD_POINTER_ACTION_REMOVE_ITEM = 2,
-        REACH_CLIPBOARD_POINTER_ACTION_RESTORE_ITEM = 3
-    } reach_clipboard_pointer_action_kind;
-
     int32_t reach_clipboard_is_open(reach_clipboard_feature *clipboard);
     size_t reach_clipboard_item_count(reach_clipboard_feature *clipboard);
     const reach_clipboard_item *reach_clipboard_item_at(reach_clipboard_feature *clipboard,

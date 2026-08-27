@@ -16,15 +16,6 @@ extern "C"
 {
 #endif
 
-    typedef enum reach_context_menu_pointer_action_kind
-    {
-        REACH_CONTEXT_MENU_POINTER_ACTION_NONE = 0,
-        REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS = 1,
-        REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE = 2,
-        REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW = 3,
-        REACH_CONTEXT_MENU_POINTER_ACTION_CLOSE_WINDOW = 4
-    } reach_context_menu_pointer_action_kind;
-
     void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                                  size_t *out_count);
     const uint16_t *reach_context_menu_command_text(uint32_t command);

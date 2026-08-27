@@ -98,19 +98,3 @@ void reach_host_toggle_battery(reach_host *host)
     }
     reach_host_set_battery_open(host, reach_battery_is_open(host->battery_capsule) ? 0 : 1);
 }
-
-reach_result reach_host_apply_battery_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                     const reach_capsule_pointer_result *result)
-{
-    (void)event;
-    if (host == nullptr || result == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    if (result->action.kind == REACH_BATTERY_POINTER_ACTION_DISMISS)
-    {
-        reach_host_set_battery_open(host, 0);
-    }
-    return REACH_OK;
-}

@@ -117,13 +117,6 @@ extern "C"
         reach_rect_f32 expand_button_icon;
     } reach_quick_settings_layout;
 
-    typedef enum reach_quick_settings_pointer_action_kind
-    {
-        REACH_QUICK_SETTINGS_POINTER_ACTION_NONE = 0,
-
-        REACH_QUICK_SETTINGS_POINTER_ACTION_CLOSE = 1
-    } reach_quick_settings_pointer_action_kind;
-
     typedef struct reach_quick_settings_render_input
     {
         reach_quick_settings_model model;

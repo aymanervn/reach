@@ -53,26 +53,3 @@ reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,
     reach_host_set_tray_popup_open(host, 0);
     return reach_tray_service_activate(host->tray_service, item_id, action);
 }
-
-reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                  const reach_capsule_pointer_result *result)
-{
-    (void)event;
-    if (host == nullptr || result == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_tray_action provider_action = REACH_TRAY_ACTION_LEFT_CLICK;
-    if (result->action.kind == REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT)
-    {
-        provider_action = REACH_TRAY_ACTION_RIGHT_CLICK;
-    }
-    else if (result->action.kind != REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT)
-    {
-        return REACH_OK;
-    }
-
-    return reach_host_activate_tray_item(host, static_cast<uint32_t>(result->action.id),
-                                         provider_action);
-}

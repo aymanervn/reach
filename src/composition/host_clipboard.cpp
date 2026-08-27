@@ -1,51 +1,5 @@
 #include "host_internal.h"
 
-reach_result reach_host_apply_clipboard_pointer_action(reach_host *host,
-                                                       const reach_ui_event *event,
-                                                       const reach_capsule_pointer_result *result)
-{
-    (void)event;
-    if (host == nullptr || result == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    switch ((reach_clipboard_pointer_action_kind)result->action.kind)
-    {
-    case REACH_CLIPBOARD_POINTER_ACTION_CLEAR_ALL:
-        reach_host_clear_clipboard(host);
-        break;
-    case REACH_CLIPBOARD_POINTER_ACTION_REMOVE_ITEM:
-    {
-        const reach_clipboard_item *item =
-            reach_clipboard_item_at(host->clipboard_capsule, result->action.index);
-        if (item != nullptr && item->id == result->action.id)
-        {
-            reach_clipboard_item removed = *item;
-            if (reach_clipboard_remove_item(host->clipboard_capsule, result->action.index,
-                                            result->action.id))
-            {
-                reach_host_release_clipboard_item(host, &removed);
-            }
-        }
-        break;
-    }
-    case REACH_CLIPBOARD_POINTER_ACTION_RESTORE_ITEM:
-        if (host->clipboard.ops.restore != nullptr &&
-            host->clipboard.ops.restore(host->clipboard.provider, result->action.id) == REACH_OK)
-        {
-            reach_clipboard_confirm_restore(host->clipboard_capsule, result->action.index);
-            reach_host_set_clipboard_open(host, 0);
-        }
-        break;
-    case REACH_CLIPBOARD_POINTER_ACTION_NONE:
-    default:
-        break;
-    }
-
-    return REACH_OK;
-}
-
 void reach_host_release_clipboard_item(reach_host *host, const reach_clipboard_item *item)
 {
     if (host == nullptr || item == nullptr || item->id == 0)

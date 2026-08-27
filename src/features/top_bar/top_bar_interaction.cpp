@@ -3,6 +3,11 @@
 #include "top_bar_common.h"
 #include "top_bar_now_playing.h"
 
+static_assert(REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER >= REACH_FEATURE_ACTION_PRIVATE_BASE &&
+                  REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS >=
+                      REACH_FEATURE_ACTION_PRIVATE_BASE,
+              "top bar pointer policy kinds must not collide with the shared action vocabulary");
+
 static int32_t reach_top_bar_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
     return rect.width > 0.0f && rect.height > 0.0f && (float)x >= rect.x &&
@@ -391,20 +396,6 @@ static int32_t reach_top_bar_take_power_release_suppressed(reach_top_bar *top_ba
     return 1;
 }
 
-static uint32_t reach_top_bar_media_action(reach_now_playing_action action)
-{
-    switch (action)
-    {
-    case REACH_NOW_PLAYING_ACTION_PREVIOUS:
-        return REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS;
-    case REACH_NOW_PLAYING_ACTION_PLAY_PAUSE:
-        return REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE;
-    case REACH_NOW_PLAYING_ACTION_NEXT:
-        return REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT;
-    default:
-        return REACH_TOP_BAR_POINTER_ACTION_NONE;
-    }
-}
 
 void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
                                 reach_pointer_button button, reach_top_bar_event_result *out)
@@ -448,26 +439,15 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
     case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER;
         return;
-    case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING;
-        return;
-    case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
-        return;
-    case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_TRAY_OVERFLOW;
-        return;
     case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
         out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS;
         return;
+    case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
     case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_SETTINGS;
-        return;
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE;
-        return;
     case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_BATTERY;
-        return;
     default:
         return;
     }
@@ -510,8 +490,9 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
     out->handled = 1;
     if (button == REACH_POINTER_BUTTON_SECONDARY)
     {
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT;
+        out->action_kind = REACH_FEATURE_ACTION_ACTIVATE_TRAY_ITEM;
         out->action_id = detail;
+        out->action_index = REACH_TRAY_ACTION_RIGHT_CLICK;
         return;
     }
     switch (region)
@@ -524,27 +505,37 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         }
         return;
     case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
-        out->action_kind =
-            reach_top_bar_media_action(static_cast<reach_now_playing_action>(detail));
-        return;
-    case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT;
+        out->action_kind = REACH_FEATURE_ACTION_MEDIA_CONTROL;
         out->action_id = detail;
         return;
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
+        out->action_kind = REACH_FEATURE_ACTION_ACTIVATE_TRAY_ITEM;
+        out->action_id = detail;
+        out->action_index = REACH_TRAY_ACTION_LEFT_CLICK;
+        return;
     case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW;
+        if (top_bar->routes.tray_overflow_activated != nullptr)
+        {
+            top_bar->routes.tray_overflow_activated(top_bar->routes.user);
+        }
         return;
     case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
+        if (top_bar->routes.quick_settings_activated != nullptr)
+        {
+            top_bar->routes.quick_settings_activated(top_bar->routes.user);
+        }
         return;
     case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS;
+        out->action_kind = REACH_FEATURE_ACTION_OPEN_SETTINGS_APP;
         return;
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE;
+        out->action_kind = REACH_FEATURE_ACTION_CYCLE_INPUT_LANGUAGE;
         return;
     case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_BATTERY;
+        if (top_bar->routes.battery_activated != nullptr)
+        {
+            top_bar->routes.battery_activated(top_bar->routes.user);
+        }
         return;
     case REACH_TOP_BAR_POINTER_REGION_NONE:
     default:

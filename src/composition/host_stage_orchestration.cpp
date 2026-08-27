@@ -255,47 +255,6 @@ void reach_host_toggle_stage(reach_host *host)
     reach_host_open_stage(host);
 }
 
-reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                   const reach_capsule_pointer_result *result)
-{
-    (void)event;
-    if (host == nullptr || result == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    if (result->action.kind == REACH_STAGE_ACTION_ACTIVATE_WINDOW)
-    {
-        reach_result activate_result = REACH_OK;
-        if (result->action.window != 0)
-        {
-            activate_result = reach_host_schedule_window_control(
-                host, REACH_WINDOW_CONTROL_ACTIVATE, result->action.window);
-        }
-        reach_host_close_stage(host);
-        return activate_result;
-    }
-
-    if (result->action.kind == REACH_STAGE_ACTION_SHOW_DESKTOP)
-    {
-        reach_host_close_stage(host);
-        return reach_host_schedule_minimize_open_windows(host);
-    }
-
-    if (result->action.kind == REACH_STAGE_ACTION_CLOSE_WINDOW)
-    {
-        host->stage.dirty_flags = 1;
-        host->dirty.render = 1;
-        reach_host_request_update(host);
-        return result->action.window != 0
-                   ? reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE,
-                                                        result->action.window)
-                   : REACH_OK;
-    }
-
-    return REACH_OK;
-}
-
 void reach_host_on_stage_edge_reveal(reach_host *host, reach_screen_hotspot_event event)
 {
     if (host == nullptr || event != REACH_SCREEN_HOTSPOT_ENTER)

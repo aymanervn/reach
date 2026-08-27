@@ -6,6 +6,7 @@
 
 #include "reach/core/geometry.h"
 #include "reach/core/ui_events.h"
+#include "reach/features/common/feature_action.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -50,6 +51,7 @@ extern "C"
     typedef struct reach_capsule_action
     {
         uint32_t kind;
+        uint32_t flags;
         size_t index;
         uint64_t id;
         uintptr_t window;

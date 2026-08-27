@@ -85,14 +85,6 @@ extern "C"
         int32_t desktop;
     } reach_stage_thumbnail_placement;
 
-    typedef enum reach_stage_action_type
-    {
-        REACH_STAGE_ACTION_NONE = 0,
-        REACH_STAGE_ACTION_ACTIVATE_WINDOW = 1,
-        REACH_STAGE_ACTION_SHOW_DESKTOP = 2,
-        REACH_STAGE_ACTION_CLOSE_WINDOW = 3
-    } reach_stage_action_type;
-
     reach_result reach_stage_create(reach_stage **out_stage);
     void reach_stage_destroy(reach_stage *stage);
 
