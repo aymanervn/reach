@@ -384,6 +384,8 @@ typedef struct reach_host_layout_target
 } reach_host_layout_target;
 
 void reach_host_init_feature_registry(reach_host *host);
+void reach_host_bind_interfeature_routes(reach_host *host);
+void reach_host_clear_interfeature_routes(reach_host *host);
 reach_result reach_host_create_registered_features(reach_host *host);
 void reach_host_destroy_registered_features(reach_host *host);
 

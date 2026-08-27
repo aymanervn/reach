@@ -46,6 +46,7 @@ struct reach_dock
 
     reach_icon_service *icons;
     reach_window_tracking *windows;
+    reach_dock_routes routes;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
     int32_t pointer_layout_valid;
@@ -57,6 +58,14 @@ struct reach_dock
     int32_t coverage_valid;
     int32_t coverage_trespassed;
 };
+
+void reach_dock_set_routes(reach_dock *dock, const reach_dock_routes *routes)
+{
+    if (dock != nullptr)
+    {
+        dock->routes = routes != nullptr ? *routes : reach_dock_routes{};
+    }
+}
 
 void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
                                 reach_window_tracking *windows)
@@ -490,6 +499,14 @@ static int32_t reach_dock_capsule_screen_y(const reach_dock *dock, int32_t local
                : local_y;
 }
 
+static void reach_dock_notify_item_hovered(const reach_dock *dock, size_t item_index)
+{
+    if (dock != nullptr && dock->routes.item_hovered != nullptr)
+    {
+        dock->routes.item_hovered(dock->routes.user, item_index);
+    }
+}
+
 static void
 reach_dock_capsule_apply_interaction_result(const reach_dock_interaction_result *interaction,
                                             reach_capsule_pointer_result *out)
@@ -642,8 +659,11 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                 hit.index < state->model.item_count)
             {
                 out->handled = 1;
-                out->action.kind = REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT;
-                out->action.index = hit.index;
+                if (dock->routes.item_context_menu != nullptr)
+                {
+                    dock->routes.item_context_menu(dock->routes.user, hit.index, event->x,
+                                                   event->y);
+                }
             }
             return;
         }
@@ -697,8 +717,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             if (hovered_item != state->hovered_item)
             {
                 state->hovered_item = hovered_item;
-                out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-                out->action.index = hovered_item;
+                reach_dock_notify_item_hovered(dock, hovered_item);
             }
         }
         if (reach_draggable_tracking(&state->drag.gesture))
@@ -747,8 +766,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
             state->hovered_item = REACH_MAX_DOCK_ITEMS;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-            out->action.index = REACH_MAX_DOCK_ITEMS;
+            reach_dock_notify_item_hovered(dock, REACH_MAX_DOCK_ITEMS);
         }
         return;
     }
@@ -760,8 +778,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
             state->hovered_item = REACH_MAX_DOCK_ITEMS;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-            out->action.index = REACH_MAX_DOCK_ITEMS;
+            reach_dock_notify_item_hovered(dock, REACH_MAX_DOCK_ITEMS);
         }
     }
 }

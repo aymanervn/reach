@@ -517,9 +517,10 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
     switch (region)
     {
     case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
-        if (!reach_top_bar_take_power_release_suppressed(top_bar))
+        if (!reach_top_bar_take_power_release_suppressed(top_bar) &&
+            top_bar->routes.power_activated != nullptr)
         {
-            out->action_kind = REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER;
+            top_bar->routes.power_activated(top_bar->routes.user);
         }
         return;
     case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:

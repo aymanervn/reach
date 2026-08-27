@@ -132,7 +132,6 @@ extern "C"
     {
         REACH_TOP_BAR_POINTER_ACTION_NONE = 0,
         REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER = 1,
-        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_POWER = 2,
         REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING = 3,
         REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS = 4,
         REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE = 5,
@@ -213,6 +212,18 @@ extern "C"
     void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar);
 
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);
+
+    /* Outbound slots for effects the Top Bar cannot express as its own state. The Top Bar never
+       learns what they reach; composition assigns them in interfeature_routes.cpp. */
+    typedef struct reach_top_bar_routes
+    {
+        void *user;
+
+        /* The power button completed a primary activation. */
+        void (*power_activated)(void *user);
+    } reach_top_bar_routes;
+
+    void reach_top_bar_set_routes(reach_top_bar *top_bar, const reach_top_bar_routes *routes);
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);

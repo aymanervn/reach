@@ -33,6 +33,7 @@ struct reach_top_bar
     reach_input_language_service *input_language;
     reach_system_status *status;
     reach_tray_service *tray;
+    reach_top_bar_routes routes;
     uint32_t tray_order[REACH_MAX_TRAY_ITEMS];
     size_t tray_order_count;
     reach_top_bar_tray_drag_state tray_drag;

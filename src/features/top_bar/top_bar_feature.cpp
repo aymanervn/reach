@@ -115,6 +115,14 @@ void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *st
     }
 }
 
+void reach_top_bar_set_routes(reach_top_bar *top_bar, const reach_top_bar_routes *routes)
+{
+    if (top_bar != nullptr)
+    {
+        top_bar->routes = routes != nullptr ? *routes : reach_top_bar_routes{};
+    }
+}
+
 static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);
 static void reach_top_bar_update_language(reach_top_bar *top_bar);
 

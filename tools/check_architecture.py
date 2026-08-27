@@ -359,6 +359,16 @@ REGISTERED_FEATURE_LIFECYCLE_RE = re.compile(
     r"system_hud|context_menu|switcher|stage)_(create|destroy)\s*\("
 )
 
+INTERFEATURE_ROUTES_SEAM = "src/composition/interfeature_routes.cpp"
+
+INTERFEATURE_ROUTE_TARGETS: dict[str, str] = {
+    "reach_host_show_dock_app_context_menu": (
+        "src/composition/host_context_menu_orchestration.cpp"
+    ),
+    "reach_host_show_power_context_menu": "src/composition/host_context_menu_orchestration.cpp",
+    "reach_host_dock_item_hovered": "src/composition/host_window_list_orchestration.cpp",
+}
+
 MIGRATED_SURFACE_FRAME_RE = re.compile(
     r"\breach_host_(frame|render)_(dock|top_bar|launcher|context_menu|stage|"
     r"system_hud|switcher|clipboard)(?:_surface)?\b"
@@ -625,6 +635,30 @@ def validate_registered_feature_lifecycle(path: Path, text: str) -> list[str]:
     ]
 
 
+def validate_interfeature_routes(path: Path, text: str) -> list[str]:
+    """An effect that opens or changes another feature may only be reached from the
+    interfeature routing seam, from the file that defines it, or from the shared
+    composition declarations."""
+    relative = rel(path).replace("\\", "/")
+    if not relative.startswith("src/composition/") or relative in (
+        INTERFEATURE_ROUTES_SEAM,
+        "src/composition/host_internal.h",
+    ):
+        return []
+
+    scan_text = strip_comments(text)
+    violations: list[str] = []
+    for symbol, owner in INTERFEATURE_ROUTE_TARGETS.items():
+        if relative == owner:
+            continue
+        if re.search(rf"\b{symbol}\s*\(", scan_text) is not None:
+            violations.append(
+                f"{relative}: {symbol} is an interfeature effect; route it from "
+                f"{INTERFEATURE_ROUTES_SEAM}"
+            )
+    return violations
+
+
 def validate_migrated_surface_frames(path: Path, text: str) -> list[str]:
     relative = rel(path).replace("\\", "/")
     if not relative.startswith("src/composition/"):
@@ -726,6 +760,7 @@ def main() -> int:
         violations.extend(validate_feature_config_ownership(path, text))
         violations.extend(validate_registered_feature_lifecycle(path, text))
         violations.extend(validate_migrated_surface_frames(path, text))
+        violations.extend(validate_interfeature_routes(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 
     if violations:
