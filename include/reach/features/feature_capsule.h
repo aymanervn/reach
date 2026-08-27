@@ -99,6 +99,8 @@ extern "C"
                                 size_t max_regions);
 
         void (*surface_geometry)(const void *capsule, reach_feature_surface_geometry *out);
+
+        int32_t (*pointer_capture_active)(const void *capsule);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

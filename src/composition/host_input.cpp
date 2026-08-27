@@ -250,17 +250,66 @@ reach_result reach_host_open_launcher_result_and_close_transients(reach_host *ho
     return activation_result;
 }
 
-static void reach_host_cancel_dock_pointer_sequence(reach_host *host)
+static int32_t reach_host_surface_sequence_active(const reach_surface_desc *desc)
 {
-    const reach_surface_desc *dock = &host->surface_descs[REACH_SURFACE_ID_DOCK];
-    if (dock->capsule_ops->pointer_sequence_active == nullptr ||
-        !dock->capsule_ops->pointer_sequence_active(dock->capsule))
+    return desc->capsule_ops != nullptr && desc->capsule_ops->pointer_sequence_active != nullptr &&
+           desc->capsule_ops->pointer_sequence_active(desc->capsule);
+}
+
+static void reach_host_cancel_pointer_sequence(reach_host *host, reach_surface_id id)
+{
+    if (!reach_host_surface_sequence_active(&host->surface_descs[id]))
     {
         return;
     }
-    reach_capsule_pointer_result dock_cancel = reach_host_dispatch_pointer(
-        host, REACH_SURFACE_ID_DOCK, nullptr, REACH_POINTER_EVENT_CANCEL);
-    (void)reach_host_apply_surface_action(host, REACH_SURFACE_ID_DOCK, &dock_cancel);
+    reach_capsule_pointer_result cancel =
+        reach_host_dispatch_pointer(host, id, nullptr, REACH_POINTER_EVENT_CANCEL);
+    (void)reach_host_apply_surface_action(host, id, &cancel);
+}
+
+static void reach_host_cancel_other_pointer_sequences(reach_host *host, reach_surface_id keep)
+{
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        if (host->surface_descs[index].id != keep)
+        {
+            reach_host_cancel_pointer_sequence(host, host->surface_descs[index].id);
+        }
+    }
+}
+
+static const reach_surface_desc *reach_host_pointer_capture_owner(reach_host *host, uint32_t flag)
+{
+    const reach_surface_desc *owner = nullptr;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_desc *desc = &host->surface_descs[index];
+        if (desc->capsule_ops == nullptr || desc->capsule_ops->pointer_capture_active == nullptr ||
+            !desc->capsule_ops->pointer_capture_active(desc->capsule) ||
+            (flag != 0 && (desc->pointer_flags & flag) == 0))
+        {
+            continue;
+        }
+        if (owner == nullptr || desc->pointer_priority > owner->pointer_priority)
+        {
+            owner = desc;
+        }
+    }
+    return owner;
+}
+
+static const reach_surface_desc *reach_host_pointer_exclusive_surface(reach_host *host)
+{
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_desc *desc = &host->surface_descs[index];
+        if ((desc->pointer_flags & REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN) != 0 &&
+            desc->capsule_ops != nullptr && reach_host_surface_pointer_open(desc))
+        {
+            return desc;
+        }
+    }
+    return nullptr;
 }
 
 static reach_result reach_host_handle_secondary_pointer_up(reach_host *host,
@@ -300,44 +349,24 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
         return reach_host_handle_secondary_pointer_up(host, event, source);
     }
 
-    if (reach_context_menu_is_open(host->context_menu_capsule))
+    const reach_surface_desc *exclusive = reach_host_pointer_exclusive_surface(host);
+    if (exclusive != nullptr)
     {
-        reach_capsule_pointer_result context_up = reach_host_dispatch_pointer(
-            host, REACH_SURFACE_ID_CONTEXT_MENU, event, REACH_POINTER_EVENT_UP);
-        return reach_host_apply_surface_action(host, REACH_SURFACE_ID_CONTEXT_MENU, &context_up);
+        reach_capsule_pointer_result exclusive_up =
+            reach_host_dispatch_pointer(host, exclusive->id, event, REACH_POINTER_EVENT_UP);
+        return reach_host_apply_surface_action(host, exclusive->id, &exclusive_up);
     }
 
-    if (reach_draggable_tracking(&reach_dock_state_ptr(host->dock_capsule)->drag.gesture))
+    const reach_surface_desc *capture = reach_host_pointer_capture_owner(host, 0);
+    if (capture != nullptr)
     {
-        reach_capsule_pointer_result dock_drag =
-            reach_host_dispatch_pointer(host, REACH_SURFACE_ID_DOCK, event, REACH_POINTER_EVENT_UP);
-        return reach_host_apply_surface_action(host, REACH_SURFACE_ID_DOCK, &dock_drag);
-    }
-
-    const reach_surface_desc *quick_settings_desc =
-        &host->surface_descs[REACH_SURFACE_ID_QUICK_SETTINGS];
-    if (quick_settings_desc->capsule_ops->wants_pointer_move != nullptr &&
-        quick_settings_desc->capsule_ops->wants_pointer_move(quick_settings_desc->capsule))
-    {
-        reach_capsule_pointer_result quick_settings_up = reach_host_dispatch_pointer(
-            host, REACH_SURFACE_ID_QUICK_SETTINGS, event, REACH_POINTER_EVENT_UP);
-        (void)reach_host_apply_surface_action(host, REACH_SURFACE_ID_QUICK_SETTINGS,
-                                              &quick_settings_up);
-        reach_host_cancel_dock_pointer_sequence(host);
-        return REACH_OK;
-    }
-
-    const reach_surface_desc *launcher_desc = &host->surface_descs[REACH_SURFACE_ID_LAUNCHER];
-    if (launcher_desc->capsule_ops->wants_pointer_move != nullptr &&
-        launcher_desc->capsule_ops->wants_pointer_move(launcher_desc->capsule))
-    {
-        reach_capsule_pointer_result launcher_release = reach_host_dispatch_pointer(
-            host, REACH_SURFACE_ID_LAUNCHER, event, REACH_POINTER_EVENT_UP);
-        if (launcher_release.handled)
+        reach_capsule_pointer_result capture_up =
+            reach_host_dispatch_pointer(host, capture->id, event, REACH_POINTER_EVENT_UP);
+        if (capture_up.handled ||
+            (capture->pointer_flags & REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE) != 0)
         {
-            reach_host_cancel_dock_pointer_sequence(host);
-            return reach_host_apply_surface_action(host, REACH_SURFACE_ID_LAUNCHER,
-                                                   &launcher_release);
+            reach_host_cancel_other_pointer_sequences(host, capture->id);
+            return reach_host_apply_surface_action(host, capture->id, &capture_up);
         }
     }
 
@@ -346,7 +375,8 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
     for (size_t index = 0; index < order_count; ++index)
     {
         const reach_surface_desc *desc = &host->surface_descs[order[index]];
-        if (desc->id == REACH_SURFACE_ID_CONTEXT_MENU || !reach_host_surface_pointer_open(desc))
+        if ((desc->pointer_flags & REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN) != 0 ||
+            !reach_host_surface_pointer_open(desc))
         {
             continue;
         }
@@ -360,10 +390,7 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
         {
             continue;
         }
-        if (desc->id != REACH_SURFACE_ID_DOCK)
-        {
-            reach_host_cancel_dock_pointer_sequence(host);
-        }
+        reach_host_cancel_other_pointer_sequences(host, desc->id);
 
         if (desc->id == REACH_SURFACE_ID_DOCK &&
             reach_top_bar_tray_popup_is_open(host->top_bar_capsule) &&
@@ -561,7 +588,7 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
                 reach_top_bar_tray_popup_is_open(host->top_bar_capsule) &&
                 source_down.action.kind == REACH_DOCK_POINTER_ACTION_PRESS_ITEM)
             {
-                reach_host_cancel_dock_pointer_sequence(host);
+                reach_host_cancel_pointer_sequence(host, source_desc->id);
                 return REACH_OK;
             }
             if (source_desc->cls == REACH_SURFACE_CLASS_PERSISTENT &&
@@ -616,15 +643,13 @@ static reach_result reach_host_handle_pointer_move(reach_host *host, const reach
         return REACH_OK;
     }
 
-    const reach_surface_desc *quick_settings_desc =
-        &host->surface_descs[REACH_SURFACE_ID_QUICK_SETTINGS];
-    if (quick_settings_desc->capsule_ops->wants_pointer_move != nullptr &&
-        quick_settings_desc->capsule_ops->wants_pointer_move(quick_settings_desc->capsule))
+    const reach_surface_desc *move_owner =
+        reach_host_pointer_capture_owner(host, REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE);
+    if (move_owner != nullptr)
     {
-        reach_capsule_pointer_result quick_settings_move = reach_host_dispatch_pointer(
-            host, REACH_SURFACE_ID_QUICK_SETTINGS, event, REACH_POINTER_EVENT_MOVE);
-        (void)reach_host_apply_surface_action(host, REACH_SURFACE_ID_QUICK_SETTINGS,
-                                              &quick_settings_move);
+        reach_capsule_pointer_result owned_move =
+            reach_host_dispatch_pointer(host, move_owner->id, event, REACH_POINTER_EVENT_MOVE);
+        (void)reach_host_apply_surface_action(host, move_owner->id, &owned_move);
         return REACH_OK;
     }
 
