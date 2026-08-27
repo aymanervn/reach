@@ -1167,6 +1167,21 @@ static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
     return reach_top_bar_capsule_pointer_sequence_active(capsule);
 }
 
+static void reach_top_bar_capsule_surface_geometry(const void *capsule,
+                                                   reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    if (top_bar != nullptr)
+    {
+        out->visible_bounds = top_bar->state.layout.bounds;
+    }
+}
+
 static size_t reach_top_bar_capsule_input_regions(const void *capsule, reach_rect_f32 *out_regions,
                                                   size_t max_regions)
 {
@@ -1246,7 +1261,7 @@ const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
         reach_top_bar_capsule_is_open,        reach_top_bar_capsule_on_game_mode,
         reach_top_bar_capsule_needs_frame,    reach_top_bar_capsule_wants_pointer_move,
         reach_top_bar_capsule_handle_pointer, reach_top_bar_capsule_pointer_sequence_active,
-        reach_top_bar_capsule_input_regions,
+        reach_top_bar_capsule_input_regions,  reach_top_bar_capsule_surface_geometry,
     };
     return &ops;
 }

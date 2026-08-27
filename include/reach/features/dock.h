@@ -233,6 +233,19 @@ extern "C"
                                                    const reach_dock_render_context *ctx,
                                                    reach_render_command_buffer *out_commands);
 
+    typedef struct reach_dock_surface_render_context
+    {
+        const reach_theme *theme;
+        reach_rect_f32 bounds;
+        int32_t icon_size_px;
+        float dpi_scale;
+    } reach_dock_surface_render_context;
+
+    reach_result
+    reach_dock_append_surface_render_commands(reach_dock *dock,
+                                              const reach_dock_surface_render_context *ctx,
+                                              reach_render_command_buffer *out_commands);
+
     void reach_dock_touch_icons(reach_dock *dock, int32_t icon_size_px);
 
     typedef struct reach_dock_drag_state

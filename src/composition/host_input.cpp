@@ -340,14 +340,14 @@ reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_
         {
             return REACH_INVALID_ARGUMENT;
         }
-        (void)reach_host_render_dock_surface(host, &host->layout.dock);
+        (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
         reach_result show_result =
             reach_host_show_dock_app_context_menu(host, result->action.index, event->x, event->y);
         if (reach_dock_retain_context_feedback(host->dock_capsule))
         {
             host->dock.dirty_flags = 1;
         }
-        (void)reach_host_render_dock_surface(host, &host->layout.dock);
+        (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
         return show_result;
     }
     case REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER:

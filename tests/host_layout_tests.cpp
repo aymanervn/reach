@@ -431,6 +431,13 @@ static void test_registered_feature_lifecycle(void)
                     "every definition owns the layout specification");
     }
 
+    expect_true(host->surface_descs[REACH_SURFACE_ID_DOCK].frame == nullptr &&
+                    host->surface_descs[REACH_SURFACE_ID_DOCK].surface_ops != nullptr,
+                "Dock uses the generic registered surface frame");
+    expect_true(host->surface_descs[REACH_SURFACE_ID_TOP_BAR].frame == nullptr &&
+                    host->surface_descs[REACH_SURFACE_ID_TOP_BAR].surface_ops != nullptr,
+                "Top Bar uses the generic registered surface frame");
+
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)

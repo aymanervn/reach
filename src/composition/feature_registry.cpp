@@ -237,9 +237,7 @@ static void reach_host_init_surface_descriptors(reach_host *host)
     descs[REACH_SURFACE_ID_LAUNCHER].frame = reach_host_frame_launcher;
     descs[REACH_SURFACE_ID_LAUNCHER].frame_priority = 10;
     descs[REACH_SURFACE_ID_CLIPBOARD].frame_priority = 20;
-    descs[REACH_SURFACE_ID_DOCK].frame = reach_host_frame_dock;
     descs[REACH_SURFACE_ID_DOCK].frame_priority = 30;
-    descs[REACH_SURFACE_ID_TOP_BAR].frame = reach_host_frame_top_bar;
     descs[REACH_SURFACE_ID_TOP_BAR].frame_priority = 35;
     descs[REACH_SURFACE_ID_TRAY].frame_priority = 40;
     descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame_priority = 50;
@@ -261,6 +259,62 @@ static void reach_host_init_surface_descriptors(reach_host *host)
         reach_switcher_routed_events(&descs[REACH_SURFACE_ID_SWITCHER].routed_event_count);
     descs[REACH_SURFACE_ID_SWITCHER].handle_routed = reach_host_handle_switcher_event;
 }
+
+static int32_t reach_dock_surface_arrange(void *capsule, const reach_feature_surface_context *ctx)
+{
+    (void)capsule;
+    (void)ctx;
+    return 0;
+}
+
+static reach_result reach_dock_surface_render(void *capsule,
+                                              const reach_feature_surface_context *ctx,
+                                              reach_render_command_buffer *out_commands)
+{
+    reach_dock_surface_render_context render = {};
+    render.theme = ctx->theme;
+    render.bounds = ctx->render_bounds;
+    render.icon_size_px = ctx->icon_size_px;
+    render.dpi_scale = ctx->dpi_scale;
+    return reach_dock_append_surface_render_commands(static_cast<reach_dock *>(capsule), &render,
+                                                     out_commands);
+}
+
+static const reach_feature_surface_ops reach_dock_surface_ops = {
+    reach_dock_surface_arrange,
+    reach_dock_surface_render,
+};
+
+static int32_t reach_top_bar_surface_arrange(void *capsule,
+                                             const reach_feature_surface_context *ctx)
+{
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
+    reach_rect_f32 before = reach_top_bar_state_ptr(top_bar)->layout.bounds;
+    reach_top_bar_build_context build = {};
+    build.theme = ctx->theme;
+    build.monitor_bounds = ctx->monitor_bounds;
+    build.dpi_scale = ctx->dpi_scale;
+    build.text_measure = ctx->text_measure;
+    reach_top_bar_build_layout(top_bar, &build);
+    return !reach_host_rect_equal(before, reach_top_bar_state_ptr(top_bar)->layout.bounds);
+}
+
+static reach_result reach_top_bar_surface_render(void *capsule,
+                                                 const reach_feature_surface_context *ctx,
+                                                 reach_render_command_buffer *out_commands)
+{
+    reach_top_bar_render_context render = {};
+    render.theme = ctx->theme;
+    render.dpi_scale = ctx->dpi_scale;
+    render.icon_size_px = ctx->icon_size_px;
+    return reach_top_bar_append_render_commands(static_cast<reach_top_bar *>(capsule), &render,
+                                                out_commands);
+}
+
+static const reach_feature_surface_ops reach_top_bar_surface_ops = {
+    reach_top_bar_surface_arrange,
+    reach_top_bar_surface_render,
+};
 
 static int32_t reach_system_hud_surface_arrange(void *capsule,
                                                 const reach_feature_surface_context *ctx)
@@ -604,6 +658,8 @@ void reach_host_init_feature_registry(reach_host *host)
     descs[REACH_SURFACE_ID_STAGE].factory = {
         reach_feature_create<reach_stage, reach_stage_create>,
         reach_feature_destroy<reach_stage, reach_stage_destroy>};
+    descs[REACH_SURFACE_ID_DOCK].surface_ops = &reach_dock_surface_ops;
+    descs[REACH_SURFACE_ID_TOP_BAR].surface_ops = &reach_top_bar_surface_ops;
     descs[REACH_SURFACE_ID_SYSTEM_HUD].surface_ops = &reach_system_hud_surface_ops;
     descs[REACH_SURFACE_ID_SYSTEM_HUD].layout_anchor = REACH_SURFACE_ID_DOCK;
     descs[REACH_SURFACE_ID_SWITCHER].surface_ops = &reach_switcher_surface_ops;

@@ -360,7 +360,7 @@ REGISTERED_FEATURE_LIFECYCLE_RE = re.compile(
 )
 
 MIGRATED_SURFACE_FRAME_RE = re.compile(
-    r"\breach_host_(frame|render)_(system_hud|switcher|clipboard)(?:_surface)?\b"
+    r"\breach_host_(frame|render)_(dock|top_bar|system_hud|switcher|clipboard)(?:_surface)?\b"
 )
 
 @dataclass(frozen=True)
