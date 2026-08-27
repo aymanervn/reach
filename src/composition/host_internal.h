@@ -210,6 +210,49 @@ typedef struct reach_feature_surface_ops
                                            reach_render_command_buffer *out_commands);
 } reach_feature_surface_ops;
 
+typedef struct reach_surface_spec
+{
+    reach_surface_class cls;
+    uint32_t pointer_flags;
+    reach_surface_shadow shadow;
+    uint32_t behavior_flags;
+    int32_t layer;
+    reach_surface_role role;
+    int32_t pointer_priority;
+    int32_t has_transition;
+    int32_t bar_shown_while_open;
+    reach_surface_edge_reveal_spec edge_reveal;
+    reach_surface_bar_reveal_spec bar_reveal;
+} reach_surface_spec;
+
+typedef struct reach_layout_spec
+{
+    reach_surface_id anchor;
+    int32_t priority;
+} reach_layout_spec;
+
+typedef struct reach_feature_definition
+{
+    reach_surface_id id;
+    reach_feature_factory factory;
+    const reach_feature_capsule_ops *capsule_ops;
+    const reach_feature_surface_ops *surface_ops;
+    reach_surface_spec surface;
+    reach_layout_spec layout;
+
+    void (*force_close)(reach_host *host);
+    reach_result (*apply_pointer_action)(reach_host *host, const reach_ui_event *event,
+                                         const reach_capsule_pointer_result *result);
+    void (*dismiss)(reach_host *host);
+    reach_result (*frame)(reach_host *host, const struct reach_host_frame_context *ctx);
+    const reach_ui_event_type *toggle_events;
+    size_t toggle_event_count;
+    void (*toggle)(reach_host *host);
+    const reach_ui_event_type *routed_events;
+    size_t routed_event_count;
+    reach_result (*handle_routed)(reach_host *host, const reach_ui_event *event);
+} reach_feature_definition;
+
 typedef struct reach_surface_desc
 {
     reach_surface_id id;
@@ -258,6 +301,7 @@ typedef struct reach_surface_desc
     reach_surface_id layout_anchor;
     reach_rect_f32 resolved_bounds;
     int32_t resolved_bounds_valid;
+    const reach_feature_definition *definition;
 } reach_surface_desc;
 
 typedef struct reach_host_edge_reveal_runtime
@@ -407,6 +451,7 @@ struct reach_host
     reach_host_surface_transition battery_transition;
     reach_host_surface_transition clipboard_transition;
 
+    reach_feature_definition feature_definitions[REACH_HOST_SURFACE_COUNT];
     reach_surface_desc surface_descs[REACH_HOST_SURFACE_COUNT];
     reach_host_edge_reveal_runtime edge_reveals[REACH_HOST_SURFACE_COUNT];
     reach_layout layout_manager;
