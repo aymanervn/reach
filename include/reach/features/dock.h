@@ -127,16 +127,12 @@ extern "C"
         REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER = 20
     } reach_dock_pointer_action_kind;
 
-    /* Outbound slots for effects the Dock cannot express as its own state. The Dock never
-       learns what they reach; composition assigns them in interfeature_routes.cpp. */
     typedef struct reach_dock_routes
     {
         void *user;
 
-        /* A secondary click activated on `item_index`, at screen point (x, y). */
         void (*item_context_menu)(void *user, size_t item_index, int32_t x, int32_t y);
 
-        /* The hovered item changed. `REACH_MAX_DOCK_ITEMS` means no item is hovered. */
         void (*item_hovered)(void *user, size_t item_index);
     } reach_dock_routes;
 

@@ -1619,8 +1619,6 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     reach_popup_placement placement = reach_quick_settings_placement(quick_settings, ctx, 0.0f);
     state->target_bounds = placement.bounds;
 
-    /* A content change requests an animated relayout; the next arrange resolves it against the
-       live anchor instead of composition re-deriving the popup's layout context. */
     if (quick_settings->relayout_animate_pending)
     {
         quick_settings->relayout_animate_pending = 0;
