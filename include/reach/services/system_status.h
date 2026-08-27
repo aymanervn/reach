@@ -23,6 +23,18 @@ extern "C"
         int32_t output_devices_valid;
     } reach_system_status_audio_snapshot;
 
+    typedef enum reach_system_status_bluetooth_outcome
+    {
+
+        REACH_SYSTEM_STATUS_BLUETOOTH_UNSUPPORTED = 0,
+
+        REACH_SYSTEM_STATUS_BLUETOOTH_PENDING = 1,
+
+        REACH_SYSTEM_STATUS_BLUETOOTH_REJECTED = 2,
+
+        REACH_SYSTEM_STATUS_BLUETOOTH_APPLIED = 3
+    } reach_system_status_bluetooth_outcome;
+
     typedef struct reach_system_status_system_snapshot
     {
         reach_network_state network;
@@ -61,6 +73,22 @@ extern "C"
 
     int32_t reach_system_status_audio_pending(const reach_system_status *service);
     int32_t reach_system_status_system_pending(const reach_system_status *service);
+
+    reach_result reach_system_status_set_main_volume(reach_system_status *service, float level,
+                                                     int32_t *in_out_muted);
+    reach_result reach_system_status_set_session_volume(reach_system_status *service,
+                                                        const uint16_t *session_instance_id,
+                                                        float level);
+    reach_result reach_system_status_set_default_output_device(reach_system_status *service,
+                                                               const uint16_t *device_id);
+    reach_result reach_system_status_set_brightness(reach_system_status *service, float level);
+
+    reach_system_status_bluetooth_outcome
+    reach_system_status_set_bluetooth_enabled(reach_system_status *service, int32_t enabled);
+    reach_result reach_system_status_set_battery_saver_enabled(reach_system_status *service,
+                                                                int32_t enabled);
+    reach_result reach_system_status_open_system_quick_settings(reach_system_status *service);
+    reach_result reach_system_status_open_project_menu(reach_system_status *service);
 
 #ifdef __cplusplus
 }

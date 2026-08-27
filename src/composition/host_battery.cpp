@@ -26,19 +26,9 @@ void reach_host_refresh_battery_power(reach_host *host)
         return;
     }
 
-    reach_system_stats_snapshot snapshot = {};
-    reach_system_stats_snapshot_take(host->system_stats, &snapshot);
-
-    int32_t has_reading =
-        snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
-    int32_t percent = has_reading ? snapshot.power.battery_percent : 0;
-    int32_t saver_on = snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0;
-
-    if (reach_battery_set_power(host->battery_capsule, percent, saver_on))
+    if (reach_battery_refresh_power(host->battery_capsule))
     {
-        reach_top_bar_set_battery_saver_pending(
-            host->top_bar_capsule, reach_battery_saver_pending(host->battery_capsule),
-            reach_battery_state_ptr(host->battery_capsule)->model.saver_pending_enabled);
+        reach_host_sync_battery_saver_pending(host);
         host->battery.dirty_flags = 1;
         host->dirty.render = 1;
     }
@@ -121,30 +111,6 @@ reach_result reach_host_apply_battery_pointer_action(reach_host *host, const rea
     if (result->action.kind == REACH_BATTERY_POINTER_ACTION_DISMISS)
     {
         reach_host_set_battery_open(host, 0);
-        return REACH_OK;
     }
-
-    if (result->action.kind != REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER)
-    {
-        return REACH_OK;
-    }
-
-    const reach_battery_state *state = reach_battery_state_ptr(host->battery_capsule);
-    int32_t target_enabled = reach_battery_model_saver_effective(&state->model) ? 0 : 1;
-
-    reach_battery_set_saver_pending(host->battery_capsule, 1, target_enabled);
-    reach_top_bar_set_battery_saver_pending(host->top_bar_capsule, 1, target_enabled);
-
-    if (host->system_controls.set_battery_saver_enabled != nullptr)
-    {
-        (void)host->system_controls.set_battery_saver_enabled(host->system_controls.userdata,
-                                                              target_enabled);
-    }
-
-    reach_host_refresh_battery_power(host);
-
-    host->battery.dirty_flags = 1;
-    host->top_bar.dirty_flags = 1;
-    host->dirty.render = 1;
     return REACH_OK;
 }

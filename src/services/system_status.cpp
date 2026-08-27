@@ -407,3 +407,154 @@ int32_t reach_system_status_system_pending(const reach_system_status *service)
 {
     return service != nullptr && reach_system_status_worker_pending(&service->system);
 }
+
+reach_result reach_system_status_set_main_volume(reach_system_status *service, float level,
+                                                 int32_t *in_out_muted)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    level = reach_system_status_clamp01(level);
+
+    int32_t muted = in_out_muted != nullptr ? *in_out_muted : 0;
+    if (service->audio_volume.get_state != nullptr)
+    {
+        reach_audio_volume_state state = {};
+        if (service->audio_volume.get_state(service->audio_volume.userdata, &state) == REACH_OK)
+        {
+            muted = state.muted ? 1 : 0;
+        }
+    }
+
+    if (muted && service->audio_volume.set_muted != nullptr &&
+        service->audio_volume.set_muted(service->audio_volume.userdata, 0) == REACH_OK)
+    {
+        muted = 0;
+    }
+
+    if (in_out_muted != nullptr)
+    {
+        *in_out_muted = muted;
+    }
+
+    return service->audio_volume.set_level != nullptr
+               ? service->audio_volume.set_level(service->audio_volume.userdata, level)
+               : REACH_NOT_IMPLEMENTED;
+}
+
+reach_result reach_system_status_set_session_volume(reach_system_status *service,
+                                                    const uint16_t *session_instance_id,
+                                                    float level)
+{
+    if (service == nullptr || session_instance_id == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->audio_volume.set_session_level == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->audio_volume.set_session_level(service->audio_volume.userdata,
+                                                   session_instance_id,
+                                                   reach_system_status_clamp01(level));
+}
+
+reach_result reach_system_status_set_default_output_device(reach_system_status *service,
+                                                           const uint16_t *device_id)
+{
+    if (service == nullptr || device_id == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->audio_volume.set_default_output_device == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->audio_volume.set_default_output_device(service->audio_volume.userdata,
+                                                           device_id);
+}
+
+reach_result reach_system_status_set_brightness(reach_system_status *service, float level)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->system_controls.set_brightness_level == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->system_controls.set_brightness_level(service->system_controls.userdata,
+                                                         reach_system_status_clamp01(level));
+}
+
+reach_system_status_bluetooth_outcome
+reach_system_status_set_bluetooth_enabled(reach_system_status *service, int32_t enabled)
+{
+    if (service == nullptr)
+    {
+        return REACH_SYSTEM_STATUS_BLUETOOTH_UNSUPPORTED;
+    }
+
+    enabled = enabled ? 1 : 0;
+
+    if (service->system_controls.request_bluetooth_enabled != nullptr)
+    {
+        return service->system_controls.request_bluetooth_enabled(
+                   service->system_controls.userdata, enabled) == REACH_OK
+                   ? REACH_SYSTEM_STATUS_BLUETOOTH_PENDING
+                   : REACH_SYSTEM_STATUS_BLUETOOTH_REJECTED;
+    }
+
+    if (service->system_controls.set_bluetooth_enabled != nullptr)
+    {
+        (void)service->system_controls.set_bluetooth_enabled(service->system_controls.userdata,
+                                                             enabled);
+        return REACH_SYSTEM_STATUS_BLUETOOTH_APPLIED;
+    }
+
+    return REACH_SYSTEM_STATUS_BLUETOOTH_UNSUPPORTED;
+}
+
+reach_result reach_system_status_set_battery_saver_enabled(reach_system_status *service,
+                                                           int32_t enabled)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->system_controls.set_battery_saver_enabled == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->system_controls.set_battery_saver_enabled(service->system_controls.userdata,
+                                                              enabled ? 1 : 0);
+}
+
+reach_result reach_system_status_open_system_quick_settings(reach_system_status *service)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->system_controls.open_system_quick_settings == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->system_controls.open_system_quick_settings(service->system_controls.userdata);
+}
+
+reach_result reach_system_status_open_project_menu(reach_system_status *service)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->system_controls.open_project_menu == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->system_controls.open_project_menu(service->system_controls.userdata);
+}

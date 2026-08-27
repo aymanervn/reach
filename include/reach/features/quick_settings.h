@@ -120,15 +120,8 @@ extern "C"
     typedef enum reach_quick_settings_pointer_action_kind
     {
         REACH_QUICK_SETTINGS_POINTER_ACTION_NONE = 0,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_MAIN_VOLUME,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_SESSION_VOLUME,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_BRIGHTNESS,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_NETWORK_TILE,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BLUETOOTH,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_OPEN_PROJECT,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_OUTPUT_DEVICES,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_OUTPUT_DEVICE,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_EXPAND
+
+        REACH_QUICK_SETTINGS_POINTER_ACTION_CLOSE = 1
     } reach_quick_settings_pointer_action_kind;
 
     typedef struct reach_quick_settings_render_input
@@ -266,7 +259,6 @@ extern "C"
     reach_quick_settings_update_open_animation(reach_quick_settings *quick_settings,
                                                const reach_quick_settings_layout_context *ctx);
 
-    int32_t reach_quick_settings_bluetooth_pending(reach_quick_settings *quick_settings);
     int32_t reach_quick_settings_bluetooth_available(reach_quick_settings *quick_settings);
     int32_t reach_quick_settings_bluetooth_enabled(reach_quick_settings *quick_settings);
     void reach_quick_settings_set_bluetooth_pending(reach_quick_settings *quick_settings,

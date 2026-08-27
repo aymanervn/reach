@@ -5,6 +5,8 @@
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/features/popup.h"
+#include "reach/services/system_stats.h"
+#include "reach/services/system_status.h"
 #include "reach/support/util.h"
 
 #include <stddef.h>
@@ -19,6 +21,9 @@ extern "C"
     {
         REACH_BATTERY_POINTER_ACTION_NONE = 0,
         REACH_BATTERY_POINTER_ACTION_DISMISS = 1,
+
+        /* Hit region only. The capsule applies the saver change through its attached
+           status service and never reports it as an outbound action. */
         REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER = 2
     } reach_battery_pointer_action_kind;
 
@@ -66,6 +71,11 @@ extern "C"
     void reach_battery_destroy(reach_battery *battery);
 
     const reach_feature_capsule_ops *reach_battery_capsule_ops(void);
+
+    void reach_battery_attach_services(reach_battery *battery, reach_system_stats *stats,
+                                       reach_system_status *status);
+
+    int32_t reach_battery_refresh_power(reach_battery *battery);
 
     const reach_battery_state *reach_battery_state_ptr(const reach_battery *battery);
     int32_t reach_battery_is_open(const reach_battery *battery);
