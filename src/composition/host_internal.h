@@ -136,7 +136,13 @@ typedef enum reach_surface_pointer_flags
 
     REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED = 1u << 2,
 
-    REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED = 1u << 3
+    REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED = 1u << 3,
+
+    REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN = 1u << 4,
+
+    REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE = 1u << 5,
+
+    REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE = 1u << 6
 } reach_surface_pointer_flags;
 
 typedef enum reach_surface_behavior_flags

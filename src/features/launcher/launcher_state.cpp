@@ -1112,6 +1112,7 @@ const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
         reach_launcher_capsule_pointer_sequence_active,
         nullptr,
         reach_launcher_capsule_surface_geometry,
+        reach_launcher_capsule_wants_pointer_move,
     };
     return &ops;
 }

@@ -73,7 +73,8 @@ static void reach_host_init_surface_descriptors(reach_host *host)
                                     nullptr,
                                     host->dock_capsule,
                                     reach_dock_capsule_ops(),
-                                    REACH_SURFACE_POINTER_SOURCE_GATED};
+                                    REACH_SURFACE_POINTER_SOURCE_GATED |
+                                        REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE};
     descs[REACH_SURFACE_ID_TOP_BAR] = {REACH_SURFACE_ID_TOP_BAR,
                                        REACH_SURFACE_CLASS_PERSISTENT,
                                        &host->top_bar,
@@ -114,7 +115,8 @@ static void reach_host_init_surface_descriptors(reach_host *host)
                                               reach_host_surface_quick_settings_close,
                                               host->quick_settings_capsule,
                                               reach_quick_settings_capsule_ops(),
-                                              REACH_SURFACE_POINTER_NONE};
+                                              REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE |
+                                                  REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE};
     descs[REACH_SURFACE_ID_BATTERY] = {
         REACH_SURFACE_ID_BATTERY,    REACH_SURFACE_CLASS_POPUP,        &host->battery,
         &host->battery_transition,   reach_host_surface_battery_close, host->battery_capsule,
@@ -134,7 +136,7 @@ static void reach_host_init_surface_descriptors(reach_host *host)
                                             reach_host_surface_context_menu_close,
                                             host->context_menu_capsule,
                                             reach_context_menu_capsule_ops(),
-                                            REACH_SURFACE_POINTER_NONE};
+                                            REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN};
     descs[REACH_SURFACE_ID_SWITCHER] = {
         REACH_SURFACE_ID_SWITCHER,    REACH_SURFACE_CLASS_OVERLAY,       &host->switcher,
         &host->switcher_transition,   reach_host_surface_switcher_close, host->switcher_capsule,

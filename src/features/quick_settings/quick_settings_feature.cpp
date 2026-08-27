@@ -1254,6 +1254,7 @@ const reach_feature_capsule_ops *reach_quick_settings_capsule_ops(void)
         reach_quick_settings_capsule_pointer_sequence_active,
         nullptr,
         reach_quick_settings_capsule_surface_geometry,
+        reach_quick_settings_capsule_wants_pointer_move,
     };
     return &ops;
 }

@@ -461,6 +461,12 @@ static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
     return reach_dock_capsule_pointer_sequence_active(capsule);
 }
 
+static int32_t reach_dock_capsule_pointer_capture_active(const void *capsule)
+{
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    return dock != nullptr && reach_draggable_tracking(&dock->state.drag.gesture);
+}
+
 static void reach_dock_capsule_surface_geometry(const void *capsule,
                                                 reach_feature_surface_geometry *out)
 {
@@ -802,6 +808,7 @@ const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
         reach_dock_capsule_pointer_sequence_active,
         nullptr,
         reach_dock_capsule_surface_geometry,
+        reach_dock_capsule_pointer_capture_active,
     };
     return &ops;
 }
