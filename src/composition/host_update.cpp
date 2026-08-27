@@ -319,36 +319,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 {
                     host->dock.dirty_flags = 1;
                 }
-                reach_rect_f32 shown_dock_bounds = layout.dock.bounds;
-                reach_surface_desc *dock_desc = &host->surface_descs[REACH_SURFACE_ID_DOCK];
-                dock_desc->resolved_bounds = shown_dock_bounds;
-                dock_desc->resolved_bounds_valid = 1;
-                reach_rect_f32 animated_dock_bounds = reach_host_reconcile_bar_visibility(
-                    host, REACH_SURFACE_ID_DOCK, shown_dock_bounds, bounds);
-
-                layout.dock.bounds = animated_dock_bounds;
-
-                float dock_left_offset = bounds.x - layout.dock.bounds.x;
-                float dock_right_offset =
-                    bounds.x + bounds.width - (layout.dock.bounds.x + layout.dock.bounds.width);
-                float dock_x_offset = 0.0f;
-                if (dock_left_offset > 0.0f)
-                {
-                    dock_x_offset = dock_left_offset;
-                }
-                else if (dock_right_offset < 0.0f)
-                {
-                    dock_x_offset = dock_right_offset;
-                }
-
-                if (dock_x_offset != 0.0f)
-                {
-                    layout.dock.bounds.x += dock_x_offset;
-                }
-
-                int32_t dock_layout_changed =
-                    !host->has_layout ||
-                    !reach_host_rect_equal(host->layout.dock.bounds, layout.dock.bounds);
                 int32_t launcher_layout_changed =
                     !host->has_layout ||
                     !reach_host_rect_equal(host->layout.launcher.bounds, layout.launcher.bounds);
@@ -360,7 +330,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
 
                 reach_host_frame_context frame_ctx = {};
                 frame_ctx.monitor_bounds = bounds;
-                frame_ctx.dock_layout_changed = dock_layout_changed;
                 frame_ctx.launcher_layout_changed = launcher_layout_changed;
                 reach_host_sync_edge_reveals(host, bounds);
                 reach_surface_id frame_order[REACH_HOST_SURFACE_COUNT];

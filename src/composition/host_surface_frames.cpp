@@ -59,6 +59,92 @@ static reach_result reach_host_apply_transient_frame(reach_host *host, reach_sur
     return REACH_OK;
 }
 
+static void reach_host_fill_surface_context(reach_host *host, const reach_surface_desc *desc,
+                                            const reach_host_frame_context *ctx,
+                                            reach_feature_surface_context *out)
+{
+    *out = {};
+    out->theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    out->monitor_bounds = ctx != nullptr ? ctx->monitor_bounds : reach_rect_f32{};
+    out->last_bounds = desc->surface->last_bounds;
+    out->text_measure.context = desc->surface->renderer.backend;
+    out->text_measure.measure = desc->surface->renderer.ops.measure_text;
+    out->dpi_scale = reach_host_layout_dpi_scale(host);
+    out->icon_size_px = reach_host_icon_size_px(host);
+    out->bounds_valid = desc->surface->bounds_valid;
+}
+
+static reach_result
+reach_host_execute_registered_surface(reach_host *host, reach_surface_desc *desc,
+                                      const reach_feature_surface_context *ctx,
+                                      const reach_feature_surface_geometry *geometry)
+{
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
+    reach_result result = desc->surface_ops->append_render_commands(desc->capsule, ctx, commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    const reach_feature_definition *definition = desc->definition;
+    if (definition != nullptr && definition->surface.popup_chrome)
+    {
+        return reach_host_render_popup_surface(host, desc->id, desc->surface,
+                                               geometry->visible_bounds, geometry->notch_anchor_x,
+                                               geometry->notch_side, commands);
+    }
+    reach_host_stamp_surface_content(host, desc->id, commands);
+
+    if (desc->surface->renderer.ops.begin_frame == nullptr)
+    {
+        return REACH_OK;
+    }
+    result = desc->surface->renderer.ops.begin_frame(desc->surface->renderer.backend);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    result = desc->surface->renderer.ops.execute(desc->surface->renderer.backend, commands);
+    reach_result end_result =
+        desc->surface->renderer.ops.end_frame(desc->surface->renderer.backend);
+    return result != REACH_OK ? result : end_result;
+}
+
+static int32_t reach_host_bar_position_only(const reach_surface_desc *desc)
+{
+    if (desc->bar_reveal.ops == nullptr || desc->bar_reveal.ops->animation == nullptr)
+    {
+        return 0;
+    }
+    reach_bar_reveal_animation animation = desc->bar_reveal.ops->animation(desc->capsule);
+    return animation.position_animating && !animation.content_animating;
+}
+
+reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_surface_desc *desc = &host->surface_descs[id];
+    if (desc->surface == nullptr || desc->surface_ops == nullptr ||
+        desc->surface_ops->append_render_commands == nullptr || desc->capsule_ops == nullptr ||
+        desc->capsule_ops->surface_geometry == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_feature_surface_geometry geometry = {};
+    desc->capsule_ops->surface_geometry(desc->capsule, &geometry);
+    reach_feature_surface_context surface_ctx = {};
+    reach_host_fill_surface_context(host, desc, nullptr, &surface_ctx);
+    surface_ctx.visible_bounds = geometry.visible_bounds;
+    surface_ctx.render_bounds =
+        desc->surface->bounds_valid ? desc->surface->last_bounds : geometry.visible_bounds;
+    return reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
+}
+
 reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface_desc *desc,
                                                  const reach_host_frame_context *ctx)
 {
@@ -89,13 +175,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
     }
 
     reach_feature_surface_context surface_ctx = {};
-    surface_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    surface_ctx.monitor_bounds = ctx->monitor_bounds;
-    surface_ctx.last_bounds = desc->surface->last_bounds;
-    surface_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    surface_ctx.icon_size_px = reach_host_icon_size_px(host);
+    reach_host_fill_surface_context(host, desc, ctx, &surface_ctx);
     surface_ctx.transition_visible = visible;
-    surface_ctx.bounds_valid = desc->surface->bounds_valid;
     const reach_feature_definition *definition = desc->definition;
     reach_surface_id anchor_id =
         definition != nullptr ? definition->layout.anchor : desc->layout_anchor;
@@ -130,11 +211,19 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
     }
     reach_feature_surface_geometry geometry = {};
     desc->capsule_ops->surface_geometry(desc->capsule, &geometry);
+    int32_t geometry_changed =
+        !desc->resolved_bounds_valid ||
+        !reach_host_rect_equal(desc->resolved_bounds, geometry.visible_bounds);
     desc->resolved_bounds = geometry.visible_bounds;
     desc->resolved_bounds_valid = 1;
     surface_ctx.visible_bounds = geometry.visible_bounds;
 
     reach_rect_f32 bounds = geometry.visible_bounds;
+    if (desc->bar_reveal.ops != nullptr)
+    {
+        bounds = reach_host_reconcile_bar_visibility(host, desc->id, geometry.visible_bounds,
+                                                     ctx->monitor_bounds);
+    }
     float opacity = 1.0f;
     if (desc->transition != nullptr)
     {
@@ -148,40 +237,14 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface
         &desc->surface->window, bounds, reach_host_surface_shadow_pad(host, desc->id), opacity,
         &desc->surface->last_bounds, &desc->surface->last_opacity, &desc->surface->bounds_valid,
         &desc->surface->opacity_valid, &window_changed);
-    if (result != REACH_OK || !open ||
-        (!host->dirty.render && !desc->surface->dirty_flags && !window_changed && !layout_changed))
+    int32_t position_only = reach_host_bar_position_only(desc);
+    int32_t render_needed = host->dirty.render || desc->surface->dirty_flags || layout_changed ||
+                            geometry_changed || (window_changed && !position_only);
+    if (result != REACH_OK || !open || !render_needed)
     {
         return result;
     }
-
-    reach_render_command_buffer *commands = &host->render_commands;
-    reach_render_command_buffer_clear(commands);
-    result = desc->surface_ops->append_render_commands(desc->capsule, &surface_ctx, commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    if (definition != nullptr && definition->surface.popup_chrome)
-    {
-        return reach_host_render_popup_surface(host, desc->id, desc->surface,
-                                               geometry.visible_bounds, geometry.notch_anchor_x,
-                                               geometry.notch_side, commands);
-    }
-    reach_host_stamp_surface_content(host, desc->id, commands);
-
-    if (desc->surface->renderer.ops.begin_frame == nullptr)
-    {
-        return REACH_OK;
-    }
-    result = desc->surface->renderer.ops.begin_frame(desc->surface->renderer.backend);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    result = desc->surface->renderer.ops.execute(desc->surface->renderer.backend, commands);
-    reach_result end_result =
-        desc->surface->renderer.ops.end_frame(desc->surface->renderer.backend);
-    return result != REACH_OK ? result : end_result;
+    return reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
 }
 
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx)
@@ -262,79 +325,6 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
         host, REACH_SURFACE_ID_LAUNCHER,
         reach_host_surface_transition_visible(&host->launcher_transition));
 
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_context *ctx)
-{
-    const int32_t dock_layout_changed = ctx->dock_layout_changed;
-    if (host->dock.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_host_set_surface_visible(host, REACH_SURFACE_ID_DOCK, 1);
-
-    int32_t dock_window_changed = 0;
-    reach_result result = reach_host_apply_window_state(
-        &host->dock.window, host->layout.dock.bounds,
-        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_DOCK), 1.0f, &host->dock.last_bounds,
-        &host->dock.last_opacity, &host->dock.bounds_valid, &host->dock.opacity_valid,
-        &dock_window_changed);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    int32_t dock_reveal_position_only =
-        reach_animation_manager_active(reach_dock_manager(host->dock_capsule), REACH_DOCK_ANIM_Y) &&
-        !reach_dock_slots_animating(host->dock_capsule) && !host->dirty.render &&
-        !host->dock.dirty_flags &&
-        !reach_draggable_tracking(&reach_dock_state_ptr(host->dock_capsule)->drag.gesture) &&
-        !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
-                                        REACH_DOCK_ANIM_DRAG_SNAP) &&
-        !reach_animation_manager_active(reach_dock_manager(host->dock_capsule),
-                                        REACH_DOCK_ANIM_FEEDBACK_OPACITY);
-
-    if (host->dirty.render || host->dock.dirty_flags ||
-        (!dock_reveal_position_only && (dock_window_changed || dock_layout_changed)))
-    {
-        (void)reach_host_render_dock_surface(host, &host->layout.dock);
-    }
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_context *ctx)
-{
-    if (host->top_bar.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    reach_host_build_top_bar_layout(host, ctx->monitor_bounds);
-
-    const reach_top_bar_state *state = reach_top_bar_state_ptr(host->top_bar_capsule);
-    reach_rect_f32 shown_bounds = state->layout.bounds;
-    reach_rect_f32 bounds = reach_host_reconcile_bar_visibility(host, REACH_SURFACE_ID_TOP_BAR,
-                                                                shown_bounds, ctx->monitor_bounds);
-
-    reach_host_set_surface_visible(host, REACH_SURFACE_ID_TOP_BAR, 1);
-
-    int32_t window_changed = 0;
-    reach_result result = reach_host_apply_window_state(
-        &host->top_bar.window, bounds,
-        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_TOP_BAR), 1.0f,
-        &host->top_bar.last_bounds, &host->top_bar.last_opacity, &host->top_bar.bounds_valid,
-        &host->top_bar.opacity_valid, &window_changed);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    if (host->dirty.render || host->top_bar.dirty_flags || window_changed)
-    {
-        (void)reach_host_render_top_bar_surface(host);
-    }
     return REACH_OK;
 }
 

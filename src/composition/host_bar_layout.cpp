@@ -127,10 +127,11 @@ static void reach_host_apply_edge_reveal(reach_host *host, reach_host_edge_revea
     reach_host_set_edge_reveal_visible(host, runtime, shown);
 }
 
-static void reach_host_apply_bar_pointer_observation(
-    reach_host *host, reach_surface_id id, const reach_bar_visibility_result *result)
+static void reach_host_apply_bar_pointer_observation(reach_host *host, reach_surface_id id,
+                                                     const reach_bar_visibility_result *result)
 {
-    if (host == nullptr || result == nullptr || host->input_source.ops.set_pointer_region == nullptr)
+    if (host == nullptr || result == nullptr ||
+        host->input_source.ops.set_pointer_region == nullptr)
     {
         return;
     }
@@ -202,23 +203,6 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
                                  result.reveal_edge_shown, result.reveal_bounds);
 
     return result.animated_bounds;
-}
-
-void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bounds)
-{
-    if (host == nullptr)
-    {
-        return;
-    }
-
-    reach_top_bar_build_context ctx = {};
-    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    ctx.monitor_bounds = monitor_bounds;
-    ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.text_measure.context = host->top_bar.renderer.backend;
-    ctx.text_measure.measure = host->top_bar.renderer.ops.measure_text;
-
-    reach_top_bar_build_layout(host->top_bar_capsule, &ctx);
 }
 
 reach_dock_build_context reach_host_dock_build_context(reach_host *host)

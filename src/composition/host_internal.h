@@ -198,6 +198,7 @@ typedef struct reach_feature_surface_context
     reach_rect_f32 last_bounds;
     reach_rect_f32 visible_bounds;
     reach_rect_f32 render_bounds;
+    reach_text_measure_port text_measure;
     float dpi_scale;
     int32_t icon_size_px;
     int32_t transition_visible;
@@ -383,7 +384,6 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening,
 struct reach_host_frame_context
 {
     reach_rect_f32 monitor_bounds;
-    int32_t dock_layout_changed;
     int32_t launcher_layout_changed;
 };
 typedef struct reach_host_frame_context reach_host_frame_context;
@@ -391,12 +391,11 @@ typedef struct reach_host_frame_context reach_host_frame_context;
 void reach_host_sync_surface_input_regions(const reach_host *host, const reach_surface_desc *desc);
 
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface_desc *desc,
                                                  const reach_host_frame_context *ctx);
+reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id);
 
 static inline uint32_t reach_surface_class_bit(reach_surface_class cls)
 {
@@ -797,9 +796,7 @@ void reach_host_request_bar_visibility_update(reach_host *host);
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
                                                    reach_rect_f32 shown_bounds,
                                                    reach_rect_f32 monitor_bounds);
-void reach_host_build_top_bar_layout(reach_host *host, reach_rect_f32 monitor_bounds);
 reach_result reach_host_cycle_input_language(reach_host *host);
-reach_result reach_host_render_top_bar_surface(reach_host *host);
 
 reach_result reach_host_refresh_monitor_layout(reach_host *host);
 int32_t reach_host_can_move_bars_without_redraw(const reach_host *host);
@@ -872,8 +869,6 @@ void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font);
 void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme);
 
 void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot);
-
-reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_layout *layout);
 
 reach_result reach_host_render_launcher_surface(reach_host *host,
                                                 const reach_launcher_layout *layout,

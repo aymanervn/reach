@@ -448,6 +448,21 @@ static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
     return reach_dock_capsule_pointer_sequence_active(capsule);
 }
 
+static void reach_dock_capsule_surface_geometry(const void *capsule,
+                                                reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    if (dock != nullptr && dock->pointer_layout_valid)
+    {
+        out->visible_bounds = dock->pointer_layout.bounds;
+    }
+}
+
 static reach_dock_interaction_context reach_dock_capsule_interaction_context(reach_dock *dock)
 {
     reach_dock_interaction_context ctx = {};
@@ -754,10 +769,16 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_dock_capsule_reset,          reach_dock_capsule_tick,
-        reach_dock_capsule_is_open,        reach_dock_capsule_on_game_mode,
-        reach_dock_capsule_needs_frame,    reach_dock_capsule_wants_pointer_move,
-        reach_dock_capsule_handle_pointer, reach_dock_capsule_pointer_sequence_active,
+        reach_dock_capsule_reset,
+        reach_dock_capsule_tick,
+        reach_dock_capsule_is_open,
+        reach_dock_capsule_on_game_mode,
+        reach_dock_capsule_needs_frame,
+        reach_dock_capsule_wants_pointer_move,
+        reach_dock_capsule_handle_pointer,
+        reach_dock_capsule_pointer_sequence_active,
+        nullptr,
+        reach_dock_capsule_surface_geometry,
     };
     return &ops;
 }
@@ -1634,6 +1655,30 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
 
     dock->pointer_layout = *layout;
     dock->pointer_layout_valid = 1;
+}
+
+reach_result reach_dock_append_surface_render_commands(reach_dock *dock,
+                                                       const reach_dock_surface_render_context *ctx,
+                                                       reach_render_command_buffer *out_commands)
+{
+    if (dock == nullptr || ctx == nullptr || out_commands == nullptr || !dock->pointer_layout_valid)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_dock_layout layout = dock->pointer_layout;
+    layout.bounds = ctx->bounds;
+
+    reach_dock_render_context render = {};
+    render.theme = ctx->theme;
+    render.layout = &layout;
+    render.focused_window =
+        dock->windows != nullptr ? reach_window_tracking_foreground(dock->windows) : 0;
+    render.pinned_apps = dock->pointer_pinned_apps;
+    render.pinned_app_count = dock->pointer_pinned_app_count;
+    render.icon_size_px = ctx->icon_size_px;
+    render.dpi_scale = ctx->dpi_scale;
+    return reach_dock_append_render_commands(dock, &render, out_commands);
 }
 
 reach_point_i32 reach_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y)
