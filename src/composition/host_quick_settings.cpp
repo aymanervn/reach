@@ -83,7 +83,6 @@ void reach_host_toggle_quick_settings(reach_host *host)
         host, reach_quick_settings_is_open(host->quick_settings_capsule) ? 0 : 1);
 }
 
-
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags)
 {
     reach_host *host = static_cast<reach_host *>(user);

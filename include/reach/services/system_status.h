@@ -86,7 +86,7 @@ extern "C"
     reach_system_status_bluetooth_outcome
     reach_system_status_set_bluetooth_enabled(reach_system_status *service, int32_t enabled);
     reach_result reach_system_status_set_battery_saver_enabled(reach_system_status *service,
-                                                                int32_t enabled);
+                                                               int32_t enabled);
     reach_result reach_system_status_open_system_quick_settings(reach_system_status *service);
     reach_result reach_system_status_open_project_menu(reach_system_status *service);
 

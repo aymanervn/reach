@@ -241,8 +241,9 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
 
         if (kind == REACH_STAGE_PRESSABLE_TILE)
         {
-            out->action.kind = state->tiles[index].desktop ? REACH_FEATURE_ACTION_MINIMIZE_ALL_WINDOWS
-                                                           : REACH_FEATURE_ACTION_ACTIVATE_WINDOW;
+            out->action.kind = state->tiles[index].desktop
+                                   ? REACH_FEATURE_ACTION_MINIMIZE_ALL_WINDOWS
+                                   : REACH_FEATURE_ACTION_ACTIVATE_WINDOW;
             out->action.index = index;
             out->action.window = state->tiles[index].window;
             state->selected_index = index;

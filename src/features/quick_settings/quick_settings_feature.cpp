@@ -1052,8 +1052,7 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
         if (session_instance_id != nullptr)
         {
             (void)reach_system_status_set_session_volume(quick_settings->status,
-                                                         session_instance_id,
-                                                         action->volume_level);
+                                                         session_instance_id, action->volume_level);
         }
         out->redraw = 1;
         break;
@@ -1091,10 +1090,9 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
     {
         const uint16_t *output_device_id =
             reach_quick_settings_output_device_id(quick_settings, action->output_device_index);
-        int32_t changed =
-            output_device_id != nullptr &&
-            reach_system_status_set_default_output_device(quick_settings->status,
-                                                          output_device_id) == REACH_OK;
+        int32_t changed = output_device_id != nullptr &&
+                          reach_system_status_set_default_output_device(
+                              quick_settings->status, output_device_id) == REACH_OK;
         if (changed)
         {
             reach_quick_settings_collapse_output_devices(quick_settings);
