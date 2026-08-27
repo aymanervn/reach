@@ -394,17 +394,17 @@ reach_clipboard_capsule_apply_event_result(const reach_clipboard_event_result *e
     out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
     if (event_result->action == REACH_CLIPBOARD_ACTION_CLEAR_ALL)
     {
-        out->action.kind = REACH_CLIPBOARD_POINTER_ACTION_CLEAR_ALL;
+        out->action.kind = REACH_FEATURE_ACTION_CLEAR_CLIPBOARD;
     }
     else if (event_result->action == REACH_CLIPBOARD_ACTION_REMOVE_ITEM)
     {
-        out->action.kind = REACH_CLIPBOARD_POINTER_ACTION_REMOVE_ITEM;
+        out->action.kind = REACH_FEATURE_ACTION_REMOVE_CLIPBOARD_ITEM;
         out->action.index = event_result->item_index;
         out->action.id = event_result->item_id;
     }
     else if (event_result->action == REACH_CLIPBOARD_ACTION_RESTORE_ITEM)
     {
-        out->action.kind = REACH_CLIPBOARD_POINTER_ACTION_RESTORE_ITEM;
+        out->action.kind = REACH_FEATURE_ACTION_RESTORE_CLIPBOARD_ITEM;
         out->action.index = event_result->item_index;
         out->action.id = event_result->item_id;
     }

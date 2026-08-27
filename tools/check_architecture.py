@@ -367,7 +367,15 @@ INTERFEATURE_ROUTE_TARGETS: dict[str, str] = {
     ),
     "reach_host_show_power_context_menu": "src/composition/host_context_menu_orchestration.cpp",
     "reach_host_dock_item_hovered": "src/composition/host_window_list_orchestration.cpp",
+    "reach_host_toggle_quick_settings": "src/composition/host_quick_settings.cpp",
+    "reach_host_toggle_battery": "src/composition/host_battery.cpp",
+    "reach_host_toggle_tray_popup": "src/composition/host_tray_orchestration.cpp",
+    "reach_host_toggle_stage": "src/composition/host_stage_orchestration.cpp",
 }
+
+FEATURE_ACTION_ENUM_RE = re.compile(r"REACH_[A-Z_]+_POINTER_ACTION_[A-Z_]+")
+
+FEATURE_ACTION_POLICY_ALLOWED = {"src/composition/host_input.cpp"}
 
 MIGRATED_SURFACE_FRAME_RE = re.compile(
     r"\breach_host_(frame|render)_(dock|top_bar|launcher|context_menu|stage|"
@@ -659,6 +667,25 @@ def validate_interfeature_routes(path: Path, text: str) -> list[str]:
     return violations
 
 
+def validate_feature_action_vocabulary(path: Path, text: str) -> list[str]:
+    """Composition dispatches the shared reach_feature_action_kind vocabulary. A
+    feature-private action enum outside the input-policy file means a translator
+    came back."""
+    relative = rel(path).replace("\\", "/")
+    if (
+        not relative.startswith("src/composition/")
+        or relative in FEATURE_ACTION_POLICY_ALLOWED
+    ):
+        return []
+    match = FEATURE_ACTION_ENUM_RE.search(strip_comments(text))
+    if match is None:
+        return []
+    return [
+        f"{relative}: {match.group(0)} is a feature-private action kind; dispatch the "
+        "shared reach_feature_action_kind vocabulary instead"
+    ]
+
+
 def validate_migrated_surface_frames(path: Path, text: str) -> list[str]:
     relative = rel(path).replace("\\", "/")
     if not relative.startswith("src/composition/"):
@@ -761,6 +788,7 @@ def main() -> int:
         violations.extend(validate_registered_feature_lifecycle(path, text))
         violations.extend(validate_migrated_surface_frames(path, text))
         violations.extend(validate_interfeature_routes(path, text))
+        violations.extend(validate_feature_action_vocabulary(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 
     if violations:

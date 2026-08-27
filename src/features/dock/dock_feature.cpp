@@ -33,6 +33,10 @@ static void reach_dock_settle_slots(reach_dock *dock);
 static void reach_dock_snap_slots(reach_dock *dock);
 static void reach_dock_gate_animating_hit(reach_dock *dock, reach_dock_hit_result *hit);
 
+static_assert(REACH_DOCK_POINTER_ACTION_PRESS_ITEM >= REACH_FEATURE_ACTION_PRIVATE_BASE &&
+                  REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER >= REACH_FEATURE_ACTION_PRIVATE_BASE,
+              "dock pointer policy kinds must not collide with the shared action vocabulary");
+
 struct reach_dock
 {
     reach_animation_manager manager;
@@ -518,11 +522,11 @@ reach_dock_capsule_apply_interaction_result(const reach_dock_interaction_result 
     out->redraw = out->redraw || interaction->redraw;
     if (interaction->rebuild_items)
     {
-        out->action.kind = REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS;
+        out->action.kind = REACH_FEATURE_ACTION_REBUILD_ITEMS;
     }
     if (interaction->move_pin)
     {
-        out->action.kind = REACH_DOCK_POINTER_ACTION_MOVE_PIN;
+        out->action.kind = REACH_FEATURE_ACTION_MOVE_PIN;
         out->action.id = interaction->move_pin_id;
         out->action.index = interaction->move_pin_target;
     }
@@ -675,8 +679,10 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         if (pressable.activated_target == REACH_DOCK_PRESSABLE_TRIGGER)
         {
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER;
-            out->action.index = REACH_DOCK_TRIGGER_PRIMARY;
+            if (dock->routes.trigger_activated != nullptr)
+            {
+                dock->routes.trigger_activated(dock->routes.user, REACH_DOCK_TRIGGER_PRIMARY);
+            }
         }
         else if (pressable.activated && hit.type == REACH_DOCK_HIT_ITEM &&
                  hit.index < state->model.item_count)
@@ -687,13 +693,13 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             out->handled = 1;
             if (item_action.type == REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED)
             {
-                out->action.kind = REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED;
+                out->action.kind = REACH_FEATURE_ACTION_OPEN_PINNED_APP;
                 out->action.index = item_action.pinned_index;
                 out->action.id = item_action.pin_id;
             }
             else if (item_action.type == REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW)
             {
-                out->action.kind = REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW;
+                out->action.kind = REACH_FEATURE_ACTION_TOGGLE_WINDOW_FOCUS;
                 out->action.window = item_action.window;
             }
         }
@@ -746,7 +752,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         if (hit.type == REACH_DOCK_HIT_ITEM)
         {
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE;
+            out->action.kind = REACH_FEATURE_ACTION_LAUNCH_NEW_INSTANCE;
             out->action.index = hit.index;
         }
         return;

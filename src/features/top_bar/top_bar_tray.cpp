@@ -509,10 +509,10 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
             const reach_tray_item *item = reach_top_bar_tray_item(top_bar, hit.index);
             if (item != nullptr)
             {
-                out->action.kind = event->button == REACH_POINTER_BUTTON_SECONDARY
-                                       ? REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT
-                                       : REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT;
-                out->action.index = hit.index;
+                out->action.kind = REACH_FEATURE_ACTION_ACTIVATE_TRAY_ITEM;
+                out->action.index = event->button == REACH_POINTER_BUTTON_SECONDARY
+                                        ? REACH_TRAY_ACTION_RIGHT_CLICK
+                                        : REACH_TRAY_ACTION_LEFT_CLICK;
                 out->action.id = item->id;
             }
             out->handled = 1;

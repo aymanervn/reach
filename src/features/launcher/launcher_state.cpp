@@ -980,7 +980,8 @@ reach_launcher_capsule_event_context(const reach_launcher *launcher)
 }
 
 static void
-reach_launcher_capsule_apply_event_result(const reach_launcher_event_result *event_result,
+reach_launcher_capsule_apply_event_result(const reach_launcher *launcher,
+                                          const reach_launcher_event_result *event_result,
                                           reach_capsule_pointer_result *out)
 {
     if (event_result == nullptr || out == nullptr)
@@ -994,17 +995,21 @@ reach_launcher_capsule_apply_event_result(const reach_launcher_event_result *eve
     out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
     if (event_result->action.type == REACH_LAUNCHER_ACTION_LAUNCH_PINNED)
     {
-        out->action.kind = REACH_LAUNCHER_POINTER_ACTION_LAUNCH_PINNED;
+        out->action.kind = REACH_FEATURE_ACTION_OPEN_PINNED_APP_BY_ID;
         out->action.index = event_result->action.pinned_index;
         out->action.id = event_result->action.pin_id;
+        if (reach_launcher_is_open(const_cast<reach_launcher *>(launcher)))
+        {
+            out->action.flags |= REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED;
+        }
     }
     else if (event_result->action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT)
     {
-        out->action.kind = REACH_LAUNCHER_POINTER_ACTION_OPEN_RESULT;
+        out->action.kind = REACH_FEATURE_ACTION_OPEN_SEARCH_RESULT;
     }
     else if (event_result->action.type == REACH_LAUNCHER_ACTION_REVEAL_RESULT)
     {
-        out->action.kind = REACH_LAUNCHER_POINTER_ACTION_REVEAL_RESULT;
+        out->action.kind = REACH_FEATURE_ACTION_REVEAL_SEARCH_RESULT;
         out->action.index = event_result->action.result_index;
     }
 }
@@ -1067,7 +1072,7 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     default:
         return;
     }
-    reach_launcher_capsule_apply_event_result(&event_result, out);
+    reach_launcher_capsule_apply_event_result(launcher, &event_result, out);
 }
 
 static void reach_launcher_capsule_surface_geometry(const void *capsule,

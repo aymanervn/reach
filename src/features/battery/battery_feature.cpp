@@ -389,7 +389,7 @@ static void reach_battery_capsule_handle_pointer(void *capsule, const reach_poin
         if (action == REACH_BATTERY_POINTER_ACTION_DISMISS)
         {
             out->handled = 1;
-            out->action.kind = REACH_BATTERY_POINTER_ACTION_DISMISS;
+            out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
             out->redraw = 1;
             return;
         }

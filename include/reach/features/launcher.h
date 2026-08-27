@@ -98,14 +98,6 @@ extern "C"
         float results_expansion;
     } reach_launcher_render_input;
 
-    typedef enum reach_launcher_pointer_action_kind
-    {
-        REACH_LAUNCHER_POINTER_ACTION_NONE = 0,
-        REACH_LAUNCHER_POINTER_ACTION_LAUNCH_PINNED = 1,
-        REACH_LAUNCHER_POINTER_ACTION_OPEN_RESULT = 2,
-        REACH_LAUNCHER_POINTER_ACTION_REVEAL_RESULT = 3
-    } reach_launcher_pointer_action_kind;
-
     struct reach_launcher_state
     {
         reach_launcher_model model;

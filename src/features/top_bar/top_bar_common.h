@@ -81,6 +81,7 @@ typedef struct reach_top_bar_event_result
     int32_t sync_pointer_subscriptions;
     uint32_t action_kind;
     uint64_t action_id;
+    size_t action_index;
 } reach_top_bar_event_result;
 
 void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,

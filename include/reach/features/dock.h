@@ -117,14 +117,8 @@ extern "C"
     typedef enum reach_dock_pointer_action_kind
     {
         REACH_DOCK_POINTER_ACTION_NONE = 0,
-        REACH_DOCK_POINTER_ACTION_PRESS_ITEM = 2,
-        REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED = 6,
-        REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW = 7,
-        REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE = 8,
-        REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS = 16,
-        REACH_DOCK_POINTER_ACTION_MOVE_PIN = 17,
-        REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER = 19,
-        REACH_DOCK_POINTER_ACTION_ACTIVATE_TRIGGER = 20
+        REACH_DOCK_POINTER_ACTION_PRESS_ITEM = REACH_FEATURE_ACTION_PRIVATE_BASE + 2,
+        REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER = REACH_FEATURE_ACTION_PRIVATE_BASE + 19
     } reach_dock_pointer_action_kind;
 
     typedef struct reach_dock_routes
@@ -134,6 +128,7 @@ extern "C"
         void (*item_context_menu)(void *user, size_t item_index, int32_t x, int32_t y);
 
         void (*item_hovered)(void *user, size_t item_index);
+        void (*trigger_activated)(void *user, size_t trigger);
     } reach_dock_routes;
 
 #define REACH_DOCK_TRIGGER_PRIMARY 0

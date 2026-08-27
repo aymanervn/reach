@@ -1066,7 +1066,7 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
 
     case REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE:
         (void)reach_system_status_open_system_quick_settings(quick_settings->status);
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_CLOSE;
+        out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         break;
 
     case REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH:
@@ -1075,7 +1075,7 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
 
     case REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT:
         (void)reach_system_status_open_project_menu(quick_settings->status);
-        out->action.kind = REACH_QUICK_SETTINGS_POINTER_ACTION_CLOSE;
+        out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         break;
 
     case REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES:

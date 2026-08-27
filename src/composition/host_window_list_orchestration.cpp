@@ -212,7 +212,7 @@ void reach_host_window_list_update(reach_host *host, double delta_seconds)
     }
 }
 
-reach_result reach_host_window_list_close_window(reach_host *host, uintptr_t window_id)
+reach_result reach_host_close_window(reach_host *host, uintptr_t window_id)
 {
     if (host == nullptr || window_id == 0)
     {

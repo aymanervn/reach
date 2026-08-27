@@ -610,14 +610,14 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         }
         if (event->button == REACH_POINTER_BUTTON_SECONDARY)
         {
-            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
+            out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
             break;
         }
         uint64_t kind = result.activated_target >> 32;
         size_t index = (size_t)(result.activated_target & UINT32_MAX);
         if (kind == REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND)
         {
-            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_DISMISS;
+            out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
             break;
         }
         if (index >= menu->state.item_count ||
@@ -628,13 +628,13 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         if (menu->state.window_list_open)
         {
             out->action.kind = kind == REACH_CONTEXT_MENU_PRESSABLE_CLOSE
-                                   ? REACH_CONTEXT_MENU_POINTER_ACTION_CLOSE_WINDOW
-                                   : REACH_CONTEXT_MENU_POINTER_ACTION_FOCUS_WINDOW;
+                                   ? REACH_FEATURE_ACTION_CLOSE_WINDOW
+                                   : REACH_FEATURE_ACTION_FOCUS_WINDOW;
             out->action.window = menu->state.item_windows[index];
         }
         else
         {
-            out->action.kind = REACH_CONTEXT_MENU_POINTER_ACTION_EXECUTE;
+            out->action.kind = REACH_FEATURE_ACTION_EXECUTE_MENU_COMMAND;
             out->action.id = menu->state.item_commands[index];
         }
         break;

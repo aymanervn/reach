@@ -161,7 +161,7 @@ int main()
     failed += expect(pointer_result.handled == 1);
     pointer.kind = REACH_POINTER_EVENT_UP;
     capsule_ops->handle_pointer(capsule, &pointer, &pointer_result);
-    failed += expect(pointer_result.action.kind == REACH_LAUNCHER_POINTER_ACTION_REVEAL_RESULT);
+    failed += expect(pointer_result.action.kind == REACH_FEATURE_ACTION_REVEAL_SEARCH_RESULT);
     failed += expect(pointer_result.action.index == 1);
 
     event.type = REACH_UI_EVENT_ARROW_DOWN;

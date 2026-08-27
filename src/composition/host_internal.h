@@ -288,8 +288,6 @@ typedef struct reach_feature_definition
     reach_layout_spec layout;
 
     void (*force_close)(reach_host *host);
-    reach_result (*apply_pointer_action)(reach_host *host, const reach_ui_event *event,
-                                         const reach_capsule_pointer_result *result);
     void (*dismiss)(reach_host *host);
     reach_result (*frame)(reach_host *host, const struct reach_host_frame_context *ctx);
     const reach_ui_event_type *toggle_events;
@@ -326,8 +324,6 @@ typedef struct reach_surface_desc
 
     int32_t pointer_priority;
 
-    reach_result (*apply_pointer_action)(reach_host *host, const reach_ui_event *event,
-                                         const reach_capsule_pointer_result *result);
 
     void (*dismiss)(reach_host *host);
 
@@ -384,6 +380,9 @@ typedef struct reach_host_layout_target
 } reach_host_layout_target;
 
 void reach_host_init_feature_registry(reach_host *host);
+reach_result reach_host_apply_feature_action(reach_host *host, const reach_surface_desc *desc,
+                                             const reach_capsule_pointer_result *result);
+reach_result reach_host_open_launcher_result_and_close_transients(reach_host *host);
 void reach_host_bind_interfeature_routes(reach_host *host);
 void reach_host_clear_interfeature_routes(reach_host *host);
 reach_result reach_host_create_registered_features(reach_host *host);
@@ -710,8 +709,6 @@ void reach_host_sync_stage_window_states(reach_host *host);
 void reach_host_on_stage_edge_reveal(reach_host *host, reach_screen_hotspot_event event);
 void reach_host_close_stage(reach_host *host);
 void reach_host_toggle_stage(reach_host *host);
-reach_result reach_host_apply_stage_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                   const reach_capsule_pointer_result *result);
 void reach_host_clear_launcher_restore_window(reach_host *host);
 void reach_host_restore_launcher_focus(reach_host *host);
 void reach_host_request_launcher_focus_restore(reach_host *host);
@@ -747,9 +744,6 @@ reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
 void reach_host_apply_launcher_search_results(reach_host *host);
 void reach_host_stop_launcher_search_worker(reach_host *host);
 
-reach_result reach_host_apply_clipboard_pointer_action(reach_host *host,
-                                                       const reach_ui_event *event,
-                                                       const reach_capsule_pointer_result *result);
 void reach_host_release_clipboard_item(reach_host *host, const reach_clipboard_item *item);
 void reach_host_clear_clipboard(reach_host *host);
 void reach_host_set_clipboard_open(reach_host *host, int32_t open);
@@ -763,8 +757,6 @@ reach_result reach_host_refresh_tray_items(reach_host *host);
 reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,
                                            reach_tray_action action);
 
-reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                  const reach_capsule_pointer_result *result);
 
 void reach_host_close_context_menu(reach_host *host);
 reach_result reach_host_execute_context_command(reach_host *host, uint32_t command);
@@ -777,7 +769,7 @@ void reach_host_dock_item_hovered(reach_host *host, size_t item_index);
 void reach_host_window_list_update(reach_host *host, double delta_seconds);
 int32_t reach_host_window_list_wants_frames(const reach_host *host);
 reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_index);
-reach_result reach_host_window_list_close_window(reach_host *host, uintptr_t window_id);
+reach_result reach_host_close_window(reach_host *host, uintptr_t window_id);
 
 int32_t reach_host_icon_size_px(const reach_host *host);
 
@@ -848,22 +840,8 @@ reach_result reach_host_step_brightness(reach_host *host, float delta);
 reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mode mode);
 void reach_host_relayout_quick_settings(reach_host *host, int32_t animate_height);
 
-reach_result reach_host_apply_battery_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                     const reach_capsule_pointer_result *result);
 
-reach_result
-reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_event *event,
-                                               const reach_capsule_pointer_result *result);
 
-reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                  const reach_capsule_pointer_result *result);
-reach_result reach_host_apply_top_bar_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                     const reach_capsule_pointer_result *result);
-reach_result reach_host_apply_launcher_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                      const reach_capsule_pointer_result *result);
-reach_result
-reach_host_apply_context_menu_pointer_action(reach_host *host, const reach_ui_event *event,
-                                             const reach_capsule_pointer_result *result);
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags);
 void reach_host_on_audio_volume_changed(void *user);

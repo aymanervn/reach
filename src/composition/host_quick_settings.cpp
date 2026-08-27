@@ -83,18 +83,6 @@ void reach_host_toggle_quick_settings(reach_host *host)
         host, reach_quick_settings_is_open(host->quick_settings_capsule) ? 0 : 1);
 }
 
-reach_result
-reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_event *event,
-                                               const reach_capsule_pointer_result *result)
-{
-    (void)event;
-    if (host != nullptr && result != nullptr &&
-        result->action.kind == REACH_QUICK_SETTINGS_POINTER_ACTION_CLOSE)
-    {
-        reach_host_set_quick_settings_open(host, 0);
-    }
-    return REACH_OK;
-}
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags)
 {

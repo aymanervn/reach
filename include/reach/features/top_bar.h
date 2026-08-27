@@ -131,23 +131,8 @@ extern "C"
     typedef enum reach_top_bar_pointer_action_kind
     {
         REACH_TOP_BAR_POINTER_ACTION_NONE = 0,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER = 1,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_NOW_PLAYING = 3,
-        REACH_TOP_BAR_POINTER_ACTION_MEDIA_PREVIOUS = 4,
-        REACH_TOP_BAR_POINTER_ACTION_MEDIA_PLAY_PAUSE = 5,
-        REACH_TOP_BAR_POINTER_ACTION_MEDIA_NEXT = 6,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_TRAY_OVERFLOW = 7,
-        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_TRAY_OVERFLOW = 8,
-        REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_LEFT = 9,
-        REACH_TOP_BAR_POINTER_ACTION_ACTIVATE_TRAY_RIGHT = 10,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS = 11,
-        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_QUICK_SETTINGS = 12,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_LANGUAGE = 13,
-        REACH_TOP_BAR_POINTER_ACTION_CYCLE_LANGUAGE = 14,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_SETTINGS = 15,
-        REACH_TOP_BAR_POINTER_ACTION_OPEN_SETTINGS = 16,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_BATTERY = 17,
-        REACH_TOP_BAR_POINTER_ACTION_TOGGLE_BATTERY = 18
+        REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER = REACH_FEATURE_ACTION_PRIVATE_BASE + 1,
+        REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS = REACH_FEATURE_ACTION_PRIVATE_BASE + 11
     } reach_top_bar_pointer_action_kind;
 
     typedef struct reach_top_bar_state
@@ -218,6 +203,9 @@ extern "C"
         void *user;
 
         void (*power_activated)(void *user);
+        void (*quick_settings_activated)(void *user);
+        void (*battery_activated)(void *user);
+        void (*tray_overflow_activated)(void *user);
     } reach_top_bar_routes;
 
     void reach_top_bar_set_routes(reach_top_bar *top_bar, const reach_top_bar_routes *routes);
