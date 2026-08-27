@@ -373,8 +373,10 @@ the shared reveal animation.
 ## composition
 
 The host (`reach_host`): wires adapters into ports, constructs services and features,
-and runs the app — frame loop, input routing, action→port translators, worker threads,
-and surface lifecycle. `feature_registry.cpp` is the controlled concrete seam for
+and runs the app — frame loop, input routing, boundary action dispatch, worker threads,
+and surface lifecycle. Concrete feature knowledge has two controlled seams:
+`feature_registry.cpp` for definitions and `interfeature_routes.cpp` for the callback
+slots that let one feature's action affect another. `feature_registry.cpp` is the seam for
 feature definitions: each owned surface declares an opaque create/destroy factory beside
 its capsule operations and surface policy. Host construction and cleanup iterate those
 factories generically; a shared surface such as the tray declares no factory and binds to
@@ -390,15 +392,22 @@ capsules receive surface-local coordinates, while other surface classes retain
 screen coordinates. Each pointer event kind
 runs as a generic loop over the table in `pointer_priority` order (popups →
 transients → persistent, first handled result wins), with the descriptor's
-`role` resolving source-gated delivery, its `apply_pointer_action` translating
-handled results, and its flags declaring the outside-press policy
+`role` resolving source-gated delivery, and its flags declaring the outside-press policy
 (SOURCE_GATED / DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED). Source-gated rows are delivered to first — press and release go to the row whose
 `role` matches the event source (or whose `pointer_sequence_active` hook reports
 an in-flight sequence) before the rest of the table sees them — so no surface
-needs a hand-written branch to receive its own input. Top-bar-cluster
+needs a hand-written branch to receive its own input. Capsules report outcomes as one shared `reach_feature_action_kind`
+(`include/reach/features/common/feature_action.h`); `host_feature_actions.cpp` dispatches
+every entry in a single generic switch keyed on the emitting descriptor, so no feature has a
+composition-side translator. Four press kinds that only composition's pointer policy reads stay
+feature-private in a reserved range above `REACH_FEATURE_ACTION_PRIVATE_BASE`, kept disjoint from
+the shared vocabulary by `static_assert` in the Dock and Top Bar. An action that opens or changes
+another feature is not in the vocabulary at all: the feature exposes a neutral outbound slot
+(`reach_dock_routes`, `reach_top_bar_routes`) and `interfeature_routes.cpp` alone decides what it
+reaches, so no feature names a peer. Top-bar-cluster
 pairwise policy (QS-button pass-through, power-press dismissal, tray/launcher
 close rules) and true capture pre-emption (dock drag, QS slider, launcher
-scrollbar) stay as named, commented exceptions ahead of the loops. Hotkey and
+scrollbar) stay as named exceptions ahead of the loops. Hotkey and
 action→port translators for media transport, volume, and brightness live in
 `host_system_actions.cpp`, out of the input routing path.
 The system HUD consumes the final top-bar visibility result cached by that same
@@ -548,17 +557,21 @@ be recorded in `docs/repo-analysis.md` rather than hidden behind another ad hoc 
    `handle_pointer` gets the complete pointer stream in its declared coordinate
    space; popup capsules use surface-local coordinates), keep state compiler-private
    (`const` `state_ptr`, internal
-   `state_mut`, semantic ops for writes), and return semantic actions —
-   never call ports.
+   `state_mut`, semantic ops for writes), and report outcomes as
+   `reach_feature_action_kind` values — never name a peer feature.
 2. **Services**: attach any you consume at wiring
-   (`reach_<name>_attach_...`, lifecycle attach/detach pair) — read +
-   request only; mutations stay composition's.
+   (`reach_<name>_attach_...`, lifecycle attach/detach pair). Apply an external effect
+   through the attached service rather than reporting an action for composition to
+   translate; composition keeps only the effects it owns, such as surface open/close,
+   app-launch scheduling, window control, and pin mutation.
 3. **Registry row** (`src/composition/feature_registry.cpp`): id, opaque factory,
    class, surface runtime, transition, host-level `force_close`, capsule ops,
-   pointer flags, `role`, `pointer_priority`, `apply_pointer_action`
-   (your action→port translator), `dismiss` if outside-press close differs
+   pointer flags, `role`, `pointer_priority`, `dismiss` if outside-press close differs
    from `force_close`, `frame` + `frame_priority`, and declarative
    `toggle_events`/`routed_events` for activation.
+   If the feature must affect another feature, add one neutral outbound slot to its own
+   header and bind it in `interfeature_routes.cpp` — the only composition file allowed to
+   know which feature an action reaches.
 4. **Surface operations**: provide uniform arrange, geometry, and render-command
    operations consumed by `reach_host_frame_registered_surface`. Do not add another
    named `reach_host_frame_<feature>` function.
