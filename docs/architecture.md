@@ -374,14 +374,20 @@ the shared reveal animation.
 
 The host (`reach_host`): wires adapters into ports, constructs services and features,
 and runs the app — frame loop, input routing, action→port translators, worker threads,
-and surface lifecycle. Surfaces register a descriptor with a class
+and surface lifecycle. `feature_registry.cpp` is the controlled concrete seam for
+feature definitions: each owned surface declares an opaque create/destroy factory beside
+its capsule operations and surface policy. Host construction and cleanup iterate those
+factories generically; a shared surface such as the tray declares no factory and binds to
+its owning top-bar capsule. Surfaces register a descriptor with a class
 (persistent | transient | popup | overlay) plus the feature capsule and its uniform
 hooks; policy runs as class loops over that table — tick, needs-frame, game mode,
 lifecycle resets, pointer-move subscription sync, the popup mouse hook, transient
 dismissal, and the “opening a popup closes the other popups” rule. Pointer input
 uses one descriptor-driven dispatcher for capsule delivery, surface dirtying,
 relayout, capture, subscription sync, and update scheduling; capsules receive
-screen-space coordinates and convert locally themselves. Each pointer event kind
+the coordinate space declared by `reach_pointer_event.coordinate_space`: popup
+capsules receive surface-local coordinates, while other surface classes retain
+screen coordinates. Each pointer event kind
 runs as a generic loop over the table in `pointer_priority` order (popups →
 transients → persistent, first handled result wins), with the descriptor's
 `role` resolving source-gated delivery, its `apply_pointer_action` translating
@@ -409,7 +415,18 @@ Per-frame layout resolves in dependency order in `reach_host_update` (monitor �
 dock cluster → launcher → clipboard → switcher); the per-surface frame steps
 (`host_surface_frames.cpp`, layout refresh → transition → window state →
 corners → show/render) run as one loop over the table in `frame_priority`
-order against a shared `reach_host_frame_context`.
+order against a shared `reach_host_frame_context`. Transition completion is also
+descriptor-driven: every non-null descriptor transition is finalized by the
+generic animation tick. Migrated definitions expose uniform `surface_ops` for
+arrangement and render-command production. `reach_host_frame_registered_surface`
+then resolves the declared layout anchor, applies window geometry and visibility,
+and executes rendering without naming the feature. System HUD uses this path and
+declares Dock as its anchor; the Dock's shown-position bounds are stored on its
+descriptor runtime rather than in a HUD-specific host cache. Switcher also uses the
+path: its capsule owns width animation, arranged bounds, and geometry publication,
+while its registry adapter supplies the transition-adjusted render bounds. Clipboard
+declares Launcher as its anchor and likewise owns relayout, animation state, geometry,
+and command production. Remaining named frame steps are migration residue.
 Surfaces that take OS activation declare `BEHAVIOR_ACTIVATES`; the class rules then
 own show-on-activate, close-on-focus-loss, and the staleness check that discards a
 focus-loss signal the surface has already recovered from (reach's own foreground
@@ -528,21 +545,23 @@ be recorded in `docs/repo-analysis.md` rather than hidden behind another ad hoc 
 
 1. **Capsule** (`src/features/<name>/`, header in `include/reach/features/`):
    implement `reach_feature_capsule_ops` (null-skip the hooks you don't need;
-   `handle_pointer` gets the complete screen-space stream and converts
-   locally), keep state compiler-private (`const` `state_ptr`, internal
+   `handle_pointer` gets the complete pointer stream in its declared coordinate
+   space; popup capsules use surface-local coordinates), keep state compiler-private
+   (`const` `state_ptr`, internal
    `state_mut`, semantic ops for writes), and return semantic actions —
    never call ports.
 2. **Services**: attach any you consume at wiring
    (`reach_<name>_attach_...`, lifecycle attach/detach pair) — read +
    request only; mutations stay composition's.
-3. **Descriptor row** (`reach_host_init_surface_descriptors`): id, class,
-   surface runtime, transition, host-level `force_close`, capsule + ops,
+3. **Registry row** (`src/composition/feature_registry.cpp`): id, opaque factory,
+   class, surface runtime, transition, host-level `force_close`, capsule ops,
    pointer flags, `role`, `pointer_priority`, `apply_pointer_action`
    (your action→port translator), `dismiss` if outside-press close differs
    from `force_close`, `frame` + `frame_priority`, and declarative
    `toggle_events`/`routed_events` for activation.
-4. **Frame step** (`host_surface_frames.cpp`): one function over
-   `reach_host_apply_transient_frame` for the common case.
+4. **Surface operations**: provide uniform arrange, geometry, and render-command
+   operations consumed by `reach_host_frame_registered_surface`. Do not add another
+   named `reach_host_frame_<feature>` function.
 5. **Tests**: logic-only, against the capsule ops — no UI or service tests.
 6. Run build + ctest + `tools/check_architecture.py`, then the live-run
    protocol with a visual pass.

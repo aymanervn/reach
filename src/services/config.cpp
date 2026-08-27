@@ -65,24 +65,6 @@ struct reach_config_service
     std::vector<reach_config_operation> pending_operations;
 };
 
-static int32_t reach_config_text_equal(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-    size_t index = 0;
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
 static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot,
                                                  const reach_config_operation *operation,
                                                  int32_t *out_changed)
@@ -138,7 +120,7 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         snapshot->windows_app_theme = operation->display.windows_app_theme;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_WALLPAPERS:
-        *out_changed = !reach_config_text_equal(snapshot->wallpaper_path, operation->path);
+        *out_changed = !reach_path_equals(snapshot->wallpaper_path, operation->path);
         (void)reach_copy_utf16(snapshot->wallpaper_path, 260, operation->path);
         for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)
         {
@@ -146,8 +128,8 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
             const uint16_t *path = index < operation->monitor_count
                                        ? operation->monitor_wallpaper_paths[index]
                                        : empty;
-            *out_changed = *out_changed ||
-                           !reach_config_text_equal(snapshot->monitor_wallpaper_paths[index], path);
+            *out_changed =
+                *out_changed || !reach_path_equals(snapshot->monitor_wallpaper_paths[index], path);
             (void)reach_copy_utf16(snapshot->monitor_wallpaper_paths[index], 260, path);
         }
         return REACH_OK;
@@ -156,7 +138,7 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         {
             return REACH_INVALID_ARGUMENT;
         }
-        *out_changed = !reach_config_text_equal(
+        *out_changed = !reach_path_equals(
             snapshot->monitor_wallpaper_paths[operation->target_index], operation->path);
         (void)reach_copy_utf16(snapshot->monitor_wallpaper_paths[operation->target_index], 260,
                                operation->path);

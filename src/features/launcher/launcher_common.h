@@ -8,6 +8,16 @@ reach_icon_service *reach_launcher_icons(reach_launcher *launcher);
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher);
 float reach_launcher_results_expansion(const reach_launcher *launcher);
 
+static inline size_t reach_launcher_visible_result_count(const reach_launcher_model *model)
+{
+    if (model == nullptr)
+    {
+        return 0;
+    }
+    return model->result_count < REACH_SEARCH_VISIBLE_RESULTS ? model->result_count
+                                                              : REACH_SEARCH_VISIBLE_RESULTS;
+}
+
 typedef enum reach_launcher_hit_type
 {
     REACH_LAUNCHER_HIT_NONE = 0,

@@ -343,7 +343,8 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
         ceilf(content_height + notch_height + border_thickness * 2.0f), 8.0f * scale);
 
     reach_rect_f32 bounds = popup->placement.bounds;
-    reach_rect_f32 content_bounds = reach_theme_border_content_rect(theme, scale, bounds);
+    reach_rect_f32 surface_bounds = {0.0f, 0.0f, bounds.width, bounds.height};
+    reach_rect_f32 content_bounds = reach_theme_border_content_rect(theme, scale, surface_bounds);
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
     float content_top =
         content_bounds.y + (anchor->direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
@@ -366,7 +367,7 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
         popup->item_slots[index] = {row_x + (float)column * (slot_size + gap),
                                     grid_y + (float)row * (slot_size + gap), slot_size, slot_size};
     }
-    popup->pointer_bounds = bounds;
+    popup->pointer_bounds = surface_bounds;
     popup->pointer_bounds_valid = 1;
     if (out_bounds != nullptr)
     {
@@ -449,7 +450,8 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
         *out = {};
     }
     reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
-    if (top_bar == nullptr || top_bar->tray_popup == nullptr || event == nullptr || out == nullptr)
+    if (top_bar == nullptr || top_bar->tray_popup == nullptr || event == nullptr ||
+        out == nullptr || event->coordinate_space != REACH_POINTER_COORDINATE_SURFACE_LOCAL)
     {
         return;
     }
@@ -583,8 +585,6 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
     {
         const reach_tray_item *item = reach_top_bar_tray_item(top_bar, index);
         reach_rect_f32 slot = popup_state->item_slots[index];
-        slot.x -= ctx->bounds.x;
-        slot.y -= ctx->bounds.y;
         float icon_size = floorf(slot.height * 0.86f);
         float minimum = 16.0f * (ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f);
         if (icon_size < minimum && slot.height >= minimum)

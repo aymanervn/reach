@@ -178,6 +178,23 @@ static int32_t reach_switcher_capsule_needs_frame(const void *capsule)
     return reach_switcher_width_animation_active(static_cast<const reach_switcher *>(capsule));
 }
 
+static void reach_switcher_capsule_surface_geometry(const void *capsule,
+                                                    reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
+    if (switcher == nullptr)
+    {
+        return;
+    }
+    out->visible_bounds = switcher->state.bounds;
+    out->envelope_bounds = switcher->state.bounds;
+}
+
 static reach_switcher_action
 reach_switcher_handle_event_with_context(reach_switcher *switcher, const reach_ui_event *event,
                                          const reach_switcher_window_context *ctx);
@@ -221,6 +238,10 @@ const reach_feature_capsule_ops *reach_switcher_capsule_ops(void)
         nullptr,
         reach_switcher_capsule_needs_frame,
         nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        reach_switcher_capsule_surface_geometry,
     };
     return &ops;
 }
@@ -551,6 +572,28 @@ reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
     animated.width = width;
     animated.x = center - width * 0.5f;
     return animated;
+}
+
+int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_arrange_context *ctx)
+{
+    if (switcher == nullptr || ctx == nullptr || ctx->theme == nullptr)
+    {
+        return 0;
+    }
+
+    float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
+    reach_rect_f32 target = reach_switcher_bounds_for_count_scaled(
+        ctx->monitor_bounds, reach_switcher_visible_count(switcher->state.window_count),
+        ctx->dpi_scale, border);
+    reach_rect_f32 bounds = reach_switcher_apply_width_animation(
+        switcher, ctx->transition_visible, switcher->state.open, ctx->bounds_valid,
+        ctx->last_bounds.width, target, nullptr);
+    int32_t changed = fabsf(bounds.x - switcher->state.bounds.x) >= 0.5f ||
+                      fabsf(bounds.y - switcher->state.bounds.y) >= 0.5f ||
+                      fabsf(bounds.width - switcher->state.bounds.width) >= 0.5f ||
+                      fabsf(bounds.height - switcher->state.bounds.height) >= 0.5f;
+    switcher->state.bounds = bounds;
+    return changed;
 }
 
 void reach_switcher_force_close(reach_switcher *switcher)

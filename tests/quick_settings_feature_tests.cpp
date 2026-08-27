@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/features/quick_settings.h"
 #include "reach/features/popup.h"
 
@@ -24,24 +25,6 @@ static void expect_near(float actual, float expected, float epsilon, const char 
     }
 }
 
-static void copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)(unsigned char)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
 static reach_quick_settings_model test_model_with_sessions(size_t count)
 {
     reach_quick_settings_model model = {};
@@ -56,10 +39,12 @@ static reach_quick_settings_model test_model_with_sessions(size_t count)
         sessions.sessions[index].muted = 0;
         sessions.sessions[index].process_id = (uint32_t)(1000 + index);
         sessions.sessions[index].icon_id = (uint64_t)(9000 + index);
-        copy_ascii(sessions.sessions[index].session_instance_id,
-                   REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY, index == 0 ? "session-a" : "session-b");
-        copy_ascii(sessions.sessions[index].label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
-                   index == 0 ? "App A.exe" : "App B.exe");
+        reach_copy_ascii_to_utf16(sessions.sessions[index].session_instance_id,
+                                  REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                                  index == 0 ? "session-a" : "session-b");
+        reach_copy_ascii_to_utf16(sessions.sessions[index].label,
+                                  REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
+                                  index == 0 ? "App A.exe" : "App B.exe");
     }
 
     reach_quick_settings_model_set_sessions(&model, &sessions);
@@ -143,12 +128,48 @@ static void test_expansion_keeps_popup_anchor_position(void)
     reach_quick_settings_destroy(quick_settings);
 }
 
+static void test_capsule_accepts_surface_local_pointer(void)
+{
+    reach_quick_settings *quick_settings = nullptr;
+    expect_true(reach_quick_settings_create(&quick_settings) == REACH_OK,
+                "quick settings capsule is created for pointer input");
+    if (quick_settings == nullptr)
+    {
+        return;
+    }
+
+    reach_quick_settings_layout_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.dpi_scale = 1.0f;
+    ctx.anchor_button = {1200.0f, 8.0f, 32.0f, 24.0f};
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    ctx.bar_edge_y = 40.0f;
+    ctx.drop_direction = REACH_POPUP_DROP_DOWN;
+    (void)reach_quick_settings_set_open(quick_settings, 1);
+    reach_quick_settings_refresh_layout(quick_settings, &ctx);
+
+    const reach_rect_f32 tile =
+        reach_quick_settings_state_ptr(quick_settings)->layout.network_tile.bounds;
+    reach_pointer_event pointer = {};
+    pointer.kind = REACH_POINTER_EVENT_DOWN;
+    pointer.coordinate_space = REACH_POINTER_COORDINATE_SURFACE_LOCAL;
+    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+    pointer.x = (int32_t)(tile.x + tile.width * 0.5f);
+    pointer.y = (int32_t)(tile.y + tile.height * 0.5f);
+    reach_capsule_pointer_result result = {};
+    reach_quick_settings_capsule_ops()->handle_pointer(quick_settings, &pointer, &result);
+    expect_true(result.handled, "surface-local pointer input reaches a quick settings tile");
+
+    reach_quick_settings_destroy(quick_settings);
+}
+
 int main(void)
 {
     test_model_clamps_volume();
     test_session_list_cap_is_respected();
     test_volume_icon_selection();
     test_expansion_keeps_popup_anchor_position();
+    test_capsule_accepts_surface_local_pointer();
 
     if (g_failures != 0)
     {

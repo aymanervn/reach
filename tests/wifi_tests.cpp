@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/core/wifi.h"
 
 #include "../src/adapters/windows/wifi_profile.h"
@@ -15,24 +16,12 @@ static void expect_true(int value, const char *message)
     }
 }
 
-static void copy_ascii(uint16_t *destination, size_t capacity, const char *source)
-{
-    size_t index = 0;
-    while (source[index] != 0 && index + 1 < capacity)
-    {
-        destination[index] = (uint16_t)(unsigned char)source[index];
-        ++index;
-    }
-    destination[index] = 0;
-}
-
 static int contains_ascii(const uint16_t *text, const char *needle)
 {
     for (size_t start = 0; text[start] != 0; ++start)
     {
         size_t index = 0;
-        while (needle[index] != 0 &&
-               text[start + index] == (uint16_t)(unsigned char)needle[index])
+        while (needle[index] != 0 && text[start + index] == (uint16_t)(unsigned char)needle[index])
         {
             ++index;
         }
@@ -48,7 +37,7 @@ static reach_wifi_network make_network(const char *ssid, int32_t signal, int32_t
                                        int32_t saved, int32_t in_range)
 {
     reach_wifi_network network = {};
-    copy_ascii(network.ssid, REACH_WIFI_SSID_CAPACITY, ssid);
+    reach_copy_ascii_to_utf16(network.ssid, REACH_WIFI_SSID_CAPACITY, ssid);
     network.signal_strength = signal;
     network.connected = connected;
     network.saved = saved;
@@ -140,8 +129,8 @@ static void test_profile_xml_escapes_and_matches_security(void)
     uint16_t key[REACH_WIFI_KEY_CAPACITY] = {};
     uint16_t xml[REACH_WIFI_PROFILE_CAPACITY] = {};
 
-    copy_ascii(ssid, REACH_WIFI_SSID_CAPACITY, "Ben & Jerry's <Wi-Fi>");
-    copy_ascii(key, REACH_WIFI_KEY_CAPACITY, "correct horse");
+    reach_copy_ascii_to_utf16(ssid, REACH_WIFI_SSID_CAPACITY, "Ben & Jerry's <Wi-Fi>");
+    reach_copy_ascii_to_utf16(key, REACH_WIFI_KEY_CAPACITY, "correct horse");
 
     size_t length = reach_wifi_build_profile_xml(xml, REACH_WIFI_PROFILE_CAPACITY, ssid, key,
                                                  REACH_WIFI_SECURITY_WPA2_PERSONAL, 1, 0);
@@ -174,8 +163,8 @@ static void test_profile_xml_rejects_invalid_requests(void)
     uint16_t empty[1] = {0};
     uint16_t xml[REACH_WIFI_PROFILE_CAPACITY] = {};
 
-    copy_ascii(ssid, REACH_WIFI_SSID_CAPACITY, "Home");
-    copy_ascii(key, REACH_WIFI_KEY_CAPACITY, "short");
+    reach_copy_ascii_to_utf16(ssid, REACH_WIFI_SSID_CAPACITY, "Home");
+    reach_copy_ascii_to_utf16(key, REACH_WIFI_KEY_CAPACITY, "short");
 
     expect_true(reach_wifi_build_profile_xml(xml, REACH_WIFI_PROFILE_CAPACITY, ssid, key,
                                              REACH_WIFI_SECURITY_WPA2_PERSONAL, 1, 0) == 0,

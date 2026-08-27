@@ -40,16 +40,6 @@ static float reach_launcher_scale(const reach_launcher_render_input *input, floa
     return value * scale;
 }
 
-static size_t reach_launcher_visible_result_count(const reach_launcher_model *model)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    return model->result_count < REACH_SEARCH_VISIBLE_RESULTS ? model->result_count
-                                                              : REACH_SEARCH_VISIBLE_RESULTS;
-}
-
 reach_result reach_launcher_build_render_commands(const reach_launcher_render_input *input,
                                                   reach_render_command_buffer *out_commands)
 {

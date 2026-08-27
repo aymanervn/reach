@@ -111,24 +111,4 @@ static inline float reach_quick_settings_clamp_min0(float value)
     return value < 0.0f ? 0.0f : value;
 }
 
-static inline void reach_quick_settings_copy_utf16(uint16_t *dst, size_t dst_count,
-                                                   const uint16_t *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
 #endif

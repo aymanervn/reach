@@ -30,9 +30,16 @@ extern "C"
         REACH_POINTER_EVENT_MIDDLE = 8
     } reach_pointer_event_kind;
 
+    typedef enum reach_pointer_coordinate_space
+    {
+        REACH_POINTER_COORDINATE_SCREEN = 0,
+        REACH_POINTER_COORDINATE_SURFACE_LOCAL = 1
+    } reach_pointer_coordinate_space;
+
     typedef struct reach_pointer_event
     {
         reach_pointer_event_kind kind;
+        reach_pointer_coordinate_space coordinate_space;
         int32_t x;
         int32_t y;
         int32_t wheel_delta;

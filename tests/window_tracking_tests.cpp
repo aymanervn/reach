@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/services/window_tracking.h"
 
 #include <stdio.h>
@@ -13,25 +14,14 @@ static void expect_true(int condition, const char *message)
     }
 }
 
-static void copy_ascii(uint16_t *dst, size_t cap, const char *src)
-{
-    size_t index = 0;
-    while (src != nullptr && src[index] != 0 && index + 1 < cap)
-    {
-        dst[index] = (uint16_t)(unsigned char)src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
 static reach_window_snapshot make_window(uintptr_t id, const char *path, const char *aumid)
 {
     reach_window_snapshot window = {};
     window.id = id;
     window.visible = 1;
-    copy_ascii(window.title, 260, "window");
-    copy_ascii(window.path, 260, path);
-    copy_ascii(window.app_user_model_id, 260, aumid);
+    reach_copy_ascii_to_utf16(window.title, 260, "window");
+    reach_copy_ascii_to_utf16(window.path, 260, path);
+    reach_copy_ascii_to_utf16(window.app_user_model_id, 260, aumid);
     return window;
 }
 
@@ -169,14 +159,14 @@ static void test_identity_rule(void)
                 "empty identities never match each other");
 
     reach_pinned_app_model app = {};
-    copy_ascii(app.path, 260, "C:\\apps\\brave.exe");
+    reach_copy_ascii_to_utf16(app.path, 260, "C:\\apps\\brave.exe");
     expect_true(reach_window_tracking_window_matches_app(&app, &browser_a),
                 "pinned path matches browser window");
     expect_true(reach_window_tracking_window_matches_app(&app, &pwa),
                 "pinned app without aumid falls back to path");
     reach_pinned_app_model pwa_pin = {};
-    copy_ascii(pwa_pin.path, 260, "C:\\apps\\brave.exe");
-    copy_ascii(pwa_pin.app_user_model_id, 260, "Brave._crx_abc");
+    reach_copy_ascii_to_utf16(pwa_pin.path, 260, "C:\\apps\\brave.exe");
+    reach_copy_ascii_to_utf16(pwa_pin.app_user_model_id, 260, "Brave._crx_abc");
     expect_true(reach_window_tracking_window_matches_app(&pwa_pin, &browser_a),
                 "pinned pwa matches by path when window has no aumid");
     expect_true(!reach_window_tracking_window_matches_app(&pwa_pin, &uwp_a),
@@ -241,8 +231,8 @@ static void test_empty_identity_and_aumid_split(void)
         make_window(33, "C:\\apps\\brave.exe", "Brave._crx_abc"),
         make_window(34, "C:\\apps\\brave.exe", "Brave._crx_xyz"),
     };
-    copy_ascii(windows[0].title, 260, "bare one");
-    copy_ascii(windows[1].title, 260, "bare two");
+    reach_copy_ascii_to_utf16(windows[0].title, 260, "bare one");
+    reach_copy_ascii_to_utf16(windows[1].title, 260, "bare two");
     set_windows(windows, 4);
     (void)reach_window_tracking_refresh(service, nullptr);
 

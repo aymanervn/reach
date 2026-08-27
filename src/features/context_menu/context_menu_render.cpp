@@ -93,8 +93,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return REACH_INVALID_ARGUMENT;
     }
 
-    const reach_context_menu_metrics *metrics =
-        reach_context_menu_metrics_for(input->window_list);
+    const reach_context_menu_metrics *metrics = reach_context_menu_metrics_for(input->window_list);
 
     reach_render_command_buffer_clear(out_commands);
     reach_render_command command = {};
@@ -124,8 +123,6 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     for (size_t index = 0; index < input->item_count; ++index)
     {
         reach_rect_f32 item = input->item_slots[index];
-        item.x -= input->bounds.x;
-        item.y -= input->bounds.y;
         reach_context_menu_item_style style =
             reach_context_menu_style_for_command(input->theme, input->item_commands[index]);
         reach_color foreground = style.foreground;
@@ -160,8 +157,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             reach_render_command_buffer_push(out_commands, &icon_command);
         }
 
-        float text_left = reach_context_menu_scale(
-            input, has_icon ? metrics->icon_text_inset : metrics->text_leading_inset);
+        float text_left = reach_context_menu_scale(input, has_icon ? metrics->icon_text_inset
+                                                                   : metrics->text_leading_inset);
         float trailing_inset = metrics->text_trailing_inset;
         if (input->window_list && input->hovered_index == index)
         {

@@ -1,4 +1,5 @@
 #include "reach/features/common/level_presentation.h"
+#include "test_utf16.h"
 #include "reach/features/system_hud.h"
 
 #include <math.h>
@@ -24,20 +25,6 @@ static void expect_near(float actual, float expected, float tolerance, const cha
     }
 }
 
-static int text_equals_ascii(const uint16_t *text, const char *expected)
-{
-    size_t index = 0;
-    while (expected[index] != 0)
-    {
-        if (text[index] != (uint16_t)(unsigned char)expected[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return text[index] == 0;
-}
-
 static void test_level_presentation(void)
 {
     expect_near(reach_level_clamp01(-0.5f), 0.0f, 0.001f, "levels clamp below zero");
@@ -49,7 +36,8 @@ static void test_level_presentation(void)
 
     uint16_t text[8] = {};
     reach_level_format_percent(text, 8, 0.56f);
-    expect_true(text_equals_ascii(text, "56%"), "level percentages use a concise suffix");
+    expect_true(reach_test_utf16_equals_ascii(text, "56%"),
+                "level percentages use a concise suffix");
 }
 
 static void test_payloads_and_repeat_policy(void)
@@ -119,6 +107,13 @@ static void test_layout_and_blocking_input(void)
                 "the progress fill reflects the exact brightness");
 
     const reach_feature_capsule_ops *ops = reach_system_hud_capsule_ops();
+    reach_feature_surface_geometry geometry = {};
+    ops->surface_geometry(hud, &geometry);
+    expect_near(geometry.visible_bounds.x, state->layout.bounds.x, 0.001f,
+                "the capsule publishes its arranged surface position");
+    expect_near(geometry.visible_bounds.width, state->layout.bounds.width, 0.001f,
+                "the capsule publishes its arranged surface size");
+
     reach_rect_f32 region = {};
     expect_true(ops->input_regions(hud, &region, 1) == 1,
                 "the visible card contributes one blocking input region");

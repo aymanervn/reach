@@ -5,6 +5,15 @@
 
 reach_clipboard_state *reach_clipboard_feature_state_mut(reach_clipboard_feature *clipboard);
 
+static inline size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
+{
+    if (model == nullptr)
+    {
+        return 0;
+    }
+    return model->count <= REACH_CLIPBOARD_MAX_ITEMS ? model->count : REACH_CLIPBOARD_MAX_ITEMS;
+}
+
 typedef enum reach_clipboard_hit_type
 {
     REACH_CLIPBOARD_HIT_NONE = 0,

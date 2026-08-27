@@ -51,7 +51,6 @@ extern "C"
         reach_result (*get_bounds)(const reach_platform_window *window, reach_rect_f32 *out_bounds);
         reach_result (*set_opacity)(reach_platform_window *window, float opacity);
         reach_result (*set_blur_enabled)(reach_platform_window *window, int32_t enabled);
-        reach_result (*apply_rounded_corners)(reach_platform_window *window, float radius);
         reach_result (*set_caption)(reach_platform_window *window,
                                     const reach_platform_window_caption *caption);
         reach_result (*set_event_callback)(reach_platform_window *window,

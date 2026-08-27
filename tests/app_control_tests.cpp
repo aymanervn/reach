@@ -1,4 +1,5 @@
 #include "reach/services/app_control.h"
+#include "test_utf16.h"
 
 #include <atomic>
 #include <chrono>
@@ -78,20 +79,6 @@ static reach_result fake_terminal_launch(reach_terminal_launcher *launcher,
     fake_terminal_request = *request;
     fake_terminal_called.store(1);
     return REACH_OK;
-}
-
-static int utf16_equals_ascii(const uint16_t *text, const char *ascii)
-{
-    size_t index = 0;
-    while (text[index] != 0 && ascii[index] != 0)
-    {
-        if (text[index] != (uint16_t)(unsigned char)ascii[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return text[index] == 0 && ascii[index] == 0;
 }
 
 static int wait_for_completion(reach_app_control *service, reach_result *out_result)
@@ -184,7 +171,7 @@ static void test_terminal_command_is_queued_unchanged(void)
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     expect_true(fake_terminal_called.load(), "terminal command reaches the launch port");
-    expect_true(utf16_equals_ascii(fake_terminal_request.command, command),
+    expect_true(reach_test_utf16_equals_ascii(fake_terminal_request.command, command),
                 "terminal command reaches the launch port unchanged");
 
     reach_app_control_destroy(service);

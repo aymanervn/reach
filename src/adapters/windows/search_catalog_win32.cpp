@@ -25,46 +25,6 @@ struct reach_windows_search_catalog
     int32_t built;
 };
 
-static void reach_catalog_copy_utf16(uint16_t *dst, size_t dst_count, const uint16_t *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    if (src == nullptr)
-    {
-        dst[0] = 0;
-        return;
-    }
-    size_t index = 0;
-    while (index + 1 < dst_count && src[index] != 0)
-    {
-        dst[index] = src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
-static void reach_catalog_copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    if (src == nullptr)
-    {
-        dst[0] = 0;
-        return;
-    }
-    size_t index = 0;
-    while (index + 1 < dst_count && src[index] != 0)
-    {
-        dst[index] = (uint16_t)(unsigned char)src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
 static uint16_t reach_catalog_lower(uint16_t ch)
 {
     return ch >= 'A' && ch <= 'Z' ? (uint16_t)(ch - 'A' + 'a') : ch;
@@ -104,8 +64,7 @@ static const uint16_t *reach_catalog_file_name(const uint16_t *path)
 static int32_t reach_catalog_path_exists(const uint16_t *path)
 {
     DWORD attributes = GetFileAttributesW(reinterpret_cast<LPCWSTR>(path));
-    return attributes != INVALID_FILE_ATTRIBUTES &&
-           (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
 static int32_t reach_catalog_is_packaged_path(const uint16_t *path)
@@ -146,9 +105,9 @@ static void reach_catalog_append(reach_windows_search_catalog *catalog, const ui
     }
 
     reach_catalog_entry entry = {};
-    reach_catalog_copy_utf16(entry.name, REACH_SEARCH_RESULT_NAME_CAPACITY, name);
-    reach_catalog_copy_utf16(entry.path, REACH_SEARCH_RESULT_PATH_CAPACITY, path);
-    reach_catalog_copy_utf16(entry.arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY, arguments);
+    reach_copy_utf16(entry.name, REACH_SEARCH_RESULT_NAME_CAPACITY, name);
+    reach_copy_utf16(entry.path, REACH_SEARCH_RESULT_PATH_CAPACITY, path);
+    reach_copy_utf16(entry.arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY, arguments);
     entry.alias_index = alias_index;
     entry.has_alias = has_alias;
     catalog->entries.push_back(entry);
@@ -167,7 +126,7 @@ static void reach_catalog_build_aliases(reach_windows_search_catalog *catalog,
         }
 
         uint16_t target[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
-        reach_catalog_copy_ascii(target, REACH_SEARCH_RESULT_PATH_CAPACITY, alias->target);
+        reach_copy_ascii_to_utf16(target, REACH_SEARCH_RESULT_PATH_CAPACITY, alias->target);
 
         uint16_t path[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
         wchar_t combined[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
@@ -176,8 +135,8 @@ static void reach_catalog_build_aliases(reach_windows_search_catalog *catalog,
         {
             continue;
         }
-        reach_catalog_copy_utf16(path, REACH_SEARCH_RESULT_PATH_CAPACITY,
-                                 reinterpret_cast<const uint16_t *>(combined));
+        reach_copy_utf16(path, REACH_SEARCH_RESULT_PATH_CAPACITY,
+                         reinterpret_cast<const uint16_t *>(combined));
         if (!reach_catalog_path_exists(path))
         {
             wchar_t resolved[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
@@ -187,8 +146,8 @@ static void reach_catalog_build_aliases(reach_windows_search_catalog *catalog,
             {
                 continue;
             }
-            reach_catalog_copy_utf16(path, REACH_SEARCH_RESULT_PATH_CAPACITY,
-                                     reinterpret_cast<const uint16_t *>(resolved));
+            reach_copy_utf16(path, REACH_SEARCH_RESULT_PATH_CAPACITY,
+                             reinterpret_cast<const uint16_t *>(resolved));
             if (!reach_catalog_path_exists(path))
             {
                 continue;
@@ -197,9 +156,9 @@ static void reach_catalog_build_aliases(reach_windows_search_catalog *catalog,
 
         uint16_t name[REACH_SEARCH_RESULT_NAME_CAPACITY] = {};
         uint16_t arguments[REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY] = {};
-        reach_catalog_copy_ascii(name, REACH_SEARCH_RESULT_NAME_CAPACITY, alias->display);
-        reach_catalog_copy_ascii(arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
-                                 alias->arguments);
+        reach_copy_ascii_to_utf16(name, REACH_SEARCH_RESULT_NAME_CAPACITY, alias->display);
+        reach_copy_ascii_to_utf16(arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
+                                  alias->arguments);
         reach_catalog_append(catalog, name, path, arguments, index, 1);
     }
 }
@@ -244,8 +203,7 @@ static void reach_catalog_build_system_pattern(reach_windows_search_catalog *cat
 
 static void reach_catalog_build_app_paths(reach_windows_search_catalog *catalog, HKEY root)
 {
-    static const wchar_t key_path[] =
-        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths";
+    static const wchar_t key_path[] = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths";
 
     HKEY key = nullptr;
     if (RegOpenKeyExW(root, key_path, 0, KEY_READ, &key) != ERROR_SUCCESS)
@@ -406,10 +364,10 @@ size_t reach_windows_search_catalog_collect(reach_windows_search_catalog *catalo
 
         reach_search_candidate *candidate = &out_candidates[count];
         *candidate = {};
-        reach_catalog_copy_utf16(candidate->name, REACH_SEARCH_RESULT_NAME_CAPACITY, entry.name);
-        reach_catalog_copy_utf16(candidate->path, REACH_SEARCH_RESULT_PATH_CAPACITY, entry.path);
-        reach_catalog_copy_utf16(candidate->arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
-                                 entry.arguments);
+        reach_copy_utf16(candidate->name, REACH_SEARCH_RESULT_NAME_CAPACITY, entry.name);
+        reach_copy_utf16(candidate->path, REACH_SEARCH_RESULT_PATH_CAPACITY, entry.path);
+        reach_copy_utf16(candidate->arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
+                         entry.arguments);
         candidate->kind = reach_search_classify_result(entry.path, 0);
         candidate->source = REACH_SEARCH_SOURCE_CATALOG;
         candidate->match_tier = (int32_t)tier;

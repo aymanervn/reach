@@ -13,14 +13,12 @@ reach_battery_pointer_action_kind reach_battery_hit_test(const reach_battery_sta
     {
         return REACH_BATTERY_POINTER_ACTION_NONE;
     }
-    if (!reach_battery_point_in_rect(state->bounds, x, y))
+    reach_rect_f32 surface_bounds = {0.0f, 0.0f, state->bounds.width, state->bounds.height};
+    if (!reach_battery_point_in_rect(surface_bounds, x, y))
     {
         return REACH_BATTERY_POINTER_ACTION_DISMISS;
     }
-    reach_rect_f32 saver_row = state->saver_row;
-    saver_row.x += state->bounds.x;
-    saver_row.y += state->bounds.y;
-    if (reach_battery_point_in_rect(saver_row, x, y))
+    if (reach_battery_point_in_rect(state->saver_row, x, y))
     {
         return REACH_BATTERY_POINTER_ACTION_TOGGLE_SAVER;
     }

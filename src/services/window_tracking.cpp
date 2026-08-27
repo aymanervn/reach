@@ -34,24 +34,6 @@ static const uint16_t *reach_window_tracking_icon_ref(const reach_window_snapsho
     return window->icon_ref[0] != 0 ? window->icon_ref : window->path;
 }
 
-static int32_t reach_window_tracking_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
 reach_result reach_window_tracking_create(reach_window_manager_port window_manager,
                                           reach_window_tracking **out_service)
 {
@@ -134,12 +116,12 @@ static int32_t reach_window_tracking_rects_overlap(reach_rect_f32 a, reach_rect_
 }
 
 static int32_t reach_window_tracking_rect_centered_on_monitor(reach_rect_f32 bounds,
-                                                             reach_rect_f32 monitor)
+                                                              reach_rect_f32 monitor)
 {
     float center_x = bounds.x + bounds.width * 0.5f;
     float center_y = bounds.y + bounds.height * 0.5f;
-    return center_x >= monitor.x && center_x < monitor.x + monitor.width &&
-           center_y >= monitor.y && center_y < monitor.y + monitor.height;
+    return center_x >= monitor.x && center_x < monitor.x + monitor.width && center_y >= monitor.y &&
+           center_y < monitor.y + monitor.height;
 }
 
 int32_t reach_window_tracking_any_trespassing(const reach_window_tracking *service,
@@ -191,39 +173,9 @@ reach_window_tracking_window_by_id(const reach_window_tracking *service, uintptr
     return nullptr;
 }
 
-static int32_t reach_window_tracking_text_equals_ci(const uint16_t *a, const uint16_t *b)
+static int32_t reach_window_tracking_nonempty_path_equals(const uint16_t *a, const uint16_t *b)
 {
-    if (a == nullptr || b == nullptr)
-    {
-        return 0;
-    }
-
-    size_t index = 0;
-    while (a[index] != 0 && b[index] != 0)
-    {
-        uint16_t ca = a[index];
-        uint16_t cb = b[index];
-        if (ca >= 'A' && ca <= 'Z')
-        {
-            ca = (uint16_t)(ca + ('a' - 'A'));
-        }
-        if (cb >= 'A' && cb <= 'Z')
-        {
-            cb = (uint16_t)(cb + ('a' - 'A'));
-        }
-        if (ca != cb)
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return a[index] == b[index];
-}
-
-static int32_t reach_window_tracking_nonempty_equals_ci(const uint16_t *a, const uint16_t *b)
-{
-    return a != nullptr && b != nullptr && a[0] != 0 && b[0] != 0 &&
-           reach_window_tracking_text_equals_ci(a, b);
+    return a != nullptr && b != nullptr && a[0] != 0 && b[0] != 0 && reach_path_equals(a, b);
 }
 
 int32_t reach_window_tracking_identity_equal(const uint16_t *path_a, const uint16_t *aumid_a,
@@ -233,9 +185,9 @@ int32_t reach_window_tracking_identity_equal(const uint16_t *path_a, const uint1
     int32_t aumid_b_set = aumid_b != nullptr && aumid_b[0] != 0;
     if (aumid_a_set && aumid_b_set)
     {
-        return reach_window_tracking_text_equals_ci(aumid_a, aumid_b);
+        return reach_utf16_equal_ascii_case_insensitive(aumid_a, aumid_b);
     }
-    return reach_window_tracking_nonempty_equals_ci(path_a, path_b);
+    return reach_window_tracking_nonempty_path_equals(path_a, path_b);
 }
 
 int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
@@ -545,13 +497,12 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         {
             int32_t item_changed =
                 old_windows[index].id != service->open_windows[index].id ||
-                !reach_window_tracking_utf16_equal(old_windows[index].path,
-                                                   service->open_windows[index].path) ||
-                !reach_window_tracking_utf16_equal(old_windows[index].app_user_model_id,
-                                                   service->open_windows[index].app_user_model_id);
-            int32_t icon_ref_changed = !reach_window_tracking_utf16_equal(
-                reach_window_tracking_icon_ref(&old_windows[index]),
-                reach_window_tracking_icon_ref(&service->open_windows[index]));
+                !reach_utf16_equal(old_windows[index].path, service->open_windows[index].path) ||
+                !reach_utf16_equal(old_windows[index].app_user_model_id,
+                                   service->open_windows[index].app_user_model_id);
+            int32_t icon_ref_changed =
+                !reach_utf16_equal(reach_window_tracking_icon_ref(&old_windows[index]),
+                                   reach_window_tracking_icon_ref(&service->open_windows[index]));
 
             if (item_changed)
             {
@@ -567,8 +518,7 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
                 old_windows[index].minimized != service->open_windows[index].minimized ||
                 old_windows[index].maximized != service->open_windows[index].maximized ||
                 old_windows[index].visible != service->open_windows[index].visible ||
-                !reach_window_tracking_utf16_equal(old_windows[index].title,
-                                                   service->open_windows[index].title))
+                !reach_utf16_equal(old_windows[index].title, service->open_windows[index].title))
             {
                 changed = 1;
             }

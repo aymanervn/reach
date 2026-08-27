@@ -1,5 +1,6 @@
 #include "reach/core/geometry.h"
 #include "render_d2d_internal.h"
+#include "render_d2d_svg_document.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -128,11 +129,6 @@ static int reach_svg_is_separator(char c)
     return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == ',';
 }
 
-static int reach_svg_is_space_only(char c)
-{
-    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
-}
-
 static int reach_svg_is_command(char c)
 {
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
@@ -177,88 +173,6 @@ static int reach_svg_read_float(const char **cursor, float *out_value)
 static int reach_svg_read_point(const char **cursor, float *out_x, float *out_y)
 {
     return reach_svg_read_float(cursor, out_x) && reach_svg_read_float(cursor, out_y);
-}
-
-static int reach_svg_attribute_name_boundary_before(const std::string &tag, size_t pos)
-{
-    if (pos == 0)
-    {
-        return 1;
-    }
-
-    char c = tag[pos - 1];
-    return reach_svg_is_space_only(c) || c == '<' || c == '/';
-}
-
-static int reach_svg_attribute_name_boundary_after(const std::string &tag, size_t pos)
-{
-    if (pos >= tag.size())
-    {
-        return 0;
-    }
-
-    char c = tag[pos];
-    return reach_svg_is_space_only(c) || c == '=';
-}
-
-static int reach_svg_read_attribute(const std::string &tag, const char *name,
-                                    std::string *out_value)
-{
-    if (name == nullptr || out_value == nullptr)
-    {
-        return 0;
-    }
-
-    size_t name_length = strlen(name);
-    size_t pos = 0;
-
-    while ((pos = tag.find(name, pos)) != std::string::npos)
-    {
-        size_t after_name = pos + name_length;
-
-        if (!reach_svg_attribute_name_boundary_before(tag, pos) ||
-            !reach_svg_attribute_name_boundary_after(tag, after_name))
-        {
-            pos = after_name;
-            continue;
-        }
-
-        size_t cursor = after_name;
-        while (cursor < tag.size() && reach_svg_is_space_only(tag[cursor]))
-        {
-            ++cursor;
-        }
-
-        if (cursor >= tag.size() || tag[cursor] != '=')
-        {
-            pos = after_name;
-            continue;
-        }
-
-        ++cursor;
-        while (cursor < tag.size() && reach_svg_is_space_only(tag[cursor]))
-        {
-            ++cursor;
-        }
-
-        if (cursor >= tag.size() || (tag[cursor] != '"' && tag[cursor] != '\''))
-        {
-            return 0;
-        }
-
-        char quote = tag[cursor++];
-        size_t end = tag.find(quote, cursor);
-
-        if (end == std::string::npos)
-        {
-            return 0;
-        }
-
-        *out_value = tag.substr(cursor, end - cursor);
-        return 1;
-    }
-
-    return 0;
 }
 
 static int reach_svg_read_root_tag(const std::string &svg, std::string *out_tag)
@@ -445,6 +359,19 @@ static reach_svg_style reach_svg_default_style(void)
     return style;
 }
 
+static int reach_svg_read_presentation_value(const std::string &tag, const char *name,
+                                             std::string *out_value)
+{
+    int found = reach_svg_read_attribute(tag, name, out_value);
+    std::string style_value;
+    if (reach_svg_read_style_property(tag, name, &style_value))
+    {
+        *out_value = style_value;
+        found = 1;
+    }
+    return found;
+}
+
 static void reach_svg_apply_style_attributes(const std::string &tag, reach_svg_style *style)
 {
     if (style == nullptr)
@@ -454,17 +381,17 @@ static void reach_svg_apply_style_attributes(const std::string &tag, reach_svg_s
 
     std::string value;
 
-    if (reach_svg_read_attribute(tag, "fill", &value))
+    if (reach_svg_read_presentation_value(tag, "fill", &value))
     {
         style->fill = reach_svg_parse_paint_active(value, style->fill);
     }
 
-    if (reach_svg_read_attribute(tag, "stroke", &value))
+    if (reach_svg_read_presentation_value(tag, "stroke", &value))
     {
         style->stroke = reach_svg_parse_paint_active(value, style->stroke);
     }
 
-    if (reach_svg_read_attribute(tag, "stroke-width", &value))
+    if (reach_svg_read_presentation_value(tag, "stroke-width", &value))
     {
         const char *cursor = value.c_str();
         float parsed = style->stroke_width;
@@ -474,17 +401,17 @@ static void reach_svg_apply_style_attributes(const std::string &tag, reach_svg_s
         }
     }
 
-    if (reach_svg_read_attribute(tag, "stroke-linecap", &value))
+    if (reach_svg_read_presentation_value(tag, "stroke-linecap", &value))
     {
         style->line_cap = reach_svg_parse_line_cap(value, style->line_cap);
     }
 
-    if (reach_svg_read_attribute(tag, "stroke-linejoin", &value))
+    if (reach_svg_read_presentation_value(tag, "stroke-linejoin", &value))
     {
         style->line_join = reach_svg_parse_line_join(value, style->line_join);
     }
 
-    if (reach_svg_read_attribute(tag, "stroke-miterlimit", &value))
+    if (reach_svg_read_presentation_value(tag, "stroke-miterlimit", &value))
     {
         const char *cursor = value.c_str();
         float parsed = style->miter_limit;
@@ -494,7 +421,7 @@ static void reach_svg_apply_style_attributes(const std::string &tag, reach_svg_s
         }
     }
 
-    if (reach_svg_read_attribute(tag, "fill-rule", &value))
+    if (reach_svg_read_presentation_value(tag, "fill-rule", &value))
     {
         style->fill_mode = reach_svg_parse_fill_rule(value, style->fill_mode);
     }
@@ -844,24 +771,6 @@ static reach_result reach_svg_path_to_geometry(ID2D1Factory1 *factory, const std
     return REACH_OK;
 }
 
-static int reach_svg_element_in_ignored_section(const std::string &svg, size_t tag_start)
-{
-    size_t defs_open = svg.rfind("<defs", tag_start);
-    size_t defs_close = svg.rfind("</defs>", tag_start);
-
-    if (defs_open != std::string::npos &&
-        (defs_close == std::string::npos || defs_close < defs_open))
-    {
-        return 1;
-    }
-
-    size_t clip_open = svg.rfind("<clipPath", tag_start);
-    size_t clip_close = svg.rfind("</clipPath>", tag_start);
-
-    return clip_open != std::string::npos &&
-           (clip_close == std::string::npos || clip_close < clip_open);
-}
-
 static D2D1_MATRIX_3X2_F reach_svg_view_box_to_rect_transform(float view_x, float view_y,
                                                               float view_width, float view_height,
                                                               const reach_rect_f32 &rect)
@@ -877,6 +786,19 @@ static D2D1_MATRIX_3X2_F reach_svg_view_box_to_rect_transform(float view_x, floa
 
     return D2D1::Matrix3x2F::Scale(scale, scale) *
            D2D1::Matrix3x2F::Translation(offset_x - view_x * scale, offset_y - view_y * scale);
+}
+
+static D2D1_MATRIX_3X2_F reach_svg_to_d2d_transform(reach_svg_matrix transform)
+{
+    return D2D1::Matrix3x2F(transform.m11, transform.m12, transform.m21, transform.m22,
+                            transform.dx, transform.dy);
+}
+
+static float reach_svg_stroke_scale(const D2D1_MATRIX_3X2_F &transform)
+{
+    float x_scale = std::sqrt(transform._11 * transform._11 + transform._12 * transform._12);
+    float y_scale = std::sqrt(transform._21 * transform._21 + transform._22 * transform._22);
+    return x_scale < y_scale ? x_scale : y_scale;
 }
 
 static reach_result reach_d2d_create_stroke_style(ID2D1Factory1 *factory,
@@ -1080,13 +1002,6 @@ static reach_result reach_d2d_draw_svg_resource(reach_render_backend *backend,
     D2D1_MATRIX_3X2_F transform = reach_svg_view_box_to_rect_transform(view_x, view_y, view_width,
                                                                        view_height, command->rect);
 
-    float stroke_scale = command->rect.width / view_width;
-    float stroke_scale_y = command->rect.height / view_height;
-    if (stroke_scale_y < stroke_scale)
-    {
-        stroke_scale = stroke_scale_y;
-    }
-
     ID2D1SolidColorBrush *brush = nullptr;
     HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
 
@@ -1097,58 +1012,34 @@ static reach_result reach_d2d_draw_svg_resource(reach_render_backend *backend,
 
     reach_svg_style root_style = reach_svg_root_style(svg);
 
-    reach_result result = REACH_OK;
-    size_t offset = 0;
-
-    while (result == REACH_OK)
+    std::vector<reach_svg_drawable> drawables;
+    if (!reach_svg_collect_drawables(svg, &drawables))
     {
-        size_t path_start = svg.find("<path", offset);
-        size_t circle_start = svg.find("<circle", offset);
+        brush->Release();
+        return REACH_ERROR;
+    }
 
-        size_t tag_start = std::string::npos;
-        const char *kind = nullptr;
+    reach_result result = REACH_OK;
+    for (const reach_svg_drawable &drawable : drawables)
+    {
+        std::string tag = svg.substr(drawable.tag_start, drawable.tag_end - drawable.tag_start + 1);
+        D2D1_MATRIX_3X2_F element_transform =
+            reach_svg_to_d2d_transform(drawable.transform) * transform;
+        float stroke_scale = reach_svg_stroke_scale(element_transform);
 
-        if (path_start != std::string::npos &&
-            (circle_start == std::string::npos || path_start < circle_start))
+        if (drawable.kind == REACH_SVG_DRAWABLE_PATH)
         {
-            tag_start = path_start;
-            kind = "path";
-        }
-        else if (circle_start != std::string::npos)
-        {
-            tag_start = circle_start;
-            kind = "circle";
-        }
-        else
-        {
-            break;
-        }
-
-        if (reach_svg_element_in_ignored_section(svg, tag_start))
-        {
-            offset = tag_start + 1;
-            continue;
-        }
-
-        size_t tag_end = svg.find('>', tag_start);
-        if (tag_end == std::string::npos)
-        {
-            result = REACH_ERROR;
-            break;
-        }
-
-        std::string tag = svg.substr(tag_start, tag_end - tag_start + 1);
-        offset = tag_end + 1;
-
-        if (strcmp(kind, "path") == 0)
-        {
-            result = reach_d2d_draw_svg_path_tag(backend, target, brush, tag, root_style, transform,
-                                                 stroke_scale);
+            result = reach_d2d_draw_svg_path_tag(backend, target, brush, tag, root_style,
+                                                 element_transform, stroke_scale);
         }
         else
         {
             result = reach_d2d_draw_svg_circle_tag(backend, target, brush, tag, root_style,
-                                                   transform, stroke_scale);
+                                                   element_transform, stroke_scale);
+        }
+        if (result != REACH_OK)
+        {
+            break;
         }
     }
 

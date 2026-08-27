@@ -1,4 +1,5 @@
 #include "reach/features/launcher.h"
+#include "test_utf16.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -27,20 +28,6 @@ static int expect_close_at(float actual, float expected, int line)
 }
 
 #define expect_close(actual, expected) expect_close_at(actual, expected, __LINE__)
-
-static int utf16_equals_ascii(const uint16_t *text, const char *ascii)
-{
-    size_t index = 0;
-    while (text[index] != 0 && ascii[index] != 0)
-    {
-        if (text[index] != (uint16_t)(unsigned char)ascii[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return text[index] == 0 && ascii[index] == 0;
-}
 
 static void type_ascii(reach_launcher *launcher, const char *text)
 {
@@ -71,9 +58,10 @@ static int test_terminal_command_mode(void)
     failed += expect(result != nullptr);
     failed +=
         expect(result != nullptr && result->action == REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND);
+    failed += expect(result != nullptr &&
+                     reach_test_utf16_equals_ascii(result->title, "Run in Windows Terminal"));
     failed +=
-        expect(result != nullptr && utf16_equals_ascii(result->title, "Run in Windows Terminal"));
-    failed += expect(result != nullptr && utf16_equals_ascii(result->icon_path, "wt.exe"));
+        expect(result != nullptr && reach_test_utf16_equals_ascii(result->icon_path, "wt.exe"));
     failed += expect(result != nullptr && result->payload.terminal_command[0] == 0);
 
     const char *command = "ls | Where-Object { $_.Length -gt 0 }; Write-Output \"done\"";
@@ -81,9 +69,9 @@ static int test_terminal_command_mode(void)
     result = reach_launcher_result_at(launcher, 0);
     failed += expect(reach_launcher_result_count(launcher) == 1);
     failed += expect(reach_launcher_selected_result_index(launcher) == 0);
-    failed += expect(result != nullptr && utf16_equals_ascii(result->subtitle, command));
-    failed +=
-        expect(result != nullptr && utf16_equals_ascii(result->payload.terminal_command, command));
+    failed += expect(result != nullptr && reach_test_utf16_equals_ascii(result->subtitle, command));
+    failed += expect(result != nullptr &&
+                     reach_test_utf16_equals_ascii(result->payload.terminal_command, command));
 
     reach_ui_event event = {};
     reach_ui_intent intent = {};
@@ -135,8 +123,8 @@ int main()
     reach_launcher_layout expansion_layout = {};
     expansion_layout.search_box = {100.0f, 200.0f, 640.0f, 52.0f};
     expansion_layout.bounds = {100.0f, 200.0f, 640.0f, 180.0f};
-    expansion_layout.envelope_bounds = {
-        100.0f, 200.0f, 640.0f, 68.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS};
+    expansion_layout.envelope_bounds = {100.0f, 200.0f, 640.0f,
+                                        68.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS};
     reach_launcher_set_pointer_context(capsule, &expansion_layout, nullptr, 0);
 
     const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
@@ -145,14 +133,14 @@ int main()
     failed += expect_close(geometry.visible_bounds.height, 52.0f);
     failed += expect_close(geometry.envelope_bounds.x, expansion_layout.bounds.x);
     failed += expect_close(geometry.envelope_bounds.y, expansion_layout.bounds.y);
-    failed += expect_close(geometry.envelope_bounds.height,
-                           expansion_layout.envelope_bounds.height);
+    failed +=
+        expect_close(geometry.envelope_bounds.height, expansion_layout.envelope_bounds.height);
 
     reach_feature_tick_result tick = {};
     capsule_ops->tick(capsule, 0.08, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed += expect(geometry.visible_bounds.height > 52.0f &&
-                     geometry.visible_bounds.height < 180.0f);
+    failed +=
+        expect(geometry.visible_bounds.height > 52.0f && geometry.visible_bounds.height < 180.0f);
     failed += expect(tick.redraw == 1);
     tick = {};
     capsule_ops->tick(capsule, 0.16, &tick);

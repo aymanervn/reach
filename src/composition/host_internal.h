@@ -184,6 +184,32 @@ typedef struct reach_surface_bar_reveal_spec
     float span_start_inset_dp;
 } reach_surface_bar_reveal_spec;
 
+typedef struct reach_feature_factory
+{
+    reach_result (*create)(void **out_capsule);
+    void (*destroy)(void *capsule);
+} reach_feature_factory;
+
+typedef struct reach_feature_surface_context
+{
+    const reach_theme *theme;
+    reach_rect_f32 monitor_bounds;
+    reach_rect_f32 anchor_bounds;
+    reach_rect_f32 last_bounds;
+    reach_rect_f32 render_bounds;
+    float dpi_scale;
+    int32_t icon_size_px;
+    int32_t transition_visible;
+    int32_t bounds_valid;
+} reach_feature_surface_context;
+
+typedef struct reach_feature_surface_ops
+{
+    int32_t (*arrange)(void *capsule, const reach_feature_surface_context *ctx);
+    reach_result (*append_render_commands)(void *capsule, const reach_feature_surface_context *ctx,
+                                           reach_render_command_buffer *out_commands);
+} reach_feature_surface_ops;
+
 typedef struct reach_surface_desc
 {
     reach_surface_id id;
@@ -227,6 +253,11 @@ typedef struct reach_surface_desc
     int32_t bar_shown_while_open;
     reach_surface_edge_reveal_spec edge_reveal;
     reach_surface_bar_reveal_spec bar_reveal;
+    reach_feature_factory factory;
+    const reach_feature_surface_ops *surface_ops;
+    reach_surface_id layout_anchor;
+    reach_rect_f32 resolved_bounds;
+    int32_t resolved_bounds_valid;
 } reach_surface_desc;
 
 typedef struct reach_host_edge_reveal_runtime
@@ -255,7 +286,9 @@ typedef struct reach_host_layout_target
     reach_screen_hotspot_port *edge_reveal;
 } reach_host_layout_target;
 
-void reach_host_init_surface_descriptors(reach_host *host);
+void reach_host_init_feature_registry(reach_host *host);
+reach_result reach_host_create_registered_features(reach_host *host);
+void reach_host_destroy_registered_features(reach_host *host);
 
 void reach_host_init_layout(reach_host *host);
 void reach_host_apply_layout(reach_host *host);
@@ -294,16 +327,15 @@ typedef struct reach_host_frame_context reach_host_frame_context;
 void reach_host_sync_surface_input_regions(const reach_host *host, const reach_surface_desc *desc);
 
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_top_bar(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_system_hud(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_stage(reach_host *host, const reach_host_frame_context *ctx);
 reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx);
+reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface_desc *desc,
+                                                 const reach_host_frame_context *ctx);
 
 static inline uint32_t reach_surface_class_bit(reach_surface_class cls)
 {
@@ -413,8 +445,6 @@ struct reach_host
     reach_dock *dock_capsule;
     reach_top_bar *top_bar_capsule;
     reach_system_hud *system_hud_capsule;
-    reach_rect_f32 dock_shown_bounds;
-    int32_t dock_shown_bounds_valid;
     int32_t top_bar_hidden;
     reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;
@@ -550,6 +580,11 @@ int32_t reach_host_surface_transition_active(const reach_host *host,
                                              const reach_host_surface_transition *transition);
 void reach_host_surface_transition_finish(reach_host *host,
                                           reach_host_surface_transition *transition);
+void reach_host_finish_surface_transitions(reach_host *host);
+
+reach_pointer_event reach_host_surface_pointer_event(const reach_surface_desc *desc,
+                                                     const reach_ui_event *event,
+                                                     reach_pointer_event_kind kind);
 
 void reach_host_request_update(reach_host *host);
 void reach_host_on_launcher_window_event(void *user, const reach_ui_event *event);
@@ -636,7 +671,6 @@ void reach_host_set_clipboard_open(reach_host *host, int32_t open);
 void reach_host_toggle_clipboard(reach_host *host);
 void reach_host_process_clipboard_refresh(reach_host *host);
 void reach_host_release_clipboard_items(reach_host *host);
-reach_result reach_host_render_clipboard_surface(reach_host *host);
 
 void reach_host_set_tray_popup_open(reach_host *host, int32_t open);
 void reach_host_toggle_tray_popup(reach_host *host);
@@ -758,7 +792,6 @@ reach_host_apply_context_menu_pointer_action(reach_host *host, const reach_ui_ev
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags);
 void reach_host_on_audio_volume_changed(void *user);
 
-size_t reach_host_switcher_visible_count(const reach_host *host);
 void reach_host_refresh_switcher_windows(reach_host *host);
 
 reach_result reach_host_handle_switcher_event(reach_host *host, const reach_ui_event *event);
@@ -790,9 +823,6 @@ reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bou
 
 reach_result reach_host_render_quick_settings_surface(reach_host *host);
 reach_result reach_host_render_battery_surface(reach_host *host);
-reach_result reach_host_render_system_hud_surface(reach_host *host);
-
-reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32 bounds);
 
 reach_result reach_host_render_launcher_surface(reach_host *host,
                                                 const reach_launcher_layout *layout,

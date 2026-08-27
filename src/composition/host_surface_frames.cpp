@@ -36,7 +36,7 @@ static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id
 
 static reach_result reach_host_apply_transient_frame(reach_host *host, reach_surface_id id,
                                                      reach_host_surface_transition *transition,
-                                                     reach_rect_f32 target_bounds, float radius,
+                                                     reach_rect_f32 target_bounds,
                                                      reach_host_frame_state *out)
 {
     *out = {};
@@ -53,15 +53,111 @@ static reach_result reach_host_apply_transient_frame(reach_host *host, reach_sur
         return result;
     }
 
-    if (out->window_changed && surface->window.ops.apply_rounded_corners != nullptr)
-    {
-        (void)surface->window.ops.apply_rounded_corners(surface->window.window, radius);
-    }
-
     out->visible = reach_host_surface_transition_visible(transition);
     reach_host_set_surface_visible(host, id, out->visible);
 
     return REACH_OK;
+}
+
+reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface_desc *desc,
+                                                 const reach_host_frame_context *ctx)
+{
+    REACH_ASSERT(host != nullptr);
+    REACH_ASSERT(desc != nullptr);
+    REACH_ASSERT(ctx != nullptr);
+    if (host == nullptr || desc == nullptr || ctx == nullptr || desc->surface == nullptr ||
+        desc->surface->window.ops.set_bounds == nullptr)
+    {
+        return REACH_OK;
+    }
+    if (desc->surface_ops == nullptr || desc->surface_ops->arrange == nullptr ||
+        desc->surface_ops->append_render_commands == nullptr || desc->capsule_ops == nullptr ||
+        desc->capsule_ops->surface_geometry == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    int32_t open =
+        desc->capsule_ops->is_open == nullptr ? 1 : desc->capsule_ops->is_open(desc->capsule);
+    int32_t visible = desc->transition != nullptr
+                          ? reach_host_surface_transition_visible(desc->transition)
+                          : open;
+    reach_host_set_surface_visible(host, desc->id, visible);
+    if (!visible)
+    {
+        return REACH_OK;
+    }
+
+    reach_feature_surface_context surface_ctx = {};
+    surface_ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    surface_ctx.monitor_bounds = ctx->monitor_bounds;
+    surface_ctx.last_bounds = desc->surface->last_bounds;
+    surface_ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+    surface_ctx.icon_size_px = reach_host_icon_size_px(host);
+    surface_ctx.transition_visible = visible;
+    surface_ctx.bounds_valid = desc->surface->bounds_valid;
+    if (desc->layout_anchor < REACH_HOST_SURFACE_COUNT)
+    {
+        const reach_surface_desc *anchor = &host->surface_descs[desc->layout_anchor];
+        if (anchor->resolved_bounds_valid)
+        {
+            surface_ctx.anchor_bounds = anchor->resolved_bounds;
+        }
+    }
+
+    int32_t layout_changed = desc->surface_ops->arrange(desc->capsule, &surface_ctx);
+    if (desc->capsule_ops->needs_frame != nullptr && desc->capsule_ops->needs_frame(desc->capsule))
+    {
+        desc->surface->dirty_flags = 1;
+        reach_host_request_update(host);
+    }
+    reach_feature_surface_geometry geometry = {};
+    desc->capsule_ops->surface_geometry(desc->capsule, &geometry);
+    desc->resolved_bounds = geometry.visible_bounds;
+    desc->resolved_bounds_valid = 1;
+
+    reach_rect_f32 bounds = geometry.visible_bounds;
+    float opacity = 1.0f;
+    if (desc->transition != nullptr)
+    {
+        bounds = reach_host_surface_transition_bounds(host, desc->transition, bounds);
+        opacity = reach_host_surface_transition_opacity(host, desc->transition);
+    }
+    surface_ctx.render_bounds = bounds;
+
+    int32_t window_changed = 0;
+    reach_result result = reach_host_apply_window_state(
+        &desc->surface->window, bounds, reach_host_surface_shadow_pad(host, desc->id), opacity,
+        &desc->surface->last_bounds, &desc->surface->last_opacity, &desc->surface->bounds_valid,
+        &desc->surface->opacity_valid, &window_changed);
+    if (result != REACH_OK || !open ||
+        (!host->dirty.render && !desc->surface->dirty_flags && !window_changed && !layout_changed))
+    {
+        return result;
+    }
+
+    reach_render_command_buffer *commands = &host->render_commands;
+    reach_render_command_buffer_clear(commands);
+    result = desc->surface_ops->append_render_commands(desc->capsule, &surface_ctx, commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    reach_host_stamp_surface_content(host, desc->id, commands);
+
+    if (desc->surface->renderer.ops.begin_frame == nullptr)
+    {
+        return REACH_OK;
+    }
+    result = desc->surface->renderer.ops.begin_frame(desc->surface->renderer.backend);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    result = desc->surface->renderer.ops.execute(desc->surface->renderer.backend, commands);
+    reach_result end_result =
+        desc->surface->renderer.ops.end_frame(desc->surface->renderer.backend);
+    return result != REACH_OK ? result : end_result;
 }
 
 reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx)
@@ -78,6 +174,9 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
     {
         launcher_ops->surface_geometry(host->launcher_capsule, &launcher_geometry);
     }
+    reach_surface_desc *launcher_desc = &host->surface_descs[REACH_SURFACE_ID_LAUNCHER];
+    launcher_desc->resolved_bounds = launcher_geometry.visible_bounds;
+    launcher_desc->resolved_bounds_valid = 1;
     reach_host_surface_transition_frame frame =
         reach_host_surface_transition_frame_compute_in_envelope(
             host, &host->launcher_transition, launcher_geometry.visible_bounds,
@@ -142,42 +241,6 @@ reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_
     return REACH_OK;
 }
 
-reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame_context *ctx)
-{
-    const reach_rect_f32 monitor_bounds = ctx->monitor_bounds;
-    int32_t clipboard_animating = 0;
-    float clipboard_border_thickness =
-        reach_theme_border_thickness(host->theme != nullptr ? host->theme : reach_theme_default(),
-                                     reach_host_layout_dpi_scale(host));
-    int32_t clipboard_layout_changed = reach_clipboard_feature_relayout(
-        host->clipboard_capsule, monitor_bounds, host->layout.launcher.bounds,
-        reach_host_layout_dpi_scale(host), clipboard_border_thickness, &clipboard_animating);
-    if (clipboard_animating)
-    {
-        host->dirty.layout = 1;
-        host->clipboard_surface.dirty_flags = 1;
-        reach_host_request_update(host);
-    }
-
-    const reach_rect_f32 clipboard_bounds =
-        reach_clipboard_feature_state_ptr(host->clipboard_capsule)->layout.bounds;
-    reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_CLIPBOARD, &host->clipboard_transition, clipboard_bounds,
-        host->theme->radius_large * reach_host_layout_dpi_scale(host), &frame);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    if (frame.visible && reach_clipboard_is_open(host->clipboard_capsule) &&
-        (host->dirty.render || host->clipboard_surface.dirty_flags || clipboard_layout_changed ||
-         frame.window_changed))
-    {
-        (void)reach_host_render_clipboard_surface(host);
-    }
-    return REACH_OK;
-}
-
 reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_context *ctx)
 {
     const int32_t dock_layout_changed = ctx->dock_layout_changed;
@@ -189,8 +252,6 @@ reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_cont
     reach_host_set_surface_visible(host, REACH_SURFACE_ID_DOCK, 1);
 
     int32_t dock_window_changed = 0;
-    float dock_radius =
-        reach_theme_dock_corner_radius(host->theme, host->layout.dock.bounds.height);
     reach_result result = reach_host_apply_window_state(
         &host->dock.window, host->layout.dock.bounds,
         reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_DOCK), 1.0f, &host->dock.last_bounds,
@@ -199,11 +260,6 @@ reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_cont
     if (result != REACH_OK)
     {
         return result;
-    }
-
-    if (dock_window_changed && host->dock.window.ops.apply_rounded_corners != nullptr)
-    {
-        (void)host->dock.window.ops.apply_rounded_corners(host->dock.window.window, dock_radius);
     }
 
     int32_t dock_reveal_position_only =
@@ -271,8 +327,7 @@ reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_cont
 
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_TRAY, &host->tray_transition, tray_bounds,
-        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
+        host, REACH_SURFACE_ID_TRAY, &host->tray_transition, tray_bounds, &frame);
     if (result != REACH_OK)
     {
         return result;
@@ -299,10 +354,9 @@ reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_
     const reach_rect_f32 quick_settings_bounds =
         reach_quick_settings_state_ptr(host->quick_settings_capsule)->bounds;
     reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_QUICK_SETTINGS, &host->quick_settings_transition,
-        quick_settings_bounds,
-        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
+    reach_result result = reach_host_apply_transient_frame(host, REACH_SURFACE_ID_QUICK_SETTINGS,
+                                                           &host->quick_settings_transition,
+                                                           quick_settings_bounds, &frame);
     if (result != REACH_OK)
     {
         return result;
@@ -329,8 +383,7 @@ reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_c
     const reach_rect_f32 battery_bounds = reach_battery_state_ptr(host->battery_capsule)->bounds;
     reach_host_frame_state frame = {};
     reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_BATTERY, &host->battery_transition, battery_bounds,
-        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
+        host, REACH_SURFACE_ID_BATTERY, &host->battery_transition, battery_bounds, &frame);
     if (result != REACH_OK)
     {
         return result;
@@ -339,109 +392,6 @@ reach_result reach_host_frame_battery(reach_host *host, const reach_host_frame_c
         (host->dirty.render || host->battery.dirty_flags))
     {
         (void)reach_host_render_battery_surface(host);
-    }
-    return REACH_OK;
-}
-
-reach_result reach_host_frame_system_hud(reach_host *host, const reach_host_frame_context *ctx)
-{
-    if (host == nullptr || ctx == nullptr || host->system_hud.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    const reach_system_hud_state *state = reach_system_hud_state_ptr(host->system_hud_capsule);
-    reach_host_set_surface_visible(host, REACH_SURFACE_ID_SYSTEM_HUD, state->open);
-    if (!state->open)
-    {
-        return REACH_OK;
-    }
-
-    reach_system_hud_arrange_context arrange = {};
-    arrange.theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    arrange.monitor_bounds = ctx->monitor_bounds;
-    arrange.dock_shown_bounds =
-        host->dock_shown_bounds_valid ? host->dock_shown_bounds : reach_rect_f32{};
-    arrange.dpi_scale = reach_host_layout_dpi_scale(host);
-    int32_t layout_changed = reach_system_hud_arrange(host->system_hud_capsule, &arrange);
-    state = reach_system_hud_state_ptr(host->system_hud_capsule);
-
-    int32_t window_changed = 0;
-    reach_result result = reach_host_apply_window_state(
-        &host->system_hud.window, state->layout.bounds,
-        reach_host_surface_shadow_pad(host, REACH_SURFACE_ID_SYSTEM_HUD), 1.0f,
-        &host->system_hud.last_bounds, &host->system_hud.last_opacity,
-        &host->system_hud.bounds_valid, &host->system_hud.opacity_valid, &window_changed);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    if ((window_changed || layout_changed) &&
-        host->system_hud.window.ops.apply_rounded_corners != nullptr)
-    {
-        (void)host->system_hud.window.ops.apply_rounded_corners(
-            host->system_hud.window.window, 18.0f * reach_host_layout_dpi_scale(host));
-    }
-
-    if (host->dirty.render || host->system_hud.dirty_flags || window_changed || layout_changed)
-    {
-        return reach_host_render_system_hud_surface(host);
-    }
-    return REACH_OK;
-}
-
-static reach_rect_f32 reach_host_apply_switcher_bounds_animation(reach_host *host,
-                                                                 reach_rect_f32 target)
-{
-    if (host == nullptr)
-    {
-        return target;
-    }
-    int32_t request_redraw = 0;
-    reach_rect_f32 animated = reach_switcher_apply_width_animation(
-        host->switcher_capsule, reach_host_surface_transition_visible(&host->switcher_transition),
-        reach_switcher_is_open(host->switcher_capsule), host->switcher.bounds_valid,
-        host->switcher.last_bounds.width, target, &request_redraw);
-    if (request_redraw)
-    {
-        host->switcher.dirty_flags = 1;
-    }
-    return animated;
-}
-
-reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_context *ctx)
-{
-    const reach_rect_f32 monitor_bounds = ctx->monitor_bounds;
-    if (host->switcher.window.ops.set_bounds == nullptr)
-    {
-        return REACH_OK;
-    }
-
-    float switcher_dpi_scale = reach_host_layout_dpi_scale(host);
-    float switcher_border_thickness = reach_theme_border_thickness(
-        host->theme != nullptr ? host->theme : reach_theme_default(), switcher_dpi_scale);
-    reach_rect_f32 target_switcher_bounds = reach_switcher_bounds_for_count_scaled(
-        monitor_bounds, reach_host_switcher_visible_count(host), switcher_dpi_scale,
-        switcher_border_thickness);
-    reach_rect_f32 switcher_bounds =
-        reach_host_apply_switcher_bounds_animation(host, target_switcher_bounds);
-
-    reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_SWITCHER, &host->switcher_transition, switcher_bounds,
-        16.0f * reach_host_layout_dpi_scale(host), &frame);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-    if (frame.visible && reach_switcher_is_open(host->switcher_capsule) &&
-        (host->dirty.render || host->switcher.dirty_flags))
-    {
-
-        reach_rect_f32 transitioned_bounds =
-            reach_host_surface_transition_bounds(host, &host->switcher_transition, switcher_bounds);
-        (void)reach_host_render_switcher_surface(host, transitioned_bounds);
     }
     return REACH_OK;
 }
@@ -515,9 +465,9 @@ reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_fr
     const reach_rect_f32 context_menu_bounds =
         reach_context_menu_state_ptr(host->context_menu_capsule)->bounds;
     reach_host_frame_state frame = {};
-    reach_result result = reach_host_apply_transient_frame(
-        host, REACH_SURFACE_ID_CONTEXT_MENU, &host->context_menu_transition, context_menu_bounds,
-        reach_popup_radius_scaled(host->theme, reach_host_layout_dpi_scale(host)), &frame);
+    reach_result result = reach_host_apply_transient_frame(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                                           &host->context_menu_transition,
+                                                           context_menu_bounds, &frame);
     if (result != REACH_OK)
     {
         return result;
