@@ -63,10 +63,9 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_surfa
     case REACH_FEATURE_ACTION_ACTIVATE_WINDOW:
     {
         reach_result activate_result =
-            action->window != 0
-                ? reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE,
-                                                     action->window)
-                : REACH_OK;
+            action->window != 0 ? reach_host_schedule_window_control(
+                                      host, REACH_WINDOW_CONTROL_ACTIVATE, action->window)
+                                : REACH_OK;
         reach_host_close_surface(host, desc);
         return activate_result;
     }

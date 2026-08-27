@@ -396,7 +396,6 @@ static int32_t reach_top_bar_take_power_release_suppressed(reach_top_bar *top_ba
     return 1;
 }
 
-
 void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
                                 reach_pointer_button button, reach_top_bar_event_result *out)
 {

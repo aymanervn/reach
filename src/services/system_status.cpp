@@ -456,9 +456,8 @@ reach_result reach_system_status_set_session_volume(reach_system_status *service
     {
         return REACH_NOT_IMPLEMENTED;
     }
-    return service->audio_volume.set_session_level(service->audio_volume.userdata,
-                                                   session_instance_id,
-                                                   reach_system_status_clamp01(level));
+    return service->audio_volume.set_session_level(
+        service->audio_volume.userdata, session_instance_id, reach_system_status_clamp01(level));
 }
 
 reach_result reach_system_status_set_default_output_device(reach_system_status *service,
@@ -502,8 +501,8 @@ reach_system_status_set_bluetooth_enabled(reach_system_status *service, int32_t 
 
     if (service->system_controls.request_bluetooth_enabled != nullptr)
     {
-        return service->system_controls.request_bluetooth_enabled(
-                   service->system_controls.userdata, enabled) == REACH_OK
+        return service->system_controls.request_bluetooth_enabled(service->system_controls.userdata,
+                                                                  enabled) == REACH_OK
                    ? REACH_SYSTEM_STATUS_BLUETOOTH_PENDING
                    : REACH_SYSTEM_STATUS_BLUETOOTH_REJECTED;
     }

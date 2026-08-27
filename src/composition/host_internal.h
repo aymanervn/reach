@@ -324,7 +324,6 @@ typedef struct reach_surface_desc
 
     int32_t pointer_priority;
 
-
     void (*dismiss)(reach_host *host);
 
     reach_result (*frame)(reach_host *host, const struct reach_host_frame_context *ctx);
@@ -757,7 +756,6 @@ reach_result reach_host_refresh_tray_items(reach_host *host);
 reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,
                                            reach_tray_action action);
 
-
 void reach_host_close_context_menu(reach_host *host);
 reach_result reach_host_execute_context_command(reach_host *host, uint32_t command);
 reach_result reach_host_show_power_context_menu(reach_host *host);
@@ -839,9 +837,6 @@ reach_result reach_host_toggle_main_volume_mute(reach_host *host);
 reach_result reach_host_step_brightness(reach_host *host, float delta);
 reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mode mode);
 void reach_host_relayout_quick_settings(reach_host *host, int32_t animate_height);
-
-
-
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags);
 void reach_host_on_audio_volume_changed(void *user);
