@@ -23,12 +23,18 @@ void reach_host_release_clipboard_items(reach_host *host)
     {
         return;
     }
-    for (size_t index = 0; index < reach_clipboard_item_count(host->clipboard_capsule); ++index)
+    for (size_t index = 0;
+         index < reach_clipboard_item_count(reach_host_feature_capsule<reach_clipboard_feature>(
+                     host, REACH_SURFACE_ID_CLIPBOARD));
+         ++index)
     {
-        reach_host_release_clipboard_item(host,
-                                          reach_clipboard_item_at(host->clipboard_capsule, index));
+        reach_host_release_clipboard_item(
+            host, reach_clipboard_item_at(reach_host_feature_capsule<reach_clipboard_feature>(
+                                              host, REACH_SURFACE_ID_CLIPBOARD),
+                                          index));
     }
-    reach_clipboard_reset_items(host->clipboard_capsule);
+    reach_clipboard_reset_items(
+        reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD));
 }
 
 void reach_host_clear_clipboard(reach_host *host)
@@ -38,13 +44,19 @@ void reach_host_clear_clipboard(reach_host *host)
         return;
     }
 
-    for (size_t index = 0; index < reach_clipboard_item_count(host->clipboard_capsule); ++index)
+    for (size_t index = 0;
+         index < reach_clipboard_item_count(reach_host_feature_capsule<reach_clipboard_feature>(
+                     host, REACH_SURFACE_ID_CLIPBOARD));
+         ++index)
     {
-        reach_host_release_clipboard_item(host,
-                                          reach_clipboard_item_at(host->clipboard_capsule, index));
+        reach_host_release_clipboard_item(
+            host, reach_clipboard_item_at(reach_host_feature_capsule<reach_clipboard_feature>(
+                                              host, REACH_SURFACE_ID_CLIPBOARD),
+                                          index));
     }
 
-    reach_clipboard_clear_all(host->clipboard_capsule);
+    reach_clipboard_clear_all(
+        reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD));
     host->clipboard_surface.dirty_flags = 1;
     host->dirty.layout = 1;
     reach_host_request_update(host);
@@ -57,14 +69,15 @@ void reach_host_set_clipboard_open(reach_host *host, int32_t open)
         return;
     }
     int32_t next = open ? 1 : 0;
-    if (!reach_clipboard_set_open(host->clipboard_capsule, next))
+    if (!reach_clipboard_set_open(
+            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD),
+            next))
     {
         return;
     }
     if (next)
     {
-        reach_host_surface_opening(host, REACH_SURFACE_ID_CLIPBOARD,
-                               REACH_SURFACE_ORIGIN_NONE);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_ORIGIN_NONE);
     }
     reach_host_surface_transition_set(host, &host->clipboard_transition, next);
     reach_host_sync_pointer_move_subscriptions(host);
@@ -77,13 +90,17 @@ void reach_host_toggle_clipboard(reach_host *host)
 {
     if (host != nullptr)
     {
-        reach_host_set_clipboard_open(host, !reach_clipboard_is_open(host->clipboard_capsule));
+        reach_host_set_clipboard_open(
+            host, !reach_clipboard_is_open(reach_host_feature_capsule<reach_clipboard_feature>(
+                      host, REACH_SURFACE_ID_CLIPBOARD)));
     }
 }
 
 void reach_host_process_clipboard_refresh(reach_host *host)
 {
-    if (host == nullptr || reach_clipboard_feature_take_refresh(host->clipboard_capsule) == 0 ||
+    if (host == nullptr ||
+        reach_clipboard_feature_take_refresh(reach_host_feature_capsule<reach_clipboard_feature>(
+            host, REACH_SURFACE_ID_CLIPBOARD)) == 0 ||
         host->clipboard.ops.capture_current == nullptr)
     {
         return;
@@ -96,7 +113,9 @@ void reach_host_process_clipboard_refresh(reach_host *host)
     }
 
     reach_clipboard_insert_outcome outcome = {};
-    reach_clipboard_insert_captured(host->clipboard_capsule, item, &outcome);
+    reach_clipboard_insert_captured(
+        reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD), item,
+        &outcome);
     if (outcome.release_rejected.id != 0)
     {
         reach_host_release_clipboard_item(host, &outcome.release_rejected);

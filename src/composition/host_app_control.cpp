@@ -137,7 +137,8 @@ void reach_host_process_deferred_launcher_app_launch(reach_host *host)
     {
         return;
     }
-    if (reach_launcher_is_open(host->launcher_capsule) ||
+    if (reach_launcher_is_open(
+            reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)) ||
         reach_host_surface_transition_visible(&host->launcher_transition) ||
         reach_host_surface_transition_active(host, &host->launcher_transition))
     {

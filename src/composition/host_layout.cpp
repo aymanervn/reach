@@ -2,9 +2,10 @@
 
 static reach_window_id reach_host_layout_native_id(const reach_host_layout_target *target)
 {
-    if (target->desc != nullptr && target->desc->surface->window.ops.native_id != nullptr)
+    if (target->runtime != nullptr && target->runtime->surface->window.ops.native_id != nullptr)
     {
-        return target->desc->surface->window.ops.native_id(target->desc->surface->window.window);
+        return target->runtime->surface->window.ops.native_id(
+            target->runtime->surface->window.window);
     }
     if (target->edge_reveal != nullptr && target->edge_reveal->ops.native_id != nullptr)
     {
@@ -16,10 +17,10 @@ static reach_window_id reach_host_layout_native_id(const reach_host_layout_targe
 static reach_result reach_host_layout_set_topmost(const reach_host_layout_target *target,
                                                   int32_t enabled)
 {
-    if (target->desc != nullptr && target->desc->surface->window.ops.set_topmost != nullptr)
+    if (target->runtime != nullptr && target->runtime->surface->window.ops.set_topmost != nullptr)
     {
-        return target->desc->surface->window.ops.set_topmost(target->desc->surface->window.window,
-                                                             enabled);
+        return target->runtime->surface->window.ops.set_topmost(
+            target->runtime->surface->window.window, enabled);
     }
     if (target->edge_reveal != nullptr && target->edge_reveal->ops.set_topmost != nullptr)
     {
@@ -31,10 +32,10 @@ static reach_result reach_host_layout_set_topmost(const reach_host_layout_target
 static reach_result reach_host_layout_place_behind(const reach_host_layout_target *target,
                                                    reach_window_id above)
 {
-    if (target->desc != nullptr && target->desc->surface->window.ops.place_behind != nullptr)
+    if (target->runtime != nullptr && target->runtime->surface->window.ops.place_behind != nullptr)
     {
-        return target->desc->surface->window.ops.place_behind(target->desc->surface->window.window,
-                                                              above);
+        return target->runtime->surface->window.ops.place_behind(
+            target->runtime->surface->window.window, above);
     }
     if (target->edge_reveal != nullptr && target->edge_reveal->ops.place_behind != nullptr)
     {
@@ -46,10 +47,11 @@ static reach_result reach_host_layout_place_behind(const reach_host_layout_targe
 static void reach_host_layout_apply_visibility(const reach_host_layout_target *target,
                                                int32_t visible)
 {
-    if (target->desc != nullptr)
+    if (target->runtime != nullptr)
     {
-        reach_surface_runtime *surface = target->desc->surface;
-        int32_t activates = (target->desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
+        reach_surface_runtime *surface = target->runtime->surface;
+        int32_t activates = (target->runtime->definition->surface.behavior_flags &
+                             REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
 
         if (!visible)
         {

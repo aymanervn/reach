@@ -4,9 +4,11 @@ static int32_t reach_host_bar_forced_shown(const reach_host *host)
 {
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->bar_shown_while_open && desc->capsule_ops != nullptr &&
-            desc->capsule_ops->is_open != nullptr && desc->capsule_ops->is_open(desc->capsule))
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->surface.bar_shown_while_open &&
+            desc->definition->capsule_ops != nullptr &&
+            desc->definition->capsule_ops->is_open != nullptr &&
+            desc->definition->capsule_ops->is_open(desc->capsule))
         {
             return 1;
         }
@@ -26,11 +28,11 @@ void reach_host_invalidate_bar_coverage(reach_host *host)
     {
         for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
         {
-            const reach_surface_desc *desc = &host->surface_descs[index];
-            if (desc->bar_reveal.ops != nullptr &&
-                desc->bar_reveal.ops->invalidate_coverage != nullptr)
+            const reach_feature_runtime *desc = &host->feature_runtimes[index];
+            if (desc->definition->surface.bar_reveal.ops != nullptr &&
+                desc->definition->surface.bar_reveal.ops->invalidate_coverage != nullptr)
             {
-                desc->bar_reveal.ops->invalidate_coverage(desc->capsule);
+                desc->definition->surface.bar_reveal.ops->invalidate_coverage(desc->capsule);
             }
         }
     }
@@ -76,25 +78,25 @@ static void reach_host_apply_pointer_move_subscriptions(reach_host *host, int32_
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_desc *desc = &host->surface_descs[index];
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->surface == nullptr)
         {
             continue;
         }
-        int32_t wants =
-            desc->capsule_ops != nullptr && desc->capsule_ops->wants_pointer_move != nullptr
-                ? desc->capsule_ops->wants_pointer_move(desc->capsule)
-                : 0;
-        if (desc->bar_reveal.ops != nullptr)
+        int32_t wants = desc->definition->capsule_ops != nullptr &&
+                                desc->definition->capsule_ops->wants_pointer_move != nullptr
+                            ? desc->definition->capsule_ops->wants_pointer_move(desc->capsule)
+                            : 0;
+        if (desc->definition->surface.bar_reveal.ops != nullptr)
         {
             wants = 1;
         }
         int32_t game_mode_visible =
-            reach_host_game_mode_enabled(host) &&
-            (desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0;
-        reach_host_sync_pointer_move_enabled(&desc->surface->window,
-                                             (enabled || game_mode_visible) && wants,
-                                             &host->pointer_move.move_enabled[desc->id], force);
+            reach_host_game_mode_enabled(host) && (desc->definition->surface.behavior_flags &
+                                                   REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0;
+        reach_host_sync_pointer_move_enabled(
+            &desc->surface->window, (enabled || game_mode_visible) && wants,
+            &host->pointer_move.move_enabled[desc->definition->id], force);
     }
     if (force)
     {
@@ -146,8 +148,9 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 {
     REACH_ASSERT(host != nullptr);
 
-    const reach_surface_desc *desc = &host->surface_descs[id];
-    if (desc->bar_reveal.ops == nullptr || desc->bar_reveal.ops->update_visibility == nullptr)
+    const reach_feature_runtime *desc = &host->feature_runtimes[id];
+    if (desc->definition->surface.bar_reveal.ops == nullptr ||
+        desc->definition->surface.bar_reveal.ops->update_visibility == nullptr)
     {
         return shown_bounds;
     }
@@ -162,21 +165,26 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.excluded_window = host->window_manipulation.active_window;
     request.reveal_seconds =
         (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
-    request.reveal_span_inset =
-        desc->bar_reveal.span_start_inset_dp * reach_host_layout_dpi_scale(host);
+    request.reveal_span_inset = desc->definition->surface.bar_reveal.span_start_inset_dp *
+                                reach_host_layout_dpi_scale(host);
     request.shadow_clearance = reach_theme_shadow_extent(reach_host_surface_shadow(host, id),
                                                          reach_host_layout_dpi_scale(host));
 
     reach_bar_visibility_result result =
-        desc->bar_reveal.ops->update_visibility(desc->capsule, &request);
+        desc->definition->surface.bar_reveal.ops->update_visibility(desc->capsule, &request);
 
     if (id == REACH_SURFACE_ID_TOP_BAR)
     {
         host->top_bar_hidden = result.visible ? 0 : 1;
-        if (!host->top_bar_hidden && host->system_hud_capsule != nullptr &&
-            reach_system_hud_state_ptr(host->system_hud_capsule)->open)
+        if (!host->top_bar_hidden &&
+            reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD) !=
+                nullptr &&
+            reach_system_hud_state_ptr(
+                reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD))
+                ->open)
         {
-            reach_system_hud_hide(host->system_hud_capsule);
+            reach_system_hud_hide(
+                reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD));
             host->system_hud.dirty_flags = 1;
         }
     }
@@ -187,11 +195,11 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
                                request.force_shown);
     reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_HELD,
                                request.hold_open);
-    if (desc->bar_reveal.active_layer > 0)
+    if (desc->definition->surface.bar_reveal.active_layer > 0)
     {
         reach_layout_set_layer_intent(&host->layout_manager, host->surface_participants[id],
                                       result.reveal_transition_active,
-                                      desc->bar_reveal.active_layer);
+                                      desc->definition->surface.bar_reveal.active_layer);
     }
 
     if (result.redraw && desc->surface != nullptr)
@@ -297,17 +305,19 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
     int32_t position_animating = 0;
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->transition != nullptr &&
             reach_host_surface_transition_active(host, desc->transition))
         {
             return 0;
         }
-        if (desc->bar_reveal.ops == nullptr || desc->bar_reveal.ops->animation == nullptr)
+        if (desc->definition->surface.bar_reveal.ops == nullptr ||
+            desc->definition->surface.bar_reveal.ops->animation == nullptr)
         {
             continue;
         }
-        reach_bar_reveal_animation animation = desc->bar_reveal.ops->animation(desc->capsule);
+        reach_bar_reveal_animation animation =
+            desc->definition->surface.bar_reveal.ops->animation(desc->capsule);
         if (animation.content_animating)
         {
             return 0;
@@ -317,9 +327,11 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
 
     return position_animating && host->has_layout && !host->dirty.update_requested &&
            !host->dirty.layout && !host->dirty.render && !reach_host_any_surface_dirty(host) &&
-           !reach_animation_manager_any_active(
-               reach_top_bar_tray_animation_manager(host->top_bar_capsule)) &&
-           !reach_quick_settings_height_animation_active(host->quick_settings_capsule);
+           !reach_animation_manager_any_active(reach_top_bar_tray_animation_manager(
+               reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR))) &&
+           !reach_quick_settings_height_animation_active(
+               reach_host_feature_capsule<reach_quick_settings>(host,
+                                                                REACH_SURFACE_ID_QUICK_SETTINGS));
 }
 
 reach_result reach_host_move_bar_animation_frame(reach_host *host)
@@ -331,13 +343,15 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->bar_reveal.ops == nullptr || desc->bar_reveal.ops->animation == nullptr ||
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->surface.bar_reveal.ops == nullptr ||
+            desc->definition->surface.bar_reveal.ops->animation == nullptr ||
             desc->surface == nullptr)
         {
             continue;
         }
-        reach_bar_reveal_animation animation = desc->bar_reveal.ops->animation(desc->capsule);
+        reach_bar_reveal_animation animation =
+            desc->definition->surface.bar_reveal.ops->animation(desc->capsule);
         if (!animation.position_animating)
         {
             continue;
@@ -347,16 +361,17 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
         bounds.y = animation.animated_y;
         int32_t window_changed = 0;
         reach_result result = reach_host_apply_window_state(
-            &desc->surface->window, bounds, reach_host_surface_shadow_pad(host, desc->id), 1.0f,
+            &desc->surface->window, bounds,
+            reach_host_surface_shadow_pad(host, desc->definition->id), 1.0f,
             &desc->surface->last_bounds, &desc->surface->last_opacity, &desc->surface->bounds_valid,
             &desc->surface->opacity_valid, &window_changed);
         if (result != REACH_OK)
         {
             return result;
         }
-        if (desc->bar_reveal.ops->position_frame != nullptr)
+        if (desc->definition->surface.bar_reveal.ops->position_frame != nullptr)
         {
-            desc->bar_reveal.ops->position_frame(desc->capsule);
+            desc->definition->surface.bar_reveal.ops->position_frame(desc->capsule);
         }
     }
 

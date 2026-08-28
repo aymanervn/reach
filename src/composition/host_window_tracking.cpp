@@ -197,7 +197,8 @@ reach_result reach_host_refresh_open_windows(reach_host *host, int32_t *out_chan
 
     if (report.items_changed)
     {
-        reach_dock_mark_items_changed(host->dock_capsule);
+        reach_dock_mark_items_changed(
+            reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK));
     }
     if (report.icon_identity_changed)
     {

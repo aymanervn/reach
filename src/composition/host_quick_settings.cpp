@@ -7,7 +7,9 @@ reach_host_quick_settings_layout_context(reach_host *host)
     ctx.theme = host->theme;
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     const reach_top_bar_layout *top_bar_layout =
-        &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
+        &reach_top_bar_state_ptr(
+             reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR))
+             ->layout;
     ctx.anchor_button =
         reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->quick_settings_button);
     reach_rect_f32 monitor = {};
@@ -28,7 +30,9 @@ void reach_host_relayout_quick_settings(reach_host *host, int32_t animate_height
     }
 
     reach_quick_settings_layout_context ctx = reach_host_quick_settings_layout_context(host);
-    reach_quick_settings_relayout(host->quick_settings_capsule, &ctx, animate_height);
+    reach_quick_settings_relayout(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+        &ctx, animate_height);
 }
 
 void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
@@ -39,7 +43,8 @@ void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
     }
 
     int32_t next_open = open ? 1 : 0;
-    if (next_open == reach_quick_settings_is_open(host->quick_settings_capsule))
+    if (next_open == reach_quick_settings_is_open(reach_host_feature_capsule<reach_quick_settings>(
+                         host, REACH_SURFACE_ID_QUICK_SETTINGS)))
     {
         return;
     }
@@ -49,16 +54,25 @@ void reach_host_set_quick_settings_open(reach_host *host, int32_t open)
         reach_host_surface_opening(host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_ID_TOP_BAR);
     }
 
-    (void)reach_quick_settings_set_open(host->quick_settings_capsule, next_open);
+    (void)reach_quick_settings_set_open(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+        next_open);
     reach_host_surface_transition_set(host, &host->quick_settings_transition, next_open);
     reach_host_sync_pointer_move_subscriptions(host);
 
-    reach_quick_settings_set_bluetooth_pending(host->quick_settings_capsule, 0, 0);
+    reach_quick_settings_set_bluetooth_pending(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS), 0,
+        0);
     if (next_open)
     {
-        reach_quick_settings_refresh_system(host->quick_settings_capsule, 0);
-        reach_quick_settings_refresh_audio(host->quick_settings_capsule);
-        reach_quick_settings_reset_height_animation(host->quick_settings_capsule);
+        reach_quick_settings_refresh_system(
+            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+            0);
+        reach_quick_settings_refresh_audio(reach_host_feature_capsule<reach_quick_settings>(
+            host, REACH_SURFACE_ID_QUICK_SETTINGS));
+        reach_quick_settings_reset_height_animation(
+            reach_host_feature_capsule<reach_quick_settings>(host,
+                                                             REACH_SURFACE_ID_QUICK_SETTINGS));
         reach_host_relayout_quick_settings(host, 0);
     }
     else
@@ -80,7 +94,10 @@ void reach_host_toggle_quick_settings(reach_host *host)
     }
 
     reach_host_set_quick_settings_open(
-        host, reach_quick_settings_is_open(host->quick_settings_capsule) ? 0 : 1);
+        host, reach_quick_settings_is_open(reach_host_feature_capsule<reach_quick_settings>(
+                  host, REACH_SURFACE_ID_QUICK_SETTINGS))
+                  ? 0
+                  : 1);
 }
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags)
@@ -120,12 +137,14 @@ void reach_host_process_quick_settings_changes(reach_host *host, double delta_se
         reach_system_status_refresh_audio(host->system_status);
     }
     reach_feature_tick_result changes = {};
-    reach_quick_settings_process_changes(host->quick_settings_capsule, delta_seconds, &changes);
+    reach_quick_settings_process_changes(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+        delta_seconds, &changes);
 
     uint64_t retired[REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     size_t retired_count = reach_quick_settings_take_retired_render_icons(
-        host->quick_settings_capsule, retired,
-        REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES);
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+        retired, REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES);
     for (size_t index = 0; index < retired_count; ++index)
     {
         reach_host_release_render_icon(host, retired[index]);

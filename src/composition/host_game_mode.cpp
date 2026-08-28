@@ -22,11 +22,13 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
     reach_host_close_transient_surfaces(host, 1);
     reach_host_set_clipboard_open(host, 0);
 
-    reach_switcher_force_close(host->switcher_capsule);
+    reach_switcher_force_close(
+        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER));
     reach_animation_manager_init(&host->animations, host->animation_tracks,
                                  REACH_HOST_ANIMATION_COUNT);
     reach_host_surface_transitions_init(host);
-    reach_dock_clear_item_x_animations(host->dock_capsule);
+    reach_dock_clear_item_x_animations(
+        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK));
 
     reach_host_mark_all_surfaces_dirty(host);
     host->dirty.render = 1;
@@ -40,10 +42,10 @@ static void reach_host_disable_bar_pointer_observations(reach_host *host)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        if (host->surface_descs[index].bar_reveal.ops != nullptr)
+        if (host->feature_runtimes[index].definition->surface.bar_reveal.ops != nullptr)
         {
-            (void)host->input_source.ops.set_pointer_region(
-                host->input_source.source, static_cast<uint32_t>(index), {}, 0);
+            (void)host->input_source.ops.set_pointer_region(host->input_source.source,
+                                                            static_cast<uint32_t>(index), {}, 0);
         }
     }
 }
@@ -78,10 +80,11 @@ reach_result reach_host_update_game_mode(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->capsule_ops != nullptr && desc->capsule_ops->on_game_mode != nullptr)
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->capsule_ops != nullptr &&
+            desc->definition->capsule_ops->on_game_mode != nullptr)
         {
-            desc->capsule_ops->on_game_mode(desc->capsule, next_active);
+            desc->definition->capsule_ops->on_game_mode(desc->capsule, next_active);
         }
     }
 

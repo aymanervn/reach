@@ -6,8 +6,8 @@ void reach_host_open_context_menu_transition(reach_host *host)
     {
         return;
     }
-    const reach_context_menu_state *state =
-        reach_context_menu_state_ptr(host->context_menu_capsule);
+    const reach_context_menu_state *state = reach_context_menu_state_ptr(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
     reach_host_surface_transition_set_settle_offset(host, &host->context_menu_transition,
                                                     state != nullptr && state->drop_direction ==
                                                                             REACH_POPUP_DROP_DOWN
@@ -22,8 +22,10 @@ void reach_host_close_context_menu(reach_host *host)
     {
         return;
     }
-    int32_t was_open = reach_context_menu_is_open(host->context_menu_capsule);
-    reach_context_menu_reset(host->context_menu_capsule);
+    int32_t was_open = reach_context_menu_is_open(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
+    reach_context_menu_reset(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
     reach_host_surface_transition_set(host, &host->context_menu_transition, 0);
     host->context_menu.dirty_flags = 1;
     reach_host_sync_pointer_move_subscriptions(host);
@@ -55,8 +57,9 @@ static int32_t reach_host_dock_item_command_allowed(reach_host *host, size_t ite
                                                     uint32_t command)
 {
     uint32_t commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
-    size_t count = reach_dock_build_item_context_commands(host->dock_capsule, item_index, commands,
-                                                          REACH_CONTEXT_MENU_MAX_ITEMS);
+    size_t count = reach_dock_build_item_context_commands(
+        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK), item_index, commands,
+        REACH_CONTEXT_MENU_MAX_ITEMS);
     for (size_t index = 0; index < count; ++index)
     {
         if (commands[index] == command)
@@ -109,22 +112,32 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
                    ? host->power_session.ops.sign_out(host->power_session.session)
                    : REACH_ERROR;
     }
-    if (reach_context_menu_state_ptr(host->context_menu_capsule)->target_index >=
-        reach_dock_item_count(host->dock_capsule))
+    if (reach_context_menu_state_ptr(
+            reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU))
+            ->target_index >=
+        reach_dock_item_count(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
     {
         return REACH_OK;
     }
-    size_t item_index = reach_context_menu_state_ptr(host->context_menu_capsule)->target_index;
+    size_t item_index = reach_context_menu_state_ptr(reach_host_feature_capsule<reach_context_menu>(
+                                                         host, REACH_SURFACE_ID_CONTEXT_MENU))
+                            ->target_index;
     uint16_t item_path[260] = {};
     const uint16_t *path = reach_host_dock_item_path(host, item_index);
     if (path != nullptr)
     {
         (void)reach_copy_utf16(item_path, 260, path);
     }
-    size_t pinned_index = reach_dock_item_at(host->dock_capsule, item_index)->pinned_index;
+    size_t pinned_index =
+        reach_dock_item_at(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                           item_index)
+            ->pinned_index;
     uint32_t pin_id =
         pinned_index < host->pinned_app_count ? host->pinned_apps[pinned_index].id : 0;
-    uintptr_t window_id = reach_dock_item_at(host->dock_capsule, item_index)->window;
+    uintptr_t window_id =
+        reach_dock_item_at(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                           item_index)
+            ->window;
     int32_t command_allowed = reach_host_dock_item_command_allowed(host, item_index, command);
     reach_host_close_context_menu(host);
 
@@ -150,7 +163,10 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
         reach_pinned_app_model app = {};
 
         const reach_window_snapshot *window = reach_window_tracking_window_by_id(
-            host->window_tracking, reach_dock_item_at(host->dock_capsule, item_index)->window);
+            host->window_tracking,
+            reach_dock_item_at(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                               item_index)
+                ->window);
         if (window != nullptr)
         {
             if (host->window_manager.ops.pin_app_for_window == nullptr ||
@@ -179,8 +195,8 @@ reach_result reach_host_execute_context_command(reach_host *host, uint32_t comma
     {
         reach_dock_item_window item_windows[REACH_HOST_MAX_ITEM_WINDOWS] = {};
         size_t item_window_count = reach_dock_collect_item_windows(
-            host->dock_capsule, item_index, host->pinned_apps, host->pinned_app_count, item_windows,
-            REACH_HOST_MAX_ITEM_WINDOWS);
+            reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK), item_index,
+            host->pinned_apps, host->pinned_app_count, item_windows, REACH_HOST_MAX_ITEM_WINDOWS);
         if (item_window_count == 0)
         {
             return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id);
@@ -213,7 +229,9 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
 
     const reach_top_bar_layout *top_bar_layout =
-        &reach_top_bar_state_ptr(host->top_bar_capsule)->layout;
+        &reach_top_bar_state_ptr(
+             reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR))
+             ->layout;
     reach_rect_f32 power_button =
         reach_top_bar_rect_to_screen(top_bar_layout, top_bar_layout->power_button);
 
@@ -226,7 +244,8 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
     ctx.anchored = 1;
     ctx.monitor = reach_host_context_menu_monitor(host, top_bar_layout->bounds);
 
-    reach_context_menu_open_power(host->context_menu_capsule, &ctx);
+    reach_context_menu_open_power(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU), &ctx);
     reach_host_open_context_menu_transition(host);
     host->context_menu.dirty_flags = 1;
     reach_host_sync_pointer_move_subscriptions(host);
@@ -237,7 +256,9 @@ reach_result reach_host_show_power_context_menu(reach_host *host)
 reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item_index, int32_t x,
                                                    int32_t y)
 {
-    if (host == nullptr || item_index >= reach_dock_item_count(host->dock_capsule))
+    if (host == nullptr ||
+        item_index >= reach_dock_item_count(
+                          reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -245,7 +266,8 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
 
     uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     size_t item_count = reach_dock_build_item_context_commands(
-        host->dock_capsule, item_index, item_commands, REACH_CONTEXT_MENU_MAX_ITEMS);
+        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK), item_index,
+        item_commands, REACH_CONTEXT_MENU_MAX_ITEMS);
 
     reach_context_menu_open_context ctx = {};
     ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
@@ -265,7 +287,9 @@ reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item
         ctx.monitor = reach_host_context_menu_monitor(host, host->layout.dock.bounds);
     }
 
-    reach_context_menu_open_for_item(host->context_menu_capsule, item_index, &ctx);
+    reach_context_menu_open_for_item(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
+        item_index, &ctx);
     reach_host_open_context_menu_transition(host);
     host->context_menu.dirty_flags = 1;
     reach_host_sync_pointer_move_subscriptions(host);

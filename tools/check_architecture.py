@@ -382,6 +382,61 @@ MIGRATED_SURFACE_FRAME_RE = re.compile(
     r"system_hud|switcher|clipboard)(?:_surface)?\b"
 )
 
+FEATURE_REGISTRY_SEAM = "src/composition/feature_registry.cpp"
+
+REGISTERED_SURFACE_IDS = (
+    "REACH_SURFACE_ID_DOCK",
+    "REACH_SURFACE_ID_TOP_BAR",
+    "REACH_SURFACE_ID_LAUNCHER",
+    "REACH_SURFACE_ID_CLIPBOARD",
+    "REACH_SURFACE_ID_TRAY",
+    "REACH_SURFACE_ID_QUICK_SETTINGS",
+    "REACH_SURFACE_ID_BATTERY",
+    "REACH_SURFACE_ID_SYSTEM_HUD",
+    "REACH_SURFACE_ID_CONTEXT_MENU",
+    "REACH_SURFACE_ID_SWITCHER",
+    "REACH_SURFACE_ID_STAGE",
+)
+
+REGISTERED_CAPSULE_OPS_RE = re.compile(
+    r"\breach_(dock|top_bar|launcher|clipboard_feature|quick_settings|battery|"
+    r"system_hud|context_menu|switcher|stage)_(?:tray_)?capsule_ops\s*\("
+)
+
+LEGACY_FEATURE_RUNTIME_RE = re.compile(
+    r"\b(reach_surface_desc|surface_descs|frame_priority)\b"
+)
+
+FEATURE_RUNTIME_STRUCT_RE = re.compile(
+    r"typedef\s+struct\s+reach_feature_runtime\s*\{(?P<body>.*?)"
+    r"\}\s*reach_feature_runtime\s*;",
+    re.DOTALL,
+)
+
+TYPED_CAPSULE_ALIAS_RE = re.compile(
+    r"\b(dock|top_bar|launcher|clipboard|quick_settings|battery|system_hud|"
+    r"context_menu|switcher|stage)_capsule\s*;"
+)
+
+IMMUTABLE_RUNTIME_FIELDS = (
+    "id",
+    "capsule_ops",
+    "surface_ops",
+    "force_close",
+    "pointer_flags",
+    "shadow",
+    "behavior_flags",
+    "layer",
+    "role",
+    "pointer_priority",
+    "dismiss",
+    "layout_anchor",
+    "frame_priority",
+    "toggle_events",
+    "routed_events",
+    "frame",
+)
+
 @dataclass(frozen=True)
 class Include:
     delimiter: str
@@ -697,6 +752,87 @@ def validate_migrated_surface_frames(path: Path, text: str) -> list[str]:
     ]
 
 
+def validate_uniform_feature_runtime(path: Path, text: str) -> list[str]:
+    relative = rel(path).replace("\\", "/")
+    if not relative.startswith("src/composition/"):
+        return []
+
+    scan_text = strip_comments(text)
+    violations: list[str] = []
+    legacy = LEGACY_FEATURE_RUNTIME_RE.search(scan_text)
+    if legacy is not None:
+        violations.append(
+            f"{relative}: {legacy.group(0)} is obsolete; use the canonical feature "
+            "definition and runtime"
+        )
+    if (
+        relative != FEATURE_REGISTRY_SEAM
+        and REGISTERED_CAPSULE_OPS_RE.search(scan_text) is not None
+    ):
+        violations.append(
+            f"{relative}: registered capsule operations belong only in "
+            f"{FEATURE_REGISTRY_SEAM}"
+        )
+    return violations
+
+
+def validate_feature_registry_contract() -> list[str]:
+    violations: list[str] = []
+    registry_text = strip_comments(read(ROOT / FEATURE_REGISTRY_SEAM))
+    host_internal_text = strip_comments(
+        read(ROOT / "src" / "composition" / "host_internal.h")
+    )
+
+    runtime_match = FEATURE_RUNTIME_STRUCT_RE.search(host_internal_text)
+    if runtime_match is None:
+        violations.append(
+            "src/composition/host_internal.h: missing reach_feature_runtime declaration"
+        )
+    else:
+        runtime_body = runtime_match.group("body")
+        for field in IMMUTABLE_RUNTIME_FIELDS:
+            if re.search(rf"\b{field}\s*(?:\[|;)", runtime_body) is not None:
+                violations.append(
+                    "src/composition/host_internal.h: immutable feature policy field "
+                    f"{field} belongs in reach_feature_definition"
+                )
+
+    capsule_alias = TYPED_CAPSULE_ALIAS_RE.search(host_internal_text)
+    if capsule_alias is not None:
+        violations.append(
+            "src/composition/host_internal.h: typed capsule alias "
+            f"{capsule_alias.group(0)[:-1]} duplicates reach_feature_runtime"
+        )
+
+    for surface_id in REGISTERED_SURFACE_IDS:
+        definition_count = len(
+            re.findall(
+                rf"\breach_host_define_feature\s*\(\s*host\s*,\s*{surface_id}\b",
+                registry_text,
+            )
+        )
+        if definition_count != 1:
+            violations.append(
+                f"{FEATURE_REGISTRY_SEAM}: {surface_id} must have exactly one runtime binding"
+            )
+        if (
+            re.search(rf"\[\s*{surface_id}\s*\]\.surface_ops\s*=", registry_text)
+            is None
+        ):
+            violations.append(
+                f"{FEATURE_REGISTRY_SEAM}: {surface_id} must declare uniform surface_ops"
+            )
+
+    host_update_text = strip_comments(
+        read(ROOT / "src" / "composition" / "host_update.cpp")
+    )
+    if re.search(r"(?:->|\.)frame\s*\(", host_update_text) is not None:
+        violations.append(
+            "src/composition/host_update.cpp: registered surfaces must not use a named frame fallback"
+        )
+    return violations
+
+
 def validate_public_inner_api(path: Path, text: str) -> list[str]:
     violations: list[str] = []
     source_layer = layer_for_path(path)
@@ -777,6 +913,7 @@ def main() -> int:
     violations.extend(validate_layer_directories())
     violations.extend(validate_document_contract())
     violations.extend(validate_cmake_dependencies())
+    violations.extend(validate_feature_registry_contract())
 
     for path in iter_source_files():
         text = read(path)
@@ -787,6 +924,7 @@ def main() -> int:
         violations.extend(validate_feature_config_ownership(path, text))
         violations.extend(validate_registered_feature_lifecycle(path, text))
         violations.extend(validate_migrated_surface_frames(path, text))
+        violations.extend(validate_uniform_feature_runtime(path, text))
         violations.extend(validate_interfeature_routes(path, text))
         violations.extend(validate_feature_action_vocabulary(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))

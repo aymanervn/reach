@@ -37,7 +37,8 @@ void reach_host_refresh_switcher_windows(reach_host *host)
         return;
     }
 
-    reach_switcher_action action = reach_switcher_sync_windows(host->switcher_capsule);
+    reach_switcher_action action = reach_switcher_sync_windows(
+        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER));
     reach_host_apply_switcher_action(host, action);
 }
 
@@ -50,8 +51,7 @@ reach_result reach_host_handle_switcher_event(reach_host *host, const reach_ui_e
 
     if (event->type == REACH_UI_EVENT_APP_SWITCH_BEGIN)
     {
-        reach_host_surface_opening(host, REACH_SURFACE_ID_SWITCHER,
-                               REACH_SURFACE_ORIGIN_NONE);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_ORIGIN_NONE);
 
         if (host->window_manager.ops.refresh != nullptr)
         {
@@ -61,7 +61,8 @@ reach_result reach_host_handle_switcher_event(reach_host *host, const reach_ui_e
         }
     }
 
-    reach_switcher_action action = reach_switcher_handle_event(host->switcher_capsule, event);
+    reach_switcher_action action = reach_switcher_handle_event(
+        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER), event);
     reach_host_apply_switcher_action(host, action);
     return REACH_OK;
 }

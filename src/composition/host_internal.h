@@ -295,7 +295,6 @@ typedef struct reach_feature_definition
 
     void (*force_close)(reach_host *host);
     void (*dismiss)(reach_host *host);
-    reach_result (*frame)(reach_host *host, const struct reach_host_frame_context *ctx);
     const reach_ui_event_type *toggle_events;
     size_t toggle_event_count;
     void (*toggle)(reach_host *host);
@@ -304,64 +303,23 @@ typedef struct reach_feature_definition
     reach_result (*handle_routed)(reach_host *host, const reach_ui_event *event);
 } reach_feature_definition;
 
-typedef struct reach_surface_desc
+typedef struct reach_feature_runtime
 {
-    reach_surface_id id;
-    reach_surface_class cls;
     reach_surface_runtime *surface;
     reach_host_surface_transition *transition;
-
-    void (*force_close)(reach_host *host);
-
     void *capsule;
-    const reach_feature_capsule_ops *capsule_ops;
-
-    uint32_t pointer_flags;
-
-    reach_surface_shadow shadow;
-    int32_t popup_chrome;
-    int32_t scale_in_envelope;
-
-    uint32_t behavior_flags;
-
-    int32_t layer;
-
-    reach_surface_role role;
-
-    int32_t pointer_priority;
-
-    void (*dismiss)(reach_host *host);
-
-    reach_result (*frame)(reach_host *host, const struct reach_host_frame_context *ctx);
-    int32_t frame_priority;
-
-    const reach_ui_event_type *toggle_events;
-    size_t toggle_event_count;
-    void (*toggle)(reach_host *host);
-
-    const reach_ui_event_type *routed_events;
-    size_t routed_event_count;
-    reach_result (*handle_routed)(reach_host *host, const reach_ui_event *event);
-
-    int32_t bar_shown_while_open;
-    reach_surface_edge_reveal_spec edge_reveal;
-    reach_surface_bar_reveal_spec bar_reveal;
-    reach_feature_factory factory;
-    const reach_feature_surface_ops *surface_ops;
-    reach_surface_id layout_anchor;
-    uint32_t layout_anchor_slot;
     reach_rect_f32 resolved_bounds;
     int32_t resolved_bounds_valid;
     reach_window_thumbnail_id native_overlay_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
     size_t native_overlay_generation;
     int32_t native_overlay_registered;
     const reach_feature_definition *definition;
-} reach_surface_desc;
+} reach_feature_runtime;
 
 typedef struct reach_host_edge_reveal_runtime
 {
     reach_host *host;
-    const reach_surface_desc *owner;
+    const reach_feature_runtime *owner;
     reach_screen_hotspot_port port;
     reach_layout_participant participant;
     int32_t bounds_valid;
@@ -380,12 +338,12 @@ typedef struct reach_host_window_manipulation_state
 
 typedef struct reach_host_layout_target
 {
-    const reach_surface_desc *desc;
+    const reach_feature_runtime *runtime;
     reach_screen_hotspot_port *edge_reveal;
 } reach_host_layout_target;
 
 void reach_host_init_feature_registry(reach_host *host);
-reach_result reach_host_apply_feature_action(reach_host *host, const reach_surface_desc *desc,
+reach_result reach_host_apply_feature_action(reach_host *host, const reach_feature_runtime *runtime,
                                              const reach_capsule_pointer_result *result);
 reach_result reach_host_open_launcher_result_and_close_transients(reach_host *host);
 void reach_host_bind_interfeature_routes(reach_host *host);
@@ -408,7 +366,7 @@ void reach_host_set_edge_reveal_bounds(reach_host_edge_reveal_runtime *runtime,
 void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal_runtime *runtime,
                                         int32_t visible);
 
-int32_t reach_host_surface_is_open(const reach_surface_desc *desc);
+int32_t reach_host_surface_is_open(const reach_feature_runtime *runtime);
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
 int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask);
 int32_t reach_host_any_surface_dirty(const reach_host *host);
@@ -425,9 +383,10 @@ struct reach_host_frame_context
 };
 typedef struct reach_host_frame_context reach_host_frame_context;
 
-void reach_host_sync_surface_input_regions(const reach_host *host, const reach_surface_desc *desc);
+void reach_host_sync_surface_input_regions(const reach_host *host,
+                                           const reach_feature_runtime *runtime);
 
-reach_result reach_host_frame_registered_surface(reach_host *host, reach_surface_desc *desc,
+reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature_runtime *runtime,
                                                  const reach_host_frame_context *ctx);
 reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id);
 
@@ -502,7 +461,7 @@ struct reach_host
     reach_host_surface_transition clipboard_transition;
 
     reach_feature_definition feature_definitions[REACH_HOST_SURFACE_COUNT];
-    reach_surface_desc surface_descs[REACH_HOST_SURFACE_COUNT];
+    reach_feature_runtime feature_runtimes[REACH_HOST_SURFACE_COUNT];
     reach_host_edge_reveal_runtime edge_reveals[REACH_HOST_SURFACE_COUNT];
     reach_layout layout_manager;
     reach_host_layout_target layout_targets[REACH_LAYOUT_MAX_PARTICIPANTS];
@@ -537,22 +496,14 @@ struct reach_host
     reach_host_dirty_state dirty;
     reach_config_service *config_service;
     reach_wallpaper *wallpaper;
-    reach_dock *dock_capsule;
-    reach_top_bar *top_bar_capsule;
-    reach_system_hud *system_hud_capsule;
     int32_t top_bar_hidden;
     reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;
     reach_host_window_list_state window_list;
-    reach_clipboard_feature *clipboard_capsule;
     reach_clipboard_port clipboard;
     reach_search_service *search_service;
     reach_app_control *app_control;
     reach_host_deferred_launch deferred_launch;
-    reach_switcher *switcher_capsule;
-    reach_stage *stage_capsule;
-    reach_context_menu *context_menu_capsule;
-    reach_launcher *launcher_capsule;
     int32_t running;
     reach_runtime_policy_state runtime_policy;
     reach_audio_volume_port audio_volume;
@@ -567,10 +518,20 @@ struct reach_host
     std::atomic<uint32_t> audio_volume_changed;
     reach_system_status *system_status;
     reach_system_stats *system_stats;
-    reach_quick_settings *quick_settings_capsule;
-    reach_battery *battery_capsule;
     reach_popup_capture_port popup_capture;
 };
+
+template <typename Feature>
+static inline Feature *reach_host_feature_capsule(reach_host *host, reach_surface_id id)
+{
+    return static_cast<Feature *>(host->feature_runtimes[id].capsule);
+}
+
+template <typename Feature>
+static inline Feature *reach_host_feature_capsule(const reach_host *host, reach_surface_id id)
+{
+    return static_cast<Feature *>(host->feature_runtimes[id].capsule);
+}
 
 static inline const reach_window_snapshot *reach_host_open_windows(const reach_host *host)
 {
@@ -674,7 +635,7 @@ void reach_host_surface_transition_finish(reach_host *host,
                                           reach_host_surface_transition *transition);
 void reach_host_finish_surface_transitions(reach_host *host);
 
-reach_pointer_event reach_host_surface_pointer_event(const reach_surface_desc *desc,
+reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
                                                      const reach_ui_event *event,
                                                      reach_pointer_event_kind kind);
 

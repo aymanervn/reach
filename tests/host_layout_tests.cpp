@@ -212,7 +212,7 @@ static size_t count_calls(fake_window_call_kind kind)
 static void attach_window(reach_host *host, reach_surface_id id, reach_surface_role role,
                           reach_window_id window_id, int32_t layer)
 {
-    reach_surface_runtime *surface = host->surface_descs[id].surface;
+    reach_surface_runtime *surface = host->feature_runtimes[id].surface;
     surface->window.window = (reach_platform_window *)(uintptr_t)window_id;
     surface->window.ops.show = fake_show;
     surface->window.ops.hide = fake_hide;
@@ -220,24 +220,22 @@ static void attach_window(reach_host *host, reach_surface_id id, reach_surface_r
     surface->window.ops.place_behind = fake_place_behind;
     surface->window.ops.native_id = fake_native_id;
 
-    reach_surface_desc *desc = &host->surface_descs[id];
-    desc->id = id;
-    desc->role = role;
-    desc->surface = surface;
-    desc->layer = layer;
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    expect_true(runtime->definition->surface.role == role,
+                "test window role matches its registered definition");
+    expect_true(runtime->definition->surface.layer == layer,
+                "test window layer matches its registered definition");
 
     reach_layout_participant participant = 0;
     expect_true(reach_layout_register(&host->layout_manager, layer, &participant) == REACH_OK,
                 "layout participant registers");
     host->surface_participants[id] = participant;
-    host->layout_targets[participant].desc = desc;
+    host->layout_targets[participant].runtime = runtime;
 }
 
 static void initialize_host(reach_host *host)
 {
-    host->surface_descs[REACH_SURFACE_ID_TOP_BAR].surface = &host->top_bar;
-    host->surface_descs[REACH_SURFACE_ID_DOCK].surface = &host->dock;
-    host->surface_descs[REACH_SURFACE_ID_STAGE].surface = &host->stage;
+    reach_host_init_feature_registry(host);
     attach_window(host, REACH_SURFACE_ID_TOP_BAR, REACH_SURFACE_TOP_BAR, 101, 0);
     attach_window(host, REACH_SURFACE_ID_DOCK, REACH_SURFACE_DOCK, 102, 110);
     attach_window(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_STAGE, 103, 50);
@@ -299,6 +297,7 @@ static void test_app_band_surface_does_not_invalidate_topmost_order(void)
 static void test_window_manipulation_relevance_survives_unavailable_pointer(void)
 {
     reach_host *host = &manipulation_host;
+    reach_host_init_feature_registry(host);
     host->input_source.ops.get_window_manipulation = fake_get_window_manipulation;
     host->window_manipulation.manual = {501, 1};
     host->window_manipulation.manual_relevant = 1;
@@ -323,6 +322,7 @@ static void test_window_manipulation_relevance_survives_unavailable_pointer(void
 static void test_window_manipulation_tracks_pointer_monitor_membership(void)
 {
     reach_host *host = &monitor_entry_host;
+    reach_host_init_feature_registry(host);
     host->input_source.ops.get_pointer_position = fake_get_pointer_position;
     host->input_source.ops.get_window_manipulation = fake_get_window_manipulation;
     host->monitors.list = reinterpret_cast<reach_monitor_list *>(&primary_monitor);
@@ -359,7 +359,7 @@ static void test_window_manipulation_tracks_pointer_monitor_membership(void)
                 "ending a drag that entered the monitor releases suppression");
 }
 
-static void test_descriptor_transition_completion(void)
+static void test_registered_transition_completion(void)
 {
     reach_host *host = &transition_host;
     reach_animation_track tracks[REACH_HOST_ANIMATION_COUNT] = {};
@@ -370,14 +370,14 @@ static void test_descriptor_transition_completion(void)
     transition.y_track = 0;
     transition.opacity_track = 1;
     transition.scale_track = REACH_HOST_ANIMATION_COUNT;
-    host->surface_descs[REACH_SURFACE_ID_SYSTEM_HUD].transition = &transition;
+    host->feature_runtimes[REACH_SURFACE_ID_SYSTEM_HUD].transition = &transition;
 
     reach_host_finish_surface_transitions(host);
 
     expect_true(!transition.visible,
-                "a transition registered only in the descriptor table completes");
+                "a transition registered only in the feature runtime completes");
     expect_true(host->dirty.update_requested,
-                "finishing a descriptor transition schedules reconciliation");
+                "finishing a registered transition schedules reconciliation");
 }
 
 static void test_scaled_transition_keeps_native_envelope_stationary(void)
@@ -426,8 +426,10 @@ static void test_popup_pointer_coordinates_are_surface_local(void)
     surface.bounds_valid = 1;
     surface.last_bounds = {120.0f, 45.0f, 300.0f, 200.0f};
 
-    reach_surface_desc popup = {};
-    popup.cls = REACH_SURFACE_CLASS_POPUP;
+    reach_feature_definition definition = {};
+    definition.surface.cls = REACH_SURFACE_CLASS_POPUP;
+    reach_feature_runtime popup = {};
+    popup.definition = &definition;
     popup.surface = &surface;
 
     reach_ui_event event = {};
@@ -443,7 +445,7 @@ static void test_popup_pointer_coordinates_are_surface_local(void)
     expect_true(pointer.x == 35 && pointer.y == 36,
                 "popup pointer events are translated from screen to surface coordinates");
 
-    popup.cls = REACH_SURFACE_CLASS_PERSISTENT;
+    definition.surface.cls = REACH_SURFACE_CLASS_PERSISTENT;
     pointer = reach_host_surface_pointer_event(&popup, &event, REACH_POINTER_EVENT_DOWN);
     expect_true(pointer.coordinate_space == REACH_POINTER_COORDINATE_SCREEN,
                 "non-popup pointer events retain screen coordinates");
@@ -458,58 +460,51 @@ static void test_registered_feature_lifecycle(void)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *runtime = &host->surface_descs[index];
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         const reach_feature_definition *definition = runtime->definition;
         expect_true(definition != nullptr, "every runtime references an immutable definition");
-        expect_true(definition != nullptr && definition->id == runtime->id,
+        expect_true(definition != nullptr && definition->id == index,
                     "every definition has the runtime's stable surface id");
-        expect_true(definition != nullptr && definition->capsule_ops == runtime->capsule_ops,
+        expect_true(definition != nullptr && definition->capsule_ops != nullptr,
                     "every definition owns the capsule operation contract");
-        expect_true(definition != nullptr && definition->surface_ops != nullptr &&
-                        runtime->frame == nullptr,
+        expect_true(definition != nullptr && definition->surface_ops != nullptr,
                     "every registered surface uses the generic frame contract");
-        expect_true(definition != nullptr && definition->surface.cls == runtime->cls &&
-                        definition->surface.role == runtime->role &&
-                        definition->surface.layer == runtime->layer,
-                    "every definition owns the surface specification");
-        expect_true(definition != nullptr && definition->layout.anchor == runtime->layout_anchor &&
-                        definition->layout.priority == runtime->frame_priority,
-                    "every definition owns the layout specification");
+        expect_true(definition != nullptr && runtime->definition == definition,
+                    "every runtime references its sole immutable definition");
     }
 
     const reach_feature_definition *launcher =
-        host->surface_descs[REACH_SURFACE_ID_LAUNCHER].definition;
+        host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].definition;
     expect_true(launcher->surface.scale_in_envelope &&
                     launcher->surface_ops->set_pointer_transform != nullptr,
                 "Launcher declares its envelope transform contract");
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU]
+                        .definition->surface_ops->layout_anchor != nullptr,
+                "Context Menu declares runtime-selected layout anchoring");
     expect_true(
-        host->surface_descs[REACH_SURFACE_ID_CONTEXT_MENU].definition->surface_ops->layout_anchor !=
-            nullptr,
-        "Context Menu declares runtime-selected layout anchoring");
-    expect_true(
-        host->surface_descs[REACH_SURFACE_ID_STAGE].definition->surface_ops->native_overlay !=
+        host->feature_runtimes[REACH_SURFACE_ID_STAGE].definition->surface_ops->native_overlay !=
             nullptr,
         "Stage declares its native overlay contract");
-    expect_true(host->surface_descs[REACH_SURFACE_ID_DOCK].definition->resolve_anchor != nullptr &&
-                    host->surface_descs[REACH_SURFACE_ID_TOP_BAR].definition->resolve_anchor !=
-                        nullptr,
-                "dynamic anchor owners publish generic anchor resolvers");
+    expect_true(
+        host->feature_runtimes[REACH_SURFACE_ID_DOCK].definition->resolve_anchor != nullptr &&
+            host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].definition->resolve_anchor != nullptr,
+        "dynamic anchor owners publish generic anchor resolvers");
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        expect_true(host->surface_descs[index].capsule != nullptr,
+        expect_true(host->feature_runtimes[index].capsule != nullptr,
                     "every registered surface receives its capsule");
     }
-    expect_true(host->surface_descs[REACH_SURFACE_ID_TRAY].capsule ==
-                    host->surface_descs[REACH_SURFACE_ID_TOP_BAR].capsule,
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_TRAY].capsule ==
+                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].capsule,
                 "the tray surface reuses its registered top-bar owner");
 
     reach_host_destroy_registered_features(host);
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        expect_true(host->surface_descs[index].capsule == nullptr,
+        expect_true(host->feature_runtimes[index].capsule == nullptr,
                     "destroying registered features clears every surface capsule");
     }
 }
@@ -523,16 +518,18 @@ static void test_registered_surface_frame_uses_declared_anchor(void)
     reach_host_init_layout(host);
     host->layout_dpi_scale = 1.0f;
 
-    reach_surface_desc *dock = &host->surface_descs[REACH_SURFACE_ID_DOCK];
+    reach_feature_runtime *dock = &host->feature_runtimes[REACH_SURFACE_ID_DOCK];
     dock->resolved_bounds = {710.0f, 1000.0f, 500.0f, 64.0f};
     dock->resolved_bounds_valid = 1;
 
     reach_brightness_state brightness = {};
     brightness.available = 1;
     brightness.level = 0.75f;
-    reach_system_hud_show_brightness(host->system_hud_capsule, &brightness);
+    reach_system_hud_show_brightness(
+        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD),
+        &brightness);
 
-    reach_surface_desc *hud = &host->surface_descs[REACH_SURFACE_ID_SYSTEM_HUD];
+    reach_feature_runtime *hud = &host->feature_runtimes[REACH_SURFACE_ID_SYSTEM_HUD];
     hud->surface->window.window = reinterpret_cast<reach_platform_window *>(1);
     hud->surface->window.ops.set_bounds = fake_set_bounds;
     hud->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
@@ -548,7 +545,8 @@ static void test_registered_surface_frame_uses_declared_anchor(void)
     expect_true(reach_host_frame_registered_surface(host, hud, &frame) == REACH_OK,
                 "the generic registered surface frame succeeds");
 
-    const reach_system_hud_state *state = reach_system_hud_state_ptr(host->system_hud_capsule);
+    const reach_system_hud_state *state = reach_system_hud_state_ptr(
+        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD));
     expect_true(
         reach_host_scalar_equal(state->layout.bounds.y + state->layout.bounds.height, 988.0f),
         "the generic frame arranges from the declared Dock anchor");
@@ -577,10 +575,12 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     window.label = label;
     window.frame = {100.0f, 100.0f, 800.0f, 600.0f};
     reach_rect_f32 monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
-    expect_true(reach_stage_open(host->stage_capsule, monitor, 1.0f, &window, 1) == REACH_OK,
-                "Stage opens for native-overlay frame testing");
+    expect_true(
+        reach_stage_open(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE),
+                         monitor, 1.0f, &window, 1) == REACH_OK,
+        "Stage opens for native-overlay frame testing");
 
-    reach_surface_desc *stage = &host->surface_descs[REACH_SURFACE_ID_STAGE];
+    reach_feature_runtime *stage = &host->feature_runtimes[REACH_SURFACE_ID_STAGE];
     stage->transition = nullptr;
     stage->surface->window.window = reinterpret_cast<reach_platform_window *>(9);
     stage->surface->window.ops.set_bounds = fake_set_bounds;
@@ -606,7 +606,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     expect_true(thumbnail_create_count == 1 && thumbnail_place_count == 1,
                 "generic frame registers and places the Stage thumbnail");
 
-    reach_stage_force_close(host->stage_capsule);
+    reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "generic frame handles native-overlay closure");
     expect_true(thumbnail_destroy_count == 1,
@@ -645,7 +645,7 @@ int main(void)
     test_app_band_surface_does_not_invalidate_topmost_order();
     test_window_manipulation_relevance_survives_unavailable_pointer();
     test_window_manipulation_tracks_pointer_monitor_membership();
-    test_descriptor_transition_completion();
+    test_registered_transition_completion();
     test_scaled_transition_keeps_native_envelope_stationary();
     test_popup_pointer_coordinates_are_surface_local();
     test_registered_feature_lifecycle();

@@ -1,6 +1,6 @@
 #include "host_internal.h"
 
-static int32_t reach_host_surface_contains_point(const reach_surface_desc *desc,
+static int32_t reach_host_surface_contains_point(const reach_feature_runtime *desc,
                                                  reach_point_i32 point)
 {
     const reach_surface_runtime *surface = desc->surface;
@@ -14,13 +14,13 @@ static int32_t reach_host_surface_contains_point(const reach_surface_desc *desc,
            (float)point.y >= bounds->y && (float)point.y <= bounds->y + bounds->height;
 }
 
-static int32_t reach_host_bar_cluster_holds_surface_open(reach_host *host,
-                                                         const reach_surface_desc *desc,
-                                                         reach_dock_pointer_region dock_region,
-                                                         reach_top_bar_pointer_region top_bar_region)
+static int32_t
+reach_host_bar_cluster_holds_surface_open(reach_host *host, const reach_feature_runtime *desc,
+                                          reach_dock_pointer_region dock_region,
+                                          reach_top_bar_pointer_region top_bar_region)
 {
     (void)host;
-    switch (desc->id)
+    switch (desc->definition->id)
     {
     case REACH_SURFACE_ID_TRAY:
         return top_bar_region == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW;
@@ -29,7 +29,9 @@ static int32_t reach_host_bar_cluster_holds_surface_open(reach_host *host,
     case REACH_SURFACE_ID_BATTERY:
         return top_bar_region == REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON;
     case REACH_SURFACE_ID_CONTEXT_MENU:
-        return reach_context_menu_state_ptr(host->context_menu_capsule)->power_open &&
+        return reach_context_menu_state_ptr(reach_host_feature_capsule<reach_context_menu>(
+                                                host, REACH_SURFACE_ID_CONTEXT_MENU))
+                   ->power_open &&
                top_bar_region == REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
     case REACH_SURFACE_ID_LAUNCHER:
         return dock_region != REACH_DOCK_POINTER_REGION_NONE;
@@ -51,25 +53,29 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
                                      ? reach_dock_local_point(&host->layout.dock, point.x, point.y)
                                      : reach_point_i32{};
     reach_dock_pointer_region dock_region =
-        host->has_layout
-            ? reach_dock_pointer_region_at(host->dock_capsule, dock_point.x, dock_point.y)
-            : REACH_DOCK_POINTER_REGION_NONE;
+        host->has_layout ? reach_dock_pointer_region_at(
+                               reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                               dock_point.x, dock_point.y)
+                         : REACH_DOCK_POINTER_REGION_NONE;
 
-    const reach_top_bar_state *top_bar_state = reach_top_bar_state_ptr(host->top_bar_capsule);
+    const reach_top_bar_state *top_bar_state = reach_top_bar_state_ptr(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR));
     reach_point_i32 top_bar_point =
         reach_top_bar_local_point(&top_bar_state->layout, point.x, point.y);
-    reach_top_bar_pointer_region top_bar_region =
-        reach_top_bar_pointer_region_at(host->top_bar_capsule, top_bar_point.x, top_bar_point.y);
+    reach_top_bar_pointer_region top_bar_region = reach_top_bar_pointer_region_at(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), top_bar_point.x,
+        top_bar_point.y);
 
     int32_t closed_any = 0;
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->cls != REACH_SURFACE_CLASS_TRANSIENT && desc->cls != REACH_SURFACE_CLASS_POPUP)
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->surface.cls != REACH_SURFACE_CLASS_TRANSIENT &&
+            desc->definition->surface.cls != REACH_SURFACE_CLASS_POPUP)
         {
             continue;
         }
-        if (desc->force_close == nullptr || !reach_host_surface_is_open(desc) ||
+        if (desc->definition->force_close == nullptr || !reach_host_surface_is_open(desc) ||
             reach_host_surface_contains_point(desc, point) ||
             reach_host_bar_cluster_holds_surface_open(host, desc, dock_region, top_bar_region))
         {
@@ -81,7 +87,7 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
             continue;
         }
 
-        desc->force_close(host);
+        desc->definition->force_close(host);
         closed_any = 1;
     }
 
@@ -120,8 +126,7 @@ void reach_host_sync_popup_mouse_hook(reach_host *host)
     }
 }
 
-void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask,
-                                      int32_t restore_focus)
+void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int32_t restore_focus)
 {
     if (host == nullptr)
     {
@@ -130,18 +135,18 @@ void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask,
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if ((class_mask & reach_surface_class_bit(desc->cls)) == 0)
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if ((class_mask & reach_surface_class_bit(desc->definition->surface.cls)) == 0)
         {
             continue;
         }
-        if (restore_focus && desc->dismiss != nullptr)
+        if (restore_focus && desc->definition->dismiss != nullptr)
         {
-            desc->dismiss(host);
+            desc->definition->dismiss(host);
         }
-        else if (desc->force_close != nullptr)
+        else if (desc->definition->force_close != nullptr)
         {
-            desc->force_close(host);
+            desc->definition->force_close(host);
         }
     }
     reach_host_clear_sticky_dock_feedback(host);
