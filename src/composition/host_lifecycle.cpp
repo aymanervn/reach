@@ -256,20 +256,33 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->config_store.ops.destroy(host->config_store.store);
     }
-    reach_launcher_attach_search(host->launcher_capsule, nullptr);
-    reach_launcher_attach_icons(host->launcher_capsule, nullptr);
-    reach_launcher_set_terminal_icon_ref(host->launcher_capsule, nullptr);
-    reach_dock_attach_services(host->dock_capsule, nullptr, nullptr);
-    reach_top_bar_attach_app_control(host->top_bar_capsule, nullptr);
-    reach_top_bar_attach_services(host->top_bar_capsule, nullptr, nullptr, nullptr, nullptr,
-                                  nullptr, nullptr, nullptr);
+    reach_launcher_attach_search(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER), nullptr);
+    reach_launcher_attach_icons(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER), nullptr);
+    reach_launcher_set_terminal_icon_ref(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER), nullptr);
+    reach_dock_attach_services(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                               nullptr, nullptr);
+    reach_top_bar_attach_app_control(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr);
+    reach_top_bar_attach_services(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr);
     reach_tray_service_destroy(host->tray_service);
     host->tray_service = nullptr;
-    reach_switcher_attach_services(host->switcher_capsule, nullptr, nullptr);
-    reach_quick_settings_attach_status(host->quick_settings_capsule, nullptr);
-    reach_battery_attach_services(host->battery_capsule, nullptr, nullptr);
+    reach_switcher_attach_services(
+        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER), nullptr,
+        nullptr);
+    reach_quick_settings_attach_status(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+        nullptr);
+    reach_battery_attach_services(
+        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), nullptr,
+        nullptr);
     reach_host_clear_interfeature_routes(host);
-    reach_system_hud_attach_now_playing(host->system_hud_capsule, nullptr);
+    reach_system_hud_attach_now_playing(
+        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD), nullptr);
     reach_search_service_destroy(host->search_service);
     host->search_service = nullptr;
     reach_system_status_destroy(host->system_status);
@@ -375,12 +388,6 @@ static void reach_host_cleanup(reach_host *host)
     host->wallpaper_service = {};
     host->wallpaper_surface = {};
     host->wallpaper = nullptr;
-    host->switcher_capsule = nullptr;
-    host->stage_capsule = nullptr;
-    host->quick_settings_capsule = nullptr;
-    host->system_hud_capsule = nullptr;
-    host->clipboard_capsule = nullptr;
-    host->dock_capsule = nullptr;
     host->power_session = {};
     host->audio_volume = {};
     host->system_controls = {};
@@ -434,13 +441,15 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->capsule_ops != nullptr && desc->capsule_ops->reset != nullptr)
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->capsule_ops != nullptr &&
+            desc->definition->capsule_ops->reset != nullptr)
         {
-            desc->capsule_ops->reset(desc->capsule);
+            desc->definition->capsule_ops->reset(desc->capsule);
         }
     }
-    reach_clipboard_feature_clear_refresh(host->clipboard_capsule);
+    reach_clipboard_feature_clear_refresh(
+        reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD));
 
     host->system_controls = {};
     host->quick_settings_system_change_flags.store(0);
@@ -580,27 +589,46 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
-    reach_launcher_attach_search(host->launcher_capsule, host->search_service);
-    reach_launcher_attach_icons(host->launcher_capsule, host->icon_service);
+    reach_launcher_attach_search(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
+        host->search_service);
+    reach_launcher_attach_icons(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
+        host->icon_service);
     uint16_t terminal_icon_ref[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
     if (host->terminal_launcher.ops.icon_ref != nullptr)
     {
         (void)host->terminal_launcher.ops.icon_ref(
             host->terminal_launcher.launcher, terminal_icon_ref, REACH_SEARCH_RESULT_PATH_CAPACITY);
     }
-    reach_launcher_set_terminal_icon_ref(host->launcher_capsule, terminal_icon_ref);
-    reach_dock_attach_services(host->dock_capsule, host->icon_service, host->window_tracking);
-    reach_top_bar_attach_services(host->top_bar_capsule, host->now_playing_service,
-                                  host->icon_service, host->window_tracking, host->system_stats,
-                                  host->clock, host->input_language, host->tray_service);
-    reach_top_bar_attach_app_control(host->top_bar_capsule, host->app_control);
-    reach_switcher_attach_services(host->switcher_capsule, host->icon_service,
-                                   host->window_tracking);
-    reach_quick_settings_attach_status(host->quick_settings_capsule, host->system_status);
-    reach_battery_attach_services(host->battery_capsule, host->system_stats, host->system_status);
+    reach_launcher_set_terminal_icon_ref(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
+        terminal_icon_ref);
+    reach_dock_attach_services(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                               host->icon_service, host->window_tracking);
+    reach_top_bar_attach_services(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR),
+        host->now_playing_service, host->icon_service, host->window_tracking, host->system_stats,
+        host->clock, host->input_language, host->tray_service);
+    reach_top_bar_attach_app_control(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR),
+        host->app_control);
+    reach_switcher_attach_services(
+        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER),
+        host->icon_service, host->window_tracking);
+    reach_quick_settings_attach_status(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+        host->system_status);
+    reach_battery_attach_services(
+        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY),
+        host->system_stats, host->system_status);
     reach_host_bind_interfeature_routes(host);
-    reach_top_bar_attach_status(host->top_bar_capsule, host->system_status);
-    reach_system_hud_attach_now_playing(host->system_hud_capsule, host->now_playing_service);
+    reach_top_bar_attach_status(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR),
+        host->system_status);
+    reach_system_hud_attach_now_playing(
+        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD),
+        host->now_playing_service);
     reach_system_status_refresh_system(host->system_status, 0);
     host->clipboard = dependencies->clipboard;
     host->theme = reach_theme_default();
@@ -810,7 +838,8 @@ reach_result reach_host_start(reach_host *host)
         {
             return result;
         }
-        reach_clipboard_feature_request_refresh(host->clipboard_capsule);
+        reach_clipboard_feature_request_refresh(
+            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD));
     }
     reach_host_sync_pointer_move_subscriptions(host);
     result = reach_host_start_edge_reveals(host);
@@ -868,8 +897,10 @@ reach_result reach_host_start(reach_host *host)
     host->switcher.dirty_flags = 1;
     host->quick_settings.dirty_flags = 1;
     host->system_hud.dirty_flags = 1;
-    reach_context_menu_force_close(host->context_menu_capsule);
-    reach_quick_settings_force_close(host->quick_settings_capsule);
+    reach_context_menu_force_close(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
+    reach_quick_settings_force_close(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS));
     return REACH_OK;
 }
 
@@ -882,14 +913,18 @@ reach_result reach_host_stop(reach_host *host)
 
     host->running = 0;
     reach_runtime_policy_init(&host->runtime_policy);
-    reach_switcher_force_close(host->switcher_capsule);
-    reach_stage_force_close(host->stage_capsule);
-    reach_context_menu_force_close(host->context_menu_capsule);
+    reach_switcher_force_close(
+        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER));
+    reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
+    reach_context_menu_force_close(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
     reach_host_set_tray_popup_open(host, 0);
     reach_host_set_quick_settings_open(host, 0);
     reach_host_set_battery_open(host, 0);
-    reach_system_hud_force_close(host->system_hud_capsule);
-    reach_launcher_cancel_search(host->launcher_capsule);
+    reach_system_hud_force_close(
+        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD));
+    reach_launcher_cancel_search(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
     reach_host_stop_config_service(host);
     reach_host_stop_launcher_search_worker(host);
     reach_icon_service_stop(host->icon_service);

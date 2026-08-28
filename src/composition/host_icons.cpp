@@ -42,7 +42,8 @@ void reach_host_drain_icon_evictions(reach_host *host)
         return;
     }
 
-    reach_dock_touch_icons(host->dock_capsule, reach_host_icon_size_px(host));
+    reach_dock_touch_icons(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                           reach_host_icon_size_px(host));
     reach_icon_service_trim(host->icon_service, REACH_HOST_ICON_TRIM_SECONDS);
     for (;;)
     {
@@ -81,7 +82,8 @@ void reach_host_release_tray_render_icons(reach_host *host)
         return;
     }
 
-    size_t count = reach_top_bar_tray_item_count(host->top_bar_capsule);
+    size_t count = reach_top_bar_tray_item_count(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR));
     if (count > REACH_MAX_TRAY_ITEMS)
     {
         count = REACH_MAX_TRAY_ITEMS;
@@ -89,7 +91,8 @@ void reach_host_release_tray_render_icons(reach_host *host)
 
     for (size_t index = 0; index < count; ++index)
     {
-        uint64_t icon_id = reach_top_bar_tray_item_icon_id(host->top_bar_capsule, index);
+        uint64_t icon_id = reach_top_bar_tray_item_icon_id(
+            reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), index);
         if (icon_id != 0)
         {
             reach_host_release_render_icon(host, icon_id);
@@ -105,7 +108,9 @@ void reach_host_release_quick_settings_audio_render_icons(reach_host *host)
     }
 
     const reach_quick_settings_model *model =
-        &reach_quick_settings_state_ptr(host->quick_settings_capsule)->model;
+        &reach_quick_settings_state_ptr(reach_host_feature_capsule<reach_quick_settings>(
+                                            host, REACH_SURFACE_ID_QUICK_SETTINGS))
+             ->model;
     size_t session_count = model->sessions.count;
     if (session_count > REACH_AUDIO_VOLUME_MAX_SESSIONS)
     {

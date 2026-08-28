@@ -85,7 +85,8 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
     uint16_t old_order_aumids[REACH_MAX_PINNED_APPS][260] = {};
     size_t pin_slot_count = 0;
 
-    size_t old_order_count = reach_dock_order_count(host->dock_capsule);
+    size_t old_order_count =
+        reach_dock_order_count(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK));
     if (old_order_count > REACH_MAX_DOCK_ITEMS)
     {
         old_order_count = REACH_MAX_DOCK_ITEMS;
@@ -94,7 +95,8 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
     for (size_t order_index = 0; order_index < old_order_count; ++order_index)
     {
         old_order_pin_slot[order_index] = REACH_MAX_PINNED_APPS;
-        old_order[order_index] = reach_dock_order_key_at(host->dock_capsule, order_index);
+        old_order[order_index] = reach_dock_order_key_at(
+            reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK), order_index);
         if (!old_order[order_index].pinned)
         {
             continue;
@@ -181,12 +183,14 @@ static reach_result reach_host_apply_pins_from_snapshot(reach_host *host,
             }
         }
     }
-    reach_dock_restore_order(host->dock_capsule, old_order, old_order_count);
+    reach_dock_restore_order(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                             old_order, old_order_count);
     host->dirty.layout = 1;
     host->dirty.render = 1;
     host->dock.dirty_flags = 1;
     host->launcher.dirty_flags = 1;
-    reach_dock_mark_items_changed(host->dock_capsule);
+    reach_dock_mark_items_changed(
+        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK));
     reach_host_request_update(host);
     return result;
 }
@@ -280,8 +284,9 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
     reach_host_apply_display_config(host, snapshot);
     if (snapshot->stage_animation_ms > 0)
     {
-        reach_stage_set_animation_seconds(host->stage_capsule,
-                                          (float)snapshot->stage_animation_ms / 1000.0f);
+        reach_stage_set_animation_seconds(
+            reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE),
+            (float)snapshot->stage_animation_ms / 1000.0f);
     }
     return REACH_OK;
 }
@@ -301,7 +306,7 @@ void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface == nullptr || surface->renderer.ops.set_ui_font == nullptr)
         {
             continue;
@@ -328,7 +333,7 @@ void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface != nullptr)
         {
             reach_surface_runtime_mark_dirty(surface, 1);

@@ -11,7 +11,8 @@ static void reach_host_route_dock_item_context_menu(void *user, size_t item_inde
 
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
     (void)reach_host_show_dock_app_context_menu(host, item_index, x, y);
-    if (reach_dock_retain_context_feedback(host->dock_capsule))
+    if (reach_dock_retain_context_feedback(
+            reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
     {
         host->dock.dirty_flags = 1;
     }
@@ -84,7 +85,8 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     dock.item_context_menu = reach_host_route_dock_item_context_menu;
     dock.item_hovered = reach_host_route_dock_item_hovered;
     dock.trigger_activated = reach_host_route_dock_trigger_activated;
-    reach_dock_set_routes(host->dock_capsule, &dock);
+    reach_dock_set_routes(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                          &dock);
 
     reach_top_bar_routes top_bar = {};
     top_bar.user = host;
@@ -92,14 +94,17 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     top_bar.quick_settings_activated = reach_host_route_top_bar_quick_settings_activated;
     top_bar.battery_activated = reach_host_route_top_bar_battery_activated;
     top_bar.tray_overflow_activated = reach_host_route_top_bar_tray_overflow_activated;
-    reach_top_bar_set_routes(host->top_bar_capsule, &top_bar);
+    reach_top_bar_set_routes(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), &top_bar);
 }
 
 void reach_host_clear_interfeature_routes(reach_host *host)
 {
     if (host != nullptr)
     {
-        reach_dock_set_routes(host->dock_capsule, nullptr);
-        reach_top_bar_set_routes(host->top_bar_capsule, nullptr);
+        reach_dock_set_routes(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                              nullptr);
+        reach_top_bar_set_routes(
+            reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr);
     }
 }

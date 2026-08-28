@@ -44,10 +44,14 @@ void reach_host_cleanup_closed_launcher(reach_host *host)
         return;
     }
 
-    reach_launcher_cancel_search(host->launcher_capsule);
-    reach_launcher_clear_query(host->launcher_capsule);
-    (void)reach_launcher_clear_results(host->launcher_capsule);
-    reach_launcher_reset_text_edit(host->launcher_capsule);
+    reach_launcher_cancel_search(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
+    reach_launcher_clear_query(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
+    (void)reach_launcher_clear_results(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
+    reach_launcher_reset_text_edit(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
 }
 
 void reach_host_notify_launcher_search_ready(reach_host *host)
@@ -68,8 +72,9 @@ void reach_host_remember_launcher_restore_window(reach_host *host)
         return;
     }
 
-    reach_launcher_remember_restore_window(host->launcher_capsule,
-                                           reach_host_foreground_window(host));
+    reach_launcher_remember_restore_window(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
+        reach_host_foreground_window(host));
 }
 
 void reach_host_toggle_launcher(reach_host *host)
@@ -78,14 +83,15 @@ void reach_host_toggle_launcher(reach_host *host)
     {
         return;
     }
-    if (!reach_launcher_is_open(host->launcher_capsule))
+    if (!reach_launcher_is_open(
+            reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)))
     {
         host->launcher_restore_pending = 0;
         reach_host_remember_launcher_restore_window(host);
-        reach_host_surface_opening(host, REACH_SURFACE_ID_LAUNCHER,
-                                   REACH_SURFACE_ORIGIN_NONE);
+        reach_host_surface_opening(host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_ORIGIN_NONE);
     }
-    (void)reach_launcher_toggle(host->launcher_capsule);
+    (void)reach_launcher_toggle(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
 }
 
 void reach_host_clear_launcher_restore_window(reach_host *host)
@@ -95,7 +101,8 @@ void reach_host_clear_launcher_restore_window(reach_host *host)
         return;
     }
 
-    reach_launcher_clear_restore_window(host->launcher_capsule);
+    reach_launcher_clear_restore_window(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
 }
 
 static int32_t reach_host_launcher_can_restore_focus_to(reach_host *host, uintptr_t window)
@@ -134,7 +141,8 @@ void reach_host_restore_launcher_focus(reach_host *host)
         return;
     }
 
-    uintptr_t window = reach_launcher_take_restore_window(host->launcher_capsule);
+    uintptr_t window = reach_launcher_take_restore_window(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
     if (window != 0 && reach_host_launcher_can_restore_focus_to(host, window))
     {
         (void)reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window);
@@ -143,12 +151,14 @@ void reach_host_restore_launcher_focus(reach_host *host)
 
 static void reach_host_close_launcher_impl(reach_host *host, int32_t restore_focus)
 {
-    if (host == nullptr || !reach_launcher_is_open(host->launcher_capsule))
+    if (host == nullptr || !reach_launcher_is_open(reach_host_feature_capsule<reach_launcher>(
+                               host, REACH_SURFACE_ID_LAUNCHER)))
     {
         return;
     }
 
-    (void)reach_launcher_close(host->launcher_capsule);
+    (void)reach_launcher_close(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
     host->dirty.layout = 1;
     host->launcher.dirty_flags = 1;
     reach_host_surface_transition_set(host, &host->launcher_transition, 0);
@@ -182,12 +192,17 @@ reach_result reach_host_open_launcher_result(reach_host *host)
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (reach_launcher_result_count(host->launcher_capsule) > 0 &&
-        reach_launcher_selected_result_index(host->launcher_capsule) <
-            reach_launcher_result_count(host->launcher_capsule))
+    if (reach_launcher_result_count(
+            reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)) > 0 &&
+        reach_launcher_selected_result_index(
+            reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)) <
+            reach_launcher_result_count(
+                reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)))
     {
         const reach_launcher_result *result = reach_launcher_result_at(
-            host->launcher_capsule, reach_launcher_selected_result_index(host->launcher_capsule));
+            reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
+            reach_launcher_selected_result_index(
+                reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)));
         if (result->action == REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND)
         {
             return reach_host_schedule_terminal_command(host, result->payload.terminal_command);
@@ -201,12 +216,16 @@ reach_result reach_host_open_launcher_result(reach_host *host)
         const uint16_t *arguments = search->arguments[0] != 0 ? search->arguments : nullptr;
         if (search->kind == REACH_SEARCH_RESULT_APP)
         {
-            return reach_host_open_app(host, search->path, arguments, nullptr, 0,
-                                       reach_launcher_is_open(host->launcher_capsule));
+            return reach_host_open_app(
+                host, search->path, arguments, nullptr, 0,
+                reach_launcher_is_open(
+                    reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)));
         }
 
-        return reach_host_launch_app(host, search->path, arguments, 0, 0,
-                                     reach_launcher_is_open(host->launcher_capsule));
+        return reach_host_launch_app(
+            host, search->path, arguments, 0, 0,
+            reach_launcher_is_open(
+                reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)));
     }
 
     if (host->explorer_service.service == nullptr)
@@ -214,7 +233,8 @@ reach_result reach_host_open_launcher_result(reach_host *host)
         return REACH_INVALID_ARGUMENT;
     }
 
-    const uint16_t *query = reach_launcher_query_text(host->launcher_capsule);
+    const uint16_t *query = reach_launcher_query_text(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
     if (query[0] == 0)
     {
         if (host->explorer_service.ops.open_default != nullptr)
@@ -253,13 +273,14 @@ reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_i
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (result_index >= reach_launcher_result_count(host->launcher_capsule))
+    if (result_index >= reach_launcher_result_count(reach_host_feature_capsule<reach_launcher>(
+                            host, REACH_SURFACE_ID_LAUNCHER)))
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    const reach_launcher_result *result =
-        reach_launcher_result_at(host->launcher_capsule, result_index);
+    const reach_launcher_result *result = reach_launcher_result_at(
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER), result_index);
     if (result->action != REACH_LAUNCHER_RESULT_OPEN_SEARCH)
     {
         return REACH_OK;

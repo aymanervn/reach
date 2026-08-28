@@ -7,13 +7,15 @@ static const float REACH_HOST_WINDOW_LIST_MARGIN = 12.0f;
 static size_t reach_host_window_list_item_windows(reach_host *host, size_t item_index,
                                                   reach_dock_item_window *out, size_t cap)
 {
-    return reach_dock_collect_item_windows(host->dock_capsule, item_index, host->pinned_apps,
-                                           host->pinned_app_count, out, cap);
+    return reach_dock_collect_item_windows(
+        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK), item_index,
+        host->pinned_apps, host->pinned_app_count, out, cap);
 }
 
 static int32_t reach_host_window_list_blocked(reach_host *host)
 {
-    if (reach_context_menu_window_list_is_open(host->context_menu_capsule))
+    if (reach_context_menu_window_list_is_open(
+            reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU)))
     {
         return 0;
     }
@@ -26,7 +28,8 @@ static int32_t reach_host_window_list_blocked(reach_host *host)
 reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_index)
 {
     if (host == nullptr || !host->has_layout ||
-        item_index >= reach_dock_item_count(host->dock_capsule) ||
+        item_index >= reach_dock_item_count(
+                          reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)) ||
         item_index >= host->layout.dock.app_slot_count)
     {
         return REACH_INVALID_ARGUMENT;
@@ -76,7 +79,9 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     ctx.text_measure.context = host->context_menu.renderer.backend;
     ctx.text_measure.measure = host->context_menu.renderer.ops.measure_text;
 
-    reach_context_menu_open_window_list(host->context_menu_capsule, item_index, &ctx);
+    reach_context_menu_open_window_list(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
+        item_index, &ctx);
     reach_host_open_context_menu_transition(host);
     host->context_menu.dirty_flags = 1;
     host->window_list.open_item = item_index;
@@ -96,13 +101,15 @@ void reach_host_dock_item_hovered(reach_host *host, size_t item_index)
     }
     reach_host_window_list_state *state = &host->window_list;
 
-    if (item_index >= reach_dock_item_count(host->dock_capsule))
+    if (item_index >=
+        reach_dock_item_count(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
     {
         state->dwell_active = 0;
         return;
     }
 
-    if (reach_context_menu_window_list_is_open(host->context_menu_capsule))
+    if (reach_context_menu_window_list_is_open(
+            reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU)))
     {
         state->dwell_active = 0;
         if (item_index == state->open_item)
@@ -147,8 +154,8 @@ static int32_t reach_host_window_list_pointer_inside(reach_host *host)
         return 1;
     }
 
-    const reach_context_menu_state *menu_state =
-        reach_context_menu_state_ptr(host->context_menu_capsule);
+    const reach_context_menu_state *menu_state = reach_context_menu_state_ptr(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
     size_t open_item = host->window_list.open_item;
     if (open_item >= host->layout.dock.app_slot_count)
     {
@@ -173,7 +180,8 @@ void reach_host_window_list_update(reach_host *host, double delta_seconds)
     if (state->dwell_active)
     {
         if (reach_host_window_list_blocked(host) ||
-            reach_context_menu_is_open(host->context_menu_capsule))
+            reach_context_menu_is_open(reach_host_feature_capsule<reach_context_menu>(
+                host, REACH_SURFACE_ID_CONTEXT_MENU)))
         {
             state->dwell_active = 0;
         }
@@ -188,12 +196,15 @@ void reach_host_window_list_update(reach_host *host, double delta_seconds)
         }
     }
 
-    if (!reach_context_menu_window_list_is_open(host->context_menu_capsule))
+    if (!reach_context_menu_window_list_is_open(
+            reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU)))
     {
         return;
     }
 
-    if (!host->has_layout || state->open_item >= reach_dock_item_count(host->dock_capsule))
+    if (!host->has_layout ||
+        state->open_item >= reach_dock_item_count(reach_host_feature_capsule<reach_dock>(
+                                host, REACH_SURFACE_ID_DOCK)))
     {
         reach_host_close_context_menu(host);
         return;
@@ -219,7 +230,9 @@ reach_result reach_host_close_window(reach_host *host, uintptr_t window_id)
         return REACH_INVALID_ARGUMENT;
     }
 
-    size_t remaining = reach_context_menu_window_list_remove(host->context_menu_capsule, window_id);
+    size_t remaining = reach_context_menu_window_list_remove(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
+        window_id);
     if (remaining == 0 || !host->has_layout ||
         host->window_list.open_item >= host->layout.dock.app_slot_count)
     {
@@ -238,6 +251,8 @@ reach_result reach_host_close_window(reach_host *host, uintptr_t window_id)
 
 int32_t reach_host_window_list_wants_frames(const reach_host *host)
 {
-    return host != nullptr && (host->window_list.dwell_active ||
-                               reach_context_menu_window_list_is_open(host->context_menu_capsule));
+    return host != nullptr &&
+           (host->window_list.dwell_active ||
+            reach_context_menu_window_list_is_open(reach_host_feature_capsule<reach_context_menu>(
+                host, REACH_SURFACE_ID_CONTEXT_MENU)));
 }

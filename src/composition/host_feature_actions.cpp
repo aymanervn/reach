@@ -3,19 +3,19 @@
 static_assert(REACH_FEATURE_ACTION_RESTORE_CLIPBOARD_ITEM < REACH_FEATURE_ACTION_PRIVATE_BASE,
               "shared feature action vocabulary must stay below the feature-private range");
 
-static void reach_host_close_surface(reach_host *host, const reach_surface_desc *desc)
+static void reach_host_close_surface(reach_host *host, const reach_feature_runtime *desc)
 {
-    if (desc->dismiss != nullptr)
+    if (desc->definition->dismiss != nullptr)
     {
-        desc->dismiss(host);
+        desc->definition->dismiss(host);
     }
-    else if (desc->force_close != nullptr)
+    else if (desc->definition->force_close != nullptr)
     {
-        desc->force_close(host);
+        desc->definition->force_close(host);
     }
 }
 
-reach_result reach_host_apply_feature_action(reach_host *host, const reach_surface_desc *desc,
+reach_result reach_host_apply_feature_action(reach_host *host, const reach_feature_runtime *desc,
                                              const reach_capsule_pointer_result *result)
 {
     if (host == nullptr || desc == nullptr || result == nullptr)
@@ -48,8 +48,9 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_surfa
     case REACH_FEATURE_ACTION_REBUILD_ITEMS:
     {
         reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
-        reach_dock_rebuild_items(host->dock_capsule, &build_ctx, &host->layout.dock,
-                                 &host->layout.dock);
+        reach_dock_rebuild_items(
+            reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK), &build_ctx,
+            &host->layout.dock, &host->layout.dock);
         return REACH_OK;
     }
 
@@ -112,12 +113,15 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_surfa
 
     case REACH_FEATURE_ACTION_REMOVE_CLIPBOARD_ITEM:
     {
-        const reach_clipboard_item *item =
-            reach_clipboard_item_at(host->clipboard_capsule, action->index);
+        const reach_clipboard_item *item = reach_clipboard_item_at(
+            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD),
+            action->index);
         if (item != nullptr && item->id == action->id)
         {
             reach_clipboard_item removed = *item;
-            if (reach_clipboard_remove_item(host->clipboard_capsule, action->index, action->id))
+            if (reach_clipboard_remove_item(reach_host_feature_capsule<reach_clipboard_feature>(
+                                                host, REACH_SURFACE_ID_CLIPBOARD),
+                                            action->index, action->id))
             {
                 reach_host_release_clipboard_item(host, &removed);
             }
@@ -129,7 +133,9 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_surfa
         if (host->clipboard.ops.restore != nullptr &&
             host->clipboard.ops.restore(host->clipboard.provider, action->id) == REACH_OK)
         {
-            reach_clipboard_confirm_restore(host->clipboard_capsule, action->index);
+            reach_clipboard_confirm_restore(reach_host_feature_capsule<reach_clipboard_feature>(
+                                                host, REACH_SURFACE_ID_CLIPBOARD),
+                                            action->index);
             reach_host_close_surface(host, desc);
         }
         return REACH_OK;

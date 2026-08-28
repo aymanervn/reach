@@ -161,18 +161,20 @@ static size_t reach_host_collect_stage_windows(reach_host *host,
 
 void reach_host_sync_stage_window_states(reach_host *host)
 {
-    if (host == nullptr || host->stage_capsule == nullptr)
+    if (host == nullptr ||
+        reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE) == nullptr)
     {
         return;
     }
-    if (!reach_stage_is_open(host->stage_capsule))
+    if (!reach_stage_is_open(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)))
     {
         return;
     }
 
     reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
     size_t count = reach_host_collect_stage_windows(host, windows, REACH_STAGE_MAX_TILES);
-    if (reach_stage_update_windows(host->stage_capsule, windows, count))
+    if (reach_stage_update_windows(
+            reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE), windows, count))
     {
         host->stage.dirty_flags = 1;
         host->dirty.render = 1;
@@ -182,11 +184,12 @@ void reach_host_sync_stage_window_states(reach_host *host)
 
 void reach_host_open_stage(reach_host *host)
 {
-    if (host == nullptr || host->stage_capsule == nullptr)
+    if (host == nullptr ||
+        reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE) == nullptr)
     {
         return;
     }
-    if (reach_stage_is_open(host->stage_capsule))
+    if (reach_stage_is_open(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)))
     {
         return;
     }
@@ -214,8 +217,9 @@ void reach_host_open_stage(reach_host *host)
     {
         return;
     }
-    if (reach_stage_open(host->stage_capsule, monitor_bounds, reach_host_layout_dpi_scale(host),
-                         windows, count) != REACH_OK)
+    if (reach_stage_open(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE),
+                         monitor_bounds, reach_host_layout_dpi_scale(host), windows,
+                         count) != REACH_OK)
     {
         return;
     }
@@ -227,16 +231,17 @@ void reach_host_open_stage(reach_host *host)
 
 void reach_host_close_stage(reach_host *host)
 {
-    if (host == nullptr || host->stage_capsule == nullptr)
+    if (host == nullptr ||
+        reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE) == nullptr)
     {
         return;
     }
-    if (!reach_stage_is_open(host->stage_capsule))
+    if (!reach_stage_is_open(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)))
     {
         return;
     }
     host->stage_transition.close_seconds = 0.0;
-    reach_stage_begin_close(host->stage_capsule);
+    reach_stage_begin_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
     reach_host_request_update(host);
 }
 
@@ -247,7 +252,7 @@ void reach_host_toggle_stage(reach_host *host)
         return;
     }
 
-    if (reach_stage_is_open(host->stage_capsule))
+    if (reach_stage_is_open(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)))
     {
         reach_host_close_stage(host);
         return;

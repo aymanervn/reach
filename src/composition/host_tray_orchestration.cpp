@@ -8,7 +8,8 @@ void reach_host_set_tray_popup_open(reach_host *host, int32_t open)
     }
 
     int32_t next_open = open ? 1 : 0;
-    if (!reach_top_bar_set_tray_popup_open(host->top_bar_capsule, next_open))
+    if (!reach_top_bar_set_tray_popup_open(
+            reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), next_open))
     {
         return;
     }
@@ -32,14 +33,17 @@ void reach_host_toggle_tray_popup(reach_host *host)
 {
     if (host != nullptr)
     {
-        reach_host_set_tray_popup_open(host,
-                                       !reach_top_bar_tray_popup_is_open(host->top_bar_capsule));
+        reach_host_set_tray_popup_open(
+            host, !reach_top_bar_tray_popup_is_open(
+                      reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR)));
     }
 }
 
 reach_result reach_host_refresh_tray_items(reach_host *host)
 {
-    return host != nullptr ? reach_top_bar_refresh_tray(host->top_bar_capsule) : REACH_OK;
+    return host != nullptr ? reach_top_bar_refresh_tray(reach_host_feature_capsule<reach_top_bar>(
+                                 host, REACH_SURFACE_ID_TOP_BAR))
+                           : REACH_OK;
 }
 
 reach_result reach_host_activate_tray_item(reach_host *host, uint32_t item_id,

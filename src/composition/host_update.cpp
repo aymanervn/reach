@@ -38,16 +38,17 @@ void reach_host_finish_surface_transitions(reach_host *host)
     }
 
     reach_host_surface_transition *launcher_transition =
-        host->surface_descs[REACH_SURFACE_ID_LAUNCHER].transition;
+        host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].transition;
     int32_t launcher_transition_was_visible =
         reach_host_surface_transition_visible(launcher_transition);
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_host_surface_transition_finish(host, host->surface_descs[index].transition);
+        reach_host_surface_transition_finish(host, host->feature_runtimes[index].transition);
     }
     if (launcher_transition_was_visible &&
         !reach_host_surface_transition_visible(launcher_transition) &&
-        !reach_launcher_is_open(host->launcher_capsule))
+        !reach_launcher_is_open(
+            reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)))
     {
         reach_host_cleanup_closed_launcher(host);
         reach_host_flush_launcher_focus_restore(host);
@@ -62,13 +63,14 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->capsule_ops == nullptr || desc->capsule_ops->tick == nullptr)
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->capsule_ops == nullptr ||
+            desc->definition->capsule_ops->tick == nullptr)
         {
             continue;
         }
         reach_feature_tick_result tick = {};
-        desc->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
+        desc->definition->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
         if (tick.redraw && desc->surface != nullptr)
         {
             desc->surface->dirty_flags = 1;
@@ -94,7 +96,7 @@ static reach_result reach_host_finish_update(reach_host *host)
     host->dirty.update_requested = 0;
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface != nullptr)
         {
             surface->dirty_flags = 0;
@@ -108,14 +110,16 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
 {
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_desc *desc = &host->surface_descs[index];
-        if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0 ||
-            desc->capsule_ops == nullptr || desc->capsule_ops->tick == nullptr)
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if ((desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) ==
+                0 ||
+            desc->definition->capsule_ops == nullptr ||
+            desc->definition->capsule_ops->tick == nullptr)
         {
             continue;
         }
         reach_feature_tick_result tick = {};
-        desc->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
+        desc->definition->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
         if (tick.redraw && desc->surface != nullptr)
         {
             desc->surface->dirty_flags = 1;
@@ -135,7 +139,7 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
                                      (float)(monitor->bounds.right - monitor->bounds.left),
                                      (float)(monitor->bounds.bottom - monitor->bounds.top)};
             host->layout_dpi_scale = reach_host_monitor_dpi_scale(monitor);
-            reach_surface_desc *dock_desc = &host->surface_descs[REACH_SURFACE_ID_DOCK];
+            reach_feature_runtime *dock_desc = &host->feature_runtimes[REACH_SURFACE_ID_DOCK];
             if (!dock_desc->resolved_bounds_valid)
             {
                 reach_ui_layout_input input = {};
@@ -153,15 +157,13 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
             frame.monitor_bounds = bounds;
             for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
             {
-                reach_surface_desc *desc = &host->surface_descs[index];
-                if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
+                reach_feature_runtime *desc = &host->feature_runtimes[index];
+                if ((desc->definition->surface.behavior_flags &
+                     REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
                 {
                     continue;
                 }
-                reach_result result =
-                    desc->surface_ops != nullptr
-                        ? reach_host_frame_registered_surface(host, desc, &frame)
-                        : (desc->frame != nullptr ? desc->frame(host, &frame) : REACH_OK);
+                reach_result result = reach_host_frame_registered_surface(host, desc, &frame);
                 if (result != REACH_OK)
                 {
                     return result;
@@ -213,7 +215,9 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     reach_host_drain_now_playing_retired_covers(host);
     reach_host_process_deferred_launcher_app_launch(host);
     reach_host_process_clipboard_refresh(host);
-    if (reach_clipboard_tick_scroll(host->clipboard_capsule, delta_seconds))
+    if (reach_clipboard_tick_scroll(
+            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD),
+            delta_seconds))
     {
         host->dirty.layout = 1;
         host->clipboard_surface.dirty_flags = 1;
@@ -300,29 +304,37 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
             reach_result dock_layout_result =
                 reach_dock_layout_compute(&host->dock_config, &input, &layout.dock);
             reach_result launcher_layout_result = reach_launcher_layout_compute(
-                &reach_launcher_state_ptr(host->launcher_capsule)->model, &input, &layout.launcher);
+                &reach_launcher_state_ptr(
+                     reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER))
+                     ->model,
+                &input, &layout.launcher);
             if (dock_layout_result == REACH_OK && launcher_layout_result == REACH_OK)
             {
                 reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
-                if (reach_dock_take_items_changed(host->dock_capsule))
+                if (reach_dock_take_items_changed(
+                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
                 {
-                    reach_dock_rebuild_items(host->dock_capsule, &build_ctx,
-                                             host->has_layout ? &host->layout.dock : nullptr,
-                                             &layout.dock);
+                    reach_dock_rebuild_items(
+                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                        &build_ctx, host->has_layout ? &host->layout.dock : nullptr, &layout.dock);
                 }
                 else
                 {
-                    reach_dock_build_layout(host->dock_capsule, &build_ctx, &layout.dock);
+                    reach_dock_build_layout(
+                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
+                        &build_ctx, &layout.dock);
                 }
 
-                if (reach_dock_slots_animating(host->dock_capsule))
+                if (reach_dock_slots_animating(
+                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
                 {
                     host->dock.dirty_flags = 1;
                 }
                 host->layout = layout;
                 host->has_layout = 1;
-                reach_launcher_set_pointer_context(host->launcher_capsule, &host->layout.launcher,
-                                                   host->pinned_apps, host->pinned_app_count);
+                reach_launcher_set_pointer_context(
+                    reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
+                    &host->layout.launcher, host->pinned_apps, host->pinned_app_count);
 
                 reach_host_frame_context frame_ctx = {};
                 frame_ctx.monitor_bounds = bounds;
@@ -331,27 +343,22 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 size_t frame_count = 0;
                 for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
                 {
-                    const reach_surface_desc *desc = &host->surface_descs[index];
-                    if (desc->frame == nullptr && desc->surface_ops == nullptr)
-                    {
-                        continue;
-                    }
+                    const reach_feature_runtime *desc = &host->feature_runtimes[index];
                     size_t at = frame_count;
-                    while (at > 0 && host->surface_descs[frame_order[at - 1]].frame_priority >
-                                         desc->frame_priority)
+                    while (at > 0 &&
+                           host->feature_runtimes[frame_order[at - 1]].definition->layout.priority >
+                               desc->definition->layout.priority)
                     {
                         frame_order[at] = frame_order[at - 1];
                         --at;
                     }
-                    frame_order[at] = desc->id;
+                    frame_order[at] = desc->definition->id;
                     ++frame_count;
                 }
                 for (size_t index = 0; index < frame_count; ++index)
                 {
-                    reach_surface_desc *desc = &host->surface_descs[frame_order[index]];
-                    result = desc->surface_ops != nullptr
-                                 ? reach_host_frame_registered_surface(host, desc, &frame_ctx)
-                                 : desc->frame(host, &frame_ctx);
+                    reach_feature_runtime *desc = &host->feature_runtimes[frame_order[index]];
+                    result = reach_host_frame_registered_surface(host, desc, &frame_ctx);
                     if (result != REACH_OK)
                     {
                         return result;
@@ -428,10 +435,12 @@ int32_t reach_host_needs_frame(const reach_host *host)
     {
         for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
         {
-            const reach_surface_desc *desc = &host->surface_descs[index];
-            if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0 &&
-                desc->capsule_ops != nullptr && desc->capsule_ops->needs_frame != nullptr &&
-                desc->capsule_ops->needs_frame(desc->capsule))
+            const reach_feature_runtime *desc = &host->feature_runtimes[index];
+            if ((desc->definition->surface.behavior_flags &
+                 REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0 &&
+                desc->definition->capsule_ops != nullptr &&
+                desc->definition->capsule_ops->needs_frame != nullptr &&
+                desc->definition->capsule_ops->needs_frame(desc->capsule))
             {
                 return 1;
             }
@@ -450,9 +459,10 @@ int32_t reach_host_needs_frame(const reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->capsule_ops != nullptr && desc->capsule_ops->needs_frame != nullptr &&
-            desc->capsule_ops->needs_frame(desc->capsule))
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->capsule_ops != nullptr &&
+            desc->definition->capsule_ops->needs_frame != nullptr &&
+            desc->definition->capsule_ops->needs_frame(desc->capsule))
         {
             return 1;
         }

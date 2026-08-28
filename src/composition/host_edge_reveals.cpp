@@ -12,20 +12,21 @@ static void reach_host_on_edge_reveal_event(void *user, reach_screen_hotspot_eve
         return;
     }
 
-    const reach_surface_desc *owner = runtime->owner;
-    if (owner->bar_reveal.ops != nullptr)
+    const reach_feature_runtime *owner = runtime->owner;
+    if (owner->definition->surface.bar_reveal.ops != nullptr)
     {
-        if (event == REACH_SCREEN_HOTSPOT_ENTER && owner->bar_reveal.ops->begin_session != nullptr)
+        if (event == REACH_SCREEN_HOTSPOT_ENTER &&
+            owner->definition->surface.bar_reveal.ops->begin_session != nullptr)
         {
-            owner->bar_reveal.ops->begin_session(owner->capsule);
+            owner->definition->surface.bar_reveal.ops->begin_session(owner->capsule);
         }
         reach_host_request_bar_visibility_update(runtime->host);
         return;
     }
 
-    if (owner->edge_reveal.handle_event != nullptr)
+    if (owner->definition->surface.edge_reveal.handle_event != nullptr)
     {
-        owner->edge_reveal.handle_event(runtime->host, event);
+        owner->definition->surface.edge_reveal.handle_event(runtime->host, event);
     }
 }
 
@@ -91,7 +92,9 @@ reach_host_edge_reveal_runtime *reach_host_edge_reveal_for_surface(reach_host *h
     {
         return nullptr;
     }
-    return host->surface_descs[id].edge_reveal.enabled ? &host->edge_reveals[id] : nullptr;
+    return host->feature_runtimes[id].definition->surface.edge_reveal.enabled
+               ? &host->edge_reveals[id]
+               : nullptr;
 }
 
 reach_result reach_host_create_edge_reveals(reach_host *host)
@@ -105,8 +108,8 @@ reach_result reach_host_create_edge_reveals(reach_host *host)
     {
         reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
         *runtime = {};
-        const reach_surface_desc *owner = &host->surface_descs[index];
-        if (!owner->edge_reveal.enabled)
+        const reach_feature_runtime *owner = &host->feature_runtimes[index];
+        if (!owner->definition->surface.edge_reveal.enabled)
         {
             continue;
         }
@@ -187,7 +190,7 @@ void reach_host_sync_edge_reveals(reach_host *host, reach_rect_f32 monitor_bound
     {
         reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
         const reach_edge_reveal_geometry *geometry =
-            &host->surface_descs[index].edge_reveal.geometry;
+            &host->feature_runtimes[index].definition->surface.edge_reveal.geometry;
         reach_rect_f32 bounds = {};
         if (runtime->port.hotspot == nullptr ||
             !reach_host_resolve_edge_reveal_bounds(geometry, monitor_bounds, dpi_scale, &bounds))

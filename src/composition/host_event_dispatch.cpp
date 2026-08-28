@@ -50,7 +50,7 @@ int32_t reach_host_has_pending_events(const reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        if (reach_host_surface_has_pending_events(host->surface_descs[index].surface))
+        if (reach_host_surface_has_pending_events(host->feature_runtimes[index].surface))
         {
             return 1;
         }
@@ -75,7 +75,7 @@ reach_result reach_host_dispatch_events(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_host_dispatch_surface_events(host->surface_descs[index].surface);
+        reach_host_dispatch_surface_events(host->feature_runtimes[index].surface);
     }
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)

@@ -21,7 +21,7 @@ const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surf
     }
 
     const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    switch (host->surface_descs[id].shadow)
+    switch (host->feature_runtimes[id].definition->surface.shadow)
     {
     case REACH_SURFACE_SHADOW_BAR:
         return &theme->bar_shadow;
@@ -60,7 +60,7 @@ void reach_host_stamp_surface_content(const reach_host *host, reach_surface_id i
         return;
     }
 
-    const reach_surface_runtime *surface = host->surface_descs[id].surface;
+    const reach_surface_runtime *surface = host->feature_runtimes[id].surface;
     if (surface == nullptr || !surface->bounds_valid)
     {
         return;
@@ -382,8 +382,8 @@ static void reach_host_register_edge_reveal_participant(reach_host *host,
                                                         reach_host_edge_reveal_runtime *runtime)
 {
     reach_layout_participant participant = 0;
-    reach_result result = reach_layout_register(&host->layout_manager,
-                                                runtime->owner->edge_reveal.layer, &participant);
+    reach_result result = reach_layout_register(
+        &host->layout_manager, runtime->owner->definition->surface.edge_reveal.layer, &participant);
     REACH_ASSERT(result == REACH_OK);
     if (result != REACH_OK)
     {
@@ -413,16 +413,16 @@ void reach_host_init_layout(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_desc *desc = &host->surface_descs[index];
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
         reach_layout_participant participant = 0;
-        reach_result result =
-            reach_layout_register(&host->layout_manager, desc->layer, &participant);
+        reach_result result = reach_layout_register(&host->layout_manager,
+                                                    desc->definition->surface.layer, &participant);
         REACH_ASSERT(result == REACH_OK);
         if (result != REACH_OK)
         {
             continue;
         }
-        host->layout_targets[participant].desc = desc;
+        host->layout_targets[participant].runtime = desc;
         host->surface_participants[index] = participant;
         reach_layout_set_visible(&host->layout_manager, participant, 0);
     }
@@ -441,8 +441,8 @@ void reach_host_init_layout(reach_host *host)
          ++participant)
     {
         const reach_host_layout_target *target = &host->layout_targets[participant];
-        if (target->desc != nullptr &&
-            (target->desc->behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0)
+        if (target->runtime != nullptr && (target->runtime->definition->surface.behavior_flags &
+                                           REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0)
         {
             continue;
         }
@@ -452,18 +452,19 @@ void reach_host_init_layout(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->bar_reveal.ops == nullptr || desc->bar_reveal.active_layer <= 0)
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->surface.bar_reveal.ops == nullptr ||
+            desc->definition->surface.bar_reveal.active_layer <= 0)
         {
             continue;
         }
         reach_layout_participant participant = host->surface_participants[index];
         reach_layout_register_override(&host->layout_manager, participant,
                                        REACH_LAYOUT_CONDITION_BARS_FORCED,
-                                       desc->bar_reveal.active_layer);
+                                       desc->definition->surface.bar_reveal.active_layer);
         reach_layout_register_override(&host->layout_manager, participant,
                                        REACH_LAYOUT_CONDITION_BARS_HELD,
-                                       desc->bar_reveal.active_layer);
+                                       desc->definition->surface.bar_reveal.active_layer);
     }
 }
 
@@ -474,28 +475,31 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening, reac
         return;
     }
 
-    const reach_surface_desc *self = &host->surface_descs[opening];
-    const int32_t self_exclusive = (self->behavior_flags & REACH_SURFACE_BEHAVIOR_EXCLUSIVE) != 0;
+    const reach_feature_runtime *self = &host->feature_runtimes[opening];
+    const int32_t self_exclusive =
+        (self->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_EXCLUSIVE) != 0;
     const int32_t self_dismissable =
-        self->cls == REACH_SURFACE_CLASS_TRANSIENT || self->cls == REACH_SURFACE_CLASS_POPUP;
+        self->definition->surface.cls == REACH_SURFACE_CLASS_TRANSIENT ||
+        self->definition->surface.cls == REACH_SURFACE_CLASS_POPUP;
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->id == opening || desc->id == origin || desc->force_close == nullptr ||
-            !reach_host_surface_is_open(desc))
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->id == opening || desc->definition->id == origin ||
+            desc->definition->force_close == nullptr || !reach_host_surface_is_open(desc))
         {
             continue;
         }
 
         const int32_t other_exclusive =
-            (desc->behavior_flags & REACH_SURFACE_BEHAVIOR_EXCLUSIVE) != 0;
+            (desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_EXCLUSIVE) != 0;
         const int32_t other_dismissable =
-            desc->cls == REACH_SURFACE_CLASS_TRANSIENT || desc->cls == REACH_SURFACE_CLASS_POPUP;
+            desc->definition->surface.cls == REACH_SURFACE_CLASS_TRANSIENT ||
+            desc->definition->surface.cls == REACH_SURFACE_CLASS_POPUP;
 
         if (other_exclusive || ((self_exclusive || self_dismissable) && other_dismissable))
         {
-            desc->force_close(host);
+            desc->definition->force_close(host);
         }
     }
 
@@ -505,9 +509,10 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening, reac
     }
 }
 
-int32_t reach_host_surface_is_open(const reach_surface_desc *desc)
+int32_t reach_host_surface_is_open(const reach_feature_runtime *desc)
 {
-    return desc->capsule_ops->is_open == nullptr || desc->capsule_ops->is_open(desc->capsule);
+    return desc->definition->capsule_ops->is_open == nullptr ||
+           desc->definition->capsule_ops->is_open(desc->capsule);
 }
 
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
@@ -519,9 +524,9 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0 ||
-            desc->force_close == nullptr || !reach_host_surface_is_open(desc))
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if ((desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0 ||
+            desc->definition->force_close == nullptr || !reach_host_surface_is_open(desc))
         {
             continue;
         }
@@ -532,7 +537,7 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
             continue;
         }
 
-        desc->force_close(host);
+        desc->definition->force_close(host);
     }
 }
 
@@ -544,10 +549,12 @@ int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if ((class_mask & reach_surface_class_bit(desc->cls)) != 0 &&
-            desc->cls != REACH_SURFACE_CLASS_PERSISTENT && desc->capsule_ops != nullptr &&
-            desc->capsule_ops->is_open != nullptr && desc->capsule_ops->is_open(desc->capsule))
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if ((class_mask & reach_surface_class_bit(desc->definition->surface.cls)) != 0 &&
+            desc->definition->surface.cls != REACH_SURFACE_CLASS_PERSISTENT &&
+            desc->definition->capsule_ops != nullptr &&
+            desc->definition->capsule_ops->is_open != nullptr &&
+            desc->definition->capsule_ops->is_open(desc->capsule))
         {
             return 1;
         }
@@ -563,7 +570,7 @@ void reach_host_mark_all_surfaces_dirty(reach_host *host)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_runtime *surface = host->surface_descs[index].surface;
+        reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface != nullptr)
         {
             surface->dirty_flags = 1;
@@ -579,7 +586,7 @@ int32_t reach_host_any_surface_dirty(const reach_host *host)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->surface != nullptr && desc->surface->dirty_flags)
         {
             return 1;
