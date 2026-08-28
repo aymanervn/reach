@@ -41,7 +41,7 @@ Abstract interfaces for every external boundary — renderer, surface, input, mo
 OS controls, filesystem, clipboard, media, icons, the Reach Service client. The
 `window_thumbnail` port abstracts live window previews (DWM thumbnails on Windows);
 `screen_hotspot` abstracts the platform capability for an invisible rectangular
-trigger window. Composition presents those windows as descriptor-declared edge
+trigger window. Composition presents those windows as definition-declared edge
 reveals; the Win32 adapter registers its window class idempotently so further
 instances cost nothing. The `system_controls` port also exposes system-surface and
 application theme modes. Display config stores each as Follow Reach, Light, or Dark;
@@ -242,7 +242,7 @@ has crossed the screen edge leaves the windows parked for the first ~80% of the
 reveal and then racing to catch up. Both the full frame path and the
 `reach_host_move_bar_animation_frame` fast path feed it: that fast path slides a
 bar without a redraw and so never reaches `reconcile_bar_visibility`, which is
-exactly the state a hide settles into. The descriptor's optional
+exactly the state a hide settles into. The definition's optional
 `reach_bar_reveal_ops.position_frame` hook keeps feature-owned effects such as
 the top-bar push on that same clock while the generic path moves the surface.
 
@@ -307,7 +307,7 @@ arrangement should be. See the composition section for the model.
 Dock and top bar are both bars: each owns a `reach_bar_visibility_state` driven
 by the shared `features/common/bar_visibility` state machine, and composition
 reconciles both through one `reach_host_reconcile_bar_visibility` over the
-descriptor `bar_reveal` spec and feature-owned `reach_bar_reveal_ops`. The spec
+definition `bar_reveal` spec and feature-owned `reach_bar_reveal_ops`. The spec
 declaratively supplies dynamic edge-reveal and active-layer policy; the capsule
 names its own edge and caches whether a tracked app intersects the protected band
 returned by `reach_bar_protected_band`. The symmetric policy band reaches from the
@@ -319,7 +319,7 @@ same even though reveal presentation differs: the top bar rests in the app band
 and uses `reach_bar_reveal_ops.position_frame` to push trespassing windows, while
 the permanently-topmost Dock reveals over them without a side effect. A single
 screen-hotspot factory creates every
-descriptor-declared edge reveal. Fixed triggers declare an anchor and DP size;
+definition-declared edge reveal. Fixed triggers declare an anchor and DP size;
 Stage is a normally enabled 4dp top-left square. Animated bars publish managed
 bounds from the shared visibility result. Every trigger is suppressed while a relevant
 window manipulation is active. Generic runtime loops own geometry,
@@ -377,28 +377,30 @@ and runs the app — frame loop, input routing, boundary action dispatch, worker
 and surface lifecycle. Concrete feature knowledge has two controlled seams:
 `feature_registry.cpp` for definitions and `interfeature_routes.cpp` for the callback
 slots that let one feature's action affect another. `feature_registry.cpp` is the seam for
-feature definitions: each owned surface declares an opaque create/destroy factory beside
-its capsule operations and surface policy. Host construction and cleanup iterate those
-factories generically; a shared surface such as the tray declares no factory and binds to
-its owning top-bar capsule. Surfaces register a descriptor with a class
-(persistent | transient | popup | overlay) plus the feature capsule and its uniform
-hooks; policy runs as class loops over that table — tick, needs-frame, game mode,
-lifecycle resets, pointer-move subscription sync, the popup mouse hook, transient
+feature definitions: each registered surface has exactly one immutable
+`reach_feature_definition` and one `reach_feature_runtime`. The definition owns its opaque
+create/destroy factory, capsule operations, surface operations, layout, and policy. The runtime
+contains only the bound surface, transition, capsule, resolved geometry, native-overlay state,
+and a pointer to that definition. `reach_host_feature_capsule<T>` derives any concrete view from that
+capsule; `reach_host` carries no parallel typed capsule pointers. Host construction and cleanup iterate the factories
+generically; a shared surface such as the tray declares no factory and binds to its owning
+top-bar capsule. Policy runs as class loops over the runtime table — tick, needs-frame, game
+mode, lifecycle resets, pointer-move subscription sync, the popup mouse hook, transient
 dismissal, and the “opening a popup closes the other popups” rule. Pointer input
-uses one descriptor-driven dispatcher for capsule delivery, surface dirtying,
+uses one runtime-driven dispatcher for capsule delivery, surface dirtying,
 relayout, capture, subscription sync, and update scheduling; capsules receive
 the coordinate space declared by `reach_pointer_event.coordinate_space`: popup
 capsules receive surface-local coordinates, while other surface classes retain
 screen coordinates. Each pointer event kind
 runs as a generic loop over the table in `pointer_priority` order (popups →
-transients → persistent, first handled result wins), with the descriptor's
+transients → persistent, first handled result wins), with the definition's
 `role` resolving source-gated delivery, and its flags declaring the outside-press policy
 (SOURCE_GATED / DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED). Source-gated rows are delivered to first — press and release go to the row whose
 `role` matches the event source (or whose `pointer_sequence_active` hook reports
 an in-flight sequence) before the rest of the table sees them — so no surface
 needs a hand-written branch to receive its own input. Capsules report outcomes as one shared `reach_feature_action_kind`
 (`include/reach/features/common/feature_action.h`); `host_feature_actions.cpp` dispatches
-every entry in a single generic switch keyed on the emitting descriptor, so no feature has a
+every entry in a single generic switch keyed on the emitting runtime, so no feature has a
 composition-side translator. Four press kinds that only composition's pointer policy reads stay
 feature-private in a reserved range above `REACH_FEATURE_ACTION_PRIVATE_BASE`, kept disjoint from
 the shared vocabulary by `static_assert` in the Dock and Top Bar. An action that opens or changes
@@ -423,19 +425,21 @@ command buffer is faded by the shared animation manager.
 Per-frame layout resolves in dependency order in `reach_host_update` (monitor →
 dock cluster → launcher → clipboard → switcher); the per-surface frame steps
 (`host_surface_frames.cpp`, layout refresh → transition → window state →
-corners → show/render) run as one loop over the table in `frame_priority`
-order against a shared `reach_host_frame_context`. Transition completion is also
-descriptor-driven: every non-null descriptor transition is finalized by the
-generic animation tick. Migrated definitions expose uniform `surface_ops` for
+corners → show/render) run as one loop over the table in definition `layout.priority`
+order against a shared `reach_host_frame_context`. Transition completion is runtime-driven:
+every non-null runtime transition is finalized by the generic animation tick. Every definition
+exposes uniform `surface_ops` for
 arrangement and render-command production. `reach_host_frame_registered_surface`
 then resolves the declared layout anchor, applies window geometry and visibility,
 and executes rendering without naming the feature. System HUD uses this path and
 declares Dock as its anchor; the Dock's shown-position bounds are stored on its
-descriptor runtime rather than in a HUD-specific host cache. Switcher also uses the
+feature runtime rather than in a HUD-specific host cache. Switcher also uses the
 path: its capsule owns width animation, arranged bounds, and geometry publication,
 while its registry adapter supplies the transition-adjusted render bounds. Clipboard
 declares Launcher as its anchor and likewise owns relayout, animation state, geometry,
-and command production. Remaining named frame steps are migration residue.
+and command production. There is no named frame fallback: every registered surface runs the
+same frame function, and the architecture checker requires one runtime binding and one
+`surface_ops` contract for every registered id.
 Surfaces that take OS activation declare `BEHAVIOR_ACTIVATES`; the class rules then
 own show-on-activate, close-on-focus-loss, and the staleness check that discards a
 focus-loss signal the surface has already recovered from (reach's own foreground
@@ -466,7 +470,7 @@ actually changed.
 
 Conditions are bits, not triggers: the arrangement is recomputed from the whole
 active set, so setting an already-set condition is a no-op and a missed one heals on
-the next resolve. `GAME_MODE` resolves every participant hidden except a descriptor
+the next resolve. `GAME_MODE` resolves every participant hidden except a definition
 that declares `BEHAVIOR_GAME_MODE_VISIBLE`. The system HUD is the only such
 participant because hardware media and level keys remain active while the top bar
 is suppressed. `host_game_mode.cpp` owns the state and the main gate in
@@ -483,7 +487,7 @@ holds the bars. Starting that Y animation and reporting the transition are the s
 act, performed by `reach_bar_update_visibility` alone — nothing else may write
 `REACH_TOP_BAR_ANIM_Y`, and nothing may set the bar's layer except the resolve
 reading `reach_bar_visibility_result.reveal_transition_active` into that
-participant's layer intent. Descriptor-declared edge reveals are participants too,
+participant's layer intent. Definition-declared edge reveals are participants too,
 attached to their owning surface runtime but independently visible; the underlying
 screen-hotspot port carries `set_topmost` / `native_id` / `place_behind` so they
 chain and seed like any other participant.
@@ -501,7 +505,7 @@ the applied plan stays truthful, rather than hiding windows behind the pass's ba
 
 Surfaces that cast a shadow are drawn into a window larger than themselves, and the
 rule that keeps that from leaking is absolute: **`reach_rect_f32 bounds` means content
-bounds everywhere.** A descriptor declares which theme shadow a surface takes
+bounds everywhere.** A definition declares which theme shadow a surface takes
 (`reach_surface_shadow`); `reach_host_surface_shadow_pad` is the single producer of the
 resulting margin, and it has exactly three consumers — the rect handed to `set_bounds`,
 the command buffer's `content_rect`, and the input-region offset. `last_bounds` keeps the
@@ -547,10 +551,10 @@ everything.
 
 ### Adding a feature
 
-The generic target is that everything a new interactive surface needs is authored
-in its own directory plus one descriptor row; no other feature's code changes.
-Until the open composition-registry migration is complete, a scoped exception must
-be recorded in `docs/repo-analysis.md` rather than hidden behind another ad hoc path.
+Everything a new interactive surface needs is authored in its own directory plus one
+registry definition and runtime binding; no other feature's code changes. A feature-specific
+composition branch outside the two controlled seams requires explicit approval and a scoped
+entry in `docs/repo-analysis.md`.
 
 1. **Capsule** (`src/features/<name>/`, header in `include/reach/features/`):
    implement `reach_feature_capsule_ops` (null-skip the hooks you don't need;
@@ -564,11 +568,12 @@ be recorded in `docs/repo-analysis.md` rather than hidden behind another ad hoc 
    through the attached service rather than reporting an action for composition to
    translate; composition keeps only the effects it owns, such as surface open/close,
    app-launch scheduling, window control, and pin mutation.
-3. **Registry row** (`src/composition/feature_registry.cpp`): id, opaque factory,
-   class, surface runtime, transition, host-level `force_close`, capsule ops,
+3. **Registry definition** (`src/composition/feature_registry.cpp`): id, opaque factory,
+   class, surface runtime binding, transition, host-level `force_close`, capsule ops,
    pointer flags, `role`, `pointer_priority`, `dismiss` if outside-press close differs
-   from `force_close`, `frame` + `frame_priority`, and declarative
-   `toggle_events`/`routed_events` for activation.
+   from `force_close`, `layout.priority`, uniform `surface_ops`, and declarative
+   `toggle_events`/`routed_events` for activation. Immutable policy belongs only in the
+   definition; mutable instance state belongs only in `reach_feature_runtime`.
    If the feature must affect another feature, add one neutral outbound slot to its own
    header and bind it in `interfeature_routes.cpp` — the only composition file allowed to
    know which feature an action reaches.
