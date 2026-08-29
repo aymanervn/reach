@@ -209,6 +209,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/explorer_service_win32.cpp
     src/adapters/windows/wallpaper_win32.cpp
     src/adapters/windows/wallpaper_surface_win32.cpp
+    src/adapters/windows/mouse_hook_thread_win32.cpp
     src/adapters/windows/popup_capture_win32.cpp
     src/adapters/windows/power_session_win32.cpp
     src/adapters/windows/audio_volume_win32.cpp

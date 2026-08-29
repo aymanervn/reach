@@ -337,7 +337,14 @@ The `bar_reveal` capability also owns pointer-exit wake-up. Surface leave remain
 a wake-up, but a hideable shown bar additionally publishes its bar-plus-bridge
 observation bounds. The Windows input adapter installs a passive low-level mouse
 hook only while at least one such region is active and posts only membership
-changes; it neither consumes input nor polls. This covers the interval after the
+changes; it neither consumes input nor polls. Both this hook and the popup
+capture hook run on the shared hook thread in
+`src/adapters/windows/mouse_hook_thread_win32.cpp`, never on the UI thread:
+Windows dispatches a low-level hook on the thread that installed it and drops
+packets that thread does not service within `LowLevelHooksTimeout`, so hooking
+from the UI thread would put every mouse event in the session behind the frame
+loop. The hook thread only pumps messages, which is also why the input adapter's
+region table is guarded — the hook reads it off-thread. This covers the interval after the
 thin edge hotspot is hidden, including a top bar that cannot receive a reliable
 surface leave because another window owns that part of the screen.
 

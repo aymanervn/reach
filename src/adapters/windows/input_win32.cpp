@@ -1,5 +1,6 @@
 #include "windows_adapters_internal.h"
 
+#include "mouse_hook_thread_win32.h"
 #include "window_management/reach_service_shared_state_win32.h"
 
 #include "reach/ports/input_source.h"
@@ -29,7 +30,9 @@ struct reach_input_source
     int32_t windows_key_down;
     int32_t windows_key_chord;
     uint32_t registered_media_hotkeys;
-    HHOOK pointer_hook;
+    reach_mouse_hook *pointer_hook;
+    /* The hook runs on the shared hook thread, so the region table is shared with it. */
+    SRWLOCK pointer_region_lock;
     reach_input_pointer_region pointer_regions[REACH_INPUT_POINTER_REGION_CAPACITY];
     volatile LONG manipulation_event_pending;
 };
@@ -73,6 +76,10 @@ static void reach_input_update_pointer_regions(reach_input_source *source, POINT
         return;
     }
 
+    uint32_t changed[REACH_INPUT_POINTER_REGION_CAPACITY];
+    size_t changed_count = 0;
+
+    AcquireSRWLockExclusive(&source->pointer_region_lock);
     for (uint32_t index = 0; index < REACH_INPUT_POINTER_REGION_CAPACITY; ++index)
     {
         reach_input_pointer_region *region = &source->pointer_regions[index];
@@ -84,8 +91,14 @@ static void reach_input_update_pointer_regions(reach_input_source *source, POINT
         if (inside != region->inside)
         {
             region->inside = inside;
-            reach_input_post_pointer_region_event(source, index);
+            changed[changed_count++] = index;
         }
+    }
+    ReleaseSRWLockExclusive(&source->pointer_region_lock);
+
+    for (size_t index = 0; index < changed_count; ++index)
+    {
+        reach_input_post_pointer_region_event(source, changed[index]);
     }
 }
 
@@ -99,9 +112,7 @@ static LRESULT CALLBACK reach_input_pointer_hook_proc(int code, WPARAM wparam, L
             reach_input_update_pointer_regions(g_pointer_hook_source, event->pt);
         }
     }
-    return CallNextHookEx(g_pointer_hook_source != nullptr ? g_pointer_hook_source->pointer_hook
-                                                           : nullptr,
-                          code, wparam, lparam);
+    return CallNextHookEx(nullptr, code, wparam, lparam);
 }
 
 static int32_t reach_input_any_pointer_region_enabled(const reach_input_source *source)
@@ -135,9 +146,8 @@ static reach_result reach_input_sync_pointer_hook(reach_input_source *source)
             return REACH_ERROR;
         }
         g_pointer_hook_source = source;
-        source->pointer_hook = SetWindowsHookExW(WH_MOUSE_LL, reach_input_pointer_hook_proc,
-                                                 GetModuleHandleW(nullptr), 0);
-        if (source->pointer_hook == nullptr)
+        if (reach_windows_install_mouse_hook(reach_input_pointer_hook_proc,
+                                             &source->pointer_hook) != REACH_OK)
         {
             g_pointer_hook_source = nullptr;
             return REACH_ERROR;
@@ -145,7 +155,7 @@ static reach_result reach_input_sync_pointer_hook(reach_input_source *source)
     }
     else if (!enabled && source->pointer_hook != nullptr)
     {
-        UnhookWindowsHookEx(source->pointer_hook);
+        reach_windows_remove_mouse_hook(source->pointer_hook);
         source->pointer_hook = nullptr;
         if (g_pointer_hook_source == source)
         {
@@ -656,21 +666,30 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
     reach_input_pointer_region *region = &source->pointer_regions[region_id];
     if (!enabled || bounds.width <= 0.0f || bounds.height <= 0.0f)
     {
+        AcquireSRWLockExclusive(&source->pointer_region_lock);
         *region = {};
+        ReleaseSRWLockExclusive(&source->pointer_region_lock);
         return reach_input_sync_pointer_hook(source);
     }
 
-    int32_t previous_inside = region->inside;
+    POINT point = {};
+    const int32_t have_point = GetCursorPos(&point) != 0;
+    int32_t changed = 0;
+
+    AcquireSRWLockExclusive(&source->pointer_region_lock);
     region->bounds = bounds;
     region->enabled = 1;
-    POINT point = {};
-    if (GetCursorPos(&point))
+    if (have_point)
     {
-        region->inside = reach_input_point_in_region(point, bounds);
-        if (region->inside != previous_inside)
-        {
-            reach_input_post_pointer_region_event(source, region_id);
-        }
+        int32_t inside = reach_input_point_in_region(point, bounds);
+        changed = inside != region->inside;
+        region->inside = inside;
+    }
+    ReleaseSRWLockExclusive(&source->pointer_region_lock);
+
+    if (changed)
+    {
+        reach_input_post_pointer_region_event(source, region_id);
     }
     return reach_input_sync_pointer_hook(source);
 }
