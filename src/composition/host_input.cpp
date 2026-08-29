@@ -520,7 +520,7 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
         host, REACH_SURFACE_ID_CLIPBOARD, nullptr, REACH_POINTER_EVENT_CANCEL);
     (void)reach_host_apply_surface_action(host, REACH_SURFACE_ID_CLIPBOARD, &clipboard_cancel);
 
-    reach_host_clear_sticky_dock_feedback(host);
+    reach_host_notify_popups_closed(host);
 
     const reach_feature_runtime *source_runtime = reach_host_surface_for_role(host, source);
     if (source_runtime != nullptr && !reach_host_surface_pointer_open(source_runtime))

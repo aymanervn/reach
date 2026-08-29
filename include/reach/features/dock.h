@@ -6,6 +6,7 @@
 
 #include "reach/core/menu_commands.h"
 #include "reach/features/common/popup.h"
+#include "reach/core/ui_layout.h"
 #include "reach/core/ui_state.h"
 #include "reach/core/render_commands.h"
 #include "reach/ports/icon_provider.h"
@@ -170,7 +171,6 @@ extern "C"
     const reach_feature_capsule_ops *reach_dock_capsule_ops(void);
 
     void reach_dock_mark_items_changed(reach_dock *dock);
-    int32_t reach_dock_take_items_changed(reach_dock *dock);
 
     void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model *apps,
                                       size_t count);
@@ -203,20 +203,29 @@ extern "C"
                                                  float native_gap, float native_border_thickness,
                                                  float available_width, float app_slot_units);
 
+    typedef struct reach_dock_arrange_context
+    {
+        const reach_theme *theme;
+        reach_rect_f32 monitor_bounds;
+        float dpi_scale;
+    } reach_dock_arrange_context;
+
     void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *ctx,
                                  reach_dock_layout *layout);
+    void reach_dock_rebuild_items(reach_dock *dock, const reach_dock_build_context *ctx,
+                                  const reach_dock_layout *old_layout,
+                                  reach_dock_layout *out_layout);
+    int32_t reach_dock_take_items_changed(reach_dock *dock);
+    int32_t reach_dock_slots_animating(const reach_dock *dock);
+
+    void reach_dock_apply_config(reach_dock *dock, float height);
+    int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx);
 
     reach_point_i32 reach_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y);
     reach_rect_f32 reach_dock_rect_to_screen(const reach_dock_layout *layout, reach_rect_f32 rect);
     reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout);
     int32_t reach_dock_item_anchor(const reach_dock *dock, size_t index, reach_rect_f32 *out_button,
                                    float *out_bar_edge_y);
-
-    void reach_dock_rebuild_items(reach_dock *dock, const reach_dock_build_context *ctx,
-                                  const reach_dock_layout *old_layout,
-                                  reach_dock_layout *out_layout);
-
-    int32_t reach_dock_slots_animating(const reach_dock *dock);
 
 
     enum

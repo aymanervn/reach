@@ -233,7 +233,9 @@ typedef enum reach_feature_notification_kind
     REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED = 7,
     REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED = 8,
     REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 9,
-    REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 10
+    REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 10,
+    REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED = 11,
+    REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 12
 } reach_feature_notification_kind;
 
 typedef struct reach_feature_notification
@@ -247,6 +249,7 @@ typedef struct reach_feature_notification
     size_t pinned_app_count;
     int32_t icon_size_px;
     reach_display_environment display;
+    const reach_config_snapshot *config;
     int32_t present;
 } reach_feature_notification;
 
@@ -478,10 +481,11 @@ void reach_host_cancel_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id);
 reach_result reach_host_execute_power_command(reach_host *host, uint32_t command);
-void reach_host_clear_sticky_dock_feedback(reach_host *host);
 void reach_host_post_feature_work_ready(reach_host *host);
 void reach_host_notify_windows_changed(reach_host *host);
 void reach_host_notify_display_changed(reach_host *host);
+void reach_host_notify_config_changed(reach_host *host, const reach_config_snapshot *snapshot);
+void reach_host_notify_popups_closed(reach_host *host);
 void reach_host_notify_windows_refreshed(reach_host *host,
                                          const reach_window_tracking_refresh_report *report);
 void reach_host_notify_pinned_apps_changed(reach_host *host);
@@ -564,7 +568,6 @@ struct reach_host
 {
     reach_monitor_port monitors;
 
-    reach_dock_model dock_config;
 
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
@@ -629,7 +632,6 @@ struct reach_host
     float layout_dpi_scale;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_HOST_ANIMATION_COUNT];
-    reach_ui_layout layout;
     int32_t has_layout;
     reach_host_dirty_state dirty;
     reach_config_service *config_service;
@@ -849,7 +851,6 @@ reach_result reach_host_schedule_window_controls(reach_host *host,
                                                  const uintptr_t *window_ids, size_t window_count);
 void reach_host_apply_window_control_result(reach_host *host);
 
-reach_dock_build_context reach_host_dock_build_context(reach_host *host);
 
 void reach_host_invalidate_bar_coverage(reach_host *host);
 void reach_host_refresh_window_world(reach_host *host);

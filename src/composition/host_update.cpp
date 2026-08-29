@@ -167,18 +167,20 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
                                      (float)(monitor->bounds.bottom - monitor->bounds.top)};
             host->layout_dpi_scale = reach_host_monitor_dpi_scale(monitor);
             reach_feature_runtime *dock_desc = &host->feature_runtimes[REACH_SURFACE_ID_DOCK];
-            if (!dock_desc->resolved_bounds_valid)
+            if (!dock_desc->resolved_bounds_valid && dock_desc->capsule != nullptr &&
+                dock_desc->definition->surface_ops != nullptr &&
+                dock_desc->definition->surface_ops->arrange != nullptr)
             {
-                reach_ui_layout_input input = {};
-                input.monitor_bounds = bounds;
-                input.work_area = bounds;
-                input.dpi_scale = host->layout_dpi_scale;
-                reach_dock_layout dock = {};
-                if (reach_dock_layout_compute(&host->dock_config, &input, &dock) == REACH_OK)
-                {
-                    dock_desc->resolved_bounds = dock.bounds;
-                    dock_desc->resolved_bounds_valid = 1;
-                }
+                reach_feature_surface_context arrange = {};
+                arrange.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+                arrange.monitor_bounds = bounds;
+                arrange.dpi_scale = host->layout_dpi_scale;
+                (void)dock_desc->definition->surface_ops->arrange(dock_desc->capsule, &arrange);
+
+                reach_feature_surface_geometry geometry = {};
+                dock_desc->definition->capsule_ops->surface_geometry(dock_desc->capsule, &geometry);
+                dock_desc->resolved_bounds = geometry.visible_bounds;
+                dock_desc->resolved_bounds_valid = 1;
             }
             reach_host_frame_context frame = {};
             frame.monitor_bounds = bounds;
@@ -306,32 +308,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 host->theme != nullptr ? host->theme : reach_theme_default(), input.dpi_scale);
             host->layout_dpi_scale = input.dpi_scale;
 
-            reach_ui_layout layout = {};
-            reach_result dock_layout_result =
-                reach_dock_layout_compute(&host->dock_config, &input, &layout.dock);
-            if (dock_layout_result == REACH_OK)
             {
-                reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
-                if (reach_dock_take_items_changed(
-                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
-                {
-                    reach_dock_rebuild_items(
-                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
-                        &build_ctx, host->has_layout ? &host->layout.dock : nullptr, &layout.dock);
-                }
-                else
-                {
-                    reach_dock_build_layout(
-                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
-                        &build_ctx, &layout.dock);
-                }
-
-                if (reach_dock_slots_animating(
-                        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
-                {
-                    host->dock.dirty_flags = 1;
-                }
-                host->layout = layout;
                 host->has_layout = 1;
 
                 reach_host_frame_context frame_ctx = {};

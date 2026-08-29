@@ -225,23 +225,6 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     return result.animated_bounds;
 }
 
-reach_dock_build_context reach_host_dock_build_context(reach_host *host)
-{
-
-    reach_dock_build_context ctx = {};
-    if (host == nullptr)
-    {
-        return ctx;
-    }
-    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    ctx.dpi_scale = reach_host_layout_dpi_scale(host);
-    ctx.icon_size = host->dock_config.icon_size;
-    ctx.gap = host->dock_config.gap;
-    ctx.pinned_apps = host->pinned_apps;
-    ctx.pinned_app_count = host->pinned_app_count;
-    return ctx;
-}
-
 reach_result reach_host_refresh_monitor_layout(reach_host *host)
 {
     if (host == nullptr || !host->dirty.monitors || host->monitors.list == nullptr ||

@@ -181,12 +181,7 @@ reach_result reach_host_apply_config_snapshot(reach_host *host,
     }
     reach_host_apply_power_config(host, snapshot);
     reach_host_apply_display_config(host, snapshot);
-    if (snapshot->stage_animation_ms > 0)
-    {
-        reach_stage_set_animation_seconds(
-            reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE),
-            (float)snapshot->stage_animation_ms / 1000.0f);
-    }
+    reach_host_notify_config_changed(host, snapshot);
     return REACH_OK;
 }
 
