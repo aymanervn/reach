@@ -279,7 +279,6 @@ add_library(reach_composition STATIC
     src/composition/host_config.cpp
     src/composition/host_bar_layout.cpp
     src/composition/host_event_dispatch.cpp
-    src/composition/host_feedback.cpp
     src/composition/host_game_mode.cpp
     src/composition/host_edge_reveals.cpp
     src/composition/host_icons.cpp

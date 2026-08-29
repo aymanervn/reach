@@ -36,15 +36,6 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
     case REACH_FEATURE_ACTION_MOVE_PIN:
         return reach_host_move_pin(host, (uint32_t)action->id, action->index);
 
-    case REACH_FEATURE_ACTION_REBUILD_ITEMS:
-    {
-        reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
-        reach_dock_rebuild_items(
-            reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK), &build_ctx,
-            &host->layout.dock, &host->layout.dock);
-        return REACH_OK;
-    }
-
     case REACH_FEATURE_ACTION_FOCUS_WINDOW:
         reach_host_close_surface(host, desc);
         return reach_host_focus_window(host, action->window, 0);

@@ -196,6 +196,12 @@ static void reach_feature_notify_stage(void *capsule,
     {
         reach_stage_set_display(stage, &notification->display);
     }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
+             notification->config != nullptr && notification->config->stage_animation_ms > 0)
+    {
+        reach_stage_set_animation_seconds(stage,
+                                          (float)notification->config->stage_animation_ms / 1000.0f);
+    }
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED &&
              reach_stage_sync_windows(stage))
     {
@@ -245,6 +251,18 @@ static void reach_feature_notify_dock(void *capsule,
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_ICONS_RETAIN)
     {
         reach_dock_touch_icons(dock, notification->icon_size_px);
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
+             notification->config != nullptr)
+    {
+        reach_dock_apply_config(dock, notification->config->dock_height);
+        out->relayout = 1;
+        out->redraw = 1;
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED &&
+             reach_dock_clear_context_feedback(dock))
+    {
+        out->redraw = 1;
     }
 }
 
@@ -887,8 +905,17 @@ static reach_result reach_dock_surface_render(void *capsule,
                                                      out_commands);
 }
 
+static int32_t reach_dock_surface_arrange(void *capsule, const reach_feature_surface_context *ctx)
+{
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = ctx->theme;
+    arrange.monitor_bounds = ctx->monitor_bounds;
+    arrange.dpi_scale = ctx->dpi_scale;
+    return reach_dock_arrange(static_cast<reach_dock *>(capsule), &arrange);
+}
+
 static const reach_feature_surface_ops reach_dock_surface_ops = {
-    reach_prearranged_surface_arrange,
+    reach_dock_surface_arrange,
     reach_dock_surface_render,
 };
 
@@ -1344,7 +1371,6 @@ void reach_host_init_feature_registry(reach_host *host)
         return;
     }
 
-    reach_dock_model_defaults(&host->dock_config);
     reach_host_init_feature_definitions(host);
     reach_feature_definition *definitions = host->feature_definitions;
     definitions[REACH_SURFACE_ID_DOCK].factory = {

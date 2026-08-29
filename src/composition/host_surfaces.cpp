@@ -500,7 +500,7 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening, reac
 
     if (self_exclusive)
     {
-        reach_host_clear_sticky_dock_feedback(host);
+        reach_host_notify_popups_closed(host);
     }
 }
 

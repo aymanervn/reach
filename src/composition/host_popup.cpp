@@ -117,7 +117,7 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
 
     if (closed_any)
     {
-        reach_host_clear_sticky_dock_feedback(host);
+        reach_host_notify_popups_closed(host);
     }
 }
 
@@ -168,7 +168,7 @@ void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int
                                             restore_focus ? REACH_SURFACE_CLOSE_DISMISS
                                                           : REACH_SURFACE_CLOSE_SUPERSEDED);
     }
-    reach_host_clear_sticky_dock_feedback(host);
+    reach_host_notify_popups_closed(host);
 }
 
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus)

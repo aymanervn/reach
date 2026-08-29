@@ -237,6 +237,31 @@ void reach_host_notify_display_changed(reach_host *host)
     reach_host_notify_registered_features(host, &notification);
 }
 
+void reach_host_notify_config_changed(reach_host *host, const reach_config_snapshot *snapshot)
+{
+    if (host == nullptr || snapshot == nullptr)
+    {
+        return;
+    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED;
+    notification.config = snapshot;
+    notification.present = 1;
+    reach_host_notify_registered_features(host, &notification);
+}
+
+void reach_host_notify_popups_closed(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED;
+    notification.present = 1;
+    reach_host_notify_registered_features(host, &notification);
+}
+
 void reach_host_notify_pinned_apps_changed(reach_host *host)
 {
     if (host == nullptr)

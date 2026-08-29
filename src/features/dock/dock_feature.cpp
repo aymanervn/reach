@@ -50,6 +50,7 @@ struct reach_dock
     size_t pinned_app_count;
     reach_menu_request action_request;
     reach_menu_request hover_request;
+    reach_dock_model metrics;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
@@ -528,17 +529,19 @@ static void reach_dock_notify_item_hovered(reach_dock *dock, size_t item_index)
 }
 
 static void
-reach_dock_capsule_apply_interaction_result(const reach_dock_interaction_result *interaction,
+reach_dock_capsule_apply_interaction_result(reach_dock *dock,
+                                            const reach_dock_interaction_result *interaction,
                                             reach_capsule_pointer_result *out)
 {
-    if (interaction == nullptr || out == nullptr)
+    if (dock == nullptr || interaction == nullptr || out == nullptr)
     {
         return;
     }
     out->redraw = out->redraw || interaction->redraw;
     if (interaction->rebuild_items)
     {
-        out->action.kind = REACH_FEATURE_ACTION_REBUILD_ITEMS;
+        reach_dock_mark_items_changed(dock);
+        out->relayout = 1;
     }
     if (interaction->move_pin)
     {
@@ -645,7 +648,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             reach_dock_item_press(dock, hit.index, reach_dock_capsule_screen_x(dock, event->x),
                                   reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
                                   &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
+            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
             out->handled = 1;
             out->control = {REACH_DOCK_CONTROL_ITEM, hit.index, 1};
             return;
@@ -662,7 +665,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         {
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
+            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
         }
 
         reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
@@ -751,7 +754,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             reach_dock_drag_update(dock, reach_dock_capsule_screen_x(dock, event->x),
                                    reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
                                    &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
+            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
             if (!was_moved && reach_draggable_moved(&state->drag.gesture))
             {
                 reach_pressable_disarm(&state->pressable, &feedback, &pressable);
@@ -794,7 +797,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         {
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
+            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
         }
         reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
         reach_pressable_result pressable = {};
@@ -846,6 +849,63 @@ static int32_t reach_dock_capsule_control_at_point(const void *capsule, int32_t 
     default:
         return 0;
     }
+}
+
+void reach_dock_apply_config(reach_dock *dock, float height)
+{
+    if (dock != nullptr && height > 0.0f)
+    {
+        dock->metrics.height = height;
+    }
+}
+
+/* The dock resolves its own geometry: the metrics it owns, the pins it was handed and the
+   windows it tracks, against the monitor composition gives every surface. */
+int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx)
+{
+    if (dock == nullptr || ctx == nullptr)
+    {
+        return 0;
+    }
+
+    const reach_theme *theme = ctx->theme != nullptr ? ctx->theme : reach_theme_default();
+    dock->metrics.icon_size = reach_theme_icon_box_size(theme, dock->metrics.height);
+
+    reach_ui_layout_input input = {};
+    input.monitor_bounds = ctx->monitor_bounds;
+    input.work_area = ctx->monitor_bounds;
+    input.dpi_scale = ctx->dpi_scale;
+    input.border_thickness = reach_theme_border_thickness(theme, ctx->dpi_scale);
+
+    reach_dock_layout layout = {};
+    if (reach_dock_layout_compute(&dock->metrics, &input, &layout) != REACH_OK)
+    {
+        return 0;
+    }
+
+    reach_dock_build_context build = {};
+    build.theme = theme;
+    build.dpi_scale = ctx->dpi_scale;
+    build.icon_size = dock->metrics.icon_size;
+    build.gap = dock->metrics.gap;
+    build.pinned_apps = dock->pinned_apps;
+    build.pinned_app_count = dock->pinned_app_count;
+
+    reach_rect_f32 before = dock->pointer_layout_valid ? dock->pointer_layout.bounds
+                                                       : reach_rect_f32{};
+    if (reach_dock_take_items_changed(dock))
+    {
+        reach_dock_rebuild_items(dock, &build,
+                                 dock->pointer_layout_valid ? &dock->pointer_layout : nullptr,
+                                 &layout);
+    }
+    else
+    {
+        reach_dock_build_layout(dock, &build, &layout);
+    }
+
+    return !reach_rect_equal(before, dock->pointer_layout.bounds) ||
+           reach_dock_slots_animating(dock);
 }
 
 const reach_feature_capsule_ops *reach_dock_capsule_ops(void)

@@ -415,25 +415,9 @@ CONCRETE_FEATURE_HEADER_BASELINE: dict[tuple[str, str], int] = {
 }
 
 CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
-    ("src/composition/host_config.cpp", "reach_stage_set_animation_seconds"): 1,
-    ("src/composition/host_feature_actions.cpp", "reach_dock_rebuild_items"): 1,
-    ("src/composition/host_feedback.cpp", "reach_dock_clear_context_feedback"): 1,
-    ("src/composition/host_update.cpp", "reach_dock_build_layout"): 1,
-    ("src/composition/host_update.cpp", "reach_dock_rebuild_items"): 1,
-    ("src/composition/host_update.cpp", "reach_dock_slots_animating"): 1,
-    ("src/composition/host_update.cpp", "reach_dock_take_items_changed"): 1,
 }
 
 COMPOSITION_FEATURE_HELPER_BASELINE: dict[tuple[str, str], int] = {
-    ("src/composition/host_bar_layout.cpp", "reach_host_dock_build_context"): 1,
-    ("src/composition/host_feature_actions.cpp", "reach_host_dock_build_context"): 1,
-    ("src/composition/host_feedback.cpp", "reach_host_clear_sticky_dock_feedback"): 1,
-    ("src/composition/host_input.cpp", "reach_host_clear_sticky_dock_feedback"): 1,
-    ("src/composition/host_internal.h", "reach_host_clear_sticky_dock_feedback"): 1,
-    ("src/composition/host_internal.h", "reach_host_dock_build_context"): 1,
-    ("src/composition/host_popup.cpp", "reach_host_clear_sticky_dock_feedback"): 2,
-    ("src/composition/host_surfaces.cpp", "reach_host_clear_sticky_dock_feedback"): 1,
-    ("src/composition/host_update.cpp", "reach_host_dock_build_context"): 1,
 }
 
 REGISTERED_SURFACE_IDS = (
