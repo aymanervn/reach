@@ -201,10 +201,6 @@ static void reach_host_cleanup(reach_host *host)
     reach_wallpaper_destroy(host->wallpaper);
     host->wallpaper = nullptr;
     reach_host_destroy_registered_features(host);
-    if (host->explorer_service.ops.destroy != nullptr)
-    {
-        host->explorer_service.ops.destroy(host->explorer_service.service);
-    }
     if (host->wallpaper_service.ops.destroy != nullptr)
     {
         host->wallpaper_service.ops.destroy(host->wallpaper_service.service);
@@ -256,7 +252,6 @@ static void reach_host_cleanup(reach_host *host)
     host->terminal_launcher = {};
     host->settings_launcher = {};
     host->icon_service = nullptr;
-    host->explorer_service = {};
     host->wallpaper_service = {};
     host->wallpaper_surface = {};
     host->wallpaper = nullptr;
@@ -375,7 +370,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     reach_icon_service_set_notify(host->icon_service, reach_host_on_icon_service_ready, host);
 
-    host->explorer_service = dependencies->explorer_service;
     host->wallpaper_service = dependencies->wallpaper_service;
     host->wallpaper_surface = dependencies->wallpaper_surface;
     host->wallpaper = nullptr;

@@ -586,7 +586,6 @@ struct reach_host
     reach_terminal_launcher_port terminal_launcher;
     reach_settings_launcher_port settings_launcher;
     reach_icon_service *icon_service;
-    reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
     reach_wallpaper_surface_port wallpaper_surface;
     reach_power_session_port power_session;
@@ -766,7 +765,6 @@ void reach_host_stop_app_control(reach_host *host);
 void reach_host_process_deferred_launch(reach_host *host);
 reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
                                                           const reach_app_launch_request *request);
-reach_result reach_host_open_default_location(reach_host *host);
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
                                             const reach_feature_target *target, uint32_t flags);
 reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature_target *target,

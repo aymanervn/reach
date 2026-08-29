@@ -21,7 +21,8 @@ enum reach_app_control_launch_item_kind
 {
     REACH_APP_CONTROL_ITEM_LAUNCH = 0,
     REACH_APP_CONTROL_ITEM_REVEAL = 1,
-    REACH_APP_CONTROL_ITEM_TERMINAL = 2
+    REACH_APP_CONTROL_ITEM_TERMINAL = 2,
+    REACH_APP_CONTROL_ITEM_OPEN_LOCATION = 3
 };
 
 struct reach_app_control_launch_item
@@ -29,6 +30,7 @@ struct reach_app_control_launch_item
     int32_t kind;
     reach_app_launch_request launch;
     reach_terminal_launch_request terminal;
+    reach_app_control_location_kind location;
 };
 
 struct reach_app_control_launch_state
@@ -58,6 +60,47 @@ static void reach_app_control_launch_state_release(reach_app_control_launch_stat
     if (last)
     {
         delete state;
+    }
+}
+
+static void reach_app_control_open_default(const reach_app_control_launch_state *state)
+{
+    if (state->explorer.ops.open_default != nullptr)
+    {
+        (void)state->explorer.ops.open_default(state->explorer.service);
+    }
+}
+
+static void reach_app_control_open_location(const reach_app_control_launch_state *state,
+                                            reach_app_control_location_kind kind,
+                                            const uint16_t *path)
+{
+    switch (kind)
+    {
+    case REACH_APP_CONTROL_LOCATION_PATH:
+        if (state->explorer.ops.path_exists != nullptr &&
+            state->explorer.ops.path_exists(state->explorer.service, path) &&
+            state->explorer.ops.open_path != nullptr)
+        {
+            (void)state->explorer.ops.open_path(state->explorer.service, path);
+            return;
+        }
+        reach_app_control_open_default(state);
+        return;
+
+    case REACH_APP_CONTROL_LOCATION_SHELL:
+        if (state->explorer.ops.open_shell_location != nullptr)
+        {
+            (void)state->explorer.ops.open_shell_location(state->explorer.service, path);
+            return;
+        }
+        reach_app_control_open_default(state);
+        return;
+
+    case REACH_APP_CONTROL_LOCATION_DEFAULT:
+    default:
+        reach_app_control_open_default(state);
+        return;
     }
 }
 
@@ -97,7 +140,11 @@ static void reach_app_control_launch_worker_main(reach_app_control_launch_state 
             --state->queue_count;
         }
 
-        if (item.kind == REACH_APP_CONTROL_ITEM_REVEAL)
+        if (item.kind == REACH_APP_CONTROL_ITEM_OPEN_LOCATION)
+        {
+            reach_app_control_open_location(state, item.location, item.launch.path);
+        }
+        else if (item.kind == REACH_APP_CONTROL_ITEM_REVEAL)
         {
             if (state->explorer.ops.reveal_path != nullptr)
             {
@@ -520,6 +567,29 @@ reach_result reach_app_control_schedule_reveal(reach_app_control *service, const
     reach_app_control_launch_item item = {};
     item.kind = REACH_APP_CONTROL_ITEM_REVEAL;
     reach_copy_utf16(item.launch.path, 260, path);
+    return reach_app_control_enqueue(service->launch, &item);
+}
+
+reach_result reach_app_control_schedule_open_location(reach_app_control *service,
+                                                      reach_app_control_location_kind kind,
+                                                      const uint16_t *path)
+{
+    if (service == nullptr || service->launch == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->launch->explorer.service == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_app_control_launch_item item = {};
+    item.kind = REACH_APP_CONTROL_ITEM_OPEN_LOCATION;
+    item.location = kind;
+    if (path != nullptr)
+    {
+        reach_copy_utf16(item.launch.path, 260, path);
+    }
     return reach_app_control_enqueue(service->launch, &item);
 }
 
