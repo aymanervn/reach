@@ -7,6 +7,17 @@ reach_launcher_state *reach_launcher_state_mut(reach_launcher *launcher);
 void reach_launcher_set_pointer_context(reach_launcher *launcher,
                                         const reach_launcher_layout *layout);
 void reach_launcher_set_search_error(reach_launcher *launcher, int32_t error);
+void reach_launcher_reset_text_edit(reach_launcher *launcher);
+void reach_launcher_clear_query(reach_launcher *launcher);
+
+typedef struct reach_launcher_text_event_result
+{
+    int32_t redraw;
+    int32_t relayout;
+} reach_launcher_text_event_result;
+
+void reach_launcher_handle_text_event(reach_launcher *launcher, const reach_ui_event *event,
+                                      reach_launcher_text_event_result *out_result);
 int32_t reach_launcher_take_search_results(reach_launcher *launcher,
                                            reach_search_candidate *out_results, size_t *out_count,
                                            int32_t *out_error);
@@ -91,7 +102,6 @@ void reach_launcher_wheel(reach_launcher *launcher, int32_t x, int32_t y, int32_
 void reach_launcher_state_init(reach_launcher_state *state);
 reach_result reach_launcher_open_state(reach_launcher_state *state);
 reach_result reach_launcher_close_state(reach_launcher_state *state);
-reach_result reach_launcher_toggle_state(reach_launcher_state *state);
 reach_result reach_launcher_set_query_state(reach_launcher_state *state, const uint16_t *query);
 reach_result reach_launcher_set_results_state(reach_launcher_state *state,
                                               const reach_search_candidate *results, size_t count);
@@ -106,8 +116,5 @@ reach_result reach_launcher_set_result_scroll_offset_state(reach_launcher_state 
                                                            size_t offset);
 size_t reach_launcher_result_scroll_offset_state(const reach_launcher_state *state);
 reach_result reach_launcher_clear_results_state(reach_launcher_state *state);
-reach_result reach_launcher_handle_event_state(reach_launcher_state *state,
-                                               const reach_ui_event *event,
-                                               reach_ui_intent *out_intent);
 
 #endif

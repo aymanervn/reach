@@ -1,5 +1,7 @@
 #include "host_internal.h"
 
+#include "reach/features/launcher.h"
+
 static void reach_feature_attach_launcher(void *capsule,
                                           const reach_feature_dependencies *dependencies)
 {
@@ -140,11 +142,6 @@ static void reach_feature_stop_system_hud(void *capsule)
     reach_system_hud_force_close(static_cast<reach_system_hud *>(capsule));
 }
 
-static void reach_host_surface_launcher_close(reach_host *host)
-{
-    reach_host_close_launcher_without_focus_restore(host);
-}
-
 static void reach_host_surface_clipboard_close(reach_host *host)
 {
     reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
@@ -175,17 +172,49 @@ static void reach_host_surface_stage_close(reach_host *host)
     reach_host_close_stage(host);
 }
 
-static void reach_host_surface_switcher_close(reach_host *host)
+static int32_t reach_feature_control_launcher_open(void *capsule, int32_t open,
+                                                   reach_feature_tick_result *out)
 {
-    reach_switcher_force_close(
-        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER));
-    reach_host_surface_transition_set(host, &host->switcher_transition, 0);
-    host->switcher.dirty_flags = 1;
+    int32_t changed = reach_launcher_set_open(static_cast<reach_launcher *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+    return changed;
 }
 
-static void reach_host_toggle_clipboard_surface(reach_host *host)
+static void reach_feature_control_launcher_hidden(void *capsule, reach_feature_tick_result *out)
 {
-    reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_CLIPBOARD);
+    reach_launcher_surface_hidden(static_cast<reach_launcher *>(capsule));
+    if (out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+    }
+}
+
+static int32_t reach_feature_control_switcher_open(void *capsule, int32_t open,
+                                                   reach_feature_tick_result *out)
+{
+    int32_t changed = reach_switcher_set_open(static_cast<reach_switcher *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->request_update = 1;
+    }
+    return changed;
+}
+
+static void reach_feature_notify_switcher(void *capsule,
+                                          const reach_feature_notification *notification,
+                                          reach_feature_tick_result *out)
+{
+    if (notification != nullptr && notification->kind == REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED)
+    {
+        reach_switcher_notify_windows_changed(static_cast<reach_switcher *>(capsule), out);
+    }
 }
 
 static int32_t reach_feature_control_clipboard_open(void *capsule, int32_t open,
@@ -498,18 +527,24 @@ static const reach_feature_render_resource_ops reach_clipboard_resource_ops = {
     reach_feature_clipboard_active_at, reach_feature_clipboard_release_source,
     reach_feature_clipboard_clear_active};
 
+static const reach_feature_control_ops reach_launcher_control_ops = {
+    reach_feature_control_launcher_open, reach_feature_control_launcher_hidden, nullptr, nullptr,
+    nullptr};
+static const reach_feature_control_ops reach_switcher_control_ops = {
+    reach_feature_control_switcher_open, nullptr, reach_feature_notify_switcher, nullptr, nullptr};
 static const reach_feature_control_ops reach_clipboard_control_ops = {
-    reach_feature_control_clipboard_open, nullptr, nullptr, &reach_clipboard_resource_ops};
+    reach_feature_control_clipboard_open, nullptr, nullptr, nullptr,
+    &reach_clipboard_resource_ops};
 static const reach_feature_control_ops reach_tray_control_ops = {
-    reach_feature_control_tray_open, nullptr, reach_feature_tray_blocks_position_frame,
+    reach_feature_control_tray_open, nullptr, nullptr, reach_feature_tray_blocks_position_frame,
     &reach_tray_resource_ops};
 static const reach_feature_control_ops reach_quick_settings_control_ops = {
-    reach_feature_control_quick_settings_open, reach_feature_notify_quick_settings,
+    reach_feature_control_quick_settings_open, nullptr, reach_feature_notify_quick_settings,
     reach_feature_quick_settings_blocks_position_frame, &reach_quick_settings_resource_ops};
 static const reach_feature_control_ops reach_battery_control_ops = {
-    reach_feature_control_battery_open, reach_feature_notify_battery, nullptr, nullptr};
+    reach_feature_control_battery_open, nullptr, reach_feature_notify_battery, nullptr, nullptr};
 static const reach_feature_control_ops reach_system_hud_control_ops = {
-    nullptr, reach_feature_notify_system_hud, nullptr, nullptr};
+    nullptr, nullptr, reach_feature_notify_system_hud, nullptr, nullptr};
 
 #define REACH_HOST_LAYER_DOCK_EDGE_REVEAL 120
 #define REACH_HOST_LAYER_BAR_ACTIVE 130
@@ -557,7 +592,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
         host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, &host->launcher,
-        &host->launcher_transition, reach_host_surface_launcher_close, reach_launcher_capsule_ops(),
+        &host->launcher_transition, nullptr, reach_launcher_capsule_ops(),
         REACH_SURFACE_POINTER_RELAYOUT_REDRAWS | REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED);
     reach_host_define_feature(
         host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT, &host->clipboard_surface,
@@ -584,9 +619,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
         &host->context_menu_transition, reach_host_surface_context_menu_close,
         reach_context_menu_capsule_ops(), REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
     reach_host_define_feature(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY,
-                              &host->switcher, &host->switcher_transition,
-                              reach_host_surface_switcher_close, reach_switcher_capsule_ops(),
-                              REACH_SURFACE_POINTER_NONE);
+                              &host->switcher, &host->switcher_transition, nullptr,
+                              reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_CLASS_TRANSIENT,
                               &host->stage, &host->stage_transition, reach_host_surface_stage_close,
                               reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
@@ -619,6 +653,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SWITCHER].lifecycle.stop = reach_feature_stop_switcher;
     definitions[REACH_SURFACE_ID_STAGE].lifecycle.stop = reach_feature_stop_stage;
 
+    definitions[REACH_SURFACE_ID_LAUNCHER].control_ops = &reach_launcher_control_ops;
+    definitions[REACH_SURFACE_ID_SWITCHER].control_ops = &reach_switcher_control_ops;
     definitions[REACH_SURFACE_ID_CLIPBOARD].control_ops = &reach_clipboard_control_ops;
     definitions[REACH_SURFACE_ID_TRAY].control_ops = &reach_tray_control_ops;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].control_ops = &reach_quick_settings_control_ops;
@@ -654,7 +690,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_CLIPBOARD].surface.pointer_priority = 20;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.role = REACH_SURFACE_LAUNCHER;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.pointer_priority = 30;
-    definitions[REACH_SURFACE_ID_LAUNCHER].dismiss = reach_host_close_launcher;
+    definitions[REACH_SURFACE_ID_LAUNCHER].surface.restores_focus_on_close = 1;
+    definitions[REACH_SURFACE_ID_LAUNCHER].surface.close_on_persistent_press = 1;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.behavior_flags =
         REACH_SURFACE_BEHAVIOR_ACTIVATES | REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.scale_in_envelope = 1;
@@ -681,7 +718,6 @@ static void reach_host_init_feature_definitions(reach_host *host)
         REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
     definitions[REACH_SURFACE_ID_STAGE].surface.role = REACH_SURFACE_STAGE;
     definitions[REACH_SURFACE_ID_STAGE].surface.pointer_priority = 60;
-    definitions[REACH_SURFACE_ID_STAGE].dismiss = reach_host_close_stage;
     definitions[REACH_SURFACE_ID_STAGE].surface.bar_shown_while_open = 1;
     definitions[REACH_SURFACE_ID_STAGE].surface.behavior_flags = REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.role = REACH_SURFACE_SYSTEM_HUD;
@@ -720,13 +756,12 @@ static void reach_host_init_feature_definitions(reach_host *host)
 
     definitions[REACH_SURFACE_ID_LAUNCHER].toggle_events = reach_launcher_activation_events(
         &definitions[REACH_SURFACE_ID_LAUNCHER].toggle_event_count);
-    definitions[REACH_SURFACE_ID_LAUNCHER].toggle = reach_host_toggle_launcher;
+    definitions[REACH_SURFACE_ID_LAUNCHER].routed_events = reach_launcher_routed_events(
+        &definitions[REACH_SURFACE_ID_LAUNCHER].routed_event_count);
     definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_events = reach_clipboard_activation_events(
         &definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_event_count);
-    definitions[REACH_SURFACE_ID_CLIPBOARD].toggle = reach_host_toggle_clipboard_surface;
     definitions[REACH_SURFACE_ID_SWITCHER].routed_events =
         reach_switcher_routed_events(&definitions[REACH_SURFACE_ID_SWITCHER].routed_event_count);
-    definitions[REACH_SURFACE_ID_SWITCHER].handle_routed = reach_host_handle_switcher_event;
 }
 
 static int32_t reach_prearranged_surface_arrange(void *capsule,

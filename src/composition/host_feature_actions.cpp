@@ -2,25 +2,17 @@
 
 static void reach_host_close_surface(reach_host *host, const reach_feature_runtime *desc)
 {
-    if (desc->definition->dismiss != nullptr)
-    {
-        desc->definition->dismiss(host);
-    }
-    else if (desc->definition->force_close != nullptr)
-    {
-        desc->definition->force_close(host);
-    }
+    reach_host_close_registered_surface(host, desc->definition->id,
+                                        REACH_SURFACE_CLOSE_SUPERSEDED);
 }
 
 reach_result reach_host_apply_feature_action(reach_host *host, const reach_feature_runtime *desc,
-                                             const reach_capsule_pointer_result *result)
+                                             const reach_capsule_action *action)
 {
-    if (host == nullptr || desc == nullptr || result == nullptr)
+    if (host == nullptr || desc == nullptr || action == nullptr)
     {
         return REACH_OK;
     }
-
-    const reach_capsule_action *action = &result->action;
 
     switch (action->kind)
     {
@@ -29,11 +21,11 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
         return REACH_OK;
 
     case REACH_FEATURE_ACTION_OPEN_PINNED_APP:
-        return reach_host_open_pinned_app(host, action->index, 0, 0);
+        return reach_host_open_pinned_app(host, action->index, 0, desc->definition->id, 0);
 
     case REACH_FEATURE_ACTION_OPEN_PINNED_APP_BY_ID:
         return reach_host_open_pinned_app_id(
-            host, (uint32_t)action->id, 0,
+            host, (uint32_t)action->id, 0, desc->definition->id,
             (action->flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0);
 
     case REACH_FEATURE_ACTION_LAUNCH_NEW_INSTANCE:
@@ -87,12 +79,26 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
     case REACH_FEATURE_ACTION_EXECUTE_MENU_COMMAND:
         return reach_host_execute_context_command(host, (uint32_t)action->id);
 
-    case REACH_FEATURE_ACTION_OPEN_SEARCH_RESULT:
-        return reach_host_open_launcher_result_and_close_transients(host);
-
-    case REACH_FEATURE_ACTION_REVEAL_SEARCH_RESULT:
+    case REACH_FEATURE_ACTION_OPEN_TARGET:
     {
-        reach_result reveal_result = reach_host_reveal_launcher_result(host, action->index);
+        reach_result open_result = reach_host_open_feature_target(
+            host, desc->definition->id, &action->target,
+            (action->flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0);
+        if (open_result == REACH_OK)
+        {
+            reach_host_close_transient_surfaces(host, 0);
+        }
+        return open_result;
+    }
+
+    case REACH_FEATURE_ACTION_REVEAL_TARGET:
+    {
+        if (action->target.kind != REACH_FEATURE_TARGET_APP || action->target.path == nullptr ||
+            action->target.path[0] == 0 || !reach_app_control_reveal_available(host->app_control))
+        {
+            return REACH_OK;
+        }
+        reach_result reveal_result = reach_host_schedule_reveal_path(host, action->target.path);
         if (reveal_result == REACH_OK)
         {
             reach_host_close_surface(host, desc);

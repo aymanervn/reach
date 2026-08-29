@@ -229,6 +229,69 @@ const reach_ui_event_type *reach_switcher_routed_events(size_t *out_count)
     return events;
 }
 
+static void reach_switcher_apply_action(reach_switcher_action action,
+                                        reach_capsule_event_result *out)
+{
+    switch (action.type)
+    {
+    case REACH_SWITCHER_ACTION_OPENED:
+    case REACH_SWITCHER_ACTION_CLOSED:
+        out->handled = 1;
+        out->redraw = 1;
+        out->request_update = 1;
+        break;
+    case REACH_SWITCHER_ACTION_CHANGED:
+        out->handled = 1;
+        out->redraw = 1;
+        out->request_update = 1;
+        break;
+    case REACH_SWITCHER_ACTION_COMMITTED:
+        out->handled = 1;
+        out->redraw = 1;
+        out->request_update = 1;
+        out->action.kind = REACH_FEATURE_ACTION_ACTIVATE_WINDOW;
+        out->action.window = action.window;
+        break;
+    case REACH_SWITCHER_ACTION_NONE:
+    default:
+        break;
+    }
+}
+
+static void reach_switcher_capsule_handle_event(void *capsule, const reach_ui_event *event,
+                                                reach_capsule_event_result *out)
+{
+    reach_switcher *switcher = static_cast<reach_switcher *>(capsule);
+    if (switcher == nullptr || event == nullptr || out == nullptr)
+    {
+        return;
+    }
+    reach_switcher_apply_action(reach_switcher_handle_event(switcher, event), out);
+}
+
+int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open)
+{
+    if (switcher == nullptr || open || !reach_switcher_is_open(switcher))
+    {
+        return 0;
+    }
+    reach_switcher_force_close(switcher);
+    return 1;
+}
+
+void reach_switcher_notify_windows_changed(reach_switcher *switcher,
+                                           reach_feature_tick_result *out)
+{
+    if (switcher == nullptr || out == nullptr)
+    {
+        return;
+    }
+    reach_capsule_event_result result = {};
+    reach_switcher_apply_action(reach_switcher_sync_windows(switcher), &result);
+    out->redraw = result.redraw;
+    out->request_update = result.request_update;
+}
+
 const reach_feature_capsule_ops *reach_switcher_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
@@ -242,6 +305,8 @@ const reach_feature_capsule_ops *reach_switcher_capsule_ops(void)
         nullptr,
         nullptr,
         reach_switcher_capsule_surface_geometry,
+        nullptr,
+        reach_switcher_capsule_handle_event,
     };
     return &ops;
 }

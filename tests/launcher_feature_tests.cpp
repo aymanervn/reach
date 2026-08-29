@@ -30,15 +30,33 @@ static int expect_close_at(float actual, float expected, int line)
 
 #define expect_close(actual, expected) expect_close_at(actual, expected, __LINE__)
 
+static void fill_ascii(uint16_t *out, size_t capacity, const char *text)
+{
+    size_t index = 0;
+    while (text[index] != 0 && index + 1 < capacity)
+    {
+        out[index] = (uint16_t)(unsigned char)text[index];
+        ++index;
+    }
+    out[index] = 0;
+}
+
+static reach_capsule_event_result route(reach_launcher *launcher, reach_ui_event_type type,
+                                       uint32_t id)
+{
+    reach_ui_event event = {};
+    event.type = type;
+    event.id = id;
+    reach_capsule_event_result result = {};
+    reach_launcher_capsule_ops()->handle_event(launcher, &event, &result);
+    return result;
+}
+
 static void type_ascii(reach_launcher *launcher, const char *text)
 {
     for (size_t index = 0; text[index] != 0; ++index)
     {
-        reach_ui_event event = {};
-        event.type = REACH_UI_EVENT_TEXT_CHAR;
-        event.id = (uint32_t)(unsigned char)text[index];
-        reach_launcher_text_event_result result = {};
-        reach_launcher_handle_text_event(launcher, &event, &result);
+        (void)route(launcher, REACH_UI_EVENT_TEXT_CHAR, (uint32_t)(unsigned char)text[index]);
     }
 }
 
@@ -47,15 +65,16 @@ static int test_terminal_command_mode(void)
     int failed = 0;
     reach_launcher *launcher = nullptr;
     failed += expect(reach_launcher_create(&launcher) == REACH_OK);
-    failed += expect(reach_launcher_toggle(launcher) == REACH_OK);
+    failed += expect(reach_launcher_set_open(launcher, 1) == 1);
+    const reach_launcher_model *model = &reach_launcher_state_ptr(launcher)->model;
 
     const uint16_t terminal_icon_ref[] = {'w', 't', '.', 'e', 'x', 'e', 0};
     reach_launcher_set_terminal_icon_ref(launcher, terminal_icon_ref);
 
     type_ascii(launcher, "!");
-    failed += expect(reach_launcher_result_count(launcher) == 1);
-    failed += expect(reach_launcher_selected_result_index(launcher) == 0);
-    const reach_launcher_result *result = reach_launcher_result_at(launcher, 0);
+    failed += expect(model->result_count == 1);
+    failed += expect(model->selected_result_index == 0);
+    const reach_launcher_result *result = &model->results[0];
     failed += expect(result != nullptr);
     failed +=
         expect(result != nullptr && result->action == REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND);
@@ -67,26 +86,47 @@ static int test_terminal_command_mode(void)
 
     const char *command = "ls | Where-Object { $_.Length -gt 0 }; Write-Output \"done\"";
     type_ascii(launcher, command);
-    result = reach_launcher_result_at(launcher, 0);
-    failed += expect(reach_launcher_result_count(launcher) == 1);
-    failed += expect(reach_launcher_selected_result_index(launcher) == 0);
-    failed += expect(result != nullptr && reach_test_utf16_equals_ascii(result->subtitle, command));
-    failed += expect(result != nullptr &&
-                     reach_test_utf16_equals_ascii(result->payload.terminal_command, command));
+    result = &model->results[0];
+    failed += expect(model->result_count == 1);
+    failed += expect(model->selected_result_index == 0);
+    failed += expect(reach_test_utf16_equals_ascii(result->subtitle, command));
+    failed += expect(reach_test_utf16_equals_ascii(result->payload.terminal_command, command));
 
-    reach_ui_event event = {};
-    reach_ui_intent intent = {};
-    event.type = REACH_UI_EVENT_ENTER;
-    failed += expect(reach_launcher_handle_event(launcher, &event, &intent) == REACH_OK);
-    failed += expect(intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT);
+    reach_capsule_event_result entered = route(launcher, REACH_UI_EVENT_ENTER, 0);
+    failed += expect(entered.action.kind == REACH_FEATURE_ACTION_OPEN_TARGET);
+    failed += expect(entered.action.target.kind == REACH_FEATURE_TARGET_TERMINAL_COMMAND);
+    failed += expect(reach_test_utf16_equals_ascii(entered.action.target.path, command));
+    failed += expect((entered.action.flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) == 0);
 
-    event = {};
-    event.type = REACH_UI_EVENT_TEXT_EDIT;
-    event.id = REACH_UI_EDIT_KEY_SELECT_ALL;
-    reach_launcher_text_event_result text_result = {};
-    reach_launcher_handle_text_event(launcher, &event, &text_result);
+    (void)route(launcher, REACH_UI_EVENT_TEXT_EDIT, REACH_UI_EDIT_KEY_SELECT_ALL);
     type_ascii(launcher, "b");
-    failed += expect(reach_launcher_result_count(launcher) == 0);
+    failed += expect(model->result_count == 0);
+
+    reach_launcher_destroy(launcher);
+    return failed;
+}
+
+static int test_open_target_for_query_without_results(void)
+{
+    int failed = 0;
+    reach_launcher *launcher = nullptr;
+    failed += expect(reach_launcher_create(&launcher) == REACH_OK);
+    failed += expect(reach_launcher_set_open(launcher, 1) == 1);
+
+    reach_capsule_event_result empty = route(launcher, REACH_UI_EVENT_ENTER, 0);
+    failed += expect(empty.action.kind == REACH_FEATURE_ACTION_OPEN_TARGET);
+    failed += expect(empty.action.target.kind == REACH_FEATURE_TARGET_DEFAULT_LOCATION);
+
+    type_ascii(launcher, "Shell:Downloads");
+    reach_capsule_event_result shell = route(launcher, REACH_UI_EVENT_ENTER, 0);
+    failed += expect(shell.action.target.kind == REACH_FEATURE_TARGET_SHELL_LOCATION);
+    failed += expect(reach_test_utf16_equals_ascii(shell.action.target.path, "Shell:Downloads"));
+
+    (void)route(launcher, REACH_UI_EVENT_TEXT_EDIT, REACH_UI_EDIT_KEY_SELECT_ALL);
+    type_ascii(launcher, "C:/dev");
+    reach_capsule_event_result path = route(launcher, REACH_UI_EVENT_ENTER, 0);
+    failed += expect(path.action.target.kind == REACH_FEATURE_TARGET_LOCATION);
+    failed += expect(reach_test_utf16_equals_ascii(path.action.target.path, "C:/dev"));
 
     reach_launcher_destroy(launcher);
     return failed;
@@ -101,11 +141,10 @@ int main()
     const reach_launcher_state *state = reach_launcher_state_ptr(capsule);
     failed += expect(state != nullptr);
 
-    reach_ui_event event = {};
     size_t activation_count = 0;
     const reach_ui_event_type *activation = reach_launcher_activation_events(&activation_count);
     failed += expect(activation_count == 1 && activation[0] == REACH_UI_EVENT_WINDOWS_KEY);
-    failed += expect(reach_launcher_toggle(capsule) == REACH_OK);
+    failed += expect(reach_launcher_set_open(capsule, 1) == 1);
     failed += expect(state->model.open == 1);
 
     const uint16_t query[] = {'b', 'r', 'a', 'v', 'e', 0};
@@ -115,8 +154,10 @@ int main()
     reach_search_candidate results[2] = {};
     results[0].name[0] = 'a';
     results[0].kind = REACH_SEARCH_RESULT_APP;
+    fill_ascii(results[0].path, REACH_SEARCH_RESULT_PATH_CAPACITY, "C:/apps/a.exe");
     results[1].name[0] = 'b';
     results[1].kind = REACH_SEARCH_RESULT_FILE;
+    fill_ascii(results[1].path, REACH_SEARCH_RESULT_PATH_CAPACITY, "C:/docs/b.txt");
     failed += expect(reach_launcher_set_results(capsule, results, 2) == REACH_OK);
     failed += expect(state->model.result_count == 2);
     failed += expect(state->model.selected_result_index == 0);
@@ -171,31 +212,42 @@ int main()
     failed += expect(pointer_result.handled == 1);
     pointer.kind = REACH_POINTER_EVENT_UP;
     capsule_ops->handle_pointer(capsule, &pointer, &pointer_result);
-    failed += expect(pointer_result.action.kind == REACH_FEATURE_ACTION_REVEAL_SEARCH_RESULT);
-    failed += expect(pointer_result.action.index == 1);
+    failed += expect(pointer_result.action.kind == REACH_FEATURE_ACTION_REVEAL_TARGET);
+    failed += expect(pointer_result.action.target.kind == REACH_FEATURE_TARGET_NONE);
 
-    event.type = REACH_UI_EVENT_ARROW_DOWN;
-    failed += expect(reach_launcher_handle_event(capsule, &event, 0) == REACH_OK);
+    pointer.kind = REACH_POINTER_EVENT_DOWN;
+    pointer.y = (int32_t)(expansion_layout.search_result_items.y + result_row_height * 0.5f);
+    capsule_ops->handle_pointer(capsule, &pointer, &pointer_result);
+    pointer.kind = REACH_POINTER_EVENT_UP;
+    capsule_ops->handle_pointer(capsule, &pointer, &pointer_result);
+    failed += expect(pointer_result.action.kind == REACH_FEATURE_ACTION_REVEAL_TARGET);
+    failed += expect(pointer_result.action.target.kind == REACH_FEATURE_TARGET_APP);
+    failed +=
+        expect(reach_test_utf16_equals_ascii(pointer_result.action.target.path, "C:/apps/a.exe"));
+
+    (void)route(capsule, REACH_UI_EVENT_ARROW_DOWN, 0);
     failed += expect(state->model.selected_result_index == 1);
-    event.type = REACH_UI_EVENT_ARROW_DOWN;
-    failed += expect(reach_launcher_handle_event(capsule, &event, 0) == REACH_OK);
+    (void)route(capsule, REACH_UI_EVENT_ARROW_DOWN, 0);
     failed += expect(state->model.selected_result_index == 1);
-    event.type = REACH_UI_EVENT_ARROW_UP;
-    failed += expect(reach_launcher_handle_event(capsule, &event, 0) == REACH_OK);
+    (void)route(capsule, REACH_UI_EVENT_ARROW_UP, 0);
     failed += expect(state->model.selected_result_index == 0);
 
-    reach_ui_intent intent = {};
-    event.type = REACH_UI_EVENT_ENTER;
-    failed += expect(reach_launcher_handle_event(capsule, &event, &intent) == REACH_OK);
-    failed += expect(intent.type == REACH_UI_INTENT_OPEN_LAUNCHER_RESULT);
+    reach_capsule_event_result entered = route(capsule, REACH_UI_EVENT_ENTER, 0);
+    failed += expect(entered.action.kind == REACH_FEATURE_ACTION_OPEN_TARGET);
+    failed += expect(entered.action.target.kind == REACH_FEATURE_TARGET_APP);
+    failed +=
+        expect(reach_test_utf16_equals_ascii(entered.action.target.path, "C:/apps/a.exe"));
+    failed +=
+        expect((entered.action.flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0);
 
-    event.type = REACH_UI_EVENT_ESCAPE;
-    failed += expect(reach_launcher_handle_event(capsule, &event, 0) == REACH_OK);
+    (void)route(capsule, REACH_UI_EVENT_ESCAPE, 0);
     failed += expect(state->model.open == 0);
-    failed += expect(reach_launcher_clear_results(capsule) == REACH_OK);
+    reach_launcher_surface_hidden(capsule);
     failed += expect(state->model.result_count == 0);
+    failed += expect(state->model.query_length == 0);
 
     reach_launcher_destroy(capsule);
     failed += test_terminal_command_mode();
+    failed += test_open_target_for_query_without_results();
     return failed == 0 ? 0 : 1;
 }

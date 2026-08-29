@@ -480,7 +480,7 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening, reac
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->id == opening || desc->definition->id == origin ||
-            desc->definition->force_close == nullptr || !reach_host_surface_is_open(desc))
+            !reach_host_surface_closable(desc) || !reach_host_surface_is_open(desc))
         {
             continue;
         }
@@ -525,6 +525,38 @@ void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtim
     }
 }
 
+void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtime *runtime,
+                                          int32_t open)
+{
+    if (host == nullptr || runtime == nullptr)
+    {
+        return;
+    }
+    int32_t next = open ? 1 : 0;
+    if (next)
+    {
+        reach_host_capture_focus_restore(host, runtime->definition->id);
+    }
+    reach_host_surface_transition_set(host, runtime->transition, next);
+    reach_host_sync_pointer_move_subscriptions(host);
+    reach_host_sync_popup_mouse_hook(host);
+    if (!next)
+    {
+        reach_host_request_bar_visibility_update(host);
+    }
+}
+
+int32_t reach_host_surface_closable(const reach_feature_runtime *runtime)
+{
+    if (runtime == nullptr || runtime->definition == nullptr)
+    {
+        return 0;
+    }
+    const reach_feature_control_ops *control = runtime->definition->control_ops;
+    return (runtime->capsule != nullptr && control != nullptr && control->set_open != nullptr) ||
+           runtime->definition->force_close != nullptr;
+}
+
 void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id id, int32_t open)
 {
     if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
@@ -547,14 +579,59 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
     {
         return;
     }
-    reach_host_surface_transition_set(host, runtime->transition, next);
-    reach_host_sync_pointer_move_subscriptions(host);
-    reach_host_sync_popup_mouse_hook(host);
-    if (!next)
-    {
-        reach_host_request_bar_visibility_update(host);
-    }
+    reach_host_apply_surface_open_change(host, runtime, next);
     reach_host_apply_feature_tick_result(host, runtime, &result);
+}
+
+void reach_host_close_surfaces_on_persistent_press(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->definition->surface.close_on_persistent_press &&
+            reach_host_surface_is_open(runtime))
+        {
+            reach_host_close_registered_surface(host, runtime->definition->id,
+                                                REACH_SURFACE_CLOSE_SUPERSEDED);
+        }
+    }
+}
+
+void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
+                                         reach_surface_close_intent intent)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    if (!reach_host_surface_is_open(runtime))
+    {
+        return;
+    }
+    if (intent == REACH_SURFACE_CLOSE_DISMISS)
+    {
+        reach_host_arm_focus_restore(host, id);
+    }
+    else
+    {
+        reach_host_cancel_focus_restore(host, id);
+    }
+
+    const reach_feature_control_ops *control = runtime->definition->control_ops;
+    if (runtime->capsule != nullptr && control != nullptr && control->set_open != nullptr)
+    {
+        reach_host_set_registered_surface_open(host, id, 0);
+        return;
+    }
+    if (runtime->definition->force_close != nullptr)
+    {
+        runtime->definition->force_close(host);
+    }
 }
 
 void reach_host_post_feature_work_ready(reach_host *host)
@@ -578,10 +655,17 @@ void reach_host_post_feature_work_ready(reach_host *host)
 
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id)
 {
-    if (host != nullptr && id < REACH_HOST_SURFACE_COUNT)
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
     {
-        reach_host_set_registered_surface_open(
-            host, id, !reach_host_surface_is_open(&host->feature_runtimes[id]));
+        return;
+    }
+    if (reach_host_surface_is_open(&host->feature_runtimes[id]))
+    {
+        reach_host_close_registered_surface(host, id, REACH_SURFACE_CLOSE_DISMISS);
+    }
+    else
+    {
+        reach_host_set_registered_surface_open(host, id, 1);
     }
 }
 
@@ -600,8 +684,18 @@ void reach_host_notify_registered_features(reach_host *host,
         {
             continue;
         }
+        int32_t was_open = reach_host_surface_is_open(runtime);
         reach_feature_tick_result result = {};
         control->notify(runtime->capsule, notification, &result);
+        int32_t open = reach_host_surface_is_open(runtime);
+        if (open != was_open)
+        {
+            if (!open)
+            {
+                reach_host_cancel_focus_restore(host, runtime->definition->id);
+            }
+            reach_host_apply_surface_open_change(host, runtime, open);
+        }
         reach_host_apply_feature_tick_result(host, runtime, &result);
     }
 }
