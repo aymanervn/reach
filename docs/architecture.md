@@ -102,7 +102,7 @@ never another feature's internals.
 Every capsule also implements the uniform hooks in
 `reach/features/feature_capsule.h` (`reset`, `tick`, `is_open`, `force_close`,
 `on_game_mode`, `needs_frame`, `wants_pointer_move`, `handle_pointer`,
-`pointer_sequence_active`);
+`pointer_sequence_active`, `handle_event`);
 composition orchestrates through these, so adding a feature costs no
 feature-specific composition code. `handle_pointer` carries the complete
 down/up/move/wheel/leave/cancel/context/middle stream so cleanup semantics do
@@ -231,9 +231,23 @@ Capsule state is compiler-enforced private: the public `reach_<f>_state_ptr()`
 accessors return `const`, mutation goes through semantic ops, and the internal
 `reach_<f>_state_mut()` accessors must never appear outside `src/features/`
 (checked by `tools/check_architecture.py`), with no exceptions: the launcher
-owns its text input end-to-end (`reach_launcher_handle_text_event` drives the
-edit model, query, and attached search; composition only routes the raw
-TEXT_CHAR/TEXT_EDIT events and applies the reported redraw/relayout).
+owns its text input end-to-end (its `handle_event` capsule hook drives the edit
+model, query, and attached search behind the routed TEXT_CHAR/TEXT_EDIT events,
+and composition applies only the reported redraw/relayout).
+
+A capsule that consumes non-pointer UI events declares them as
+`reach_feature_definition.routed_events` and receives them through the uniform
+`handle_event` hook, which returns the same `reach_capsule_event_result`
+vocabulary as pointer input: handled/redraw/relayout/request_update plus one
+shared action. Composition broadcasts each routed event to every declaring
+capsule and observes the capsule's own `is_open` to drive transitions, so
+keyboard behaviour needs no feature branch. A capsule that acts on a target
+outside Reach publishes a complete `reach_feature_target`
+(`include/reach/features/common/feature_target.h`) — app, path, terminal command,
+or explorer location — instead of leaving composition to query it back for the
+selection it just acted on. The Launcher owns the whole decision: which result is
+selected, whether an empty query means the default location, and whether a query
+is a `shell:` location or a filesystem path.
 
 **Accepted coupling (by design — do not “fix”):** the top bar cluster. The top
 bar hosts the tray / quick-settings / power buttons, so its private tray overflow UI and the
@@ -437,7 +451,17 @@ the capsule's semantic `set_open`; registry adapters are the only code that tran
 a concrete capsule. Typed host notifications are broadcast through the same contract for external
 state that more than one capsule may present, including system statistics, Now Playing, media
 actions, volume, brightness, and the final top-bar visibility result. Clipboard, Tray, Quick
-Settings, Battery, and System HUD use these operations rather than named host orchestration files.
+Settings, Battery, System HUD, Launcher, and Switcher use these operations rather than named host
+orchestration files. Closing carries an intent: `REACH_SURFACE_CLOSE_DISMISS` for a dismissal the
+user drove, `REACH_SURFACE_CLOSE_SUPERSEDED` when something else took over. A surface that declares
+`restores_focus_on_close` has composition remember the foreground window when it opens and
+reactivate it once the close transition has finished; a superseded close drops that window instead,
+so a launch or a click on another surface keeps the focus it just took. `close_on_persistent_press`
+declares the other half of that rule — a primary press a persistent bar handled supersedes the
+surfaces that declare it. Both are surface-spec data, so neither the focus controller
+(`host_focus_restore.cpp`) nor the pointer path names a feature. Control operations also declare
+`surface_hidden`, called by the generic transition tail once a surface has finished animating out,
+which is where a capsule drops the state that must not survive a close.
 Render-resource operations on the control contract expose retired and active opaque
 renderer/source identities, so the host drains and releases icons in one runtime loop while each
 registry adapter preserves its feature's ownership rules.
@@ -494,8 +518,11 @@ presses are consumed without actions or capture, while pointer enter pauses its
 dismissal dwell and pointer leave releases it. It is centered above the Dock's
 shown-position geometry even when the Dock itself is hidden, and its whole render
 command buffer is faded by the shared animation manager.
+A deferred launch is keyed on the surface that requested it, so composition waits for that
+surface's own close transition before running the launch rather than testing one named feature.
 Per-frame layout resolves in dependency order in `reach_host_update` (monitor →
-dock cluster → launcher → clipboard → switcher); the per-surface frame steps
+dock cluster → clipboard → switcher), while a capsule that owns its own geometry — the Launcher
+computes its layout inside `arrange` — resolves during the frame pass; the per-surface frame steps
 (`host_surface_frames.cpp`, layout refresh → transition → window state →
 corners → show/render) run as one loop over the table in definition `layout.priority`
 order against a shared `reach_host_frame_context`. Transition completion is runtime-driven:

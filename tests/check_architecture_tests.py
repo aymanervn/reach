@@ -75,6 +75,21 @@ class ArchitectureCheckerTests(unittest.TestCase):
                 self.assertTrue(
                     any("reach_beta_ping" in item for item in composition_violations)
                 )
+
+                helper_source = root / "src" / "composition" / "host_helper_probe.cpp"
+                helper_source.write_text(
+                    "void reach_host_refresh_beta_windows(void) {}\n", encoding="utf-8"
+                )
+                pattern = check_architecture.composition_feature_helper_pattern(headers)
+                helper_violations = check_architecture.validate_composition_feature_helpers(
+                    helper_source, helper_source.read_text(encoding="utf-8"), pattern
+                )
+                self.assertTrue(
+                    any(
+                        "reach_host_refresh_beta_windows" in item
+                        for item in helper_violations
+                    )
+                )
             finally:
                 check_architecture.ROOT = original_root
 
