@@ -352,8 +352,84 @@ static void test_pin_snapshot_rebases_the_dock_order_by_path(void)
     reach_dock_destroy(dock);
 }
 
+static void test_dock_metrics_are_spaced_before_any_configuration_arrives(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "metrics test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+
+    reach_pinned_app_model pins[2] = {make_pin(1, "C:\\apps\\a.exe"),
+                                      make_pin(2, "C:\\apps\\b.exe")};
+    reach_dock_apply_pinned_apps(dock, pins, 2);
+    (void)reach_dock_arrange(dock, &arrange);
+
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    expect_true(layout != nullptr && layout->app_slot_count == 2,
+                "arranging the dock lays out every item");
+    expect_true(layout != nullptr && layout->bounds.height > 0.0f,
+                "a dock that has never seen configuration still has its default height");
+    if (layout != nullptr && layout->app_slot_count == 2)
+    {
+        expect_true(layout->app_slots[0].width > 0.0f,
+                    "dock slots keep their icon size without configuration");
+        expect_true(layout->app_slots[1].x > layout->app_slots[0].x + layout->app_slots[0].width,
+                    "dock slots keep the gap between them without configuration");
+    }
+
+    reach_dock_destroy(dock);
+}
+
+static void test_pinned_reorder_survives_the_config_round_trip(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "reorder test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+
+    reach_pinned_app_model pins[2] = {make_pin(1, "C:\\apps\\a.exe"),
+                                      make_pin(2, "C:\\apps\\b.exe")};
+    reach_dock_apply_pinned_apps(dock, pins, 2);
+
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+    (void)reach_dock_arrange(dock, &arrange);
+
+    /* the user drags the second pin in front of the first */
+    reach_dock_order_key swapped[2] = {reach_dock_order_key_at(dock, 1),
+                                       reach_dock_order_key_at(dock, 0)};
+    reach_dock_restore_order(dock, swapped, 2);
+    reach_dock_mark_items_changed(dock);
+    (void)reach_dock_arrange(dock, &arrange);
+    expect_true(reach_dock_item_at(dock, 0)->pinned_index == 1,
+                "the dragged pin takes the first slot straight away");
+
+    /* config persists that move and reissues pin ids on the way back */
+    reach_pinned_app_model reordered[2] = {make_pin(7, "C:\\apps\\b.exe"),
+                                           make_pin(8, "C:\\apps\\a.exe")};
+    reach_dock_apply_pinned_apps(dock, reordered, 2);
+    (void)reach_dock_arrange(dock, &arrange);
+    expect_true(reach_dock_item_at(dock, 0)->pinned_index == 0,
+                "the dragged order survives the config round trip that reissues pin ids");
+
+    reach_dock_destroy(dock);
+}
+
 int main(void)
 {
+    test_dock_metrics_are_spaced_before_any_configuration_arrives();
+    test_pinned_reorder_survives_the_config_round_trip();
     test_pin_snapshot_rebases_the_dock_order_by_path();
     test_unpinned_windows_group_into_one_item();
     test_pinned_app_claims_matching_windows();

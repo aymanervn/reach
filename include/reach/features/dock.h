@@ -220,6 +220,7 @@ extern "C"
 
     void reach_dock_apply_config(reach_dock *dock, float height);
     int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx);
+    const reach_dock_layout *reach_dock_arranged_layout(const reach_dock *dock);
 
     reach_point_i32 reach_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y);
     reach_rect_f32 reach_dock_rect_to_screen(const reach_dock_layout *layout, reach_rect_f32 rect);

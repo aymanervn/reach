@@ -165,6 +165,7 @@ reach_result reach_dock_create(reach_dock **out_animations)
     {
         return REACH_ERROR;
     }
+    reach_dock_model_defaults(&animations->metrics);
     reach_animation_manager_init(&animations->manager, animations->tracks, REACH_DOCK_ANIM_COUNT);
     reach_draggable_init(&animations->state.drag.gesture);
     animations->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
@@ -861,6 +862,11 @@ void reach_dock_apply_config(reach_dock *dock, float height)
 
 /* The dock resolves its own geometry: the metrics it owns, the pins it was handed and the
    windows it tracks, against the monitor composition gives every surface. */
+const reach_dock_layout *reach_dock_arranged_layout(const reach_dock *dock)
+{
+    return dock != nullptr && dock->pointer_layout_valid ? &dock->pointer_layout : nullptr;
+}
+
 int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx)
 {
     if (dock == nullptr || ctx == nullptr)
