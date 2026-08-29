@@ -1,5 +1,6 @@
 #include "reach/support/util.h"
 #include "reach/features/dock.h"
+#include "test_utf16.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -54,6 +55,7 @@ static void test_unpinned_windows_group_into_one_item(void)
 {
     reach_dock_feature_model model = {};
     reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
 
     reach_window_snapshot windows[3] = {
         make_window(101, "C:\\apps\\brave.exe", ""),
@@ -62,23 +64,23 @@ static void test_unpinned_windows_group_into_one_item(void)
     };
     uint32_t group_ids[3] = {7, 7, 7};
 
-    reach_dock_feature_model_build_items(&model, nullptr, 0, windows, group_ids, 3, matches_thunk,
+    reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, windows, group_ids, 3, matches_thunk,
                                          nullptr);
 
     expect_true(model.item_count == 1, "three same-app windows collapse into one item");
     expect_true(model.items[0].pinned == 0, "grouped item is unpinned");
-    expect_true(model.items[0].app_id == 7, "item carries the group id");
+    expect_true(model.items[0].instance_count == 3, "the item owns all three instances");
     expect_true(model.items[0].window == 101, "first window is the representative");
-
-    reach_dock_order_key key = {0, 7};
-    expect_true(reach_dock_feature_model_find_order_key(&model, key) == 0,
-                "order key is the group id");
+    expect_true(reach_dock_feature_model_find_order_key(
+                    &model, reach_dock_item_key_at(&model, 0)) == 0,
+                "the item holds the first slot in the order");
 }
 
 static void test_pinned_app_claims_matching_windows(void)
 {
     reach_dock_feature_model model = {};
     reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
 
     reach_pinned_app_model pins[1] = {make_pin(5, "C:\\apps\\brave.exe")};
     reach_window_snapshot windows[3] = {
@@ -88,21 +90,22 @@ static void test_pinned_app_claims_matching_windows(void)
     };
     uint32_t group_ids[3] = {7, 7, 8};
 
-    reach_dock_feature_model_build_items(&model, pins, 1, windows, group_ids, 3, matches_thunk,
+    reach_dock_feature_model_build_items(&model, &next_key, pins, 1, windows, group_ids, 3, matches_thunk,
                                          nullptr);
 
     expect_true(model.item_count == 2, "one pinned item plus one unpinned group");
-    expect_true(model.items[0].pinned == 1 && model.items[0].app_id == 5,
-                "pinned item keyed by pin id");
+    expect_true(model.items[0].pinned == 1 && model.items[0].pin_id == 5,
+                "a pinned entry carries its pin id as a property");
     expect_true(model.items[0].window == 101, "pinned item takes first matching window");
-    expect_true(model.items[1].pinned == 0 && model.items[1].app_id == 8,
-                "leftover window forms unpinned group");
+    expect_true(model.items[1].pinned == 0 && model.items[1].pin_id == 0,
+                "leftover window forms an unpinned entry");
 }
 
 static void test_key_stable_when_representative_closes(void)
 {
     reach_dock_feature_model model = {};
     reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
 
     reach_window_snapshot windows[3] = {
         make_window(101, "C:\\apps\\brave.exe", ""),
@@ -110,20 +113,20 @@ static void test_key_stable_when_representative_closes(void)
         make_window(103, "C:\\apps\\code.exe", ""),
     };
     uint32_t group_ids[3] = {7, 7, 8};
-    reach_dock_feature_model_build_items(&model, nullptr, 0, windows, group_ids, 3, matches_thunk,
+    reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, windows, group_ids, 3, matches_thunk,
                                          nullptr);
     expect_true(model.item_count == 2, "two groups before churn");
 
     reach_window_snapshot after[2] = {windows[1], windows[2]};
     uint32_t after_group_ids[2] = {7, 8};
-    reach_dock_feature_model_build_items(&model, nullptr, 0, after, after_group_ids, 2,
+    reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, after, after_group_ids, 2,
                                          matches_thunk, nullptr);
 
-    reach_dock_order_key brave_key = {0, 7};
     expect_true(model.item_count == 2, "groups survive representative closing");
-    expect_true(reach_dock_feature_model_find_order_key(&model, brave_key) == 0,
+    expect_true(reach_dock_feature_model_find_order_key(
+                    &model, reach_dock_item_key_at(&model, 0)) == 0,
                 "group keeps its dock position when representative closes");
-    expect_true(model.items[0].app_id == 7 && model.items[0].window == 102,
+    expect_true(model.items[0].window == 102,
                 "surviving window becomes the representative");
 }
 
@@ -131,6 +134,7 @@ static void test_order_preserved_and_new_groups_append(void)
 {
     reach_dock_feature_model model = {};
     reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
 
     reach_pinned_app_model pins[1] = {make_pin(5, "C:\\apps\\term.exe")};
     reach_window_snapshot windows[2] = {
@@ -138,7 +142,7 @@ static void test_order_preserved_and_new_groups_append(void)
         make_window(202, "C:\\apps\\code.exe", ""),
     };
     uint32_t group_ids[2] = {7, 8};
-    reach_dock_feature_model_build_items(&model, pins, 1, windows, group_ids, 2, matches_thunk,
+    reach_dock_feature_model_build_items(&model, &next_key, pins, 1, windows, group_ids, 2, matches_thunk,
                                          nullptr);
     expect_true(model.item_count == 3, "pinned plus two unpinned groups");
 
@@ -146,14 +150,12 @@ static void test_order_preserved_and_new_groups_append(void)
     reach_window_snapshot with_new[3] = {windows[0], windows[1],
                                          make_window(203, "C:\\apps\\mail.exe", "")};
     uint32_t new_group_ids[3] = {7, 8, 9};
-    reach_dock_feature_model_build_items(&model, pins, 1, with_new, new_group_ids, 3, matches_thunk,
+    reach_dock_feature_model_build_items(&model, &next_key, pins, 1, with_new, new_group_ids, 3, matches_thunk,
                                          nullptr);
 
-    reach_dock_order_key code_key = {0, 8};
-    reach_dock_order_key mail_key = {0, 9};
-    expect_true(reach_dock_feature_model_find_order_key(&model, code_key) == 0,
+    expect_true(reach_test_utf16_equals_ascii(model.items[0].path, "C:\\apps\\code.exe"),
                 "moved group keeps its position across rebuild");
-    expect_true(reach_dock_feature_model_find_order_key(&model, mail_key) == 3,
+    expect_true(reach_test_utf16_equals_ascii(model.items[3].path, "C:\\apps\\mail.exe"),
                 "new group appends at the end");
 }
 
@@ -161,28 +163,92 @@ static void test_same_path_different_aumid_stays_split(void)
 {
     reach_dock_feature_model model = {};
     reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
 
     reach_window_snapshot windows[2] = {
         make_window(301, "C:\\apps\\brave.exe", "Brave._crx_abc"),
         make_window(302, "C:\\apps\\brave.exe", "Brave._crx_xyz"),
     };
     uint32_t group_ids[2] = {7, 8};
-    reach_dock_feature_model_build_items(&model, nullptr, 0, windows, group_ids, 2, matches_thunk,
+    reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, windows, group_ids, 2, matches_thunk,
                                          nullptr);
 
     expect_true(model.item_count == 2, "distinct group ids produce distinct items");
 }
 
-static void test_key_equality_semantics(void)
+/* The property the whole dock rests on: an entry describes an application, and being pinned is
+   one of its properties. Everything that drives behaviour must therefore be identical whether the
+   app arrived from the config store or from a tracked window. */
+static void test_pinned_and_unpinned_entries_are_the_same_kind_of_thing(void)
 {
-    reach_dock_order_key pinned_key = {1, 7};
-    reach_dock_order_key unpinned_key = {0, 7};
-    reach_dock_order_key zero_key = {0, 0};
+    reach_window_snapshot windows[1] = {make_window(501, "C:\\apps\\brave.exe", "Brave.App")};
+    uint32_t group_ids[1] = {11};
 
-    expect_true(!reach_dock_key_equal(&pinned_key, &unpinned_key),
-                "pin ids and group ids live in separate namespaces");
-    expect_true(!reach_dock_key_equal(&zero_key, &zero_key), "zero id never matches");
-    expect_true(reach_dock_key_equal(&unpinned_key, &unpinned_key), "same key matches itself");
+    reach_dock_feature_model unpinned = {};
+    reach_dock_feature_model_init(&unpinned);
+    uint32_t unpinned_key = 1;
+    reach_dock_feature_model_build_items(&unpinned, &unpinned_key, nullptr, 0, windows, group_ids,
+                                         1, matches_thunk, nullptr);
+
+    reach_pinned_app_model pins[1] = {make_pin(5, "C:\\apps\\brave.exe")};
+    reach_copy_ascii_to_utf16(pins[0].app_user_model_id, 260, "Brave.App");
+    reach_dock_feature_model pinned = {};
+    reach_dock_feature_model_init(&pinned);
+    uint32_t pinned_key = 1;
+    reach_dock_feature_model_build_items(&pinned, &pinned_key, pins, 1, windows, group_ids, 1,
+                                         matches_thunk, nullptr);
+
+    expect_true(unpinned.item_count == 1 && pinned.item_count == 1,
+                "the same application is one entry either way");
+
+    const reach_dock_item_model *a = &unpinned.items[0];
+    const reach_dock_item_model *b = &pinned.items[0];
+
+    expect_true(a->key != 0 && b->key != 0, "every entry has a usable identity");
+    expect_true(reach_dock_item_identity_equal(a, b->path, b->app_user_model_id),
+                "both entries describe the same application");
+    expect_true(a->instance_count == b->instance_count && a->instance_count == 1,
+                "both entries own the running window");
+    expect_true(a->window == b->window && a->window == 501,
+                "both entries report the same representative");
+    expect_true(a->icon_ref[0] != 0 && b->icon_ref[0] != 0,
+                "both entries can draw themselves without an external lookup");
+    expect_true(a->path[0] != 0 && b->path[0] != 0,
+                "both entries can be launched without an external lookup");
+
+    expect_true(!a->pinned && a->pin_id == 0, "the unpinned entry differs only in its properties");
+    expect_true(b->pinned && b->pin_id == 5, "the pinned entry differs only in its properties");
+}
+
+static void test_identity_survives_pinning_and_unpinning(void)
+{
+    reach_dock_feature_model model = {};
+    reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
+
+    reach_window_snapshot windows[1] = {make_window(401, "C:\\apps\\brave.exe", "")};
+    uint32_t group_ids[1] = {7};
+    reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, windows, group_ids, 1,
+                                         matches_thunk, nullptr);
+    expect_true(model.item_count == 1 && !model.items[0].pinned,
+                "the running app starts unpinned");
+    uint32_t running_key = reach_dock_item_key_at(&model, 0);
+
+    reach_pinned_app_model pins[1] = {make_pin(5, "C:\\apps\\brave.exe")};
+    reach_dock_feature_model_build_items(&model, &next_key, pins, 1, windows, group_ids, 1,
+                                         matches_thunk, nullptr);
+    expect_true(model.item_count == 1, "pinning a running app does not duplicate it");
+    expect_true(model.items[0].pinned && model.items[0].pin_id == 5,
+                "pinning sets the properties on the same entry");
+    expect_true(reach_dock_item_key_at(&model, 0) == running_key,
+                "an app keeps its identity, and so its dock slot, when it is pinned");
+
+    reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, windows, group_ids, 1,
+                                         matches_thunk, nullptr);
+    expect_true(reach_dock_item_key_at(&model, 0) == running_key,
+                "and keeps it again when it is unpinned");
+    expect_true(!model.items[0].pinned && model.items[0].pin_id == 0,
+                "unpinning clears the properties without changing the entry");
 }
 
 static void test_capacity_keeps_all_pinned_and_running_groups(void)
@@ -192,6 +258,7 @@ static void test_capacity_keeps_all_pinned_and_running_groups(void)
     static uint32_t group_ids[REACH_MAX_DOCK_RUNNING_APPS];
     reach_dock_feature_model model = {};
     reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
 
     for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
     {
@@ -207,7 +274,7 @@ static void test_capacity_keeps_all_pinned_and_running_groups(void)
         group_ids[index] = (uint32_t)(index + 1000);
     }
 
-    reach_dock_feature_model_build_items(&model, pins, REACH_MAX_PINNED_APPS, windows, group_ids,
+    reach_dock_feature_model_build_items(&model, &next_key, pins, REACH_MAX_PINNED_APPS, windows, group_ids,
                                          REACH_MAX_DOCK_RUNNING_APPS, matches_thunk, nullptr);
 
     expect_true(REACH_MAX_PINNED_APPS == 96, "configured pin capacity is 96");
@@ -309,49 +376,6 @@ static void test_adaptive_layout_rebuild_keeps_native_height(void)
     reach_dock_destroy(dock);
 }
 
-static void test_pin_snapshot_rebases_the_dock_order_by_path(void)
-{
-    reach_dock *dock = nullptr;
-    expect_true(reach_dock_create(&dock) == REACH_OK, "dock capsule is created");
-    if (dock == nullptr)
-    {
-        return;
-    }
-
-    reach_pinned_app_model before[2] = {make_pin(1, "C:\\apps\\a.exe"),
-                                        make_pin(2, "C:\\apps\\b.exe")};
-    reach_dock_apply_pinned_apps(dock, before, 2);
-
-    reach_dock_order_key order[3] = {};
-    order[0].pinned = 1;
-    order[0].app_id = 1;
-    order[1].pinned = 0;
-    order[1].app_id = 90;
-    order[2].pinned = 1;
-    order[2].app_id = 2;
-    reach_dock_restore_order(dock, order, 3);
-
-    reach_pinned_app_model after[2] = {make_pin(7, "C:\\apps\\b.exe"),
-                                       make_pin(8, "C:\\apps\\a.exe")};
-    reach_dock_apply_pinned_apps(dock, after, 2);
-
-    expect_true(reach_dock_order_count(dock) == 3,
-                "rebasing the pin snapshot keeps every dock order slot");
-    expect_true(reach_dock_order_key_at(dock, 0).pinned == 1 &&
-                    reach_dock_order_key_at(dock, 0).app_id == 8,
-                "a still-pinned app keeps its slot under its reissued pin id");
-    expect_true(reach_dock_order_key_at(dock, 2).pinned == 1 &&
-                    reach_dock_order_key_at(dock, 2).app_id == 7,
-                "pin ids are rebased by path, not by position");
-    expect_true(reach_dock_order_key_at(dock, 1).pinned == 0 &&
-                    reach_dock_order_key_at(dock, 1).app_id == 90,
-                "an unpinned running group is left alone by a pin snapshot");
-    expect_true(reach_dock_take_items_changed(dock),
-                "a pin snapshot marks the dock items for rebuild");
-
-    reach_dock_destroy(dock);
-}
-
 static void test_dock_metrics_are_spaced_before_any_configuration_arrives(void)
 {
     reach_dock *dock = nullptr;
@@ -407,12 +431,12 @@ static void test_pinned_reorder_survives_the_config_round_trip(void)
     (void)reach_dock_arrange(dock, &arrange);
 
     /* the user drags the second pin in front of the first */
-    reach_dock_order_key swapped[2] = {reach_dock_order_key_at(dock, 1),
-                                       reach_dock_order_key_at(dock, 0)};
+    uint32_t swapped[2] = {reach_dock_order_key_at(dock, 1), reach_dock_order_key_at(dock, 0)};
     reach_dock_restore_order(dock, swapped, 2);
     reach_dock_mark_items_changed(dock);
     (void)reach_dock_arrange(dock, &arrange);
-    expect_true(reach_dock_item_at(dock, 0)->pinned_index == 1,
+    expect_true(reach_test_utf16_equals_ascii(reach_dock_item_at(dock, 0)->path,
+                                              "C:\\apps\\b.exe"),
                 "the dragged pin takes the first slot straight away");
 
     /* config persists that move and reissues pin ids on the way back */
@@ -420,8 +444,11 @@ static void test_pinned_reorder_survives_the_config_round_trip(void)
                                            make_pin(8, "C:\\apps\\a.exe")};
     reach_dock_apply_pinned_apps(dock, reordered, 2);
     (void)reach_dock_arrange(dock, &arrange);
-    expect_true(reach_dock_item_at(dock, 0)->pinned_index == 0,
+    expect_true(reach_test_utf16_equals_ascii(reach_dock_item_at(dock, 0)->path,
+                                              "C:\\apps\\b.exe"),
                 "the dragged order survives the config round trip that reissues pin ids");
+    expect_true(reach_dock_item_at(dock, 0)->pin_id == 7,
+                "and the entry picks up the pin id the config store reissued");
 
     reach_dock_destroy(dock);
 }
@@ -430,13 +457,13 @@ int main(void)
 {
     test_dock_metrics_are_spaced_before_any_configuration_arrives();
     test_pinned_reorder_survives_the_config_round_trip();
-    test_pin_snapshot_rebases_the_dock_order_by_path();
     test_unpinned_windows_group_into_one_item();
     test_pinned_app_claims_matching_windows();
     test_key_stable_when_representative_closes();
     test_order_preserved_and_new_groups_append();
     test_same_path_different_aumid_stays_split();
-    test_key_equality_semantics();
+    test_pinned_and_unpinned_entries_are_the_same_kind_of_thing();
+    test_identity_survives_pinning_and_unpinning();
     test_capacity_keeps_all_pinned_and_running_groups();
     test_fit_metrics_keep_native_size_until_overflow();
     test_fit_metrics_scale_every_dimension_without_a_minimum();

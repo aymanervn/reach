@@ -7,21 +7,21 @@
 #include "reach/features/common/icon_feedback.h"
 #include "reach/core/typography.h"
 
-static uint16_t reach_dock_pinned_fallback_initial(const reach_pinned_app_model *app)
+static uint16_t reach_dock_item_fallback_initial(const reach_dock_item_model *item)
 {
-    if (app == nullptr || app->path[0] == 0)
+    if (item == nullptr || item->path[0] == 0)
     {
         return '?';
     }
     size_t stem = 0;
-    for (size_t index = 0; app->path[index] != 0; ++index)
+    for (size_t index = 0; item->path[index] != 0; ++index)
     {
-        if (app->path[index] == '\\' || app->path[index] == '/')
+        if (item->path[index] == '\\' || item->path[index] == '/')
         {
             stem = index + 1;
         }
     }
-    return app->path[stem] != 0 ? app->path[stem] : '?';
+    return item->path[stem] != 0 ? item->path[stem] : '?';
 }
 
 static void reach_dock_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
@@ -268,7 +268,7 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
 
     if ((reach_draggable_tracking(&state->drag.gesture) ||
          reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)) &&
-        reach_dock_feature_model_item_matches_key(&state->model, index, state->drag.key))
+        state->drag.key != 0 && reach_dock_item_key_at(&state->model, index) == state->drag.key)
     {
         return reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
                    ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)
@@ -276,8 +276,8 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
     }
 
     const float slot_x = reach_dock_slot_box_x(theme, layout, index);
-    reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
-    if (state->item_x_valid[index] && reach_dock_key_equal(&state->item_x_keys[index], &item_key))
+    uint32_t item_key = reach_dock_item_key_at(&state->model, index);
+    if (state->item_x_valid[index] && item_key != 0 && state->item_x_keys[index] == item_key)
     {
         return slot_x + reach_animation_manager_value(manager, reach_dock_item_animation_id(index));
     }
@@ -320,26 +320,15 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         const reach_dock_item_model *item = &state->model.items[index];
-        const uint16_t *icon_path = nullptr;
-        uint16_t initial = '?';
-        if (item->pinned)
+        const uint16_t *icon_path = item->icon_ref;
+        uint16_t initial = reach_dock_item_fallback_initial(item);
+        const reach_window_snapshot *window =
+            item->window != 0
+                ? reach_window_tracking_window_by_id(reach_dock_windows(dock), item->window)
+                : nullptr;
+        if (window != nullptr && window->title[0] != 0)
         {
-            if (ctx->pinned_apps != nullptr && item->pinned_index < ctx->pinned_app_count)
-            {
-                const reach_pinned_app_model *app = &ctx->pinned_apps[item->pinned_index];
-                icon_path = app->icon_ref[0] != 0 ? app->icon_ref : app->path;
-                initial = reach_dock_pinned_fallback_initial(app);
-            }
-        }
-        else
-        {
-            const reach_window_snapshot *window =
-                reach_window_tracking_window_by_id(reach_dock_windows(dock), item->window);
-            if (window != nullptr)
-            {
-                icon_path = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
-                initial = window->title[0] != 0 ? window->title[0] : '?';
-            }
+            initial = window->title[0];
         }
         render_items[index].fallback_initial = initial;
         if (icon_path != nullptr && icon_path[0] != 0)

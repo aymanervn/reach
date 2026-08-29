@@ -30,42 +30,49 @@ extern "C"
                                                            const reach_pinned_app_model *pinned_app,
                                                            const reach_window_snapshot *window);
 
-    typedef struct reach_dock_order_key
-    {
-        int32_t pinned;
-        uint32_t app_id;
-    } reach_dock_order_key;
+#define REACH_DOCK_TEXT_CAPACITY 260
+#define REACH_DOCK_MAX_INSTANCES 16
 
+    /* One entry per application on the dock. Pinned and running are properties of an entry, not
+       different kinds of entry, so every icon carries the same information and behaves the same.
+       Identity is the (path, app_user_model_id) pair window tracking already uses, which is why a
+       key survives an app being pinned, unpinned, or reissued a pin id by the config store. */
     typedef struct reach_dock_item_model
     {
+        uint32_t key;
         int32_t pinned;
-        uint32_t app_id;
+        uint32_t pin_id;
+
+        uint16_t path[REACH_DOCK_TEXT_CAPACITY];
+        uint16_t app_user_model_id[REACH_DOCK_TEXT_CAPACITY];
+        uint16_t icon_ref[REACH_DOCK_TEXT_CAPACITY];
+
+        uintptr_t instances[REACH_DOCK_MAX_INSTANCES];
+        size_t instance_count;
         uintptr_t window;
-        size_t pinned_index;
     } reach_dock_item_model;
 
     typedef struct reach_dock_feature_model
     {
         reach_dock_item_model items[REACH_MAX_DOCK_ITEMS];
         size_t item_count;
-        reach_dock_order_key order[REACH_MAX_DOCK_ITEMS];
+        uint32_t order[REACH_MAX_DOCK_ITEMS];
         size_t order_count;
     } reach_dock_feature_model;
 
     void reach_dock_feature_model_init(reach_dock_feature_model *model);
-    int32_t reach_dock_key_equal(const reach_dock_order_key *a, const reach_dock_order_key *b);
     uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *model,
                                                   size_t index);
-    int32_t reach_dock_feature_model_item_matches_key(const reach_dock_feature_model *model,
-                                                      size_t index, reach_dock_order_key key);
     size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *model,
-                                                  reach_dock_order_key key);
+                                                  uint32_t key);
     size_t reach_dock_feature_model_find_order_key(const reach_dock_feature_model *model,
-                                                   reach_dock_order_key key);
+                                                   uint32_t key);
     void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t source,
                                              size_t target);
-    reach_dock_order_key reach_dock_item_key_at(const reach_dock_feature_model *model,
-                                                size_t index);
+    uint32_t reach_dock_item_key_at(const reach_dock_feature_model *model, size_t index);
+    int32_t reach_dock_item_identity_equal(const reach_dock_item_model *item,
+                                           const uint16_t *path,
+                                           const uint16_t *app_user_model_id);
     size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_model *model,
                                                        uint32_t pin_id);
     size_t
@@ -74,10 +81,11 @@ extern "C"
                                       reach_dock_window_matches_pinned_fn window_matches_pinned,
                                       void *match_user);
     void reach_dock_feature_model_build_items(
-        reach_dock_feature_model *model, const reach_pinned_app_model *pinned_apps,
-        size_t pinned_app_count, const reach_window_snapshot *open_windows,
-        const uint32_t *window_group_ids, size_t open_window_count,
-        reach_dock_window_matches_pinned_fn window_matches_pinned, void *match_user);
+        reach_dock_feature_model *model, uint32_t *next_key,
+        const reach_pinned_app_model *pinned_apps, size_t pinned_app_count,
+        const reach_window_snapshot *open_windows, const uint32_t *window_group_ids,
+        size_t open_window_count, reach_dock_window_matches_pinned_fn window_matches_pinned,
+        void *match_user);
     typedef struct reach_dock_render_item
     {
         reach_icon_handle icon;
@@ -271,7 +279,7 @@ extern "C"
     {
         reach_draggable gesture;
         size_t target_index;
-        reach_dock_order_key key;
+        uint32_t key;
         float grab_offset_x;
         float x;
     } reach_dock_drag_state;
@@ -287,7 +295,7 @@ extern "C"
         size_t hovered_item;
 
         int32_t item_x_valid[REACH_MAX_DOCK_ITEMS];
-        reach_dock_order_key item_x_keys[REACH_MAX_DOCK_ITEMS];
+        uint32_t item_x_keys[REACH_MAX_DOCK_ITEMS];
         int32_t items_changed;
     } reach_dock_state;
 
@@ -321,8 +329,8 @@ extern "C"
                                           float pointer_y, reach_menu_request *out_request);
 
     size_t reach_dock_order_count(reach_dock *dock);
-    reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index);
-    void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys, size_t count);
+    uint32_t reach_dock_order_key_at(reach_dock *dock, size_t index);
+    void reach_dock_restore_order(reach_dock *dock, const uint32_t *keys, size_t count);
 
 #ifdef __cplusplus
 }
