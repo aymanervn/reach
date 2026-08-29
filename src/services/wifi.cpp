@@ -118,10 +118,12 @@ static void reach_wifi_service_thread_main(reach_wifi_service *service)
         uint32_t generation = 0;
         {
             std::unique_lock<std::mutex> lock(service->mutex);
-            service->cv.wait(lock, [service]() {
-                return service->stop ||
-                       service->pending_command != REACH_WIFI_SERVICE_COMMAND_NONE;
-            });
+            service->cv.wait(lock,
+                             [service]()
+                             {
+                                 return service->stop ||
+                                        service->pending_command != REACH_WIFI_SERVICE_COMMAND_NONE;
+                             });
             if (service->stop)
             {
                 break;
@@ -168,9 +170,9 @@ static void reach_wifi_service_thread_main(reach_wifi_service *service)
                 snapshot.connect_result == REACH_WIFI_CONNECT_RESULT_SUCCEEDED;
             break;
         case REACH_WIFI_SERVICE_COMMAND_DISCONNECT:
-            snapshot.command_succeeded = service->port.disconnect != nullptr &&
-                                         service->port.disconnect(service->port.userdata) ==
-                                             REACH_OK;
+            snapshot.command_succeeded =
+                service->port.disconnect != nullptr &&
+                service->port.disconnect(service->port.userdata) == REACH_OK;
             break;
         case REACH_WIFI_SERVICE_COMMAND_FORGET:
             snapshot.command_succeeded =

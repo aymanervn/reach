@@ -101,8 +101,7 @@ static void reach_wifi_network_merge(reach_wifi_network *kept, const reach_wifi_
     }
 }
 
-static int reach_wifi_network_order(const reach_wifi_network *left,
-                                    const reach_wifi_network *right)
+static int reach_wifi_network_order(const reach_wifi_network *left, const reach_wifi_network *right)
 {
     if (left->connected != right->connected)
     {
@@ -193,4 +192,3 @@ size_t reach_wifi_network_list_find(const reach_wifi_network_list *list, const u
     }
     return REACH_WIFI_MAX_NETWORKS;
 }
-

@@ -135,10 +135,8 @@ static void test_layout_wraps_runtime_border_around_stable_content(void)
     (void)reach_clipboard_model_insert(&model, make_item(1, 1));
     reach_rect_f32 monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
 
-    reach_clipboard_layout narrow =
-        reach_clipboard_compute_layout(&model, monitor, {}, 1.0f, 1.0f);
-    reach_clipboard_layout wide =
-        reach_clipboard_compute_layout(&model, monitor, {}, 1.0f, 3.0f);
+    reach_clipboard_layout narrow = reach_clipboard_compute_layout(&model, monitor, {}, 1.0f, 1.0f);
+    reach_clipboard_layout wide = reach_clipboard_compute_layout(&model, monitor, {}, 1.0f, 3.0f);
 
     expect_near(wide.bounds.width - narrow.bounds.width, 4.0f, 0.001f,
                 "clipboard outer width derives both border sides");

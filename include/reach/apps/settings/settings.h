@@ -610,8 +610,7 @@ extern "C"
     void reach_windows_update_apply_default_selection(reach_windows_update_list *updates);
     const uint16_t *reach_windows_update_state_label(reach_windows_update_state state);
 
-    void reach_settings_model_apply_wifi(reach_settings_model *model,
-                                         reach_wifi_radio_state radio,
+    void reach_settings_model_apply_wifi(reach_settings_model *model, reach_wifi_radio_state radio,
                                          const reach_wifi_network_list *networks);
     void reach_settings_model_set_wifi_radio(reach_settings_model *model,
                                              reach_wifi_radio_state radio);
@@ -674,8 +673,8 @@ extern "C"
 
     void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_model *model,
                                     float scale);
-    void reach_settings_layout_bluetooth(reach_settings_layout *layout,
-                                         reach_settings_model *model, float scale);
+    void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settings_model *model,
+                                         float scale);
 
     const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count);
     const uint16_t *reach_settings_page_title(reach_settings_page page);

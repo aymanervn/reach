@@ -60,36 +60,37 @@ void reach_top_bar_now_playing_reset(reach_top_bar_now_playing *now_playing);
 
 void reach_top_bar_now_playing_model_init(reach_top_bar_now_playing_model *model);
 float reach_top_bar_now_playing_model_desired_width(const reach_top_bar_now_playing_model *model,
-                                                 const reach_theme *theme, float dpi_scale);
-reach_top_bar_now_playing_layout
-reach_top_bar_now_playing_compute_layout(const reach_top_bar_now_playing_model *model,
-                                      const reach_theme *theme, reach_rect_f32 bounds,
-                                      float dpi_scale, const reach_text_measure_port *text_measure);
+                                                    const reach_theme *theme, float dpi_scale);
+reach_top_bar_now_playing_layout reach_top_bar_now_playing_compute_layout(
+    const reach_top_bar_now_playing_model *model, const reach_theme *theme, reach_rect_f32 bounds,
+    float dpi_scale, const reach_text_measure_port *text_measure);
 reach_now_playing_action
 reach_top_bar_now_playing_hit_test(const reach_top_bar_now_playing_model *model,
-                                const reach_top_bar_now_playing_layout *layout, int32_t x, int32_t y);
+                                   const reach_top_bar_now_playing_layout *layout, int32_t x,
+                                   int32_t y);
 reach_result
 reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_render_input *input,
-                                             reach_render_command_buffer *out_commands);
+                                                reach_render_command_buffer *out_commands);
 
 void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
-                                 reach_now_playing_service *service,
-                                 reach_top_bar_now_playing_update_result *out);
+                                    reach_now_playing_service *service,
+                                    reach_top_bar_now_playing_update_result *out);
 int32_t reach_top_bar_now_playing_tick(reach_top_bar_now_playing *now_playing,
                                        double delta_seconds);
 int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now_playing);
 float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *now_playing,
-                                           const reach_theme *theme, float dpi_scale);
-void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing, const reach_theme *theme,
-                                     reach_rect_f32 bounds, float dpi_scale,
-                                     const reach_text_measure_port *text_measure);
+                                              const reach_theme *theme, float dpi_scale);
+void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing,
+                                        const reach_theme *theme, reach_rect_f32 bounds,
+                                        float dpi_scale,
+                                        const reach_text_measure_port *text_measure);
 
-reach_now_playing_action reach_top_bar_now_playing_action_at(
-    const reach_top_bar_now_playing *now_playing, int32_t x, int32_t y);
+reach_now_playing_action
+reach_top_bar_now_playing_action_at(const reach_top_bar_now_playing *now_playing, int32_t x,
+                                    int32_t y);
 
-reach_result
-reach_top_bar_now_playing_append_render_commands(reach_top_bar_now_playing *now_playing,
-                                              const reach_top_bar_now_playing_render_context *ctx,
-                                              reach_render_command_buffer *out_commands);
+reach_result reach_top_bar_now_playing_append_render_commands(
+    reach_top_bar_now_playing *now_playing, const reach_top_bar_now_playing_render_context *ctx,
+    reach_render_command_buffer *out_commands);
 
 #endif

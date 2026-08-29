@@ -222,16 +222,16 @@ static reach_result reach_d2d_shadow_bake(reach_render_backend *backend,
     ComPtr<ID2D1CommandList> caster;
     if (SUCCEEDED(hr))
     {
-        hr = reach_d2d_shadow_fill_list(
-            context, geometry, mask.Get(),
-            D2D1::Matrix3x2F::Translation(key->offset_x, key->offset_y), &caster);
+        hr = reach_d2d_shadow_fill_list(context, geometry, mask.Get(),
+                                        D2D1::Matrix3x2F::Translation(key->offset_x, key->offset_y),
+                                        &caster);
     }
 
     ComPtr<ID2D1CommandList> cutter;
     if (SUCCEEDED(hr))
     {
-        hr = reach_d2d_shadow_fill_list(context, geometry, mask.Get(),
-                                        D2D1::Matrix3x2F::Identity(), &cutter);
+        hr = reach_d2d_shadow_fill_list(context, geometry, mask.Get(), D2D1::Matrix3x2F::Identity(),
+                                        &cutter);
     }
 
     geometry->Release();
@@ -363,8 +363,8 @@ static ID2D1Bitmap1 *reach_d2d_shadow_acquire(reach_render_backend *backend,
 }
 
 static void reach_d2d_shadow_axis(float source_size, float dest_origin, float dest_size,
-                                  float near_inset, float far_inset, int32_t stretch,
-                                  float *source, float *dest)
+                                  float near_inset, float far_inset, int32_t stretch, float *source,
+                                  float *dest)
 {
     source[0] = 0.0f;
     dest[0] = dest_origin;
@@ -438,15 +438,14 @@ reach_result reach_d2d_draw_shadow(reach_render_backend *backend,
             {
                 continue;
             }
-            if (source_x[column + 1] <= source_x[column] ||
-                source_y[row + 1] <= source_y[row] || dest_x[column + 1] <= dest_x[column] ||
-                dest_y[row + 1] <= dest_y[row])
+            if (source_x[column + 1] <= source_x[column] || source_y[row + 1] <= source_y[row] ||
+                dest_x[column + 1] <= dest_x[column] || dest_y[row + 1] <= dest_y[row])
             {
                 continue;
             }
 
-            D2D1_RECT_F source = D2D1::RectF(source_x[column], source_y[row],
-                                             source_x[column + 1], source_y[row + 1]);
+            D2D1_RECT_F source = D2D1::RectF(source_x[column], source_y[row], source_x[column + 1],
+                                             source_y[row + 1]);
             D2D1_RECT_F destination =
                 D2D1::RectF(dest_x[column], dest_y[row], dest_x[column + 1], dest_y[row + 1]);
             backend->d2d_context->DrawBitmap(bitmap, &destination, 1.0f,

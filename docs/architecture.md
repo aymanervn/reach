@@ -61,7 +61,8 @@ cannot block transport state. Interfaces only. Includes `core`, `protocol`.
 ## adapters
 
 The Windows implementations of `ports`; the **only** layer that touches the OS.
-Includes `ports`, `protocol`, `core`, and platform SDKs.
+Includes `ports`, `protocol`, `core`, and platform SDKs. Vector-icon resource lookup degrades a
+missing executable-local SVG to a skipped glyph; an absent optional asset never fails the frame.
 
 ## services
 
@@ -83,6 +84,9 @@ with the UI placeholder. A media-to-no-media transition retains the last snapsho
 four seconds, then refetches and publishes disappearance only if absence is confirmed.
 Cover acquisition waits for a 300-millisecond quiet period on the latest media
 generation, coalescing provider thumbnail bursts without delaying core state.
+System status serializes blocking system-control reads and brightness writes on its system worker.
+Relative brightness commands accumulate against the latest queued target, publish the successful
+target through the cumulative system snapshot, and never call the WMI-backed port on the UI thread.
 
 ## features
 
@@ -461,7 +465,9 @@ the highest-priority surface whose `pointer_capture_active` predicate is set own
 sequence, with `EXCLUSIVE_WHILE_OPEN`, `CAPTURE_CONSUMES_RELEASE`, and
 `CAPTURE_OWNS_MOVE` declaring the differences between them. Hotkey and
 action→port translators for media transport, volume, and brightness live in
-`host_system_actions.cpp`, out of the input routing path.
+`host_system_actions.cpp`, out of the input routing path. Brightness translation submits a relative
+command to `reach_system_status`; the host uses only the cached target returned by the service for
+immediate Quick Settings and HUD presentation.
 The system HUD consumes the final top-bar visibility result cached by that same
 bar reconciliation, so keyboard media, volume, and brightness actions never
 reconstruct the hiding predicate. Successful level changes hand the capsule the
@@ -520,7 +526,10 @@ actually changed.
 
 Conditions are bits, not triggers: the arrangement is recomputed from the whole
 active set, so setting an already-set condition is a no-op and a missed one heals on
-the next resolve. `GAME_MODE` resolves every participant hidden except a definition
+the next resolve. `reach_host_sync_bar_layout_conditions` publishes the process-wide
+`BARS_FORCED` and `BARS_HELD` values once before the surface frame loop; individual bar
+reconciliation only owns that bar's visibility result and layer intent. `GAME_MODE` resolves every
+participant hidden except a definition
 that declares `BEHAVIOR_GAME_MODE_VISIBLE`. The system HUD is the only such
 participant because hardware media and level keys remain active while the top bar
 is suppressed. `host_game_mode.cpp` owns the state and the main gate in
@@ -541,6 +550,8 @@ participant's layer intent. Definition-declared edge reveals are participants to
 attached to their owning surface runtime but independently visible; the underlying
 screen-hotspot port carries `set_topmost` / `native_id` / `place_behind` so they
 chain and seed like any other participant.
+The host drains each `system_stats` change once, marks the top bar for layout, and refreshes the
+Battery capsule from the same stable snapshot so an open popup and saver pending state stay live.
 The wallpaper is not a participant: it re-pins itself to `HWND_BOTTOM` and is
 deliberately not hidden in game mode.
 

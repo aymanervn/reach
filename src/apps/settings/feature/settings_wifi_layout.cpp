@@ -56,8 +56,8 @@ static void reach_settings_wifi_layout_row_actions(reach_settings_layout *layout
 
         layout->wifi_key_field = reach_settings_wifi_rect(
             row.x + inset, form_y, row.width - inset * 2.0f - show_width - gap, field_height);
-        layout->wifi_show_button = reach_settings_wifi_rect(right - show_width, form_y, show_width,
-                                                            field_height);
+        layout->wifi_show_button =
+            reach_settings_wifi_rect(right - show_width, form_y, show_width, field_height);
 
         float toggle_width = 34.0f * scale;
         float toggle_height = 18.0f * scale;
@@ -105,24 +105,23 @@ static void reach_settings_wifi_layout_add_form(reach_settings_layout *layout,
 
     float option_y = form_y + field_height + gap;
     float option_height = 26.0f * scale;
-    float option_width =
-        (width - gap * (REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT - 1)) /
-        (float)REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT;
+    float option_width = (width - gap * (REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT - 1)) /
+                         (float)REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT;
     for (size_t option = 0; option < REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT; ++option)
     {
-        layout->wifi_add_security_options[option] = reach_settings_wifi_rect(
-            row.x + inset + (float)option * (option_width + gap), option_y, option_width,
-            option_height);
+        layout->wifi_add_security_options[option] =
+            reach_settings_wifi_rect(row.x + inset + (float)option * (option_width + gap), option_y,
+                                     option_width, option_height);
     }
 
     float key_y = option_y + option_height + gap;
     float show_width = 58.0f * scale;
     if (model->wifi_add_security != REACH_WIFI_SECURITY_OPEN)
     {
-        layout->wifi_add_key_field = reach_settings_wifi_rect(
-            row.x + inset, key_y, width - show_width - gap, field_height);
-        layout->wifi_add_show_button = reach_settings_wifi_rect(
-            row.x + inset + width - show_width, key_y, show_width, field_height);
+        layout->wifi_add_key_field =
+            reach_settings_wifi_rect(row.x + inset, key_y, width - show_width - gap, field_height);
+        layout->wifi_add_show_button = reach_settings_wifi_rect(row.x + inset + width - show_width,
+                                                                key_y, show_width, field_height);
     }
 
     float toggle_width = 34.0f * scale;
@@ -132,9 +131,8 @@ static void reach_settings_wifi_layout_add_form(reach_settings_layout *layout,
     float footer_y = key_y + field_height + 12.0f * scale;
     layout->wifi_add_auto_toggle =
         reach_settings_wifi_rect(row.x + inset, footer_y, toggle_width, toggle_height);
-    layout->wifi_add_submit_button =
-        reach_settings_wifi_rect(row.x + inset + width - submit_width, footer_y - 5.0f * scale,
-                                 submit_width, submit_height);
+    layout->wifi_add_submit_button = reach_settings_wifi_rect(
+        row.x + inset + width - submit_width, footer_y - 5.0f * scale, submit_width, submit_height);
 }
 
 void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_model *model,
@@ -164,8 +162,7 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
         float icon_box = 34.0f * scale;
         float toggle_width = 40.0f * scale;
         float toggle_height = 22.0f * scale;
-        layout->wifi_radio_card =
-            reach_settings_wifi_rect(area_x, area_y, area_width, card_height);
+        layout->wifi_radio_card = reach_settings_wifi_rect(area_x, area_y, area_width, card_height);
         layout->wifi_radio_icon = reach_settings_wifi_rect(
             area_x + 16.0f * scale, area_y + (card_height - icon_box) * 0.5f, icon_box, icon_box);
         layout->wifi_radio_toggle = reach_settings_wifi_rect(
@@ -186,11 +183,11 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
         float known_width = 148.0f * scale;
         layout->wifi_scan_button =
             reach_settings_wifi_rect(area_x, button_y, scan_width, button_height);
-        layout->wifi_add_button = reach_settings_wifi_rect(
-            area_x + area_width - known_width - gap - add_width, button_y, add_width,
-            button_height);
-        layout->wifi_known_button = reach_settings_wifi_rect(
-            area_x + area_width - known_width, button_y, known_width, button_height);
+        layout->wifi_add_button =
+            reach_settings_wifi_rect(area_x + area_width - known_width - gap - add_width, button_y,
+                                     add_width, button_height);
+        layout->wifi_known_button = reach_settings_wifi_rect(area_x + area_width - known_width,
+                                                             button_y, known_width, button_height);
         viewport_y = button_y + button_height + 12.0f * scale;
     }
 
@@ -232,9 +229,9 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
             {
                 clip_bottom = viewport_bottom;
             }
-            layout->wifi_add_clip = reach_settings_wifi_rect(
-                layout->wifi_add_row.x, clip_top, layout->wifi_add_row.width,
-                clip_bottom - clip_top);
+            layout->wifi_add_clip =
+                reach_settings_wifi_rect(layout->wifi_add_row.x, clip_top,
+                                         layout->wifi_add_row.width, clip_bottom - clip_top);
             reach_settings_wifi_layout_add_form(layout, model, layout->wifi_add_row, scale);
             content_y += visible_height + row_gap;
         }

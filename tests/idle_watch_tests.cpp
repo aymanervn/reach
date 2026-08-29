@@ -177,8 +177,8 @@ static void test_multiple_actions_fire_together(void)
 
     reach_idle_watch_sample sample = make_sample(2 * MINUTE, 2 * MINUTE, 0);
     uint32_t mask = reach_idle_watch_evaluate(&state, &config, &sample, POLL * 5);
-    expect_true(mask == ((1u << REACH_IDLE_WATCH_ACTION_LOCK) |
-                         (1u << REACH_IDLE_WATCH_ACTION_SLEEP)),
+    expect_true(mask ==
+                    ((1u << REACH_IDLE_WATCH_ACTION_LOCK) | (1u << REACH_IDLE_WATCH_ACTION_SLEEP)),
                 "actions sharing a timeout report together");
 }
 

@@ -33,6 +33,10 @@ struct reach_system_status
 
     reach_system_status_worker system;
     uint32_t system_pending_change_flags = 0;
+    int32_t brightness_target_valid = 0;
+    float brightness_target = 0.0f;
+    uint32_t brightness_target_generation = 0;
+    float brightness_delta = 0.0f;
     reach_system_status_system_snapshot system_snapshot = {};
 };
 
@@ -114,6 +118,10 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
     {
         uint32_t generation = 0;
         uint32_t change_flags = 0;
+        int32_t brightness_target_valid = 0;
+        float brightness_target = 0.0f;
+        uint32_t brightness_target_generation = 0;
+        float brightness_delta = 0.0f;
         reach_system_status_system_snapshot snapshot = {};
         {
             std::unique_lock<std::mutex> lock(worker->mutex);
@@ -127,6 +135,11 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
             worker->pending = 0;
             service->system_pending_change_flags = 0;
             worker->in_flight = 1;
+            brightness_target_valid = service->brightness_target_valid;
+            brightness_target = service->brightness_target;
+            brightness_target_generation = service->brightness_target_generation;
+            brightness_delta = service->brightness_delta;
+            service->brightness_delta = 0.0f;
             snapshot = service->system_snapshot;
         }
 
@@ -168,8 +181,40 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
             }
         }
 
-        if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS) != 0 &&
-            service->system_controls.get_brightness_state != nullptr)
+        if (brightness_target_valid || brightness_delta != 0.0f)
+        {
+            reach_brightness_state brightness = snapshot.brightness;
+            int32_t brightness_valid = snapshot.brightness_valid;
+            float target = brightness_target;
+            if (!brightness_target_valid)
+            {
+                if ((!brightness_valid || !brightness.available) &&
+                    service->system_controls.get_brightness_state != nullptr)
+                {
+                    brightness = {};
+                    brightness_valid =
+                        service->system_controls.get_brightness_state(
+                            service->system_controls.userdata, &brightness) == REACH_OK;
+                }
+                if (brightness_valid && brightness.available)
+                {
+                    target = reach_system_status_clamp01(brightness.level + brightness_delta);
+                    brightness_target_valid = 1;
+                }
+            }
+            if (brightness_target_valid &&
+                service->system_controls.set_brightness_level != nullptr &&
+                service->system_controls.set_brightness_level(service->system_controls.userdata,
+                                                              target) == REACH_OK)
+            {
+                brightness.available = 1;
+                brightness.level = target;
+                snapshot.brightness = brightness;
+                snapshot.brightness_valid = 1;
+            }
+        }
+        else if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS) != 0 &&
+                 service->system_controls.get_brightness_state != nullptr)
         {
             reach_brightness_state brightness = {};
             if (service->system_controls.get_brightness_state(service->system_controls.userdata,
@@ -183,6 +228,11 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
         {
             std::lock_guard<std::mutex> lock(worker->mutex);
             service->system_snapshot = snapshot;
+            if (service->brightness_target_valid &&
+                service->brightness_target_generation == brightness_target_generation)
+            {
+                service->brightness_target_valid = 0;
+            }
             worker->completed_generation = generation;
             worker->completed = 1;
             worker->in_flight = 0;
@@ -252,6 +302,10 @@ void reach_system_status_stop(reach_system_status *service)
     reach_system_status_stop_worker(&service->audio);
     reach_system_status_stop_worker(&service->system);
     service->system_pending_change_flags = 0;
+    service->brightness_target_valid = 0;
+    service->brightness_target = 0.0f;
+    service->brightness_target_generation = 0;
+    service->brightness_delta = 0.0f;
 }
 
 void reach_system_status_destroy(reach_system_status *service)
@@ -498,8 +552,87 @@ reach_result reach_system_status_set_brightness(reach_system_status *service, fl
     {
         return REACH_NOT_IMPLEMENTED;
     }
-    return service->system_controls.set_brightness_level(service->system_controls.userdata,
-                                                         reach_system_status_clamp01(level));
+    if (reach_system_status_start_worker(service, &service->system,
+                                         reach_system_status_system_thread_main) != REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(service->system.mutex);
+        ++service->system.generation;
+        service->system.pending_generation = service->system.generation;
+        service->brightness_target_valid = 1;
+        service->brightness_target = reach_system_status_clamp01(level);
+        service->brightness_target_generation = service->system.generation;
+        service->brightness_delta = 0.0f;
+        service->system_pending_change_flags |= REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS;
+        service->system.pending = 1;
+    }
+    service->system.cv.notify_one();
+    return REACH_OK;
+}
+
+reach_result reach_system_status_step_brightness(reach_system_status *service, float delta,
+                                                 reach_brightness_state *out_state)
+{
+    if (out_state != nullptr)
+    {
+        *out_state = {};
+    }
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->system_controls.set_brightness_level == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    if (reach_system_status_start_worker(service, &service->system,
+                                         reach_system_status_system_thread_main) != REACH_OK)
+    {
+        return REACH_ERROR;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(service->system.mutex);
+        reach_brightness_state next = service->system_snapshot.brightness;
+        int32_t next_valid = service->system_snapshot.brightness_valid && next.available;
+        if (service->brightness_target_valid)
+        {
+            next.available = 1;
+            next.level = service->brightness_target;
+            next_valid = 1;
+        }
+        if (!next_valid && service->system_controls.get_brightness_state == nullptr)
+        {
+            return REACH_NOT_IMPLEMENTED;
+        }
+
+        ++service->system.generation;
+        service->system.pending_generation = service->system.generation;
+        if (next_valid)
+        {
+            service->brightness_target_valid = 1;
+            service->brightness_target =
+                reach_system_status_clamp01(next.level + delta + service->brightness_delta);
+            service->brightness_target_generation = service->system.generation;
+            service->brightness_delta = 0.0f;
+            next.level = service->brightness_target;
+            if (out_state != nullptr)
+            {
+                *out_state = next;
+            }
+        }
+        else
+        {
+            service->brightness_delta += delta;
+        }
+        service->system_pending_change_flags |= REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS;
+        service->system.pending = 1;
+    }
+    service->system.cv.notify_one();
+    return REACH_OK;
 }
 
 reach_system_status_bluetooth_outcome

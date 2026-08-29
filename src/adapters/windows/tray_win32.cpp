@@ -209,8 +209,7 @@ static void reach_tray_copy_payload_wstring(uint16_t *dst, size_t dst_count, con
     reach_tray_copy_wide_to_u16(dst, dst_count, src, available_wchars);
 }
 
-static void reach_tray_retire_item_icon(reach_tray_provider *provider,
-                                        reach_tray_native_item *item)
+static void reach_tray_retire_item_icon(reach_tray_provider *provider, reach_tray_native_item *item)
 {
     if (item == nullptr || item->item.icon_id == 0)
     {
@@ -229,8 +228,8 @@ static void reach_tray_retire_item_icon(reach_tray_provider *provider,
     reach_windows_icon_id_release(icon_id);
 }
 
-static void reach_tray_update_item_icon(reach_tray_provider *provider,
-                                        reach_tray_native_item *item, uint32_t raw_icon)
+static void reach_tray_update_item_icon(reach_tray_provider *provider, reach_tray_native_item *item,
+                                        uint32_t raw_icon)
 {
     if (item == nullptr)
     {

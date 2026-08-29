@@ -777,6 +777,7 @@ int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32 *out_p
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
 void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);
+void reach_host_sync_bar_layout_conditions(reach_host *host);
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
                                                    reach_rect_f32 shown_bounds,

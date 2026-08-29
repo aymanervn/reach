@@ -7,8 +7,7 @@
 #include "settings_pages_internal.h"
 #include "settings_render_internal.h"
 
-static reach_vector_icon_id
-reach_settings_bluetooth_fallback_icon(reach_bluetooth_device_kind kind)
+static reach_vector_icon_id reach_settings_bluetooth_fallback_icon(reach_bluetooth_device_kind kind)
 {
     switch (kind)
     {
@@ -50,11 +49,10 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
     const reach_rect_f32 row = layout->bluetooth_rows[row_index];
 
     reach_color background =
-        device->connected
-            ? reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha)
-            : input->theme->settings_card_background;
-    reach_settings_push_rect(commands, row,
-                             reach_settings_scale(input, input->theme->radius_small), background);
+        device->connected ? reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha)
+                          : input->theme->settings_card_background;
+    reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
+                             background);
 
     float header_height = reach_settings_scale(input, 58.0f);
     float icon_box_size = reach_settings_scale(input, 34.0f);
@@ -114,9 +112,9 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
             {row.x + reach_settings_scale(input, 14.0f),
              layout->bluetooth_pin_accept_button.y - reach_settings_scale(input, 24.0f),
              row.width - reach_settings_scale(input, 28.0f), reach_settings_scale(input, 18.0f)},
-            model->bluetooth_pairing.pin,
-            reach_settings_scale(input, REACH_TEXT_SIZE_LARGE), REACH_TEXT_WEIGHT_SEMIBOLD,
-            input->text_alignment_leading, input->theme->settings_text, 1);
+            model->bluetooth_pairing.pin, reach_settings_scale(input, REACH_TEXT_SIZE_LARGE),
+            REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading, input->theme->settings_text,
+            1);
 
         reach_ui_button_style accept_style =
             reach_settings_button_style(input, input->theme->settings_button_primary);
@@ -140,8 +138,7 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
                                   : input->theme->settings_button_primary);
         reach_ui_button_render(
             commands, layout->bluetooth_action_button,
-            device->paired ? (const uint16_t *)u"Remove" : (const uint16_t *)u"Pair",
-            &action_style,
+            device->paired ? (const uint16_t *)u"Remove" : (const uint16_t *)u"Pair", &action_style,
             model->bluetooth_status != REACH_SETTINGS_BLUETOOTH_STATUS_PAIRING,
             reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_BLUETOOTH_ACTION));
     }
@@ -161,16 +158,13 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
     reach_settings_push_rect(commands, layout->bluetooth_radio_icon,
                              reach_settings_scale(input, input->theme->radius_small),
                              input->theme->settings_icon_box_background);
-    reach_settings_push_icon(commands, layout->bluetooth_radio_icon,
-                             input->theme->settings_secondary_text,
-                             enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON
-                                     : REACH_VECTOR_ICON_BLUETOOTH_OFF,
-                             0.24f);
-    reach_settings_push_text(commands, layout->bluetooth_radio_title,
-                             (const uint16_t *)u"Bluetooth",
-                             reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
-                             REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
-                             input->theme->settings_text, 1);
+    reach_settings_push_icon(
+        commands, layout->bluetooth_radio_icon, input->theme->settings_secondary_text,
+        enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF, 0.24f);
+    reach_settings_push_text(
+        commands, layout->bluetooth_radio_title, (const uint16_t *)u"Bluetooth",
+        reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+        input->text_alignment_leading, input->theme->settings_text, 1);
 
     const uint16_t *subtitle = (const uint16_t *)u"Bluetooth is off";
     if (!model->bluetooth_radio.available)
@@ -199,8 +193,7 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
         reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->bluetooth_scan_button,
-        model->bluetooth_scanning ? (const uint16_t *)u"Stop scanning"
-                                  : (const uint16_t *)u"Scan",
+        model->bluetooth_scanning ? (const uint16_t *)u"Stop scanning" : (const uint16_t *)u"Scan",
         &scan_style, enabled,
         reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_BLUETOOTH_SCAN));
 
@@ -228,9 +221,8 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
     if (layout->bluetooth_row_count == 0)
     {
         reach_settings_push_text(commands, layout->bluetooth_viewport,
-                                 model->bluetooth_loaded
-                                     ? (const uint16_t *)u"No devices found"
-                                     : (const uint16_t *)u"Reading devices...",
+                                 model->bluetooth_loaded ? (const uint16_t *)u"No devices found"
+                                                         : (const uint16_t *)u"Reading devices...",
                                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                                  REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_CENTER,
                                  input->theme->settings_secondary_text, 1);

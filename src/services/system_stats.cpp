@@ -76,14 +76,12 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
             std::unique_lock<std::mutex> lock(service->mutex);
             if (!service->stop && !service->enabled)
             {
-                service->cv.wait(lock,
-                                 [service]() { return service->stop || service->enabled; });
+                service->cv.wait(lock, [service]() { return service->stop || service->enabled; });
             }
             else if (!service->stop)
             {
-                service->cv.wait_for(lock, interval, [service]() {
-                    return service->stop || !service->enabled;
-                });
+                service->cv.wait_for(lock, interval,
+                                     [service]() { return service->stop || !service->enabled; });
             }
             if (service->stop)
             {

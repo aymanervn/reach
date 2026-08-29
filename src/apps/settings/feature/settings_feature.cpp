@@ -34,8 +34,7 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     memset(model, 0, sizeof(*model));
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
-    reach_animation_manager_init(&model->nav_selection_animation,
-                                 &model->nav_selection_track, 1);
+    reach_animation_manager_init(&model->nav_selection_animation, &model->nav_selection_track, 1);
     reach_animation_manager_set(&model->nav_selection_animation, 0, 0.0f);
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
     model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_IDLE;
@@ -60,8 +59,8 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_animation_manager_init(&model->wifi_radio_animation, &model->wifi_radio_track, 1);
     reach_animation_manager_init(&model->bluetooth_row_animations, model->bluetooth_row_tracks,
                                  REACH_BLUETOOTH_MAX_DEVICES);
-    reach_animation_manager_init(&model->bluetooth_radio_animation,
-                                 &model->bluetooth_radio_track, 1);
+    reach_animation_manager_init(&model->bluetooth_radio_animation, &model->bluetooth_radio_track,
+                                 1);
     model->wifi_expanded_row = REACH_SETTINGS_WIFI_ROW_NONE;
     model->wifi_focused_field = REACH_SETTINGS_WIFI_FIELD_NONE;
     model->wifi_add_security = REACH_WIFI_SECURITY_WPA2_PERSONAL;
@@ -124,11 +123,9 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
                                        REACH_EASING_EASE_IN_OUT);
 }
 
-int32_t reach_settings_model_tick_nav_selection(reach_settings_model *model,
-                                                double delta_seconds)
+int32_t reach_settings_model_tick_nav_selection(reach_settings_model *model, double delta_seconds)
 {
-    if (model == nullptr ||
-        !reach_animation_manager_any_active(&model->nav_selection_animation))
+    if (model == nullptr || !reach_animation_manager_any_active(&model->nav_selection_animation))
     {
         return 0;
     }
@@ -138,8 +135,7 @@ int32_t reach_settings_model_tick_nav_selection(reach_settings_model *model,
 
 int32_t reach_settings_model_nav_selection_active(const reach_settings_model *model)
 {
-    return model != nullptr &&
-           reach_animation_manager_any_active(&model->nav_selection_animation);
+    return model != nullptr && reach_animation_manager_any_active(&model->nav_selection_animation);
 }
 
 float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)
@@ -662,9 +658,9 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.display_windows_section_title =
             reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
         float appearance_y = section_y + 26.0f * scale;
-        float appearance_card_height =
-            area_width >= REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH * scale ? 76.0f * scale
-                                                                        : 104.0f * scale;
+        float appearance_card_height = area_width >= REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH * scale
+                                           ? 76.0f * scale
+                                           : 104.0f * scale;
         reach_settings_layout_theme_choice_card(
             &layout.display_windows_system_card, &layout.display_windows_system_title,
             &layout.display_windows_system_subtitle, layout.display_windows_system_options, area_x,
@@ -1032,9 +1028,9 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             return result;
         }
     }
-    int32_t wifi_add_form_visible = layout->wifi_add_row.height > 0.0f &&
-                                    layout->wifi_add_clip.height >=
-                                        layout->wifi_add_row.height * 0.99f;
+    int32_t wifi_add_form_visible =
+        layout->wifi_add_row.height > 0.0f &&
+        layout->wifi_add_clip.height >= layout->wifi_add_row.height * 0.99f;
     if (wifi_add_form_visible)
     {
         const struct

@@ -324,8 +324,8 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
                       REACH_SEARCH_VISIBLE_RESULTS + icon_overscan_rows;
 
     uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS] = {};
-    for (size_t index = icon_start; index < icon_end && index < state->model.result_count &&
-                                    index < REACH_SEARCH_MAX_RESULTS;
+    for (size_t index = icon_start;
+         index < icon_end && index < state->model.result_count && index < REACH_SEARCH_MAX_RESULTS;
          ++index)
     {
         const uint16_t *path = state->model.results[index].icon_path;

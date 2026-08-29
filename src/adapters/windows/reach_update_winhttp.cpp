@@ -175,9 +175,8 @@ static reach_result reach_app_update_check(void *userdata, const uint16_t *owner
 
     std::wstring path = std::wstring(L"/") + owner_w + L"/" + repo_w + L"/releases.atom";
     std::string body;
-    reach_result result =
-        reach_app_update_https_get(L"github.com", path.c_str(),
-                                   L"Accept: application/atom+xml\r\n", &body);
+    reach_result result = reach_app_update_https_get(L"github.com", path.c_str(),
+                                                     L"Accept: application/atom+xml\r\n", &body);
     if (result != REACH_OK || body.empty())
     {
         return REACH_ERROR;
@@ -273,9 +272,9 @@ static reach_result reach_app_update_download(void *userdata, const uint16_t *ur
     if (connection != nullptr)
     {
         DWORD flags = components.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0;
-        HINTERNET request = WinHttpOpenRequest(connection, L"GET", path, nullptr,
-                                               WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                               flags);
+        HINTERNET request =
+            WinHttpOpenRequest(connection, L"GET", path, nullptr, WINHTTP_NO_REFERER,
+                               WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
         if (request != nullptr)
         {
             DWORD redirect = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
@@ -295,9 +294,9 @@ static reach_result reach_app_update_download(void *userdata, const uint16_t *ur
                     total = content_length;
                 }
 
-                HANDLE file = CreateFileW(reinterpret_cast<const wchar_t *>(dest_path),
-                                          GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-                                          FILE_ATTRIBUTE_NORMAL, nullptr);
+                HANDLE file =
+                    CreateFileW(reinterpret_cast<const wchar_t *>(dest_path), GENERIC_WRITE, 0,
+                                nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     uint64_t received = 0;

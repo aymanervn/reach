@@ -16,8 +16,8 @@ extern "C"
     typedef struct reach_startup_apps_ops
     {
         reach_result (*enumerate)(reach_startup_apps *apps, reach_startup_app_list *out_list);
-        reach_result (*set_enabled)(reach_startup_apps *apps,
-                                    const reach_startup_app_entry *entry, int32_t enabled);
+        reach_result (*set_enabled)(reach_startup_apps *apps, const reach_startup_app_entry *entry,
+                                    int32_t enabled);
         void (*destroy)(reach_startup_apps *apps);
     } reach_startup_apps_ops;
 

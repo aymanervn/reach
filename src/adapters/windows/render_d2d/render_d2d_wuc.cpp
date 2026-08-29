@@ -71,8 +71,8 @@ reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
 
     ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset;
     HRESULT hr = backend->compositor->CreateInsetClipWithInsets(
-        content_rect.x, content_rect.y, right > 0.0f ? right : 0.0f,
-        bottom > 0.0f ? bottom : 0.0f, &inset);
+        content_rect.x, content_rect.y, right > 0.0f ? right : 0.0f, bottom > 0.0f ? bottom : 0.0f,
+        &inset);
 
     ComPtr<ABI::Windows::UI::Composition::IVisual> backdrop;
     if (SUCCEEDED(hr))

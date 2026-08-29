@@ -81,8 +81,7 @@ extern "C"
                                     reach_rect_f32 monitor_bounds, float shadow_clearance);
     float reach_bar_reveal_progress(float animated_y, float shown_y, float hidden_y);
     reach_rect_f32 reach_bar_protected_band(reach_bar_edge edge, reach_rect_f32 shown_bounds,
-                                            reach_rect_f32 monitor_bounds,
-                                            float shadow_clearance);
+                                            reach_rect_f32 monitor_bounds, float shadow_clearance);
 
     reach_bar_visibility_result
     reach_bar_update_visibility(reach_bar_visibility_state *state, reach_animation_manager *manager,

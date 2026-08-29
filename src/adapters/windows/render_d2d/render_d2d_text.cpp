@@ -57,12 +57,13 @@ static IDWriteFontCollection *reach_d2d_build_bundled_collection(reach_render_ba
     size_t added = 0;
     if (SUCCEEDED(hr))
     {
-        for (size_t index = 0;
-             index < sizeof(reach_d2d_bundled_font_resources) / sizeof(UINT); ++index)
+        for (size_t index = 0; index < sizeof(reach_d2d_bundled_font_resources) / sizeof(UINT);
+             ++index)
         {
             const void *data = nullptr;
             UINT32 size = 0;
-            if (!reach_d2d_load_font_resource(reach_d2d_bundled_font_resources[index], &data, &size))
+            if (!reach_d2d_load_font_resource(reach_d2d_bundled_font_resources[index], &data,
+                                              &size))
             {
                 continue;
             }
@@ -161,9 +162,8 @@ reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float t
         return REACH_OK;
     }
 
-    const DWRITE_FONT_WEIGHT weight = text_weight > 0
-                                          ? static_cast<DWRITE_FONT_WEIGHT>(text_weight)
-                                          : DWRITE_FONT_WEIGHT_NORMAL;
+    const DWRITE_FONT_WEIGHT weight =
+        text_weight > 0 ? static_cast<DWRITE_FONT_WEIGHT>(text_weight) : DWRITE_FONT_WEIGHT_NORMAL;
     IDWriteTextFormat *format = nullptr;
     HRESULT hr = backend->text_factory->CreateTextFormat(
         reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
@@ -439,8 +439,7 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
     const wchar_t *display = showing_placeholder ? placeholder : text;
     const UINT32 display_length = static_cast<UINT32>(wcslen(display));
 
-    const float font_size =
-        command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
+    const float font_size = command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
     const DWRITE_FONT_WEIGHT weight = command->text_weight > 0
                                           ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
                                           : DWRITE_FONT_WEIGHT_NORMAL;

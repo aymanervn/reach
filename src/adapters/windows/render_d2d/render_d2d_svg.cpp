@@ -1067,7 +1067,7 @@ reach_result reach_d2d_draw_vector_icon(reach_render_backend *backend,
 
     if (load_result != REACH_OK)
     {
-        return load_result;
+        return REACH_OK;
     }
 
     return reach_d2d_draw_svg_resource(backend, command, svg_text);

@@ -659,8 +659,8 @@ static reach_result reach_window_manager_frame_bounds(const reach_window_manager
         }
         frame = placement.rcNormalPosition;
     }
-    else if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame,
-                                          sizeof(frame))) &&
+    else if (FAILED(
+                 DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) &&
              !GetWindowRect(hwnd, &frame))
     {
         return REACH_ERROR;

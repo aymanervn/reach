@@ -89,19 +89,18 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         return;
     }
 
-    reach_settings_push_rect(commands, row,
-                             reach_settings_scale(input, input->theme->radius_small),
+    reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
                              input->theme->settings_card_background);
 
     float text_x = row.x + reach_settings_scale(input, 16.0f);
-    reach_settings_push_text(
-        commands,
-        {text_x, row.y + reach_settings_scale(input, 14.0f),
-         row.width - (text_x - row.x) - reach_settings_scale(input, 16.0f),
-         reach_settings_scale(input, 18.0f)},
-        (const uint16_t *)u"Add a hidden network",
-        reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
-        input->text_alignment_leading, input->theme->settings_text, 1);
+    reach_settings_push_text(commands,
+                             {text_x, row.y + reach_settings_scale(input, 14.0f),
+                              row.width - (text_x - row.x) - reach_settings_scale(input, 16.0f),
+                              reach_settings_scale(input, 18.0f)},
+                             (const uint16_t *)u"Add a hidden network",
+                             reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
+                             REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+                             input->theme->settings_text, 1);
 
     if (layout->wifi_add_name_field.width <= 0.0f)
     {
@@ -132,19 +131,17 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
     name_state.selection_color = reach_settings_color_with_alpha(accent, 0.30f);
     float name_inset = reach_settings_scale(input, 13.0f);
-    reach_rect_f32 name_rect = {layout->wifi_add_name_field.x + name_inset,
-                                layout->wifi_add_name_field.y,
-                                layout->wifi_add_name_field.width - name_inset * 2.0f,
-                                layout->wifi_add_name_field.height};
+    reach_rect_f32 name_rect = {
+        layout->wifi_add_name_field.x + name_inset, layout->wifi_add_name_field.y,
+        layout->wifi_add_name_field.width - name_inset * 2.0f, layout->wifi_add_name_field.height};
     reach_ui_textbox_render(commands, name_rect, &name_style, name_focused ? 1.0f : 0.0f,
                             &name_state);
 
     reach_ui_selection_item_style option_style = reach_settings_pill_style(input, accent);
     for (size_t option = 0; option < REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT; ++option)
     {
-        float selected = model->wifi_add_security == reach_settings_wifi_security_option(option)
-                             ? 1.0f
-                             : 0.0f;
+        float selected =
+            model->wifi_add_security == reach_settings_wifi_security_option(option) ? 1.0f : 0.0f;
         reach_ui_selection_item_render(commands, layout->wifi_add_security_options[option],
                                        reach_settings_wifi_security_option_label(option),
                                        &option_style, selected);
@@ -159,12 +156,11 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         reach_ui_button_style show_style =
             reach_settings_button_style(input, input->theme->settings_input_background);
         show_style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_SMALL);
-        reach_ui_button_render(commands, layout->wifi_add_show_button,
-                               model->wifi_show_key ? (const uint16_t *)u"Hide"
-                                                    : (const uint16_t *)u"Show",
-                               &show_style, 1,
-                               reach_settings_model_button_press_value(
-                                   model, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY));
+        reach_ui_button_render(
+            commands, layout->wifi_add_show_button,
+            model->wifi_show_key ? (const uint16_t *)u"Hide" : (const uint16_t *)u"Show",
+            &show_style, 1,
+            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY));
     }
 
     reach_ui_toggle_style toggle_style = {};
@@ -173,15 +169,15 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_render(commands, layout->wifi_add_auto_toggle, &toggle_style,
                            model->wifi_connect_automatically ? 1.0f : 0.0f);
-    reach_settings_push_text(
-        commands,
-        {layout->wifi_add_auto_toggle.x + layout->wifi_add_auto_toggle.width +
-             reach_settings_scale(input, 10.0f),
-         layout->wifi_add_auto_toggle.y, reach_settings_scale(input, 190.0f),
-         layout->wifi_add_auto_toggle.height},
-        (const uint16_t *)u"Connect automatically",
-        reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
-        input->text_alignment_leading, input->theme->settings_secondary_text, 1);
+    reach_settings_push_text(commands,
+                             {layout->wifi_add_auto_toggle.x + layout->wifi_add_auto_toggle.width +
+                                  reach_settings_scale(input, 10.0f),
+                              layout->wifi_add_auto_toggle.y, reach_settings_scale(input, 190.0f),
+                              layout->wifi_add_auto_toggle.height},
+                             (const uint16_t *)u"Connect automatically",
+                             reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                             REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+                             input->theme->settings_secondary_text, 1);
 
     reach_ui_button_style submit_style =
         reach_settings_button_style(input, input->theme->settings_button_primary);
@@ -205,20 +201,21 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
     const reach_wifi_network *network = &model->wifi_networks.networks[index];
     const reach_rect_f32 row = layout->wifi_rows[row_index];
 
-    reach_color background = network->connected
-                                 ? reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha)
-                                 : input->theme->settings_card_background;
-    reach_settings_push_rect(commands, row,
-                             reach_settings_scale(input, input->theme->radius_small), background);
+    reach_color background =
+        network->connected
+            ? reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha)
+            : input->theme->settings_card_background;
+    reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
+                             background);
 
     float icon_size = reach_settings_scale(input, 22.0f);
     float header_height = reach_settings_scale(input, 58.0f);
     reach_rect_f32 icon = {row.x + reach_settings_scale(input, 15.0f),
                            row.y + (header_height - icon_size) * 0.5f, icon_size, icon_size};
     reach_color icon_color =
-        network->in_range ? input->theme->settings_secondary_text
-                          : reach_settings_color_with_alpha(
-                                input->theme->settings_secondary_text, 0.6f);
+        network->in_range
+            ? input->theme->settings_secondary_text
+            : reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.6f);
     reach_settings_push_icon(commands, icon, icon_color,
                              reach_wifi_signal_icon(network->signal_strength), 0.0f);
 
@@ -261,8 +258,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
                              REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading, detail_color,
                              1);
 
-    if (layout->wifi_key_field.width > 0.0f &&
-        reach_settings_wifi_row_needs_key_form(model, index))
+    if (layout->wifi_key_field.width > 0.0f && reach_settings_wifi_row_needs_key_form(model, index))
     {
         reach_settings_wifi_render_key_field(
             input, commands, layout->wifi_key_field, &model->wifi_key_edit,
@@ -283,15 +279,15 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_render(commands, layout->wifi_auto_toggle, &toggle_style,
                                model->wifi_connect_automatically ? 1.0f : 0.0f);
-        reach_settings_push_text(
-            commands,
-            {layout->wifi_auto_toggle.x + layout->wifi_auto_toggle.width +
-                 reach_settings_scale(input, 10.0f),
-             layout->wifi_auto_toggle.y, reach_settings_scale(input, 190.0f),
-             layout->wifi_auto_toggle.height},
-            (const uint16_t *)u"Connect automatically",
-            reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
-            input->text_alignment_leading, input->theme->settings_secondary_text, 1);
+        reach_settings_push_text(commands,
+                                 {layout->wifi_auto_toggle.x + layout->wifi_auto_toggle.width +
+                                      reach_settings_scale(input, 10.0f),
+                                  layout->wifi_auto_toggle.y, reach_settings_scale(input, 190.0f),
+                                  layout->wifi_auto_toggle.height},
+                                 (const uint16_t *)u"Connect automatically",
+                                 reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                                 REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+                                 input->theme->settings_secondary_text, 1);
     }
 
     if (layout->wifi_connect_button.width > 0.0f)
@@ -347,12 +343,11 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
         reach_settings_push_rect(commands, layout->wifi_radio_icon,
                                  reach_settings_scale(input, input->theme->radius_small),
                                  input->theme->settings_icon_box_background);
-        reach_settings_push_icon(commands, layout->wifi_radio_icon,
-                                 input->theme->settings_secondary_text,
-                                 model->wifi_radio == REACH_WIFI_RADIO_ON
-                                     ? REACH_VECTOR_ICON_WIFI_HIGH
-                                     : REACH_VECTOR_ICON_NO_INTERNET,
-                                 0.24f);
+        reach_settings_push_icon(
+            commands, layout->wifi_radio_icon, input->theme->settings_secondary_text,
+            model->wifi_radio == REACH_WIFI_RADIO_ON ? REACH_VECTOR_ICON_WIFI_HIGH
+                                                     : REACH_VECTOR_ICON_NO_INTERNET,
+            0.24f);
         reach_settings_push_text(commands, layout->wifi_radio_title, (const uint16_t *)u"Wi-Fi",
                                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                                  REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,

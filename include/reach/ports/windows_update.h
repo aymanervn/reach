@@ -38,8 +38,7 @@ extern "C"
                                                   reach_windows_update_identity *out_updates,
                                                   size_t update_capacity, size_t *out_update_count);
         reach_result (*load_journal)(void *userdata, reach_windows_update_journal *out_journal);
-        reach_result (*wait_for_install)(void *userdata,
-                                         reach_windows_update_journal *out_journal);
+        reach_result (*wait_for_install)(void *userdata, reach_windows_update_journal *out_journal);
         void (*clear_journal)(void *userdata);
         void (*cancel)(void *userdata);
         void (*destroy)(void *userdata);

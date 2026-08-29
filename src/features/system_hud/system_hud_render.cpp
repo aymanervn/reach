@@ -83,9 +83,8 @@ static void reach_system_hud_render_media(const reach_system_hud_state *state,
     static const uint16_t fallback_title[] = {'M', 'e', 'd', 'i', 'a', 0};
     const uint16_t *title = state->media.title[0] != 0 ? state->media.title : fallback_title;
     reach_system_hud_push_text(commands, state->layout.title, title,
-                               REACH_TEXT_SIZE_LARGE * ctx->dpi_scale,
-                               REACH_TEXT_WEIGHT_DEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                               theme->system_hud_primary_text);
+                               REACH_TEXT_SIZE_LARGE * ctx->dpi_scale, REACH_TEXT_WEIGHT_DEMIBOLD,
+                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_primary_text);
     reach_system_hud_push_text(commands, state->layout.subtitle, state->media.artist,
                                REACH_TEXT_SIZE_SMALL * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
                                REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_secondary_text);
@@ -113,16 +112,14 @@ static void reach_system_hud_render_level(const reach_system_hud_state *state,
                                                 'n', 'e', 's', 's', 0};
     const uint16_t *label = volume ? (muted ? muted_label : volume_label) : brightness_label;
     reach_system_hud_push_text(commands, state->layout.title, label,
-                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale,
-                               REACH_TEXT_WEIGHT_DEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                               theme->system_hud_primary_text);
+                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_DEMIBOLD,
+                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_primary_text);
 
     uint16_t percent[8] = {};
     reach_level_format_percent(percent, 8, level);
     reach_system_hud_push_text(commands, state->layout.value, percent,
-                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale,
-                               REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_TRAILING,
-                               theme->system_hud_secondary_text);
+                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
+                               REACH_TEXT_ALIGNMENT_TRAILING, theme->system_hud_secondary_text);
 
     reach_color fill = muted ? theme->system_hud_muted_fill : theme->system_hud_fill;
     reach_rect_f32 origin = {};

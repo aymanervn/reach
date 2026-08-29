@@ -29,9 +29,8 @@ static void reach_settings_bluetooth_layout_row_actions(reach_settings_layout *l
     {
         float button_width = 76.0f * scale;
         float strip_y = row.y + row.height - button_height - 12.0f * scale;
-        layout->bluetooth_pin_reject_button =
-            reach_settings_bluetooth_rect(right - button_width, strip_y, button_width,
-                                          button_height);
+        layout->bluetooth_pin_reject_button = reach_settings_bluetooth_rect(
+            right - button_width, strip_y, button_width, button_height);
         layout->bluetooth_pin_accept_button = reach_settings_bluetooth_rect(
             right - button_width * 2.0f - gap, strip_y, button_width, button_height);
         return;

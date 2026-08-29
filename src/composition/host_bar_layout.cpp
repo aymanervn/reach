@@ -20,6 +20,18 @@ static int32_t reach_host_popup_open(const reach_host *host)
                                        reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP));
 }
 
+void reach_host_sync_bar_layout_conditions(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_FORCED,
+                               reach_host_bar_forced_shown(host));
+    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_HELD,
+                               reach_host_popup_open(host));
+}
+
 void reach_host_invalidate_bar_coverage(reach_host *host)
 {
     if (host != nullptr)
@@ -189,10 +201,6 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     reach_host_apply_bar_pointer_observation(host, id, &result);
 
-    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_FORCED,
-                               request.force_shown);
-    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_HELD,
-                               request.hold_open);
     if (desc->definition->surface.bar_reveal.active_layer > 0)
     {
         reach_layout_set_layer_intent(&host->layout_manager, host->surface_participants[id],

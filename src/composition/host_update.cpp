@@ -224,6 +224,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         reach_host_request_update(host);
     }
 
+    reach_host_sync_bar_layout_conditions(host);
     if (reach_host_can_move_bars_without_redraw(host))
     {
         return reach_host_move_bar_animation_frame(host);
@@ -253,6 +254,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     {
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
+        reach_host_refresh_battery_power(host);
     }
     if (reach_tray_service_needs_refresh(host->tray_service))
     {

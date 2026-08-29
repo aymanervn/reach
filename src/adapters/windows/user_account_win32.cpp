@@ -56,8 +56,8 @@ static void reach_user_account_read_display_name(uint16_t *out_name, DWORD capac
     HMODULE secur32 = LoadLibraryW(L"secur32.dll");
     if (secur32 != nullptr)
     {
-        reach_get_user_name_ex_fn get_user_name_ex = reinterpret_cast<reach_get_user_name_ex_fn>(
-            GetProcAddress(secur32, "GetUserNameExW"));
+        reach_get_user_name_ex_fn get_user_name_ex =
+            reinterpret_cast<reach_get_user_name_ex_fn>(GetProcAddress(secur32, "GetUserNameExW"));
         if (get_user_name_ex != nullptr)
         {
             ULONG count = capacity;
@@ -252,8 +252,7 @@ static reach_result reach_user_account_query(reach_user_account *account,
 }
 
 static reach_result reach_user_account_verify_password(reach_user_account *account,
-                                                       const uint16_t *password,
-                                                       int32_t *out_valid)
+                                                       const uint16_t *password, int32_t *out_valid)
 {
     if (account == nullptr || password == nullptr || out_valid == nullptr)
     {
@@ -284,9 +283,10 @@ static reach_result reach_user_account_verify_password(reach_user_account *accou
 
 typedef DWORD(WINAPI *reach_net_user_change_password_fn)(LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR);
 
-static reach_result reach_user_account_change_password(
-    reach_user_account *account, const uint16_t *current_password, const uint16_t *new_password,
-    reach_user_account_password_status *out_status)
+static reach_result
+reach_user_account_change_password(reach_user_account *account, const uint16_t *current_password,
+                                   const uint16_t *new_password,
+                                   reach_user_account_password_status *out_status)
 {
     if (account == nullptr || current_password == nullptr || new_password == nullptr ||
         out_status == nullptr)

@@ -14,8 +14,8 @@ static void reach_ui_push_rect(reach_render_command_buffer *commands, reach_rect
 }
 
 static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                               const uint16_t *text, float size, int32_t weight,
-                               int32_t alignment, reach_color color)
+                               const uint16_t *text, float size, int32_t weight, int32_t alignment,
+                               reach_color color)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
@@ -74,8 +74,8 @@ void reach_ui_selection_item_backdrop_render(reach_render_command_buffer *comman
         return;
     }
 
-    reach_color background = reach_theme_color_mix(style->background, style->accent,
-                                                   0.22f * selection);
+    reach_color background =
+        reach_theme_color_mix(style->background, style->accent, 0.22f * selection);
     reach_color border = reach_theme_color_mix(background, style->accent, 0.85f * selection);
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
@@ -122,8 +122,7 @@ void reach_ui_toggle_render(reach_render_command_buffer *commands, reach_rect_f3
     float knob_off_x = bounds.x + inset;
     float knob_on_x = bounds.x + bounds.width - inset - knob;
     float knob_x = knob_off_x + (knob_on_x - knob_off_x) * position;
-    reach_ui_push_rect(commands, {knob_x, bounds.y + inset, knob, knob}, knob * 0.5f,
-                       style->knob);
+    reach_ui_push_rect(commands, {knob_x, bounds.y + inset, knob, knob}, knob * 0.5f, style->knob);
 }
 
 void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
@@ -142,8 +141,7 @@ void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f
         reach_rect_f32 suffix_rect = {bounds.x + box.width, bounds.y, state->suffix_width,
                                       bounds.height};
         reach_ui_push_text(commands, suffix_rect, state->suffix, style->text_size,
-                           style->text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                           state->suffix_color);
+                           style->text_weight, REACH_TEXT_ALIGNMENT_LEADING, state->suffix_color);
     }
 
     reach_color transparent = {};

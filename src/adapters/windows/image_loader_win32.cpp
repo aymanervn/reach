@@ -51,9 +51,9 @@ static reach_result reach_image_loader_load(reach_image_loader *loader, const ui
     *out_image_id = 0;
 
     IWICBitmapDecoder *decoder = nullptr;
-    if (FAILED(loader->factory->CreateDecoderFromFilename(reinterpret_cast<LPCWSTR>(path), nullptr,
-                                                          GENERIC_READ,
-                                                          WICDecodeMetadataCacheOnLoad, &decoder)) ||
+    if (FAILED(loader->factory->CreateDecoderFromFilename(
+            reinterpret_cast<LPCWSTR>(path), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad,
+            &decoder)) ||
         decoder == nullptr)
     {
         return REACH_ERROR;
@@ -100,9 +100,8 @@ static reach_result reach_image_loader_load(reach_image_loader *loader, const ui
 
     IWICFormatConverter *converter = nullptr;
     if (FAILED(loader->factory->CreateFormatConverter(&converter)) || converter == nullptr ||
-        FAILED(converter->Initialize(source, GUID_WICPixelFormat32bppPBGRA,
-                                     WICBitmapDitherTypeNone, nullptr, 0.0,
-                                     WICBitmapPaletteTypeMedianCut)))
+        FAILED(converter->Initialize(source, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone,
+                                     nullptr, 0.0, WICBitmapPaletteTypeMedianCut)))
     {
         if (converter != nullptr)
         {

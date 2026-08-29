@@ -178,30 +178,27 @@ reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mod
 
 reach_result reach_host_step_brightness(reach_host *host, float delta)
 {
-    if (host == nullptr || host->system_controls.get_brightness_state == nullptr ||
-        host->system_controls.set_brightness_level == nullptr)
+    if (host == nullptr || host->system_status == nullptr)
     {
         return REACH_OK;
     }
 
     reach_brightness_state state = {};
-    if (host->system_controls.get_brightness_state(host->system_controls.userdata, &state) !=
-        REACH_OK)
+    reach_result result = reach_system_status_step_brightness(host->system_status, delta, &state);
+    if (result == REACH_NOT_IMPLEMENTED)
     {
-        return REACH_ERROR;
+        return REACH_OK;
+    }
+    if (result != REACH_OK)
+    {
+        return result;
     }
     if (!state.available)
     {
         return REACH_OK;
     }
 
-    float level = reach_host_clamp01(state.level + delta);
-    reach_result result =
-        host->system_controls.set_brightness_level(host->system_controls.userdata, level);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
+    float level = state.level;
 
     if (reach_quick_settings_state_ptr(
             reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS))
@@ -221,9 +218,6 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
         {
             reach_host_relayout_quick_settings(host, 1);
         }
-        reach_quick_settings_refresh_system(
-            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-            REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS);
         reach_host_mark_quick_settings_changed(host);
     }
     if (host->top_bar_hidden)

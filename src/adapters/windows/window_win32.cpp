@@ -150,8 +150,7 @@ static HFONT reach_create_windows_menu_font(HWND hwnd)
     {
         UINT dpi = GetDpiForWindow(hwnd);
         dpi = dpi > 0 ? dpi : 96;
-        metrics.lfMenuFont.lfHeight =
-            -MulDiv((int)REACH_TEXT_SIZE_MEDIUM, (int)dpi, 96);
+        metrics.lfMenuFont.lfHeight = -MulDiv((int)REACH_TEXT_SIZE_MEDIUM, (int)dpi, 96);
         return CreateFontIndirectW(&metrics.lfMenuFont);
     }
     return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));

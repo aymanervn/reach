@@ -200,8 +200,8 @@ reach_result reach_d2d_create_notched_rounded_rect_geometry(ID2D1Factory *factor
         D2D1_ARC_SEGMENT arc = {};
         arc.size = D2D1::SizeF(r, r);
         arc.rotationAngle = 0.0f;
-        arc.sweepDirection = mirrored ? D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE
-                                      : D2D1_SWEEP_DIRECTION_CLOCKWISE;
+        arc.sweepDirection =
+            mirrored ? D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE : D2D1_SWEEP_DIRECTION_CLOCKWISE;
         arc.arcSize = D2D1_ARC_SIZE_SMALL;
 
         arc.point = D2D1::Point2F(x + w, fy(y + r));
