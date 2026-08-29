@@ -94,6 +94,9 @@ struct reach_context_menu
     reach_animation_track animation_tracks[REACH_CONTEXT_MENU_ANIM_COUNT];
     reach_pressable pressable;
     uint64_t pressable_identity;
+
+    reach_menu_request request;
+    uintptr_t request_windows[REACH_MENU_MAX_WINDOWS];
 };
 
 enum
@@ -121,6 +124,16 @@ void reach_context_menu_force_close(reach_context_menu *menu)
         menu->pressable_identity = 0;
         menu->state.open = 0;
     }
+}
+
+int32_t reach_context_menu_set_open(reach_context_menu *menu, int32_t open)
+{
+    if (menu == nullptr || open || !reach_context_menu_is_open(menu))
+    {
+        return 0;
+    }
+    reach_context_menu_reset(menu);
+    return 1;
 }
 
 void reach_context_menu_reset(reach_context_menu *menu)
@@ -321,6 +334,90 @@ void reach_context_menu_open_power(reach_context_menu *menu,
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
 }
 
+/* The menu answers with the whole request it was opened for, so composition never asks the
+   feature that owns the item what the command meant. */
+void reach_context_menu_command_action(const reach_menu_request *request,
+                                       const uintptr_t *request_windows, uint32_t command,
+                                       reach_capsule_action *out)
+{
+    if (request == nullptr || out == nullptr)
+    {
+        return;
+    }
+
+    out->flags |= REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST;
+
+    if (command >= REACH_CONTEXT_MENU_COMMAND_POWER_LOCK)
+    {
+        out->kind = REACH_FEATURE_ACTION_EXECUTE_MENU_COMMAND;
+        out->id = command;
+        return;
+    }
+
+
+    if (!reach_menu_request_allows(request, command))
+    {
+        out->kind = REACH_FEATURE_ACTION_NONE;
+        return;
+    }
+
+    switch (command)
+    {
+    case REACH_CONTEXT_MENU_COMMAND_OPEN_NEW:
+    case REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN:
+        if (request->path[0] == 0)
+        {
+            out->kind = REACH_FEATURE_ACTION_NONE;
+            return;
+        }
+        out->kind = REACH_FEATURE_ACTION_OPEN_TARGET;
+        out->target.kind = REACH_FEATURE_TARGET_PATH;
+        out->target.path = request->path;
+        out->target.arguments = request->arguments[0] != 0 ? request->arguments : nullptr;
+        out->flags |= REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE;
+        if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN)
+        {
+            out->flags |= REACH_FEATURE_ACTION_FLAG_RUN_AS_ADMIN;
+        }
+        return;
+
+    case REACH_CONTEXT_MENU_COMMAND_UNPIN:
+        out->kind = REACH_FEATURE_ACTION_UNPIN_APP;
+        out->id = request->pin_id;
+        return;
+
+    case REACH_CONTEXT_MENU_COMMAND_PIN:
+        out->kind = REACH_FEATURE_ACTION_PIN_APP;
+        out->window = request->window;
+        out->target.kind = REACH_FEATURE_TARGET_APP;
+        out->target.path = request->path;
+        out->target.app_user_model_id = request->app_user_model_id;
+        out->target.icon_ref = request->icon_ref;
+        return;
+
+    case REACH_CONTEXT_MENU_COMMAND_CLOSE:
+        out->kind = REACH_FEATURE_ACTION_CLOSE_WINDOW;
+        out->window = request->window;
+        return;
+
+    case REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL:
+        if (request->window_count == 0)
+        {
+            out->kind = REACH_FEATURE_ACTION_CLOSE_WINDOW;
+            out->window = request->window;
+            return;
+        }
+        out->kind = REACH_FEATURE_ACTION_CLOSE_WINDOWS;
+        out->windows = request_windows;
+        out->window_count = request->window_count;
+        return;
+
+    default:
+        out->kind = REACH_FEATURE_ACTION_NONE;
+        return;
+    }
+}
+
 void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_index,
                                       const reach_context_menu_open_context *ctx)
 {
@@ -342,6 +439,12 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     }
     state->power_open = 0;
     state->window_list_open = 0;
+    menu->request = ctx->request != nullptr ? *ctx->request : reach_menu_request{};
+    for (size_t index = 0; index < menu->request.window_count && index < REACH_MENU_MAX_WINDOWS;
+         ++index)
+    {
+        menu->request_windows[index] = menu->request.windows[index].window;
+    }
     reach_context_menu_place(state, ctx, reach_context_menu_item_popup_width * ctx->dpi_scale,
                              reach_context_menu_item_anchor_ratio);
     state->target_index = target_index;
@@ -644,8 +747,8 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         }
         else
         {
-            out->action.kind = REACH_FEATURE_ACTION_EXECUTE_MENU_COMMAND;
-            out->action.id = menu->state.item_commands[index];
+            reach_context_menu_command_action(&menu->request, menu->request_windows,
+                                              menu->state.item_commands[index], &out->action);
         }
         break;
     }

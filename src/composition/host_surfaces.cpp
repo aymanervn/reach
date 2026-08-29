@@ -584,6 +584,28 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
     reach_host_apply_feature_tick_result(host, runtime, &result);
 }
 
+void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
+                                         int32_t drop_direction)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    reach_host_surface_transition_set_settle_offset(host, runtime->transition,
+                                                    drop_direction == REACH_POPUP_DROP_DOWN
+                                                        ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE
+                                                        : REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
+    reach_host_surface_transition_set(host, runtime->transition, 1);
+    if (runtime->surface != nullptr)
+    {
+        runtime->surface->dirty_flags = 1;
+    }
+    reach_host_sync_pointer_move_subscriptions(host);
+    reach_host_sync_popup_mouse_hook(host);
+    reach_host_request_bar_visibility_update(host);
+}
+
 void reach_host_close_surfaces_on_persistent_press(reach_host *host)
 {
     if (host == nullptr)

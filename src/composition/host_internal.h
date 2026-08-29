@@ -454,6 +454,8 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
 void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
                                          reach_surface_close_intent intent);
 void reach_host_close_surfaces_on_persistent_press(reach_host *host);
+void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
+                                         int32_t drop_direction);
 int32_t reach_host_surface_closable(const reach_feature_runtime *runtime);
 void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtime *runtime,
                                           int32_t open);
@@ -464,6 +466,8 @@ void reach_host_arm_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_cancel_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id);
+reach_result reach_host_execute_power_command(reach_host *host, uint32_t command);
+void reach_host_clear_sticky_dock_feedback(reach_host *host);
 void reach_host_post_feature_work_ready(reach_host *host);
 void reach_host_notify_windows_changed(reach_host *host);
 void reach_host_notify_windows_refreshed(reach_host *host,
@@ -740,7 +744,6 @@ void reach_host_surface_transition_set_scale(reach_host *host,
 void reach_host_surface_transition_set_settle_offset(reach_host *host,
                                                      reach_host_surface_transition *transition,
                                                      float settle_offset);
-void reach_host_open_context_menu_transition(reach_host *host);
 void reach_host_surface_transitions_init(reach_host *host);
 void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
                                        int32_t open);
@@ -796,7 +799,9 @@ reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reac
                                                           const reach_app_launch_request *request);
 reach_result reach_host_open_default_location(reach_host *host);
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
-                                            const reach_feature_target *target, int32_t defer);
+                                            const reach_feature_target *target, uint32_t flags);
+reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature_target *target,
+                                           uintptr_t window_id);
 
 reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
                                      int32_t minimize_if_foreground);
@@ -816,12 +821,7 @@ reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
                                            int32_t force_new_instance, reach_surface_id source,
                                            int32_t defer_until_closed);
 
-void reach_host_close_context_menu(reach_host *host);
-reach_result reach_host_execute_context_command(reach_host *host, uint32_t command);
-reach_result reach_host_show_power_context_menu(reach_host *host);
 
-reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item_index, int32_t x,
-                                                   int32_t y);
 
 void reach_host_dock_item_hovered(reach_host *host, size_t item_index);
 void reach_host_window_list_update(reach_host *host, double delta_seconds);
@@ -875,12 +875,8 @@ reach_result reach_host_refresh_monitor_layout(reach_host *host);
 int32_t reach_host_can_move_bars_without_redraw(const reach_host *host);
 reach_result reach_host_move_bar_animation_frame(reach_host *host);
 
-const uint16_t *reach_host_dock_item_path(const reach_host *host, size_t item_index);
 
-reach_result reach_host_launch_dock_item(reach_host *host, size_t item_index,
-                                         int32_t force_new_instance);
 
-void reach_host_clear_sticky_dock_feedback(reach_host *host);
 
 reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing_action action);
 reach_result reach_host_step_main_volume(reach_host *host, float delta);

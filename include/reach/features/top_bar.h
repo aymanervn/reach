@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/core/menu_commands.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/features/common/bar_visibility.h"
@@ -208,6 +209,9 @@ extern "C"
         void (*battery_activated)(void *user);
         void (*tray_overflow_activated)(void *user);
     } reach_top_bar_routes;
+
+    int32_t reach_top_bar_build_power_menu_request(reach_top_bar *top_bar,
+                                                   reach_menu_request *out_request);
 
     void reach_top_bar_set_routes(reach_top_bar *top_bar, const reach_top_bar_routes *routes);
 
