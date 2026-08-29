@@ -69,8 +69,8 @@ void reach_settings_model_apply_reach_download(reach_settings_model *model, int3
 {
     if (model == nullptr)
         return;
-    model->reach_update_state = success ? REACH_SETTINGS_REACH_UPDATE_AVAILABLE
-                                        : REACH_SETTINGS_REACH_UPDATE_ERROR;
+    model->reach_update_state =
+        success ? REACH_SETTINGS_REACH_UPDATE_AVAILABLE : REACH_SETTINGS_REACH_UPDATE_ERROR;
 }
 
 int32_t reach_settings_model_reach_update_action_enabled(const reach_settings_model *model)
@@ -279,9 +279,8 @@ void reach_settings_model_apply_update_operation(
             }
     }
     if (result->failure_class == REACH_WINDOWS_UPDATE_USER_CANCELLED)
-        model->update_page_state = model->update_scan_completed
-                                       ? REACH_SETTINGS_UPDATE_AVAILABLE
-                                       : REACH_SETTINGS_UPDATE_NOT_SCANNED;
+        model->update_page_state = model->update_scan_completed ? REACH_SETTINGS_UPDATE_AVAILABLE
+                                                                : REACH_SETTINGS_UPDATE_NOT_SCANNED;
     else if (result->failure_class != REACH_WINDOWS_UPDATE_FAILURE_NONE)
         model->update_page_state = REACH_SETTINGS_UPDATE_ERROR;
     else

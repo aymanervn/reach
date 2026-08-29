@@ -32,8 +32,8 @@ extern "C"
     int32_t reach_wallpaper_apply_snapshot(reach_wallpaper *wallpaper,
                                            reach_config_snapshot *snapshot);
 
-    void reach_wallpaper_reload(reach_wallpaper *wallpaper,
-                                const reach_config_snapshot *snapshot, int32_t force);
+    void reach_wallpaper_reload(reach_wallpaper *wallpaper, const reach_config_snapshot *snapshot,
+                                int32_t force);
 
     reach_result reach_wallpaper_set_bounds(reach_wallpaper *wallpaper, reach_rect_f32 bounds);
 

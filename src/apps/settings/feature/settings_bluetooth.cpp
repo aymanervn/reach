@@ -44,8 +44,7 @@ void reach_settings_model_apply_bluetooth(reach_settings_model *model,
     }
 
     model->bluetooth_devices = devices != nullptr ? *devices : reach_bluetooth_device_list{};
-    model->bluetooth_pairing =
-        pairing != nullptr ? *pairing : reach_bluetooth_pairing_request{};
+    model->bluetooth_pairing = pairing != nullptr ? *pairing : reach_bluetooth_pairing_request{};
     model->bluetooth_scanning = scanning;
     model->bluetooth_loaded = 1;
     for (size_t index = 0; index < REACH_BLUETOOTH_MAX_DEVICES; ++index)
@@ -100,7 +99,7 @@ void reach_settings_model_set_bluetooth_icon(reach_settings_model *model, size_t
 }
 
 static void reach_settings_model_apply_bluetooth_radio(reach_settings_model *model,
-                                                        reach_bluetooth_state state)
+                                                       reach_bluetooth_state state)
 {
     model->bluetooth_radio = state;
     if (!state.available || !state.enabled)

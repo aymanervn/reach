@@ -59,9 +59,9 @@ reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float 
 
     placement.bounds.width = width;
     placement.bounds.height = height;
-    placement.bounds.x = reach_popup_clamp_to_monitor(
-        anchor->button.x + anchor->button.width * 0.5f - width * 0.5f, width, anchor->monitor.x,
-        anchor->monitor.width, margin);
+    placement.bounds.x =
+        reach_popup_clamp_to_monitor(anchor->button.x + anchor->button.width * 0.5f - width * 0.5f,
+                                     width, anchor->monitor.x, anchor->monitor.width, margin);
     placement.bounds.y = reach_popup_clamp_to_monitor(drop_y, height, anchor->monitor.y,
                                                       anchor->monitor.height, margin);
     placement.notch_anchor_x = anchor->button.x + anchor->button.width * 0.5f;
@@ -143,9 +143,9 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
 
     reach_render_command shape = reach_popup_shape(input);
     reach_color background = input->has_background_color_override ? input->background_color_override
-                                                                   : input->theme->popup_background;
+                                                                  : input->theme->popup_background;
     return reach_render_push_bordered_background(
         out_commands, &shape, background, input->theme->popup_border,
-        reach_theme_border_thickness(input->theme, input->dpi_scale),
-        &input->theme->popup_shadow, input->dpi_scale);
+        reach_theme_border_thickness(input->theme, input->dpi_scale), &input->theme->popup_shadow,
+        input->dpi_scale);
 }

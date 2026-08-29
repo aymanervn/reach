@@ -108,8 +108,8 @@ void reach_render_command_buffer_multiply_opacity(reach_render_command_buffer *b
 }
 
 reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
-                                      const reach_render_command *shape,
-                                      const reach_shadow *shadow, float dpi_scale)
+                                      const reach_render_command *shape, const reach_shadow *shadow,
+                                      float dpi_scale)
 {
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     reach_render_command command;
@@ -156,10 +156,11 @@ static reach_render_command reach_render_inset_shape(const reach_render_command 
     return inner;
 }
 
-reach_result reach_render_push_bordered_background(
-    reach_render_command_buffer *buffer, const reach_render_command *shape,
-    reach_color background_color, reach_color border_color, float border_thickness,
-    const reach_shadow *shadow, float dpi_scale)
+reach_result reach_render_push_bordered_background(reach_render_command_buffer *buffer,
+                                                   const reach_render_command *shape,
+                                                   reach_color background_color,
+                                                   reach_color border_color, float border_thickness,
+                                                   const reach_shadow *shadow, float dpi_scale)
 {
     reach_render_command outer;
     reach_render_command inner;

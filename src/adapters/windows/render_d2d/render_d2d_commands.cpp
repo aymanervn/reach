@@ -128,10 +128,9 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             continue;
         }
 
-        D2D1_RECT_F scissor = D2D1::RectF(
-            command->scissor_rect.x, command->scissor_rect.y,
-            command->scissor_rect.x + command->scissor_rect.width,
-            command->scissor_rect.y + command->scissor_rect.height);
+        D2D1_RECT_F scissor = D2D1::RectF(command->scissor_rect.x, command->scissor_rect.y,
+                                          command->scissor_rect.x + command->scissor_rect.width,
+                                          command->scissor_rect.y + command->scissor_rect.height);
         target->PushAxisAlignedClip(scissor, D2D1_ANTIALIAS_MODE_ALIASED);
         outcome = reach_d2d_execute_command(backend, target, command);
         target->PopAxisAlignedClip();

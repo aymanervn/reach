@@ -24,7 +24,8 @@ extern "C"
     {
         reach_result (*get_state)(reach_input_language *language, reach_window_id foreground_window,
                                   reach_input_language_state *out_state);
-        reach_result (*cycle_next)(reach_input_language *language, reach_window_id foreground_window);
+        reach_result (*cycle_next)(reach_input_language *language,
+                                   reach_window_id foreground_window);
         void (*destroy)(reach_input_language *language);
     } reach_input_language_ops;
 

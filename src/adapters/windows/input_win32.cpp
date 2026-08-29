@@ -64,8 +64,8 @@ static void reach_input_post_pointer_region_event(reach_input_source *source, ui
 {
     if (source != nullptr && source->window != nullptr)
     {
-        PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT,
-                     REACH_UI_EVENT_POINTER_REGION_CHANGED, region_id);
+        PostMessageW(source->window, REACH_INPUT_WM_UI_EVENT, REACH_UI_EVENT_POINTER_REGION_CHANGED,
+                     region_id);
     }
 }
 
@@ -694,9 +694,8 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
     return reach_input_sync_pointer_hook(source);
 }
 
-static reach_result
-reach_input_get_window_manipulation(reach_input_source *source,
-                                    reach_window_manipulation *out_manipulation)
+static reach_result reach_input_get_window_manipulation(reach_input_source *source,
+                                                        reach_window_manipulation *out_manipulation)
 {
     (void)source;
     if (out_manipulation == nullptr)

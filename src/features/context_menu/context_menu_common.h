@@ -25,9 +25,8 @@ typedef struct reach_context_menu_render_input
     float close_hover;
 } reach_context_menu_render_input;
 
-reach_result
-reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
-                                         reach_render_command_buffer *out_commands);
+reach_result reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
+                                                      reach_render_command_buffer *out_commands);
 
 reach_rect_f32 reach_context_menu_close_button_rect(const reach_context_menu_metrics *metrics,
                                                     reach_rect_f32 item_slot, float dpi_scale);

@@ -339,9 +339,9 @@ static reach_result reach_terminal_launcher_launch(reach_terminal_launcher *laun
         wchar_t default_profile[64] = {};
         if (request->command[0] != 0 &&
             (reach_terminal_find_settings(launcher->executable, settings_path) != REACH_OK ||
-             reach_terminal_read_default_profile(
-                 settings_path, default_profile,
-                 sizeof(default_profile) / sizeof(default_profile[0])) != REACH_OK))
+             reach_terminal_read_default_profile(settings_path, default_profile,
+                                                 sizeof(default_profile) /
+                                                     sizeof(default_profile[0])) != REACH_OK))
         {
             return REACH_ERROR;
         }

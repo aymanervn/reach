@@ -31,6 +31,7 @@ static reach_host registry_host;
 static reach_host generic_frame_host;
 static reach_host native_overlay_host;
 static reach_host closing_stage_host;
+static reach_host bar_conditions_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
 static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
@@ -654,6 +655,58 @@ static void test_forced_bars_hold_through_a_closing_stage(void)
     reach_host_destroy_registered_features(host);
 }
 
+static int32_t bar_condition_active(const reach_host *host, reach_layout_condition condition)
+{
+    return (host->layout_manager.active_conditions & (1u << (uint32_t)condition)) != 0;
+}
+
+static void test_bar_conditions_sync_once_from_host_state(void)
+{
+    reach_host *host = &bar_conditions_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered popup and Stage features are available");
+    reach_host_init_layout(host);
+
+    reach_host_sync_bar_layout_conditions(host);
+    expect_true(!bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_FORCED) &&
+                    !bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_HELD),
+                "closed surfaces leave both global bar conditions clear");
+
+    static const uint16_t label[] = {'W', 'i', 'n', 'd', 'o', 'w', 0};
+    reach_stage_open_window window = {};
+    window.window = 42;
+    window.label = label;
+    window.frame = {100.0f, 100.0f, 800.0f, 600.0f};
+    reach_stage *stage = reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE);
+    expect_true(reach_stage_open(stage, {0.0f, 0.0f, 1920.0f, 1080.0f}, 1.0f, &window, 1) ==
+                    REACH_OK,
+                "Stage opens for the forced-bar condition");
+    reach_host_sync_bar_layout_conditions(host);
+    expect_true(bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_FORCED),
+                "the host-level sync publishes the forced-bar condition");
+
+    reach_battery_open_context battery_context = {};
+    battery_context.theme = reach_theme_default();
+    battery_context.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    battery_context.dpi_scale = 1.0f;
+    reach_battery_open(reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY),
+                       &battery_context);
+    reach_host_sync_bar_layout_conditions(host);
+    expect_true(bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_HELD),
+                "the host-level sync publishes the popup-held condition");
+
+    reach_stage_force_close(stage);
+    reach_battery_force_close(
+        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY));
+    reach_host_sync_bar_layout_conditions(host);
+    expect_true(!bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_FORCED) &&
+                    !bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_HELD),
+                "one host-level sync clears both global conditions after closure");
+
+    reach_host_destroy_registered_features(host);
+}
+
 static void test_switcher_publishes_arranged_surface_geometry(void)
 {
     reach_switcher *switcher = nullptr;
@@ -691,6 +744,7 @@ int main(void)
     test_registered_surface_frame_uses_declared_anchor();
     test_registered_surface_frame_syncs_native_overlay();
     test_forced_bars_hold_through_a_closing_stage();
+    test_bar_conditions_sync_once_from_host_state();
     test_switcher_publishes_arranged_surface_geometry();
 
     if (failures != 0)

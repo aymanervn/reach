@@ -1049,7 +1049,6 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
     }
     case REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS:
         (void)reach_system_status_set_brightness(quick_settings->status, action->volume_level);
-        reach_quick_settings_refresh_system(quick_settings, 0);
         out->redraw = 1;
         break;
 

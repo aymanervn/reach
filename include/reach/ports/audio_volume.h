@@ -80,8 +80,8 @@ extern "C"
 
         reach_result (*set_default_output_device)(void *userdata, const uint16_t *device_id);
 
-        reach_result (*start_watching)(void *userdata,
-                                       reach_audio_volume_change_callback callback, void *user);
+        reach_result (*start_watching)(void *userdata, reach_audio_volume_change_callback callback,
+                                       void *user);
 
         void (*stop_watching)(void *userdata);
 

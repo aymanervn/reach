@@ -51,8 +51,7 @@ int main(void)
            "UTF-16 exact copy");
     expect(reach_copy_utf16(copy, 5, alpha) == REACH_ERROR && copy[4] == 0,
            "UTF-16 truncated copy");
-    expect(reach_copy_utf16(copy, 1, alpha) == REACH_ERROR && copy[0] == 0,
-           "UTF-16 one-unit copy");
+    expect(reach_copy_utf16(copy, 1, alpha) == REACH_ERROR && copy[0] == 0, "UTF-16 one-unit copy");
     expect(reach_copy_utf16(nullptr, 6, alpha) == REACH_INVALID_ARGUMENT,
            "UTF-16 invalid destination");
 

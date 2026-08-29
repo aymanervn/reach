@@ -14,8 +14,8 @@ static reach_result reach_power_session_screen_off(reach_power_session *session)
 {
     (void)session;
     DWORD_PTR result = 0;
-    return SendMessageTimeoutW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, 2,
-                               SMTO_ABORTIFHUNG, 1000, &result)
+    return SendMessageTimeoutW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, 2, SMTO_ABORTIFHUNG,
+                               1000, &result)
                ? REACH_OK
                : REACH_ERROR;
 }

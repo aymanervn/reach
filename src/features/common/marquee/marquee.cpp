@@ -60,8 +60,8 @@ float reach_marquee_advance(reach_marquee_state *state, const reach_marquee_requ
     phase -= REACH_MARQUEE_HOLD_SECONDS;
     if (phase < travel_seconds)
     {
-        return -overflow * reach_easing_apply((float)(phase / travel_seconds),
-                                              REACH_EASING_EASE_IN_OUT);
+        return -overflow *
+               reach_easing_apply((float)(phase / travel_seconds), REACH_EASING_EASE_IN_OUT);
     }
     phase -= travel_seconds;
     if (phase < REACH_MARQUEE_HOLD_SECONDS)
@@ -69,6 +69,6 @@ float reach_marquee_advance(reach_marquee_state *state, const reach_marquee_requ
         return -overflow;
     }
     phase -= REACH_MARQUEE_HOLD_SECONDS;
-    return -overflow * (1.0f - reach_easing_apply((float)(phase / travel_seconds),
-                                                  REACH_EASING_EASE_IN_OUT));
+    return -overflow *
+           (1.0f - reach_easing_apply((float)(phase / travel_seconds), REACH_EASING_EASE_IN_OUT));
 }

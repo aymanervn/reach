@@ -254,8 +254,7 @@ static void reach_shared_reader_accept_state(const reach_service_shared_state *s
     windows_changed = state->window_sequence != g_reader.last_window_sequence;
     hotkeys_changed = state->hotkey_sequence != g_reader.last_hotkey_sequence;
     game_mode_changed = state->game_mode_sequence != g_reader.last_game_mode_sequence;
-    manipulation_changed =
-        state->manipulation_sequence != g_reader.last_manipulation_sequence;
+    manipulation_changed = state->manipulation_sequence != g_reader.last_manipulation_sequence;
     g_reader.cache = *state;
     g_reader.last_publish_sequence = state->publish_sequence;
     g_reader.last_window_sequence = state->window_sequence;
@@ -773,8 +772,9 @@ reach_result reach_service_shared_publish_window_manipulation(uint64_t window, i
     return REACH_OK;
 }
 
-reach_result reach_service_shared_finish_window_manipulation(
-    const reach_service_window_snapshot *windows, uint32_t window_count)
+reach_result
+reach_service_shared_finish_window_manipulation(const reach_service_window_snapshot *windows,
+                                                uint32_t window_count)
 {
     if (g_writer.view == nullptr || (window_count > 0 && windows == nullptr))
     {

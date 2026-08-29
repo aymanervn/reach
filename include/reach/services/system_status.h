@@ -88,6 +88,8 @@ extern "C"
     reach_result reach_system_status_set_default_output_device(reach_system_status *service,
                                                                const uint16_t *device_id);
     reach_result reach_system_status_set_brightness(reach_system_status *service, float level);
+    reach_result reach_system_status_step_brightness(reach_system_status *service, float delta,
+                                                     reach_brightness_state *out_state);
 
     reach_system_status_bluetooth_outcome
     reach_system_status_set_bluetooth_enabled(reach_system_status *service, int32_t enabled);

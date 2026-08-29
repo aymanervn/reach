@@ -153,8 +153,8 @@ static void reach_bluetooth_read_icon(enumeration::DeviceInformation const &info
     {
         winrt::hstring icon = winrt::unbox_value<winrt::hstring>(value);
         wchar_t expanded[REACH_BLUETOOTH_ICON_PATH_CAPACITY] = {};
-        DWORD written = ExpandEnvironmentStringsW(icon.c_str(), expanded,
-                                                  REACH_BLUETOOTH_ICON_PATH_CAPACITY);
+        DWORD written =
+            ExpandEnvironmentStringsW(icon.c_str(), expanded, REACH_BLUETOOTH_ICON_PATH_CAPACITY);
         const wchar_t *source =
             written > 0 && written <= REACH_BLUETOOTH_ICON_PATH_CAPACITY ? expanded : icon.c_str();
         reach_copy_utf16(out_path, REACH_BLUETOOTH_ICON_PATH_CAPACITY,
@@ -206,8 +206,8 @@ static void reach_bluetooth_fill_device(reach_bluetooth_device *device,
     reach_bluetooth_copy_hstring(device->name, REACH_BLUETOOTH_NAME_CAPACITY, information.Name());
     reach_bluetooth_read_icon(information, device->icon_path);
     device->kind = reach_bluetooth_read_kind(information);
-    device->connected =
-        reach_bluetooth_property_flag(information, winrt::hstring(L"System.Devices.Aep.IsConnected"));
+    device->connected = reach_bluetooth_property_flag(
+        information, winrt::hstring(L"System.Devices.Aep.IsConnected"));
     try
     {
         device->paired = information.Pairing().IsPaired() ? 1 : 0;
@@ -310,24 +310,31 @@ static void reach_bluetooth_attach_watcher(reach_bluetooth_adapter *adapter,
                                            enumeration::DeviceWatcher const &watcher,
                                            winrt::event_token *tokens)
 {
-    tokens[0] = watcher.Added([adapter](enumeration::DeviceWatcher const &,
-                                        enumeration::DeviceInformation const &information) {
-        reach_bluetooth_store(adapter, information);
-        reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_DEVICES);
-    });
-    tokens[1] = watcher.Updated([adapter](enumeration::DeviceWatcher const &,
-                                          enumeration::DeviceInformationUpdate const &update) {
-        reach_bluetooth_update(adapter, update);
-        reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_DEVICES);
-    });
-    tokens[2] = watcher.Removed([adapter](enumeration::DeviceWatcher const &,
-                                          enumeration::DeviceInformationUpdate const &update) {
-        reach_bluetooth_remove(adapter, update);
-        reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_DEVICES);
-    });
+    tokens[0] = watcher.Added(
+        [adapter](enumeration::DeviceWatcher const &,
+                  enumeration::DeviceInformation const &information)
+        {
+            reach_bluetooth_store(adapter, information);
+            reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_DEVICES);
+        });
+    tokens[1] = watcher.Updated(
+        [adapter](enumeration::DeviceWatcher const &,
+                  enumeration::DeviceInformationUpdate const &update)
+        {
+            reach_bluetooth_update(adapter, update);
+            reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_DEVICES);
+        });
+    tokens[2] = watcher.Removed(
+        [adapter](enumeration::DeviceWatcher const &,
+                  enumeration::DeviceInformationUpdate const &update)
+        {
+            reach_bluetooth_remove(adapter, update);
+            reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_DEVICES);
+        });
     tokens[3] = watcher.EnumerationCompleted(
-        [adapter](enumeration::DeviceWatcher const &, winrt::Windows::Foundation::IInspectable
-                                                          const &) {
+        [adapter](enumeration::DeviceWatcher const &,
+                  winrt::Windows::Foundation::IInspectable const &)
+        {
             reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_SCAN_COMPLETE |
                                                 REACH_BLUETOOTH_CHANGE_DEVICES);
         });
@@ -463,9 +470,9 @@ static reach_result reach_bluetooth_read_pairing_request(void *userdata,
     return REACH_OK;
 }
 
-static void reach_bluetooth_on_pairing_requested(reach_bluetooth_adapter *adapter,
-                                                 enumeration::DevicePairingRequestedEventArgs const
-                                                     &args)
+static void
+reach_bluetooth_on_pairing_requested(reach_bluetooth_adapter *adapter,
+                                     enumeration::DevicePairingRequestedEventArgs const &args)
 {
     if (args.PairingKind() == enumeration::DevicePairingKinds::ConfirmOnly)
     {
@@ -485,7 +492,8 @@ static void reach_bluetooth_on_pairing_requested(reach_bluetooth_adapter *adapte
         adapter->pairing_request.active = 1;
         adapter->pairing_request.needs_confirmation = 1;
         reach_bluetooth_copy_hstring(adapter->pairing_request.device_id,
-                                     REACH_BLUETOOTH_DEVICE_ID_CAPACITY, args.DeviceInformation().Id());
+                                     REACH_BLUETOOTH_DEVICE_ID_CAPACITY,
+                                     args.DeviceInformation().Id());
         reach_bluetooth_copy_hstring(adapter->pairing_request.pin, REACH_BLUETOOTH_PIN_CAPACITY,
                                      args.Pin());
     }
@@ -546,41 +554,42 @@ static reach_result reach_bluetooth_pair(void *userdata, const uint16_t *device_
         adapter->pairing = information.Pairing().Custom();
         adapter->pairing_token = adapter->pairing.PairingRequested(
             [adapter](enumeration::DeviceInformationCustomPairing const &,
-                      enumeration::DevicePairingRequestedEventArgs const &args) {
-                reach_bluetooth_on_pairing_requested(adapter, args);
-            });
+                      enumeration::DevicePairingRequestedEventArgs const &args)
+            { reach_bluetooth_on_pairing_requested(adapter, args); });
 
         uint16_t requested_id[REACH_BLUETOOTH_DEVICE_ID_CAPACITY] = {};
         reach_copy_utf16(requested_id, REACH_BLUETOOTH_DEVICE_ID_CAPACITY, device_id);
 
-        auto operation = adapter->pairing.PairAsync(
-            enumeration::DevicePairingKinds::ConfirmOnly |
-                enumeration::DevicePairingKinds::ConfirmPinMatch,
-            enumeration::DevicePairingProtectionLevel::Default);
-        operation.Completed([adapter, requested_id](
-                                winrt::Windows::Foundation::IAsyncOperation<
-                                    enumeration::DevicePairingResult> const &async,
-                                winrt::Windows::Foundation::AsyncStatus) {
-            reach_bluetooth_pair_result result = REACH_BLUETOOTH_PAIR_RESULT_FAILED;
-            try
+        auto operation =
+            adapter->pairing.PairAsync(enumeration::DevicePairingKinds::ConfirmOnly |
+                                           enumeration::DevicePairingKinds::ConfirmPinMatch,
+                                       enumeration::DevicePairingProtectionLevel::Default);
+        operation.Completed(
+            [adapter, requested_id](
+                winrt::Windows::Foundation::IAsyncOperation<enumeration::DevicePairingResult> const
+                    &async,
+                winrt::Windows::Foundation::AsyncStatus)
             {
-                result = reach_bluetooth_result_from_status(async.GetResults().Status());
-            }
-            catch (winrt::hresult_error const &)
-            {
-            }
-            {
-                std::lock_guard<std::mutex> lock(adapter->mutex);
-                reach_copy_utf16(adapter->completed_device_id, REACH_BLUETOOTH_DEVICE_ID_CAPACITY,
-                                 requested_id);
-                adapter->completed_result = result;
-                adapter->pairing_request = {};
-                adapter->pairing_args = nullptr;
-                adapter->pairing_deferral = nullptr;
-            }
-            reach_bluetooth_notify(adapter,
-                                   REACH_BLUETOOTH_CHANGE_PAIRING | REACH_BLUETOOTH_CHANGE_DEVICES);
-        });
+                reach_bluetooth_pair_result result = REACH_BLUETOOTH_PAIR_RESULT_FAILED;
+                try
+                {
+                    result = reach_bluetooth_result_from_status(async.GetResults().Status());
+                }
+                catch (winrt::hresult_error const &)
+                {
+                }
+                {
+                    std::lock_guard<std::mutex> lock(adapter->mutex);
+                    reach_copy_utf16(adapter->completed_device_id,
+                                     REACH_BLUETOOTH_DEVICE_ID_CAPACITY, requested_id);
+                    adapter->completed_result = result;
+                    adapter->pairing_request = {};
+                    adapter->pairing_args = nullptr;
+                    adapter->pairing_deferral = nullptr;
+                }
+                reach_bluetooth_notify(adapter, REACH_BLUETOOTH_CHANGE_PAIRING |
+                                                    REACH_BLUETOOTH_CHANGE_DEVICES);
+            });
         return REACH_OK;
     }
     catch (winrt::hresult_error const &)

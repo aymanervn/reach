@@ -38,9 +38,8 @@ uint32_t reach_idle_watch_evaluate(reach_idle_watch_state *state,
     }
     state->last_sample_milliseconds = now;
 
-    uint64_t since_baseline = now >= state->baseline_milliseconds
-                                  ? now - state->baseline_milliseconds
-                                  : 0;
+    uint64_t since_baseline =
+        now >= state->baseline_milliseconds ? now - state->baseline_milliseconds : 0;
     uint64_t idle = sample->input_idle_milliseconds < since_baseline
                         ? sample->input_idle_milliseconds
                         : since_baseline;

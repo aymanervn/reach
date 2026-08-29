@@ -10,14 +10,11 @@ const uint16_t *reach_settings_power_sleep_page_placeholder(void)
     return (const uint16_t *)L"Energy settings page";
 }
 
-static const int32_t
-    reach_settings_power_presets[REACH_SETTINGS_POWER_TIMER_COUNT]
-                                [REACH_SETTINGS_POWER_PRESET_COUNT] = {
-                                    {0, 5, 10, 15, 30},
-                                    {0, 5, 15, 30, 60},
-                                    {0, 1, 5, 10, 15},
-                                    {0, 30, 60, 120, 180},
-                                    {0, 60, 120, 240, 360},
+static const int32_t reach_settings_power_presets[REACH_SETTINGS_POWER_TIMER_COUNT]
+                                                 [REACH_SETTINGS_POWER_PRESET_COUNT] = {
+                                                     {0, 5, 10, 15, 30},     {0, 5, 15, 30, 60},
+                                                     {0, 1, 5, 10, 15},      {0, 30, 60, 120, 180},
+                                                     {0, 60, 120, 240, 360},
 };
 
 const reach_settings_power_row_style *reach_settings_power_row_styles(void)
@@ -53,12 +50,12 @@ const uint16_t *reach_settings_power_option_label(size_t timer, size_t option)
         int32_t minutes;
         const uint16_t *label;
     } labels[] = {
-        {0, (const uint16_t *)L"Never"},    {1, (const uint16_t *)L"1 min"},
-        {5, (const uint16_t *)L"5 min"},    {10, (const uint16_t *)L"10 min"},
-        {15, (const uint16_t *)L"15 min"},  {30, (const uint16_t *)L"30 min"},
-        {60, (const uint16_t *)L"1 hr"},    {120, (const uint16_t *)L"2 hrs"},
-        {180, (const uint16_t *)L"3 hrs"},  {240, (const uint16_t *)L"4 hrs"},
-        {360, (const uint16_t *)L"6 hrs"},  {720, (const uint16_t *)L"12 hrs"},
+        {0, (const uint16_t *)L"Never"},   {1, (const uint16_t *)L"1 min"},
+        {5, (const uint16_t *)L"5 min"},   {10, (const uint16_t *)L"10 min"},
+        {15, (const uint16_t *)L"15 min"}, {30, (const uint16_t *)L"30 min"},
+        {60, (const uint16_t *)L"1 hr"},   {120, (const uint16_t *)L"2 hrs"},
+        {180, (const uint16_t *)L"3 hrs"}, {240, (const uint16_t *)L"4 hrs"},
+        {360, (const uint16_t *)L"6 hrs"}, {720, (const uint16_t *)L"12 hrs"},
     };
 
     int32_t minutes = reach_settings_power_option_minutes(timer, option);
@@ -231,9 +228,8 @@ int32_t reach_settings_model_tick_power_animations(reach_settings_model *model,
 
 int32_t reach_settings_model_power_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr &&
-           (reach_animation_manager_any_active(&model->power_animations) ||
-            reach_animation_manager_any_active(&model->power_wait_animations));
+    return model != nullptr && (reach_animation_manager_any_active(&model->power_animations) ||
+                                reach_animation_manager_any_active(&model->power_wait_animations));
 }
 
 void reach_settings_model_power_focus_custom(reach_settings_model *model, size_t timer,

@@ -7,8 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static const wchar_t *reach_elevate_run_path =
-    L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+static const wchar_t *reach_elevate_run_path = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 static const wchar_t *reach_elevate_approved_run_path =
     L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 static const wchar_t *reach_elevate_approved_folder_path =
@@ -39,8 +38,8 @@ static int32_t reach_elevate_run_value_exists(const wchar_t *name)
 static int32_t reach_elevate_startup_file_exists(const wchar_t *name)
 {
     PWSTR folder_path = nullptr;
-    if (FAILED(SHGetKnownFolderPath(FOLDERID_CommonStartup, KF_FLAG_DEFAULT, nullptr,
-                                    &folder_path)) ||
+    if (FAILED(
+            SHGetKnownFolderPath(FOLDERID_CommonStartup, KF_FLAG_DEFAULT, nullptr, &folder_path)) ||
         folder_path == nullptr)
     {
         return 0;

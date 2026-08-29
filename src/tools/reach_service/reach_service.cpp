@@ -695,8 +695,8 @@ static void reach_helper_build_snapshot_response(reach_service_response *respons
     reach_helper_prune_window_metadata(g_metadata_generation);
 }
 
-static uint32_t
-reach_helper_collect_window_state(reach_service_window_snapshot *windows, uint32_t capacity)
+static uint32_t reach_helper_collect_window_state(reach_service_window_snapshot *windows,
+                                                  uint32_t capacity)
 {
     if (windows == nullptr || capacity == 0)
     {
@@ -737,8 +737,7 @@ static void reach_helper_store_window_state(const reach_service_window_snapshot 
 static void reach_helper_publish_window_state(void)
 {
     reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS] = {};
-    uint32_t window_count =
-        reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
+    uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
     (void)reach_service_shared_publish_windows(windows, window_count);
     reach_helper_store_window_state(windows, window_count);
     reach_helper_publish_game_mode();
@@ -747,8 +746,7 @@ static void reach_helper_publish_window_state(void)
 static void reach_helper_finish_window_manipulation(void)
 {
     reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS] = {};
-    uint32_t window_count =
-        reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
+    uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
     (void)reach_service_shared_finish_window_manipulation(windows, window_count);
     reach_helper_store_window_state(windows, window_count);
     reach_helper_publish_game_mode();
@@ -846,10 +844,11 @@ static int32_t reach_helper_publish_name_change(HWND hwnd)
 static void reach_helper_close_window_event_hooks(void)
 {
     HWINEVENTHOOK *hooks[] = {
-        &g_session.create_hook,     &g_session.destroy_hook,        &g_session.show_hook,
-        &g_session.hide_hook,       &g_session.minimize_start_hook, &g_session.minimize_end_hook,
-        &g_session.foreground_hook, &g_session.location_hook,       &g_session.name_hook,
-        &g_session.move_size_start_hook,
+        &g_session.create_hook,         &g_session.destroy_hook,
+        &g_session.show_hook,           &g_session.hide_hook,
+        &g_session.minimize_start_hook, &g_session.minimize_end_hook,
+        &g_session.foreground_hook,     &g_session.location_hook,
+        &g_session.name_hook,           &g_session.move_size_start_hook,
         &g_session.move_size_end_hook,
     };
     for (HWINEVENTHOOK *hook : hooks)
@@ -892,8 +891,8 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
             g_session.move_size_window = hwnd;
             reach_service_window_snapshot snapshot = reach_helper_inspect_window(hwnd);
             g_session.move_size_relevant = snapshot.include_in_switcher ? 1 : 0;
-            (void)reach_service_shared_publish_window_manipulation(
-                reinterpret_cast<uint64_t>(hwnd), g_session.move_size_relevant);
+            (void)reach_service_shared_publish_window_manipulation(reinterpret_cast<uint64_t>(hwnd),
+                                                                   g_session.move_size_relevant);
             return;
         }
         if (event == EVENT_SYSTEM_MOVESIZEEND)

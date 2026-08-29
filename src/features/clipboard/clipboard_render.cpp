@@ -456,8 +456,8 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     command.rect = {0.0f, 0.0f, layout->bounds.width, layout->bounds.height};
     command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
     reach_result result = reach_render_push_bordered_background(
-        commands, &command, theme->clipboard_background, theme->clipboard_border,
-        border_thickness, &theme->popup_shadow, input->dpi_scale);
+        commands, &command, theme->clipboard_background, theme->clipboard_border, border_thickness,
+        &theme->popup_shadow, input->dpi_scale);
     if (result != REACH_OK)
     {
         return result;

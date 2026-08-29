@@ -659,7 +659,8 @@ reach_result reach_app_control_move_windows(reach_app_control *service,
     {
         return REACH_NOT_IMPLEMENTED;
     }
-    return service->window_manager.ops.move_windows(service->window_manager.manager, windows, count);
+    return service->window_manager.ops.move_windows(service->window_manager.manager, windows,
+                                                    count);
 }
 
 int32_t reach_app_control_take_window_completed(reach_app_control *service,

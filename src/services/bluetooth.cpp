@@ -85,10 +85,12 @@ static void reach_bluetooth_service_thread_main(reach_bluetooth_service *service
         uint32_t generation = 0;
         {
             std::unique_lock<std::mutex> lock(service->mutex);
-            service->cv.wait(lock, [service]() {
-                return service->stop ||
-                       service->pending_command != REACH_BLUETOOTH_SERVICE_COMMAND_NONE;
-            });
+            service->cv.wait(lock,
+                             [service]()
+                             {
+                                 return service->stop || service->pending_command !=
+                                                             REACH_BLUETOOTH_SERVICE_COMMAND_NONE;
+                             });
             if (service->stop)
             {
                 break;

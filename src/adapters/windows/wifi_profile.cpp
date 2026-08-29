@@ -189,9 +189,8 @@ size_t reach_wifi_build_profile_xml(uint16_t *out_xml, size_t capacity, const ui
     reach_wifi_xml_write(&writer, authentication);
     reach_wifi_xml_write(&writer, "</authentication>\r\n\t\t\t\t<encryption>");
     reach_wifi_xml_write(&writer, encryption);
-    reach_wifi_xml_write(&writer,
-                         "</encryption>\r\n\t\t\t\t<useOneX>false</useOneX>\r\n\t\t\t"
-                         "</authEncryption>\r\n");
+    reach_wifi_xml_write(&writer, "</encryption>\r\n\t\t\t\t<useOneX>false</useOneX>\r\n\t\t\t"
+                                  "</authEncryption>\r\n");
 
     if (security != REACH_WIFI_SECURITY_OPEN)
     {

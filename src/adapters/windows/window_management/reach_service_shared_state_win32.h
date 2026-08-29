@@ -22,8 +22,9 @@ reach_result reach_service_shared_publish_windows(const reach_service_window_sna
                                                   uint32_t window_count);
 reach_result reach_service_shared_bump_window_sequence(void);
 reach_result reach_service_shared_publish_window_manipulation(uint64_t window, int32_t active);
-reach_result reach_service_shared_finish_window_manipulation(
-    const reach_service_window_snapshot *windows, uint32_t window_count);
+reach_result
+reach_service_shared_finish_window_manipulation(const reach_service_window_snapshot *windows,
+                                                uint32_t window_count);
 reach_result reach_service_shared_publish_game_mode(int32_t active);
 reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, uint32_t modifiers);
 

@@ -49,15 +49,16 @@ static void test_open_and_close_state_machine(void)
 
     expect_true(!reach_stage_is_open(stage), "a new stage is closed");
 
-    expect_true(reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, nullptr, 0) != REACH_OK,
+    expect_true(reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, nullptr,
+                                 0) != REACH_OK,
                 "opening with no windows fails");
     expect_true(!reach_stage_is_open(stage), "a failed open leaves the stage closed");
 
-    reach_stage_open_window windows[2] = {
-        make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f)),
-        make_window(2, make_rect(400.0f, 0.0f, 400.0f, 300.0f))};
+    reach_stage_open_window windows[2] = {make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f)),
+                                          make_window(2, make_rect(400.0f, 0.0f, 400.0f, 300.0f))};
 
-    expect_true(reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, windows, 2) == REACH_OK,
+    expect_true(reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, windows,
+                                 2) == REACH_OK,
                 "opening with windows succeeds");
     expect_true(reach_stage_is_open(stage), "stage is open after a successful open");
     expect_true(reach_stage_thumbnail_count(stage) == 2, "stage tracks both windows");

@@ -33,9 +33,9 @@ void reach_settings_model_apply_startup_apps(reach_settings_model *model,
 
     for (size_t index = 0; index < REACH_STARTUP_APP_MAX_ENTRIES; ++index)
     {
-        float value = index < model->startup_apps.count && model->startup_apps.entries[index].enabled
-                          ? 1.0f
-                          : 0.0f;
+        float value =
+            index < model->startup_apps.count && model->startup_apps.entries[index].enabled ? 1.0f
+                                                                                            : 0.0f;
         reach_animation_manager_set(&model->startup_animations, index, value);
     }
 
@@ -64,8 +64,8 @@ void reach_settings_model_set_startup_enabled(reach_settings_model *model, size_
     }
     model->startup_apps.entries[index].enabled = enabled ? 1 : 0;
     float current = reach_animation_manager_value(&model->startup_animations, index);
-    reach_animation_manager_start(&model->startup_animations, index, current,
-                                  enabled ? 1.0f : 0.0f, 0.18, REACH_EASING_EASE_OUT);
+    reach_animation_manager_start(&model->startup_animations, index, current, enabled ? 1.0f : 0.0f,
+                                  0.18, REACH_EASING_EASE_OUT);
 }
 
 int32_t reach_settings_model_startup_enabled(const reach_settings_model *model, size_t index)

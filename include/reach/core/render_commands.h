@@ -173,10 +173,12 @@ extern "C"
     reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                           const reach_render_command *shape,
                                           const reach_shadow *shadow, float dpi_scale);
-    reach_result reach_render_push_bordered_background(
-        reach_render_command_buffer *buffer, const reach_render_command *shape,
-        reach_color background_color, reach_color border_color, float border_thickness,
-        const reach_shadow *shadow, float dpi_scale);
+    reach_result reach_render_push_bordered_background(reach_render_command_buffer *buffer,
+                                                       const reach_render_command *shape,
+                                                       reach_color background_color,
+                                                       reach_color border_color,
+                                                       float border_thickness,
+                                                       const reach_shadow *shadow, float dpi_scale);
     void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buffer);
 
 #ifdef __cplusplus

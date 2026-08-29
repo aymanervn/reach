@@ -67,9 +67,12 @@ typedef struct fake_controls
     int32_t bluetooth_reads;
     int32_t power_reads;
     int32_t brightness_reads;
+    int32_t brightness_sets;
     int32_t bluetooth_fails;
     int32_t bluetooth_enabled;
     int32_t battery_percent;
+    float brightness_level;
+    std::thread::id brightness_set_thread;
 } fake_controls;
 
 static fake_controls controls;
@@ -130,7 +133,16 @@ static reach_result fake_get_brightness(void *userdata, reach_brightness_state *
     ++controls.brightness_reads;
     *out_state = {};
     out_state->available = 1;
-    out_state->level = 0.5f;
+    out_state->level = controls.brightness_level;
+    return REACH_OK;
+}
+
+static reach_result fake_set_brightness(void *userdata, float level)
+{
+    (void)userdata;
+    ++controls.brightness_sets;
+    controls.brightness_level = level;
+    controls.brightness_set_thread = std::this_thread::get_id();
     return REACH_OK;
 }
 
@@ -141,6 +153,7 @@ static reach_system_controls_port readable_controls_port(void)
     port.get_bluetooth_state = fake_get_bluetooth;
     port.get_power_state = fake_get_power;
     port.get_brightness_state = fake_get_brightness;
+    port.set_brightness_level = fake_set_brightness;
     return port;
 }
 
@@ -163,6 +176,7 @@ static reach_system_status *make_service(reach_audio_volume_port audio_port,
 {
     audio = {};
     controls = {};
+    controls.brightness_level = 0.5f;
     audio.get_state_supported = 1;
     reach_system_status *service = nullptr;
     if (reach_system_status_create(audio_port, controls_port, nullptr, nullptr, &service) !=
@@ -362,6 +376,46 @@ static void test_a_failed_read_keeps_the_last_known_value(void)
     reach_system_status_destroy(service);
 }
 
+static void test_brightness_steps_run_on_the_system_worker(void)
+{
+    reach_system_status *service = make_service({}, readable_controls_port());
+    reach_system_status_system_snapshot snapshot = {};
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS);
+    expect_true(wait_for_system_snapshot(service, &snapshot),
+                "an initial brightness snapshot is published");
+
+    std::thread::id caller_thread = std::this_thread::get_id();
+    reach_brightness_state optimistic = {};
+    expect_true(reach_system_status_step_brightness(service, 0.1f, &optimistic) == REACH_OK,
+                "a relative brightness step is accepted");
+    expect_true(optimistic.available && optimistic.level > 0.59f && optimistic.level < 0.61f,
+                "a relative brightness step reports its cached target immediately");
+    expect_true(reach_system_status_step_brightness(service, 0.1f, &optimistic) == REACH_OK,
+                "a second relative brightness step is accepted");
+    expect_true(optimistic.level > 0.69f && optimistic.level < 0.71f,
+                "rapid relative steps accumulate against the pending target");
+
+    expect_true(wait_for_system_snapshot(service, &snapshot),
+                "the brightness worker publishes its completed command");
+    expect_true(controls.brightness_sets >= 1 && controls.brightness_level > 0.69f &&
+                    controls.brightness_level < 0.71f,
+                "the worker applies the accumulated brightness target");
+    expect_true(controls.brightness_set_thread != caller_thread,
+                "the brightness port is never called on the requesting thread");
+    expect_true(snapshot.brightness_valid && snapshot.brightness.level > 0.69f &&
+                    snapshot.brightness.level < 0.71f,
+                "the completed target is published through the system snapshot");
+
+    expect_true(reach_system_status_set_brightness(service, 2.0f) == REACH_OK,
+                "an absolute brightness request is queued");
+    expect_true(wait_for_system_snapshot(service, &snapshot),
+                "the absolute brightness command completes");
+    expect_true(controls.brightness_level == 1.0f && snapshot.brightness.level == 1.0f,
+                "an absolute brightness command is clamped and published");
+
+    reach_system_status_destroy(service);
+}
+
 static void test_null_service_is_rejected(void)
 {
     int32_t muted = 0;
@@ -385,6 +439,7 @@ int main(void)
     test_bluetooth_without_a_capable_port_is_unsupported();
     test_a_scoped_refresh_probes_only_what_it_names();
     test_a_failed_read_keeps_the_last_known_value();
+    test_brightness_steps_run_on_the_system_worker();
     test_missing_entry_points_are_not_implemented();
     test_null_service_is_rejected();
 

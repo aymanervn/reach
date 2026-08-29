@@ -731,8 +731,8 @@ static void verify_results(IUpdateSearcher *searcher, IUpdateCollection *pending
         int32_t still_pending = pending_contains(pending, &item->identity);
         int32_t has_history = history_date > 0.0 || history_result_code != 0;
         int32_t installed_ok = has_history ? history_success : !still_pending;
-        int32_t reboot_expected = item->reboot_required_known ? item->reboot_required
-                                                              : (installed_ok && system_reboot);
+        int32_t reboot_expected =
+            item->reboot_required_known ? item->reboot_required : (installed_ok && system_reboot);
         if (reboot_expected)
         {
             int32_t reboot_observed = history_date > 0.0 && boot_date > history_date;
@@ -934,9 +934,9 @@ static void save_pending_verification(const reach_windows_update_operation_resul
     for (size_t index = 0; index < result->per_update_result_count; ++index)
     {
         const reach_windows_update_item *item = &result->per_update_results[index];
-        int32_t pending = item->state == REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED ||
-                          item->verification_status ==
-                              REACH_WINDOWS_UPDATE_VERIFICATION_STATUS_PENDING_REBOOT;
+        int32_t pending =
+            item->state == REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED ||
+            item->verification_status == REACH_WINDOWS_UPDATE_VERIFICATION_STATUS_PENDING_REBOOT;
 
         uint32_t existing = file->count;
         for (uint32_t stored = 0; stored < file->count; ++stored)
@@ -1036,8 +1036,8 @@ static int32_t helper_process_is_running(uint32_t process_id, uint64_t journal_f
     if (process_id == 0)
         return 0;
 
-    HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
-                                 (DWORD)process_id);
+    HANDLE process =
+        OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)process_id);
     if (process == nullptr)
         return 0;
 
@@ -1757,8 +1757,8 @@ static int32_t helper_executable_path(wchar_t *path, size_t capacity)
     if (slash == nullptr)
         return 0;
 
-    return wcscpy_s(slash + 1, capacity - (size_t)(slash + 1 - path),
-                    L"reach_update_helper.exe") == 0;
+    return wcscpy_s(slash + 1, capacity - (size_t)(slash + 1 - path), L"reach_update_helper.exe") ==
+           0;
 }
 
 static void set_install_detached(const reach_windows_update_identity *selected,

@@ -350,14 +350,14 @@ static void reach_wifi_copy_ssid(uint16_t *destination, const DOT11_SSID *ssid)
     {
         source_count = sizeof(ssid->ucSSID);
     }
-    int converted = MultiByteToWideChar(
-        CP_UTF8, 0, reinterpret_cast<const char *>(ssid->ucSSID), (int)source_count,
-        reinterpret_cast<wchar_t *>(destination), (int)(REACH_WIFI_SSID_CAPACITY - 1));
+    int converted = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char *>(ssid->ucSSID),
+                                        (int)source_count, reinterpret_cast<wchar_t *>(destination),
+                                        (int)(REACH_WIFI_SSID_CAPACITY - 1));
     if (converted <= 0)
     {
-        converted = MultiByteToWideChar(
-            CP_ACP, 0, reinterpret_cast<const char *>(ssid->ucSSID), (int)source_count,
-            reinterpret_cast<wchar_t *>(destination), (int)(REACH_WIFI_SSID_CAPACITY - 1));
+        converted = MultiByteToWideChar(CP_ACP, 0, reinterpret_cast<const char *>(ssid->ucSSID),
+                                        (int)source_count, reinterpret_cast<wchar_t *>(destination),
+                                        (int)(REACH_WIFI_SSID_CAPACITY - 1));
     }
     destination[converted > 0 ? (size_t)converted : 0] = 0;
 }
