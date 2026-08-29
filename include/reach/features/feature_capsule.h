@@ -75,6 +75,8 @@ extern "C"
         float value;
 
         reach_feature_target target;
+        const uintptr_t *windows;
+        size_t window_count;
     } reach_capsule_action;
 
     typedef struct reach_capsule_event_result

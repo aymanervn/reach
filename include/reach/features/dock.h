@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/menu_commands.h"
+#include "reach/features/common/popup.h"
 #include "reach/core/ui_state.h"
 #include "reach/core/render_commands.h"
 #include "reach/ports/icon_provider.h"
@@ -125,7 +126,7 @@ extern "C"
     {
         void *user;
 
-        void (*item_context_menu)(void *user, size_t item_index, int32_t x, int32_t y);
+        void (*item_context_menu)(void *user, const reach_menu_request *request);
 
         void (*item_hovered)(void *user, size_t item_index);
         void (*trigger_activated)(void *user, size_t trigger);
@@ -305,6 +306,9 @@ extern "C"
                                            const reach_pinned_app_model *pinned_apps,
                                            size_t pinned_app_count, reach_dock_item_window *out,
                                            size_t cap);
+
+    int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float pointer_x,
+                                          float pointer_y, reach_menu_request *out_request);
 
     size_t reach_dock_order_count(reach_dock *dock);
     reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index);

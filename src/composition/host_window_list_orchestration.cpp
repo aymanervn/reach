@@ -82,7 +82,8 @@ reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_inde
     reach_context_menu_open_window_list(
         reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
         item_index, &ctx);
-    reach_host_open_context_menu_transition(host);
+    reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                       REACH_POPUP_DROP_UP);
     host->context_menu.dirty_flags = 1;
     host->window_list.open_item = item_index;
     host->window_list.grace_seconds = 0.0;
@@ -206,7 +207,8 @@ void reach_host_window_list_update(reach_host *host, double delta_seconds)
         state->open_item >= reach_dock_item_count(reach_host_feature_capsule<reach_dock>(
                                 host, REACH_SURFACE_ID_DOCK)))
     {
-        reach_host_close_context_menu(host);
+        reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                           REACH_SURFACE_CLOSE_SUPERSEDED);
         return;
     }
 
@@ -219,7 +221,8 @@ void reach_host_window_list_update(reach_host *host, double delta_seconds)
     state->grace_seconds += delta_seconds;
     if (state->grace_seconds >= REACH_HOST_WINDOW_LIST_GRACE_SECONDS)
     {
-        reach_host_close_context_menu(host);
+        reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                           REACH_SURFACE_CLOSE_SUPERSEDED);
     }
 }
 
@@ -236,7 +239,8 @@ reach_result reach_host_close_window(reach_host *host, uintptr_t window_id)
     if (remaining == 0 || !host->has_layout ||
         host->window_list.open_item >= host->layout.dock.app_slot_count)
     {
-        reach_host_close_context_menu(host);
+        reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                           REACH_SURFACE_CLOSE_SUPERSEDED);
     }
     else
     {

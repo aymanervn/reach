@@ -175,3 +175,37 @@ reach_result reach_host_cycle_input_language(reach_host *host)
     return reach_input_language_service_cycle_next(host->input_language,
                                                    reach_host_foreground_window(host));
 }
+
+reach_result reach_host_execute_power_command(reach_host *host, uint32_t command)
+{
+    if (host == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    switch (command)
+    {
+    case REACH_CONTEXT_MENU_COMMAND_POWER_LOCK:
+        return host->power_session.ops.lock != nullptr
+                   ? host->power_session.ops.lock(host->power_session.session)
+                   : REACH_ERROR;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP:
+        return host->power_session.ops.sleep != nullptr
+                   ? host->power_session.ops.sleep(host->power_session.session)
+                   : REACH_ERROR;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_RESTART:
+        return host->power_session.ops.restart != nullptr
+                   ? host->power_session.ops.restart(host->power_session.session)
+                   : REACH_ERROR;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN:
+        return host->power_session.ops.shutdown != nullptr
+                   ? host->power_session.ops.shutdown(host->power_session.session)
+                   : REACH_ERROR;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT:
+        return host->power_session.ops.sign_out != nullptr
+                   ? host->power_session.ops.sign_out(host->power_session.session)
+                   : REACH_ERROR;
+    default:
+        return REACH_OK;
+    }
+}

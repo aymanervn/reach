@@ -162,9 +162,17 @@ static void reach_host_surface_battery_close(reach_host *host)
     reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_BATTERY, 0);
 }
 
-static void reach_host_surface_context_menu_close(reach_host *host)
+static int32_t reach_feature_control_context_menu_open(void *capsule, int32_t open,
+                                                       reach_feature_tick_result *out)
 {
-    reach_host_close_context_menu(host);
+    int32_t changed = reach_context_menu_set_open(static_cast<reach_context_menu *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+    return changed;
 }
 
 static void reach_host_surface_stage_close(reach_host *host)
@@ -567,6 +575,8 @@ static const reach_feature_render_resource_ops reach_clipboard_resource_ops = {
     reach_feature_clipboard_active_at, reach_feature_clipboard_release_source,
     reach_feature_clipboard_clear_active};
 
+static const reach_feature_control_ops reach_context_menu_control_ops = {
+    reach_feature_control_context_menu_open, nullptr, nullptr, nullptr, nullptr};
 static const reach_feature_control_ops reach_dock_control_ops = {
     nullptr, nullptr, reach_feature_notify_dock, nullptr, nullptr};
 static const reach_feature_control_ops reach_launcher_control_ops = {
@@ -658,8 +668,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
         host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, &host->context_menu,
-        &host->context_menu_transition, reach_host_surface_context_menu_close,
-        reach_context_menu_capsule_ops(), REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
+        &host->context_menu_transition, nullptr, reach_context_menu_capsule_ops(),
+        REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
     reach_host_define_feature(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY,
                               &host->switcher, &host->switcher_transition, nullptr,
                               reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
@@ -695,6 +705,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SWITCHER].lifecycle.stop = reach_feature_stop_switcher;
     definitions[REACH_SURFACE_ID_STAGE].lifecycle.stop = reach_feature_stop_stage;
 
+    definitions[REACH_SURFACE_ID_CONTEXT_MENU].control_ops = &reach_context_menu_control_ops;
     definitions[REACH_SURFACE_ID_DOCK].control_ops = &reach_dock_control_ops;
     definitions[REACH_SURFACE_ID_LAUNCHER].control_ops = &reach_launcher_control_ops;
     definitions[REACH_SURFACE_ID_SWITCHER].control_ops = &reach_switcher_control_ops;

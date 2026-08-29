@@ -26,6 +26,8 @@ extern "C"
         reach_feature_target_kind kind;
         const uint16_t *path;
         const uint16_t *arguments;
+        const uint16_t *app_user_model_id;
+        const uint16_t *icon_ref;
     } reach_feature_target;
 
 #ifdef __cplusplus

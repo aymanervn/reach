@@ -164,26 +164,65 @@ reach_result reach_host_open_default_location(reach_host *host)
     return REACH_OK;
 }
 
-reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
-                                            const reach_feature_target *target, int32_t defer)
+reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature_target *target,
+                                           uintptr_t window_id)
 {
     if (host == nullptr || target == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
+    reach_pinned_app_model app = {};
+    const reach_window_snapshot *window =
+        window_id != 0 ? reach_window_tracking_window_by_id(host->window_tracking, window_id)
+                       : nullptr;
+    if (window != nullptr && host->window_manager.ops.pin_app_for_window != nullptr &&
+        host->window_manager.ops.pin_app_for_window(host->window_manager.manager, window->id,
+                                                    window, &app) == REACH_OK)
+    {
+        return app.path[0] != 0 ? reach_host_pin_app(host, &app) : REACH_ERROR;
+    }
+
+    app = {};
+    if (target->path != nullptr)
+    {
+        (void)reach_copy_utf16(app.path, 260, target->path);
+    }
+    if (target->icon_ref != nullptr)
+    {
+        (void)reach_copy_utf16(app.icon_ref, 260, target->icon_ref);
+    }
+    if (target->app_user_model_id != nullptr)
+    {
+        (void)reach_copy_utf16(app.app_user_model_id, 260, target->app_user_model_id);
+    }
+    return app.path[0] != 0 ? reach_host_pin_app(host, &app) : REACH_ERROR;
+}
+
+reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
+                                            const reach_feature_target *target, uint32_t flags)
+{
+    if (host == nullptr || target == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const int32_t defer = (flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0;
+    const int32_t new_instance = (flags & REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE) != 0;
+    const int32_t run_as_admin = (flags & REACH_FEATURE_ACTION_FLAG_RUN_AS_ADMIN) != 0;
+
     switch (target->kind)
     {
     case REACH_FEATURE_TARGET_APP:
         return target->path != nullptr && target->path[0] != 0
-                   ? reach_host_open_app(host, target->path, target->arguments, nullptr, 0, source,
-                                         defer)
+                   ? reach_host_open_app(host, target->path, target->arguments,
+                                         target->app_user_model_id, new_instance, source, defer)
                    : REACH_OK;
 
     case REACH_FEATURE_TARGET_PATH:
         return target->path != nullptr && target->path[0] != 0
-                   ? reach_host_launch_app(host, target->path, target->arguments, 0, 0, source,
-                                           defer)
+                   ? reach_host_launch_app(host, target->path, target->arguments, new_instance,
+                                           run_as_admin, source, defer)
                    : REACH_OK;
 
     case REACH_FEATURE_TARGET_TERMINAL_COMMAND:

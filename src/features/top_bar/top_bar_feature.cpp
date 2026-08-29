@@ -115,6 +115,22 @@ void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *st
     }
 }
 
+int32_t reach_top_bar_build_power_menu_request(reach_top_bar *top_bar,
+                                               reach_menu_request *out_request)
+{
+    if (top_bar == nullptr || out_request == nullptr)
+    {
+        return 0;
+    }
+    const reach_top_bar_layout *layout = &reach_top_bar_state_ptr(top_bar)->layout;
+    *out_request = {};
+    out_request->anchored = 1;
+    out_request->anchor_button = reach_top_bar_rect_to_screen(layout, layout->power_button);
+    out_request->bar_edge_y = layout->bounds.y + layout->bounds.height;
+    out_request->drop_direction = REACH_POPUP_DROP_DOWN;
+    return 1;
+}
+
 void reach_top_bar_set_routes(reach_top_bar *top_bar, const reach_top_bar_routes *routes)
 {
     if (top_bar != nullptr)

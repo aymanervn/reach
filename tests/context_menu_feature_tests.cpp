@@ -221,8 +221,69 @@ static void test_capsule_owns_popup_pointer_policy(void)
     reach_context_menu_destroy(menu);
 }
 
+static reach_menu_request make_request(void)
+{
+    reach_menu_request request = {};
+    request.pin_id = 0;
+    request.window = 4242;
+    request.commands[0] = REACH_CONTEXT_MENU_COMMAND_OPEN_NEW;
+    request.commands[1] = REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL;
+    request.command_count = 2;
+    request.path[0] = 'a';
+    request.path[1] = 0;
+    request.window_count = 2;
+    request.windows[0].window = 11;
+    request.windows[1].window = 22;
+    return request;
+}
+
+static void test_menu_commands_execute_only_from_the_published_snapshot(void)
+{
+    reach_menu_request request = make_request();
+    uintptr_t windows[REACH_MENU_MAX_WINDOWS] = {11, 22};
+
+    reach_capsule_action allowed = {};
+    reach_context_menu_command_action(&request, windows, REACH_CONTEXT_MENU_COMMAND_OPEN_NEW,
+                                      &allowed);
+    expect_true(allowed.kind == REACH_FEATURE_ACTION_OPEN_TARGET,
+                "a published command resolves to a complete target");
+    expect_true(allowed.target.path == request.path &&
+                    (allowed.flags & REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE) != 0,
+                "open-new carries the request path and asks for a new instance");
+    expect_true((allowed.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) != 0,
+                "acting on a menu command dismisses the menu first");
+
+    reach_capsule_action withheld = {};
+    reach_context_menu_command_action(&request, windows, REACH_CONTEXT_MENU_COMMAND_UNPIN,
+                                      &withheld);
+    expect_true(withheld.kind == REACH_FEATURE_ACTION_NONE,
+                "a command the owner never published is refused");
+
+    reach_capsule_action close_all = {};
+    reach_context_menu_command_action(&request, windows, REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL,
+                                      &close_all);
+    expect_true(close_all.kind == REACH_FEATURE_ACTION_CLOSE_WINDOWS &&
+                    close_all.window_count == 2 && close_all.windows == windows,
+                "close-all carries the window set captured when the menu opened");
+
+    request.window_count = 0;
+    reach_capsule_action close_one = {};
+    reach_context_menu_command_action(&request, windows, REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL,
+                                      &close_one);
+    expect_true(close_one.kind == REACH_FEATURE_ACTION_CLOSE_WINDOW && close_one.window == 4242,
+                "close-all falls back to the item's own window when the set is empty");
+
+    reach_capsule_action power = {};
+    reach_context_menu_command_action(&request, windows,
+                                      REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP, &power);
+    expect_true(power.kind == REACH_FEATURE_ACTION_EXECUTE_MENU_COMMAND &&
+                    power.id == REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP,
+                "power commands stay system actions and skip the item snapshot");
+}
+
 int main(void)
 {
+    test_menu_commands_execute_only_from_the_published_snapshot();
     test_power_commands_and_text();
     test_window_list_remove();
     test_window_list_width_fits_and_clamps_measured_titles();

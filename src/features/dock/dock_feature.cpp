@@ -48,6 +48,7 @@ struct reach_dock
     reach_window_tracking *windows;
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
+    reach_menu_request action_request;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
@@ -668,8 +669,12 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                 out->handled = 1;
                 if (dock->routes.item_context_menu != nullptr)
                 {
-                    dock->routes.item_context_menu(dock->routes.user, hit.index, event->x,
-                                                   event->y);
+                    reach_menu_request request = {};
+                    if (reach_dock_build_menu_request(dock, hit.index, (float)event->x,
+                                                      (float)event->y, &request))
+                    {
+                        dock->routes.item_context_menu(dock->routes.user, &request);
+                    }
                 }
             }
             return;
@@ -755,8 +760,21 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         if (hit.type == REACH_DOCK_HIT_ITEM)
         {
             out->handled = 1;
-            out->action.kind = REACH_FEATURE_ACTION_LAUNCH_NEW_INSTANCE;
-            out->action.index = hit.index;
+            if (reach_dock_build_menu_request(dock, hit.index, 0.0f, 0.0f, &dock->action_request) &&
+                dock->action_request.path[0] != 0)
+            {
+                out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
+                out->action.flags |= REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE;
+                out->action.target.kind = REACH_FEATURE_TARGET_APP;
+                out->action.target.path = dock->action_request.path;
+                out->action.target.arguments = dock->action_request.arguments[0] != 0
+                                                   ? dock->action_request.arguments
+                                                   : nullptr;
+                out->action.target.app_user_model_id =
+                    dock->action_request.app_user_model_id[0] != 0
+                        ? dock->action_request.app_user_model_id
+                        : nullptr;
+            }
         }
         return;
     }
@@ -1326,6 +1344,76 @@ void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model
 
     reach_dock_restore_order(dock, order, order_count);
     reach_dock_mark_items_changed(dock);
+}
+
+int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float pointer_x,
+                                      float pointer_y, reach_menu_request *out_request)
+{
+    if (dock == nullptr || out_request == nullptr || item_index >= reach_dock_item_count(dock))
+    {
+        return 0;
+    }
+
+    *out_request = {};
+    out_request->target_index = item_index;
+    out_request->pointer_x = pointer_x;
+    out_request->pointer_y = pointer_y;
+    out_request->drop_direction = REACH_POPUP_DROP_UP;
+
+    const reach_dock_item_model *item = reach_dock_item_at(dock, item_index);
+    out_request->window = item->window;
+
+    const reach_pinned_app_model *pinned_app =
+        item->pinned && item->pinned_index < dock->pinned_app_count
+            ? &dock->pinned_apps[item->pinned_index]
+            : nullptr;
+    if (pinned_app != nullptr)
+    {
+        out_request->pin_id = pinned_app->id;
+        reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, pinned_app->path);
+        reach_copy_utf16(out_request->arguments, REACH_MENU_TEXT_CAPACITY, pinned_app->arguments);
+        reach_copy_utf16(out_request->app_user_model_id, REACH_MENU_TEXT_CAPACITY,
+                         pinned_app->app_user_model_id);
+        reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY, pinned_app->icon_ref);
+    }
+    else
+    {
+        const reach_window_snapshot *window =
+            reach_window_tracking_window_by_id(dock->windows, item->window);
+        if (window != nullptr)
+        {
+            reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, window->path);
+            reach_copy_utf16(out_request->app_user_model_id, REACH_MENU_TEXT_CAPACITY,
+                             window->app_user_model_id);
+            reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY,
+                             window->icon_ref[0] != 0 ? window->icon_ref : window->path);
+        }
+    }
+
+    out_request->command_count = reach_dock_build_item_context_commands(
+        dock, item_index, out_request->commands, REACH_CONTEXT_MENU_MAX_ITEMS);
+
+    reach_dock_item_window item_windows[REACH_MENU_MAX_WINDOWS] = {};
+    size_t window_count = reach_dock_collect_item_windows(
+        dock, item_index, dock->pinned_apps, dock->pinned_app_count, item_windows,
+        REACH_MENU_MAX_WINDOWS);
+    out_request->window_count = window_count;
+    for (size_t index = 0; index < window_count; ++index)
+    {
+        out_request->windows[index].window = item_windows[index].window;
+        reach_copy_utf16(out_request->windows[index].title, REACH_MENU_TEXT_CAPACITY,
+                         item_windows[index].title);
+    }
+
+    reach_rect_f32 anchor = {};
+    float bar_edge_y = 0.0f;
+    if (reach_dock_item_anchor(dock, item_index, &anchor, &bar_edge_y))
+    {
+        out_request->anchored = 1;
+        out_request->anchor_button = anchor;
+        out_request->bar_edge_y = bar_edge_y;
+    }
+    return 1;
 }
 
 size_t reach_dock_order_count(reach_dock *dock)

@@ -60,6 +60,11 @@ extern "C"
     int32_t reach_context_menu_is_open(const reach_context_menu *menu);
     void reach_context_menu_force_close(reach_context_menu *menu);
     void reach_context_menu_reset(reach_context_menu *menu);
+    int32_t reach_context_menu_set_open(reach_context_menu *menu, int32_t open);
+
+    void reach_context_menu_command_action(const reach_menu_request *request,
+                                           const uintptr_t *request_windows, uint32_t command,
+                                           reach_capsule_action *out);
 
     typedef struct reach_context_menu_open_context
     {
@@ -77,6 +82,8 @@ extern "C"
         const reach_context_menu_window_entry *window_entries;
         size_t window_entry_count;
         reach_text_measure_port text_measure;
+
+        const reach_menu_request *request;
     } reach_context_menu_open_context;
 
     void reach_context_menu_open_power(reach_context_menu *menu,

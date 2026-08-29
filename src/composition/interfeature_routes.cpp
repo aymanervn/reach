@@ -1,16 +1,50 @@
 #include "host_internal.h"
 
-static void reach_host_route_dock_item_context_menu(void *user, size_t item_index, int32_t x,
-                                                    int32_t y)
+#include "reach/features/context_menu.h"
+
+static reach_rect_f32 reach_host_menu_monitor(reach_host *host, reach_rect_f32 fallback)
+{
+    reach_rect_f32 monitor = {};
+    return reach_host_primary_monitor_bounds(host, &monitor) ? monitor : fallback;
+}
+
+static reach_context_menu_open_context
+reach_host_menu_open_context(reach_host *host, const reach_menu_request *request)
+{
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    ctx.dpi_scale = reach_host_layout_dpi_scale(host);
+    ctx.monitor = reach_host_menu_monitor(host, request->anchor_button);
+    ctx.text_measure.context = host->context_menu.renderer.backend;
+    ctx.text_measure.measure = host->context_menu.renderer.ops.measure_text;
+    ctx.anchor_button = request->anchor_button;
+    ctx.bar_edge_y = request->bar_edge_y;
+    ctx.drop_direction = request->drop_direction;
+    ctx.anchored = request->anchored;
+    ctx.pointer_x = request->pointer_x;
+    ctx.pointer_y = request->pointer_y;
+    ctx.item_commands = request->commands;
+    ctx.item_count = request->command_count;
+    ctx.request = request;
+    return ctx;
+}
+
+static void reach_host_route_dock_item_context_menu(void *user, const reach_menu_request *request)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host == nullptr)
+    if (host == nullptr || request == nullptr)
     {
         return;
     }
 
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
-    (void)reach_host_show_dock_app_context_menu(host, item_index, x, y);
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
+    reach_context_menu_open_context ctx = reach_host_menu_open_context(host, request);
+    reach_context_menu_open_for_item(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
+        request->target_index, &ctx);
+    reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                       request->drop_direction);
     if (reach_dock_retain_context_feedback(
             reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
     {
@@ -40,10 +74,24 @@ static void reach_host_route_dock_trigger_activated(void *user, size_t trigger)
 static void reach_host_route_top_bar_power_activated(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host != nullptr)
+    if (host == nullptr || !host->has_layout)
     {
-        (void)reach_host_show_power_context_menu(host);
+        return;
     }
+
+    reach_menu_request request = {};
+    if (!reach_top_bar_build_power_menu_request(
+            reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), &request))
+    {
+        return;
+    }
+
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
+    reach_context_menu_open_context ctx = reach_host_menu_open_context(host, &request);
+    reach_context_menu_open_power(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU), &ctx);
+    reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                       request.drop_direction);
 }
 
 static void reach_host_route_top_bar_quick_settings_activated(void *user)
