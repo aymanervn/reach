@@ -309,8 +309,52 @@ static void test_adaptive_layout_rebuild_keeps_native_height(void)
     reach_dock_destroy(dock);
 }
 
+static void test_pin_snapshot_rebases_the_dock_order_by_path(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "dock capsule is created");
+    if (dock == nullptr)
+    {
+        return;
+    }
+
+    reach_pinned_app_model before[2] = {make_pin(1, "C:\\apps\\a.exe"),
+                                        make_pin(2, "C:\\apps\\b.exe")};
+    reach_dock_apply_pinned_apps(dock, before, 2);
+
+    reach_dock_order_key order[3] = {};
+    order[0].pinned = 1;
+    order[0].app_id = 1;
+    order[1].pinned = 0;
+    order[1].app_id = 90;
+    order[2].pinned = 1;
+    order[2].app_id = 2;
+    reach_dock_restore_order(dock, order, 3);
+
+    reach_pinned_app_model after[2] = {make_pin(7, "C:\\apps\\b.exe"),
+                                       make_pin(8, "C:\\apps\\a.exe")};
+    reach_dock_apply_pinned_apps(dock, after, 2);
+
+    expect_true(reach_dock_order_count(dock) == 3,
+                "rebasing the pin snapshot keeps every dock order slot");
+    expect_true(reach_dock_order_key_at(dock, 0).pinned == 1 &&
+                    reach_dock_order_key_at(dock, 0).app_id == 8,
+                "a still-pinned app keeps its slot under its reissued pin id");
+    expect_true(reach_dock_order_key_at(dock, 2).pinned == 1 &&
+                    reach_dock_order_key_at(dock, 2).app_id == 7,
+                "pin ids are rebased by path, not by position");
+    expect_true(reach_dock_order_key_at(dock, 1).pinned == 0 &&
+                    reach_dock_order_key_at(dock, 1).app_id == 90,
+                "an unpinned running group is left alone by a pin snapshot");
+    expect_true(reach_dock_take_items_changed(dock),
+                "a pin snapshot marks the dock items for rebuild");
+
+    reach_dock_destroy(dock);
+}
+
 int main(void)
 {
+    test_pin_snapshot_rebases_the_dock_order_by_path();
     test_unpinned_windows_group_into_one_item();
     test_pinned_app_claims_matching_windows();
     test_key_stable_when_representative_closes();

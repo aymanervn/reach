@@ -176,6 +176,36 @@ void reach_host_notify_windows_changed(reach_host *host)
 {
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED;
+    notification.windows.changed = 1;
+    notification.present = 1;
+    reach_host_notify_registered_features(host, &notification);
+}
+
+void reach_host_notify_windows_refreshed(reach_host *host,
+                                         const reach_window_tracking_refresh_report *report)
+{
+    if (report == nullptr)
+    {
+        return;
+    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED;
+    notification.windows = *report;
+    notification.windows.changed = 0;
+    notification.present = 1;
+    reach_host_notify_registered_features(host, &notification);
+}
+
+void reach_host_notify_pinned_apps_changed(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED;
+    notification.pinned_apps = host->pinned_apps;
+    notification.pinned_app_count = host->pinned_app_count;
     notification.present = 1;
     reach_host_notify_registered_features(host, &notification);
 }
@@ -202,16 +232,9 @@ reach_result reach_host_refresh_open_windows(reach_host *host, int32_t *out_chan
     reach_window_tracking_refresh_report report = {};
     reach_result result = reach_window_tracking_refresh(host->window_tracking, &report);
 
-    if (report.items_changed)
+    if (report.items_changed || report.icon_identity_changed)
     {
-        reach_dock_mark_items_changed(
-            reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK));
-    }
-    if (report.icon_identity_changed)
-    {
-
-        host->dock.dirty_flags = 1;
-        host->switcher.dirty_flags = 1;
+        reach_host_notify_windows_refreshed(host, &report);
     }
 
     if (out_changed != nullptr)

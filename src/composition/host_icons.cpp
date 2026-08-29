@@ -26,6 +26,19 @@ void reach_host_release_render_icon(reach_host *host, uint64_t icon_id)
 
 static const double REACH_HOST_ICON_TRIM_SECONDS = 60.0;
 
+void reach_host_notify_icons_retained(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_ICONS_RETAIN;
+    notification.icon_size_px = reach_host_icon_size_px(host);
+    notification.present = 1;
+    reach_host_notify_registered_features(host, &notification);
+}
+
 void reach_host_drain_icon_evictions(reach_host *host)
 {
     if (host == nullptr || host->icon_service == nullptr)
@@ -33,8 +46,7 @@ void reach_host_drain_icon_evictions(reach_host *host)
         return;
     }
 
-    reach_dock_touch_icons(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
-                           reach_host_icon_size_px(host));
+    reach_host_notify_icons_retained(host);
     reach_icon_service_trim(host->icon_service, REACH_HOST_ICON_TRIM_SECONDS);
     for (;;)
     {

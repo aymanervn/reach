@@ -230,7 +230,9 @@ typedef enum reach_feature_notification_kind
     REACH_FEATURE_NOTIFICATION_MAIN_VOLUME = 4,
     REACH_FEATURE_NOTIFICATION_BRIGHTNESS = 5,
     REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE = 6,
-    REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED = 7
+    REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED = 7,
+    REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED = 8,
+    REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 9
 } reach_feature_notification_kind;
 
 typedef struct reach_feature_notification
@@ -239,6 +241,10 @@ typedef struct reach_feature_notification
     reach_now_playing_action media_action;
     reach_audio_volume_state volume;
     reach_brightness_state brightness;
+    reach_window_tracking_refresh_report windows;
+    const reach_pinned_app_model *pinned_apps;
+    size_t pinned_app_count;
+    int32_t icon_size_px;
     int32_t present;
 } reach_feature_notification;
 
@@ -460,6 +466,10 @@ void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id);
 void reach_host_post_feature_work_ready(reach_host *host);
 void reach_host_notify_windows_changed(reach_host *host);
+void reach_host_notify_windows_refreshed(reach_host *host,
+                                         const reach_window_tracking_refresh_report *report);
+void reach_host_notify_pinned_apps_changed(reach_host *host);
+void reach_host_notify_icons_retained(reach_host *host);
 void reach_host_stop_search_service(reach_host *host);
 void reach_host_notify_registered_features(reach_host *host,
                                            const reach_feature_notification *notification);
