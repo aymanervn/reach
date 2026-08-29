@@ -493,7 +493,8 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening, reac
 
         if (other_exclusive || ((self_exclusive || self_dismissable) && other_dismissable))
         {
-            desc->definition->force_close(host);
+            reach_host_close_registered_surface(host, desc->definition->id,
+                                                REACH_SURFACE_CLOSE_SUPERSEDED);
         }
     }
 
@@ -728,7 +729,7 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if ((desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0 ||
-            desc->definition->force_close == nullptr || !reach_host_surface_is_open(desc))
+            !reach_host_surface_closable(desc) || !reach_host_surface_is_open(desc))
         {
             continue;
         }
@@ -739,7 +740,8 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
             continue;
         }
 
-        desc->definition->force_close(host);
+        reach_host_close_registered_surface(host, desc->definition->id,
+                                            REACH_SURFACE_CLOSE_SUPERSEDED);
     }
 }
 
