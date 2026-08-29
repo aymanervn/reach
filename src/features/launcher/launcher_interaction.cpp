@@ -24,16 +24,6 @@ reach_launcher_hit_result reach_launcher_hit_test(const reach_launcher_model *mo
         return hit;
     }
 
-    for (size_t index = 0; index < layout->pinned_app_slot_count; ++index)
-    {
-        if (reach_launcher_rect_contains(layout->pinned_app_slots[index], x, y))
-        {
-            hit.type = REACH_LAUNCHER_HIT_PINNED_APP;
-            hit.index = index;
-            return hit;
-        }
-    }
-
     if (reach_launcher_rect_contains(layout->search_result_scrollbar_thumb, x, y))
     {
         hit.type = REACH_LAUNCHER_HIT_SCROLLBAR_THUMB;
@@ -81,11 +71,6 @@ static uint64_t reach_launcher_pressable_target(const reach_launcher *launcher,
         return (static_cast<uint64_t>(hit.type) << 56) |
                (static_cast<uint64_t>(reach_launcher_search_generation(launcher)) << 24) |
                static_cast<uint32_t>(hit.index);
-    }
-    if (button == REACH_POINTER_BUTTON_PRIMARY && ctx != nullptr &&
-        hit.type == REACH_LAUNCHER_HIT_PINNED_APP && hit.index < ctx->pinned_app_count)
-    {
-        return (static_cast<uint64_t>(hit.type) << 56) | ctx->pinned_apps[hit.index].id;
     }
     return REACH_PRESSABLE_TARGET_NONE;
 }
@@ -204,8 +189,7 @@ void reach_launcher_pointer_up(reach_launcher *launcher, int32_t x, int32_t y,
         }
         else
         {
-            action = reach_launcher_action_for_hit(&state->model, ctx->pinned_apps,
-                                                   ctx->pinned_app_count, hit);
+            action = reach_launcher_action_for_hit(&state->model, hit);
         }
         if (action.type != REACH_LAUNCHER_ACTION_NONE)
         {

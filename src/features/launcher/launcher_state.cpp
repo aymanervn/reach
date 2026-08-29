@@ -25,8 +25,6 @@ struct reach_launcher
     uint16_t terminal_icon_ref[REACH_SEARCH_RESULT_PATH_CAPACITY];
     reach_launcher_layout pointer_layout;
     int32_t pointer_layout_valid;
-    const reach_pinned_app_model *pointer_pinned_apps;
-    size_t pointer_pinned_app_count;
     reach_transform_f32 pointer_transform;
 };
 
@@ -77,9 +75,7 @@ uint32_t reach_launcher_search_generation(const reach_launcher *launcher)
 }
 
 void reach_launcher_set_pointer_context(reach_launcher *launcher,
-                                        const reach_launcher_layout *layout,
-                                        const reach_pinned_app_model *pinned_apps,
-                                        size_t pinned_app_count)
+                                        const reach_launcher_layout *layout)
 {
     if (launcher == nullptr)
     {
@@ -90,8 +86,6 @@ void reach_launcher_set_pointer_context(reach_launcher *launcher,
     {
         launcher->pointer_layout = *layout;
     }
-    launcher->pointer_pinned_apps = pinned_apps;
-    launcher->pointer_pinned_app_count = pinned_app_count;
 }
 
 void reach_launcher_set_pointer_transform(reach_launcher *launcher, reach_transform_f32 transform)
@@ -462,12 +456,6 @@ reach_result reach_launcher_set_selected_result_state(reach_launcher_state *stat
     state->model.selected_result_index = index;
     reach_launcher_keep_selected_visible(state);
     return REACH_OK;
-}
-
-int32_t reach_launcher_should_show_pinned_apps_state(const reach_launcher_state *state)
-{
-    (void)state;
-    return 0;
 }
 
 reach_result reach_launcher_handle_event_state(reach_launcher_state *state,
@@ -973,8 +961,6 @@ reach_launcher_capsule_event_context(const reach_launcher *launcher)
     if (launcher != nullptr)
     {
         ctx.layout = launcher->pointer_layout_valid ? &launcher->pointer_layout : nullptr;
-        ctx.pinned_apps = launcher->pointer_pinned_apps;
-        ctx.pinned_app_count = launcher->pointer_pinned_app_count;
     }
     return ctx;
 }
@@ -993,17 +979,7 @@ reach_launcher_capsule_apply_event_result(const reach_launcher *launcher,
     out->relayout = event_result->viewport_changed;
     out->capture = event_result->capture_pointer;
     out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
-    if (event_result->action.type == REACH_LAUNCHER_ACTION_LAUNCH_PINNED)
-    {
-        out->action.kind = REACH_FEATURE_ACTION_OPEN_PINNED_APP_BY_ID;
-        out->action.index = event_result->action.pinned_index;
-        out->action.id = event_result->action.pin_id;
-        if (reach_launcher_is_open(const_cast<reach_launcher *>(launcher)))
-        {
-            out->action.flags |= REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED;
-        }
-    }
-    else if (event_result->action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT)
+    if (event_result->action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT)
     {
         out->action.kind = REACH_FEATURE_ACTION_OPEN_SEARCH_RESULT;
     }

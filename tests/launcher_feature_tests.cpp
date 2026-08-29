@@ -125,7 +125,7 @@ int main()
     expansion_layout.bounds = {100.0f, 200.0f, 640.0f, 180.0f};
     expansion_layout.envelope_bounds = {100.0f, 200.0f, 640.0f,
                                         68.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS};
-    reach_launcher_set_pointer_context(capsule, &expansion_layout, nullptr, 0);
+    reach_launcher_set_pointer_context(capsule, &expansion_layout);
 
     const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
     reach_feature_surface_geometry geometry = {};
@@ -150,7 +150,7 @@ int main()
     reach_launcher_layout pointer_layout = {};
     pointer_layout.bounds = {0.0f, 0.0f, 200.0f, 112.0f};
     pointer_layout.search_result_items = pointer_layout.bounds;
-    reach_launcher_set_pointer_context(capsule, &pointer_layout, nullptr, 0);
+    reach_launcher_set_pointer_context(capsule, &pointer_layout);
     reach_pointer_event pointer = {};
     pointer.kind = REACH_POINTER_EVENT_DOWN;
     pointer.button = REACH_POINTER_BUTTON_SECONDARY;

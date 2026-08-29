@@ -97,26 +97,6 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
         out_layout->search_icon.x - search_text_padding_x - out_layout->search_text_input.x;
     out_layout->search_text_input.height = search_content_height - search_text_padding_y * 2.0f;
 
-    out_layout->pinned_app_slot_count = 0;
-
-    float launcher_icon = reach_scale(56.0f, scale);
-    float launcher_gap = reach_scale(16.0f, scale);
-    float total_width =
-        (launcher_icon * (float)input->pinned_app_count) +
-        (launcher_gap * (float)(input->pinned_app_count > 0 ? input->pinned_app_count - 1 : 0));
-    float apps_x = input->monitor_bounds.x + (input->monitor_bounds.width - total_width) * 0.5f;
-    float apps_y =
-        out_layout->search_box.y + out_layout->search_box.height + reach_scale(24.0f, scale);
-
-    for (size_t index = 0; index < input->pinned_app_count; ++index)
-    {
-        out_layout->pinned_app_slots[index].x =
-            apps_x + (launcher_icon + launcher_gap) * (float)index;
-        out_layout->pinned_app_slots[index].y = apps_y;
-        out_layout->pinned_app_slots[index].width = launcher_icon;
-        out_layout->pinned_app_slots[index].height = launcher_icon;
-    }
-
     float search_results_top_padding = reach_scale(8.0f, scale);
     float search_results_bottom_padding = reach_scale(8.0f, scale) + border_thickness;
     out_layout->search_results.x = out_layout->search_box.x;
@@ -180,21 +160,6 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
         out_layout->bounds.y = out_layout->search_box.y;
         out_layout->bounds.height =
             out_layout->search_results.y + out_layout->search_results.height - out_layout->bounds.y;
-    }
-    else if (out_layout->pinned_app_slot_count > 0)
-    {
-        float launcher_left = apps_x < out_layout->search_box.x ? apps_x : out_layout->search_box.x;
-        float launcher_right = apps_x + total_width;
-        float search_right = out_layout->search_box.x + out_layout->search_box.width;
-        if (search_right > launcher_right)
-        {
-            launcher_right = search_right;
-        }
-        float launcher_bottom = apps_y + launcher_icon;
-        out_layout->bounds.x = launcher_left;
-        out_layout->bounds.width = launcher_right - launcher_left;
-        out_layout->bounds.y = out_layout->search_box.y;
-        out_layout->bounds.height = launcher_bottom - out_layout->bounds.y;
     }
 
     return REACH_OK;

@@ -294,7 +294,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
             input.dpi_scale = reach_host_monitor_dpi_scale(monitor);
             input.border_thickness = reach_theme_border_thickness(
                 host->theme != nullptr ? host->theme : reach_theme_default(), input.dpi_scale);
-            input.pinned_app_count = host->pinned_app_count;
             host->layout_dpi_scale = input.dpi_scale;
 
             reach_ui_layout layout = {};
@@ -331,7 +330,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 host->has_layout = 1;
                 reach_launcher_set_pointer_context(
                     reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
-                    &host->layout.launcher, host->pinned_apps, host->pinned_app_count);
+                    &host->layout.launcher);
 
                 reach_host_frame_context frame_ctx = {};
                 frame_ctx.monitor_bounds = bounds;
