@@ -8,6 +8,7 @@
 #include "reach/core/clipboard.h"
 #include "reach/core/scrollbar.h"
 #include "reach/features/common/pressable.h"
+#include "reach/ports/clipboard.h"
 #include "reach/support/animation.h"
 #include "reach/support/util.h"
 
@@ -136,6 +137,23 @@ extern "C"
     void reach_clipboard_feature_request_refresh(reach_clipboard_feature *clipboard);
     void reach_clipboard_feature_clear_refresh(reach_clipboard_feature *clipboard);
     int32_t reach_clipboard_feature_take_refresh(reach_clipboard_feature *clipboard);
+
+    typedef struct reach_clipboard_retired_resource
+    {
+        uint64_t item_id;
+        uint64_t thumbnail_id;
+    } reach_clipboard_retired_resource;
+
+    void reach_clipboard_feature_attach_port(reach_clipboard_feature *clipboard,
+                                             const reach_clipboard_port *port,
+                                             void (*request_update)(void *user), void *user);
+    reach_result reach_clipboard_feature_start(reach_clipboard_feature *clipboard);
+    void reach_clipboard_feature_stop(reach_clipboard_feature *clipboard);
+    size_t reach_clipboard_feature_take_retired_resources(reach_clipboard_feature *clipboard,
+                                                          reach_clipboard_retired_resource *out,
+                                                          size_t cap);
+    void reach_clipboard_feature_release_resource(reach_clipboard_feature *clipboard,
+                                                  const reach_clipboard_retired_resource *resource);
 
 #ifdef __cplusplus
 }

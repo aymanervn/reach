@@ -1,5 +1,145 @@
 #include "host_internal.h"
 
+static void reach_feature_attach_launcher(void *capsule,
+                                          const reach_feature_dependencies *dependencies)
+{
+    reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
+    reach_launcher_attach_search(launcher,
+                                 dependencies != nullptr ? dependencies->search : nullptr);
+    reach_launcher_attach_icons(launcher, dependencies != nullptr ? dependencies->icons : nullptr);
+    reach_launcher_set_terminal_icon_ref(
+        launcher, dependencies != nullptr ? dependencies->terminal_icon_ref : nullptr);
+}
+
+static void reach_feature_attach_dock(void *capsule, const reach_feature_dependencies *dependencies)
+{
+    reach_dock_attach_services(static_cast<reach_dock *>(capsule),
+                               dependencies != nullptr ? dependencies->icons : nullptr,
+                               dependencies != nullptr ? dependencies->windows : nullptr);
+}
+
+static void reach_feature_attach_top_bar(void *capsule,
+                                         const reach_feature_dependencies *dependencies)
+{
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
+    reach_top_bar_attach_services(top_bar,
+                                  dependencies != nullptr ? dependencies->now_playing : nullptr,
+                                  dependencies != nullptr ? dependencies->icons : nullptr,
+                                  dependencies != nullptr ? dependencies->windows : nullptr,
+                                  dependencies != nullptr ? dependencies->system_stats : nullptr,
+                                  dependencies != nullptr ? dependencies->clock : nullptr,
+                                  dependencies != nullptr ? dependencies->input_language : nullptr,
+                                  dependencies != nullptr ? dependencies->tray : nullptr);
+    reach_top_bar_attach_app_control(top_bar,
+                                     dependencies != nullptr ? dependencies->app_control : nullptr);
+    reach_top_bar_attach_status(top_bar,
+                                dependencies != nullptr ? dependencies->system_status : nullptr);
+}
+
+static void reach_feature_attach_switcher(void *capsule,
+                                          const reach_feature_dependencies *dependencies)
+{
+    reach_switcher_attach_services(static_cast<reach_switcher *>(capsule),
+                                   dependencies != nullptr ? dependencies->icons : nullptr,
+                                   dependencies != nullptr ? dependencies->windows : nullptr);
+}
+
+static void reach_feature_attach_quick_settings(void *capsule,
+                                                const reach_feature_dependencies *dependencies)
+{
+    reach_quick_settings_attach_status(static_cast<reach_quick_settings *>(capsule),
+                                       dependencies != nullptr ? dependencies->system_status
+                                                               : nullptr);
+}
+
+static void reach_feature_attach_battery(void *capsule,
+                                         const reach_feature_dependencies *dependencies)
+{
+    reach_battery_attach_services(static_cast<reach_battery *>(capsule),
+                                  dependencies != nullptr ? dependencies->system_stats : nullptr,
+                                  dependencies != nullptr ? dependencies->system_status : nullptr);
+}
+
+static void reach_feature_attach_system_hud(void *capsule,
+                                            const reach_feature_dependencies *dependencies)
+{
+    reach_system_hud_attach_now_playing(static_cast<reach_system_hud *>(capsule),
+                                        dependencies != nullptr ? dependencies->now_playing
+                                                                : nullptr);
+}
+
+static void reach_feature_attach_clipboard(void *capsule,
+                                           const reach_feature_dependencies *dependencies)
+{
+    reach_clipboard_feature_attach_port(
+        static_cast<reach_clipboard_feature *>(capsule),
+        dependencies != nullptr ? dependencies->clipboard : nullptr,
+        dependencies != nullptr ? dependencies->request_update : nullptr,
+        dependencies != nullptr ? dependencies->request_update_user : nullptr);
+}
+
+static reach_result reach_feature_start_clipboard(void *capsule)
+{
+    return reach_clipboard_feature_start(static_cast<reach_clipboard_feature *>(capsule));
+}
+
+static void reach_feature_stop_clipboard(void *capsule)
+{
+    reach_clipboard_feature_stop(static_cast<reach_clipboard_feature *>(capsule));
+}
+
+static reach_result reach_feature_start_context_menu(void *capsule)
+{
+    reach_context_menu_force_close(static_cast<reach_context_menu *>(capsule));
+    return REACH_OK;
+}
+
+static reach_result reach_feature_start_quick_settings(void *capsule)
+{
+    reach_quick_settings_force_close(static_cast<reach_quick_settings *>(capsule));
+    return REACH_OK;
+}
+
+static void reach_feature_stop_launcher(void *capsule)
+{
+    reach_launcher_cancel_search(static_cast<reach_launcher *>(capsule));
+}
+
+static void reach_feature_stop_tray(void *capsule)
+{
+    reach_top_bar_set_tray_popup_open(static_cast<reach_top_bar *>(capsule), 0);
+}
+
+static void reach_feature_stop_switcher(void *capsule)
+{
+    reach_switcher_force_close(static_cast<reach_switcher *>(capsule));
+}
+
+static void reach_feature_stop_stage(void *capsule)
+{
+    reach_stage_force_close(static_cast<reach_stage *>(capsule));
+}
+
+static void reach_feature_stop_context_menu(void *capsule)
+{
+    reach_context_menu_force_close(static_cast<reach_context_menu *>(capsule));
+}
+
+static void reach_feature_stop_quick_settings(void *capsule)
+{
+    reach_quick_settings_force_close(static_cast<reach_quick_settings *>(capsule));
+}
+
+static void reach_feature_stop_battery(void *capsule)
+{
+    reach_battery_force_close(static_cast<reach_battery *>(capsule));
+}
+
+static void reach_feature_stop_system_hud(void *capsule)
+{
+    reach_system_hud_force_close(static_cast<reach_system_hud *>(capsule));
+}
+
 static void reach_host_surface_launcher_close(reach_host *host)
 {
     reach_host_close_launcher_without_focus_restore(host);
@@ -7,22 +147,22 @@ static void reach_host_surface_launcher_close(reach_host *host)
 
 static void reach_host_surface_clipboard_close(reach_host *host)
 {
-    reach_host_set_clipboard_open(host, 0);
+    reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
 }
 
 static void reach_host_surface_tray_close(reach_host *host)
 {
-    reach_host_set_tray_popup_open(host, 0);
+    reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_TRAY, 0);
 }
 
 static void reach_host_surface_quick_settings_close(reach_host *host)
 {
-    reach_host_set_quick_settings_open(host, 0);
+    reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_QUICK_SETTINGS, 0);
 }
 
 static void reach_host_surface_battery_close(reach_host *host)
 {
-    reach_host_set_battery_open(host, 0);
+    reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_BATTERY, 0);
 }
 
 static void reach_host_surface_context_menu_close(reach_host *host)
@@ -43,6 +183,334 @@ static void reach_host_surface_switcher_close(reach_host *host)
     host->switcher.dirty_flags = 1;
 }
 
+static void reach_host_toggle_clipboard_surface(reach_host *host)
+{
+    reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_CLIPBOARD);
+}
+
+static int32_t reach_feature_control_clipboard_open(void *capsule, int32_t open,
+                                                    reach_feature_tick_result *out)
+{
+    int32_t changed =
+        reach_clipboard_set_open(static_cast<reach_clipboard_feature *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+    return changed;
+}
+
+static int32_t reach_feature_control_tray_open(void *capsule, int32_t open,
+                                               reach_feature_tick_result *out)
+{
+    int32_t changed =
+        reach_top_bar_set_tray_popup_open(static_cast<reach_top_bar *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+    return changed;
+}
+
+static int32_t reach_feature_control_quick_settings_open(void *capsule, int32_t open,
+                                                         reach_feature_tick_result *out)
+{
+    int32_t changed =
+        reach_quick_settings_set_open(static_cast<reach_quick_settings *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+    return changed;
+}
+
+static int32_t reach_feature_control_battery_open(void *capsule, int32_t open,
+                                                  reach_feature_tick_result *out)
+{
+    int32_t changed = reach_battery_set_open(static_cast<reach_battery *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+    return changed;
+}
+
+static void reach_feature_notify_quick_settings(void *capsule,
+                                                const reach_feature_notification *notification,
+                                                reach_feature_tick_result *out)
+{
+    reach_quick_settings *quick_settings = static_cast<reach_quick_settings *>(capsule);
+    if (quick_settings == nullptr || notification == nullptr || out == nullptr ||
+        !reach_quick_settings_is_open(quick_settings))
+    {
+        return;
+    }
+    if (notification->kind == REACH_FEATURE_NOTIFICATION_MAIN_VOLUME)
+    {
+        reach_quick_settings_apply_main_volume(quick_settings, notification->volume.level,
+                                               notification->volume.muted);
+        out->redraw = 1;
+        out->request_update = 1;
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_BRIGHTNESS)
+    {
+        const reach_quick_settings_model *model =
+            &reach_quick_settings_state_ptr(quick_settings)->model;
+        reach_quick_settings_system_apply_result applied = {};
+        reach_quick_settings_apply_system_states(quick_settings, &model->network, &model->bluetooth,
+                                                 &notification->brightness, 0, 0, &applied);
+        out->redraw = 1;
+        out->relayout = applied.relayout;
+        out->request_update = 1;
+    }
+}
+
+static void reach_feature_notify_battery(void *capsule,
+                                         const reach_feature_notification *notification,
+                                         reach_feature_tick_result *out)
+{
+    if (notification != nullptr && out != nullptr &&
+        notification->kind == REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED &&
+        reach_battery_refresh_power(static_cast<reach_battery *>(capsule)))
+    {
+        out->redraw = 1;
+        out->request_update = 1;
+    }
+}
+
+static void reach_feature_notify_system_hud(void *capsule,
+                                            const reach_feature_notification *notification,
+                                            reach_feature_tick_result *out)
+{
+    reach_system_hud *hud = static_cast<reach_system_hud *>(capsule);
+    if (hud == nullptr || notification == nullptr || out == nullptr)
+    {
+        return;
+    }
+    if (notification->kind == REACH_FEATURE_NOTIFICATION_MEDIA_ACTION && notification->present)
+    {
+        reach_system_hud_show_media(hud, notification->media_action);
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_MAIN_VOLUME && notification->present)
+    {
+        reach_system_hud_show_volume(hud, &notification->volume);
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_BRIGHTNESS && notification->present)
+    {
+        reach_system_hud_show_brightness(hud, &notification->brightness);
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE &&
+             notification->present)
+    {
+        reach_system_hud_hide(hud);
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_NOW_PLAYING_CHANGED)
+    {
+        reach_system_hud_refresh_media(hud);
+    }
+    else
+    {
+        return;
+    }
+    out->redraw = 1;
+    out->request_update = 1;
+}
+
+static int32_t reach_feature_quick_settings_blocks_position_frame(const void *capsule)
+{
+    return reach_quick_settings_height_animation_active(
+        static_cast<const reach_quick_settings *>(capsule));
+}
+
+static int32_t reach_feature_tray_blocks_position_frame(const void *capsule)
+{
+    reach_animation_manager *animations = reach_top_bar_tray_animation_manager(
+        const_cast<reach_top_bar *>(static_cast<const reach_top_bar *>(capsule)));
+    return animations != nullptr && reach_animation_manager_any_active(animations);
+}
+
+static size_t reach_feature_quick_settings_take_retired(void *capsule,
+                                                        reach_feature_render_resource *out,
+                                                        size_t cap)
+{
+    if (out == nullptr)
+    {
+        return 0;
+    }
+    uint64_t ids[REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES] = {};
+    size_t count = reach_quick_settings_take_retired_render_icons(
+        static_cast<reach_quick_settings *>(capsule), ids,
+        cap < REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES
+            ? cap
+            : REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES);
+    for (size_t index = 0; index < count; ++index)
+    {
+        out[index].render_icon_id = ids[index];
+    }
+    return count;
+}
+
+static size_t reach_feature_quick_settings_active_count(const void *capsule)
+{
+    const reach_quick_settings_state *state = reach_quick_settings_state_ptr(
+        const_cast<reach_quick_settings *>(static_cast<const reach_quick_settings *>(capsule)));
+    return state != nullptr ? state->model.sessions.count + state->model.output_devices.count : 0;
+}
+
+static int32_t reach_feature_quick_settings_active_at(const void *capsule, size_t index,
+                                                      reach_feature_render_resource *out)
+{
+    const reach_quick_settings_state *state = reach_quick_settings_state_ptr(
+        const_cast<reach_quick_settings *>(static_cast<const reach_quick_settings *>(capsule)));
+    if (state == nullptr || out == nullptr)
+    {
+        return 0;
+    }
+    if (index < state->model.sessions.count)
+    {
+        out->render_icon_id = state->model.sessions.sessions[index].icon_id;
+        return 1;
+    }
+    index -= state->model.sessions.count;
+    if (index < state->model.output_devices.count)
+    {
+        out->render_icon_id = state->model.output_devices.devices[index].icon_id;
+        return 1;
+    }
+    return 0;
+}
+
+static size_t reach_feature_tray_take_retired(void *capsule, reach_feature_render_resource *out,
+                                              size_t cap)
+{
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
+    size_t count = 0;
+    while (count < cap && reach_top_bar_take_retired_tray_icon(top_bar, &out[count].render_icon_id))
+    {
+        out[count].source_id = out[count].render_icon_id;
+        out[count].release_source = 1;
+        ++count;
+    }
+    return count;
+}
+
+static size_t reach_feature_tray_active_count(const void *capsule)
+{
+    return reach_top_bar_tray_item_count(static_cast<const reach_top_bar *>(capsule));
+}
+
+static int32_t reach_feature_tray_active_at(const void *capsule, size_t index,
+                                            reach_feature_render_resource *out)
+{
+    if (out == nullptr ||
+        index >= reach_top_bar_tray_item_count(static_cast<const reach_top_bar *>(capsule)))
+    {
+        return 0;
+    }
+    out->render_icon_id =
+        reach_top_bar_tray_item_icon_id(static_cast<const reach_top_bar *>(capsule), index);
+    return 1;
+}
+
+static void reach_feature_tray_release_source(void *capsule,
+                                              const reach_feature_render_resource *resource)
+{
+    if (resource != nullptr && resource->release_source)
+    {
+        reach_top_bar_release_retired_tray_icon(static_cast<reach_top_bar *>(capsule),
+                                                resource->source_id);
+    }
+}
+
+static size_t reach_feature_clipboard_take_retired(void *capsule,
+                                                   reach_feature_render_resource *out, size_t cap)
+{
+    if (out == nullptr)
+    {
+        return 0;
+    }
+    reach_clipboard_retired_resource resources[REACH_CLIPBOARD_MAX_ITEMS * 2] = {};
+    size_t count = reach_clipboard_feature_take_retired_resources(
+        static_cast<reach_clipboard_feature *>(capsule), resources,
+        cap < REACH_CLIPBOARD_MAX_ITEMS * 2 ? cap : REACH_CLIPBOARD_MAX_ITEMS * 2);
+    for (size_t index = 0; index < count; ++index)
+    {
+        out[index] = {resources[index].thumbnail_id, resources[index].item_id, 1};
+    }
+    return count;
+}
+
+static size_t reach_feature_clipboard_active_count(const void *capsule)
+{
+    return reach_clipboard_item_count(const_cast<reach_clipboard_feature *>(
+        static_cast<const reach_clipboard_feature *>(capsule)));
+}
+
+static int32_t reach_feature_clipboard_active_at(const void *capsule, size_t index,
+                                                 reach_feature_render_resource *out)
+{
+    const reach_clipboard_item *item =
+        reach_clipboard_item_at(const_cast<reach_clipboard_feature *>(
+                                    static_cast<const reach_clipboard_feature *>(capsule)),
+                                index);
+    if (item == nullptr || out == nullptr)
+    {
+        return 0;
+    }
+    *out = {item->thumbnail_id, item->id, 1};
+    return 1;
+}
+
+static void reach_feature_clipboard_release_source(void *capsule,
+                                                   const reach_feature_render_resource *resource)
+{
+    if (resource != nullptr && resource->release_source)
+    {
+        reach_clipboard_retired_resource retired = {resource->source_id, resource->render_icon_id};
+        reach_clipboard_feature_release_resource(static_cast<reach_clipboard_feature *>(capsule),
+                                                 &retired);
+    }
+}
+
+static void reach_feature_clipboard_clear_active(void *capsule)
+{
+    reach_clipboard_reset_items(static_cast<reach_clipboard_feature *>(capsule));
+}
+
+static const reach_feature_render_resource_ops reach_quick_settings_resource_ops = {
+    reach_feature_quick_settings_take_retired, reach_feature_quick_settings_active_count,
+    reach_feature_quick_settings_active_at, nullptr, nullptr};
+
+static const reach_feature_render_resource_ops reach_tray_resource_ops = {
+    reach_feature_tray_take_retired, reach_feature_tray_active_count, reach_feature_tray_active_at,
+    reach_feature_tray_release_source, nullptr};
+
+static const reach_feature_render_resource_ops reach_clipboard_resource_ops = {
+    reach_feature_clipboard_take_retired, reach_feature_clipboard_active_count,
+    reach_feature_clipboard_active_at, reach_feature_clipboard_release_source,
+    reach_feature_clipboard_clear_active};
+
+static const reach_feature_control_ops reach_clipboard_control_ops = {
+    reach_feature_control_clipboard_open, nullptr, nullptr, &reach_clipboard_resource_ops};
+static const reach_feature_control_ops reach_tray_control_ops = {
+    reach_feature_control_tray_open, nullptr, reach_feature_tray_blocks_position_frame,
+    &reach_tray_resource_ops};
+static const reach_feature_control_ops reach_quick_settings_control_ops = {
+    reach_feature_control_quick_settings_open, reach_feature_notify_quick_settings,
+    reach_feature_quick_settings_blocks_position_frame, &reach_quick_settings_resource_ops};
+static const reach_feature_control_ops reach_battery_control_ops = {
+    reach_feature_control_battery_open, reach_feature_notify_battery, nullptr, nullptr};
+static const reach_feature_control_ops reach_system_hud_control_ops = {
+    nullptr, reach_feature_notify_system_hud, nullptr, nullptr};
+
 #define REACH_HOST_LAYER_DOCK_EDGE_REVEAL 120
 #define REACH_HOST_LAYER_BAR_ACTIVE 130
 #define REACH_HOST_LAYER_TOP_BAR_EDGE_REVEAL 140
@@ -62,6 +530,7 @@ static void reach_host_define_feature(reach_host *host, reach_surface_id id,
     definition->surface.cls = cls;
     definition->surface.pointer_flags = pointer_flags;
     definition->surface.has_transition = transition != nullptr;
+    definition->surface.opening_origin = REACH_HOST_SURFACE_COUNT;
     definition->layout.anchor = REACH_HOST_SURFACE_COUNT;
     definition->force_close = force_close;
 
@@ -123,6 +592,38 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
 
     reach_feature_definition *definitions = host->feature_definitions;
+
+    definitions[REACH_SURFACE_ID_DOCK].lifecycle.attach = reach_feature_attach_dock;
+    definitions[REACH_SURFACE_ID_TOP_BAR].lifecycle.attach = reach_feature_attach_top_bar;
+    definitions[REACH_SURFACE_ID_LAUNCHER].lifecycle.attach = reach_feature_attach_launcher;
+    definitions[REACH_SURFACE_ID_LAUNCHER].lifecycle.stop = reach_feature_stop_launcher;
+    definitions[REACH_SURFACE_ID_CLIPBOARD].lifecycle.attach = reach_feature_attach_clipboard;
+    definitions[REACH_SURFACE_ID_CLIPBOARD].lifecycle.start = reach_feature_start_clipboard;
+    definitions[REACH_SURFACE_ID_CLIPBOARD].lifecycle.stop = reach_feature_stop_clipboard;
+    definitions[REACH_SURFACE_ID_TRAY].lifecycle.stop = reach_feature_stop_tray;
+    definitions[REACH_SURFACE_ID_TRAY].lifecycle.close_transition_on_stop = 1;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.attach =
+        reach_feature_attach_quick_settings;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.start =
+        reach_feature_start_quick_settings;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.stop = reach_feature_stop_quick_settings;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.close_transition_on_stop = 1;
+    definitions[REACH_SURFACE_ID_BATTERY].lifecycle.attach = reach_feature_attach_battery;
+    definitions[REACH_SURFACE_ID_BATTERY].lifecycle.stop = reach_feature_stop_battery;
+    definitions[REACH_SURFACE_ID_BATTERY].lifecycle.close_transition_on_stop = 1;
+    definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.attach = reach_feature_attach_system_hud;
+    definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.stop = reach_feature_stop_system_hud;
+    definitions[REACH_SURFACE_ID_CONTEXT_MENU].lifecycle.start = reach_feature_start_context_menu;
+    definitions[REACH_SURFACE_ID_CONTEXT_MENU].lifecycle.stop = reach_feature_stop_context_menu;
+    definitions[REACH_SURFACE_ID_SWITCHER].lifecycle.attach = reach_feature_attach_switcher;
+    definitions[REACH_SURFACE_ID_SWITCHER].lifecycle.stop = reach_feature_stop_switcher;
+    definitions[REACH_SURFACE_ID_STAGE].lifecycle.stop = reach_feature_stop_stage;
+
+    definitions[REACH_SURFACE_ID_CLIPBOARD].control_ops = &reach_clipboard_control_ops;
+    definitions[REACH_SURFACE_ID_TRAY].control_ops = &reach_tray_control_ops;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].control_ops = &reach_quick_settings_control_ops;
+    definitions[REACH_SURFACE_ID_BATTERY].control_ops = &reach_battery_control_ops;
+    definitions[REACH_SURFACE_ID_SYSTEM_HUD].control_ops = &reach_system_hud_control_ops;
 
     definitions[REACH_SURFACE_ID_DOCK].surface.shadow = REACH_SURFACE_SHADOW_BAR;
     definitions[REACH_SURFACE_ID_TOP_BAR].surface.shadow = REACH_SURFACE_SHADOW_BAR;
@@ -188,13 +689,16 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.behavior_flags =
         REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.opening_origin = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor_slot =
         REACH_TOP_BAR_CONTROL_QUICK_SETTINGS;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.popup_chrome = 1;
     definitions[REACH_SURFACE_ID_BATTERY].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
+    definitions[REACH_SURFACE_ID_BATTERY].surface.opening_origin = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_BATTERY].layout.anchor_slot = REACH_TOP_BAR_CONTROL_BATTERY;
     definitions[REACH_SURFACE_ID_BATTERY].surface.popup_chrome = 1;
     definitions[REACH_SURFACE_ID_TRAY].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
+    definitions[REACH_SURFACE_ID_TRAY].surface.opening_origin = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_TRAY].layout.anchor_slot = REACH_TOP_BAR_CONTROL_TRAY;
     definitions[REACH_SURFACE_ID_STAGE].surface.edge_reveal = {
         1,
@@ -219,7 +723,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_LAUNCHER].toggle = reach_host_toggle_launcher;
     definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_events = reach_clipboard_activation_events(
         &definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_event_count);
-    definitions[REACH_SURFACE_ID_CLIPBOARD].toggle = reach_host_toggle_clipboard;
+    definitions[REACH_SURFACE_ID_CLIPBOARD].toggle = reach_host_toggle_clipboard_surface;
     definitions[REACH_SURFACE_ID_SWITCHER].routed_events =
         reach_switcher_routed_events(&definitions[REACH_SURFACE_ID_SWITCHER].routed_event_count);
     definitions[REACH_SURFACE_ID_SWITCHER].handle_routed = reach_host_handle_switcher_event;
@@ -693,6 +1197,7 @@ void reach_host_init_feature_registry(reach_host *host)
         return;
     }
 
+    reach_dock_model_defaults(&host->dock_config);
     reach_host_init_feature_definitions(host);
     reach_feature_definition *definitions = host->feature_definitions;
     definitions[REACH_SURFACE_ID_DOCK].factory = {
@@ -740,6 +1245,144 @@ void reach_host_init_feature_registry(reach_host *host)
     definitions[REACH_SURFACE_ID_TRAY].surface_ops = &reach_tray_surface_ops;
     definitions[REACH_SURFACE_ID_DOCK].resolve_anchor = reach_dock_resolve_anchor;
     definitions[REACH_SURFACE_ID_TOP_BAR].resolve_anchor = reach_top_bar_resolve_anchor;
+}
+
+void reach_host_bind_registered_surface_ports(reach_host *host,
+                                              const reach_host_dependencies *dependencies)
+{
+    if (host == nullptr || dependencies == nullptr)
+    {
+        return;
+    }
+
+    host->launcher.window = dependencies->launcher_window;
+    host->launcher.renderer = dependencies->launcher_renderer;
+    host->dock.window = dependencies->dock_window;
+    host->dock.renderer = dependencies->dock_renderer;
+    host->top_bar.window = dependencies->top_bar_window;
+    host->top_bar.renderer = dependencies->top_bar_renderer;
+    host->tray.window = dependencies->tray_window;
+    host->tray.renderer = dependencies->tray_renderer;
+    host->switcher.window = dependencies->switcher_window;
+    host->switcher.renderer = dependencies->switcher_renderer;
+    host->stage.window = dependencies->stage_window;
+    host->stage.renderer = dependencies->stage_renderer;
+    host->context_menu.window = dependencies->context_menu_window;
+    host->context_menu.renderer = dependencies->context_menu_renderer;
+    host->quick_settings.window = dependencies->quick_settings_window;
+    host->quick_settings.renderer = dependencies->quick_settings_renderer;
+    host->battery.window = dependencies->battery_window;
+    host->battery.renderer = dependencies->battery_renderer;
+    host->system_hud.window = dependencies->system_hud_window;
+    host->system_hud.renderer = dependencies->system_hud_renderer;
+    host->clipboard_surface.window = dependencies->clipboard_window;
+    host->clipboard_surface.renderer = dependencies->clipboard_renderer;
+}
+
+void reach_host_init_registered_surfaces(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_runtime_init(host->feature_runtimes[index].surface);
+    }
+}
+
+void reach_host_destroy_registered_surface_ports(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = REACH_HOST_SURFACE_COUNT; index > 0; --index)
+    {
+        reach_surface_runtime *surface = host->feature_runtimes[index - 1].surface;
+        if (surface == nullptr)
+        {
+            continue;
+        }
+        if (surface->window.ops.destroy != nullptr)
+        {
+            surface->window.ops.destroy(surface->window.window);
+        }
+        if (surface->renderer.ops.destroy != nullptr)
+        {
+            surface->renderer.ops.destroy(surface->renderer.backend);
+        }
+        reach_surface_runtime_init(surface);
+    }
+}
+
+void reach_host_attach_registered_features(reach_host *host,
+                                           const reach_feature_dependencies *dependencies)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->capsule != nullptr && runtime->definition->lifecycle.attach != nullptr)
+        {
+            runtime->definition->lifecycle.attach(runtime->capsule, dependencies);
+        }
+    }
+}
+
+reach_result reach_host_start_registered_features(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->capsule != nullptr && runtime->definition->lifecycle.start != nullptr)
+        {
+            reach_result result = runtime->definition->lifecycle.start(runtime->capsule);
+            if (result != REACH_OK)
+            {
+                return result;
+            }
+        }
+    }
+    return REACH_OK;
+}
+
+void reach_host_stop_registered_features(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (size_t index = REACH_HOST_SURFACE_COUNT; index > 0; --index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index - 1];
+        const reach_feature_lifecycle_ops *lifecycle = &runtime->definition->lifecycle;
+        if (runtime->capsule == nullptr || lifecycle->stop == nullptr)
+        {
+            continue;
+        }
+        lifecycle->stop(runtime->capsule);
+        if (lifecycle->close_transition_on_stop && runtime->transition != nullptr)
+        {
+            reach_host_surface_transition_set(host, runtime->transition, 0);
+        }
+        if (runtime->surface != nullptr)
+        {
+            runtime->surface->dirty_flags = 1;
+        }
+    }
 }
 
 reach_result reach_host_create_registered_features(reach_host *host)

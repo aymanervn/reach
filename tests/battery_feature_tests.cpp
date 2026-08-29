@@ -5,6 +5,21 @@
 
 static int failures;
 
+typedef struct battery_route_probe
+{
+    int32_t pending;
+    int32_t enabled;
+    int calls;
+} battery_route_probe;
+
+static void battery_pending_changed(void *user, int32_t pending, int32_t enabled)
+{
+    battery_route_probe *probe = static_cast<battery_route_probe *>(user);
+    probe->pending = pending;
+    probe->enabled = enabled;
+    ++probe->calls;
+}
+
 static void expect_true(int condition, const char *message)
 {
     if (!condition)
@@ -85,8 +100,14 @@ static void test_pending_reconciles_with_system(void)
     reach_battery *battery = nullptr;
     expect_true(reach_battery_create(&battery) == REACH_OK, "battery capsule is created");
 
+    battery_route_probe probe = {};
+    reach_battery_routes routes = {&probe, battery_pending_changed};
+    reach_battery_set_routes(battery, &routes);
+
     reach_battery_set_saver_pending(battery, 1, 1);
     expect_true(reach_battery_saver_pending(battery), "requesting saver marks the model pending");
+    expect_true(probe.calls == 1 && probe.pending && probe.enabled,
+                "pending request publishes its typed route");
 
     (void)reach_battery_set_power(battery, 55, 0);
     expect_true(reach_battery_saver_pending(battery),
@@ -97,6 +118,8 @@ static void test_pending_reconciles_with_system(void)
     (void)reach_battery_set_power(battery, 55, 1);
     expect_true(!reach_battery_saver_pending(battery),
                 "pending clears once the system agrees with the request");
+    expect_true(probe.calls == 2 && !probe.pending,
+                "system reconciliation publishes the cleared pending state");
     expect_true(reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 1,
                 "the system state carries the value after reconciling");
 

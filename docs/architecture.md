@@ -87,11 +87,13 @@ generation, coalescing provider thumbnail bursts without delaying core state.
 System status serializes blocking system-control reads and brightness writes on its system worker.
 Relative brightness commands accumulate against the latest queued target, publish the successful
 target through the cumulative system snapshot, and never call the WMI-backed port on the UI thread.
+The wallpaper service owns the cached applied path, per-monitor reconciliation, configuration
+seeding, and the ports that control the desktop wallpaper and its Reach-owned presentation surface.
 
 ## features
 
 Self-contained UI capsules — dock, launcher, switcher, quick settings, clipboard,
-settings, context menu, wallpaper. Each owns its state, layout, animation,
+settings, context menu. Each owns its state, layout, animation,
 hit-testing, render composition, and interaction behind
 create/update/handle_event/append_render_commands entry points, and returns semantic
 actions instead of calling ports. Includes `services`, `ports`, `protocol`, `core` —
@@ -424,9 +426,23 @@ transition completion in `reach_host_finish_surface_transitions`, input ordering
 `reach_host_pointer_order`, and the frame pass in `reach_host_update` each iterate it whole, and
 `tools/check_architecture.py` rejects any of them being narrowed to a hand-maintained feature
 list. `reach_host_feature_capsule<T>` derives any concrete view from that
-capsule; `reach_host` carries no parallel typed capsule pointers. Host construction and cleanup iterate the factories
-generically; a shared surface such as the tray declares no factory and binds to its owning
-top-bar capsule. Policy runs as class loops over the runtime table — tick, needs-frame, game
+capsule; `reach_host` carries no parallel typed capsule pointers. Host construction and cleanup
+iterate the factories generically; a shared surface such as the tray declares no factory and
+binds to its owning top-bar capsule. Definitions also declare opaque lifecycle operations for
+dependency attachment, start, and stop. Composition supplies one service dependency bundle and
+iterates every runtime; concrete attachment and start/stop calls remain inside the registry seam.
+Definitions may also declare opaque control operations. The shared open/close path applies opening
+policy, transitions, pointer subscriptions, popup capture, dirtying, and update scheduling around
+the capsule's semantic `set_open`; registry adapters are the only code that translates that call to
+a concrete capsule. Typed host notifications are broadcast through the same contract for external
+state that more than one capsule may present, including system statistics, Now Playing, media
+actions, volume, brightness, and the final top-bar visibility result. Clipboard, Tray, Quick
+Settings, Battery, and System HUD use these operations rather than named host orchestration files.
+Render-resource operations on the control contract expose retired and active opaque
+renderer/source identities, so the host drains and releases icons in one runtime loop while each
+registry adapter preserves its feature's ownership rules.
+Window-event callbacks are bound by that same runtime loop and derive their source role from the
+definition. Policy runs as class loops over the runtime table — tick, needs-frame, game
 mode, lifecycle resets, pointer-move subscription sync, the popup mouse hook, transient
 dismissal, and the “opening a popup closes the other popups” rule. Pointer input
 uses one runtime-driven dispatcher for capsule delivery, surface dirtying,
@@ -467,12 +483,12 @@ sequence, with `EXCLUSIVE_WHILE_OPEN`, `CAPTURE_CONSUMES_RELEASE`, and
 action→port translators for media transport, volume, and brightness live in
 `host_system_actions.cpp`, out of the input routing path. Brightness translation submits a relative
 command to `reach_system_status`; the host uses only the cached target returned by the service for
-immediate Quick Settings and HUD presentation.
-The system HUD consumes the final top-bar visibility result cached by that same
-bar reconciliation, so keyboard media, volume, and brightness actions never
-reconstruct the hiding predicate. Successful level changes hand the capsule the
-exact post-action state; media actions refresh their presentation snapshot from
-the Now Playing service. The HUD is a persistent, source-gated surface at layer
+immediate presentation. The resulting typed notification is offered to every registered control;
+Quick Settings and System HUD consume the kinds they support. System HUD also consumes the final
+top-bar visibility notification from that same bar reconciliation, so keyboard media, volume, and
+brightness actions never reconstruct the hiding predicate. Successful level changes carry the
+exact post-action state; media actions make the HUD refresh its presentation snapshot from the Now
+Playing service. The HUD is a persistent, source-gated surface at layer
 220, above every other Reach layer. Its visual card is one blocking input region:
 presses are consumed without actions or capture, while pointer enter pauses its
 dismissal dwell and pointer leave releases it. It is centered above the Dock's
@@ -550,9 +566,12 @@ participant's layer intent. Definition-declared edge reveals are participants to
 attached to their owning surface runtime but independently visible; the underlying
 screen-hotspot port carries `set_topmost` / `native_id` / `place_behind` so they
 chain and seed like any other participant.
-The host drains each `system_stats` change once, marks the top bar for layout, and refreshes the
-Battery capsule from the same stable snapshot so an open popup and saver pending state stay live.
-The wallpaper is not a participant: it re-pins itself to `HWND_BOTTOM` and is
+The host drains each `system_stats` change once, marks the top bar for layout, and broadcasts one
+typed notification. Battery consumes it through its registry control adapter and refreshes from the
+same stable snapshot so an open popup and saver pending state stay live. Battery publishes saver
+pending reconciliation through a neutral route bound to Top Bar in `interfeature_routes.cpp`.
+The wallpaper service is not a participant: its presentation surface re-pins itself to
+`HWND_BOTTOM` and is
 deliberately not hidden in game mode.
 
 Band membership has exactly one author. The Win32 window adapter no longer keys
@@ -630,7 +649,9 @@ entry in `docs/repo-analysis.md`.
    translate; composition keeps only the effects it owns, such as surface open/close,
    app-launch scheduling, window control, and pin mutation.
 3. **Registry definition** (`src/composition/feature_registry.cpp`): id, opaque factory,
-   class, surface runtime binding, transition, host-level `force_close`, capsule ops,
+   class, surface runtime binding, transition, opaque lifecycle attachment/start/stop operations,
+   host-level `force_close`, optional opaque control operations for semantic open/close,
+   notifications, fast-frame blockers, and render-resource ownership, capsule ops,
    pointer flags, `role`, `pointer_priority`, `dismiss` if outside-press close differs
    from `force_close`, `layout.priority`, uniform `surface_ops`, and declarative
    `toggle_events`/`routed_events` for activation. Immutable policy belongs only in the
@@ -641,7 +662,9 @@ entry in `docs/repo-analysis.md`.
 4. **Surface operations**: provide uniform arrange, geometry, and render-command
    operations consumed by `reach_host_frame_registered_surface`. Do not add another
    named `reach_host_frame_<feature>` function.
-5. **Tests**: logic-only, against the capsule ops — no UI or service tests.
+5. **Tests**: no UI tests. Add logic tests only where ownership, reconciliation, asynchronous
+   publication, or another fragile rule is likely to regress; do not mirror straightforward
+   presentation wiring in tests.
 6. Run build + ctest + `tools/check_architecture.py`, then the live-run
    protocol with a visual pass.
 

@@ -185,17 +185,14 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     if (id == REACH_SURFACE_ID_TOP_BAR)
     {
+        int32_t was_hidden = host->top_bar_hidden;
         host->top_bar_hidden = result.visible ? 0 : 1;
-        if (!host->top_bar_hidden &&
-            reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD) !=
-                nullptr &&
-            reach_system_hud_state_ptr(
-                reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD))
-                ->open)
+        if (was_hidden && !host->top_bar_hidden)
         {
-            reach_system_hud_hide(
-                reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD));
-            host->system_hud.dirty_flags = 1;
+            reach_feature_notification notification = {};
+            notification.kind = REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE;
+            notification.present = 1;
+            reach_host_notify_registered_features(host, &notification);
         }
     }
 
@@ -331,13 +328,19 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
         position_animating = position_animating || animation.position_animating;
     }
 
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        const reach_feature_control_ops *control = runtime->definition->control_ops;
+        if (control != nullptr && control->blocks_position_only_frame != nullptr &&
+            control->blocks_position_only_frame(runtime->capsule))
+        {
+            return 0;
+        }
+    }
+
     return position_animating && host->has_layout && !host->dirty.update_requested &&
-           !host->dirty.layout && !host->dirty.render && !reach_host_any_surface_dirty(host) &&
-           !reach_animation_manager_any_active(reach_top_bar_tray_animation_manager(
-               reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR))) &&
-           !reach_quick_settings_height_animation_active(
-               reach_host_feature_capsule<reach_quick_settings>(host,
-                                                                REACH_SURFACE_ID_QUICK_SETTINGS));
+           !host->dirty.layout && !host->dirty.render && !reach_host_any_surface_dirty(host);
 }
 
 reach_result reach_host_move_bar_animation_frame(reach_host *host)

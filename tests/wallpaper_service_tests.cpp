@@ -1,6 +1,6 @@
 #include "reach/support/util.h"
 #include "test_utf16.h"
-#include "reach/features/wallpaper.h"
+#include "reach/services/wallpaper.h"
 
 #include <stdio.h>
 

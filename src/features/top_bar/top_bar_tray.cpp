@@ -279,6 +279,10 @@ int32_t reach_top_bar_set_tray_popup_open(reach_top_bar *top_bar, int32_t open)
         reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);
         reach_pressable_reset(&top_bar->tray_popup->pressable, &feedback);
     }
+    else
+    {
+        (void)reach_top_bar_refresh_tray(top_bar);
+    }
     return 1;
 }
 
@@ -294,6 +298,27 @@ reach_result reach_top_bar_refresh_tray(reach_top_bar *top_bar)
         reach_top_bar_reconcile_tray_order(top_bar);
     }
     return result;
+}
+
+reach_result reach_top_bar_activate_tray_item(reach_top_bar *top_bar, uint32_t item_id,
+                                              reach_tray_action action)
+{
+    return top_bar != nullptr ? reach_tray_service_activate(top_bar->tray, item_id, action)
+                              : REACH_OK;
+}
+
+int32_t reach_top_bar_take_retired_tray_icon(reach_top_bar *top_bar, uint64_t *out_icon_id)
+{
+    return top_bar != nullptr ? reach_tray_service_take_retired_icon(top_bar->tray, out_icon_id)
+                              : 0;
+}
+
+void reach_top_bar_release_retired_tray_icon(reach_top_bar *top_bar, uint64_t icon_id)
+{
+    if (top_bar != nullptr)
+    {
+        reach_tray_service_release_retired_icon(top_bar->tray, icon_id);
+    }
 }
 
 size_t reach_top_bar_tray_item_count(const reach_top_bar *top_bar)
@@ -525,11 +550,11 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
             const reach_tray_item *item = reach_top_bar_tray_item(top_bar, hit.index);
             if (item != nullptr)
             {
-                out->action.kind = REACH_FEATURE_ACTION_ACTIVATE_TRAY_ITEM;
-                out->action.index = event->button == REACH_POINTER_BUTTON_SECONDARY
-                                        ? REACH_TRAY_ACTION_RIGHT_CLICK
-                                        : REACH_TRAY_ACTION_LEFT_CLICK;
-                out->action.id = item->id;
+                reach_tray_action action = event->button == REACH_POINTER_BUTTON_SECONDARY
+                                               ? REACH_TRAY_ACTION_RIGHT_CLICK
+                                               : REACH_TRAY_ACTION_LEFT_CLICK;
+                (void)reach_top_bar_activate_tray_item(top_bar, item->id, action);
+                out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
             }
             out->handled = 1;
         }

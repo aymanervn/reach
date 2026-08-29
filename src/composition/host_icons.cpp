@@ -18,19 +18,10 @@ void reach_host_release_render_icon(reach_host *host, uint64_t icon_id)
         return;
     }
 
-    // Every surface owns its own render backend and therefore its own icon cache, so a surface
-    // left out here holds its cached bitmap for the rest of the process.
-    reach_host_release_render_icon_from_surface(&host->launcher, icon_id);
-    reach_host_release_render_icon_from_surface(&host->dock, icon_id);
-    reach_host_release_render_icon_from_surface(&host->top_bar, icon_id);
-    reach_host_release_render_icon_from_surface(&host->tray, icon_id);
-    reach_host_release_render_icon_from_surface(&host->switcher, icon_id);
-    reach_host_release_render_icon_from_surface(&host->stage, icon_id);
-    reach_host_release_render_icon_from_surface(&host->context_menu, icon_id);
-    reach_host_release_render_icon_from_surface(&host->quick_settings, icon_id);
-    reach_host_release_render_icon_from_surface(&host->battery, icon_id);
-    reach_host_release_render_icon_from_surface(&host->system_hud, icon_id);
-    reach_host_release_render_icon_from_surface(&host->clipboard_surface, icon_id);
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_host_release_render_icon_from_surface(host->feature_runtimes[index].surface, icon_id);
+    }
 }
 
 static const double REACH_HOST_ICON_TRIM_SECONDS = 60.0;
@@ -60,84 +51,86 @@ void reach_host_drain_icon_evictions(reach_host *host)
     }
 }
 
-void reach_host_drain_tray_retired_icons(reach_host *host)
+static void
+reach_host_release_feature_render_resource(reach_host *host, reach_feature_runtime *runtime,
+                                           const reach_feature_render_resource *resource)
 {
-    if (host == nullptr || host->tray_service == nullptr)
+    if (host == nullptr || runtime == nullptr || resource == nullptr)
     {
         return;
     }
-
-    uint64_t icon_id = 0;
-    while (reach_tray_service_take_retired_icon(host->tray_service, &icon_id))
+    reach_host_release_render_icon(host, resource->render_icon_id);
+    const reach_feature_render_resource_ops *resources =
+        runtime->definition->control_ops->render_resources;
+    if (resources->release_source != nullptr)
     {
-        reach_host_release_render_icon(host, icon_id);
-        reach_tray_service_release_retired_icon(host->tray_service, icon_id);
+        resources->release_source(runtime->capsule, resource);
     }
 }
 
-void reach_host_release_tray_render_icons(reach_host *host)
+void reach_host_drain_registered_render_resources(reach_host *host)
 {
     if (host == nullptr)
     {
         return;
     }
 
-    size_t count = reach_top_bar_tray_item_count(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR));
-    if (count > REACH_MAX_TRAY_ITEMS)
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        count = REACH_MAX_TRAY_ITEMS;
-    }
-
-    for (size_t index = 0; index < count; ++index)
-    {
-        uint64_t icon_id = reach_top_bar_tray_item_icon_id(
-            reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), index);
-        if (icon_id != 0)
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        const reach_feature_control_ops *control = runtime->definition->control_ops;
+        if (control == nullptr || control->render_resources == nullptr ||
+            control->render_resources->take_retired == nullptr)
         {
-            reach_host_release_render_icon(host, icon_id);
+            continue;
+        }
+        for (;;)
+        {
+            reach_feature_render_resource retired[64] = {};
+            size_t count = control->render_resources->take_retired(runtime->capsule, retired, 64);
+            for (size_t resource = 0; resource < count; ++resource)
+            {
+                reach_host_release_feature_render_resource(host, runtime, &retired[resource]);
+            }
+            if (count < 64)
+            {
+                break;
+            }
         }
     }
 }
 
-void reach_host_release_quick_settings_audio_render_icons(reach_host *host)
+void reach_host_release_registered_render_resources(reach_host *host)
 {
     if (host == nullptr)
     {
         return;
     }
 
-    const reach_quick_settings_model *model =
-        &reach_quick_settings_state_ptr(reach_host_feature_capsule<reach_quick_settings>(
-                                            host, REACH_SURFACE_ID_QUICK_SETTINGS))
-             ->model;
-    size_t session_count = model->sessions.count;
-    if (session_count > REACH_AUDIO_VOLUME_MAX_SESSIONS)
+    reach_host_drain_registered_render_resources(host);
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        session_count = REACH_AUDIO_VOLUME_MAX_SESSIONS;
-    }
-
-    for (size_t index = 0; index < session_count; ++index)
-    {
-        uint64_t icon_id = model->sessions.sessions[index].icon_id;
-        if (icon_id != 0)
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        const reach_feature_control_ops *control = runtime->definition->control_ops;
+        if (control == nullptr || control->render_resources == nullptr)
         {
-            reach_host_release_render_icon(host, icon_id);
+            continue;
         }
-    }
-
-    size_t device_count = model->output_devices.count;
-    if (device_count > REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES)
-    {
-        device_count = REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES;
-    }
-
-    for (size_t index = 0; index < device_count; ++index)
-    {
-        uint64_t icon_id = model->output_devices.devices[index].icon_id;
-        if (icon_id != 0)
+        const reach_feature_render_resource_ops *resources = control->render_resources;
+        size_t count =
+            resources->active_count != nullptr ? resources->active_count(runtime->capsule) : 0;
+        for (size_t resource_index = 0; resource_index < count; ++resource_index)
         {
-            reach_host_release_render_icon(host, icon_id);
+            reach_feature_render_resource resource = {};
+            if (resources->active_at != nullptr &&
+                resources->active_at(runtime->capsule, resource_index, &resource))
+            {
+                reach_host_release_feature_render_resource(host, runtime, &resource);
+            }
+        }
+        if (resources->clear_active != nullptr)
+        {
+            resources->clear_active(runtime->capsule);
         }
     }
 }

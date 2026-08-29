@@ -11,7 +11,7 @@
 #include "reach/features/common/draggable.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
-#include "reach/features/popup.h"
+#include "reach/features/common/popup.h"
 #include "reach/ports/text_measure.h"
 #include "reach/services/app_control.h"
 #include "reach/services/icon_service.h"
@@ -241,6 +241,10 @@ extern "C"
     int32_t reach_top_bar_tray_popup_is_open(const reach_top_bar *top_bar);
     int32_t reach_top_bar_set_tray_popup_open(reach_top_bar *top_bar, int32_t open);
     reach_result reach_top_bar_refresh_tray(reach_top_bar *top_bar);
+    reach_result reach_top_bar_activate_tray_item(reach_top_bar *top_bar, uint32_t item_id,
+                                                  reach_tray_action action);
+    int32_t reach_top_bar_take_retired_tray_icon(reach_top_bar *top_bar, uint64_t *out_icon_id);
+    void reach_top_bar_release_retired_tray_icon(reach_top_bar *top_bar, uint64_t icon_id);
     void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *theme,
                                          const reach_popup_anchor *anchor, float dpi_scale,
                                          reach_rect_f32 *out_bounds);

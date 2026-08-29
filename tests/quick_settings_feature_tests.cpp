@@ -1,6 +1,6 @@
 #include "reach/support/util.h"
 #include "reach/features/quick_settings.h"
-#include "reach/features/popup.h"
+#include "reach/features/common/popup.h"
 
 #include <math.h>
 #include <stdio.h>

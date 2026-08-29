@@ -1,5 +1,5 @@
-#ifndef REACH_FEATURES_POPUP_H
-#define REACH_FEATURES_POPUP_H
+#ifndef REACH_FEATURES_COMMON_POPUP_H
+#define REACH_FEATURES_COMMON_POPUP_H
 
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"

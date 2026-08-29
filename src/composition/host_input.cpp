@@ -699,69 +699,16 @@ static reach_result reach_host_handle_pointer_cancel(reach_host *host)
 static reach_result reach_host_handle_surface_event(reach_host *host, const reach_ui_event *event,
                                                     reach_surface_role source);
 
-static void reach_host_on_surface_event(void *user, const reach_ui_event *event,
-                                        reach_surface_role source)
+void reach_host_on_registered_surface_event(void *user, const reach_ui_event *event)
 {
-    reach_host *host = static_cast<reach_host *>(user);
-    if (host != nullptr && event != nullptr)
+    reach_host_surface_event_binding *binding =
+        static_cast<reach_host_surface_event_binding *>(user);
+    if (binding != nullptr && binding->host != nullptr && binding->runtime != nullptr &&
+        binding->runtime->definition != nullptr && event != nullptr)
     {
-        (void)reach_host_handle_surface_event(host, event, source);
+        (void)reach_host_handle_surface_event(binding->host, event,
+                                              binding->runtime->definition->surface.role);
     }
-}
-
-void reach_host_on_launcher_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_LAUNCHER);
-}
-
-void reach_host_on_dock_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_DOCK);
-}
-
-void reach_host_on_top_bar_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_TOP_BAR);
-}
-
-void reach_host_on_tray_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_TRAY_MENU);
-}
-
-void reach_host_on_switcher_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_SWITCHER);
-}
-
-void reach_host_on_context_menu_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_CONTEXT_MENU);
-}
-
-void reach_host_on_quick_settings_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_QUICK_SETTINGS);
-}
-
-void reach_host_on_battery_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_BATTERY);
-}
-
-void reach_host_on_system_hud_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_SYSTEM_HUD);
-}
-
-void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_CLIPBOARD);
-}
-
-void reach_host_on_stage_window_event(void *user, const reach_ui_event *event)
-{
-    reach_host_on_surface_event(user, event, REACH_SURFACE_STAGE);
 }
 
 static reach_result reach_host_handle_surface_event(reach_host *host, const reach_ui_event *event,
@@ -776,30 +723,14 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     reach_ui_intent intent = {};
 
-    if (event->type == REACH_UI_EVENT_CLIPBOARD_CHANGED)
-    {
-        reach_clipboard_feature_request_refresh(
-            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD));
-        reach_host_request_update(host);
-        return REACH_OK;
-    }
-
     if (event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED ||
         event->type == REACH_UI_EVENT_SYSTEM_STATS_CHANGED)
     {
-        if (event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED &&
-            reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD) !=
-                nullptr)
-        {
-            reach_system_hud_refresh_media(
-                reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD));
-            if (reach_system_hud_state_ptr(
-                    reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD))
-                    ->kind == REACH_SYSTEM_HUD_MEDIA)
-            {
-                host->system_hud.dirty_flags = 1;
-            }
-        }
+        reach_feature_notification notification = {};
+        notification.kind = event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED
+                                ? REACH_FEATURE_NOTIFICATION_NOW_PLAYING_CHANGED
+                                : REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED;
+        reach_host_notify_registered_features(host, &notification);
         reach_host_request_update(host);
         return REACH_OK;
     }
@@ -1062,7 +993,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     if (event->type == REACH_UI_EVENT_ESCAPE)
     {
-        reach_host_set_clipboard_open(host, 0);
+        reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
         reach_host_close_stage(host);
     }
 

@@ -1,5 +1,5 @@
-#ifndef REACH_FEATURES_WALLPAPER_H
-#define REACH_FEATURES_WALLPAPER_H
+#ifndef REACH_SERVICES_WALLPAPER_H
+#define REACH_SERVICES_WALLPAPER_H
 
 #include <stddef.h>
 #include <stdint.h>

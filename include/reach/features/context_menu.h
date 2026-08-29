@@ -8,7 +8,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
-#include "reach/features/popup.h"
+#include "reach/features/common/popup.h"
 #include "reach/ports/text_measure.h"
 
 #ifdef __cplusplus

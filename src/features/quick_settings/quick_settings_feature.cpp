@@ -1,5 +1,5 @@
 #include "reach/features/quick_settings.h"
-#include "reach/features/popup.h"
+#include "reach/features/common/popup.h"
 
 #include "quick_settings_common.h"
 #include "quick_settings_metrics.h"
@@ -784,6 +784,13 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
     state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     state->drag.level_valid = 0;
     reach_quick_settings_reset_pressable(quick_settings);
+    reach_quick_settings_set_bluetooth_pending(quick_settings, 0, 0);
+    if (next_open)
+    {
+        reach_quick_settings_refresh_system(quick_settings, 0);
+        reach_quick_settings_refresh_audio(quick_settings);
+        reach_quick_settings_reset_height_animation(quick_settings);
+    }
     return 1;
 }
 
@@ -884,11 +891,15 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
             reach_quick_settings_pressable_feedback(quick_settings);
         reach_pressable_settle_feedback(&quick_settings->pressable, &feedback);
     }
-    if (out != nullptr && (animations_were_active ||
-                           (quick_settings != nullptr &&
-                            reach_animation_manager_any_active(&quick_settings->animations))))
+    reach_feature_tick_result changes = {};
+    reach_quick_settings_process_changes(quick_settings, &changes);
+    if (out != nullptr)
     {
-        out->redraw = 1;
+        out->redraw = changes.redraw || animations_were_active ||
+                      (quick_settings != nullptr &&
+                       reach_animation_manager_any_active(&quick_settings->animations));
+        out->relayout = changes.relayout;
+        out->request_update = changes.request_update;
     }
 }
 

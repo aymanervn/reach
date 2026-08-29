@@ -396,6 +396,121 @@ MIGRATED_SURFACE_FRAME_RE = re.compile(
 
 FEATURE_REGISTRY_SEAM = "src/composition/feature_registry.cpp"
 
+COMPOSITION_FEATURE_SEAMS = {
+    FEATURE_REGISTRY_SEAM,
+    INTERFEATURE_ROUTES_SEAM,
+}
+
+CONCRETE_FEATURE_HEADER_BASELINE: dict[tuple[str, str], int] = {
+    ("src/composition/host_internal.h", "reach/features/battery.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/clipboard.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/context_menu.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/dock.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/launcher.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/quick_settings.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/stage.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/switcher.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/system_hud.h"): 1,
+    ("src/composition/host_internal.h", "reach/features/top_bar.h"): 1,
+}
+
+CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
+    ("src/composition/host_app_control.cpp", "reach_launcher_is_open"): 1,
+    ("src/composition/host_config.cpp", "reach_dock_mark_items_changed"): 1,
+    ("src/composition/host_config.cpp", "reach_dock_order_count"): 1,
+    ("src/composition/host_config.cpp", "reach_dock_order_key_at"): 1,
+    ("src/composition/host_config.cpp", "reach_dock_restore_order"): 1,
+    ("src/composition/host_config.cpp", "reach_stage_set_animation_seconds"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_context_menu_is_open"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_context_menu_open_for_item"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_context_menu_open_power"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_context_menu_reset"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_context_menu_state_ptr"): 3,
+    (
+        "src/composition/host_context_menu_orchestration.cpp",
+        "reach_dock_build_item_context_commands",
+    ): 2,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_dock_collect_item_windows"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_dock_item_at"): 3,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_dock_item_count"): 2,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_dock_rect_to_screen"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_top_bar_rect_to_screen"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_top_bar_state_ptr"): 1,
+    ("src/composition/host_dock_orchestration.cpp", "reach_dock_item_at"): 5,
+    ("src/composition/host_dock_orchestration.cpp", "reach_dock_item_count"): 2,
+    ("src/composition/host_feature_actions.cpp", "reach_dock_rebuild_items"): 1,
+    ("src/composition/host_feedback.cpp", "reach_dock_clear_context_feedback"): 1,
+    ("src/composition/host_game_mode.cpp", "reach_dock_clear_item_x_animations"): 1,
+    ("src/composition/host_game_mode.cpp", "reach_switcher_force_close"): 1,
+    ("src/composition/host_icons.cpp", "reach_dock_touch_icons"): 1,
+    ("src/composition/host_input.cpp", "reach_launcher_handle_event"): 1,
+    ("src/composition/host_input.cpp", "reach_launcher_handle_text_event"): 1,
+    ("src/composition/host_input.cpp", "reach_launcher_is_open"): 6,
+    ("src/composition/host_input.cpp", "reach_launcher_reset_text_edit"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_cancel_search"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_clear_query"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_clear_restore_window"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_clear_results"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_close"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_is_open"): 4,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_query_text"): 1,
+    (
+        "src/composition/host_launcher_orchestration.cpp",
+        "reach_launcher_remember_restore_window",
+    ): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_reset_text_edit"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_result_at"): 2,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_result_count"): 3,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_selected_result_index"): 2,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_take_restore_window"): 1,
+    ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_toggle"): 1,
+    ("src/composition/host_launcher_search.cpp", "reach_launcher_set_results"): 1,
+    ("src/composition/host_launcher_search.cpp", "reach_launcher_set_search_error"): 1,
+    ("src/composition/host_launcher_search.cpp", "reach_launcher_take_search_results"): 1,
+    ("src/composition/host_popup.cpp", "reach_context_menu_state_ptr"): 1,
+    ("src/composition/host_popup.cpp", "reach_dock_local_point"): 1,
+    ("src/composition/host_popup.cpp", "reach_dock_pointer_region_at"): 1,
+    ("src/composition/host_popup.cpp", "reach_top_bar_local_point"): 1,
+    ("src/composition/host_popup.cpp", "reach_top_bar_pointer_region_at"): 1,
+    ("src/composition/host_popup.cpp", "reach_top_bar_state_ptr"): 1,
+    ("src/composition/host_stage_orchestration.cpp", "reach_stage_begin_close"): 1,
+    ("src/composition/host_stage_orchestration.cpp", "reach_stage_is_open"): 4,
+    ("src/composition/host_stage_orchestration.cpp", "reach_stage_open"): 1,
+    ("src/composition/host_stage_orchestration.cpp", "reach_stage_refresh_tile_frames"): 1,
+    ("src/composition/host_stage_orchestration.cpp", "reach_stage_update_windows"): 1,
+    ("src/composition/host_switcher_input.cpp", "reach_switcher_handle_event"): 1,
+    ("src/composition/host_switcher_input.cpp", "reach_switcher_sync_windows"): 1,
+    ("src/composition/host_update.cpp", "reach_dock_build_layout"): 1,
+    ("src/composition/host_update.cpp", "reach_dock_rebuild_items"): 1,
+    ("src/composition/host_update.cpp", "reach_dock_slots_animating"): 1,
+    ("src/composition/host_update.cpp", "reach_dock_take_items_changed"): 1,
+    ("src/composition/host_update.cpp", "reach_launcher_is_open"): 1,
+    ("src/composition/host_update.cpp", "reach_launcher_set_pointer_context"): 1,
+    ("src/composition/host_update.cpp", "reach_launcher_state_ptr"): 1,
+    (
+        "src/composition/host_window_list_orchestration.cpp",
+        "reach_context_menu_hover_region_contains",
+    ): 1,
+    ("src/composition/host_window_list_orchestration.cpp", "reach_context_menu_is_open"): 1,
+    (
+        "src/composition/host_window_list_orchestration.cpp",
+        "reach_context_menu_open_window_list",
+    ): 1,
+    ("src/composition/host_window_list_orchestration.cpp", "reach_context_menu_state_ptr"): 1,
+    (
+        "src/composition/host_window_list_orchestration.cpp",
+        "reach_context_menu_window_list_is_open",
+    ): 4,
+    (
+        "src/composition/host_window_list_orchestration.cpp",
+        "reach_context_menu_window_list_remove",
+    ): 1,
+    ("src/composition/host_window_list_orchestration.cpp", "reach_dock_collect_item_windows"): 1,
+    ("src/composition/host_window_list_orchestration.cpp", "reach_dock_item_count"): 3,
+    ("src/composition/host_window_list_orchestration.cpp", "reach_dock_rect_to_screen"): 2,
+    ("src/composition/host_window_tracking.cpp", "reach_dock_mark_items_changed"): 1,
+}
+
 REGISTERED_SURFACE_IDS = (
     "REACH_SURFACE_ID_DOCK",
     "REACH_SURFACE_ID_TOP_BAR",
@@ -539,6 +654,31 @@ def layer_for_include(source: Path, include: Include) -> str | None:
 def includes_from(text: str) -> list[Include]:
     return [Include(delimiter, value) for delimiter, value in INCLUDE_RE.findall(text)]
 
+
+def concrete_feature_headers() -> dict[str, str]:
+    source_root = ROOT / "src" / "features"
+    include_root = ROOT / "include" / "reach" / "features"
+    if not source_root.exists() or not include_root.exists():
+        return {}
+
+    headers: dict[str, str] = {}
+    for feature_dir in source_root.iterdir():
+        if not feature_dir.is_dir() or feature_dir.name == "common":
+            continue
+        header = include_root / f"{feature_dir.name}.h"
+        if header.exists():
+            headers[f"reach/features/{header.name}"] = feature_dir.name
+    return headers
+
+
+def concrete_feature_symbols(headers: dict[str, str]) -> dict[str, str]:
+    symbols: dict[str, str] = {}
+    for include, feature in headers.items():
+        header = ROOT / "include" / include
+        for symbol in re.findall(r"\b(reach_[a-z0-9_]+)\s*\(", strip_comments(read(header))):
+            symbols[symbol] = feature
+    return symbols
+
 def strip_comments(text: str) -> str:
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     return re.sub(r"//.*", "", text)
@@ -681,6 +821,105 @@ def validate_capsule_state_encapsulation(path: Path, text: str) -> list[str]:
             f"(found a *_state_mut( accessor use)"
         )
     return violations
+
+def feature_owner_for_path(path: Path, headers: dict[str, str]) -> str | None:
+    relative = rel(path).replace("\\", "/")
+    if relative.startswith("src/features/"):
+        parts = relative.split("/")
+        if len(parts) >= 3 and parts[2] != "common":
+            return parts[2]
+    if relative.startswith("include/reach/features/"):
+        include = relative.removeprefix("include/")
+        return headers.get(include)
+    return None
+
+
+def validate_feature_peer_dependencies(
+    path: Path, text: str, headers: dict[str, str], symbols: dict[str, str]
+) -> list[str]:
+    owner = feature_owner_for_path(path, headers)
+    if owner is None:
+        return []
+
+    relative = rel(path).replace("\\", "/")
+    violations: list[str] = []
+    for include in includes_from(text):
+        peer = headers.get(include.value.replace("\\", "/"))
+        if peer is not None and peer != owner:
+            violations.append(
+                f"{relative}: feature {owner} must not include peer feature {peer} "
+                f"through {include.value}; use a features/common contract or a routed slot"
+            )
+
+    scan_text = strip_comments(text)
+    for symbol, peer in symbols.items():
+        if peer != owner and re.search(rf"\b{re.escape(symbol)}\s*\(", scan_text):
+            violations.append(
+                f"{relative}: feature {owner} must not call peer feature {peer} symbol {symbol}"
+            )
+    return violations
+
+
+def validate_composition_feature_boundary(
+    path: Path, text: str, headers: dict[str, str], symbols: dict[str, str]
+) -> list[str]:
+    relative = rel(path).replace("\\", "/")
+    if not relative.startswith("src/composition/") or relative in COMPOSITION_FEATURE_SEAMS:
+        return []
+
+    violations: list[str] = []
+    include_counts: dict[str, int] = {}
+    for include in includes_from(text):
+        normalized = include.value.replace("\\", "/")
+        if normalized in headers:
+            include_counts[normalized] = include_counts.get(normalized, 0) + 1
+    for include, count in include_counts.items():
+        baseline = CONCRETE_FEATURE_HEADER_BASELINE.get((relative, include), 0)
+        if count > baseline:
+            violations.append(
+                f"{relative}: concrete feature header {include} is allowed only in the "
+                f"composition seams (found {count}, baseline {baseline})"
+            )
+    for (baseline_file, include), baseline in CONCRETE_FEATURE_HEADER_BASELINE.items():
+        if baseline_file == relative and include_counts.get(include, 0) < baseline:
+            violations.append(
+                f"{relative}: concrete feature header baseline for {include} is stale; "
+                f"shrink it from {baseline} to {include_counts.get(include, 0)}"
+            )
+
+    scan_text = strip_comments(text)
+    symbol_counts: dict[str, int] = {}
+    for symbol in symbols:
+        count = len(re.findall(rf"\b{re.escape(symbol)}\s*\(", scan_text))
+        if count == 0:
+            continue
+        symbol_counts[symbol] = count
+        baseline = CONCRETE_FEATURE_SYMBOL_BASELINE.get((relative, symbol), 0)
+        if count > baseline:
+            violations.append(
+                f"{relative}: concrete feature symbol {symbol} is allowed only in the "
+                f"composition seams (found {count}, baseline {baseline})"
+            )
+    for (baseline_file, symbol), baseline in CONCRETE_FEATURE_SYMBOL_BASELINE.items():
+        if baseline_file == relative and symbol_counts.get(symbol, 0) < baseline:
+            violations.append(
+                f"{relative}: concrete feature symbol baseline for {symbol} is stale; "
+                f"shrink it from {baseline} to {symbol_counts.get(symbol, 0)}"
+            )
+    return violations
+
+
+def validate_composition_feature_baseline_files(paths: list[Path]) -> list[str]:
+    existing = {rel(path).replace("\\", "/") for path in paths}
+    baseline_files = {
+        path for path, _ in CONCRETE_FEATURE_HEADER_BASELINE
+    } | {
+        path for path, _ in CONCRETE_FEATURE_SYMBOL_BASELINE
+    }
+    return [
+        f"{path}: concrete feature baseline names a missing file; remove its entries"
+        for path in sorted(baseline_files - existing)
+    ]
 
 
 def validate_feature_config_ownership(path: Path, text: str) -> list[str]:
@@ -959,18 +1198,28 @@ def validate_cmake_dependencies() -> list[str]:
 def main() -> int:
     violations: list[str] = []
     warnings: list[str] = []
+    feature_headers = concrete_feature_headers()
+    feature_symbols = concrete_feature_symbols(feature_headers)
+    source_files = iter_source_files()
     violations.extend(validate_layer_directories())
     violations.extend(validate_document_contract())
     violations.extend(validate_cmake_dependencies())
     violations.extend(validate_feature_registry_contract())
     violations.extend(validate_generic_surface_loops())
+    violations.extend(validate_composition_feature_baseline_files(source_files))
 
-    for path in iter_source_files():
+    for path in source_files:
         text = read(path)
         violations.extend(validate_imports(path, text))
         violations.extend(validate_windows_boundary(path, text))
         violations.extend(validate_public_inner_api(path, text))
         violations.extend(validate_capsule_state_encapsulation(path, text))
+        violations.extend(
+            validate_feature_peer_dependencies(path, text, feature_headers, feature_symbols)
+        )
+        violations.extend(
+            validate_composition_feature_boundary(path, text, feature_headers, feature_symbols)
+        )
         violations.extend(validate_feature_config_ownership(path, text))
         violations.extend(validate_registered_feature_lifecycle(path, text))
         violations.extend(validate_migrated_surface_frames(path, text))

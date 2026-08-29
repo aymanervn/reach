@@ -49,6 +49,29 @@ int32_t reach_battery_is_open(const reach_battery *battery)
     return battery != nullptr && battery->state.open;
 }
 
+int32_t reach_battery_set_open(reach_battery *battery, int32_t open)
+{
+    if (battery == nullptr)
+    {
+        return 0;
+    }
+    int32_t next = open ? 1 : 0;
+    if (battery->state.open == next)
+    {
+        return 0;
+    }
+    if (next)
+    {
+        (void)reach_battery_refresh_power(battery);
+    }
+    else
+    {
+        reach_battery_reset_pressable(battery);
+    }
+    battery->state.open = next;
+    return 1;
+}
+
 void reach_battery_force_close(reach_battery *battery)
 {
     if (battery != nullptr)
@@ -128,6 +151,14 @@ void reach_battery_attach_services(reach_battery *battery, reach_system_stats *s
     }
 }
 
+void reach_battery_set_routes(reach_battery *battery, const reach_battery_routes *routes)
+{
+    if (battery != nullptr)
+    {
+        battery->routes = routes != nullptr ? *routes : reach_battery_routes{};
+    }
+}
+
 int32_t reach_battery_refresh_power(reach_battery *battery)
 {
     if (battery == nullptr)
@@ -183,9 +214,17 @@ void reach_battery_set_saver_pending(reach_battery *battery, int32_t pending,
     {
         return;
     }
-    battery->state.model.saver_pending = pending ? 1 : 0;
-    battery->state.model.saver_pending_enabled = pending_enabled ? 1 : 0;
+    int32_t next_pending = pending ? 1 : 0;
+    int32_t next_enabled = pending_enabled ? 1 : 0;
+    int32_t changed = battery->state.model.saver_pending != next_pending ||
+                      battery->state.model.saver_pending_enabled != next_enabled;
+    battery->state.model.saver_pending = next_pending;
+    battery->state.model.saver_pending_enabled = next_enabled;
     battery->saver_pending_seconds = 0.0;
+    if (changed && battery->routes.saver_pending_changed != nullptr)
+    {
+        battery->routes.saver_pending_changed(battery->routes.user, next_pending, next_enabled);
+    }
 }
 
 int32_t reach_battery_saver_pending(const reach_battery *battery)

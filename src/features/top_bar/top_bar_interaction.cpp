@@ -468,9 +468,7 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
     out->handled = 1;
     if (button == REACH_POINTER_BUTTON_SECONDARY)
     {
-        out->action_kind = REACH_FEATURE_ACTION_ACTIVATE_TRAY_ITEM;
-        out->action_id = detail;
-        out->action_index = REACH_TRAY_ACTION_RIGHT_CLICK;
+        (void)reach_top_bar_activate_tray_item(top_bar, detail, REACH_TRAY_ACTION_RIGHT_CLICK);
         return;
     }
     switch (region)
@@ -486,9 +484,7 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         out->action_id = detail;
         return;
     case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
-        out->action_kind = REACH_FEATURE_ACTION_ACTIVATE_TRAY_ITEM;
-        out->action_id = detail;
-        out->action_index = REACH_TRAY_ACTION_LEFT_CLICK;
+        (void)reach_top_bar_activate_tray_item(top_bar, detail, REACH_TRAY_ACTION_LEFT_CLICK);
         return;
     case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
         if (top_bar->routes.tray_overflow_activated != nullptr)

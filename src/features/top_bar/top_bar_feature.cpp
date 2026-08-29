@@ -1057,6 +1057,14 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         return;
     }
 
+    if (reach_tray_service_needs_refresh(top_bar->tray) &&
+        reach_top_bar_refresh_tray(top_bar) == REACH_OK && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+
     if (reach_top_bar_update_clock(top_bar) && out != nullptr)
     {
         out->redraw = 1;
