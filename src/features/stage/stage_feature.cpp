@@ -370,6 +370,38 @@ int32_t reach_stage_update_windows(reach_stage *stage, const reach_stage_open_wi
     return changed;
 }
 
+void reach_stage_refresh_tile_frames(reach_stage *stage, const reach_stage_open_window *windows,
+                                     size_t window_count)
+{
+    if (stage == nullptr || !stage->state.open)
+    {
+        return;
+    }
+    if (window_count > 0 && windows == nullptr)
+    {
+        return;
+    }
+
+    reach_stage_state *state = &stage->state;
+    for (size_t index = 0; index < state->tile_count; ++index)
+    {
+        reach_stage_tile *tile = &state->tiles[index];
+        if (tile->departing)
+        {
+            continue;
+        }
+
+        for (size_t candidate = 0; candidate < window_count; ++candidate)
+        {
+            if (windows[candidate].window == tile->window)
+            {
+                tile->source_rect = windows[candidate].frame;
+                break;
+            }
+        }
+    }
+}
+
 size_t reach_stage_thumbnail_count(const reach_stage *stage)
 {
     return stage != nullptr ? stage->state.tile_count : 0;

@@ -515,6 +515,17 @@ int32_t reach_host_surface_is_open(const reach_feature_runtime *desc)
            desc->definition->capsule_ops->is_open(desc->capsule);
 }
 
+int32_t reach_host_surface_needs_frame(const reach_feature_runtime *desc)
+{
+    return desc->definition->capsule_ops->needs_frame != nullptr &&
+           desc->definition->capsule_ops->needs_frame(desc->capsule);
+}
+
+int32_t reach_host_surface_presented(const reach_feature_runtime *desc)
+{
+    return reach_host_surface_is_open(desc) || reach_host_surface_needs_frame(desc);
+}
+
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
 {
     if (host == nullptr)

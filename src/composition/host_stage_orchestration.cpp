@@ -240,6 +240,11 @@ void reach_host_close_stage(reach_host *host)
     {
         return;
     }
+    reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
+    size_t count = reach_host_collect_stage_windows(host, windows, REACH_STAGE_MAX_TILES);
+    reach_stage_refresh_tile_frames(
+        reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE), windows, count);
+
     host->stage_transition.close_seconds = 0.0;
     reach_stage_begin_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
     reach_host_request_update(host);

@@ -207,6 +207,14 @@ The Desktop tile uses the Reach-owned top-level Progman compatibility host as it
 DWM source and crops the virtual-screen thumbnail to the primary monitor.
 Activating a tile suppresses every other tile's thumbnail for the close animation, so
 the chosen window animates alone instead of being covered by a maximized neighbour.
+A tile's `source_rect` is the screen rect the close animation lands on, and windows
+move while the overview is up — opening Stage forces the top bar shown, and the bar
+pushes every trespassing window down with its reveal progress. Composition therefore
+re-seats the landing rects from live `frame_bounds` immediately before
+`reach_stage_begin_close` (`reach_stage_refresh_tile_frames`), so a tile returns to
+where its window is now rather than where it was when the overview opened. That
+refresh deliberately leaves `target_rect` alone: the grid box is an aspect fit of
+`source_rect`, so re-fitting it would resize tiles the instant a close begins.
 
 Context Menu owns row hit resolution, hover state, command selection, dismissal,
 and cancellation through `handle_pointer`. Composition executes the reported
@@ -373,8 +381,17 @@ move/size-loop events.
 
 Two separate inputs decide how another open surface affects the bars, and both
 apply to both bars identically. A surface that declares `bar_shown_while_open`
-_forces_ them shown for as long as it is open; stage is the only one, because it
-is a window overview and wants the bars in frame. Any open popup instead only
+_forces_ them shown for as long as it is *presented*, not merely while its capsule
+reports open: `reach_host_surface_presented` is `is_open || needs_frame`, the same
+predicate the frame pass uses to decide a surface is still on screen, so the force
+survives the whole close animation and lifts on the frame the surface actually
+leaves. Stage is the only such surface, because it is a window overview and wants
+the bars in frame. The distinction is load-bearing rather than pedantic: the Stage
+capsule reports closed the moment `reach_stage_begin_close` runs, while its tiles
+keep animating for the full close duration, and dropping the force there demotes
+the top bar out of the topmost band mid-animation — `HWND_NOTOPMOST` lifts it to
+the top of the app band, under the still-banded Stage, so the closing overview
+covers it until the animation ends. Any open popup instead only
 _holds_ them: a bar already shown stays shown, but opening a popup never summons
 a hidden bar, and the hold lifts the frame the last popup closes. Everything else
 leaves the bars to hide on their own rules — the launcher and the clipboard are
