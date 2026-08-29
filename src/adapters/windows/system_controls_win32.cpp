@@ -399,7 +399,7 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
 
         reach_result result = REACH_ERROR;
         reach_bluetooth_state state = {};
-        int32_t notify_bluetooth = 0;
+        uint32_t notify_flags = 0;
 
         if (request_type == REACH_BLUETOOTH_REQUEST_GET_STATE)
         {
@@ -412,7 +412,8 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
         else if (request_type == REACH_BLUETOOTH_REQUEST_SET_ENABLED_ASYNC)
         {
             result = reach_bluetooth_worker_set_enabled(&radio, request_enabled);
-            notify_bluetooth = 1;
+            notify_flags = REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH |
+                           REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST;
         }
 
         if (adapter->bluetooth_lock_initialized)
@@ -428,9 +429,9 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
         {
             SetEvent(adapter->bluetooth_complete);
         }
-        if (notify_bluetooth)
+        if (notify_flags != 0)
         {
-            reach_system_controls_notify(adapter, REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
+            reach_system_controls_notify(adapter, notify_flags);
         }
     }
 

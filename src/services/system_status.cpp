@@ -114,6 +114,7 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
     {
         uint32_t generation = 0;
         uint32_t change_flags = 0;
+        reach_system_status_system_snapshot snapshot = {};
         {
             std::unique_lock<std::mutex> lock(worker->mutex);
             worker->cv.wait(lock, [worker]() { return worker->stop || worker->pending; });
@@ -126,47 +127,57 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
             worker->pending = 0;
             service->system_pending_change_flags = 0;
             worker->in_flight = 1;
+            snapshot = service->system_snapshot;
         }
 
-        reach_system_status_system_snapshot snapshot = {};
-        snapshot.change_flags = change_flags;
+        snapshot.change_flags |= change_flags;
 
-        if (service->system_controls.get_network_state != nullptr &&
-            service->system_controls.get_network_state(service->system_controls.userdata,
-                                                       &snapshot.network) == REACH_OK)
+        if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_NETWORK) != 0 &&
+            service->system_controls.get_network_state != nullptr)
         {
-            snapshot.network_valid = 1;
-        }
-        else
-        {
-            snapshot.network.kind = REACH_NETWORK_KIND_NONE;
-            snapshot.network.connected = 0;
-        }
-
-        if (service->system_controls.get_bluetooth_state != nullptr &&
-            service->system_controls.get_bluetooth_state(service->system_controls.userdata,
-                                                         &snapshot.bluetooth) == REACH_OK)
-        {
-            snapshot.bluetooth_valid = 1;
-        }
-        else
-        {
-            snapshot.bluetooth.available = 0;
-            snapshot.bluetooth.enabled = 0;
+            reach_network_state network = {};
+            if (service->system_controls.get_network_state(service->system_controls.userdata,
+                                                           &network) == REACH_OK)
+            {
+                snapshot.network = network;
+                snapshot.network_valid = 1;
+            }
         }
 
-        if (service->system_controls.get_power_state != nullptr &&
-            service->system_controls.get_power_state(service->system_controls.userdata,
-                                                     &snapshot.power) == REACH_OK)
+        if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH) != 0 &&
+            service->system_controls.get_bluetooth_state != nullptr)
         {
-            snapshot.power_valid = 1;
+            reach_bluetooth_state bluetooth = {};
+            if (service->system_controls.get_bluetooth_state(service->system_controls.userdata,
+                                                             &bluetooth) == REACH_OK)
+            {
+                snapshot.bluetooth = bluetooth;
+                snapshot.bluetooth_valid = 1;
+            }
         }
 
-        if (service->system_controls.get_brightness_state != nullptr &&
-            service->system_controls.get_brightness_state(service->system_controls.userdata,
-                                                          &snapshot.brightness) == REACH_OK)
+        if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_POWER) != 0 &&
+            service->system_controls.get_power_state != nullptr)
         {
-            snapshot.brightness_valid = 1;
+            reach_power_state power = {};
+            if (service->system_controls.get_power_state(service->system_controls.userdata,
+                                                         &power) == REACH_OK)
+            {
+                snapshot.power = power;
+                snapshot.power_valid = 1;
+            }
+        }
+
+        if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS) != 0 &&
+            service->system_controls.get_brightness_state != nullptr)
+        {
+            reach_brightness_state brightness = {};
+            if (service->system_controls.get_brightness_state(service->system_controls.userdata,
+                                                              &brightness) == REACH_OK)
+            {
+                snapshot.brightness = brightness;
+                snapshot.brightness_valid = 1;
+            }
         }
 
         {
@@ -305,7 +316,8 @@ void reach_system_status_refresh_system(reach_system_status *service, uint32_t c
         std::lock_guard<std::mutex> lock(service->system.mutex);
         ++service->system.generation;
         service->system.pending_generation = service->system.generation;
-        service->system_pending_change_flags |= change_flags;
+        service->system_pending_change_flags |=
+            change_flags != 0 ? change_flags : (uint32_t)REACH_SYSTEM_CONTROLS_CHANGE_ALL;
         service->system.pending = 1;
     }
     service->system.cv.notify_one();
@@ -352,6 +364,7 @@ int32_t reach_system_status_take_system(reach_system_status *service,
         return 0;
     }
     *out_snapshot = service->system_snapshot;
+    service->system_snapshot.change_flags = 0;
     return 1;
 }
 

@@ -796,7 +796,7 @@ void reach_host_toggle_battery(reach_host *host);
 void reach_host_refresh_battery_power(reach_host *host);
 void reach_host_sync_battery_saver_pending(reach_host *host);
 
-void reach_host_process_quick_settings_changes(reach_host *host, double delta_seconds);
+void reach_host_process_quick_settings_changes(reach_host *host);
 
 reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing_action action);
 reach_result reach_host_step_main_volume(reach_host *host, float delta);

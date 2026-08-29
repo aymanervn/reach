@@ -654,8 +654,6 @@ enum
 };
 
 static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
-static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_REFRESH_SECONDS = 0.35;
-static const double REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_TIMEOUT_SECONDS = 8.0;
 
 #define REACH_QUICK_SETTINGS_MAX_RETIRED_RENDER_ICONS                                              \
     (REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES)
@@ -671,10 +669,6 @@ struct reach_quick_settings
     reach_system_status *status;
 
     int32_t relayout_animate_pending;
-
-    int32_t bluetooth_pending_active;
-    double bluetooth_pending_elapsed_seconds;
-    double bluetooth_pending_refresh_elapsed_seconds;
 
     uint64_t retired_render_icons[REACH_QUICK_SETTINGS_MAX_RETIRED_RENDER_ICONS];
     size_t retired_render_icon_count;
@@ -830,9 +824,6 @@ void reach_quick_settings_reset(reach_quick_settings *quick_settings)
     state->layout = {};
     state->drag = {};
     reach_quick_settings_reset_pressable(quick_settings);
-    quick_settings->bluetooth_pending_active = 0;
-    quick_settings->bluetooth_pending_elapsed_seconds = 0.0;
-    quick_settings->bluetooth_pending_refresh_elapsed_seconds = 0.0;
 
     quick_settings->retired_render_icon_count = 0;
 }
@@ -914,7 +905,6 @@ static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
         return 0;
     }
     return reach_animation_manager_any_active(&quick_settings->animations) ||
-           quick_settings->bluetooth_pending_active ||
            (quick_settings->status != nullptr &&
             (reach_system_status_audio_pending(quick_settings->status) ||
              reach_system_status_system_pending(quick_settings->status)));
@@ -1372,7 +1362,7 @@ size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quic
 }
 
 void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
-                                          double delta_seconds, reach_feature_tick_result *out)
+                                          reach_feature_tick_result *out)
 {
     if (out != nullptr)
     {
@@ -1383,41 +1373,6 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
         return;
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-
-    if (state->open)
-    {
-        if (state->model.bluetooth_pending && quick_settings->bluetooth_pending_active)
-        {
-            if (delta_seconds < 0.0)
-            {
-                delta_seconds = 0.0;
-            }
-            quick_settings->bluetooth_pending_elapsed_seconds += delta_seconds;
-            quick_settings->bluetooth_pending_refresh_elapsed_seconds += delta_seconds;
-
-            if (quick_settings->bluetooth_pending_elapsed_seconds >=
-                REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_TIMEOUT_SECONDS)
-            {
-                reach_quick_settings_set_bluetooth_pending(quick_settings, 0, 0);
-                reach_quick_settings_refresh_system(quick_settings,
-                                                    REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
-                out->redraw = 1;
-            }
-            else
-            {
-                if (quick_settings->bluetooth_pending_refresh_elapsed_seconds >=
-                        REACH_QUICK_SETTINGS_BLUETOOTH_PENDING_REFRESH_SECONDS &&
-                    (quick_settings->status == nullptr ||
-                     !reach_system_status_system_pending(quick_settings->status)))
-                {
-                    quick_settings->bluetooth_pending_refresh_elapsed_seconds = 0.0;
-                    reach_quick_settings_refresh_system(quick_settings,
-                                                        REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
-                }
-                out->request_update = 1;
-            }
-        }
-    }
 
     if (quick_settings->status == nullptr)
     {
@@ -1430,13 +1385,8 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
         reach_quick_settings_system_apply_result apply_result = {};
         reach_quick_settings_apply_system_states(
             quick_settings, &system_snapshot.network, &system_snapshot.bluetooth,
-            &system_snapshot.brightness, system_snapshot.bluetooth_valid, &apply_result);
-        if (apply_result.bluetooth_pending_cleared)
-        {
-            quick_settings->bluetooth_pending_active = 0;
-            quick_settings->bluetooth_pending_elapsed_seconds = 0.0;
-            quick_settings->bluetooth_pending_refresh_elapsed_seconds = 0.0;
-        }
+            &system_snapshot.brightness, system_snapshot.bluetooth_valid,
+            system_snapshot.change_flags, &apply_result);
         if (apply_result.relayout)
         {
             out->relayout = 1;
@@ -1722,9 +1672,6 @@ void reach_quick_settings_set_bluetooth_pending(reach_quick_settings *quick_sett
     {
         reach_quick_settings_model_set_bluetooth_pending(
             &reach_quick_settings_state_mut(quick_settings)->model, pending, pending_enabled);
-        quick_settings->bluetooth_pending_active = pending ? 1 : 0;
-        quick_settings->bluetooth_pending_elapsed_seconds = 0.0;
-        quick_settings->bluetooth_pending_refresh_elapsed_seconds = 0.0;
     }
 }
 
@@ -1810,7 +1757,7 @@ void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settin
                                               const reach_network_state *network,
                                               const reach_bluetooth_state *bluetooth,
                                               const reach_brightness_state *brightness,
-                                              int32_t bluetooth_valid,
+                                              int32_t bluetooth_valid, uint32_t change_flags,
                                               reach_quick_settings_system_apply_result *out)
 {
     if (quick_settings == nullptr || out == nullptr)
@@ -1826,12 +1773,14 @@ void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settin
 
     reach_quick_settings_model_set_system_states(&state->model, network, bluetooth, brightness);
 
-    if (bluetooth_pending && bluetooth_valid &&
-        (!state->model.bluetooth.available ||
-         state->model.bluetooth.enabled == bluetooth_pending_enabled))
+    const int32_t bluetooth_request_settled =
+        (change_flags & REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST) != 0;
+    if (bluetooth_pending &&
+        (bluetooth_request_settled ||
+         (bluetooth_valid && (!state->model.bluetooth.available ||
+                              state->model.bluetooth.enabled == bluetooth_pending_enabled))))
     {
         reach_quick_settings_model_set_bluetooth_pending(&state->model, 0, 0);
-        out->bluetooth_pending_cleared = 1;
     }
 
     int32_t layout_changed = previous_brightness.available != state->model.brightness.available;

@@ -216,7 +216,7 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
         reach_quick_settings_system_apply_result apply_result = {};
         reach_quick_settings_apply_system_states(
             reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-            &model->network, &model->bluetooth, &brightness, 0, &apply_result);
+            &model->network, &model->bluetooth, &brightness, 0, 0, &apply_result);
         if (apply_result.relayout)
         {
             reach_host_relayout_quick_settings(host, 1);

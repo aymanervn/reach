@@ -120,7 +120,7 @@ void reach_host_on_audio_volume_changed(void *user)
     }
 }
 
-void reach_host_process_quick_settings_changes(reach_host *host, double delta_seconds)
+void reach_host_process_quick_settings_changes(reach_host *host)
 {
     if (host == nullptr)
     {
@@ -139,7 +139,7 @@ void reach_host_process_quick_settings_changes(reach_host *host, double delta_se
     reach_feature_tick_result changes = {};
     reach_quick_settings_process_changes(
         reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-        delta_seconds, &changes);
+        &changes);
 
     uint64_t retired[REACH_AUDIO_VOLUME_MAX_SESSIONS + REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     size_t retired_count = reach_quick_settings_take_retired_render_icons(
