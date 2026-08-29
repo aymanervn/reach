@@ -638,6 +638,9 @@ void reach_host_finish_surface_transitions(reach_host *host);
 reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
                                                      const reach_ui_event *event,
                                                      reach_pointer_event_kind kind);
+int32_t reach_host_popup_owner_trigger(const reach_feature_runtime *popup,
+                                       const reach_feature_runtime *source,
+                                       const reach_capsule_pointer_result *source_result);
 
 void reach_host_request_update(reach_host *host);
 void reach_host_on_launcher_window_event(void *user, const reach_ui_event *event);

@@ -48,16 +48,6 @@ static void reach_host_surface_switcher_close(reach_host *host)
 #define REACH_HOST_LAYER_TOP_BAR_EDGE_REVEAL 140
 #define REACH_HOST_LAYER_STAGE_EDGE_REVEAL 150
 
-enum reach_host_anchor_slot
-{
-    REACH_HOST_ANCHOR_WHOLE_SURFACE = 0,
-    REACH_HOST_ANCHOR_TOP_BAR_TRAY,
-    REACH_HOST_ANCHOR_TOP_BAR_QUICK_SETTINGS,
-    REACH_HOST_ANCHOR_TOP_BAR_BATTERY,
-    REACH_HOST_ANCHOR_TOP_BAR_POWER,
-    REACH_HOST_ANCHOR_DOCK_ITEM
-};
-
 static void reach_host_define_feature(reach_host *host, reach_surface_id id,
                                       reach_surface_class cls, reach_surface_runtime *surface,
                                       reach_host_surface_transition *transition,
@@ -199,13 +189,13 @@ static void reach_host_init_feature_definitions(reach_host *host)
         REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor_slot =
-        REACH_HOST_ANCHOR_TOP_BAR_QUICK_SETTINGS;
+        REACH_TOP_BAR_CONTROL_QUICK_SETTINGS;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.popup_chrome = 1;
     definitions[REACH_SURFACE_ID_BATTERY].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
-    definitions[REACH_SURFACE_ID_BATTERY].layout.anchor_slot = REACH_HOST_ANCHOR_TOP_BAR_BATTERY;
+    definitions[REACH_SURFACE_ID_BATTERY].layout.anchor_slot = REACH_TOP_BAR_CONTROL_BATTERY;
     definitions[REACH_SURFACE_ID_BATTERY].surface.popup_chrome = 1;
     definitions[REACH_SURFACE_ID_TRAY].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
-    definitions[REACH_SURFACE_ID_TRAY].layout.anchor_slot = REACH_HOST_ANCHOR_TOP_BAR_TRAY;
+    definitions[REACH_SURFACE_ID_TRAY].layout.anchor_slot = REACH_TOP_BAR_CONTROL_TRAY;
     definitions[REACH_SURFACE_ID_STAGE].surface.edge_reveal = {
         1,
         REACH_HOST_LAYER_STAGE_EDGE_REVEAL,
@@ -264,7 +254,7 @@ static const reach_feature_surface_ops reach_dock_surface_ops = {
 static int32_t reach_dock_resolve_anchor(const void *capsule, uint32_t slot, size_t index,
                                          reach_feature_anchor *out)
 {
-    if (slot != REACH_HOST_ANCHOR_DOCK_ITEM || out == nullptr)
+    if (slot != REACH_DOCK_CONTROL_ITEM || out == nullptr)
     {
         return 0;
     }
@@ -343,7 +333,7 @@ static int32_t reach_context_menu_surface_layout_anchor(const void *capsule,
         return 0;
     }
     out->surface = state->power_open ? REACH_SURFACE_ID_TOP_BAR : REACH_SURFACE_ID_DOCK;
-    out->slot = state->power_open ? REACH_HOST_ANCHOR_TOP_BAR_POWER : REACH_HOST_ANCHOR_DOCK_ITEM;
+    out->slot = state->power_open ? REACH_TOP_BAR_CONTROL_POWER : REACH_DOCK_CONTROL_ITEM;
     out->index = state->target_index;
     return 1;
 }
@@ -535,19 +525,19 @@ static int32_t reach_top_bar_resolve_anchor(const void *capsule, uint32_t slot, 
     }
 
     reach_rect_f32 button = {};
-    if (slot == REACH_HOST_ANCHOR_TOP_BAR_TRAY)
+    if (slot == REACH_TOP_BAR_CONTROL_TRAY)
     {
         button = state->layout.tray_overflow_button;
     }
-    else if (slot == REACH_HOST_ANCHOR_TOP_BAR_QUICK_SETTINGS)
+    else if (slot == REACH_TOP_BAR_CONTROL_QUICK_SETTINGS)
     {
         button = state->layout.quick_settings_button;
     }
-    else if (slot == REACH_HOST_ANCHOR_TOP_BAR_BATTERY)
+    else if (slot == REACH_TOP_BAR_CONTROL_BATTERY)
     {
         button = state->layout.battery_button;
     }
-    else if (slot == REACH_HOST_ANCHOR_TOP_BAR_POWER)
+    else if (slot == REACH_TOP_BAR_CONTROL_POWER)
     {
         button = state->layout.power_button;
     }

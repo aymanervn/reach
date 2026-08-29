@@ -397,7 +397,12 @@ feature definitions: each registered surface has exactly one immutable
 `reach_feature_definition` and one `reach_feature_runtime`. The definition owns its opaque
 create/destroy factory, capsule operations, surface operations, layout, and policy. The runtime
 contains only the bound surface, transition, capsule, resolved geometry, native-overlay state,
-and a pointer to that definition. `reach_host_feature_capsule<T>` derives any concrete view from that
+and a pointer to that definition. A registered surface joins every loop by being in that table:
+lifecycle in `reach_host_create_with_dependencies`, layout in `reach_host_init_layout`,
+transition completion in `reach_host_finish_surface_transitions`, input ordering in
+`reach_host_pointer_order`, and the frame pass in `reach_host_update` each iterate it whole, and
+`tools/check_architecture.py` rejects any of them being narrowed to a hand-maintained feature
+list. `reach_host_feature_capsule<T>` derives any concrete view from that
 capsule; `reach_host` carries no parallel typed capsule pointers. Host construction and cleanup iterate the factories
 generically; a shared surface such as the tray declares no factory and binds to its owning
 top-bar capsule. Policy runs as class loops over the runtime table — tick, needs-frame, game
@@ -414,18 +419,30 @@ transients → persistent, first handled result wins), with the definition's
 (SOURCE_GATED / DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED). Source-gated rows are delivered to first — press and release go to the row whose
 `role` matches the event source (or whose `pointer_sequence_active` hook reports
 an in-flight sequence) before the rest of the table sees them — so no surface
-needs a hand-written branch to receive its own input. Capsules report outcomes as one shared `reach_feature_action_kind`
+needs a hand-written branch to receive its own input. The source row is evaluated
+against the same flags as every other row, so a surface that receives its own
+press still closes or applies an unhandled result exactly as it would from the
+loop. Capsules report outcomes as one shared `reach_feature_action_kind`
 (`include/reach/features/common/feature_action.h`); `host_feature_actions.cpp` dispatches
 every entry in a single generic switch keyed on the emitting runtime, so no feature has a
-composition-side translator. Four press kinds that only composition's pointer policy reads stay
-feature-private in a reserved range above `REACH_FEATURE_ACTION_PRIVATE_BASE`, kept disjoint from
-the shared vocabulary by `static_assert` in the Dock and Top Bar. An action that opens or changes
+composition-side translator. A press that only composition's pointer policy reads is not an action
+at all: the capsule publishes an opaque `reach_feature_control` naming which of its own controls was
+pressed, and those same slot tokens serve as the anchor slots in `reach_feature_layout_anchor`, so
+one vocabulary describes both "this control was pressed" and "this popup hangs off that control".
+An action that opens or changes
 another feature is not in the vocabulary at all: the feature exposes a neutral outbound slot
 (`reach_dock_routes`, `reach_top_bar_routes`) and `interfeature_routes.cpp` alone decides what it
-reaches, so no feature names a peer. Top-bar-cluster
-pairwise policy (QS-button pass-through, power-press dismissal, tray/launcher
-close rules) and true capture pre-emption (dock drag, QS slider, launcher
-scrollbar) stay as named exceptions ahead of the loops. Hotkey and
+reaches, so no feature names a peer. Policy that depends on another surface being
+open is derived rather than branched: `reach_host_popup_owner_trigger` resolves an
+open popup's layout anchor and compares it with the control the source published,
+so composition learns only whether the press landed on the control that owns that
+popup. The popup capsule decides what that means and answers with neutral flags —
+`continue_source_sequence` keeps the owner's press alive so its release can toggle,
+`cancel_source_sequence` ends it, `CLOSE_SELF` dismisses — and composition executes
+the flags without naming a feature. Capture pre-emption is generic in the same way:
+the highest-priority surface whose `pointer_capture_active` predicate is set owns the
+sequence, with `EXCLUSIVE_WHILE_OPEN`, `CAPTURE_CONSUMES_RELEASE`, and
+`CAPTURE_OWNS_MOVE` declaring the differences between them. Hotkey and
 action→port translators for media transport, volume, and brightness live in
 `host_system_actions.cpp`, out of the input routing path.
 The system HUD consumes the final top-bar visibility result cached by that same

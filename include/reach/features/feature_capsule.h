@@ -37,6 +37,20 @@ extern "C"
         REACH_POINTER_COORDINATE_SURFACE_LOCAL = 1
     } reach_pointer_coordinate_space;
 
+    typedef enum reach_pointer_surface_relation
+    {
+        REACH_POINTER_SURFACE_UNKNOWN = 0,
+        REACH_POINTER_SURFACE_INSIDE = 1,
+        REACH_POINTER_SURFACE_OUTSIDE = 2
+    } reach_pointer_surface_relation;
+
+    typedef struct reach_feature_control
+    {
+        uint32_t slot;
+        size_t index;
+        int32_t valid;
+    } reach_feature_control;
+
     typedef struct reach_pointer_event
     {
         reach_pointer_event_kind kind;
@@ -46,6 +60,8 @@ extern "C"
         int32_t wheel_delta;
         uint32_t modifiers;
         reach_pointer_button button;
+        reach_pointer_surface_relation surface_relation;
+        int32_t owner_trigger;
     } reach_pointer_event;
 
     typedef struct reach_capsule_action
@@ -65,6 +81,9 @@ extern "C"
         int32_t relayout;
         int32_t capture;
         int32_t sync_pointer_subscriptions;
+        int32_t continue_source_sequence;
+        int32_t cancel_source_sequence;
+        reach_feature_control control;
         reach_capsule_action action;
     } reach_capsule_pointer_result;
 

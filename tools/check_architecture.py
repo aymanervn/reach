@@ -375,7 +375,19 @@ INTERFEATURE_ROUTE_TARGETS: dict[str, str] = {
 
 FEATURE_ACTION_ENUM_RE = re.compile(r"REACH_[A-Z_]+_POINTER_ACTION_[A-Z_]+")
 
-FEATURE_ACTION_POLICY_ALLOWED = {"src/composition/host_input.cpp"}
+FEATURE_ACTION_POLICY_ALLOWED: set[str] = set()
+
+GENERIC_SURFACE_LOOPS = (
+    ("src/composition/host_lifecycle.cpp", "reach_host_create_with_dependencies", "lifecycle"),
+    ("src/composition/host_surfaces.cpp", "reach_host_init_layout", "layout"),
+    ("src/composition/host_update.cpp", "reach_host_finish_surface_transitions", "transition"),
+    ("src/composition/host_input.cpp", "reach_host_pointer_order", "input"),
+    ("src/composition/host_update.cpp", "reach_host_update", "frame"),
+)
+
+SURFACE_TABLE_LOOP_RE = re.compile(
+    r"for\s*\([^;]*;[^;]*<\s*REACH_HOST_SURFACE_COUNT\s*;[^)]*\)"
+)
 
 MIGRATED_SURFACE_FRAME_RE = re.compile(
     r"\breach_host_(frame|render)_(dock|top_bar|launcher|context_menu|stage|"
@@ -741,6 +753,43 @@ def validate_feature_action_vocabulary(path: Path, text: str) -> list[str]:
     ]
 
 
+def function_body(text: str, name: str) -> str | None:
+    match = re.search(rf"^[A-Za-z_][A-Za-z0-9_ *]*\b{name}\s*\(", text, re.MULTILINE)
+    if match is None:
+        return None
+    open_brace = text.find("{", match.end())
+    if open_brace < 0:
+        return None
+    depth = 0
+    for index in range(open_brace, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_brace : index + 1]
+    return None
+
+
+def validate_generic_surface_loops() -> list[str]:
+    """Every registered surface joins lifecycle, layout, transition, input, and frame
+    work by being in the runtime table. Each loop must iterate the whole table, so a
+    hand-maintained feature list cannot come back."""
+    violations: list[str] = []
+    for relative, function, loop in GENERIC_SURFACE_LOOPS:
+        text = strip_comments(read(ROOT / relative))
+        body = function_body(text, function)
+        if body is None:
+            violations.append(f"{relative}: missing the generic {loop} entry point {function}")
+            continue
+        if SURFACE_TABLE_LOOP_RE.search(body) is None:
+            violations.append(
+                f"{relative}: {function} must iterate the whole runtime table so every "
+                f"registered surface joins the {loop} loop automatically"
+            )
+    return violations
+
+
 def validate_migrated_surface_frames(path: Path, text: str) -> list[str]:
     relative = rel(path).replace("\\", "/")
     if not relative.startswith("src/composition/"):
@@ -914,6 +963,7 @@ def main() -> int:
     violations.extend(validate_document_contract())
     violations.extend(validate_cmake_dependencies())
     violations.extend(validate_feature_registry_contract())
+    violations.extend(validate_generic_surface_loops())
 
     for path in iter_source_files():
         text = read(path)

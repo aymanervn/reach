@@ -128,12 +128,14 @@ extern "C"
         REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON = 8
     } reach_top_bar_pointer_region;
 
-    typedef enum reach_top_bar_pointer_action_kind
+    typedef enum reach_top_bar_control_slot
     {
-        REACH_TOP_BAR_POINTER_ACTION_NONE = 0,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER = REACH_FEATURE_ACTION_PRIVATE_BASE + 1,
-        REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS = REACH_FEATURE_ACTION_PRIVATE_BASE + 11
-    } reach_top_bar_pointer_action_kind;
+        REACH_TOP_BAR_CONTROL_NONE = 0,
+        REACH_TOP_BAR_CONTROL_TRAY = 1,
+        REACH_TOP_BAR_CONTROL_QUICK_SETTINGS = 2,
+        REACH_TOP_BAR_CONTROL_BATTERY = 3,
+        REACH_TOP_BAR_CONTROL_POWER = 4
+    } reach_top_bar_control_slot;
 
     typedef struct reach_top_bar_state
     {
@@ -141,7 +143,6 @@ extern "C"
         reach_bar_visibility_state visibility;
         reach_pressable pressable;
         int32_t power_hovered;
-        int32_t power_release_suppressed;
 
         uint16_t clock_time_text[32];
         uint16_t clock_date_text[64];
@@ -231,8 +232,6 @@ extern "C"
 
     reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar *top_bar,
                                                                  int32_t local_x, int32_t local_y);
-    void reach_top_bar_suppress_power_release(reach_top_bar *top_bar);
-
     void reach_top_bar_set_battery_saver_pending(reach_top_bar *top_bar, int32_t pending,
                                                  int32_t pending_enabled);
 

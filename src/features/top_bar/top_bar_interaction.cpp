@@ -3,11 +3,6 @@
 #include "top_bar_common.h"
 #include "top_bar_now_playing.h"
 
-static_assert(REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER >= REACH_FEATURE_ACTION_PRIVATE_BASE &&
-                  REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS >=
-                      REACH_FEATURE_ACTION_PRIVATE_BASE,
-              "top bar pointer policy kinds must not collide with the shared action vocabulary");
-
 static int32_t reach_top_bar_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
     return rect.width > 0.0f && rect.height > 0.0f && (float)x >= rect.x &&
@@ -385,17 +380,6 @@ static void reach_top_bar_apply_pressable_result(const reach_pressable_result *p
         out->sync_pointer_subscriptions || pressable->sync_pointer_subscriptions;
 }
 
-static int32_t reach_top_bar_take_power_release_suppressed(reach_top_bar *top_bar)
-{
-    reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
-    if (state == nullptr || !state->power_release_suppressed)
-    {
-        return 0;
-    }
-    state->power_release_suppressed = 0;
-    return 1;
-}
-
 void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t local_y,
                                 reach_pointer_button button, reach_top_bar_event_result *out)
 {
@@ -410,11 +394,6 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
     if (target == REACH_PRESSABLE_TARGET_NONE)
     {
         return;
-    }
-    if (button == REACH_POINTER_BUTTON_PRIMARY &&
-        region != REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON)
-    {
-        state->power_release_suppressed = 0;
     }
     reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
     reach_pressable_result pressable = {};
@@ -436,17 +415,21 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
     switch (region)
     {
     case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_POWER;
+        out->control = {REACH_TOP_BAR_CONTROL_POWER, 0, 1};
         return;
     case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
-        out->action_kind = REACH_TOP_BAR_POINTER_ACTION_PRESS_QUICK_SETTINGS;
+        out->control = {REACH_TOP_BAR_CONTROL_QUICK_SETTINGS, 0, 1};
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
+        out->control = {REACH_TOP_BAR_CONTROL_TRAY, 0, 1};
+        return;
+    case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
+        out->control = {REACH_TOP_BAR_CONTROL_BATTERY, 0, 1};
         return;
     case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
     case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
-    case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
     case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
-    case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
     default:
         return;
     }
@@ -477,10 +460,6 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
     }
     if (!pressable.activated)
     {
-        if (button == REACH_POINTER_BUTTON_PRIMARY)
-        {
-            state->power_release_suppressed = 0;
-        }
         return;
     }
     reach_top_bar_pointer_region region =
@@ -497,8 +476,7 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
     switch (region)
     {
     case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
-        if (!reach_top_bar_take_power_release_suppressed(top_bar) &&
-            top_bar->routes.power_activated != nullptr)
+        if (top_bar->routes.power_activated != nullptr)
         {
             top_bar->routes.power_activated(top_bar->routes.user);
         }
@@ -617,7 +595,6 @@ void reach_top_bar_pointer_cancel(reach_top_bar *top_bar, reach_top_bar_event_re
     reach_pressable_cancel(&state->pressable, &feedback, &pressable);
     reach_top_bar_apply_pressable_result(&pressable, out);
     (void)reach_top_bar_tray_drag_end(top_bar);
-    state->power_release_suppressed = 0;
 }
 
 void reach_top_bar_pointer_leave(reach_top_bar *top_bar, reach_top_bar_event_result *out)

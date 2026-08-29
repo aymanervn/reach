@@ -760,14 +760,6 @@ reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar
     return reach_top_bar_hit_test(&top_bar->state.layout, local_x, local_y);
 }
 
-void reach_top_bar_suppress_power_release(reach_top_bar *top_bar)
-{
-    if (top_bar != nullptr)
-    {
-        top_bar->state.power_release_suppressed = 1;
-    }
-}
-
 static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
 {
     reach_top_bar_state *state = &top_bar->state;
@@ -1034,7 +1026,6 @@ static void reach_top_bar_capsule_reset(void *capsule)
                                       reach_top_bar_tray_item_x_animation_id(index));
     }
     top_bar->state.power_hovered = 0;
-    top_bar->state.power_release_suppressed = 0;
     top_bar->state.bluetooth_absent_seconds = 0.0;
 }
 
@@ -1221,6 +1212,7 @@ static void reach_top_bar_capsule_apply_event_result(const reach_top_bar_event_r
     out->action.kind = event_result->action_kind;
     out->action.id = event_result->action_id;
     out->action.index = event_result->action_index;
+    out->control = event_result->control;
 }
 
 static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,

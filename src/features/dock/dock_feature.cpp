@@ -33,10 +33,6 @@ static void reach_dock_settle_slots(reach_dock *dock);
 static void reach_dock_snap_slots(reach_dock *dock);
 static void reach_dock_gate_animating_hit(reach_dock *dock, reach_dock_hit_result *hit);
 
-static_assert(REACH_DOCK_POINTER_ACTION_PRESS_ITEM >= REACH_FEATURE_ACTION_PRIVATE_BASE &&
-                  REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER >= REACH_FEATURE_ACTION_PRIVATE_BASE,
-              "dock pointer policy kinds must not collide with the shared action vocabulary");
-
 struct reach_dock
 {
     reach_animation_manager manager;
@@ -626,8 +622,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         if (hit.type == REACH_DOCK_HIT_TRIGGER)
         {
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER;
-            out->action.index = REACH_DOCK_TRIGGER_PRIMARY;
+            out->control = {REACH_DOCK_CONTROL_TRIGGER, REACH_DOCK_TRIGGER_PRIMARY, 1};
             return;
         }
         if (hit.type == REACH_DOCK_HIT_ITEM)
@@ -638,8 +633,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                                   &interaction);
             reach_dock_capsule_apply_interaction_result(&interaction, out);
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_ITEM;
-            out->action.index = hit.index;
+            out->control = {REACH_DOCK_CONTROL_ITEM, hit.index, 1};
             return;
         }
         return;

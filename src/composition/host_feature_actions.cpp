@@ -1,8 +1,5 @@
 #include "host_internal.h"
 
-static_assert(REACH_FEATURE_ACTION_RESTORE_CLIPBOARD_ITEM < REACH_FEATURE_ACTION_PRIVATE_BASE,
-              "shared feature action vocabulary must stay below the feature-private range");
-
 static void reach_host_close_surface(reach_host *host, const reach_feature_runtime *desc)
 {
     if (desc->definition->dismiss != nullptr)

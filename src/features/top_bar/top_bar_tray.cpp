@@ -469,6 +469,22 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
     {
         return;
     }
+    if (event->kind == REACH_POINTER_EVENT_DOWN && event->button == REACH_POINTER_BUTTON_PRIMARY &&
+        event->owner_trigger)
+    {
+        out->handled = 1;
+        out->continue_source_sequence = 1;
+        return;
+    }
+    if (event->kind == REACH_POINTER_EVENT_DOWN &&
+        event->surface_relation == REACH_POINTER_SURFACE_OUTSIDE)
+    {
+        out->handled = 1;
+        out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
+        out->cancel_source_sequence = event->button == REACH_POINTER_BUTTON_PRIMARY;
+        out->continue_source_sequence = event->button == REACH_POINTER_BUTTON_SECONDARY;
+        return;
+    }
     reach_top_bar_tray_popup *popup = top_bar->tray_popup;
     reach_top_bar_tray_hit hit = {};
     hit.index = REACH_MAX_TRAY_ITEMS;

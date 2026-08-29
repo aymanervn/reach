@@ -114,12 +114,12 @@ extern "C"
         REACH_DOCK_POINTER_REGION_TRIGGER = 5
     } reach_dock_pointer_region;
 
-    typedef enum reach_dock_pointer_action_kind
+    typedef enum reach_dock_control_slot
     {
-        REACH_DOCK_POINTER_ACTION_NONE = 0,
-        REACH_DOCK_POINTER_ACTION_PRESS_ITEM = REACH_FEATURE_ACTION_PRIVATE_BASE + 2,
-        REACH_DOCK_POINTER_ACTION_PRESS_TRIGGER = REACH_FEATURE_ACTION_PRIVATE_BASE + 19
-    } reach_dock_pointer_action_kind;
+        REACH_DOCK_CONTROL_NONE = 0,
+        REACH_DOCK_CONTROL_ITEM = 1,
+        REACH_DOCK_CONTROL_TRIGGER = 2
+    } reach_dock_control_slot;
 
     typedef struct reach_dock_routes
     {
