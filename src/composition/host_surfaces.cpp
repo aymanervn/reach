@@ -509,6 +509,90 @@ void reach_host_surface_opening(reach_host *host, reach_surface_id opening, reac
     }
 }
 
+void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtime *runtime,
+                                          const reach_feature_tick_result *result)
+{
+    if (host == nullptr || runtime == nullptr || result == nullptr)
+    {
+        return;
+    }
+    if (result->redraw && runtime->surface != nullptr)
+    {
+        runtime->surface->dirty_flags = 1;
+        host->dirty.render = 1;
+    }
+    if (result->relayout)
+    {
+        host->dirty.layout = 1;
+    }
+    if (result->request_update)
+    {
+        reach_host_request_update(host);
+    }
+}
+
+void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id id, int32_t open)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    const reach_feature_control_ops *control = runtime->definition->control_ops;
+    if (runtime->capsule == nullptr || control == nullptr || control->set_open == nullptr)
+    {
+        return;
+    }
+    int32_t next = open ? 1 : 0;
+    if (next && !reach_host_surface_is_open(runtime))
+    {
+        reach_host_surface_opening(host, id, runtime->definition->surface.opening_origin);
+    }
+    reach_feature_tick_result result = {};
+    if (!control->set_open(runtime->capsule, next, &result))
+    {
+        return;
+    }
+    reach_host_surface_transition_set(host, runtime->transition, next);
+    reach_host_sync_pointer_move_subscriptions(host);
+    reach_host_sync_popup_mouse_hook(host);
+    if (!next)
+    {
+        reach_host_request_bar_visibility_update(host);
+    }
+    reach_host_apply_feature_tick_result(host, runtime, &result);
+}
+
+void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id)
+{
+    if (host != nullptr && id < REACH_HOST_SURFACE_COUNT)
+    {
+        reach_host_set_registered_surface_open(
+            host, id, !reach_host_surface_is_open(&host->feature_runtimes[id]));
+    }
+}
+
+void reach_host_notify_registered_features(reach_host *host,
+                                           const reach_feature_notification *notification)
+{
+    if (host == nullptr || notification == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        const reach_feature_control_ops *control = runtime->definition->control_ops;
+        if (runtime->capsule == nullptr || control == nullptr || control->notify == nullptr)
+        {
+            continue;
+        }
+        reach_feature_tick_result result = {};
+        control->notify(runtime->capsule, notification, &result);
+        reach_host_apply_feature_tick_result(host, runtime, &result);
+    }
+}
+
 int32_t reach_host_surface_is_open(const reach_feature_runtime *desc)
 {
     return desc->definition->capsule_ops->is_open == nullptr ||

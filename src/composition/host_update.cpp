@@ -30,6 +30,39 @@ void reach_host_request_update(reach_host *host)
     }
 }
 
+void reach_host_on_system_controls_changed(void *user, uint32_t change_flags)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host != nullptr && change_flags != 0)
+    {
+        host->quick_settings_system_change_flags.fetch_or(change_flags);
+        reach_host_request_update(host);
+    }
+}
+
+void reach_host_on_audio_volume_changed(void *user)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host != nullptr)
+    {
+        host->audio_volume_changed.store(1);
+        reach_host_request_update(host);
+    }
+}
+
+static void reach_host_process_system_status_requests(reach_host *host)
+{
+    uint32_t system_flags = host->quick_settings_system_change_flags.exchange(0);
+    if (system_flags != 0)
+    {
+        reach_system_status_refresh_system(host->system_status, system_flags);
+    }
+    if (host->audio_volume_changed.exchange(0) != 0)
+    {
+        reach_system_status_refresh_audio(host->system_status);
+    }
+}
+
 void reach_host_finish_surface_transitions(reach_host *host)
 {
     if (host == nullptr)
@@ -71,18 +104,7 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
         }
         reach_feature_tick_result tick = {};
         desc->definition->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
-        if (tick.redraw && desc->surface != nullptr)
-        {
-            desc->surface->dirty_flags = 1;
-        }
-        if (tick.relayout)
-        {
-            host->dirty.layout = 1;
-        }
-        if (tick.request_update)
-        {
-            reach_host_request_update(host);
-        }
+        reach_host_apply_feature_tick_result(host, desc, &tick);
     }
     reach_host_finish_surface_transitions(host);
 }
@@ -120,14 +142,7 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
         }
         reach_feature_tick_result tick = {};
         desc->definition->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
-        if (tick.redraw && desc->surface != nullptr)
-        {
-            desc->surface->dirty_flags = 1;
-        }
-        if (tick.request_update)
-        {
-            reach_host_request_update(host);
-        }
+        reach_host_apply_feature_tick_result(host, desc, &tick);
     }
 
     if (host->monitors.ops.primary != nullptr)
@@ -210,28 +225,17 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         return reach_host_update_game_mode_surfaces(host, delta_seconds);
     }
 
+    reach_host_process_system_status_requests(host);
     reach_host_tick_animations(host, delta_seconds);
+    reach_host_drain_registered_render_resources(host);
     reach_host_window_list_update(host, delta_seconds);
     reach_host_drain_now_playing_retired_covers(host);
     reach_host_process_deferred_launcher_app_launch(host);
-    reach_host_process_clipboard_refresh(host);
-    if (reach_clipboard_tick_scroll(
-            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD),
-            delta_seconds))
-    {
-        host->dirty.layout = 1;
-        host->clipboard_surface.dirty_flags = 1;
-        reach_host_request_update(host);
-    }
-
     reach_host_sync_bar_layout_conditions(host);
     if (reach_host_can_move_bars_without_redraw(host))
     {
         return reach_host_move_bar_animation_frame(host);
     }
-
-    reach_host_process_quick_settings_changes(host);
-    reach_host_sync_battery_saver_pending(host);
 
     host->popup_hook_reassert_seconds += delta_seconds;
     if (host->popup_hook_reassert_seconds >= 2.0)
@@ -254,16 +258,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     {
         host->top_bar.dirty_flags = 1;
         host->dirty.layout = 1;
-        reach_host_refresh_battery_power(host);
     }
-    if (reach_tray_service_needs_refresh(host->tray_service))
-    {
-        (void)reach_host_refresh_tray_items(host);
-        host->tray.dirty_flags = 1;
-        host->top_bar.dirty_flags = 1;
-        host->dirty.layout = 1;
-    }
-    reach_host_drain_tray_retired_icons(host);
 
     reach_result monitor_result = reach_host_refresh_monitor_layout(host);
     if (monitor_result != REACH_OK)

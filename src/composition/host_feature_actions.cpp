@@ -78,10 +78,6 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
     case REACH_FEATURE_ACTION_MEDIA_CONTROL:
         return reach_host_execute_media_action(host, (reach_now_playing_action)action->id);
 
-    case REACH_FEATURE_ACTION_ACTIVATE_TRAY_ITEM:
-        return reach_host_activate_tray_item(host, (uint32_t)action->id,
-                                             (reach_tray_action)action->index);
-
     case REACH_FEATURE_ACTION_CYCLE_INPUT_LANGUAGE:
         return reach_host_cycle_input_language(host);
 
@@ -103,39 +99,6 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
         }
         return reveal_result;
     }
-
-    case REACH_FEATURE_ACTION_CLEAR_CLIPBOARD:
-        reach_host_clear_clipboard(host);
-        return REACH_OK;
-
-    case REACH_FEATURE_ACTION_REMOVE_CLIPBOARD_ITEM:
-    {
-        const reach_clipboard_item *item = reach_clipboard_item_at(
-            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD),
-            action->index);
-        if (item != nullptr && item->id == action->id)
-        {
-            reach_clipboard_item removed = *item;
-            if (reach_clipboard_remove_item(reach_host_feature_capsule<reach_clipboard_feature>(
-                                                host, REACH_SURFACE_ID_CLIPBOARD),
-                                            action->index, action->id))
-            {
-                reach_host_release_clipboard_item(host, &removed);
-            }
-        }
-        return REACH_OK;
-    }
-
-    case REACH_FEATURE_ACTION_RESTORE_CLIPBOARD_ITEM:
-        if (host->clipboard.ops.restore != nullptr &&
-            host->clipboard.ops.restore(host->clipboard.provider, action->id) == REACH_OK)
-        {
-            reach_clipboard_confirm_restore(reach_host_feature_capsule<reach_clipboard_feature>(
-                                                host, REACH_SURFACE_ID_CLIPBOARD),
-                                            action->index);
-            reach_host_close_surface(host, desc);
-        }
-        return REACH_OK;
 
     case REACH_FEATURE_ACTION_NONE:
     default:

@@ -20,7 +20,7 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
     cancel.type = REACH_UI_EVENT_POINTER_CANCEL;
     (void)reach_host_handle_event(host, &cancel);
     reach_host_close_transient_surfaces(host, 1);
-    reach_host_set_clipboard_open(host, 0);
+    reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
 
     reach_switcher_force_close(
         reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER));

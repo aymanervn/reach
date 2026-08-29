@@ -37,6 +37,99 @@ static reach_clipboard_item make_item(uint64_t id, uint64_t hash)
     return item;
 }
 
+struct fake_clipboard_provider
+{
+    reach_clipboard_changed_callback changed;
+    void *changed_user;
+    reach_clipboard_item next;
+    uint64_t released_id;
+    int start_count;
+    int stop_count;
+    int update_count;
+};
+
+static reach_result fake_clipboard_start(reach_clipboard_provider *provider,
+                                         reach_clipboard_changed_callback callback, void *user)
+{
+    fake_clipboard_provider *fake = reinterpret_cast<fake_clipboard_provider *>(provider);
+    fake->changed = callback;
+    fake->changed_user = user;
+    ++fake->start_count;
+    return REACH_OK;
+}
+
+static reach_result fake_clipboard_stop(reach_clipboard_provider *provider)
+{
+    ++reinterpret_cast<fake_clipboard_provider *>(provider)->stop_count;
+    return REACH_OK;
+}
+
+static reach_result fake_clipboard_capture(reach_clipboard_provider *provider,
+                                           reach_clipboard_item *out)
+{
+    *out = reinterpret_cast<fake_clipboard_provider *>(provider)->next;
+    return REACH_OK;
+}
+
+static void fake_clipboard_release(reach_clipboard_provider *provider, uint64_t item_id)
+{
+    reinterpret_cast<fake_clipboard_provider *>(provider)->released_id = item_id;
+}
+
+static void fake_clipboard_request_update(void *user)
+{
+    ++static_cast<fake_clipboard_provider *>(user)->update_count;
+}
+
+static void test_capsule_owns_capture_and_resource_retirement()
+{
+    fake_clipboard_provider fake = {};
+    reach_clipboard_port port = {};
+    port.provider = reinterpret_cast<reach_clipboard_provider *>(&fake);
+    port.ops.start = fake_clipboard_start;
+    port.ops.stop = fake_clipboard_stop;
+    port.ops.capture_current = fake_clipboard_capture;
+    port.ops.release = fake_clipboard_release;
+
+    reach_clipboard_feature *clipboard = nullptr;
+    expect_true(reach_clipboard_feature_create(&clipboard) == REACH_OK,
+                "clipboard capsule is created");
+    reach_clipboard_feature_attach_port(clipboard, &port, fake_clipboard_request_update, &fake);
+    expect_true(reach_clipboard_feature_start(clipboard) == REACH_OK,
+                "clipboard capsule starts its provider");
+    expect_true(fake.start_count == 1, "provider starts exactly once");
+
+    fake.next = make_item(1, 100);
+    fake.next.thumbnail_id = 11;
+    fake.changed(fake.changed_user);
+    expect_true(fake.update_count == 1, "provider change requests a host update");
+
+    reach_feature_tick_result tick = {};
+    reach_clipboard_feature_capsule_ops()->tick(clipboard, 0.0, &tick);
+    expect_true(reach_clipboard_item_count(clipboard) == 1,
+                "capsule captures the provider item during its tick");
+    expect_true(tick.redraw && tick.relayout && tick.request_update,
+                "accepted capture reports its generic runtime effects");
+
+    fake.next = make_item(2, 100);
+    fake.next.thumbnail_id = 22;
+    fake.changed(fake.changed_user);
+    tick = {};
+    reach_clipboard_feature_capsule_ops()->tick(clipboard, 0.0, &tick);
+
+    reach_clipboard_retired_resource retired = {};
+    expect_true(reach_clipboard_feature_take_retired_resources(clipboard, &retired, 1) == 1,
+                "duplicate capture exposes one retired resource");
+    expect_true(retired.item_id == 2 && retired.thumbnail_id == 22,
+                "retired resource keeps provider and renderer identities together");
+    reach_clipboard_feature_release_resource(clipboard, &retired);
+    expect_true(fake.released_id == 2, "resource release returns ownership to the provider");
+
+    reach_clipboard_feature_stop(clipboard);
+    expect_true(fake.stop_count == 1, "provider stops exactly once");
+    reach_clipboard_feature_destroy(clipboard);
+}
+
 static void test_capacity_and_order()
 {
     reach_clipboard_model model = {};
@@ -158,5 +251,6 @@ int main()
     test_preview();
     test_scrollbar_edges();
     test_layout_wraps_runtime_border_around_stable_content();
+    test_capsule_owns_capture_and_resource_retirement();
     return failures == 0 ? 0 : 1;
 }

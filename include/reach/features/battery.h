@@ -4,7 +4,7 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
-#include "reach/features/popup.h"
+#include "reach/features/common/popup.h"
 #include "reach/services/system_stats.h"
 #include "reach/services/system_status.h"
 #include "reach/support/util.h"
@@ -65,6 +65,12 @@ extern "C"
 
     typedef struct reach_battery reach_battery;
 
+    typedef struct reach_battery_routes
+    {
+        void *user;
+        void (*saver_pending_changed)(void *user, int32_t pending, int32_t pending_enabled);
+    } reach_battery_routes;
+
     reach_result reach_battery_create(reach_battery **out_battery);
     void reach_battery_destroy(reach_battery *battery);
 
@@ -72,11 +78,13 @@ extern "C"
 
     void reach_battery_attach_services(reach_battery *battery, reach_system_stats *stats,
                                        reach_system_status *status);
+    void reach_battery_set_routes(reach_battery *battery, const reach_battery_routes *routes);
 
     int32_t reach_battery_refresh_power(reach_battery *battery);
 
     const reach_battery_state *reach_battery_state_ptr(const reach_battery *battery);
     int32_t reach_battery_is_open(const reach_battery *battery);
+    int32_t reach_battery_set_open(reach_battery *battery, int32_t open);
     void reach_battery_force_close(reach_battery *battery);
     void reach_battery_reset(reach_battery *battery);
 

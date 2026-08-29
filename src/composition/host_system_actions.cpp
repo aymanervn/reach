@@ -13,24 +13,6 @@ static float reach_host_clamp01(float value)
     return value;
 }
 
-static void reach_host_mark_quick_settings_changed(reach_host *host)
-{
-    host->quick_settings.dirty_flags = 1;
-    host->dirty.render = 1;
-    reach_host_request_update(host);
-}
-
-static void reach_host_mark_system_hud_changed(reach_host *host)
-{
-    if (host == nullptr)
-    {
-        return;
-    }
-    host->system_hud.dirty_flags = 1;
-    host->dirty.render = 1;
-    reach_host_request_update(host);
-}
-
 reach_result reach_host_launch_settings_app(reach_host *host)
 {
     if (host == nullptr || host->settings_launcher.ops.resolve == nullptr)
@@ -58,13 +40,11 @@ reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing
     if (reach_now_playing_service_try_action(host->now_playing_service, action))
     {
         host->dock.dirty_flags = 1;
-        if (host->top_bar_hidden)
-        {
-            reach_system_hud_show_media(
-                reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD),
-                action);
-            reach_host_mark_system_hud_changed(host);
-        }
+        reach_feature_notification notification = {};
+        notification.kind = REACH_FEATURE_NOTIFICATION_MEDIA_ACTION;
+        notification.media_action = action;
+        notification.present = host->top_bar_hidden;
+        reach_host_notify_registered_features(host, &notification);
         reach_host_request_update(host);
     }
     return REACH_OK;
@@ -91,23 +71,12 @@ reach_result reach_host_step_main_volume(reach_host *host, float delta)
         return result;
     }
 
-    if (reach_quick_settings_state_ptr(
-            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS))
-            ->open)
-    {
-        reach_quick_settings_apply_main_volume(
-            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-            level, state.muted ? 1 : 0);
-        reach_host_mark_quick_settings_changed(host);
-    }
-    if (host->top_bar_hidden)
-    {
-        reach_audio_volume_state next = state;
-        next.level = level;
-        reach_system_hud_show_volume(
-            reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD), &next);
-        reach_host_mark_system_hud_changed(host);
-    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_MAIN_VOLUME;
+    notification.volume = state;
+    notification.volume.level = level;
+    notification.present = host->top_bar_hidden;
+    reach_host_notify_registered_features(host, &notification);
 
     return REACH_OK;
 }
@@ -133,23 +102,13 @@ reach_result reach_host_toggle_main_volume_mute(reach_host *host)
         return result;
     }
 
-    if (reach_quick_settings_state_ptr(
-            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS))
-            ->open)
-    {
-        reach_quick_settings_apply_main_volume(
-            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-            reach_host_clamp01(state.level), muted);
-        reach_host_mark_quick_settings_changed(host);
-    }
-    if (host->top_bar_hidden)
-    {
-        reach_audio_volume_state next = state;
-        next.muted = muted;
-        reach_system_hud_show_volume(
-            reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD), &next);
-        reach_host_mark_system_hud_changed(host);
-    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_MAIN_VOLUME;
+    notification.volume = state;
+    notification.volume.level = reach_host_clamp01(state.level);
+    notification.volume.muted = muted;
+    notification.present = host->top_bar_hidden;
+    reach_host_notify_registered_features(host, &notification);
 
     return REACH_OK;
 }
@@ -198,37 +157,11 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
         return REACH_OK;
     }
 
-    float level = state.level;
-
-    if (reach_quick_settings_state_ptr(
-            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS))
-            ->open)
-    {
-        reach_brightness_state brightness = state;
-        brightness.level = level;
-        const reach_quick_settings_model *model =
-            &reach_quick_settings_state_ptr(reach_host_feature_capsule<reach_quick_settings>(
-                                                host, REACH_SURFACE_ID_QUICK_SETTINGS))
-                 ->model;
-        reach_quick_settings_system_apply_result apply_result = {};
-        reach_quick_settings_apply_system_states(
-            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-            &model->network, &model->bluetooth, &brightness, 0, 0, &apply_result);
-        if (apply_result.relayout)
-        {
-            reach_host_relayout_quick_settings(host, 1);
-        }
-        reach_host_mark_quick_settings_changed(host);
-    }
-    if (host->top_bar_hidden)
-    {
-        reach_brightness_state brightness = state;
-        brightness.level = level;
-        reach_system_hud_show_brightness(
-            reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD),
-            &brightness);
-        reach_host_mark_system_hud_changed(host);
-    }
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_BRIGHTNESS;
+    notification.brightness = state;
+    notification.present = host->top_bar_hidden;
+    reach_host_notify_registered_features(host, &notification);
 
     return REACH_OK;
 }

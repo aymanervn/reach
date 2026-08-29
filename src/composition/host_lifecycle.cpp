@@ -79,6 +79,11 @@ static void reach_host_on_app_control_notify(void *user)
     reach_host_request_update(static_cast<reach_host *>(user));
 }
 
+static void reach_host_on_feature_update_requested(void *user)
+{
+    reach_host_request_update(static_cast<reach_host *>(user));
+}
+
 static void reach_host_on_now_playing_ready(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
@@ -90,17 +95,6 @@ static void reach_host_on_now_playing_ready(void *user)
                                               REACH_UI_EVENT_NOW_PLAYING_CHANGED);
 }
 
-static void reach_host_on_clipboard_changed(void *user)
-{
-    reach_host *host = static_cast<reach_host *>(user);
-    if (host == nullptr || host->clipboard_surface.window.ops.post_event == nullptr)
-    {
-        return;
-    }
-    (void)host->clipboard_surface.window.ops.post_event(host->clipboard_surface.window.window,
-                                                        REACH_UI_EVENT_CLIPBOARD_CHANGED);
-}
-
 static void reach_host_cleanup(reach_host *host)
 {
     if (host == nullptr)
@@ -108,17 +102,12 @@ static void reach_host_cleanup(reach_host *host)
         return;
     }
 
-    reach_host_set_tray_popup_open(host, 0);
-    reach_host_set_quick_settings_open(host, 0);
+    reach_host_stop_registered_features(host);
     reach_host_stop_config_service(host);
     reach_host_stop_launcher_search_worker(host);
     reach_icon_service_stop(host->icon_service);
     reach_host_stop_app_control(host);
     reach_now_playing_service_stop(host->now_playing_service);
-    if (host->clipboard.ops.stop != nullptr)
-    {
-        (void)host->clipboard.ops.stop(host->clipboard.provider);
-    }
     if (host->system_controls.stop_watching != nullptr)
     {
         host->system_controls.stop_watching(host->system_controls.userdata);
@@ -127,106 +116,18 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->audio_volume.stop_watching(host->audio_volume.userdata);
     }
-    reach_host_close_context_menu(host);
     reach_host_sync_popup_mouse_hook(host);
-    reach_host_release_tray_render_icons(host);
+    reach_host_release_registered_render_resources(host);
     reach_idle_watch_stop(host->idle_watch);
     reach_system_status_stop(host->system_status);
     reach_system_stats_stop(host->system_stats);
-    reach_host_release_quick_settings_audio_render_icons(host);
-    reach_host_release_clipboard_items(host);
+    reach_host_clear_interfeature_routes(host);
+    reach_host_attach_registered_features(host, nullptr);
     if (host->monitors.ops.destroy != nullptr)
     {
         host->monitors.ops.destroy(host->monitors.list);
     }
-    if (host->launcher.window.ops.destroy != nullptr)
-    {
-        host->launcher.window.ops.destroy(host->launcher.window.window);
-    }
-    if (host->launcher.renderer.ops.destroy != nullptr)
-    {
-        host->launcher.renderer.ops.destroy(host->launcher.renderer.backend);
-    }
-    if (host->dock.window.ops.destroy != nullptr)
-    {
-        host->dock.window.ops.destroy(host->dock.window.window);
-    }
-    if (host->dock.renderer.ops.destroy != nullptr)
-    {
-        host->dock.renderer.ops.destroy(host->dock.renderer.backend);
-    }
-    if (host->top_bar.window.ops.destroy != nullptr)
-    {
-        host->top_bar.window.ops.destroy(host->top_bar.window.window);
-    }
-    if (host->top_bar.renderer.ops.destroy != nullptr)
-    {
-        host->top_bar.renderer.ops.destroy(host->top_bar.renderer.backend);
-    }
-    if (host->tray.window.ops.destroy != nullptr)
-    {
-        host->tray.window.ops.destroy(host->tray.window.window);
-    }
-    if (host->tray.renderer.ops.destroy != nullptr)
-    {
-        host->tray.renderer.ops.destroy(host->tray.renderer.backend);
-    }
-    if (host->switcher.window.ops.destroy != nullptr)
-    {
-        host->switcher.window.ops.destroy(host->switcher.window.window);
-    }
-    if (host->switcher.renderer.ops.destroy != nullptr)
-    {
-        host->switcher.renderer.ops.destroy(host->switcher.renderer.backend);
-    }
-    if (host->context_menu.window.ops.destroy != nullptr)
-    {
-        host->context_menu.window.ops.destroy(host->context_menu.window.window);
-    }
-    if (host->context_menu.renderer.ops.destroy != nullptr)
-    {
-        host->context_menu.renderer.ops.destroy(host->context_menu.renderer.backend);
-    }
-    if (host->quick_settings.window.ops.destroy != nullptr)
-    {
-        host->quick_settings.window.ops.destroy(host->quick_settings.window.window);
-    }
-    if (host->quick_settings.renderer.ops.destroy != nullptr)
-    {
-        host->quick_settings.renderer.ops.destroy(host->quick_settings.renderer.backend);
-    }
-    if (host->battery.window.ops.destroy != nullptr)
-    {
-        host->battery.window.ops.destroy(host->battery.window.window);
-    }
-    if (host->battery.renderer.ops.destroy != nullptr)
-    {
-        host->battery.renderer.ops.destroy(host->battery.renderer.backend);
-    }
-    if (host->system_hud.window.ops.destroy != nullptr)
-    {
-        host->system_hud.window.ops.destroy(host->system_hud.window.window);
-    }
-    if (host->system_hud.renderer.ops.destroy != nullptr)
-    {
-        host->system_hud.renderer.ops.destroy(host->system_hud.renderer.backend);
-    }
-    if (host->clipboard_surface.window.ops.destroy != nullptr)
-    {
-        host->clipboard_surface.window.ops.destroy(host->clipboard_surface.window.window);
-    }
-    if (host->clipboard_surface.renderer.ops.destroy != nullptr)
-    {
-        host->clipboard_surface.renderer.ops.destroy(host->clipboard_surface.renderer.backend);
-    }
-    if (host->stage.window.ops.destroy != nullptr)
-    {
-        host->stage.window.ops.destroy(host->stage.window.window);
-    }
-    if (host->stage.renderer.ops.destroy != nullptr)
-    {
-        host->stage.renderer.ops.destroy(host->stage.renderer.backend);
-    }
+    reach_host_destroy_registered_surface_ports(host);
     if (host->window_thumbnails.ops.destroy != nullptr)
     {
         host->window_thumbnails.ops.destroy(host->window_thumbnails.thumbnails);
@@ -256,33 +157,8 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->config_store.ops.destroy(host->config_store.store);
     }
-    reach_launcher_attach_search(
-        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER), nullptr);
-    reach_launcher_attach_icons(
-        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER), nullptr);
-    reach_launcher_set_terminal_icon_ref(
-        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER), nullptr);
-    reach_dock_attach_services(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
-                               nullptr, nullptr);
-    reach_top_bar_attach_app_control(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr);
-    reach_top_bar_attach_services(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr, nullptr,
-        nullptr, nullptr, nullptr, nullptr, nullptr);
     reach_tray_service_destroy(host->tray_service);
     host->tray_service = nullptr;
-    reach_switcher_attach_services(
-        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER), nullptr,
-        nullptr);
-    reach_quick_settings_attach_status(
-        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-        nullptr);
-    reach_battery_attach_services(
-        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), nullptr,
-        nullptr);
-    reach_host_clear_interfeature_routes(host);
-    reach_system_hud_attach_now_playing(
-        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD), nullptr);
     reach_search_service_destroy(host->search_service);
     host->search_service = nullptr;
     reach_system_status_destroy(host->system_status);
@@ -359,17 +235,6 @@ static void reach_host_cleanup(reach_host *host)
 
     host->monitors = {};
     host->popup_capture = {};
-    reach_surface_runtime_init(&host->launcher);
-    reach_surface_runtime_init(&host->dock);
-    reach_surface_runtime_init(&host->top_bar);
-    reach_surface_runtime_init(&host->tray);
-    reach_surface_runtime_init(&host->switcher);
-    reach_surface_runtime_init(&host->stage);
-    reach_surface_runtime_init(&host->context_menu);
-    reach_surface_runtime_init(&host->quick_settings);
-    reach_surface_runtime_init(&host->battery);
-    reach_surface_runtime_init(&host->system_hud);
-    reach_surface_runtime_init(&host->clipboard_surface);
     host->screen_hotspots = {};
     host->image_loader = {};
     host->window_thumbnails = {};
@@ -418,22 +283,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     reach_result result = REACH_OK;
 
-    reach_dock_model_defaults(&host->dock_config);
-    reach_surface_runtime_init(&host->launcher);
-    reach_surface_runtime_init(&host->dock);
-    reach_surface_runtime_init(&host->top_bar);
-    reach_surface_runtime_init(&host->tray);
-    reach_surface_runtime_init(&host->switcher);
-    reach_surface_runtime_init(&host->stage);
-    reach_surface_runtime_init(&host->context_menu);
-    reach_surface_runtime_init(&host->quick_settings);
-    reach_surface_runtime_init(&host->battery);
-    reach_surface_runtime_init(&host->system_hud);
-    reach_surface_runtime_init(&host->clipboard_surface);
     reach_animation_manager_init(&host->animations, host->animation_tracks,
                                  REACH_HOST_ANIMATION_COUNT);
     reach_host_surface_transitions_init(host);
     reach_host_init_feature_registry(host);
+    reach_host_init_registered_surfaces(host);
     if (reach_host_create_registered_features(host) != REACH_OK)
     {
         result = REACH_ERROR;
@@ -448,38 +302,14 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
             desc->definition->capsule_ops->reset(desc->capsule);
         }
     }
-    reach_clipboard_feature_clear_refresh(
-        reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD));
-
     host->system_controls = {};
     host->quick_settings_system_change_flags.store(0);
     host->audio_volume_changed.store(0);
 
-    host->launcher.window = dependencies->launcher_window;
-    host->launcher.renderer = dependencies->launcher_renderer;
-    host->dock.window = dependencies->dock_window;
-    host->dock.renderer = dependencies->dock_renderer;
-    host->top_bar.window = dependencies->top_bar_window;
-    host->top_bar.renderer = dependencies->top_bar_renderer;
+    reach_host_bind_registered_surface_ports(host, dependencies);
     host->screen_hotspots = dependencies->screen_hotspots;
     host->image_loader = dependencies->image_loader;
-    host->tray.window = dependencies->tray_window;
-    host->tray.renderer = dependencies->tray_renderer;
-    host->switcher.window = dependencies->switcher_window;
-    host->switcher.renderer = dependencies->switcher_renderer;
-    host->stage.window = dependencies->stage_window;
-    host->stage.renderer = dependencies->stage_renderer;
     host->window_thumbnails = dependencies->window_thumbnails;
-    host->context_menu.window = dependencies->context_menu_window;
-    host->context_menu.renderer = dependencies->context_menu_renderer;
-    host->quick_settings.window = dependencies->quick_settings_window;
-    host->quick_settings.renderer = dependencies->quick_settings_renderer;
-    host->battery.window = dependencies->battery_window;
-    host->battery.renderer = dependencies->battery_renderer;
-    host->system_hud.window = dependencies->system_hud_window;
-    host->system_hud.renderer = dependencies->system_hud_renderer;
-    host->clipboard_surface.window = dependencies->clipboard_window;
-    host->clipboard_surface.renderer = dependencies->clipboard_renderer;
     if (result == REACH_OK)
     {
         result = reach_host_create_edge_reveals(host);
@@ -583,54 +413,36 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         result = REACH_ERROR;
     }
     host->media_controls = dependencies->media_controls;
+    host->clipboard = dependencies->clipboard;
     host->now_playing_service = nullptr;
     if (reach_now_playing_service_create(host->media_controls, reach_host_on_now_playing_ready,
                                          host, &host->now_playing_service) != REACH_OK)
     {
         result = REACH_ERROR;
     }
-    reach_launcher_attach_search(
-        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
-        host->search_service);
-    reach_launcher_attach_icons(
-        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
-        host->icon_service);
     uint16_t terminal_icon_ref[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
     if (host->terminal_launcher.ops.icon_ref != nullptr)
     {
         (void)host->terminal_launcher.ops.icon_ref(
             host->terminal_launcher.launcher, terminal_icon_ref, REACH_SEARCH_RESULT_PATH_CAPACITY);
     }
-    reach_launcher_set_terminal_icon_ref(
-        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
-        terminal_icon_ref);
-    reach_dock_attach_services(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
-                               host->icon_service, host->window_tracking);
-    reach_top_bar_attach_services(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR),
-        host->now_playing_service, host->icon_service, host->window_tracking, host->system_stats,
-        host->clock, host->input_language, host->tray_service);
-    reach_top_bar_attach_app_control(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR),
-        host->app_control);
-    reach_switcher_attach_services(
-        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER),
-        host->icon_service, host->window_tracking);
-    reach_quick_settings_attach_status(
-        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
-        host->system_status);
-    reach_battery_attach_services(
-        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY),
-        host->system_stats, host->system_status);
+    reach_feature_dependencies feature_dependencies = {host->search_service,
+                                                       host->icon_service,
+                                                       host->window_tracking,
+                                                       host->now_playing_service,
+                                                       host->system_stats,
+                                                       host->clock,
+                                                       host->input_language,
+                                                       host->tray_service,
+                                                       host->app_control,
+                                                       host->system_status,
+                                                       &host->clipboard,
+                                                       reach_host_on_feature_update_requested,
+                                                       host,
+                                                       terminal_icon_ref};
+    reach_host_attach_registered_features(host, &feature_dependencies);
     reach_host_bind_interfeature_routes(host);
-    reach_top_bar_attach_status(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR),
-        host->system_status);
-    reach_system_hud_attach_now_playing(
-        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD),
-        host->now_playing_service);
     reach_system_status_refresh_system(host->system_status, 0);
-    host->clipboard = dependencies->clipboard;
     host->theme = reach_theme_default();
 
     if (host->monitors.list == nullptr || host->clipboard.provider == nullptr ||
@@ -679,10 +491,10 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->dirty.layout = 1;
     host->dirty.render = 1;
     host->dirty.monitors = 1;
-    host->dock.dirty_flags = 1;
-    host->launcher.dirty_flags = 1;
-    host->switcher.dirty_flags = 1;
-    host->quick_settings.dirty_flags = 1;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        host->feature_runtimes[index].surface->dirty_flags = 1;
+    }
     *out_shell = host;
     return REACH_OK;
 }
@@ -731,115 +543,27 @@ reach_result reach_host_start(reach_host *host)
                                                  reach_host_on_foreground_changed, host);
     }
 
-    if (host->dock.window.ops.set_event_callback != nullptr)
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        result = host->dock.window.ops.set_event_callback(host->dock.window.window,
-                                                          reach_host_on_dock_window_event, host);
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        reach_surface_runtime *surface = runtime->surface;
+        if (surface == nullptr || surface->window.ops.set_event_callback == nullptr)
+        {
+            continue;
+        }
+        host->surface_event_bindings[index] = {host, runtime};
+        result = surface->window.ops.set_event_callback(surface->window.window,
+                                                        reach_host_on_registered_surface_event,
+                                                        &host->surface_event_bindings[index]);
         if (result != REACH_OK)
         {
             return result;
         }
     }
-    if (host->top_bar.window.ops.set_event_callback != nullptr)
+    result = reach_host_start_registered_features(host);
+    if (result != REACH_OK)
     {
-        result = host->top_bar.window.ops.set_event_callback(
-            host->top_bar.window.window, reach_host_on_top_bar_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->launcher.window.ops.set_event_callback != nullptr)
-    {
-        result = host->launcher.window.ops.set_event_callback(
-            host->launcher.window.window, reach_host_on_launcher_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->tray.window.ops.set_event_callback != nullptr)
-    {
-        result = host->tray.window.ops.set_event_callback(host->tray.window.window,
-                                                          reach_host_on_tray_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->switcher.window.ops.set_event_callback != nullptr)
-    {
-        result = host->switcher.window.ops.set_event_callback(
-            host->switcher.window.window, reach_host_on_switcher_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->stage.window.ops.set_event_callback != nullptr)
-    {
-        result = host->stage.window.ops.set_event_callback(host->stage.window.window,
-                                                           reach_host_on_stage_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->context_menu.window.ops.set_event_callback != nullptr)
-    {
-        result = host->context_menu.window.ops.set_event_callback(
-            host->context_menu.window.window, reach_host_on_context_menu_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->quick_settings.window.ops.set_event_callback != nullptr)
-    {
-        result = host->quick_settings.window.ops.set_event_callback(
-            host->quick_settings.window.window, reach_host_on_quick_settings_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->battery.window.ops.set_event_callback != nullptr)
-    {
-        result = host->battery.window.ops.set_event_callback(
-            host->battery.window.window, reach_host_on_battery_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->system_hud.window.ops.set_event_callback != nullptr)
-    {
-        result = host->system_hud.window.ops.set_event_callback(
-            host->system_hud.window.window, reach_host_on_system_hud_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->clipboard_surface.window.ops.set_event_callback != nullptr)
-    {
-        result = host->clipboard_surface.window.ops.set_event_callback(
-            host->clipboard_surface.window.window, reach_host_on_clipboard_window_event, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-    }
-    if (host->clipboard.ops.start != nullptr)
-    {
-        result = host->clipboard.ops.start(host->clipboard.provider,
-                                           reach_host_on_clipboard_changed, host);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-        reach_clipboard_feature_request_refresh(
-            reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD));
+        return result;
     }
     reach_host_sync_pointer_move_subscriptions(host);
     result = reach_host_start_edge_reveals(host);
@@ -890,17 +614,10 @@ reach_result reach_host_start(reach_host *host)
     host->dirty.layout = 1;
     host->dirty.render = 1;
     host->dirty.monitors = 1;
-    host->dock.dirty_flags = 1;
-    host->top_bar.dirty_flags = 1;
-    host->launcher.dirty_flags = 1;
-    host->tray.dirty_flags = 1;
-    host->switcher.dirty_flags = 1;
-    host->quick_settings.dirty_flags = 1;
-    host->system_hud.dirty_flags = 1;
-    reach_context_menu_force_close(
-        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
-    reach_quick_settings_force_close(
-        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS));
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        host->feature_runtimes[index].surface->dirty_flags = 1;
+    }
     return REACH_OK;
 }
 
@@ -913,18 +630,7 @@ reach_result reach_host_stop(reach_host *host)
 
     host->running = 0;
     reach_runtime_policy_init(&host->runtime_policy);
-    reach_switcher_force_close(
-        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER));
-    reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
-    reach_context_menu_force_close(
-        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU));
-    reach_host_set_tray_popup_open(host, 0);
-    reach_host_set_quick_settings_open(host, 0);
-    reach_host_set_battery_open(host, 0);
-    reach_system_hud_force_close(
-        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD));
-    reach_launcher_cancel_search(
-        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
+    reach_host_stop_registered_features(host);
     reach_host_stop_config_service(host);
     reach_host_stop_launcher_search_worker(host);
     reach_icon_service_stop(host->icon_service);

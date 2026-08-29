@@ -76,6 +76,7 @@ add_library(reach_services STATIC
     src/services/system_stats.cpp
     src/services/system_status.cpp
     src/services/tray.cpp
+    src/services/wallpaper.cpp
     src/services/wifi.cpp
     src/services/window_tracking.cpp
 )
@@ -141,7 +142,7 @@ add_library(reach_features STATIC
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
     src/features/launcher/launcher_state.cpp
-    src/features/popup/popup_render.cpp
+    src/features/common/popup/popup_render.cpp
     src/features/quick_settings/quick_settings_feature.cpp
     src/features/quick_settings/quick_settings_interaction.cpp
     src/features/quick_settings/quick_settings_render.cpp
@@ -159,7 +160,6 @@ add_library(reach_features STATIC
     src/features/top_bar/top_bar_tray.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
-    src/features/wallpaper/wallpaper_feature.cpp
 )
 
 reach_configure_common(reach_features)
@@ -275,7 +275,6 @@ target_link_libraries(reach_windows_adapters PRIVATE
 
 add_library(reach_composition STATIC
     src/composition/feature_registry.cpp
-    src/composition/host_clipboard.cpp
     src/composition/host_app_control.cpp
     src/composition/host_context_menu_orchestration.cpp
     src/composition/host_config.cpp
@@ -295,14 +294,11 @@ add_library(reach_composition STATIC
     src/composition/host_lifecycle.cpp
     src/composition/host_popup.cpp
     src/composition/host_popup_surface.cpp
-    src/composition/host_battery.cpp
-    src/composition/host_quick_settings.cpp
     src/composition/host_surface_frames.cpp
     src/composition/host_surfaces.cpp
     src/composition/host_system_actions.cpp
     src/composition/host_stage_orchestration.cpp
     src/composition/host_switcher_input.cpp
-    src/composition/host_tray_orchestration.cpp
     src/composition/host_update.cpp
     src/composition/host_window_list_orchestration.cpp
     src/composition/host_window_tracking.cpp
@@ -801,16 +797,16 @@ target_link_libraries(reach_app_control_tests PRIVATE
     reach_services
 )
 
-add_executable(reach_wallpaper_feature_tests
-    tests/wallpaper_feature_tests.cpp
+add_executable(reach_wallpaper_service_tests
+    tests/wallpaper_service_tests.cpp
 )
 
-reach_configure_common(reach_wallpaper_feature_tests)
-target_compile_features(reach_wallpaper_feature_tests PRIVATE
+reach_configure_common(reach_wallpaper_service_tests)
+target_compile_features(reach_wallpaper_service_tests PRIVATE
     cxx_std_17
 )
-target_link_libraries(reach_wallpaper_feature_tests PRIVATE
-    reach_features
+target_link_libraries(reach_wallpaper_service_tests PRIVATE
+    reach_services
 )
 
 add_executable(reach_now_playing_service_tests
@@ -1000,7 +996,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_system_hud_feature_tests COMMAND reach_system_hud_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)
-    add_test(NAME reach_wallpaper_feature_tests COMMAND reach_wallpaper_feature_tests)
+    add_test(NAME reach_wallpaper_service_tests COMMAND reach_wallpaper_service_tests)
     add_test(NAME reach_now_playing_service_tests COMMAND reach_now_playing_service_tests)
     add_test(NAME reach_idle_watch_tests COMMAND reach_idle_watch_tests)
     add_test(NAME reach_settings_feature_tests COMMAND reach_settings_feature_tests)
@@ -1015,6 +1011,10 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_bar_visibility_tests COMMAND reach_bar_visibility_tests)
     add_test(NAME reach_loader_tests COMMAND reach_loader_tests)
     add_test(NAME reach_window_tracking_tests COMMAND reach_window_tracking_tests)
+    add_test(
+        NAME reach_architecture_checker_tests
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_architecture_tests.py
+    )
 endif()
 
 if(REACH_RUN_ARCHITECTURE_CHECK)

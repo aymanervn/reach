@@ -17,6 +17,7 @@ struct reach_battery
     reach_battery_state state;
     reach_system_stats *stats;
     reach_system_status *status;
+    reach_battery_routes routes;
     double saver_pending_seconds;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_BATTERY_ANIMATION_COUNT];

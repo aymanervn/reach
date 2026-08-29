@@ -271,7 +271,51 @@ struct reach_clipboard_feature
     reach_animation_track animation_tracks[REACH_CLIPBOARD_ANIMATION_COUNT];
     reach_clipboard_state state;
     std::atomic<int32_t> refresh_requested;
+    reach_clipboard_port port;
+    int32_t started;
+    void (*request_update)(void *user);
+    void *request_update_user;
+    reach_clipboard_retired_resource retired[REACH_CLIPBOARD_MAX_ITEMS * 2];
+    size_t retired_count;
 };
+
+static void reach_clipboard_feature_retire(reach_clipboard_feature *clipboard,
+                                           const reach_clipboard_item *item)
+{
+    if (clipboard == nullptr || item == nullptr || item->id == 0 ||
+        clipboard->retired_count >= REACH_CLIPBOARD_MAX_ITEMS * 2)
+    {
+        return;
+    }
+    clipboard->retired[clipboard->retired_count++] = {item->id, item->thumbnail_id};
+}
+
+static void reach_clipboard_feature_capture(reach_clipboard_feature *clipboard,
+                                            reach_feature_tick_result *out)
+{
+    if (clipboard == nullptr || out == nullptr ||
+        !reach_clipboard_feature_take_refresh(clipboard) ||
+        clipboard->port.ops.capture_current == nullptr)
+    {
+        return;
+    }
+    reach_clipboard_item item = {};
+    if (clipboard->port.ops.capture_current(clipboard->port.provider, &item) != REACH_OK ||
+        item.id == 0)
+    {
+        return;
+    }
+    reach_clipboard_insert_outcome outcome = {};
+    reach_clipboard_insert_captured(clipboard, item, &outcome);
+    reach_clipboard_feature_retire(clipboard, &outcome.release_rejected);
+    reach_clipboard_feature_retire(clipboard, &outcome.release_evicted);
+    if (outcome.accepted)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+}
 
 const reach_clipboard_state *reach_clipboard_feature_state_ptr(reach_clipboard_feature *clipboard)
 {
@@ -341,7 +385,18 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
                                          reach_feature_tick_result *out)
 {
     reach_clipboard_feature *clipboard = static_cast<reach_clipboard_feature *>(capsule);
+    if (out != nullptr)
+    {
+        *out = {};
+    }
     reach_clipboard_feature_tick(clipboard, delta_seconds);
+    reach_clipboard_feature_capture(clipboard, out);
+    if (out != nullptr && reach_clipboard_tick_scroll(clipboard, delta_seconds))
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
     if (out != nullptr && reach_clipboard_feature_any_hover_active(clipboard))
     {
         out->redraw = 1;
@@ -350,7 +405,9 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
 
 static void reach_clipboard_capsule_reset(void *capsule)
 {
-    reach_clipboard_feature_reset(static_cast<reach_clipboard_feature *>(capsule));
+    reach_clipboard_feature *clipboard = static_cast<reach_clipboard_feature *>(capsule);
+    reach_clipboard_feature_reset(clipboard);
+    reach_clipboard_feature_clear_refresh(clipboard);
 }
 
 static int32_t reach_clipboard_capsule_is_open(const void *capsule)
@@ -381,6 +438,7 @@ static int32_t reach_clipboard_capsule_wants_pointer_move(const void *capsule)
 
 static void
 reach_clipboard_capsule_apply_event_result(const reach_clipboard_event_result *event_result,
+                                           reach_clipboard_feature *clipboard,
                                            reach_capsule_pointer_result *out)
 {
     if (event_result == nullptr || out == nullptr)
@@ -394,19 +452,42 @@ reach_clipboard_capsule_apply_event_result(const reach_clipboard_event_result *e
     out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
     if (event_result->action == REACH_CLIPBOARD_ACTION_CLEAR_ALL)
     {
-        out->action.kind = REACH_FEATURE_ACTION_CLEAR_CLIPBOARD;
+        size_t count = reach_clipboard_item_count(clipboard);
+        for (size_t index = 0; index < count; ++index)
+        {
+            reach_clipboard_feature_retire(clipboard, reach_clipboard_item_at(clipboard, index));
+        }
+        reach_clipboard_clear_all(clipboard);
+        out->redraw = 1;
+        out->relayout = 1;
     }
     else if (event_result->action == REACH_CLIPBOARD_ACTION_REMOVE_ITEM)
     {
-        out->action.kind = REACH_FEATURE_ACTION_REMOVE_CLIPBOARD_ITEM;
-        out->action.index = event_result->item_index;
-        out->action.id = event_result->item_id;
+        const reach_clipboard_item *item =
+            reach_clipboard_item_at(clipboard, event_result->item_index);
+        if (item != nullptr && item->id == event_result->item_id)
+        {
+            reach_clipboard_item removed = *item;
+            if (reach_clipboard_remove_item(clipboard, event_result->item_index,
+                                            event_result->item_id))
+            {
+                reach_clipboard_feature_retire(clipboard, &removed);
+                out->redraw = 1;
+                out->relayout = 1;
+            }
+        }
     }
     else if (event_result->action == REACH_CLIPBOARD_ACTION_RESTORE_ITEM)
     {
-        out->action.kind = REACH_FEATURE_ACTION_RESTORE_CLIPBOARD_ITEM;
-        out->action.index = event_result->item_index;
-        out->action.id = event_result->item_id;
+        if (clipboard->port.ops.restore != nullptr &&
+            clipboard->port.ops.restore(clipboard->port.provider, event_result->item_id) ==
+                REACH_OK)
+        {
+            reach_clipboard_confirm_restore(clipboard, event_result->item_index);
+            out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
+            out->redraw = 1;
+            out->relayout = 1;
+        }
     }
 }
 
@@ -473,7 +554,7 @@ static void reach_clipboard_capsule_handle_pointer(void *capsule, const reach_po
     default:
         return;
     }
-    reach_clipboard_capsule_apply_event_result(&event_result, out);
+    reach_clipboard_capsule_apply_event_result(&event_result, clipboard, out);
 }
 
 static void reach_clipboard_capsule_surface_geometry(const void *capsule,
@@ -574,6 +655,8 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
                                  REACH_CLIPBOARD_ANIMATION_COUNT);
     reach_pressable_init(&clipboard->state.pressable);
     clipboard->refresh_requested.store(0);
+    clipboard->port = {};
+    clipboard->retired_count = 0;
     reach_clipboard_model_init(&clipboard->state.model);
     *out_clipboard = clipboard;
     return REACH_OK;
@@ -582,6 +665,91 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
 void reach_clipboard_feature_destroy(reach_clipboard_feature *clipboard)
 {
     delete clipboard;
+}
+
+static void reach_clipboard_feature_on_changed(void *user)
+{
+    reach_clipboard_feature *clipboard = static_cast<reach_clipboard_feature *>(user);
+    reach_clipboard_feature_request_refresh(clipboard);
+    if (clipboard != nullptr && clipboard->request_update != nullptr)
+    {
+        clipboard->request_update(clipboard->request_update_user);
+    }
+}
+
+void reach_clipboard_feature_attach_port(reach_clipboard_feature *clipboard,
+                                         const reach_clipboard_port *port,
+                                         void (*request_update)(void *user), void *user)
+{
+    if (clipboard != nullptr)
+    {
+        clipboard->port = port != nullptr ? *port : reach_clipboard_port{};
+        clipboard->request_update = request_update;
+        clipboard->request_update_user = user;
+    }
+}
+
+reach_result reach_clipboard_feature_start(reach_clipboard_feature *clipboard)
+{
+    if (clipboard == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (clipboard->started)
+    {
+        return REACH_OK;
+    }
+    reach_clipboard_feature_request_refresh(clipboard);
+    reach_result result =
+        clipboard->port.ops.start != nullptr
+            ? clipboard->port.ops.start(clipboard->port.provider,
+                                        reach_clipboard_feature_on_changed, clipboard)
+            : REACH_OK;
+    clipboard->started = result == REACH_OK;
+    return result;
+}
+
+void reach_clipboard_feature_stop(reach_clipboard_feature *clipboard)
+{
+    if (clipboard != nullptr && clipboard->started)
+    {
+        if (clipboard->port.ops.stop != nullptr)
+        {
+            (void)clipboard->port.ops.stop(clipboard->port.provider);
+        }
+        clipboard->started = 0;
+    }
+}
+
+size_t reach_clipboard_feature_take_retired_resources(reach_clipboard_feature *clipboard,
+                                                      reach_clipboard_retired_resource *out,
+                                                      size_t cap)
+{
+    if (clipboard == nullptr || out == nullptr)
+    {
+        return 0;
+    }
+    size_t count = clipboard->retired_count < cap ? clipboard->retired_count : cap;
+    for (size_t index = 0; index < count; ++index)
+    {
+        out[index] = clipboard->retired[index];
+    }
+    for (size_t index = count; index < clipboard->retired_count; ++index)
+    {
+        clipboard->retired[index - count] = clipboard->retired[index];
+    }
+    clipboard->retired_count -= count;
+    return count;
+}
+
+void reach_clipboard_feature_release_resource(reach_clipboard_feature *clipboard,
+                                              const reach_clipboard_retired_resource *resource)
+{
+    if (clipboard != nullptr && resource != nullptr && resource->item_id != 0 &&
+        clipboard->port.ops.release != nullptr)
+    {
+        clipboard->port.ops.release(clipboard->port.provider, resource->item_id);
+    }
 }
 
 void reach_clipboard_feature_tick(reach_clipboard_feature *clipboard, double delta_seconds)

@@ -51,7 +51,7 @@ static void reach_host_route_top_bar_quick_settings_activated(void *user)
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr)
     {
-        reach_host_toggle_quick_settings(host);
+        reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS);
     }
 }
 
@@ -60,7 +60,7 @@ static void reach_host_route_top_bar_battery_activated(void *user)
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr)
     {
-        reach_host_toggle_battery(host);
+        reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_BATTERY);
     }
 }
 
@@ -69,8 +69,23 @@ static void reach_host_route_top_bar_tray_overflow_activated(void *user)
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr)
     {
-        reach_host_toggle_tray_popup(host);
+        reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_TRAY);
     }
+}
+
+static void reach_host_route_battery_saver_pending_changed(void *user, int32_t pending,
+                                                           int32_t pending_enabled)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_top_bar_set_battery_saver_pending(
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), pending,
+        pending_enabled);
+    host->top_bar.dirty_flags = 1;
+    host->dirty.render = 1;
 }
 
 void reach_host_bind_interfeature_routes(reach_host *host)
@@ -96,6 +111,12 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     top_bar.tray_overflow_activated = reach_host_route_top_bar_tray_overflow_activated;
     reach_top_bar_set_routes(
         reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), &top_bar);
+
+    reach_battery_routes battery = {};
+    battery.user = host;
+    battery.saver_pending_changed = reach_host_route_battery_saver_pending_changed;
+    reach_battery_set_routes(
+        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), &battery);
 }
 
 void reach_host_clear_interfeature_routes(reach_host *host)
@@ -106,5 +127,7 @@ void reach_host_clear_interfeature_routes(reach_host *host)
                               nullptr);
         reach_top_bar_set_routes(
             reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr);
+        reach_battery_set_routes(
+            reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), nullptr);
     }
 }
