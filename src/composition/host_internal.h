@@ -345,6 +345,12 @@ typedef struct reach_surface_spec
     int32_t restores_focus_on_close;
     int32_t close_on_persistent_press;
     int32_t refresh_world_on_open;
+
+    /* A press on the control this surface hangs off must not dismiss it. By default that is its
+       layout anchor; a surface with no anchor names the control explicitly. */
+    reach_surface_id dismiss_guard_surface;
+    uint32_t dismiss_guard_slot;
+    int32_t dismiss_guard_any_control;
     reach_surface_id opening_origin;
     reach_surface_edge_reveal_spec edge_reveal;
     reach_surface_bar_reveal_spec bar_reveal;

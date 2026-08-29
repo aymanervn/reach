@@ -658,6 +658,7 @@ static void reach_host_define_feature(reach_host *host, reach_surface_id id,
     definition->surface.has_transition = transition != nullptr;
     definition->surface.opening_origin = REACH_HOST_SURFACE_COUNT;
     definition->layout.anchor = REACH_HOST_SURFACE_COUNT;
+    definition->surface.dismiss_guard_surface = REACH_HOST_SURFACE_COUNT;
     definition->force_close = force_close;
 
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
@@ -747,6 +748,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
 
     definitions[REACH_SURFACE_ID_STAGE].control_ops = &reach_stage_control_ops;
     definitions[REACH_SURFACE_ID_STAGE].surface.refresh_world_on_open = 1;
+    definitions[REACH_SURFACE_ID_STAGE].surface.dismiss_guard_surface = REACH_SURFACE_ID_DOCK;
+    definitions[REACH_SURFACE_ID_STAGE].surface.dismiss_guard_slot = REACH_DOCK_CONTROL_TRIGGER;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].control_ops = &reach_context_menu_control_ops;
     definitions[REACH_SURFACE_ID_DOCK].control_ops = &reach_dock_control_ops;
     definitions[REACH_SURFACE_ID_LAUNCHER].control_ops = &reach_launcher_control_ops;
@@ -786,6 +789,9 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_CLIPBOARD].surface.pointer_priority = 20;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.role = REACH_SURFACE_LAUNCHER;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.pointer_priority = 30;
+    definitions[REACH_SURFACE_ID_LAUNCHER].surface.dismiss_guard_surface = REACH_SURFACE_ID_DOCK;
+    definitions[REACH_SURFACE_ID_LAUNCHER].surface.dismiss_guard_any_control = 1;
+    
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.restores_focus_on_close = 1;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.close_on_persistent_press = 1;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.behavior_flags =

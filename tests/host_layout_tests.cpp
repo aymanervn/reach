@@ -33,6 +33,7 @@ static reach_host native_overlay_host;
 static reach_host closing_stage_host;
 static reach_host focus_restore_host;
 static reach_host closable_host;
+static reach_host dismiss_guard_host;
 static reach_host bar_conditions_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
@@ -526,6 +527,54 @@ static void test_every_dismissable_surface_reaches_the_shared_close_path(void)
     reach_host_destroy_registered_features(host);
 }
 
+static void test_every_popup_names_the_control_that_holds_it_open(void)
+{
+    reach_host *host = &dismiss_guard_host;
+    reach_host_init_feature_registry(host);
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_definition *definition = host->feature_runtimes[index].definition;
+        const reach_surface_spec *spec = &definition->surface;
+        if (spec->cls != REACH_SURFACE_CLASS_POPUP && spec->cls != REACH_SURFACE_CLASS_TRANSIENT)
+        {
+            continue;
+        }
+        int32_t declares_guard = spec->dismiss_guard_surface < REACH_HOST_SURFACE_COUNT;
+        int32_t anchored = definition->layout.anchor < REACH_HOST_SURFACE_COUNT ||
+                           (definition->surface_ops != nullptr &&
+                            definition->surface_ops->layout_anchor != nullptr);
+        expect_true(declares_guard || anchored,
+                    "every dismissable surface names the control a press must not dismiss it from");
+    }
+
+    const reach_surface_spec *launcher =
+        &host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].definition->surface;
+    expect_true(launcher->dismiss_guard_surface == REACH_SURFACE_ID_DOCK &&
+                    launcher->dismiss_guard_any_control,
+                "a press anywhere on the dock is the dock's to handle while the launcher is open");
+
+    const reach_surface_spec *stage =
+        &host->feature_runtimes[REACH_SURFACE_ID_STAGE].definition->surface;
+    expect_true(stage->dismiss_guard_surface == REACH_SURFACE_ID_DOCK &&
+                    stage->dismiss_guard_slot == REACH_DOCK_CONTROL_TRIGGER &&
+                    !stage->dismiss_guard_any_control,
+                "the stage is held open only by the dock trigger that opens it");
+
+    const reach_feature_definition *battery =
+        host->feature_runtimes[REACH_SURFACE_ID_BATTERY].definition;
+    expect_true(battery->surface.dismiss_guard_surface >= REACH_HOST_SURFACE_COUNT &&
+                    battery->layout.anchor == REACH_SURFACE_ID_TOP_BAR &&
+                    battery->layout.anchor_slot == REACH_TOP_BAR_CONTROL_BATTERY,
+                "a top-bar popup is held open by the control it already anchors to");
+
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_DOCK]
+                        .definition->capsule_ops->control_at_point != nullptr &&
+                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
+                            .definition->capsule_ops->control_at_point != nullptr,
+                "both bars can name the control under a screen point");
+}
+
 static void test_registered_feature_lifecycle(void)
 {
     reach_host *host = &registry_host;
@@ -813,6 +862,7 @@ int main(void)
     test_popup_pointer_coordinates_are_surface_local();
     test_focus_restore_follows_the_close_intent();
     test_every_dismissable_surface_reaches_the_shared_close_path();
+    test_every_popup_names_the_control_that_holds_it_open();
     test_registered_feature_lifecycle();
     test_registered_surface_frame_uses_declared_anchor();
     test_registered_surface_frame_syncs_native_overlay();

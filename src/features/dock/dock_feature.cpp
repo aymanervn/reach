@@ -820,6 +820,34 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     }
 }
 
+static int32_t reach_dock_capsule_control_at_point(const void *capsule, int32_t screen_x,
+                                                   int32_t screen_y, reach_feature_control *out)
+{
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    if (dock == nullptr || out == nullptr || !dock->pointer_layout_valid)
+    {
+        return 0;
+    }
+
+    reach_point_i32 local = reach_dock_local_point(&dock->pointer_layout, screen_x, screen_y);
+    reach_dock_hit_result hit = reach_dock_hit_test(&dock->pointer_layout, local.x, local.y);
+    *out = {};
+    switch (hit.type)
+    {
+    case REACH_DOCK_HIT_ITEM:
+        out->slot = REACH_DOCK_CONTROL_ITEM;
+        out->index = hit.index;
+        out->valid = 1;
+        return 1;
+    case REACH_DOCK_HIT_TRIGGER:
+        out->slot = REACH_DOCK_CONTROL_TRIGGER;
+        out->valid = 1;
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
@@ -834,6 +862,8 @@ const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
         nullptr,
         reach_dock_capsule_surface_geometry,
         reach_dock_capsule_pointer_capture_active,
+        nullptr,
+        reach_dock_capsule_control_at_point,
     };
     return &ops;
 }
