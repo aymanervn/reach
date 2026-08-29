@@ -367,9 +367,6 @@ INTERFEATURE_ROUTE_TARGETS: dict[str, str] = {
     ),
     "reach_host_show_power_context_menu": "src/composition/host_context_menu_orchestration.cpp",
     "reach_host_dock_item_hovered": "src/composition/host_window_list_orchestration.cpp",
-    "reach_host_toggle_quick_settings": "src/composition/host_quick_settings.cpp",
-    "reach_host_toggle_battery": "src/composition/host_battery.cpp",
-    "reach_host_toggle_tray_popup": "src/composition/host_tray_orchestration.cpp",
     "reach_host_toggle_stage": "src/composition/host_stage_orchestration.cpp",
 }
 
@@ -478,6 +475,81 @@ CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_window_list_orchestration.cpp", "reach_dock_item_count"): 3,
     ("src/composition/host_window_list_orchestration.cpp", "reach_dock_rect_to_screen"): 2,
     ("src/composition/host_window_tracking.cpp", "reach_dock_mark_items_changed"): 1,
+}
+
+COMPOSITION_FEATURE_HELPER_BASELINE: dict[tuple[str, str], int] = {
+    ("src/composition/host_bar_layout.cpp", "reach_host_dock_build_context"): 1,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_host_close_context_menu"): 7,
+    (
+        "src/composition/host_context_menu_orchestration.cpp",
+        "reach_host_context_menu_monitor",
+    ): 3,
+    (
+        "src/composition/host_context_menu_orchestration.cpp",
+        "reach_host_dock_item_command_allowed",
+    ): 2,
+    ("src/composition/host_context_menu_orchestration.cpp", "reach_host_dock_item_path"): 1,
+    (
+        "src/composition/host_context_menu_orchestration.cpp",
+        "reach_host_launch_context_menu_item",
+    ): 3,
+    (
+        "src/composition/host_context_menu_orchestration.cpp",
+        "reach_host_open_context_menu_transition",
+    ): 3,
+    (
+        "src/composition/host_context_menu_orchestration.cpp",
+        "reach_host_show_dock_app_context_menu",
+    ): 1,
+    (
+        "src/composition/host_context_menu_orchestration.cpp",
+        "reach_host_show_power_context_menu",
+    ): 1,
+    ("src/composition/host_dock_orchestration.cpp", "reach_host_dock_item_path"): 2,
+    ("src/composition/host_dock_orchestration.cpp", "reach_host_launch_dock_item"): 1,
+    ("src/composition/host_feature_actions.cpp", "reach_host_dock_build_context"): 1,
+    ("src/composition/host_feature_actions.cpp", "reach_host_launch_dock_item"): 1,
+    ("src/composition/host_feedback.cpp", "reach_host_clear_sticky_dock_feedback"): 1,
+    ("src/composition/host_input.cpp", "reach_host_clear_sticky_dock_feedback"): 1,
+    ("src/composition/host_input.cpp", "reach_host_close_stage"): 1,
+    ("src/composition/host_input.cpp", "reach_host_sync_stage_window_states"): 1,
+    ("src/composition/host_internal.h", "reach_host_clear_sticky_dock_feedback"): 1,
+    ("src/composition/host_internal.h", "reach_host_close_context_menu"): 1,
+    ("src/composition/host_internal.h", "reach_host_close_stage"): 1,
+    ("src/composition/host_internal.h", "reach_host_dock_build_context"): 1,
+    ("src/composition/host_internal.h", "reach_host_dock_item_hovered"): 1,
+    ("src/composition/host_internal.h", "reach_host_dock_item_path"): 1,
+    ("src/composition/host_internal.h", "reach_host_launch_dock_item"): 1,
+    ("src/composition/host_internal.h", "reach_host_on_stage_edge_reveal"): 1,
+    ("src/composition/host_internal.h", "reach_host_open_context_menu_transition"): 1,
+    ("src/composition/host_internal.h", "reach_host_open_stage"): 1,
+    ("src/composition/host_internal.h", "reach_host_show_dock_app_context_menu"): 1,
+    ("src/composition/host_internal.h", "reach_host_show_dock_window_list"): 1,
+    ("src/composition/host_internal.h", "reach_host_show_power_context_menu"): 1,
+    ("src/composition/host_internal.h", "reach_host_sync_stage_window_states"): 1,
+    ("src/composition/host_internal.h", "reach_host_toggle_stage"): 1,
+    ("src/composition/host_popup.cpp", "reach_host_clear_sticky_dock_feedback"): 2,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_close_stage"): 2,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_collect_stage_windows"): 4,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_on_stage_edge_reveal"): 1,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_open_stage"): 3,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_stage_monitor_for"): 3,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_stage_monitor_is_portrait"): 3,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_sync_stage_window_states"): 1,
+    ("src/composition/host_stage_orchestration.cpp", "reach_host_toggle_stage"): 1,
+    ("src/composition/host_surfaces.cpp", "reach_host_clear_sticky_dock_feedback"): 1,
+    ("src/composition/host_update.cpp", "reach_host_dock_build_context"): 1,
+    ("src/composition/host_update.cpp", "reach_host_sync_stage_window_states"): 1,
+    ("src/composition/host_window_list_orchestration.cpp", "reach_host_close_context_menu"): 3,
+    ("src/composition/host_window_list_orchestration.cpp", "reach_host_dock_item_hovered"): 1,
+    (
+        "src/composition/host_window_list_orchestration.cpp",
+        "reach_host_open_context_menu_transition",
+    ): 1,
+    (
+        "src/composition/host_window_list_orchestration.cpp",
+        "reach_host_show_dock_window_list",
+    ): 3,
 }
 
 REGISTERED_SURFACE_IDS = (
@@ -878,12 +950,57 @@ def validate_composition_feature_boundary(
     return violations
 
 
+def composition_feature_helper_pattern(headers: dict[str, str]) -> re.Pattern[str] | None:
+    features = sorted(set(headers.values()), key=len, reverse=True)
+    if not features:
+        return None
+    return re.compile(
+        r"\breach_host_[a-z0-9_]*(?:" + "|".join(features) + r")[a-z0-9_]*\b"
+    )
+
+
+def validate_composition_feature_helpers(
+    path: Path, text: str, pattern: re.Pattern[str] | None
+) -> list[str]:
+    """Composition v0 wants generic composition code. A reach_host helper named after a
+    concrete feature is per-feature orchestration wearing a host prefix, so the remaining
+    ones are an explicit baseline that may only shrink."""
+    relative = rel(path).replace("\\", "/")
+    if (
+        pattern is None
+        or not relative.startswith("src/composition/")
+        or relative in COMPOSITION_FEATURE_SEAMS
+    ):
+        return []
+
+    violations: list[str] = []
+    counts: dict[str, int] = {}
+    for symbol in pattern.findall(strip_comments(text)):
+        counts[symbol] = counts.get(symbol, 0) + 1
+    for symbol, count in counts.items():
+        baseline = COMPOSITION_FEATURE_HELPER_BASELINE.get((relative, symbol), 0)
+        if count > baseline:
+            violations.append(
+                f"{relative}: {symbol} is feature-specific composition; move it behind a "
+                f"generic contract (found {count}, baseline {baseline})"
+            )
+    for (baseline_file, symbol), baseline in COMPOSITION_FEATURE_HELPER_BASELINE.items():
+        if baseline_file == relative and counts.get(symbol, 0) < baseline:
+            violations.append(
+                f"{relative}: feature-specific composition baseline for {symbol} is stale; "
+                f"shrink it from {baseline} to {counts.get(symbol, 0)}"
+            )
+    return violations
+
+
 def validate_composition_feature_baseline_files(paths: list[Path]) -> list[str]:
     existing = {rel(path).replace("\\", "/") for path in paths}
     baseline_files = {
         path for path, _ in CONCRETE_FEATURE_HEADER_BASELINE
     } | {
         path for path, _ in CONCRETE_FEATURE_SYMBOL_BASELINE
+    } | {
+        path for path, _ in COMPOSITION_FEATURE_HELPER_BASELINE
     }
     return [
         f"{path}: concrete feature baseline names a missing file; remove its entries"
@@ -1169,6 +1286,7 @@ def main() -> int:
     warnings: list[str] = []
     feature_headers = concrete_feature_headers()
     feature_symbols = concrete_feature_symbols(feature_headers)
+    feature_helper_pattern = composition_feature_helper_pattern(feature_headers)
     source_files = iter_source_files()
     violations.extend(validate_layer_directories())
     violations.extend(validate_document_contract())
@@ -1188,6 +1306,9 @@ def main() -> int:
         )
         violations.extend(
             validate_composition_feature_boundary(path, text, feature_headers, feature_symbols)
+        )
+        violations.extend(
+            validate_composition_feature_helpers(path, text, feature_helper_pattern)
         )
         violations.extend(validate_feature_config_ownership(path, text))
         violations.extend(validate_registered_feature_lifecycle(path, text))
