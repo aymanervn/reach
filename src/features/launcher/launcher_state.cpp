@@ -285,15 +285,6 @@ reach_result reach_launcher_close_state(reach_launcher_state *state)
     return REACH_OK;
 }
 
-reach_result reach_launcher_toggle_state(reach_launcher_state *state)
-{
-    if (state == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    return state->model.open ? reach_launcher_close_state(state) : reach_launcher_open_state(state);
-}
-
 reach_result reach_launcher_set_query_state(reach_launcher_state *state, const uint16_t *query)
 {
     if (state == 0 || query == 0)
@@ -484,50 +475,6 @@ reach_result reach_launcher_set_selected_result_state(reach_launcher_state *stat
     return REACH_OK;
 }
 
-reach_result reach_launcher_handle_event_state(reach_launcher_state *state,
-                                               const reach_ui_event *event,
-                                               reach_ui_intent *out_intent)
-{
-    if (state == 0 || event == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    if (out_intent != 0)
-    {
-        out_intent->type = REACH_UI_INTENT_NONE;
-        out_intent->id = 0;
-    }
-
-    switch (event->type)
-    {
-    case REACH_UI_EVENT_ESCAPE:
-        return state->model.open ? reach_launcher_close_state(state) : REACH_OK;
-    case REACH_UI_EVENT_ENTER:
-        if (out_intent != 0 && state->model.open)
-        {
-            out_intent->type = REACH_UI_INTENT_OPEN_LAUNCHER_RESULT;
-        }
-        return REACH_OK;
-    case REACH_UI_EVENT_ARROW_UP:
-        return state->model.open ? reach_launcher_select_previous_result_state(state) : REACH_OK;
-    case REACH_UI_EVENT_ARROW_DOWN:
-        return state->model.open ? reach_launcher_select_next_result_state(state) : REACH_OK;
-    case REACH_UI_EVENT_DOCK_APP_CLICK:
-        if (out_intent != 0)
-        {
-            out_intent->type = REACH_UI_INTENT_LAUNCH_APP;
-            out_intent->id = event->id;
-        }
-        return REACH_OK;
-    case REACH_UI_EVENT_POINTER_WHEEL:
-        return REACH_OK;
-    case REACH_UI_EVENT_NONE:
-    default:
-        return REACH_OK;
-    }
-}
-
 reach_result reach_launcher_create(reach_launcher **out_launcher)
 {
     if (out_launcher == nullptr)
@@ -618,14 +565,34 @@ void reach_launcher_clear_query(reach_launcher *launcher)
     }
 }
 
-reach_result reach_launcher_close(reach_launcher *launcher)
+int32_t reach_launcher_set_open(reach_launcher *launcher, int32_t open)
 {
-    return reach_launcher_close_state(reach_launcher_state_mut(launcher));
+    if (launcher == nullptr || launcher->state.model.open == (open ? 1 : 0))
+    {
+        return 0;
+    }
+    if (open)
+    {
+        (void)reach_launcher_open_state(&launcher->state);
+        reach_launcher_reset_text_edit(launcher);
+    }
+    else
+    {
+        (void)reach_launcher_close_state(&launcher->state);
+    }
+    return 1;
 }
 
-reach_result reach_launcher_toggle(reach_launcher *launcher)
+void reach_launcher_surface_hidden(reach_launcher *launcher)
 {
-    return reach_launcher_toggle_state(reach_launcher_state_mut(launcher));
+    if (launcher == nullptr)
+    {
+        return;
+    }
+    reach_launcher_cancel_search(launcher);
+    reach_launcher_clear_query(launcher);
+    (void)reach_launcher_clear_results(launcher);
+    reach_launcher_reset_text_edit(launcher);
 }
 
 reach_result reach_launcher_set_query(reach_launcher *launcher, const uint16_t *query)
@@ -738,10 +705,16 @@ const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count)
     return events;
 }
 
-reach_result reach_launcher_handle_event(reach_launcher *launcher, const reach_ui_event *event,
-                                         reach_ui_intent *out_intent)
+const reach_ui_event_type *reach_launcher_routed_events(size_t *out_count)
 {
-    return reach_launcher_handle_event_state(reach_launcher_state_mut(launcher), event, out_intent);
+    static const reach_ui_event_type events[] = {
+        REACH_UI_EVENT_ESCAPE,    REACH_UI_EVENT_ENTER,     REACH_UI_EVENT_ARROW_UP,
+        REACH_UI_EVENT_ARROW_DOWN, REACH_UI_EVENT_TEXT_CHAR, REACH_UI_EVENT_TEXT_EDIT};
+    if (out_count != nullptr)
+    {
+        *out_count = sizeof(events) / sizeof(events[0]);
+    }
+    return events;
 }
 
 #define REACH_LAUNCHER_CARET_BLINK_SECONDS 0.53
@@ -785,37 +758,6 @@ static void reach_launcher_reset_scrollbar_drag(reach_launcher *launcher)
     }
     launcher->state.launcher_scrollbar_drag.active = 0;
     launcher->state.launcher_scrollbar_drag.grab_offset = 0.0f;
-}
-
-void reach_launcher_remember_restore_window(reach_launcher *launcher, uintptr_t window)
-{
-    if (launcher == nullptr)
-    {
-        return;
-    }
-    launcher->state.restore_window = window;
-    launcher->state.restore_window_valid = window != 0;
-}
-
-void reach_launcher_clear_restore_window(reach_launcher *launcher)
-{
-    if (launcher == nullptr)
-    {
-        return;
-    }
-    launcher->state.restore_window = 0;
-    launcher->state.restore_window_valid = 0;
-}
-
-uintptr_t reach_launcher_take_restore_window(reach_launcher *launcher)
-{
-    if (launcher == nullptr || !launcher->state.restore_window_valid)
-    {
-        return 0;
-    }
-    uintptr_t window = launcher->state.restore_window;
-    reach_launcher_clear_restore_window(launcher);
-    return window;
 }
 
 void reach_launcher_reset_text_edit(reach_launcher *launcher)
@@ -1011,6 +953,170 @@ reach_launcher_capsule_event_context(const reach_launcher *launcher)
     return ctx;
 }
 
+static int32_t reach_launcher_query_starts_with_ascii(const uint16_t *text, const char *prefix)
+{
+    if (text == nullptr || prefix == nullptr)
+    {
+        return 0;
+    }
+
+    size_t index = 0;
+    while (prefix[index] != 0)
+    {
+        uint16_t current = text[index];
+        char expected = prefix[index];
+        if (current >= 'A' && current <= 'Z')
+        {
+            current = (uint16_t)(current - 'A' + 'a');
+        }
+        if (expected >= 'A' && expected <= 'Z')
+        {
+            expected = (char)(expected - 'A' + 'a');
+        }
+        if (current != (uint16_t)expected)
+        {
+            return 0;
+        }
+        ++index;
+    }
+    return 1;
+}
+
+reach_feature_target reach_launcher_open_target(const reach_launcher *launcher)
+{
+    reach_feature_target target = {};
+    if (launcher == nullptr)
+    {
+        return target;
+    }
+
+    const reach_launcher_model *model = &launcher->state.model;
+    if (model->result_count > 0 && model->selected_result_index < model->result_count)
+    {
+        const reach_launcher_result *result = &model->results[model->selected_result_index];
+        if (result->action == REACH_LAUNCHER_RESULT_RUN_TERMINAL_COMMAND)
+        {
+            target.kind = REACH_FEATURE_TARGET_TERMINAL_COMMAND;
+            target.path = result->payload.terminal_command;
+            return target;
+        }
+
+        const reach_search_candidate *search = &result->payload.search;
+        if (search->path[0] == 0)
+        {
+            return target;
+        }
+        target.kind = search->kind == REACH_SEARCH_RESULT_APP ? REACH_FEATURE_TARGET_APP
+                                                              : REACH_FEATURE_TARGET_PATH;
+        target.path = search->path;
+        target.arguments = search->arguments[0] != 0 ? search->arguments : nullptr;
+        return target;
+    }
+
+    if (model->query[0] == 0)
+    {
+        target.kind = REACH_FEATURE_TARGET_DEFAULT_LOCATION;
+        return target;
+    }
+
+    target.kind = reach_launcher_query_starts_with_ascii(model->query, "shell:")
+                      ? REACH_FEATURE_TARGET_SHELL_LOCATION
+                      : REACH_FEATURE_TARGET_LOCATION;
+    target.path = model->query;
+    return target;
+}
+
+reach_feature_target reach_launcher_reveal_target(const reach_launcher *launcher, size_t index)
+{
+    reach_feature_target target = {};
+    if (launcher == nullptr || index >= launcher->state.model.result_count)
+    {
+        return target;
+    }
+
+    const reach_launcher_result *result = &launcher->state.model.results[index];
+    const reach_search_candidate *search = &result->payload.search;
+    if (result->action != REACH_LAUNCHER_RESULT_OPEN_SEARCH ||
+        search->kind != REACH_SEARCH_RESULT_APP || search->path[0] == 0)
+    {
+        return target;
+    }
+
+    target.kind = REACH_FEATURE_TARGET_APP;
+    target.path = search->path;
+    return target;
+}
+
+static void reach_launcher_set_open_action(const reach_launcher *launcher,
+                                           reach_capsule_action *out)
+{
+    out->kind = REACH_FEATURE_ACTION_OPEN_TARGET;
+    out->target = reach_launcher_open_target(launcher);
+    if ((out->target.kind == REACH_FEATURE_TARGET_APP ||
+         out->target.kind == REACH_FEATURE_TARGET_PATH) &&
+        launcher->state.model.open)
+    {
+        out->flags |= REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED;
+    }
+}
+
+static void reach_launcher_capsule_handle_event(void *capsule, const reach_ui_event *event,
+                                                reach_capsule_event_result *out)
+{
+    reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
+    if (launcher == nullptr || event == nullptr || out == nullptr ||
+        !launcher->state.model.open)
+    {
+        return;
+    }
+
+    switch (event->type)
+    {
+    case REACH_UI_EVENT_ESCAPE:
+        if (reach_launcher_set_open(launcher, 0))
+        {
+            out->handled = 1;
+            out->redraw = 1;
+            out->relayout = 1;
+            out->request_update = 1;
+        }
+        return;
+    case REACH_UI_EVENT_ENTER:
+        reach_launcher_set_open_action(launcher, &out->action);
+        out->handled = 1;
+        return;
+    case REACH_UI_EVENT_ARROW_UP:
+    case REACH_UI_EVENT_ARROW_DOWN:
+    {
+        reach_result result =
+            event->type == REACH_UI_EVENT_ARROW_UP
+                ? reach_launcher_select_previous_result_state(&launcher->state)
+                : reach_launcher_select_next_result_state(&launcher->state);
+        if (result == REACH_OK)
+        {
+            out->handled = 1;
+            out->redraw = 1;
+            out->relayout = 1;
+            out->request_update = 1;
+        }
+        return;
+    }
+    case REACH_UI_EVENT_TEXT_CHAR:
+    case REACH_UI_EVENT_TEXT_EDIT:
+    {
+        reach_launcher_text_event_result text = {};
+        reach_launcher_handle_text_event(launcher, event, &text);
+        out->handled = 1;
+        out->redraw = text.redraw;
+        out->relayout = text.relayout;
+        out->request_update = text.redraw || text.relayout;
+        return;
+    }
+    default:
+        return;
+    }
+}
+
 static void
 reach_launcher_capsule_apply_event_result(const reach_launcher *launcher,
                                           const reach_launcher_event_result *event_result,
@@ -1027,12 +1133,13 @@ reach_launcher_capsule_apply_event_result(const reach_launcher *launcher,
     out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
     if (event_result->action.type == REACH_LAUNCHER_ACTION_OPEN_RESULT)
     {
-        out->action.kind = REACH_FEATURE_ACTION_OPEN_SEARCH_RESULT;
+        reach_launcher_set_open_action(launcher, &out->action);
     }
     else if (event_result->action.type == REACH_LAUNCHER_ACTION_REVEAL_RESULT)
     {
-        out->action.kind = REACH_FEATURE_ACTION_REVEAL_SEARCH_RESULT;
-        out->action.index = event_result->action.result_index;
+        out->action.kind = REACH_FEATURE_ACTION_REVEAL_TARGET;
+        out->action.target =
+            reach_launcher_reveal_target(launcher, event_result->action.result_index);
     }
 }
 
@@ -1135,6 +1242,7 @@ const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
         nullptr,
         reach_launcher_capsule_surface_geometry,
         reach_launcher_capsule_wants_pointer_move,
+        reach_launcher_capsule_handle_event,
     };
     return &ops;
 }

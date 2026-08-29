@@ -46,9 +46,11 @@ reach_result reach_host_launch_dock_item(reach_host *host, size_t item_index,
             reach_dock_item_at(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
                                item_index)
                 ->pinned_index;
-        return reach_host_open_pinned_app(host, pinned_index, force_new_instance, 0);
+        return reach_host_open_pinned_app(host, pinned_index, force_new_instance,
+                                          REACH_SURFACE_ORIGIN_NONE, 0);
     }
 
     const uint16_t *path = reach_host_dock_item_path(host, item_index);
-    return reach_host_open_app(host, path, nullptr, nullptr, force_new_instance, 0);
+    return reach_host_open_app(host, path, nullptr, nullptr, force_new_instance,
+                               REACH_SURFACE_ORIGIN_NONE, 0);
 }

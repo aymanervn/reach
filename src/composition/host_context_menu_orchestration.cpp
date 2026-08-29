@@ -50,7 +50,8 @@ static reach_result reach_host_launch_context_menu_item(reach_host *host, const 
         arguments = host->pinned_apps[pinned_index].arguments;
     }
 
-    return reach_host_launch_app(host, path, arguments, 1, run_as_admin, 0);
+    return reach_host_launch_app(host, path, arguments, 1, run_as_admin,
+                                 REACH_SURFACE_ORIGIN_NONE, 0);
 }
 
 static int32_t reach_host_dock_item_command_allowed(reach_host *host, size_t item_index,

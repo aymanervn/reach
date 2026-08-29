@@ -149,14 +149,9 @@ void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int
         {
             continue;
         }
-        if (restore_focus && desc->definition->dismiss != nullptr)
-        {
-            desc->definition->dismiss(host);
-        }
-        else if (desc->definition->force_close != nullptr)
-        {
-            desc->definition->force_close(host);
-        }
+        reach_host_close_registered_surface(host, desc->definition->id,
+                                            restore_focus ? REACH_SURFACE_CLOSE_DISMISS
+                                                          : REACH_SURFACE_CLOSE_SUPERSEDED);
     }
     reach_host_clear_sticky_dock_feedback(host);
 }

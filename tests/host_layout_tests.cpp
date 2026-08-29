@@ -31,6 +31,7 @@ static reach_host registry_host;
 static reach_host generic_frame_host;
 static reach_host native_overlay_host;
 static reach_host closing_stage_host;
+static reach_host focus_restore_host;
 static reach_host bar_conditions_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
@@ -455,6 +456,38 @@ static void test_popup_pointer_coordinates_are_surface_local(void)
                 "non-popup pointer positions remain unchanged");
 }
 
+static void test_focus_restore_follows_the_close_intent(void)
+{
+    reach_host *host = &focus_restore_host;
+    reach_host_init_feature_registry(host);
+
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER]
+                    .definition->surface.restores_focus_on_close,
+                "the Launcher declares that closing restores the previous foreground window");
+
+    host->focus_restore_window[REACH_SURFACE_ID_LAUNCHER] = 4242;
+    reach_host_arm_focus_restore(host, REACH_SURFACE_ID_LAUNCHER);
+    expect_true(host->focus_restore_pending[REACH_SURFACE_ID_LAUNCHER],
+                "a dismissed surface arms its focus restore");
+
+    reach_host_cancel_focus_restore(host, REACH_SURFACE_ID_LAUNCHER);
+    expect_true(!host->focus_restore_pending[REACH_SURFACE_ID_LAUNCHER] &&
+                    host->focus_restore_window[REACH_SURFACE_ID_LAUNCHER] == 0,
+                "a superseded close drops the remembered window instead of stealing focus back");
+
+    host->focus_restore_window[REACH_SURFACE_ID_LAUNCHER] = 4242;
+    reach_host_arm_focus_restore(host, REACH_SURFACE_ID_LAUNCHER);
+    reach_host_flush_focus_restore(host, REACH_SURFACE_ID_LAUNCHER);
+    expect_true(!host->focus_restore_pending[REACH_SURFACE_ID_LAUNCHER] &&
+                    host->focus_restore_window[REACH_SURFACE_ID_LAUNCHER] == 0,
+                "flushing a restore consumes it so a later hide cannot replay it");
+
+    host->focus_restore_window[REACH_SURFACE_ID_DOCK] = 4242;
+    reach_host_arm_focus_restore(host, REACH_SURFACE_ID_DOCK);
+    expect_true(!host->focus_restore_pending[REACH_SURFACE_ID_DOCK],
+                "a surface that does not declare focus restore never arms one");
+}
+
 static void test_registered_feature_lifecycle(void)
 {
     reach_host *host = &registry_host;
@@ -740,6 +773,7 @@ int main(void)
     test_registered_transition_completion();
     test_scaled_transition_keeps_native_envelope_stationary();
     test_popup_pointer_coordinates_are_surface_local();
+    test_focus_restore_follows_the_close_intent();
     test_registered_feature_lifecycle();
     test_registered_surface_frame_uses_declared_anchor();
     test_registered_surface_frame_syncs_native_overlay();

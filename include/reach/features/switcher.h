@@ -131,6 +131,10 @@ extern "C"
 
     void reach_switcher_force_close(reach_switcher *switcher);
 
+    int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open);
+    void reach_switcher_notify_windows_changed(reach_switcher *switcher,
+                                               reach_feature_tick_result *out);
+
     reach_switcher_action reach_switcher_handle_event(reach_switcher *switcher,
                                                       const reach_ui_event *event);
 

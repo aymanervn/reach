@@ -70,23 +70,35 @@ void reach_host_finish_surface_transitions(reach_host *host)
         return;
     }
 
-    reach_host_surface_transition *launcher_transition =
-        host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].transition;
-    int32_t launcher_transition_was_visible =
-        reach_host_surface_transition_visible(launcher_transition);
+    int32_t was_visible[REACH_HOST_SURFACE_COUNT] = {};
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        was_visible[index] =
+            reach_host_surface_transition_visible(host->feature_runtimes[index].transition);
+    }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_host_surface_transition_finish(host, host->feature_runtimes[index].transition);
     }
-    if (launcher_transition_was_visible &&
-        !reach_host_surface_transition_visible(launcher_transition) &&
-        !reach_launcher_is_open(
-            reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER)))
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_host_cleanup_closed_launcher(host);
-        reach_host_flush_launcher_focus_restore(host);
-        host->dirty.layout = 1;
-        host->launcher.dirty_flags = 1;
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (!was_visible[index] || runtime->definition == nullptr ||
+            reach_host_surface_transition_visible(runtime->transition) ||
+            reach_host_surface_is_open(runtime))
+        {
+            continue;
+        }
+
+        const reach_feature_control_ops *control = runtime->definition->control_ops;
+        if (control != nullptr && control->surface_hidden != nullptr &&
+            runtime->capsule != nullptr)
+        {
+            reach_feature_tick_result result = {};
+            control->surface_hidden(runtime->capsule, &result);
+            reach_host_apply_feature_tick_result(host, runtime, &result);
+        }
+        reach_host_flush_focus_restore(host, runtime->definition->id);
     }
 }
 
@@ -230,7 +242,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     reach_host_drain_registered_render_resources(host);
     reach_host_window_list_update(host, delta_seconds);
     reach_host_drain_now_playing_retired_covers(host);
-    reach_host_process_deferred_launcher_app_launch(host);
+    reach_host_process_deferred_launch(host);
     reach_host_sync_bar_layout_conditions(host);
     if (reach_host_can_move_bars_without_redraw(host))
     {

@@ -288,7 +288,7 @@ add_library(reach_composition STATIC
     src/composition/host_feature_actions.cpp
     src/composition/host_input.cpp
     src/composition/interfeature_routes.cpp
-    src/composition/host_launcher_orchestration.cpp
+    src/composition/host_focus_restore.cpp
     src/composition/host_layout.cpp
     src/composition/host_lifecycle.cpp
     src/composition/host_popup.cpp
@@ -297,7 +297,6 @@ add_library(reach_composition STATIC
     src/composition/host_surfaces.cpp
     src/composition/host_system_actions.cpp
     src/composition/host_stage_orchestration.cpp
-    src/composition/host_switcher_input.cpp
     src/composition/host_update.cpp
     src/composition/host_window_list_orchestration.cpp
     src/composition/host_window_tracking.cpp

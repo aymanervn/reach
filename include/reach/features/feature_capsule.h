@@ -7,6 +7,7 @@
 #include "reach/core/geometry.h"
 #include "reach/core/ui_events.h"
 #include "reach/features/common/feature_action.h"
+#include "reach/features/common/feature_target.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -72,7 +73,18 @@ extern "C"
         uint64_t id;
         uintptr_t window;
         float value;
+
+        reach_feature_target target;
     } reach_capsule_action;
+
+    typedef struct reach_capsule_event_result
+    {
+        int32_t handled;
+        int32_t redraw;
+        int32_t relayout;
+        int32_t request_update;
+        reach_capsule_action action;
+    } reach_capsule_event_result;
 
     typedef struct reach_capsule_pointer_result
     {
@@ -120,6 +132,9 @@ extern "C"
         void (*surface_geometry)(const void *capsule, reach_feature_surface_geometry *out);
 
         int32_t (*pointer_capture_active)(const void *capsule);
+
+        void (*handle_event)(void *capsule, const reach_ui_event *event,
+                             reach_capsule_event_result *out);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

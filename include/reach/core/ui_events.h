@@ -19,7 +19,6 @@ extern "C"
         REACH_UI_EVENT_NONE = 0,
         REACH_UI_EVENT_WINDOWS_KEY = 1,
         REACH_UI_EVENT_ESCAPE = 2,
-        REACH_UI_EVENT_DOCK_APP_CLICK = 5,
         REACH_UI_EVENT_TRAY_BUTTON_CLICK = 6,
         REACH_UI_EVENT_POINTER_UP = 7,
         REACH_UI_EVENT_WALLPAPER_CHANGED = 9,
@@ -96,20 +95,6 @@ extern "C"
         uint16_t text[REACH_MAX_SEARCH_CHARS + 1];
     } reach_ui_event;
 
-    typedef enum reach_ui_intent_type
-    {
-        REACH_UI_INTENT_NONE = 0,
-        REACH_UI_INTENT_LAUNCH_APP = 1,
-        REACH_UI_INTENT_RESERVED_2 = 2,
-        REACH_UI_INTENT_RESERVED_3 = 3,
-        REACH_UI_INTENT_OPEN_LAUNCHER_RESULT = 4
-    } reach_ui_intent_type;
-
-    typedef struct reach_ui_intent
-    {
-        reach_ui_intent_type type;
-        uint32_t id;
-    } reach_ui_intent;
 
 #ifdef __cplusplus
 }
