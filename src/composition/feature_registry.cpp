@@ -1,6 +1,15 @@
 #include "host_internal.h"
 
+#include "reach/features/battery.h"
+#include "reach/features/clipboard.h"
+#include "reach/features/context_menu.h"
+#include "reach/features/dock.h"
 #include "reach/features/launcher.h"
+#include "reach/features/quick_settings.h"
+#include "reach/features/stage.h"
+#include "reach/features/switcher.h"
+#include "reach/features/system_hud.h"
+#include "reach/features/top_bar.h"
 
 static void reach_feature_attach_launcher(void *capsule,
                                           const reach_feature_dependencies *dependencies)
@@ -661,19 +670,20 @@ static const reach_feature_control_ops reach_system_hud_control_ops = {
 #define REACH_HOST_LAYER_STAGE_EDGE_REVEAL 150
 
 static void reach_host_define_feature(reach_host *host, reach_surface_id id,
-                                      reach_surface_class cls, reach_surface_runtime *surface,
-                                      reach_host_surface_transition *transition,
+                                      reach_surface_class cls, int32_t has_transition,
                                       void (*force_close)(reach_host *),
                                       const reach_feature_capsule_ops *capsule_ops,
                                       uint32_t pointer_flags)
 {
+    reach_surface_runtime *surface = &host->surfaces[id];
+    reach_host_surface_transition *transition = has_transition ? &host->transitions[id] : nullptr;
     reach_feature_definition *definition = &host->feature_definitions[id];
     *definition = {};
     definition->id = id;
     definition->capsule_ops = capsule_ops;
     definition->surface.cls = cls;
     definition->surface.pointer_flags = pointer_flags;
-    definition->surface.has_transition = transition != nullptr;
+    definition->surface.has_transition = has_transition != 0;
     definition->surface.opening_origin = REACH_HOST_SURFACE_COUNT;
     definition->layout.anchor = REACH_HOST_SURFACE_COUNT;
     definition->surface.dismiss_guard_surface = REACH_HOST_SURFACE_COUNT;
@@ -694,45 +704,40 @@ static void reach_host_init_feature_definitions(reach_host *host)
     }
 
     reach_host_define_feature(host, REACH_SURFACE_ID_DOCK, REACH_SURFACE_CLASS_PERSISTENT,
-                              &host->dock, nullptr, nullptr, reach_dock_capsule_ops(),
+                              0, nullptr, reach_dock_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED |
                                   REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE);
     reach_host_define_feature(host, REACH_SURFACE_ID_TOP_BAR, REACH_SURFACE_CLASS_PERSISTENT,
-                              &host->top_bar, nullptr, nullptr, reach_top_bar_capsule_ops(),
+                              0, nullptr, reach_top_bar_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, &host->launcher,
-        &host->launcher_transition, nullptr, reach_launcher_capsule_ops(),
+        host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, 1, nullptr, reach_launcher_capsule_ops(),
         REACH_SURFACE_POINTER_RELAYOUT_REDRAWS | REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT, &host->clipboard_surface,
-        &host->clipboard_transition, reach_host_surface_clipboard_close,
+        host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT, 1, reach_host_surface_clipboard_close,
         reach_clipboard_feature_capsule_ops(), REACH_SURFACE_POINTER_SOURCE_GATED);
-    reach_host_define_feature(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP, &host->tray,
-                              &host->tray_transition, reach_host_surface_tray_close,
+    reach_host_define_feature(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP, 1, reach_host_surface_tray_close,
                               reach_top_bar_tray_capsule_ops(),
                               REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_CLASS_POPUP, &host->quick_settings,
-        &host->quick_settings_transition, reach_host_surface_quick_settings_close,
+        host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_CLASS_POPUP, 1, reach_host_surface_quick_settings_close,
         reach_quick_settings_capsule_ops(),
         REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE | REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE);
     reach_host_define_feature(host, REACH_SURFACE_ID_BATTERY, REACH_SURFACE_CLASS_POPUP,
-                              &host->battery, &host->battery_transition,
+                              1,
                               reach_host_surface_battery_close, reach_battery_capsule_ops(),
                               REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_SYSTEM_HUD, REACH_SURFACE_CLASS_PERSISTENT,
-                              &host->system_hud, nullptr, nullptr, reach_system_hud_capsule_ops(),
+                              0, nullptr, reach_system_hud_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, &host->context_menu,
-        &host->context_menu_transition, nullptr, reach_context_menu_capsule_ops(),
+        host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, 1, nullptr, reach_context_menu_capsule_ops(),
         REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
     reach_host_define_feature(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY,
-                              &host->switcher, &host->switcher_transition, nullptr,
+                              1, nullptr,
                               reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_CLASS_TRANSIENT,
-                              &host->stage, &host->stage_transition, nullptr,
+                              1, nullptr,
                               reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
 
     reach_feature_definition *definitions = host->feature_definitions;
@@ -815,6 +820,10 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.behavior_flags =
         REACH_SURFACE_BEHAVIOR_ACTIVATES | REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.scale_in_envelope = 1;
+    definitions[REACH_SURFACE_ID_LAUNCHER].surface.start_scale = REACH_HOST_TRANSITION_SCALE_IN;
+    definitions[REACH_SURFACE_ID_TRAY].surface.settle_from_above = 1;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.settle_from_above = 1;
+    definitions[REACH_SURFACE_ID_BATTERY].surface.settle_from_above = 1;
     definitions[REACH_SURFACE_ID_TRAY].surface.role = REACH_SURFACE_TRAY_MENU;
     definitions[REACH_SURFACE_ID_TRAY].surface.pointer_priority = 40;
     definitions[REACH_SURFACE_ID_BATTERY].surface.role = REACH_SURFACE_BATTERY;
@@ -1428,28 +1437,28 @@ void reach_host_bind_registered_surface_ports(reach_host *host,
         return;
     }
 
-    host->launcher.window = dependencies->launcher_window;
-    host->launcher.renderer = dependencies->launcher_renderer;
-    host->dock.window = dependencies->dock_window;
-    host->dock.renderer = dependencies->dock_renderer;
-    host->top_bar.window = dependencies->top_bar_window;
-    host->top_bar.renderer = dependencies->top_bar_renderer;
-    host->tray.window = dependencies->tray_window;
-    host->tray.renderer = dependencies->tray_renderer;
-    host->switcher.window = dependencies->switcher_window;
-    host->switcher.renderer = dependencies->switcher_renderer;
-    host->stage.window = dependencies->stage_window;
-    host->stage.renderer = dependencies->stage_renderer;
-    host->context_menu.window = dependencies->context_menu_window;
-    host->context_menu.renderer = dependencies->context_menu_renderer;
-    host->quick_settings.window = dependencies->quick_settings_window;
-    host->quick_settings.renderer = dependencies->quick_settings_renderer;
-    host->battery.window = dependencies->battery_window;
-    host->battery.renderer = dependencies->battery_renderer;
-    host->system_hud.window = dependencies->system_hud_window;
-    host->system_hud.renderer = dependencies->system_hud_renderer;
-    host->clipboard_surface.window = dependencies->clipboard_window;
-    host->clipboard_surface.renderer = dependencies->clipboard_renderer;
+    host->surfaces[REACH_SURFACE_ID_LAUNCHER].window = dependencies->launcher_window;
+    host->surfaces[REACH_SURFACE_ID_LAUNCHER].renderer = dependencies->launcher_renderer;
+    host->surfaces[REACH_SURFACE_ID_DOCK].window = dependencies->dock_window;
+    host->surfaces[REACH_SURFACE_ID_DOCK].renderer = dependencies->dock_renderer;
+    host->surfaces[REACH_SURFACE_ID_TOP_BAR].window = dependencies->top_bar_window;
+    host->surfaces[REACH_SURFACE_ID_TOP_BAR].renderer = dependencies->top_bar_renderer;
+    host->surfaces[REACH_SURFACE_ID_TRAY].window = dependencies->tray_window;
+    host->surfaces[REACH_SURFACE_ID_TRAY].renderer = dependencies->tray_renderer;
+    host->surfaces[REACH_SURFACE_ID_SWITCHER].window = dependencies->switcher_window;
+    host->surfaces[REACH_SURFACE_ID_SWITCHER].renderer = dependencies->switcher_renderer;
+    host->surfaces[REACH_SURFACE_ID_STAGE].window = dependencies->stage_window;
+    host->surfaces[REACH_SURFACE_ID_STAGE].renderer = dependencies->stage_renderer;
+    host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].window = dependencies->context_menu_window;
+    host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer = dependencies->context_menu_renderer;
+    host->surfaces[REACH_SURFACE_ID_QUICK_SETTINGS].window = dependencies->quick_settings_window;
+    host->surfaces[REACH_SURFACE_ID_QUICK_SETTINGS].renderer = dependencies->quick_settings_renderer;
+    host->surfaces[REACH_SURFACE_ID_BATTERY].window = dependencies->battery_window;
+    host->surfaces[REACH_SURFACE_ID_BATTERY].renderer = dependencies->battery_renderer;
+    host->surfaces[REACH_SURFACE_ID_SYSTEM_HUD].window = dependencies->system_hud_window;
+    host->surfaces[REACH_SURFACE_ID_SYSTEM_HUD].renderer = dependencies->system_hud_renderer;
+    host->surfaces[REACH_SURFACE_ID_CLIPBOARD].window = dependencies->clipboard_window;
+    host->surfaces[REACH_SURFACE_ID_CLIPBOARD].renderer = dependencies->clipboard_renderer;
 }
 
 void reach_host_init_registered_surfaces(reach_host *host)

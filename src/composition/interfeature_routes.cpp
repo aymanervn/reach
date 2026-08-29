@@ -1,6 +1,9 @@
 #include "host_internal.h"
 
+#include "reach/features/battery.h"
 #include "reach/features/context_menu.h"
+#include "reach/features/dock.h"
+#include "reach/features/top_bar.h"
 
 static reach_rect_f32 reach_host_menu_monitor(reach_host *host, reach_rect_f32 fallback)
 {
@@ -15,8 +18,8 @@ reach_host_menu_open_context(reach_host *host, const reach_menu_request *request
     ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.monitor = reach_host_menu_monitor(host, request->anchor_button);
-    ctx.text_measure.context = host->context_menu.renderer.backend;
-    ctx.text_measure.measure = host->context_menu.renderer.ops.measure_text;
+    ctx.text_measure.context = host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.backend;
+    ctx.text_measure.measure = host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.ops.measure_text;
     ctx.anchor_button = request->anchor_button;
     ctx.bar_edge_y = request->bar_edge_y;
     ctx.drop_direction = request->drop_direction;
@@ -48,7 +51,7 @@ static void reach_host_route_dock_item_context_menu(void *user, const reach_menu
     if (reach_dock_retain_context_feedback(
             reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
     {
-        host->dock.dirty_flags = 1;
+        host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
     }
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
 }
@@ -240,7 +243,7 @@ static void reach_host_route_battery_saver_pending_changed(void *user, int32_t p
     reach_top_bar_set_battery_saver_pending(
         reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), pending,
         pending_enabled);
-    host->top_bar.dirty_flags = 1;
+    host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
     host->dirty.render = 1;
 }
 

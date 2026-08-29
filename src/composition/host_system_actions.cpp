@@ -39,7 +39,7 @@ reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing
 
     if (reach_now_playing_service_try_action(host->now_playing_service, action))
     {
-        host->dock.dirty_flags = 1;
+        host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
         reach_feature_notification notification = {};
         notification.kind = REACH_FEATURE_NOTIFICATION_MEDIA_ACTION;
         notification.media_action = action;

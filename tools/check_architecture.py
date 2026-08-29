@@ -402,23 +402,8 @@ COMPOSITION_FEATURE_SEAMS = {
     INTERFEATURE_ROUTES_SEAM,
 }
 
-CONCRETE_FEATURE_HEADER_BASELINE: dict[tuple[str, str], int] = {
-    ("src/composition/host_internal.h", "reach/features/battery.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/clipboard.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/context_menu.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/dock.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/quick_settings.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/stage.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/switcher.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/system_hud.h"): 1,
-    ("src/composition/host_internal.h", "reach/features/top_bar.h"): 1,
-}
 
-CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
-}
 
-COMPOSITION_FEATURE_HELPER_BASELINE: dict[tuple[str, str], int] = {
-}
 
 REGISTERED_SURFACE_IDS = (
     "REACH_SURFACE_ID_DOCK",
@@ -777,43 +762,20 @@ def validate_composition_feature_boundary(
         return []
 
     violations: list[str] = []
-    include_counts: dict[str, int] = {}
     for include in includes_from(text):
         normalized = include.value.replace("\\", "/")
         if normalized in headers:
-            include_counts[normalized] = include_counts.get(normalized, 0) + 1
-    for include, count in include_counts.items():
-        baseline = CONCRETE_FEATURE_HEADER_BASELINE.get((relative, include), 0)
-        if count > baseline:
             violations.append(
-                f"{relative}: concrete feature header {include} is allowed only in the "
-                f"composition seams (found {count}, baseline {baseline})"
-            )
-    for (baseline_file, include), baseline in CONCRETE_FEATURE_HEADER_BASELINE.items():
-        if baseline_file == relative and include_counts.get(include, 0) < baseline:
-            violations.append(
-                f"{relative}: concrete feature header baseline for {include} is stale; "
-                f"shrink it from {baseline} to {include_counts.get(include, 0)}"
+                f"{relative}: concrete feature header {normalized} is allowed only in "
+                f"{FEATURE_REGISTRY_SEAM} and {INTERFEATURE_ROUTES_SEAM}"
             )
 
     scan_text = strip_comments(text)
-    symbol_counts: dict[str, int] = {}
     for symbol in symbols:
-        count = len(re.findall(rf"\b{re.escape(symbol)}\s*\(", scan_text))
-        if count == 0:
-            continue
-        symbol_counts[symbol] = count
-        baseline = CONCRETE_FEATURE_SYMBOL_BASELINE.get((relative, symbol), 0)
-        if count > baseline:
+        if re.search(rf"\b{re.escape(symbol)}\s*\(", scan_text) is not None:
             violations.append(
-                f"{relative}: concrete feature symbol {symbol} is allowed only in the "
-                f"composition seams (found {count}, baseline {baseline})"
-            )
-    for (baseline_file, symbol), baseline in CONCRETE_FEATURE_SYMBOL_BASELINE.items():
-        if baseline_file == relative and symbol_counts.get(symbol, 0) < baseline:
-            violations.append(
-                f"{relative}: concrete feature symbol baseline for {symbol} is stale; "
-                f"shrink it from {baseline} to {symbol_counts.get(symbol, 0)}"
+                f"{relative}: {symbol} is a concrete feature API and is allowed only in "
+                f"{FEATURE_REGISTRY_SEAM} and {INTERFEATURE_ROUTES_SEAM}"
             )
     return violations
 
@@ -841,23 +803,16 @@ def validate_composition_feature_helpers(
     ):
         return []
 
+    seen: set[str] = set()
     violations: list[str] = []
-    counts: dict[str, int] = {}
     for symbol in pattern.findall(strip_comments(text)):
-        counts[symbol] = counts.get(symbol, 0) + 1
-    for symbol, count in counts.items():
-        baseline = COMPOSITION_FEATURE_HELPER_BASELINE.get((relative, symbol), 0)
-        if count > baseline:
-            violations.append(
-                f"{relative}: {symbol} is feature-specific composition; move it behind a "
-                f"generic contract (found {count}, baseline {baseline})"
-            )
-    for (baseline_file, symbol), baseline in COMPOSITION_FEATURE_HELPER_BASELINE.items():
-        if baseline_file == relative and counts.get(symbol, 0) < baseline:
-            violations.append(
-                f"{relative}: feature-specific composition baseline for {symbol} is stale; "
-                f"shrink it from {baseline} to {counts.get(symbol, 0)}"
-            )
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+        violations.append(
+            f"{relative}: {symbol} is feature-specific composition; move it behind a "
+            "generic contract"
+        )
     return violations
 
 
@@ -877,21 +832,6 @@ def validate_shared_close_path(path: Path, text: str) -> list[str]:
     return [
         f"{relative}: close surfaces through reach_host_close_registered_surface; calling "
         "definition->force_close directly skips every capsule-controlled surface"
-    ]
-
-
-def validate_composition_feature_baseline_files(paths: list[Path]) -> list[str]:
-    existing = {rel(path).replace("\\", "/") for path in paths}
-    baseline_files = {
-        path for path, _ in CONCRETE_FEATURE_HEADER_BASELINE
-    } | {
-        path for path, _ in CONCRETE_FEATURE_SYMBOL_BASELINE
-    } | {
-        path for path, _ in COMPOSITION_FEATURE_HELPER_BASELINE
-    }
-    return [
-        f"{path}: concrete feature baseline names a missing file; remove its entries"
-        for path in sorted(baseline_files - existing)
     ]
 
 
@@ -1180,7 +1120,6 @@ def main() -> int:
     violations.extend(validate_cmake_dependencies())
     violations.extend(validate_feature_registry_contract())
     violations.extend(validate_generic_surface_loops())
-    violations.extend(validate_composition_feature_baseline_files(source_files))
 
     for path in source_files:
         text = read(path)

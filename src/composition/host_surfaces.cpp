@@ -166,35 +166,28 @@ void reach_host_surface_transitions_init(reach_host *host)
     {
         return;
     }
-    reach_host_surface_transition_init(
-        host, &host->launcher_transition, REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y,
-        REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY, REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
-    reach_host_surface_transition_set_scale(host, &host->launcher_transition,
-                                            REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_SCALE,
-                                            REACH_HOST_LAUNCHER_TRANSITION_SCALE);
-    reach_host_surface_transition_init(
-        host, &host->tray_transition, REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
-        REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY, REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE);
-    reach_host_surface_transition_init(host, &host->quick_settings_transition,
-                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY,
-                                       REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE);
-    reach_host_surface_transition_init(
-        host, &host->battery_transition, REACH_HOST_ANIMATION_BATTERY_TRANSITION_Y,
-        REACH_HOST_ANIMATION_BATTERY_TRANSITION_OPACITY, REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE);
-    reach_host_surface_transition_init(
-        host, &host->switcher_transition, REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
-        REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY, REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
-    reach_host_surface_transition_init(host, &host->context_menu_transition,
-                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY,
-                                       REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
-    reach_host_surface_transition_init(
-        host, &host->clipboard_transition, REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_Y,
-        REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY, REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
-    reach_host_surface_transition_init(
-        host, &host->stage_transition, REACH_HOST_ANIMATION_STAGE_TRANSITION_Y,
-        REACH_HOST_ANIMATION_STAGE_TRANSITION_OPACITY, REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->transition == nullptr || runtime->definition == nullptr)
+        {
+            continue;
+        }
+        const reach_surface_spec *spec = &runtime->definition->surface;
+        reach_surface_id id = runtime->definition->id;
+        reach_host_surface_transition_init(host, runtime->transition,
+                                           reach_host_surface_track(id, 0),
+                                           reach_host_surface_track(id, 1),
+                                           spec->settle_from_above
+                                               ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE
+                                               : REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
+        if (spec->start_scale > 1.0f)
+        {
+            reach_host_surface_transition_set_scale(host, runtime->transition,
+                                                    reach_host_surface_track(id, 2),
+                                                    spec->start_scale);
+        }
+    }
 }
 
 void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,

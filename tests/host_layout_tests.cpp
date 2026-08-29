@@ -1,5 +1,16 @@
 #include "host_internal.h"
 
+#include "reach/features/battery.h"
+#include "reach/features/clipboard.h"
+#include "reach/features/context_menu.h"
+#include "reach/features/dock.h"
+#include "reach/features/launcher.h"
+#include "reach/features/quick_settings.h"
+#include "reach/features/stage.h"
+#include "reach/features/switcher.h"
+#include "reach/features/system_hud.h"
+#include "reach/features/top_bar.h"
+
 #include <stdint.h>
 #include <stdio.h>
 
@@ -397,7 +408,7 @@ static void test_scaled_transition_keeps_native_envelope_stationary(void)
     transition.y_track = 0;
     transition.opacity_track = 1;
     transition.scale_track = 2;
-    transition.start_scale = REACH_HOST_LAUNCHER_TRANSITION_SCALE;
+    transition.start_scale = REACH_HOST_TRANSITION_SCALE_IN;
 
     reach_animation_manager_set(&host->animations, transition.scale_track, 1.04f);
     reach_animation_manager_set(&host->animations, transition.y_track, 8.0f);
