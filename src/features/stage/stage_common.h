@@ -37,6 +37,11 @@ struct reach_stage
     reach_stage_state state;
     reach_pressable pressable;
     size_t pressable_generation;
+
+    reach_window_tracking *windows;
+    reach_icon_service *icons;
+    reach_app_control *apps;
+    reach_display_environment display;
 };
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);

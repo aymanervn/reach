@@ -573,6 +573,15 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
     int32_t next = open ? 1 : 0;
     if (next && !reach_host_surface_is_open(runtime))
     {
+        if (runtime->definition->surface.refresh_world_on_open)
+        {
+            if (host->monitors.list != nullptr && host->monitors.ops.refresh != nullptr)
+            {
+                (void)host->monitors.ops.refresh(host->monitors.list);
+            }
+            reach_host_refresh_window_world(host);
+            reach_host_notify_display_changed(host);
+        }
         reach_host_surface_opening(host, id, runtime->definition->surface.opening_origin);
     }
     reach_feature_tick_result result = {};

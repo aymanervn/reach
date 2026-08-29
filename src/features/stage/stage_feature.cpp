@@ -541,6 +541,175 @@ static void reach_stage_capsule_surface_geometry(const void *capsule,
 void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
                                 reach_capsule_pointer_result *out);
 
+void reach_stage_attach_services(reach_stage *stage, reach_window_tracking *windows,
+                                 reach_icon_service *icons, reach_app_control *apps)
+{
+    if (stage != nullptr)
+    {
+        stage->windows = windows;
+        stage->icons = icons;
+        stage->apps = apps;
+    }
+}
+
+void reach_stage_set_display(reach_stage *stage, const reach_display_environment *display)
+{
+    if (stage != nullptr && display != nullptr)
+    {
+        stage->display = *display;
+    }
+}
+
+static size_t reach_stage_monitor_index_for(const reach_stage *stage, reach_rect_f32 frame,
+                                            int32_t *out_portrait)
+{
+    *out_portrait = 0;
+    if (stage->display.monitor_count == 0)
+    {
+        return 0;
+    }
+
+    float center_x = frame.x + frame.width * 0.5f;
+    float center_y = frame.y + frame.height * 0.5f;
+    size_t match = stage->display.monitor_count;
+    for (size_t index = 0; index < stage->display.monitor_count && match == stage->display.monitor_count;
+         ++index)
+    {
+        reach_rect_f32 bounds = stage->display.monitors[index];
+        if (center_x >= bounds.x && center_x < bounds.x + bounds.width && center_y >= bounds.y &&
+            center_y < bounds.y + bounds.height)
+        {
+            match = index;
+        }
+    }
+    if (match == stage->display.monitor_count)
+    {
+        match = 0;
+    }
+
+    reach_rect_f32 matched = stage->display.monitors[match];
+    *out_portrait = matched.height > matched.width ? 1 : 0;
+
+    size_t rank = 0;
+    for (size_t index = 0; index < stage->display.monitor_count; ++index)
+    {
+        if (index == match)
+        {
+            continue;
+        }
+        reach_rect_f32 bounds = stage->display.monitors[index];
+        if (bounds.x < matched.x || (bounds.x == matched.x && bounds.y < matched.y))
+        {
+            ++rank;
+        }
+    }
+    return rank;
+}
+
+static size_t reach_stage_collect_windows(reach_stage *stage, reach_stage_open_window *out_windows,
+                                          size_t capacity)
+{
+    if (stage == nullptr || out_windows == nullptr || capacity == 0)
+    {
+        return 0;
+    }
+
+    const reach_window_snapshot *windows = reach_window_tracking_windows(stage->windows);
+    size_t window_count = reach_window_tracking_window_count(stage->windows);
+    if (windows == nullptr)
+    {
+        return 0;
+    }
+
+    size_t collected = 0;
+    for (size_t index = 0; index < window_count && collected < capacity; ++index)
+    {
+        const reach_window_snapshot *snapshot = &windows[index];
+        if (!snapshot->visible || snapshot->id == 0)
+        {
+            continue;
+        }
+
+        reach_rect_f32 frame = {};
+        if (reach_app_control_window_frame_bounds(stage->apps, snapshot->id, &frame) != REACH_OK ||
+            frame.width <= 0.0f || frame.height <= 0.0f)
+        {
+            continue;
+        }
+
+        reach_stage_open_window *entry = &out_windows[collected];
+        *entry = {};
+        entry->window = snapshot->id;
+        entry->label = snapshot->title;
+        entry->minimized = snapshot->minimized;
+        entry->frame = frame;
+        int32_t portrait = 0;
+        entry->monitor_index = (uint32_t)reach_stage_monitor_index_for(stage, frame, &portrait);
+        entry->monitor_portrait = portrait;
+        entry->icon_id =
+            reach_icon_service_get(stage->icons, snapshot->icon_ref, stage->display.icon_size_px);
+        collected++;
+    }
+
+    if (collected < capacity && stage->display.desktop_window != 0)
+    {
+        static const uint16_t desktop_label[] = {'D', 'e', 's', 'k', 't', 'o', 'p', 0};
+        reach_stage_open_window *entry = &out_windows[collected];
+        *entry = {};
+        entry->window = stage->display.desktop_window;
+        entry->label = desktop_label;
+        entry->desktop = 1;
+        entry->frame = stage->display.primary_bounds;
+        int32_t portrait = 0;
+        entry->monitor_index =
+            (uint32_t)reach_stage_monitor_index_for(stage, entry->frame, &portrait);
+        entry->monitor_portrait = portrait;
+        collected++;
+    }
+
+    return collected;
+}
+
+int32_t reach_stage_set_open(reach_stage *stage, int32_t open)
+{
+    if (stage == nullptr)
+    {
+        return 0;
+    }
+
+    reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
+    size_t count = reach_stage_collect_windows(stage, windows, REACH_STAGE_MAX_TILES);
+
+    if (!open)
+    {
+        if (!reach_stage_is_open(stage))
+        {
+            return 0;
+        }
+        reach_stage_refresh_tile_frames(stage, windows, count);
+        reach_stage_begin_close(stage);
+        return 0;
+    }
+
+    if (reach_stage_is_open(stage) || count == 0)
+    {
+        return 0;
+    }
+    return reach_stage_open(stage, stage->display.primary_bounds, stage->display.dpi_scale, windows,
+                            count) == REACH_OK;
+}
+
+int32_t reach_stage_sync_windows(reach_stage *stage)
+{
+    if (stage == nullptr || !reach_stage_is_open(stage))
+    {
+        return 0;
+    }
+    reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
+    size_t count = reach_stage_collect_windows(stage, windows, REACH_STAGE_MAX_TILES);
+    return reach_stage_update_windows(stage, windows, count);
+}
+
 const reach_feature_capsule_ops *reach_stage_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {reach_stage_capsule_reset,

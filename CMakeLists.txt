@@ -294,7 +294,6 @@ add_library(reach_composition STATIC
     src/composition/host_surface_frames.cpp
     src/composition/host_surfaces.cpp
     src/composition/host_system_actions.cpp
-    src/composition/host_stage_orchestration.cpp
     src/composition/host_update.cpp
     src/composition/host_window_tracking.cpp
     src/composition/surface_runtime.cpp

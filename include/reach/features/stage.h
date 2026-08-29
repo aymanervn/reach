@@ -6,6 +6,10 @@
 
 #include "reach/core/geometry.h"
 #include "reach/core/limits.h"
+#include "reach/services/window_tracking.h"
+#include "reach/services/icon_service.h"
+#include "reach/services/app_control.h"
+#include "reach/core/ui_layout.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
@@ -91,6 +95,12 @@ extern "C"
     const reach_stage_state *reach_stage_state_ptr(const reach_stage *stage);
 
     int32_t reach_stage_is_open(const reach_stage *stage);
+
+    void reach_stage_attach_services(reach_stage *stage, reach_window_tracking *windows,
+                                     reach_icon_service *icons, reach_app_control *apps);
+    void reach_stage_set_display(reach_stage *stage, const reach_display_environment *display);
+    int32_t reach_stage_set_open(reach_stage *stage, int32_t open);
+    int32_t reach_stage_sync_windows(reach_stage *stage);
     int32_t reach_stage_animation_active(const reach_stage *stage);
 
     void reach_stage_set_animation_seconds(reach_stage *stage, float seconds);

@@ -196,6 +196,47 @@ void reach_host_notify_windows_refreshed(reach_host *host,
     reach_host_notify_registered_features(host, &notification);
 }
 
+void reach_host_notify_display_changed(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED;
+    notification.present = 1;
+    notification.display.icon_size_px = reach_host_icon_size_px(host);
+    notification.display.dpi_scale = reach_host_layout_dpi_scale(host);
+    notification.display.desktop_window =
+        host->wallpaper_surface.ops.desktop_window != nullptr
+            ? host->wallpaper_surface.ops.desktop_window(host->wallpaper_surface.surface)
+            : 0;
+    (void)reach_host_primary_monitor_bounds(host, &notification.display.primary_bounds);
+
+    if (host->monitors.list != nullptr && host->monitors.ops.count != nullptr &&
+        host->monitors.ops.get != nullptr)
+    {
+        size_t count = host->monitors.ops.count(host->monitors.list);
+        for (size_t index = 0; index < count && index < REACH_DISPLAY_MAX_MONITORS; ++index)
+        {
+            const reach_monitor_info *monitor = host->monitors.ops.get(host->monitors.list, index);
+            if (monitor == nullptr)
+            {
+                continue;
+            }
+            reach_rect_f32 *bounds =
+                &notification.display.monitors[notification.display.monitor_count++];
+            bounds->x = (float)monitor->bounds.left;
+            bounds->y = (float)monitor->bounds.top;
+            bounds->width = (float)(monitor->bounds.right - monitor->bounds.left);
+            bounds->height = (float)(monitor->bounds.bottom - monitor->bounds.top);
+        }
+    }
+
+    reach_host_notify_registered_features(host, &notification);
+}
+
 void reach_host_notify_pinned_apps_changed(reach_host *host)
 {
     if (host == nullptr)

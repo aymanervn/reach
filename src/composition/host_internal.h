@@ -232,7 +232,8 @@ typedef enum reach_feature_notification_kind
     REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE = 6,
     REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED = 7,
     REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED = 8,
-    REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 9
+    REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 9,
+    REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 10
 } reach_feature_notification_kind;
 
 typedef struct reach_feature_notification
@@ -245,6 +246,7 @@ typedef struct reach_feature_notification
     const reach_pinned_app_model *pinned_apps;
     size_t pinned_app_count;
     int32_t icon_size_px;
+    reach_display_environment display;
     int32_t present;
 } reach_feature_notification;
 
@@ -342,6 +344,7 @@ typedef struct reach_surface_spec
     int32_t bar_shown_while_open;
     int32_t restores_focus_on_close;
     int32_t close_on_persistent_press;
+    int32_t refresh_world_on_open;
     reach_surface_id opening_origin;
     reach_surface_edge_reveal_spec edge_reveal;
     reach_surface_bar_reveal_spec bar_reveal;
@@ -472,6 +475,7 @@ reach_result reach_host_execute_power_command(reach_host *host, uint32_t command
 void reach_host_clear_sticky_dock_feedback(reach_host *host);
 void reach_host_post_feature_work_ready(reach_host *host);
 void reach_host_notify_windows_changed(reach_host *host);
+void reach_host_notify_display_changed(reach_host *host);
 void reach_host_notify_windows_refreshed(reach_host *host,
                                          const reach_window_tracking_refresh_report *report);
 void reach_host_notify_pinned_apps_changed(reach_host *host);
@@ -492,6 +496,7 @@ void reach_host_destroy_edge_reveals(reach_host *host);
 void reach_host_sync_edge_reveals(reach_host *host, reach_rect_f32 monitor_bounds);
 void reach_host_set_edge_reveal_bounds(reach_host_edge_reveal_runtime *runtime,
                                        reach_rect_f32 bounds);
+void reach_host_on_surface_edge_reveal(reach_host *host, reach_screen_hotspot_event event);
 void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal_runtime *runtime,
                                         int32_t visible);
 
@@ -778,11 +783,6 @@ void reach_host_sync_popup_mouse_hook(reach_host *host);
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);
 void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int32_t restore_focus);
 
-void reach_host_open_stage(reach_host *host);
-void reach_host_sync_stage_window_states(reach_host *host);
-void reach_host_on_stage_edge_reveal(reach_host *host, reach_screen_hotspot_event event);
-void reach_host_close_stage(reach_host *host);
-void reach_host_toggle_stage(reach_host *host);
 reach_result reach_host_schedule_app_launch(reach_host *host,
                                             const reach_app_launch_request *request);
 reach_result reach_host_schedule_reveal_path(reach_host *host, const uint16_t *path);

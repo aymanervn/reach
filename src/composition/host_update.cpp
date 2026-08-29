@@ -227,7 +227,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     if (window_manager_dirty)
     {
         reach_host_refresh_window_world(host);
-        reach_host_sync_stage_window_states(host);
         reach_host_apply_foreground_change(host);
     }
 

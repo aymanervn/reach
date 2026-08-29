@@ -48,6 +48,20 @@ extern "C"
         reach_dock_layout dock;
     } reach_ui_layout;
 
+#define REACH_DISPLAY_MAX_MONITORS 8
+
+    /* Monitors resolved by composition, so a feature that has to reason about where a window
+       lives never reaches for the platform itself. */
+    typedef struct reach_display_environment
+    {
+        reach_rect_f32 primary_bounds;
+        reach_rect_f32 monitors[REACH_DISPLAY_MAX_MONITORS];
+        size_t monitor_count;
+        uintptr_t desktop_window;
+        int32_t icon_size_px;
+        float dpi_scale;
+    } reach_display_environment;
+
     reach_result reach_dock_layout_compute(const reach_dock_model *dock,
                                            const reach_ui_layout_input *input,
                                            reach_dock_layout *out_layout);

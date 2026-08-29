@@ -175,7 +175,7 @@ static void reach_host_route_dock_trigger_activated(void *user, size_t trigger)
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr && trigger == REACH_DOCK_TRIGGER_PRIMARY)
     {
-        reach_host_toggle_stage(host);
+        reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_STAGE);
     }
 }
 
