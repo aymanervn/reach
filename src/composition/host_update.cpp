@@ -299,12 +299,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
             reach_ui_layout layout = {};
             reach_result dock_layout_result =
                 reach_dock_layout_compute(&host->dock_config, &input, &layout.dock);
-            reach_result launcher_layout_result = reach_launcher_layout_compute(
-                &reach_launcher_state_ptr(
-                     reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER))
-                     ->model,
-                &input, &layout.launcher);
-            if (dock_layout_result == REACH_OK && launcher_layout_result == REACH_OK)
+            if (dock_layout_result == REACH_OK)
             {
                 reach_dock_build_context build_ctx = reach_host_dock_build_context(host);
                 if (reach_dock_take_items_changed(
@@ -328,9 +323,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 }
                 host->layout = layout;
                 host->has_layout = 1;
-                reach_launcher_set_pointer_context(
-                    reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER),
-                    &host->layout.launcher);
 
                 reach_host_frame_context frame_ctx = {};
                 frame_ctx.monitor_bounds = bounds;

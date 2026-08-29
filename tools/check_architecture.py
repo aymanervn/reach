@@ -464,9 +464,6 @@ CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_selected_result_index"): 2,
     ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_take_restore_window"): 1,
     ("src/composition/host_launcher_orchestration.cpp", "reach_launcher_toggle"): 1,
-    ("src/composition/host_launcher_search.cpp", "reach_launcher_set_results"): 1,
-    ("src/composition/host_launcher_search.cpp", "reach_launcher_set_search_error"): 1,
-    ("src/composition/host_launcher_search.cpp", "reach_launcher_take_search_results"): 1,
     ("src/composition/host_popup.cpp", "reach_context_menu_state_ptr"): 1,
     ("src/composition/host_popup.cpp", "reach_dock_local_point"): 1,
     ("src/composition/host_popup.cpp", "reach_dock_pointer_region_at"): 1,
@@ -485,8 +482,6 @@ CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_update.cpp", "reach_dock_slots_animating"): 1,
     ("src/composition/host_update.cpp", "reach_dock_take_items_changed"): 1,
     ("src/composition/host_update.cpp", "reach_launcher_is_open"): 1,
-    ("src/composition/host_update.cpp", "reach_launcher_set_pointer_context"): 1,
-    ("src/composition/host_update.cpp", "reach_launcher_state_ptr"): 1,
     (
         "src/composition/host_window_list_orchestration.cpp",
         "reach_context_menu_hover_region_contains",

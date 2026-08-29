@@ -307,7 +307,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
     int32_t geometry_changed =
         !desc->resolved_bounds_valid ||
-        !reach_host_rect_equal(desc->resolved_bounds, geometry.visible_bounds);
+        !reach_rect_equal(desc->resolved_bounds, geometry.visible_bounds);
     desc->resolved_bounds = geometry.visible_bounds;
     desc->resolved_bounds_valid = 1;
     surface_ctx.visible_bounds = geometry.visible_bounds;

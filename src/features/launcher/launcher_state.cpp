@@ -88,6 +88,32 @@ void reach_launcher_set_pointer_context(reach_launcher *launcher,
     }
 }
 
+int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_arrange_context *ctx)
+{
+    if (launcher == nullptr || ctx == nullptr)
+    {
+        return 0;
+    }
+
+    reach_ui_layout_input input = {};
+    input.monitor_bounds = ctx->monitor_bounds;
+    input.work_area = ctx->monitor_bounds;
+    input.dpi_scale = ctx->dpi_scale;
+    input.border_thickness = reach_theme_border_thickness(
+        ctx->theme != nullptr ? ctx->theme : reach_theme_default(), ctx->dpi_scale);
+
+    reach_launcher_layout layout = {};
+    if (reach_launcher_layout_compute(&launcher->state.model, &input, &layout) != REACH_OK)
+    {
+        return 0;
+    }
+
+    int32_t changed = !launcher->pointer_layout_valid ||
+                      !reach_rect_equal(launcher->pointer_layout.bounds, layout.bounds);
+    reach_launcher_set_pointer_context(launcher, &layout);
+    return changed;
+}
+
 void reach_launcher_set_pointer_transform(reach_launcher *launcher, reach_transform_f32 transform)
 {
     if (launcher != nullptr)
@@ -903,10 +929,30 @@ static void reach_launcher_capsule_reset(void *capsule)
     }
 }
 
+static int32_t reach_launcher_drain_search_results(reach_launcher *launcher)
+{
+    reach_search_candidate results[REACH_SEARCH_MAX_RESULTS] = {};
+    size_t count = 0;
+    int32_t error = 0;
+    if (!reach_launcher_take_search_results(launcher, results, &count, &error))
+    {
+        return 0;
+    }
+    (void)reach_launcher_set_results(launcher, results, count);
+    reach_launcher_set_search_error(launcher, error);
+    return 1;
+}
+
 static void reach_launcher_capsule_tick(void *capsule, double delta_seconds,
                                         reach_feature_tick_result *out)
 {
     reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
+    if (out != nullptr && reach_launcher_drain_search_results(launcher))
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
     int32_t expansion_was_active =
         launcher != nullptr &&
         reach_animation_manager_active(&launcher->animations,

@@ -46,7 +46,6 @@ extern "C"
     typedef struct reach_ui_layout
     {
         reach_dock_layout dock;
-        reach_launcher_layout launcher;
     } reach_ui_layout;
 
     reach_result reach_dock_layout_compute(const reach_dock_model *dock,

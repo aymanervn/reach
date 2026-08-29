@@ -65,13 +65,12 @@ static void reach_host_on_system_stats_ready(void *user)
 
 static void reach_host_on_search_service_ready(void *user)
 {
-    reach_host_notify_launcher_search_ready(static_cast<reach_host *>(user));
+    reach_host_post_feature_work_ready(static_cast<reach_host *>(user));
 }
 
 static void reach_host_on_icon_service_ready(void *user)
 {
-
-    reach_host_notify_launcher_search_ready(static_cast<reach_host *>(user));
+    reach_host_post_feature_work_ready(static_cast<reach_host *>(user));
 }
 
 static void reach_host_on_app_control_notify(void *user)
@@ -95,6 +94,14 @@ static void reach_host_on_now_playing_ready(void *user)
                                               REACH_UI_EVENT_NOW_PLAYING_CHANGED);
 }
 
+void reach_host_stop_search_service(reach_host *host)
+{
+    if (host != nullptr)
+    {
+        reach_search_service_stop(host->search_service);
+    }
+}
+
 static void reach_host_cleanup(reach_host *host)
 {
     if (host == nullptr)
@@ -104,7 +111,7 @@ static void reach_host_cleanup(reach_host *host)
 
     reach_host_stop_registered_features(host);
     reach_host_stop_config_service(host);
-    reach_host_stop_launcher_search_worker(host);
+    reach_host_stop_search_service(host);
     reach_icon_service_stop(host->icon_service);
     reach_host_stop_app_control(host);
     reach_now_playing_service_stop(host->now_playing_service);
@@ -632,7 +639,7 @@ reach_result reach_host_stop(reach_host *host)
     reach_runtime_policy_init(&host->runtime_policy);
     reach_host_stop_registered_features(host);
     reach_host_stop_config_service(host);
-    reach_host_stop_launcher_search_worker(host);
+    reach_host_stop_search_service(host);
     reach_icon_service_stop(host->icon_service);
     reach_host_stop_app_control(host);
     reach_idle_watch_stop(host->idle_watch);
