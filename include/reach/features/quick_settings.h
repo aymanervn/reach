@@ -269,7 +269,6 @@ extern "C"
 
     typedef struct reach_quick_settings_system_apply_result
     {
-        int32_t bluetooth_pending_cleared;
         int32_t relayout;
     } reach_quick_settings_system_apply_result;
 
@@ -277,7 +276,7 @@ extern "C"
                                                   const reach_network_state *network,
                                                   const reach_bluetooth_state *bluetooth,
                                                   const reach_brightness_state *brightness,
-                                                  int32_t bluetooth_valid,
+                                                  int32_t bluetooth_valid, uint32_t change_flags,
                                                   reach_quick_settings_system_apply_result *out);
 
     void reach_quick_settings_attach_status(reach_quick_settings *quick_settings,
@@ -288,7 +287,7 @@ extern "C"
                                              uint32_t change_flags);
 
     void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
-                                              double delta_seconds, reach_feature_tick_result *out);
+                                              reach_feature_tick_result *out);
     size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quick_settings,
                                                           uint64_t *out_ids, size_t cap);
 

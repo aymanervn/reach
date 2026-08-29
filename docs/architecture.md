@@ -155,9 +155,13 @@ Quick Settings owns tile, slider, output-device, expansion, drag/capture, releas
 and cancellation behavior through the same hook. Composition translates its
 semantic actions into audio and system-control calls and retains popup policy.
 Quick Settings also attaches the system-status service directly (the
-launcher→search precedent): snapshot take/apply and the bluetooth-pending grace
-timers run inside the capsule (`reach_quick_settings_process_changes`); its
-pending service work folds into `needs_frame`. The system-controls watcher fires
+launcher→search precedent): snapshot take/apply runs inside the capsule
+(`reach_quick_settings_process_changes`); its pending service work folds into
+`needs_frame`. A bluetooth toggle is resolved by the port, not by a timer: the
+adapter raises `REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST` alongside
+`..._CHANGE_BLUETOOTH` when the requested set has run to completion, and the
+capsule clears its pending tile on the snapshot carrying that reason — or earlier,
+on any valid read that already matches the target. The system-controls watcher fires
 on a port thread, so composition keeps the atomic change-flag accumulator and —
 because the top bar's network readout needs fresh state whether or not the panel
 is open — composition, not the capsule, turns the drained flags into the
@@ -165,6 +169,11 @@ is open — composition, not the capsule, turns the drained flags into the
 off-thread. GPU lifetime stays in
 composition: audio applies retire the replaced session/device render icons
 and the host drains and releases them.
+A refresh probes only the capabilities its `change_flags` name (0 means all), and
+the published snapshot is cumulative: every field holds the last value read
+successfully, so a scoped refresh never blanks the fields it skipped and a failed
+read never replaces a good value with a zeroed one. `change_flags` accumulates the
+reasons published since the last `take_system`, which consumes them.
 The system-status snapshot therefore has two readers with different needs, so
 the service offers both: `take_system` consumes a published generation (Quick
 Settings applies each one exactly once) and `read_system` copies the latest

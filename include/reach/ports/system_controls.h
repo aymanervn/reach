@@ -17,6 +17,12 @@ extern "C"
 #define REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH (1u << 1)
 #define REACH_SYSTEM_CONTROLS_CHANGE_POWER (1u << 2)
 #define REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS (1u << 3)
+/* Raised, together with CHANGE_BLUETOOTH, when a `request_bluetooth_enabled` call has run to
+   completion — whether or not it changed the radio. Not a capability, so not in CHANGE_ALL. */
+#define REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST (1u << 4)
+#define REACH_SYSTEM_CONTROLS_CHANGE_ALL                                                           \
+    (REACH_SYSTEM_CONTROLS_CHANGE_NETWORK | REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH |               \
+     REACH_SYSTEM_CONTROLS_CHANGE_POWER | REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS)
 
     typedef void (*reach_system_controls_change_callback)(void *user, uint32_t change_flags);
 

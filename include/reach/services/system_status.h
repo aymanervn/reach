@@ -35,6 +35,10 @@ extern "C"
         REACH_SYSTEM_STATUS_BLUETOOTH_APPLIED = 3
     } reach_system_status_bluetooth_outcome;
 
+    /* Cumulative: every field holds the last value read successfully, and a `_valid` flag
+       means that field has been read at least once. A refresh only rewrites the fields it
+       probes, so an unrequested or failed read never clears a good value. `change_flags`
+       accumulates the reasons published since the last `take_system`, which consumes them. */
     typedef struct reach_system_status_system_snapshot
     {
         reach_network_state network;
@@ -58,6 +62,8 @@ extern "C"
 
     void reach_system_status_refresh_audio(reach_system_status *service);
 
+    /* Probes only the capabilities named in `change_flags`; 0 requests every capability.
+       Coalesced requests take the union. */
     void reach_system_status_refresh_system(reach_system_status *service, uint32_t change_flags);
 
     int32_t reach_system_status_take_audio(reach_system_status *service,

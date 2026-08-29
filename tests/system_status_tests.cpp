@@ -1,6 +1,8 @@
 #include "reach/services/system_status.h"
 
+#include <chrono>
 #include <stdio.h>
+#include <thread>
 
 static int failures;
 
@@ -61,6 +63,13 @@ typedef struct fake_controls
     int32_t request_calls;
     int32_t request_fails;
     int32_t set_calls;
+    int32_t network_reads;
+    int32_t bluetooth_reads;
+    int32_t power_reads;
+    int32_t brightness_reads;
+    int32_t bluetooth_fails;
+    int32_t bluetooth_enabled;
+    int32_t battery_percent;
 } fake_controls;
 
 static fake_controls controls;
@@ -79,6 +88,74 @@ static reach_result fake_set_bluetooth(void *userdata, int32_t enabled)
     (void)enabled;
     ++controls.set_calls;
     return REACH_OK;
+}
+
+static reach_result fake_get_network(void *userdata, reach_network_state *out_state)
+{
+    (void)userdata;
+    ++controls.network_reads;
+    *out_state = {};
+    out_state->kind = REACH_NETWORK_KIND_WIFI;
+    out_state->connected = 1;
+    return REACH_OK;
+}
+
+static reach_result fake_get_bluetooth(void *userdata, reach_bluetooth_state *out_state)
+{
+    (void)userdata;
+    ++controls.bluetooth_reads;
+    if (controls.bluetooth_fails)
+    {
+        return REACH_ERROR;
+    }
+    *out_state = {};
+    out_state->available = 1;
+    out_state->enabled = controls.bluetooth_enabled;
+    return REACH_OK;
+}
+
+static reach_result fake_get_power(void *userdata, reach_power_state *out_state)
+{
+    (void)userdata;
+    ++controls.power_reads;
+    *out_state = {};
+    out_state->has_battery = 1;
+    out_state->battery_percent = controls.battery_percent;
+    return REACH_OK;
+}
+
+static reach_result fake_get_brightness(void *userdata, reach_brightness_state *out_state)
+{
+    (void)userdata;
+    ++controls.brightness_reads;
+    *out_state = {};
+    out_state->available = 1;
+    out_state->level = 0.5f;
+    return REACH_OK;
+}
+
+static reach_system_controls_port readable_controls_port(void)
+{
+    reach_system_controls_port port = {};
+    port.get_network_state = fake_get_network;
+    port.get_bluetooth_state = fake_get_bluetooth;
+    port.get_power_state = fake_get_power;
+    port.get_brightness_state = fake_get_brightness;
+    return port;
+}
+
+static int32_t wait_for_system_snapshot(reach_system_status *service,
+                                        reach_system_status_system_snapshot *out_snapshot)
+{
+    for (int attempt = 0; attempt < 400; ++attempt)
+    {
+        if (reach_system_status_take_system(service, out_snapshot))
+        {
+            return 1;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    return 0;
 }
 
 static reach_system_status *make_service(reach_audio_volume_port audio_port,
@@ -233,6 +310,58 @@ static void test_missing_entry_points_are_not_implemented(void)
     reach_system_status_destroy(service);
 }
 
+static void test_a_scoped_refresh_probes_only_what_it_names(void)
+{
+    reach_system_status *service = make_service(full_audio_port(), readable_controls_port());
+    controls.battery_percent = 80;
+    controls.bluetooth_enabled = 0;
+
+    reach_system_status_system_snapshot snapshot = {};
+    reach_system_status_refresh_system(service, 0);
+    expect_true(wait_for_system_snapshot(service, &snapshot),
+                "a full refresh publishes a snapshot");
+    expect_true(controls.network_reads == 1 && controls.bluetooth_reads == 1 &&
+                    controls.power_reads == 1 && controls.brightness_reads == 1,
+                "a full refresh probes every capability");
+
+    controls.bluetooth_enabled = 1;
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
+    expect_true(wait_for_system_snapshot(service, &snapshot),
+                "a scoped refresh publishes a snapshot");
+    expect_true(controls.bluetooth_reads == 2, "a bluetooth refresh re-reads bluetooth");
+    expect_true(controls.network_reads == 1 && controls.power_reads == 1 &&
+                    controls.brightness_reads == 1,
+                "a bluetooth refresh probes nothing else");
+    expect_true(snapshot.bluetooth_valid && snapshot.bluetooth.enabled == 1,
+                "a scoped refresh publishes the value it probed");
+    expect_true(snapshot.network_valid && snapshot.network.connected && snapshot.power_valid &&
+                    snapshot.power.battery_percent == 80 && snapshot.brightness_valid,
+                "a scoped refresh carries the fields it skipped");
+
+    reach_system_status_destroy(service);
+}
+
+static void test_a_failed_read_keeps_the_last_known_value(void)
+{
+    reach_system_status *service = make_service(full_audio_port(), readable_controls_port());
+    controls.bluetooth_enabled = 1;
+
+    reach_system_status_system_snapshot snapshot = {};
+    reach_system_status_refresh_system(service, 0);
+    expect_true(wait_for_system_snapshot(service, &snapshot),
+                "a full refresh publishes a snapshot");
+
+    controls.bluetooth_fails = 1;
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
+    expect_true(wait_for_system_snapshot(service, &snapshot),
+                "a failed read still publishes a snapshot");
+    expect_true(snapshot.bluetooth_valid && snapshot.bluetooth.available &&
+                    snapshot.bluetooth.enabled == 1,
+                "a failed read leaves the last known bluetooth state intact");
+
+    reach_system_status_destroy(service);
+}
+
 static void test_null_service_is_rejected(void)
 {
     int32_t muted = 0;
@@ -254,6 +383,8 @@ int main(void)
     test_bluetooth_reports_a_rejected_request();
     test_bluetooth_falls_back_to_the_synchronous_set();
     test_bluetooth_without_a_capable_port_is_unsupported();
+    test_a_scoped_refresh_probes_only_what_it_names();
+    test_a_failed_read_keeps_the_last_known_value();
     test_missing_entry_points_are_not_implemented();
     test_null_service_is_rejected();
 
