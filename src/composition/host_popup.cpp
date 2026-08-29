@@ -3,15 +3,24 @@
 static int32_t reach_host_surface_contains_point(const reach_feature_runtime *desc,
                                                  reach_point_i32 point)
 {
-    const reach_surface_runtime *surface = desc->surface;
-    if (surface == nullptr || !surface->bounds_valid)
+    reach_rect_f32 bounds = {};
+    if (desc->resolved_bounds_valid && desc->resolved_bounds.width > 0.0f &&
+        desc->resolved_bounds.height > 0.0f)
     {
-        return 1;
+        bounds = desc->resolved_bounds;
+    }
+    else
+    {
+        const reach_surface_runtime *surface = desc->surface;
+        if (surface == nullptr || !surface->bounds_valid)
+        {
+            return 1;
+        }
+        bounds = surface->last_bounds;
     }
 
-    const reach_rect_f32 *bounds = &surface->last_bounds;
-    return (float)point.x >= bounds->x && (float)point.x <= bounds->x + bounds->width &&
-           (float)point.y >= bounds->y && (float)point.y <= bounds->y + bounds->height;
+    return (float)point.x >= bounds.x && (float)point.x <= bounds.x + bounds.width &&
+           (float)point.y >= bounds.y && (float)point.y <= bounds.y + bounds.height;
 }
 
 static int32_t

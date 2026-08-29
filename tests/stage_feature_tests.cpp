@@ -199,11 +199,66 @@ static void test_close_before_the_first_tick_completes(void)
     reach_stage_destroy(stage);
 }
 
+static void test_closing_lands_on_the_current_window_frame(void)
+{
+    reach_stage *stage = nullptr;
+    if (reach_stage_create(&stage) != REACH_OK || stage == nullptr)
+    {
+        expect_true(0, "stage is created for the displaced close");
+        return;
+    }
+
+    reach_rect_f32 opened = make_rect(0.0f, 0.0f, 1000.0f, 800.0f);
+    reach_stage_open_window window = make_window(1, opened);
+    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, &window, 1);
+
+    const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
+    reach_feature_tick_result tick = {};
+    for (int step = 0; step < 40; ++step)
+    {
+        ops->tick(stage, 0.016, &tick);
+    }
+
+    reach_rect_f32 grid_rect = reach_stage_state_ptr(stage)->tiles[0].target_rect;
+
+    reach_rect_f32 displaced = make_rect(0.0f, 40.0f, 1000.0f, 760.0f);
+    reach_stage_open_window pushed = make_window(1, displaced);
+    reach_stage_refresh_tile_frames(stage, &pushed, 1);
+
+    const reach_stage_tile *tile = &reach_stage_state_ptr(stage)->tiles[0];
+    expect_near(tile->source_rect.y, displaced.y, "a refresh re-seats the tile landing rect");
+    expect_near(tile->target_rect.y, grid_rect.y,
+                "a refresh leaves the tile where it sits in the grid");
+    expect_near(tile->target_rect.height, grid_rect.height,
+                "a refresh does not resize the tile in the grid");
+
+    reach_stage_begin_close(stage);
+    reach_rect_f32 last = tile->current_rect;
+    int guard = 0;
+    while (reach_stage_is_open(stage) && guard < 200)
+    {
+        ops->tick(stage, 0.016, &tick);
+        if (reach_stage_is_open(stage))
+        {
+            last = tile->current_rect;
+        }
+        ++guard;
+    }
+
+    expect_true(fabsf(last.y - displaced.y) < fabsf(last.y - opened.y),
+                "the close animation settles onto the moved window, not where it opened");
+    expect_true(fabsf(last.height - displaced.height) < fabsf(last.height - opened.height),
+                "the close animation settles at the moved window size");
+
+    reach_stage_destroy(stage);
+}
+
 int main(void)
 {
     test_open_and_close_state_machine();
     test_force_close_keeps_configured_animation();
     test_closing_stage_finishes_without_external_wake_ups();
     test_close_before_the_first_tick_completes();
+    test_closing_lands_on_the_current_window_frame();
     return failures == 0 ? 0 : 1;
 }

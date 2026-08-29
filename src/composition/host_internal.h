@@ -367,6 +367,8 @@ void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal
                                         int32_t visible);
 
 int32_t reach_host_surface_is_open(const reach_feature_runtime *runtime);
+int32_t reach_host_surface_needs_frame(const reach_feature_runtime *runtime);
+int32_t reach_host_surface_presented(const reach_feature_runtime *runtime);
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
 int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask);
 int32_t reach_host_any_surface_dirty(const reach_host *host);

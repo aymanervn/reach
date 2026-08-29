@@ -30,6 +30,7 @@ static reach_host transition_frame_host;
 static reach_host registry_host;
 static reach_host generic_frame_host;
 static reach_host native_overlay_host;
+static reach_host closing_stage_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
 static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
@@ -615,6 +616,44 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     reach_host_destroy_registered_features(host);
 }
 
+static void test_forced_bars_hold_through_a_closing_stage(void)
+{
+    reach_host *host = &closing_stage_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered Stage feature is available");
+    reach_host_init_layout(host);
+    host->layout_dpi_scale = 1.0f;
+
+    reach_feature_runtime *stage = &host->feature_runtimes[REACH_SURFACE_ID_STAGE];
+    expect_true(stage->definition->surface.bar_shown_while_open,
+                "Stage is the surface that forces the bars shown");
+
+    static const uint16_t label[] = {'W', 'i', 'n', 'd', 'o', 'w', 0};
+    reach_stage_open_window window = {};
+    window.window = 42;
+    window.label = label;
+    window.frame = {100.0f, 100.0f, 800.0f, 600.0f};
+    reach_rect_f32 monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    reach_stage *capsule = reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE);
+    expect_true(reach_stage_open(capsule, monitor, 1.0f, &window, 1) == REACH_OK,
+                "Stage opens for close-animation testing");
+    expect_true(reach_host_surface_presented(stage), "an open Stage is presented");
+
+    reach_stage_begin_close(capsule);
+    expect_true(!stage->definition->capsule_ops->is_open(stage->capsule),
+                "the Stage capsule reports closed as soon as it begins closing");
+    expect_true(reach_host_surface_presented(stage),
+                "a Stage animating closed is still presented, so the bars stay forced shown");
+
+    reach_feature_tick_result tick = {};
+    stage->definition->capsule_ops->tick(stage->capsule, 5.0, &tick);
+    expect_true(!reach_host_surface_presented(stage),
+                "a fully closed Stage stops forcing the bars shown");
+
+    reach_host_destroy_registered_features(host);
+}
+
 static void test_switcher_publishes_arranged_surface_geometry(void)
 {
     reach_switcher *switcher = nullptr;
@@ -651,6 +690,7 @@ int main(void)
     test_registered_feature_lifecycle();
     test_registered_surface_frame_uses_declared_anchor();
     test_registered_surface_frame_syncs_native_overlay();
+    test_forced_bars_hold_through_a_closing_stage();
     test_switcher_publishes_arranged_surface_geometry();
 
     if (failures != 0)

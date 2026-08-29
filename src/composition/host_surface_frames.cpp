@@ -241,12 +241,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         return REACH_ERROR;
     }
 
-    int32_t open = desc->definition->capsule_ops->is_open == nullptr
-                       ? 1
-                       : desc->definition->capsule_ops->is_open(desc->capsule);
-    int32_t needs_frame = desc->definition->capsule_ops->needs_frame != nullptr &&
-                          desc->definition->capsule_ops->needs_frame(desc->capsule);
-    int32_t active = open || needs_frame;
+    int32_t needs_frame = reach_host_surface_needs_frame(desc);
+    int32_t active = reach_host_surface_presented(desc);
     if (desc->transition != nullptr && !active)
     {
         reach_host_surface_transition_set(host, desc->transition, 0);

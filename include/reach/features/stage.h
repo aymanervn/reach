@@ -103,6 +103,9 @@ extern "C"
 
     int32_t reach_stage_update_windows(reach_stage *stage, const reach_stage_open_window *windows,
                                        size_t window_count);
+    void reach_stage_refresh_tile_frames(reach_stage *stage,
+                                         const reach_stage_open_window *windows,
+                                         size_t window_count);
     size_t reach_stage_tile_generation(const reach_stage *stage);
 
     size_t reach_stage_thumbnail_count(const reach_stage *stage);

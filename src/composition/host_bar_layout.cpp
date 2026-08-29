@@ -6,9 +6,7 @@ static int32_t reach_host_bar_forced_shown(const reach_host *host)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->surface.bar_shown_while_open &&
-            desc->definition->capsule_ops != nullptr &&
-            desc->definition->capsule_ops->is_open != nullptr &&
-            desc->definition->capsule_ops->is_open(desc->capsule))
+            desc->definition->capsule_ops != nullptr && reach_host_surface_presented(desc))
         {
             return 1;
         }
