@@ -1,4 +1,5 @@
 #include "reach/features/launcher.h"
+#include "reach/core/ui_layout.h"
 #include "test_utf16.h"
 
 #include <math.h>
@@ -120,17 +121,27 @@ int main()
     failed += expect(state->model.result_count == 2);
     failed += expect(state->model.selected_result_index == 0);
 
+    reach_launcher_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1480.0f, 900.0f};
+    arrange.dpi_scale = 1.0f;
+    failed += expect(reach_launcher_arrange(capsule, &arrange) == 1);
+
+    reach_ui_layout_input layout_input = {};
+    layout_input.monitor_bounds = arrange.monitor_bounds;
+    layout_input.work_area = arrange.monitor_bounds;
+    layout_input.dpi_scale = arrange.dpi_scale;
+    layout_input.border_thickness =
+        reach_theme_border_thickness(arrange.theme, arrange.dpi_scale);
     reach_launcher_layout expansion_layout = {};
-    expansion_layout.search_box = {100.0f, 200.0f, 640.0f, 52.0f};
-    expansion_layout.bounds = {100.0f, 200.0f, 640.0f, 180.0f};
-    expansion_layout.envelope_bounds = {100.0f, 200.0f, 640.0f,
-                                        68.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS};
-    reach_launcher_set_pointer_context(capsule, &expansion_layout);
+    failed +=
+        expect(reach_launcher_layout_compute(&state->model, &layout_input, &expansion_layout) ==
+               REACH_OK);
 
     const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
     reach_feature_surface_geometry geometry = {};
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed += expect_close(geometry.visible_bounds.height, 52.0f);
+    failed += expect_close(geometry.visible_bounds.height, expansion_layout.search_box.height);
     failed += expect_close(geometry.envelope_bounds.x, expansion_layout.bounds.x);
     failed += expect_close(geometry.envelope_bounds.y, expansion_layout.bounds.y);
     failed +=
@@ -139,23 +150,22 @@ int main()
     reach_feature_tick_result tick = {};
     capsule_ops->tick(capsule, 0.08, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed +=
-        expect(geometry.visible_bounds.height > 52.0f && geometry.visible_bounds.height < 180.0f);
+    failed += expect(geometry.visible_bounds.height > expansion_layout.search_box.height &&
+                     geometry.visible_bounds.height < expansion_layout.bounds.height);
     failed += expect(tick.redraw == 1);
     tick = {};
     capsule_ops->tick(capsule, 0.16, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed += expect_close(geometry.visible_bounds.height, 180.0f);
+    failed += expect_close(geometry.visible_bounds.height, expansion_layout.bounds.height);
 
-    reach_launcher_layout pointer_layout = {};
-    pointer_layout.bounds = {0.0f, 0.0f, 200.0f, 112.0f};
-    pointer_layout.search_result_items = pointer_layout.bounds;
-    reach_launcher_set_pointer_context(capsule, &pointer_layout);
+    float result_row_height =
+        expansion_layout.search_result_items.height / (float)state->model.result_count;
     reach_pointer_event pointer = {};
     pointer.kind = REACH_POINTER_EVENT_DOWN;
     pointer.button = REACH_POINTER_BUTTON_SECONDARY;
-    pointer.x = 50;
-    pointer.y = 84;
+    pointer.x = (int32_t)(expansion_layout.search_result_items.x +
+                          expansion_layout.search_result_items.width * 0.5f);
+    pointer.y = (int32_t)(expansion_layout.search_result_items.y + result_row_height * 1.5f);
     reach_capsule_pointer_result pointer_result = {};
     capsule_ops->handle_pointer(capsule, &pointer, &pointer_result);
     failed += expect(pointer_result.handled == 1);

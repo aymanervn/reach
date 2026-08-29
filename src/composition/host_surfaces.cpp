@@ -2,12 +2,6 @@
 
 #include <math.h>
 
-int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
-{
-    return fabsf(a.x - b.x) < 0.5f && fabsf(a.y - b.y) < 0.5f && fabsf(a.width - b.width) < 0.5f &&
-           fabsf(a.height - b.height) < 0.5f;
-}
-
 int32_t reach_host_scalar_equal(float a, float b)
 {
     return fabsf(a - b) < 0.001f;
@@ -92,7 +86,7 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
 
     *out_changed = 0;
     if (window->ops.set_bounds != nullptr &&
-        (!*bounds_valid || !reach_host_rect_equal(*last_bounds, bounds)))
+        (!*bounds_valid || !reach_rect_equal(*last_bounds, bounds)))
     {
         reach_result result =
             window->ops.set_bounds(window->window, reach_host_surface_window_bounds(bounds, pad));
@@ -561,6 +555,25 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
         reach_host_request_bar_visibility_update(host);
     }
     reach_host_apply_feature_tick_result(host, runtime, &result);
+}
+
+void reach_host_post_feature_work_ready(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_runtime *surface = host->feature_runtimes[index].surface;
+        if (surface != nullptr && surface->window.ops.post_event != nullptr)
+        {
+            (void)surface->window.ops.post_event(surface->window.window,
+                                                 REACH_UI_EVENT_FEATURE_WORK_READY);
+            return;
+        }
+    }
+    reach_host_request_update(host);
 }
 
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id)

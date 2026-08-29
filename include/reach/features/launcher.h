@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/render_commands.h"
+#include "reach/core/ui_layout.h"
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
 #include "reach/features/common/text_edit.h"
@@ -29,8 +30,15 @@ extern "C"
 
     const reach_feature_capsule_ops *reach_launcher_capsule_ops(void);
 
-    void reach_launcher_set_pointer_context(reach_launcher *launcher,
-                                            const reach_launcher_layout *layout);
+    typedef struct reach_launcher_arrange_context
+    {
+        const reach_theme *theme;
+        reach_rect_f32 monitor_bounds;
+        float dpi_scale;
+    } reach_launcher_arrange_context;
+
+    int32_t reach_launcher_arrange(reach_launcher *launcher,
+                                   const reach_launcher_arrange_context *ctx);
     void reach_launcher_set_pointer_transform(reach_launcher *launcher,
                                               reach_transform_f32 transform);
 
@@ -40,7 +48,6 @@ extern "C"
     reach_result reach_launcher_set_results(reach_launcher *launcher,
                                             const reach_search_candidate *results, size_t count);
     reach_result reach_launcher_clear_results(reach_launcher *launcher);
-    void reach_launcher_set_search_error(reach_launcher *launcher, int32_t error);
     size_t reach_launcher_model_result_scroll_offset(const reach_launcher_model *launcher);
 
     void reach_launcher_attach_search(reach_launcher *launcher, reach_search_service *search);
@@ -48,9 +55,6 @@ extern "C"
     void reach_launcher_attach_icons(reach_launcher *launcher, reach_icon_service *icons);
     void reach_launcher_set_terminal_icon_ref(reach_launcher *launcher, const uint16_t *icon_ref);
     void reach_launcher_cancel_search(reach_launcher *launcher);
-    int32_t reach_launcher_take_search_results(reach_launcher *launcher,
-                                               reach_search_candidate *out_results,
-                                               size_t *out_count, int32_t *out_error);
 
     const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count);
 

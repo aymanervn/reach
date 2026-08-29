@@ -4,6 +4,12 @@
 #include "reach/features/launcher.h"
 
 reach_launcher_state *reach_launcher_state_mut(reach_launcher *launcher);
+void reach_launcher_set_pointer_context(reach_launcher *launcher,
+                                        const reach_launcher_layout *layout);
+void reach_launcher_set_search_error(reach_launcher *launcher, int32_t error);
+int32_t reach_launcher_take_search_results(reach_launcher *launcher,
+                                           reach_search_candidate *out_results, size_t *out_count,
+                                           int32_t *out_error);
 reach_icon_service *reach_launcher_icons(reach_launcher *launcher);
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher);
 float reach_launcher_results_expansion(const reach_launcher *launcher);

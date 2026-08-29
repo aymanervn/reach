@@ -290,7 +290,6 @@ add_library(reach_composition STATIC
     src/composition/interfeature_routes.cpp
     src/composition/host_launcher_orchestration.cpp
     src/composition/host_layout.cpp
-    src/composition/host_launcher_search.cpp
     src/composition/host_lifecycle.cpp
     src/composition/host_popup.cpp
     src/composition/host_popup_surface.cpp

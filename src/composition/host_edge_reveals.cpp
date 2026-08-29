@@ -212,7 +212,7 @@ void reach_host_set_edge_reveal_bounds(reach_host_edge_reveal_runtime *runtime,
     {
         return;
     }
-    if (runtime->bounds_valid && reach_host_rect_equal(runtime->bounds, bounds))
+    if (runtime->bounds_valid && reach_rect_equal(runtime->bounds, bounds))
     {
         return;
     }

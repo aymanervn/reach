@@ -553,7 +553,7 @@ static void test_registered_surface_frame_uses_declared_anchor(void)
         reach_host_scalar_equal(state->layout.bounds.y + state->layout.bounds.height, 988.0f),
         "the generic frame arranges from the declared Dock anchor");
     expect_true(hud->resolved_bounds_valid &&
-                    reach_host_rect_equal(hud->resolved_bounds, state->layout.bounds),
+                    reach_rect_equal(hud->resolved_bounds, state->layout.bounds),
                 "the generic frame publishes the resolved HUD bounds");
     expect_true(observed_bounds.width >= state->layout.bounds.width,
                 "the generic frame applies native bounds with surface padding");

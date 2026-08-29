@@ -54,17 +54,6 @@ void reach_host_cleanup_closed_launcher(reach_host *host)
         reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER));
 }
 
-void reach_host_notify_launcher_search_ready(reach_host *host)
-{
-    if (host == nullptr || host->launcher.window.ops.post_event == nullptr)
-    {
-        return;
-    }
-
-    (void)host->launcher.window.ops.post_event(host->launcher.window.window,
-                                               REACH_UI_EVENT_LAUNCHER_SEARCH_READY);
-}
-
 void reach_host_remember_launcher_restore_window(reach_host *host)
 {
     if (host == nullptr)

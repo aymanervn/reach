@@ -441,6 +441,8 @@ void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtim
                                           const reach_feature_tick_result *result);
 void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id id, int32_t open);
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id);
+void reach_host_post_feature_work_ready(reach_host *host);
+void reach_host_stop_search_service(reach_host *host);
 void reach_host_notify_registered_features(reach_host *host,
                                            const reach_feature_notification *notification);
 
@@ -689,7 +691,6 @@ static inline int32_t reach_host_primary_monitor_bounds(const reach_host *host,
     return out_bounds->width > 0.0f && out_bounds->height > 0.0f ? 1 : 0;
 }
 
-int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
 int32_t reach_host_scalar_equal(float a, float b);
 
 const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surface_id id);
@@ -750,7 +751,6 @@ void reach_host_sync_popup_mouse_hook(reach_host *host);
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);
 void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int32_t restore_focus);
 
-void reach_host_notify_launcher_search_ready(reach_host *host);
 void reach_host_cleanup_closed_launcher(reach_host *host);
 
 void reach_host_close_launcher(reach_host *host);
@@ -796,8 +796,6 @@ reach_result reach_host_open_pinned_app(reach_host *host, size_t pinned_index,
 reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
                                            int32_t force_new_instance,
                                            int32_t defer_until_launcher_closed);
-void reach_host_apply_launcher_search_results(reach_host *host);
-void reach_host_stop_launcher_search_worker(reach_host *host);
 
 void reach_host_close_context_menu(reach_host *host);
 reach_result reach_host_execute_context_command(reach_host *host, uint32_t command);

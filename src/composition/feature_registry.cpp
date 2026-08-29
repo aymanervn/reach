@@ -786,7 +786,7 @@ static int32_t reach_top_bar_surface_arrange(void *capsule,
     build.dpi_scale = ctx->dpi_scale;
     build.text_measure = ctx->text_measure;
     reach_top_bar_build_layout(top_bar, &build);
-    return !reach_host_rect_equal(before, reach_top_bar_state_ptr(top_bar)->layout.bounds);
+    return !reach_rect_equal(before, reach_top_bar_state_ptr(top_bar)->layout.bounds);
 }
 
 static reach_result reach_top_bar_surface_render(void *capsule,
@@ -806,6 +806,16 @@ static const reach_feature_surface_ops reach_top_bar_surface_ops = {
     reach_top_bar_surface_render,
 };
 
+static int32_t reach_launcher_surface_arrange(void *capsule,
+                                              const reach_feature_surface_context *ctx)
+{
+    reach_launcher_arrange_context arrange = {};
+    arrange.theme = ctx->theme;
+    arrange.monitor_bounds = ctx->monitor_bounds;
+    arrange.dpi_scale = ctx->dpi_scale;
+    return reach_launcher_arrange(static_cast<reach_launcher *>(capsule), &arrange);
+}
+
 static reach_result reach_launcher_surface_render(void *capsule,
                                                   const reach_feature_surface_context *ctx,
                                                   reach_render_command_buffer *out_commands)
@@ -821,7 +831,7 @@ static void reach_launcher_surface_set_pointer_transform(void *capsule,
 }
 
 static const reach_feature_surface_ops reach_launcher_surface_ops = {
-    reach_prearranged_surface_arrange,
+    reach_launcher_surface_arrange,
     reach_launcher_surface_render,
     nullptr,
     reach_launcher_surface_set_pointer_transform,
@@ -861,7 +871,7 @@ static int32_t reach_context_menu_surface_arrange(void *capsule,
     arrange.anchored = 1;
     arrange.text_measure = ctx->text_measure;
     reach_context_menu_reanchor(menu, &arrange);
-    return !reach_host_rect_equal(before, reach_context_menu_state_ptr(menu)->bounds);
+    return !reach_rect_equal(before, reach_context_menu_state_ptr(menu)->bounds);
 }
 
 static reach_result reach_context_menu_surface_render(void *capsule,
@@ -1076,7 +1086,7 @@ static int32_t reach_quick_settings_surface_arrange(void *capsule,
     reach_quick_settings_refresh_layout(quick_settings, &layout);
     int32_t animation_changed = reach_quick_settings_update_open_animation(quick_settings, &layout);
     return animation_changed ||
-           !reach_host_rect_equal(before, reach_quick_settings_state_ptr(quick_settings)->bounds);
+           !reach_rect_equal(before, reach_quick_settings_state_ptr(quick_settings)->bounds);
 }
 
 static reach_result reach_quick_settings_surface_render(void *capsule,
@@ -1109,7 +1119,7 @@ static int32_t reach_battery_surface_arrange(void *capsule,
     layout.dpi_scale = ctx->dpi_scale;
     layout.drop_direction = ctx->anchor_direction;
     reach_battery_relayout(battery, &layout);
-    return !reach_host_rect_equal(before, reach_battery_state_ptr(battery)->bounds);
+    return !reach_rect_equal(before, reach_battery_state_ptr(battery)->bounds);
 }
 
 static reach_result reach_battery_surface_render(void *capsule,
@@ -1145,7 +1155,7 @@ static int32_t reach_tray_surface_arrange(void *capsule, const reach_feature_sur
     anchor.direction = ctx->anchor_direction;
     reach_rect_f32 bounds = {};
     reach_top_bar_layout_tray_popup(top_bar, ctx->theme, &anchor, ctx->dpi_scale, &bounds);
-    return !reach_host_rect_equal(before.visible_bounds, bounds);
+    return !reach_rect_equal(before.visible_bounds, bounds);
 }
 
 static reach_result reach_tray_surface_render(void *capsule,

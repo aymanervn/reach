@@ -215,11 +215,11 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
-    case REACH_WM_LAUNCHER_SEARCH_READY:
+    case REACH_WM_FEATURE_WORK_READY:
         if (window != nullptr)
         {
             reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_LAUNCHER_SEARCH_READY;
+            event.type = REACH_UI_EVENT_FEATURE_WORK_READY;
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
@@ -1061,8 +1061,8 @@ static reach_result reach_platform_window_post_event(reach_platform_window *wind
     UINT message = 0;
     switch (type)
     {
-    case REACH_UI_EVENT_LAUNCHER_SEARCH_READY:
-        message = REACH_WM_LAUNCHER_SEARCH_READY;
+    case REACH_UI_EVENT_FEATURE_WORK_READY:
+        message = REACH_WM_FEATURE_WORK_READY;
         break;
     case REACH_UI_EVENT_CONFIG_CHANGED:
         message = REACH_WM_CONFIG_CHANGED;

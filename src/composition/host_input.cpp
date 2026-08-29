@@ -802,17 +802,13 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return reach_host_request_config_reload(host);
     }
 
-    if (event->type == REACH_UI_EVENT_LAUNCHER_SEARCH_READY)
+    if (event->type == REACH_UI_EVENT_FEATURE_WORK_READY)
     {
-        reach_host_apply_launcher_search_results(host);
-
         if (reach_icon_service_take_loads_completed(host->icon_service))
         {
-            host->dock.dirty_flags = 1;
-            host->launcher.dirty_flags = 1;
-            host->switcher.dirty_flags = 1;
-            reach_host_request_update(host);
+            reach_host_mark_all_surfaces_dirty(host);
         }
+        reach_host_request_update(host);
         return REACH_OK;
     }
 
