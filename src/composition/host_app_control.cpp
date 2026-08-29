@@ -151,19 +151,6 @@ void reach_host_process_deferred_launch(reach_host *host)
     (void)reach_host_schedule_app_launch(host, &request);
 }
 
-reach_result reach_host_open_default_location(reach_host *host)
-{
-    if (host == nullptr || host->explorer_service.service == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    if (host->explorer_service.ops.open_default != nullptr)
-    {
-        return host->explorer_service.ops.open_default(host->explorer_service.service);
-    }
-    return REACH_OK;
-}
-
 reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature_target *target,
                                            uintptr_t window_id)
 {
@@ -229,25 +216,16 @@ reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id s
         return reach_host_schedule_terminal_command(host, target->path);
 
     case REACH_FEATURE_TARGET_LOCATION:
-        if (host->explorer_service.ops.path_exists != nullptr &&
-            host->explorer_service.ops.path_exists(host->explorer_service.service, target->path) &&
-            host->explorer_service.ops.open_path != nullptr)
-        {
-            return host->explorer_service.ops.open_path(host->explorer_service.service,
-                                                        target->path);
-        }
-        return reach_host_open_default_location(host);
+        return reach_app_control_schedule_open_location(
+            host->app_control, REACH_APP_CONTROL_LOCATION_PATH, target->path);
 
     case REACH_FEATURE_TARGET_SHELL_LOCATION:
-        if (host->explorer_service.ops.open_shell_location != nullptr)
-        {
-            return host->explorer_service.ops.open_shell_location(host->explorer_service.service,
-                                                                  target->path);
-        }
-        return reach_host_open_default_location(host);
+        return reach_app_control_schedule_open_location(
+            host->app_control, REACH_APP_CONTROL_LOCATION_SHELL, target->path);
 
     case REACH_FEATURE_TARGET_DEFAULT_LOCATION:
-        return reach_host_open_default_location(host);
+        return reach_app_control_schedule_open_location(
+            host->app_control, REACH_APP_CONTROL_LOCATION_DEFAULT, nullptr);
 
     case REACH_FEATURE_TARGET_NONE:
     default:

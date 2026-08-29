@@ -41,6 +41,19 @@ extern "C"
     reach_app_control_schedule_terminal_launch(reach_app_control *service,
                                                const reach_terminal_launch_request *request);
 
+    typedef enum reach_app_control_location_kind
+    {
+        REACH_APP_CONTROL_LOCATION_DEFAULT = 0,
+        REACH_APP_CONTROL_LOCATION_PATH = 1,
+        REACH_APP_CONTROL_LOCATION_SHELL = 2
+    } reach_app_control_location_kind;
+
+    /* Opening a shell location is a blocking ShellExecute, and deciding whether a path exists can
+       block for seconds on a disconnected share, so both happen on the worker. */
+    reach_result reach_app_control_schedule_open_location(reach_app_control *service,
+                                                          reach_app_control_location_kind kind,
+                                                          const uint16_t *path);
+
     int32_t reach_app_control_reveal_available(const reach_app_control *service);
     reach_result reach_app_control_schedule_reveal(reach_app_control *service,
                                                    const uint16_t *path);
