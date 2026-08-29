@@ -5,6 +5,7 @@
 #include "reach/platform/windows_adapters.h"
 #include "reach/services/bluetooth.h"
 #include "reach/services/config.h"
+#include "reach/services/system_status.h"
 #include "reach/services/wifi.h"
 
 #include <windows.h>
@@ -116,6 +117,7 @@ struct reach_settings_app
     reach_startup_apps_port startup_apps;
     reach_icon_provider_port icon_provider;
     reach_system_controls_port system_controls;
+    reach_system_status *system_status;
     reach_wifi_service *wifi_service;
     reach_bluetooth_service *bluetooth_service;
     std::atomic<int32_t> radio_notify;
@@ -1290,17 +1292,22 @@ static void reach_settings_radio_notify(void *user)
     }
 }
 
-static void reach_settings_refresh_bluetooth_radio(reach_settings_app *app)
+static void reach_settings_request_bluetooth_radio(reach_settings_app *app)
 {
-    reach_bluetooth_state state = {};
-    if (app->system_controls.get_bluetooth_state != nullptr)
+    if (app->system_status != nullptr)
     {
-        (void)app->system_controls.get_bluetooth_state(app->system_controls.userdata, &state);
+        reach_system_status_refresh_system(app->system_status,
+                                           REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
     }
+}
+
+static void reach_settings_apply_bluetooth_radio(reach_settings_app *app,
+                                                 const reach_bluetooth_state *state)
+{
     int32_t stop_scan = app->model.bluetooth_scanning ||
                         app->model.bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING;
-    reach_settings_model_set_bluetooth_radio(&app->model, state);
-    if ((!state.available || !state.enabled) && app->bluetooth_service != nullptr && stop_scan)
+    reach_settings_model_set_bluetooth_radio(&app->model, *state);
+    if ((!state->available || !state->enabled) && app->bluetooth_service != nullptr && stop_scan)
     {
         reach_bluetooth_service_set_scan_enabled(app->bluetooth_service, 0);
     }
@@ -1332,7 +1339,7 @@ static void reach_settings_enter_bluetooth_page(reach_settings_app *app)
     {
         return;
     }
-    reach_settings_refresh_bluetooth_radio(app);
+    reach_settings_request_bluetooth_radio(app);
     reach_bluetooth_service_refresh(app->bluetooth_service);
     app->dirty = 1;
 }
@@ -1470,7 +1477,6 @@ static void reach_settings_apply_bluetooth_snapshot(reach_settings_app *app)
     reach_settings_model_apply_bluetooth(&app->model, &snapshot.devices, &snapshot.pairing,
                                          snapshot.scanning);
     reach_settings_load_bluetooth_icons(app);
-    reach_settings_refresh_bluetooth_radio(app);
 
     if (snapshot.pair_result != REACH_BLUETOOTH_PAIR_RESULT_NONE)
     {
@@ -1758,12 +1764,13 @@ static void reach_settings_handle_bluetooth_action(reach_settings_app *app,
     switch (hit.type)
     {
     case REACH_SETTINGS_HIT_BLUETOOTH_RADIO_TOGGLE:
-        if (model->bluetooth_radio.available &&
-            app->system_controls.request_bluetooth_enabled != nullptr)
+        if (model->bluetooth_radio.available)
         {
             int32_t enabled = model->bluetooth_radio.enabled ? 0 : 1;
-            if (app->system_controls.request_bluetooth_enabled(
-                    app->system_controls.userdata, enabled) == REACH_OK)
+            reach_system_status_bluetooth_outcome outcome =
+                reach_system_status_set_bluetooth_enabled(app->system_status, enabled);
+            if (outcome == REACH_SYSTEM_STATUS_BLUETOOTH_PENDING ||
+                outcome == REACH_SYSTEM_STATUS_BLUETOOTH_APPLIED)
             {
                 (void)reach_settings_model_toggle_bluetooth_radio(model);
                 if (!enabled)
@@ -2442,6 +2449,9 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     (void)reach_windows_create_startup_apps(&app->startup_apps);
     (void)reach_windows_create_icon_provider(&app->icon_provider);
     (void)reach_windows_create_system_controls(&app->system_controls);
+    reach_audio_volume_port settings_audio_volume = {};
+    (void)reach_system_status_create(settings_audio_volume, app->system_controls,
+                                     reach_settings_radio_notify, app, &app->system_status);
 
     reach_wifi_port wifi_port = {};
     if (reach_windows_create_wifi(&wifi_port) == REACH_OK)
@@ -2511,6 +2521,7 @@ reach_result reach_settings_app_start(reach_settings_app *app)
         (void)app->system_controls.start_watching(app->system_controls.userdata,
                                                   reach_settings_on_system_controls_changed, app);
     }
+    reach_settings_request_bluetooth_radio(app);
     if (!reach_settings_schedule_resume(app))
     {
         reach_settings_schedule_verification(app);
@@ -2537,7 +2548,14 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     uint32_t system_changes = app->system_controls_change_flags.exchange(0);
     if ((system_changes & REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH) != 0)
     {
-        reach_settings_refresh_bluetooth_radio(app);
+        reach_settings_request_bluetooth_radio(app);
+    }
+    reach_system_status_system_snapshot system_snapshot = {};
+    if (app->system_status != nullptr &&
+        reach_system_status_take_system(app->system_status, &system_snapshot) &&
+        system_snapshot.bluetooth_valid)
+    {
+        reach_settings_apply_bluetooth_radio(app, &system_snapshot.bluetooth);
         app->dirty = 1;
     }
     if (app->radio_notify.exchange(0) != 0)
@@ -2680,6 +2698,7 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||
            app->model.wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE ||
            app->radio_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
+           reach_system_status_system_pending(app->system_status) ||
            reach_wifi_service_pending(app->wifi_service) ||
            reach_bluetooth_service_pending(app->bluetooth_service) ||
            app->model.wifi_scrollbar.offset != app->model.wifi_scrollbar.target ||
@@ -2775,6 +2794,8 @@ void reach_settings_app_destroy(reach_settings_app *app)
     app->wifi_service = nullptr;
     reach_bluetooth_service_destroy(app->bluetooth_service);
     app->bluetooth_service = nullptr;
+    reach_system_status_destroy(app->system_status);
+    app->system_status = nullptr;
     if (app->system_controls.destroy != nullptr)
     {
         app->system_controls.destroy(app->system_controls.userdata);

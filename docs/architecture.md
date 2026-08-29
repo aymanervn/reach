@@ -632,7 +632,13 @@ List policy is pure and lives in core: `reach_wifi_network_list_normalize` merge
 advertised by several access points, keeps the strongest signal and the union of the
 connected/saved/in-range facts, and orders connected → in range → saved → signal.
 `reach_bluetooth_device_list_normalize` does the same across the two watchers, dropping unnamed
-endpoints. Bluetooth radio power reuses `system_controls`; there is no second path.
+endpoints. Bluetooth radio power reuses `system_controls`; there is no second path. The app reaches
+it through its own `reach_system_status` instance rather than calling the port from the UI thread,
+so the radio row is fed by scoped refreshes and published snapshots exactly as Quick Settings is —
+`reach_system_controls_get_bluetooth_state` is a blocking cross-thread round trip and belongs on a
+service worker. The device list says nothing about the radio, so a device snapshot does not
+re-read it. The retained `system_controls_port` exists only to create the service, start the change
+watcher, and destroy the adapter.
 
 Both pages render as an accordion: one row expands in place, driven by one animation track per
 row, and every action lives inside the expanded row, so neither page opens a popup. The Wi-Fi
