@@ -21,7 +21,6 @@ static inline size_t reach_launcher_visible_result_count(const reach_launcher_mo
 typedef enum reach_launcher_hit_type
 {
     REACH_LAUNCHER_HIT_NONE = 0,
-    REACH_LAUNCHER_HIT_PINNED_APP = 1,
     REACH_LAUNCHER_HIT_SEARCH_RESULT = 2,
     REACH_LAUNCHER_HIT_SCROLLBAR_TRACK = 3,
     REACH_LAUNCHER_HIT_SCROLLBAR_THUMB = 4
@@ -36,7 +35,6 @@ typedef struct reach_launcher_hit_result
 typedef enum reach_launcher_action_type
 {
     REACH_LAUNCHER_ACTION_NONE = 0,
-    REACH_LAUNCHER_ACTION_LAUNCH_PINNED = 1,
     REACH_LAUNCHER_ACTION_OPEN_RESULT = 2,
     REACH_LAUNCHER_ACTION_REVEAL_RESULT = 3
 } reach_launcher_action_type;
@@ -44,16 +42,12 @@ typedef enum reach_launcher_action_type
 typedef struct reach_launcher_action
 {
     reach_launcher_action_type type;
-    size_t pinned_index;
-    uint32_t pin_id;
     size_t result_index;
 } reach_launcher_action;
 
 typedef struct reach_launcher_event_context
 {
     const reach_launcher_layout *layout;
-    const reach_pinned_app_model *pinned_apps;
-    size_t pinned_app_count;
 } reach_launcher_event_context;
 
 typedef struct reach_launcher_event_result
@@ -70,8 +64,6 @@ reach_launcher_hit_result reach_launcher_hit_test(const reach_launcher_model *mo
                                                   const reach_launcher_layout *layout, int32_t x,
                                                   int32_t y);
 reach_launcher_action reach_launcher_action_for_hit(const reach_launcher_model *model,
-                                                    const reach_pinned_app_model *pinned_apps,
-                                                    size_t pinned_app_count,
                                                     reach_launcher_hit_result hit);
 void reach_launcher_pointer_down(reach_launcher *launcher, int32_t x, int32_t y,
                                  reach_pointer_button button,
@@ -108,7 +100,6 @@ reach_result reach_launcher_set_result_scroll_offset_state(reach_launcher_state 
                                                            size_t offset);
 size_t reach_launcher_result_scroll_offset_state(const reach_launcher_state *state);
 reach_result reach_launcher_clear_results_state(reach_launcher_state *state);
-int32_t reach_launcher_should_show_pinned_apps_state(const reach_launcher_state *state);
 reach_result reach_launcher_handle_event_state(reach_launcher_state *state,
                                                const reach_ui_event *event,
                                                reach_ui_intent *out_intent);

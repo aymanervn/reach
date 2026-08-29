@@ -30,9 +30,7 @@ extern "C"
     const reach_feature_capsule_ops *reach_launcher_capsule_ops(void);
 
     void reach_launcher_set_pointer_context(reach_launcher *launcher,
-                                            const reach_launcher_layout *layout,
-                                            const reach_pinned_app_model *pinned_apps,
-                                            size_t pinned_app_count);
+                                            const reach_launcher_layout *layout);
     void reach_launcher_set_pointer_transform(reach_launcher *launcher,
                                               reach_transform_f32 transform);
 
