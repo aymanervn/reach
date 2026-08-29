@@ -28,4 +28,6 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
                               const reach_dock_layout *layout,
                               const reach_dock_item_x_snapshot *snapshot);
 
+void reach_dock_clear_item_x_animations(reach_dock *dock);
+
 #endif

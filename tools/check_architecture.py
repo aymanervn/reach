@@ -415,10 +415,6 @@ CONCRETE_FEATURE_HEADER_BASELINE: dict[tuple[str, str], int] = {
 }
 
 CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
-    ("src/composition/host_config.cpp", "reach_dock_mark_items_changed"): 1,
-    ("src/composition/host_config.cpp", "reach_dock_order_count"): 1,
-    ("src/composition/host_config.cpp", "reach_dock_order_key_at"): 1,
-    ("src/composition/host_config.cpp", "reach_dock_restore_order"): 1,
     ("src/composition/host_config.cpp", "reach_stage_set_animation_seconds"): 1,
     ("src/composition/host_context_menu_orchestration.cpp", "reach_context_menu_is_open"): 1,
     ("src/composition/host_context_menu_orchestration.cpp", "reach_context_menu_open_for_item"): 1,
@@ -439,9 +435,6 @@ CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_dock_orchestration.cpp", "reach_dock_item_count"): 2,
     ("src/composition/host_feature_actions.cpp", "reach_dock_rebuild_items"): 1,
     ("src/composition/host_feedback.cpp", "reach_dock_clear_context_feedback"): 1,
-    ("src/composition/host_game_mode.cpp", "reach_dock_clear_item_x_animations"): 1,
-    ("src/composition/host_game_mode.cpp", "reach_switcher_force_close"): 1,
-    ("src/composition/host_icons.cpp", "reach_dock_touch_icons"): 1,
     ("src/composition/host_popup.cpp", "reach_context_menu_state_ptr"): 1,
     ("src/composition/host_popup.cpp", "reach_dock_local_point"): 1,
     ("src/composition/host_popup.cpp", "reach_dock_pointer_region_at"): 1,
@@ -478,7 +471,6 @@ CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_window_list_orchestration.cpp", "reach_dock_collect_item_windows"): 1,
     ("src/composition/host_window_list_orchestration.cpp", "reach_dock_item_count"): 3,
     ("src/composition/host_window_list_orchestration.cpp", "reach_dock_rect_to_screen"): 2,
-    ("src/composition/host_window_tracking.cpp", "reach_dock_mark_items_changed"): 1,
 }
 
 COMPOSITION_FEATURE_HELPER_BASELINE: dict[tuple[str, str], int] = {

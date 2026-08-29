@@ -46,6 +46,8 @@ struct reach_dock
 
     reach_icon_service *icons;
     reach_window_tracking *windows;
+    reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
+    size_t pinned_app_count;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
@@ -436,6 +438,7 @@ static void reach_dock_capsule_on_game_mode(void *capsule, int32_t enabled)
     if (enabled)
     {
         reach_dock_reset_reveal_state(static_cast<reach_dock *>(capsule));
+        reach_dock_clear_item_x_animations(static_cast<reach_dock *>(capsule));
     }
 }
 
@@ -1200,6 +1203,129 @@ size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_inde
                                                       : REACH_CONTEXT_MENU_COMMAND_CLOSE;
     }
     return count;
+}
+
+void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model *apps,
+                                  size_t count)
+{
+    if (dock == nullptr)
+    {
+        return;
+    }
+    if (apps == nullptr)
+    {
+        count = 0;
+    }
+    if (count > REACH_MAX_PINNED_APPS)
+    {
+        count = REACH_MAX_PINNED_APPS;
+    }
+
+    reach_dock_state *state = reach_dock_state_mut(dock);
+    reach_dock_order_key order[REACH_MAX_DOCK_ITEMS] = {};
+    size_t order_pin_slot[REACH_MAX_DOCK_ITEMS] = {};
+    uint16_t order_paths[REACH_MAX_PINNED_APPS][260] = {};
+    uint16_t order_aumids[REACH_MAX_PINNED_APPS][260] = {};
+    size_t pin_slot_count = 0;
+
+    size_t order_count = state->model.order_count;
+    if (order_count > REACH_MAX_DOCK_ITEMS)
+    {
+        order_count = REACH_MAX_DOCK_ITEMS;
+    }
+
+    for (size_t order_index = 0; order_index < order_count; ++order_index)
+    {
+        order_pin_slot[order_index] = REACH_MAX_PINNED_APPS;
+        order[order_index] = state->model.order[order_index];
+        if (!order[order_index].pinned)
+        {
+            continue;
+        }
+
+        for (size_t pin_index = 0; pin_index < dock->pinned_app_count; ++pin_index)
+        {
+            if (dock->pinned_apps[pin_index].id != order[order_index].app_id)
+            {
+                continue;
+            }
+            if (pin_slot_count < REACH_MAX_PINNED_APPS)
+            {
+                size_t slot = pin_slot_count++;
+                order_pin_slot[order_index] = slot;
+                reach_copy_utf16(order_paths[slot], 260, dock->pinned_apps[pin_index].path);
+                reach_copy_utf16(order_aumids[slot], 260,
+                                 dock->pinned_apps[pin_index].app_user_model_id);
+            }
+            break;
+        }
+    }
+
+    dock->pinned_app_count = count;
+    for (size_t index = 0; index < count; ++index)
+    {
+        dock->pinned_apps[index] = apps[index];
+    }
+
+    const reach_window_snapshot *open_windows = reach_window_tracking_windows(dock->windows);
+    const uint32_t *window_group_ids = reach_window_tracking_window_group_ids(dock->windows);
+    size_t open_window_count = reach_window_tracking_window_count(dock->windows);
+    for (size_t order_index = 0; order_index < order_count; ++order_index)
+    {
+        size_t pin_slot = order_pin_slot[order_index];
+        if (order[order_index].pinned && pin_slot < REACH_MAX_PINNED_APPS &&
+            order_paths[pin_slot][0] != 0)
+        {
+            int32_t still_pinned = 0;
+            for (size_t pin_index = 0; pin_index < dock->pinned_app_count; ++pin_index)
+            {
+                if (reach_path_equals(dock->pinned_apps[pin_index].path, order_paths[pin_slot]))
+                {
+                    order[order_index].app_id = dock->pinned_apps[pin_index].id;
+                    still_pinned = 1;
+                    break;
+                }
+            }
+            if (!still_pinned)
+            {
+                reach_pinned_app_model unpinned_app = {};
+                reach_copy_utf16(unpinned_app.path, 260, order_paths[pin_slot]);
+                reach_copy_utf16(unpinned_app.app_user_model_id, 260, order_aumids[pin_slot]);
+                uint32_t group_id =
+                    reach_window_tracking_group_id_for_app(dock->windows, &unpinned_app);
+                if (group_id != 0)
+                {
+                    order[order_index].pinned = 0;
+                    order[order_index].app_id = group_id;
+                }
+            }
+        }
+        else if (!order[order_index].pinned && order[order_index].app_id != 0 &&
+                 open_windows != nullptr && window_group_ids != nullptr)
+        {
+            for (size_t window_index = 0; window_index < open_window_count; ++window_index)
+            {
+                if (window_group_ids[window_index] != order[order_index].app_id)
+                {
+                    continue;
+                }
+                for (size_t pin_index = 0; pin_index < dock->pinned_app_count; ++pin_index)
+                {
+                    if (reach_window_tracking_window_matches_app(&dock->pinned_apps[pin_index],
+                                                                 &open_windows[window_index]))
+                    {
+                        order[order_index].pinned = 1;
+                        order[order_index].app_id = dock->pinned_apps[pin_index].id;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    reach_dock_restore_order(dock, order, order_count);
+    reach_dock_mark_items_changed(dock);
 }
 
 size_t reach_dock_order_count(reach_dock *dock)

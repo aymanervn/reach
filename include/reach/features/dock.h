@@ -171,6 +171,9 @@ extern "C"
     void reach_dock_mark_items_changed(reach_dock *dock);
     int32_t reach_dock_take_items_changed(reach_dock *dock);
 
+    void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model *apps,
+                                      size_t count);
+
     reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
                                                            int32_t local_y);
 
@@ -214,7 +217,6 @@ extern "C"
 
     int32_t reach_dock_slots_animating(const reach_dock *dock);
 
-    void reach_dock_clear_item_x_animations(reach_dock *dock);
 
     enum
     {

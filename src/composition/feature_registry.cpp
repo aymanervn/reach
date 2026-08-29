@@ -172,6 +172,37 @@ static void reach_host_surface_stage_close(reach_host *host)
     reach_host_close_stage(host);
 }
 
+static void reach_feature_notify_dock(void *capsule,
+                                     const reach_feature_notification *notification,
+                                     reach_feature_tick_result *out)
+{
+    reach_dock *dock = static_cast<reach_dock *>(capsule);
+    if (dock == nullptr || notification == nullptr || out == nullptr)
+    {
+        return;
+    }
+    if (notification->kind == REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED)
+    {
+        if (notification->windows.items_changed)
+        {
+            reach_dock_mark_items_changed(dock);
+        }
+        if (notification->windows.icon_identity_changed)
+        {
+            out->redraw = 1;
+        }
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED)
+    {
+        reach_dock_apply_pinned_apps(dock, notification->pinned_apps,
+                                     notification->pinned_app_count);
+    }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_ICONS_RETAIN)
+    {
+        reach_dock_touch_icons(dock, notification->icon_size_px);
+    }
+}
+
 static int32_t reach_feature_control_launcher_open(void *capsule, int32_t open,
                                                    reach_feature_tick_result *out)
 {
@@ -211,9 +242,18 @@ static void reach_feature_notify_switcher(void *capsule,
                                           const reach_feature_notification *notification,
                                           reach_feature_tick_result *out)
 {
-    if (notification != nullptr && notification->kind == REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED)
+    if (notification == nullptr ||
+        notification->kind != REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED)
+    {
+        return;
+    }
+    if (notification->windows.changed)
     {
         reach_switcher_notify_windows_changed(static_cast<reach_switcher *>(capsule), out);
+    }
+    if (notification->windows.icon_identity_changed && out != nullptr)
+    {
+        out->redraw = 1;
     }
 }
 
@@ -527,6 +567,8 @@ static const reach_feature_render_resource_ops reach_clipboard_resource_ops = {
     reach_feature_clipboard_active_at, reach_feature_clipboard_release_source,
     reach_feature_clipboard_clear_active};
 
+static const reach_feature_control_ops reach_dock_control_ops = {
+    nullptr, nullptr, reach_feature_notify_dock, nullptr, nullptr};
 static const reach_feature_control_ops reach_launcher_control_ops = {
     reach_feature_control_launcher_open, reach_feature_control_launcher_hidden, nullptr, nullptr,
     nullptr};
@@ -653,6 +695,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SWITCHER].lifecycle.stop = reach_feature_stop_switcher;
     definitions[REACH_SURFACE_ID_STAGE].lifecycle.stop = reach_feature_stop_stage;
 
+    definitions[REACH_SURFACE_ID_DOCK].control_ops = &reach_dock_control_ops;
     definitions[REACH_SURFACE_ID_LAUNCHER].control_ops = &reach_launcher_control_ops;
     definitions[REACH_SURFACE_ID_SWITCHER].control_ops = &reach_switcher_control_ops;
     definitions[REACH_SURFACE_ID_CLIPBOARD].control_ops = &reach_clipboard_control_ops;

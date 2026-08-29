@@ -468,6 +468,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
             host->dock_config.icon_size =
                 reach_theme_icon_box_size(host->theme, host->dock_config.height);
             (void)reach_host_set_pinned_apps(host, snapshot.pinned_apps, snapshot.pinned_app_count);
+            reach_host_notify_pinned_apps_changed(host);
             reach_host_seed_or_apply_wallpaper(host, &snapshot);
             if (snapshot.power_shutdown_minutes != 0 || snapshot.power_restart_minutes != 0)
             {

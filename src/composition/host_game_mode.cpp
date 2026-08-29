@@ -22,13 +22,9 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
     reach_host_close_transient_surfaces(host, 1);
     reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
 
-    reach_switcher_force_close(
-        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER));
     reach_animation_manager_init(&host->animations, host->animation_tracks,
                                  REACH_HOST_ANIMATION_COUNT);
     reach_host_surface_transitions_init(host);
-    reach_dock_clear_item_x_animations(
-        reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK));
 
     reach_host_mark_all_surfaces_dirty(host);
     host->dirty.render = 1;
