@@ -84,7 +84,7 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
         {
             continue;
         }
-        if (desc->definition->force_close == nullptr || !reach_host_surface_is_open(desc) ||
+        if (!reach_host_surface_closable(desc) || !reach_host_surface_is_open(desc) ||
             reach_host_surface_contains_point(desc, point) ||
             reach_host_bar_cluster_holds_surface_open(host, desc, dock_region, top_bar_region))
         {
@@ -96,7 +96,8 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
             continue;
         }
 
-        desc->definition->force_close(host);
+        reach_host_close_registered_surface(host, desc->definition->id,
+                                            REACH_SURFACE_CLOSE_SUPERSEDED);
         closed_any = 1;
     }
 

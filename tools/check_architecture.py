@@ -393,6 +393,10 @@ MIGRATED_SURFACE_FRAME_RE = re.compile(
 
 FEATURE_REGISTRY_SEAM = "src/composition/feature_registry.cpp"
 
+SHARED_CLOSE_PATH_OWNER = "src/composition/host_surfaces.cpp"
+
+DEFINITION_CLOSE_CALL_RE = re.compile(r"definition->force_close\s*\(")
+
 COMPOSITION_FEATURE_SEAMS = {
     FEATURE_REGISTRY_SEAM,
     INTERFEATURE_ROUTES_SEAM,
@@ -993,6 +997,25 @@ def validate_composition_feature_helpers(
     return violations
 
 
+def validate_shared_close_path(path: Path, text: str) -> list[str]:
+    """Closing a surface runs one shared path so intent, focus restore and the capsule's own
+    control operation always apply. A definition's force_close is the fallback inside that
+    path, so calling it anywhere else silently skips every surface that has already migrated
+    to control operations."""
+    relative = rel(path).replace("\\", "/")
+    if not relative.startswith("src/composition/") or relative in (
+        SHARED_CLOSE_PATH_OWNER,
+        FEATURE_REGISTRY_SEAM,
+    ):
+        return []
+    if DEFINITION_CLOSE_CALL_RE.search(strip_comments(text)) is None:
+        return []
+    return [
+        f"{relative}: close surfaces through reach_host_close_registered_surface; calling "
+        "definition->force_close directly skips every capsule-controlled surface"
+    ]
+
+
 def validate_composition_feature_baseline_files(paths: list[Path]) -> list[str]:
     existing = {rel(path).replace("\\", "/") for path in paths}
     baseline_files = {
@@ -1310,6 +1333,7 @@ def main() -> int:
         violations.extend(
             validate_composition_feature_helpers(path, text, feature_helper_pattern)
         )
+        violations.extend(validate_shared_close_path(path, text))
         violations.extend(validate_feature_config_ownership(path, text))
         violations.extend(validate_registered_feature_lifecycle(path, text))
         violations.extend(validate_migrated_surface_frames(path, text))

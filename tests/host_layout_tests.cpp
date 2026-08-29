@@ -32,6 +32,7 @@ static reach_host generic_frame_host;
 static reach_host native_overlay_host;
 static reach_host closing_stage_host;
 static reach_host focus_restore_host;
+static reach_host closable_host;
 static reach_host bar_conditions_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
@@ -488,6 +489,43 @@ static void test_focus_restore_follows_the_close_intent(void)
                 "a surface that does not declare focus restore never arms one");
 }
 
+static void test_every_dismissable_surface_reaches_the_shared_close_path(void)
+{
+    reach_host *host = &closable_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered feature factories create every capsule");
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        reach_surface_class cls = runtime->definition->surface.cls;
+        if (cls != REACH_SURFACE_CLASS_TRANSIENT && cls != REACH_SURFACE_CLASS_POPUP &&
+            cls != REACH_SURFACE_CLASS_OVERLAY)
+        {
+            continue;
+        }
+        expect_true(reach_host_surface_closable(runtime),
+                    "every dismissable surface can be closed through the shared close path");
+    }
+
+    reach_feature_runtime *launcher = &host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER];
+    expect_true(launcher->definition->force_close == nullptr &&
+                    reach_host_surface_closable(launcher),
+                "a capsule-controlled surface is closable without a force_close callback");
+
+    reach_animation_track tracks[REACH_HOST_ANIMATION_COUNT] = {};
+    reach_animation_manager_init(&host->animations, tracks, REACH_HOST_ANIMATION_COUNT);
+    expect_true(launcher->definition->control_ops->set_open(launcher->capsule, 1, nullptr),
+                "the launcher capsule opens through its control operation");
+    reach_host_close_registered_surface(host, REACH_SURFACE_ID_LAUNCHER,
+                                        REACH_SURFACE_CLOSE_SUPERSEDED);
+    expect_true(!reach_host_surface_is_open(launcher),
+                "the shared close path closes a surface that owns no force_close callback");
+
+    reach_host_destroy_registered_features(host);
+}
+
 static void test_registered_feature_lifecycle(void)
 {
     reach_host *host = &registry_host;
@@ -774,6 +812,7 @@ int main(void)
     test_scaled_transition_keeps_native_envelope_stationary();
     test_popup_pointer_coordinates_are_surface_local();
     test_focus_restore_follows_the_close_intent();
+    test_every_dismissable_surface_reaches_the_shared_close_path();
     test_registered_feature_lifecycle();
     test_registered_surface_frame_uses_declared_anchor();
     test_registered_surface_frame_syncs_native_overlay();
