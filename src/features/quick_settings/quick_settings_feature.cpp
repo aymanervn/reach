@@ -1127,6 +1127,23 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
         return;
     }
 
+    if (event->kind == REACH_POINTER_EVENT_DOWN && event->button == REACH_POINTER_BUTTON_PRIMARY &&
+        event->owner_trigger)
+    {
+        out->handled = 1;
+        out->continue_source_sequence = 1;
+        return;
+    }
+    if (event->kind == REACH_POINTER_EVENT_DOWN &&
+        event->surface_relation == REACH_POINTER_SURFACE_OUTSIDE)
+    {
+        out->handled = 1;
+        out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
+        out->cancel_source_sequence = event->button == REACH_POINTER_BUTTON_PRIMARY;
+        out->continue_source_sequence = event->button == REACH_POINTER_BUTTON_SECONDARY;
+        return;
+    }
+
     if (event->kind == REACH_POINTER_EVENT_DOWN && event->button == REACH_POINTER_BUTTON_PRIMARY)
     {
         reach_quick_settings_action action =

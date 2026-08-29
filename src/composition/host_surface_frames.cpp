@@ -57,12 +57,6 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
     {
         return result;
     }
-    if (ctx->content_transform_active)
-    {
-        reach_render_command_buffer_set_content_transform(commands, ctx->content_rect,
-                                                          ctx->render_transform);
-    }
-
     const reach_feature_definition *definition = desc->definition;
     if (definition != nullptr && definition->surface.popup_chrome)
     {
@@ -71,6 +65,11 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
                                                geometry->notch_side, commands);
     }
     reach_host_stamp_surface_content(host, desc->definition->id, commands);
+    if (ctx->content_transform_active)
+    {
+        reach_render_command_buffer_set_content_transform(commands, ctx->content_rect,
+                                                          ctx->render_transform);
+    }
 
     if (desc->surface->renderer.ops.begin_frame == nullptr)
     {

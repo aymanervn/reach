@@ -178,10 +178,54 @@ static void test_window_list_width_fits_and_clamps_measured_titles(void)
     reach_context_menu_destroy(menu);
 }
 
+static void test_capsule_owns_popup_pointer_policy(void)
+{
+    reach_context_menu *menu = nullptr;
+    expect_true(reach_context_menu_create(&menu) == REACH_OK,
+                "context menu is created for popup policy");
+    if (menu == nullptr)
+    {
+        return;
+    }
+
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = 1;
+    ctx.anchor_button = {1200.0f, 8.0f, 32.0f, 24.0f};
+    ctx.bar_edge_y = 40.0f;
+    ctx.drop_direction = REACH_POPUP_DROP_DOWN;
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    reach_context_menu_open_power(menu, &ctx);
+
+    reach_pointer_event pointer = {};
+    pointer.kind = REACH_POINTER_EVENT_DOWN;
+    pointer.coordinate_space = REACH_POINTER_COORDINATE_SURFACE_LOCAL;
+    pointer.surface_relation = REACH_POINTER_SURFACE_OUTSIDE;
+    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+    pointer.owner_trigger = 1;
+    reach_capsule_pointer_result result = {};
+    reach_context_menu_capsule_ops()->handle_pointer(menu, &pointer, &result);
+    expect_true(result.handled && result.cancel_source_sequence &&
+                    !result.continue_source_sequence &&
+                    result.action.kind == REACH_FEATURE_ACTION_CLOSE_SELF,
+                "the context menu closes and cancels its primary owner sequence");
+
+    pointer.button = REACH_POINTER_BUTTON_SECONDARY;
+    reach_context_menu_capsule_ops()->handle_pointer(menu, &pointer, &result);
+    expect_true(result.handled && result.continue_source_sequence &&
+                    !result.cancel_source_sequence &&
+                    result.action.kind == REACH_FEATURE_ACTION_CLOSE_SELF,
+                "the context menu closes before continuing an outside secondary press");
+
+    reach_context_menu_destroy(menu);
+}
+
 int main(void)
 {
     test_power_commands_and_text();
     test_window_list_remove();
     test_window_list_width_fits_and_clamps_measured_titles();
+    test_capsule_owns_popup_pointer_policy();
     return failures == 0 ? 0 : 1;
 }

@@ -40,8 +40,6 @@ extern "C"
 
 #define REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED (1u << 0)
 
-#define REACH_FEATURE_ACTION_PRIVATE_BASE 0x1000u
-
 #ifdef __cplusplus
 }
 #endif

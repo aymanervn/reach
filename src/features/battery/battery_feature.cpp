@@ -380,6 +380,22 @@ static void reach_battery_capsule_handle_pointer(void *capsule, const reach_poin
     {
         return;
     }
+    if (event->kind == REACH_POINTER_EVENT_DOWN && event->button == REACH_POINTER_BUTTON_PRIMARY &&
+        event->owner_trigger)
+    {
+        out->handled = 1;
+        out->continue_source_sequence = 1;
+        return;
+    }
+    if (event->kind == REACH_POINTER_EVENT_DOWN &&
+        event->surface_relation == REACH_POINTER_SURFACE_OUTSIDE)
+    {
+        out->handled = 1;
+        out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
+        out->cancel_source_sequence = event->button == REACH_POINTER_BUTTON_PRIMARY;
+        out->continue_source_sequence = event->button == REACH_POINTER_BUTTON_SECONDARY;
+        return;
+    }
     reach_battery_pointer_action_kind action =
         reach_battery_hit_test(&battery->state, event->x, event->y);
     reach_pressable_feedback_style feedback = reach_battery_pressable_feedback(battery);

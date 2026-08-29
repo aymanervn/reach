@@ -163,6 +163,45 @@ static void test_capsule_accepts_surface_local_pointer(void)
     reach_quick_settings_destroy(quick_settings);
 }
 
+static void test_capsule_owns_popup_pointer_policy(void)
+{
+    reach_quick_settings *quick_settings = nullptr;
+    expect_true(reach_quick_settings_create(&quick_settings) == REACH_OK,
+                "quick settings capsule is created for popup policy");
+    if (quick_settings == nullptr)
+    {
+        return;
+    }
+    (void)reach_quick_settings_set_open(quick_settings, 1);
+
+    reach_pointer_event pointer = {};
+    pointer.kind = REACH_POINTER_EVENT_DOWN;
+    pointer.coordinate_space = REACH_POINTER_COORDINATE_SURFACE_LOCAL;
+    pointer.surface_relation = REACH_POINTER_SURFACE_OUTSIDE;
+    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+    pointer.owner_trigger = 1;
+    reach_capsule_pointer_result result = {};
+    reach_quick_settings_capsule_ops()->handle_pointer(quick_settings, &pointer, &result);
+    expect_true(result.handled && result.continue_source_sequence &&
+                    result.action.kind == REACH_FEATURE_ACTION_NONE,
+                "the owner trigger keeps quick settings open for its release toggle");
+
+    pointer.owner_trigger = 0;
+    reach_quick_settings_capsule_ops()->handle_pointer(quick_settings, &pointer, &result);
+    expect_true(result.handled && result.cancel_source_sequence &&
+                    result.action.kind == REACH_FEATURE_ACTION_CLOSE_SELF,
+                "an outside primary press closes quick settings and cancels its source");
+
+    pointer.button = REACH_POINTER_BUTTON_SECONDARY;
+    reach_quick_settings_capsule_ops()->handle_pointer(quick_settings, &pointer, &result);
+    expect_true(result.handled && result.continue_source_sequence &&
+                    !result.cancel_source_sequence &&
+                    result.action.kind == REACH_FEATURE_ACTION_CLOSE_SELF,
+                "an outside secondary press closes quick settings and continues to its source");
+
+    reach_quick_settings_destroy(quick_settings);
+}
+
 int main(void)
 {
     test_model_clamps_volume();
@@ -170,6 +209,7 @@ int main(void)
     test_volume_icon_selection();
     test_expansion_keeps_popup_anchor_position();
     test_capsule_accepts_surface_local_pointer();
+    test_capsule_owns_popup_pointer_policy();
 
     if (g_failures != 0)
     {
