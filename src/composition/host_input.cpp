@@ -832,6 +832,10 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     if (event->type == REACH_UI_EVENT_POINTER_REGION_CHANGED)
     {
+        if (host->pointer_region_route != nullptr)
+        {
+            host->pointer_region_route(host, event->id);
+        }
         reach_host_request_bar_visibility_update(host);
         return REACH_OK;
     }

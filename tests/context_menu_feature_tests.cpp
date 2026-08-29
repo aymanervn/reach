@@ -338,6 +338,30 @@ static void test_window_list_holds_the_pointer_across_the_gap(void)
     expect_true(!reach_context_menu_window_list_holds_pointer(menu, 40.0f, 200.0f),
                 "the pointer well away from both dismisses the list");
 
+    /* Reach is told about the pointer leaving this band and nothing else, so anything the hold
+       test still accepts has to be inside it. A hole here is a window list that can never be
+       dismissed once the pointer is over another application. */
+    reach_rect_f32 watch = {};
+    expect_true(reach_context_menu_window_list_hover_bounds(menu, &watch),
+                "an open window list publishes a band for the platform to watch");
+    int32_t escaped = 0;
+    for (float sample_x = 200.0f; sample_x <= 700.0f; sample_x += 5.0f)
+    {
+        for (float sample_y = 700.0f; sample_y <= 1060.0f; sample_y += 5.0f)
+        {
+            if (!reach_context_menu_window_list_holds_pointer(menu, sample_x, sample_y))
+            {
+                continue;
+            }
+            if (sample_x < watch.x || sample_x > watch.x + watch.width || sample_y < watch.y ||
+                sample_y > watch.y + watch.height)
+            {
+                escaped = 1;
+            }
+        }
+    }
+    expect_true(!escaped, "every point that holds the list open lies inside the watched band");
+
     reach_context_menu_destroy(menu);
 }
 

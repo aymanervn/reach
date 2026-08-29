@@ -53,6 +53,18 @@ static void reach_host_route_dock_item_context_menu(void *user, const reach_menu
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
 }
 
+/* Reach only sees pointer moves over its own windows, so the window list also asks the platform
+   to watch the band it lives in. Leaving that band over a foreign window is the case that has no
+   other signal at all. */
+static void reach_host_watch_window_list_pointer(reach_host *host)
+{
+    reach_context_menu *menu =
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    reach_rect_f32 bounds = {};
+    int32_t watching = reach_context_menu_window_list_hover_bounds(menu, &bounds);
+    reach_host_set_pointer_observation(host, REACH_SURFACE_ID_CONTEXT_MENU, bounds, watching);
+}
+
 static void reach_host_open_window_list(reach_host *host, const reach_menu_request *request)
 {
     reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
@@ -75,6 +87,7 @@ static void reach_host_open_window_list(reach_host *host, const reach_menu_reque
         request->target_index, &ctx);
     reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
                                         request->drop_direction);
+    reach_host_watch_window_list_pointer(host);
 }
 
 static void reach_host_route_dock_item_hovered(void *user, const reach_menu_request *request)
@@ -110,6 +123,34 @@ static void reach_host_route_dock_item_hovered(void *user, const reach_menu_requ
 
 /* The window list is the only surface that must survive the pointer crossing the gap between
    the control it hangs off and itself, so it decides when the pointer has truly left. */
+static void reach_host_route_pointer_region(void *user, uint32_t region_id)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr || region_id != (uint32_t)REACH_SURFACE_ID_CONTEXT_MENU)
+    {
+        return;
+    }
+
+    reach_context_menu *menu =
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    if (reach_context_menu_window_list_target(menu) == REACH_CONTEXT_MENU_NO_TARGET)
+    {
+        reach_host_watch_window_list_pointer(host);
+        return;
+    }
+
+    reach_point_i32 pointer = {};
+    if (!reach_host_get_pointer_position(host, &pointer) ||
+        reach_context_menu_window_list_holds_pointer(menu, (float)pointer.x, (float)pointer.y))
+    {
+        return;
+    }
+
+    reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                        REACH_SURFACE_CLOSE_SUPERSEDED);
+    reach_host_watch_window_list_pointer(host);
+}
+
 static void reach_host_route_pointer_moved(void *user, reach_point_i32 point)
 {
     reach_host *host = static_cast<reach_host *>(user);
@@ -126,6 +167,7 @@ static void reach_host_route_pointer_moved(void *user, reach_point_i32 point)
     }
     reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
                                         REACH_SURFACE_CLOSE_SUPERSEDED);
+    reach_host_watch_window_list_pointer(host);
 }
 
 static void reach_host_route_dock_trigger_activated(void *user, size_t trigger)
@@ -210,6 +252,7 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     }
 
     host->pointer_moved_route = reach_host_route_pointer_moved;
+    host->pointer_region_route = reach_host_route_pointer_region;
 
     reach_dock_routes dock = {};
     dock.user = host;
@@ -240,6 +283,7 @@ void reach_host_clear_interfeature_routes(reach_host *host)
     if (host != nullptr)
     {
         host->pointer_moved_route = nullptr;
+        host->pointer_region_route = nullptr;
         reach_dock_set_routes(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
                               nullptr);
         reach_top_bar_set_routes(

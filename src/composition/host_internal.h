@@ -453,6 +453,8 @@ typedef enum reach_surface_close_intent
 void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id id, int32_t open);
 void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
                                          reach_surface_close_intent intent);
+void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
+                                        reach_rect_f32 bounds, int32_t enabled);
 void reach_host_close_surfaces_on_persistent_press(reach_host *host);
 void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
                                          int32_t drop_direction);
@@ -612,6 +614,7 @@ struct reach_host
 
     reach_window_tracking *window_tracking;
     void (*pointer_moved_route)(void *user, reach_point_i32 point);
+    void (*pointer_region_route)(void *user, uint32_t region_id);
     float layout_dpi_scale;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_HOST_ANIMATION_COUNT];
