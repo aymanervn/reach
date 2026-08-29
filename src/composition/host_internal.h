@@ -3,24 +3,17 @@
 
 #include "reach/composition/host.h"
 
+#include "reach/core/menu_commands.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
 
+#include "reach/features/common/bar_visibility.h"
 #include "reach/features/common/layout.h"
 #include "reach/features/common/text_edit.h"
-#include "reach/features/context_menu.h"
 #include "reach/features/feature_capsule.h"
-#include "reach/features/clipboard.h"
-#include "reach/features/dock.h"
 #include "reach/services/pin_config.h"
 #include "reach/features/common/popup.h"
-#include "reach/features/battery.h"
-#include "reach/features/quick_settings.h"
-#include "reach/features/stage.h"
-#include "reach/features/switcher.h"
-#include "reach/features/system_hud.h"
-#include "reach/features/top_bar.h"
 
 #include "reach/core/runtime_policy.h"
 #include "reach/composition/surface_runtime.h"
@@ -47,31 +40,9 @@
 #define REACH_HOST_MAX_ITEM_WINDOWS 16
 #define REACH_SURFACE_NATIVE_OVERLAY_CAPACITY (REACH_MAX_OPEN_WINDOWS + 1)
 
-typedef enum reach_host_animation_id
-{
-    REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y = 0,
-    REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_SCALE,
-    REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
-    REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
-    REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_BATTERY_TRANSITION_Y,
-    REACH_HOST_ANIMATION_BATTERY_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
-    REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
-    REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_Y,
-    REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_STAGE_TRANSITION_Y,
-    REACH_HOST_ANIMATION_STAGE_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_COUNT
-} reach_host_animation_id;
-
 static const float REACH_HOST_TRANSITION_SETTLE_FROM_BELOW = 8.0f;
 static const float REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE = -8.0f;
-static const float REACH_HOST_LAUNCHER_TRANSITION_SCALE = 1.08f;
+static const float REACH_HOST_TRANSITION_SCALE_IN = 1.08f;
 
 typedef struct reach_host_surface_transition
 {
@@ -119,6 +90,16 @@ typedef enum reach_surface_id
     REACH_SURFACE_ID_SYSTEM_HUD,
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
+
+#define REACH_HOST_ANIMATION_TRACKS_PER_SURFACE 3
+#define REACH_HOST_ANIMATION_COUNT                                                                 \
+    ((size_t)REACH_HOST_SURFACE_COUNT * REACH_HOST_ANIMATION_TRACKS_PER_SURFACE)
+
+static inline size_t reach_host_surface_track(reach_surface_id id, size_t offset)
+{
+    return (size_t)id * REACH_HOST_ANIMATION_TRACKS_PER_SURFACE + offset;
+}
+
 
 typedef enum reach_surface_shadow
 {
@@ -348,6 +329,8 @@ typedef struct reach_surface_spec
     int32_t restores_focus_on_close;
     int32_t close_on_persistent_press;
     int32_t refresh_world_on_open;
+    int32_t settle_from_above;
+    float start_scale;
 
     /* A press on the control this surface hangs off must not dismiss it. By default that is its
        layout anchor; a surface with no anchor names the control explicitly. */
@@ -569,34 +552,18 @@ struct reach_host
     reach_monitor_port monitors;
 
 
+    reach_surface_runtime surfaces[REACH_HOST_SURFACE_COUNT];
+    reach_host_surface_transition transitions[REACH_HOST_SURFACE_COUNT];
+
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
-    reach_surface_runtime launcher;
-    reach_surface_runtime dock;
-    reach_surface_runtime top_bar;
     reach_screen_hotspot_factory_port screen_hotspots;
     reach_image_loader_port image_loader;
-    reach_surface_runtime tray;
-    reach_surface_runtime switcher;
-    reach_surface_runtime stage;
     reach_window_thumbnail_port window_thumbnails;
-    reach_surface_runtime context_menu;
-    reach_surface_runtime quick_settings;
-    reach_surface_runtime battery;
-    reach_surface_runtime system_hud;
-    reach_surface_runtime clipboard_surface;
     reach_render_command_buffer render_commands;
     reach_render_command_buffer popup_render_commands;
-    reach_host_surface_transition launcher_transition;
     uintptr_t focus_restore_window[REACH_HOST_SURFACE_COUNT];
     int32_t focus_restore_pending[REACH_HOST_SURFACE_COUNT];
-    reach_host_surface_transition tray_transition;
-    reach_host_surface_transition switcher_transition;
-    reach_host_surface_transition stage_transition;
-    reach_host_surface_transition context_menu_transition;
-    reach_host_surface_transition quick_settings_transition;
-    reach_host_surface_transition battery_transition;
-    reach_host_surface_transition clipboard_transition;
 
     reach_feature_definition feature_definitions[REACH_HOST_SURFACE_COUNT];
     reach_feature_runtime feature_runtimes[REACH_HOST_SURFACE_COUNT];

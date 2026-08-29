@@ -429,7 +429,11 @@ The host (`reach_host`): wires adapters into ports, constructs services and feat
 and runs the app — frame loop, input routing, boundary action dispatch, worker threads,
 and surface lifecycle. Concrete feature knowledge has two controlled seams:
 `feature_registry.cpp` for definitions and `interfeature_routes.cpp` for the callback
-slots that let one feature's action affect another. `feature_registry.cpp` is the seam for
+slots that let one feature's action affect another. Those are the only two files in the layer that
+include a concrete feature header or call a concrete feature API, and
+`tools/check_architecture.py` rejects either anywhere else outright — there is no baseline and no
+exception list. `reach_host` holds no feature-named state: surface runtimes, transitions and
+animation tracks are arrays indexed by `reach_surface_id`, so adding a surface adds no field. `feature_registry.cpp` is the seam for
 feature definitions: each registered surface has exactly one immutable
 `reach_feature_definition` and one `reach_feature_runtime`. The definition owns its opaque
 create/destroy factory, capsule operations, surface operations, layout, and policy. The runtime
@@ -520,9 +524,10 @@ shown-position geometry even when the Dock itself is hidden, and its whole rende
 command buffer is faded by the shared animation manager.
 A deferred launch is keyed on the surface that requested it, so composition waits for that
 surface's own close transition before running the launch rather than testing one named feature.
-Per-frame layout resolves in dependency order in `reach_host_update` (monitor →
-dock cluster → clipboard → switcher), while a capsule that owns its own geometry — the Launcher
-computes its layout inside `arrange` — resolves during the frame pass; the per-surface frame steps
+Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
+own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
+pass. A surface also declares how it animates in — `settle_from_above` and `start_scale` on its
+spec — so transition setup is one loop over the runtime table rather than a list of features; the per-surface frame steps
 (`host_surface_frames.cpp`, layout refresh → transition → window state →
 corners → show/render) run as one loop over the table in definition `layout.priority`
 order against a shared `reach_host_frame_context`. Transition completion is runtime-driven:

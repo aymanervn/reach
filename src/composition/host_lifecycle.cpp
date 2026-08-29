@@ -18,9 +18,9 @@ static void reach_host_on_config_service_ready(void *user, reach_config_service_
     {
         return;
     }
-    if (host->launcher.window.ops.post_event != nullptr)
+    if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.post_event != nullptr)
     {
-        (void)host->launcher.window.ops.post_event(host->launcher.window.window,
+        (void)host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.window,
                                                    REACH_UI_EVENT_CONFIG_CHANGED);
     }
     else
@@ -36,9 +36,9 @@ static void reach_host_on_foreground_changed(void *user)
     {
         return;
     }
-    if (host->dock.window.ops.post_event != nullptr)
+    if (host->surfaces[REACH_SURFACE_ID_DOCK].window.ops.post_event != nullptr)
     {
-        (void)host->dock.window.ops.post_event(host->dock.window.window,
+        (void)host->surfaces[REACH_SURFACE_ID_DOCK].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_DOCK].window.window,
                                                REACH_UI_EVENT_FOREGROUND_CHANGED);
     }
     else
@@ -55,11 +55,11 @@ static void reach_host_on_system_status_ready(void *user)
 static void reach_host_on_system_stats_ready(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host == nullptr || host->top_bar.window.ops.post_event == nullptr)
+    if (host == nullptr || host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event == nullptr)
     {
         return;
     }
-    (void)host->top_bar.window.ops.post_event(host->top_bar.window.window,
+    (void)host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.window,
                                               REACH_UI_EVENT_SYSTEM_STATS_CHANGED);
 }
 
@@ -86,11 +86,11 @@ static void reach_host_on_feature_update_requested(void *user)
 static void reach_host_on_now_playing_ready(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host == nullptr || host->top_bar.window.ops.post_event == nullptr)
+    if (host == nullptr || host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event == nullptr)
     {
         return;
     }
-    (void)host->top_bar.window.ops.post_event(host->top_bar.window.window,
+    (void)host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.window,
                                               REACH_UI_EVENT_NOW_PLAYING_CHANGED);
 }
 
@@ -453,7 +453,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->theme = reach_theme_default();
 
     if (host->monitors.list == nullptr || host->clipboard.provider == nullptr ||
-        host->clipboard_surface.window.window == nullptr)
+        host->surfaces[REACH_SURFACE_ID_CLIPBOARD].window.window == nullptr)
     {
         result = REACH_INVALID_ARGUMENT;
     }

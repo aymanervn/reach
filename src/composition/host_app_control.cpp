@@ -111,7 +111,7 @@ void reach_host_apply_window_control_result(reach_host *host)
 
     if (result == REACH_OK)
     {
-        host->dock.dirty_flags = 1;
+        host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
     }
 }
 
@@ -331,8 +331,8 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
         result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window_id);
     }
 
-    host->dock.dirty_flags = 1;
-    host->switcher.dirty_flags = 1;
+    host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
+    host->surfaces[REACH_SURFACE_ID_SWITCHER].dirty_flags = 1;
     return result;
 }
 

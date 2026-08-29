@@ -258,17 +258,17 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     reach_host_drain_icon_evictions(host);
     if (reach_clock_tick(host->clock))
     {
-        host->top_bar.dirty_flags = 1;
+        host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
     }
     if (reach_input_language_service_tick_settle(host->input_language, delta_seconds,
                                                  reach_host_foreground_window(host)))
     {
-        host->top_bar.dirty_flags = 1;
+        host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
         host->dirty.layout = 1;
     }
     if (reach_system_stats_take_changed(host->system_stats))
     {
-        host->top_bar.dirty_flags = 1;
+        host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
         host->dirty.layout = 1;
     }
 
@@ -278,7 +278,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         return monitor_result;
     }
 
-    if (host->launcher.window.ops.set_bounds != nullptr && host->monitors.list != nullptr &&
+    if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.set_bounds != nullptr && host->monitors.list != nullptr &&
         host->monitors.ops.count != nullptr && host->monitors.ops.primary != nullptr &&
         host->monitors.ops.count(host->monitors.list) > 0)
     {
@@ -298,7 +298,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
 
         reach_result result = REACH_OK;
 
-        if (host->launcher.renderer.ops.begin_frame != nullptr)
+        if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].renderer.ops.begin_frame != nullptr)
         {
             reach_ui_layout_input input = {};
             input.monitor_bounds = bounds;
