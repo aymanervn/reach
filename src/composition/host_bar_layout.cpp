@@ -257,6 +257,7 @@ reach_result reach_host_refresh_monitor_layout(reach_host *host)
     }
 
     (void)host->monitors.ops.refresh(host->monitors.list);
+    reach_host_notify_display_changed(host);
     size_t monitor_count = host->monitors.ops.count(host->monitors.list);
     if (monitor_count == 0)
     {

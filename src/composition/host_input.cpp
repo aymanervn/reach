@@ -818,7 +818,6 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     {
         reach_host_refresh_window_world(host);
         reach_host_sync_window_manipulation(host);
-        reach_host_sync_stage_window_states(host);
         reach_host_apply_foreground_change(host);
         (void)reach_host_update_game_mode(host);
         return REACH_OK;
@@ -965,7 +964,8 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     if (event->type == REACH_UI_EVENT_ESCAPE)
     {
         reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
-        reach_host_close_stage(host);
+        reach_host_close_registered_surface(host, REACH_SURFACE_ID_STAGE,
+                                           REACH_SURFACE_CLOSE_DISMISS);
     }
 
     return REACH_OK;

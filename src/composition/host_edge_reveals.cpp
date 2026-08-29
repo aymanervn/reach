@@ -234,3 +234,20 @@ void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal
     reach_layout_set_visible(&host->layout_manager, runtime->participant,
                              visible && !host->window_manipulation.relevant);
 }
+
+void reach_host_on_surface_edge_reveal(reach_host *host, reach_screen_hotspot_event event)
+{
+    if (host == nullptr || event != REACH_SCREEN_HOTSPOT_ENTER)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->definition->surface.edge_reveal.handle_event ==
+            reach_host_on_surface_edge_reveal)
+        {
+            reach_host_set_registered_surface_open(host, runtime->definition->id, 1);
+        }
+    }
+}
