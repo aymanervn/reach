@@ -87,6 +87,8 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
     return (const uint16_t *)L"";
 }
 
+#define REACH_CONTEXT_MENU_HOVER_MARGIN 12.0f
+
 struct reach_context_menu
 {
     reach_context_menu_state state;
@@ -97,6 +99,7 @@ struct reach_context_menu
 
     reach_menu_request request;
     uintptr_t request_windows[REACH_MENU_MAX_WINDOWS];
+    float hover_margin;
 };
 
 enum
@@ -124,6 +127,30 @@ void reach_context_menu_force_close(reach_context_menu *menu)
         menu->pressable_identity = 0;
         menu->state.open = 0;
     }
+}
+
+/* The window list stays up while the pointer is anywhere in the band that joins it to the
+   control it hangs off, so it survives the gap the pointer crosses on the way over. */
+int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *menu, float screen_x,
+                                                     float screen_y)
+{
+    if (menu == nullptr || !menu->state.window_list_open)
+    {
+        return 0;
+    }
+    if (!menu->request.anchored)
+    {
+        return 1;
+    }
+    return reach_context_menu_hover_region_contains(
+        menu->state.bounds, menu->request.anchor_button, menu->request.bar_edge_y,
+        menu->state.drop_direction, menu->hover_margin, screen_x, screen_y);
+}
+
+size_t reach_context_menu_window_list_target(const reach_context_menu *menu)
+{
+    return menu != nullptr && menu->state.window_list_open ? menu->state.target_index
+                                                           : REACH_CONTEXT_MENU_NO_TARGET;
 }
 
 int32_t reach_context_menu_set_open(reach_context_menu *menu, int32_t open)
@@ -463,6 +490,8 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
         return;
     }
     reach_context_menu_state *state = &menu->state;
+    menu->request = ctx->request != nullptr ? *ctx->request : reach_menu_request{};
+    menu->hover_margin = REACH_CONTEXT_MENU_HOVER_MARGIN * ctx->dpi_scale;
     state->item_count = ctx->window_entry_count < REACH_CONTEXT_MENU_MAX_ITEMS
                             ? ctx->window_entry_count
                             : REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -740,10 +769,23 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         }
         if (menu->state.window_list_open)
         {
-            out->action.kind = kind == REACH_CONTEXT_MENU_PRESSABLE_CLOSE
-                                   ? REACH_FEATURE_ACTION_CLOSE_WINDOW
-                                   : REACH_FEATURE_ACTION_FOCUS_WINDOW;
             out->action.window = menu->state.item_windows[index];
+            if (kind == REACH_CONTEXT_MENU_PRESSABLE_CLOSE)
+            {
+                out->action.kind = REACH_FEATURE_ACTION_CLOSE_WINDOW;
+                if (reach_context_menu_window_list_remove(menu, out->action.window) == 0)
+                {
+                    out->action.flags |= REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST;
+                }
+                else
+                {
+                    out->redraw = 1;
+                }
+            }
+            else
+            {
+                out->action.kind = REACH_FEATURE_ACTION_FOCUS_WINDOW;
+            }
         }
         else
         {

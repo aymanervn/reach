@@ -128,7 +128,7 @@ extern "C"
 
         void (*item_context_menu)(void *user, const reach_menu_request *request);
 
-        void (*item_hovered)(void *user, size_t item_index);
+        void (*item_hovered)(void *user, const reach_menu_request *request);
         void (*trigger_activated)(void *user, size_t trigger);
     } reach_dock_routes;
 

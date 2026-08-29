@@ -96,7 +96,12 @@ extern "C"
     void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target_index,
                                              const reach_context_menu_open_context *ctx);
 
+#define REACH_CONTEXT_MENU_NO_TARGET ((size_t)-1)
+
     int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu);
+    size_t reach_context_menu_window_list_target(const reach_context_menu *menu);
+    int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *menu,
+                                                         float screen_x, float screen_y);
     float reach_context_menu_hover_opacity(const reach_context_menu *menu);
     float reach_context_menu_close_hover(const reach_context_menu *menu);
 

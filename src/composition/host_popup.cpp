@@ -164,3 +164,12 @@ void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus
                                          reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP),
                                      restore_focus);
 }
+
+reach_result reach_host_close_window(reach_host *host, uintptr_t window_id)
+{
+    if (host == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id);
+}
