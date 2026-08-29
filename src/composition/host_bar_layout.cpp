@@ -139,17 +139,26 @@ static void reach_host_apply_edge_reveal(reach_host *host, reach_host_edge_revea
     reach_host_set_edge_reveal_visible(host, runtime, shown);
 }
 
-static void reach_host_apply_bar_pointer_observation(reach_host *host, reach_surface_id id,
-                                                     const reach_bar_visibility_result *result)
+void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
+                                        reach_rect_f32 bounds, int32_t enabled)
 {
-    if (host == nullptr || result == nullptr ||
-        host->input_source.ops.set_pointer_region == nullptr)
+    if (host == nullptr || host->input_source.ops.set_pointer_region == nullptr)
     {
         return;
     }
-    (void)host->input_source.ops.set_pointer_region(
-        host->input_source.source, static_cast<uint32_t>(id), result->pointer_observation_bounds,
-        result->pointer_observation_active);
+    (void)host->input_source.ops.set_pointer_region(host->input_source.source,
+                                                    static_cast<uint32_t>(id), bounds, enabled);
+}
+
+static void reach_host_apply_bar_pointer_observation(reach_host *host, reach_surface_id id,
+                                                     const reach_bar_visibility_result *result)
+{
+    if (result == nullptr)
+    {
+        return;
+    }
+    reach_host_set_pointer_observation(host, id, result->pointer_observation_bounds,
+                                       result->pointer_observation_active);
 }
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,

@@ -147,6 +147,42 @@ int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *m
         menu->state.drop_direction, menu->hover_margin, screen_x, screen_y);
 }
 
+/* The bounding band of the hold region above, so the pointer can be watched globally while the
+   pointer never enters a Reach window. */
+int32_t reach_context_menu_window_list_hover_bounds(const reach_context_menu *menu,
+                                                    reach_rect_f32 *out_bounds)
+{
+    if (menu == nullptr || out_bounds == nullptr || !menu->state.window_list_open ||
+        !menu->request.anchored)
+    {
+        return 0;
+    }
+
+    const reach_rect_f32 popup = menu->state.bounds;
+    const reach_rect_f32 slot = menu->request.anchor_button;
+    const float margin = menu->hover_margin;
+    float left = popup.x < slot.x ? popup.x : slot.x;
+    float right = popup.x + popup.width > slot.x + slot.width ? popup.x + popup.width
+                                                              : slot.x + slot.width;
+    float top = popup.y < slot.y ? popup.y : slot.y;
+    float bottom =
+        popup.y + popup.height > slot.y + slot.height ? popup.y + popup.height : slot.y + slot.height;
+    if (menu->request.bar_edge_y < top)
+    {
+        top = menu->request.bar_edge_y;
+    }
+    if (menu->request.bar_edge_y > bottom)
+    {
+        bottom = menu->request.bar_edge_y;
+    }
+
+    out_bounds->x = left - margin;
+    out_bounds->y = top - margin;
+    out_bounds->width = (right - left) + margin * 2.0f;
+    out_bounds->height = (bottom - top) + margin * 2.0f;
+    return 1;
+}
+
 size_t reach_context_menu_window_list_target(const reach_context_menu *menu)
 {
     return menu != nullptr && menu->state.window_list_open ? menu->state.target_index
