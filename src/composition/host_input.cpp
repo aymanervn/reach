@@ -521,7 +521,6 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
     (void)reach_host_apply_surface_action(host, REACH_SURFACE_ID_CLIPBOARD, &clipboard_cancel);
 
     reach_host_clear_sticky_dock_feedback(host);
-    host->window_list.dwell_active = 0;
 
     const reach_feature_runtime *source_runtime = reach_host_surface_for_role(host, source);
     if (source_runtime != nullptr && !reach_host_surface_pointer_open(source_runtime))
@@ -586,6 +585,11 @@ static reach_result reach_host_handle_pointer_move(reach_host *host, const reach
     if (host == nullptr || event == nullptr || !host->has_layout)
     {
         return REACH_OK;
+    }
+
+    if (host->pointer_moved_route != nullptr)
+    {
+        host->pointer_moved_route(host, reach_point_i32{event->x, event->y});
     }
 
     const reach_feature_runtime *move_owner =

@@ -433,30 +433,6 @@ CONCRETE_FEATURE_SYMBOL_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_update.cpp", "reach_dock_rebuild_items"): 1,
     ("src/composition/host_update.cpp", "reach_dock_slots_animating"): 1,
     ("src/composition/host_update.cpp", "reach_dock_take_items_changed"): 1,
-    (
-        "src/composition/host_window_list_orchestration.cpp",
-        "reach_context_menu_hover_region_contains",
-    ): 1,
-    ("src/composition/host_window_list_orchestration.cpp", "reach_context_menu_is_open"): 1,
-    (
-        "src/composition/host_window_list_orchestration.cpp",
-        "reach_context_menu_open_window_list",
-    ): 1,
-    ("src/composition/host_window_list_orchestration.cpp", "reach_context_menu_state_ptr"): 1,
-    (
-        "src/composition/host_window_list_orchestration.cpp",
-        "reach_context_menu_window_list_is_open",
-    ): 4,
-    (
-        "src/composition/host_window_list_orchestration.cpp",
-        "reach_context_menu_window_list_remove",
-    ): 1,
-    (
-        "src/composition/host_window_list_orchestration.cpp",
-        "reach_dock_collect_item_windows",
-    ): 1,
-    ("src/composition/host_window_list_orchestration.cpp", "reach_dock_item_count"): 3,
-    ("src/composition/host_window_list_orchestration.cpp", "reach_dock_rect_to_screen"): 2,
 }
 
 COMPOSITION_FEATURE_HELPER_BASELINE: dict[tuple[str, str], int] = {
@@ -469,10 +445,8 @@ COMPOSITION_FEATURE_HELPER_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_internal.h", "reach_host_clear_sticky_dock_feedback"): 1,
     ("src/composition/host_internal.h", "reach_host_close_stage"): 1,
     ("src/composition/host_internal.h", "reach_host_dock_build_context"): 1,
-    ("src/composition/host_internal.h", "reach_host_dock_item_hovered"): 1,
     ("src/composition/host_internal.h", "reach_host_on_stage_edge_reveal"): 1,
     ("src/composition/host_internal.h", "reach_host_open_stage"): 1,
-    ("src/composition/host_internal.h", "reach_host_show_dock_window_list"): 1,
     ("src/composition/host_internal.h", "reach_host_sync_stage_window_states"): 1,
     ("src/composition/host_internal.h", "reach_host_toggle_stage"): 1,
     ("src/composition/host_popup.cpp", "reach_host_clear_sticky_dock_feedback"): 2,
@@ -487,11 +461,6 @@ COMPOSITION_FEATURE_HELPER_BASELINE: dict[tuple[str, str], int] = {
     ("src/composition/host_surfaces.cpp", "reach_host_clear_sticky_dock_feedback"): 1,
     ("src/composition/host_update.cpp", "reach_host_dock_build_context"): 1,
     ("src/composition/host_update.cpp", "reach_host_sync_stage_window_states"): 1,
-    ("src/composition/host_window_list_orchestration.cpp", "reach_host_dock_item_hovered"): 1,
-    (
-        "src/composition/host_window_list_orchestration.cpp",
-        "reach_host_show_dock_window_list",
-    ): 3,
 }
 
 REGISTERED_SURFACE_IDS = (

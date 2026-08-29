@@ -541,15 +541,6 @@ typedef struct reach_host_dirty_state
     int32_t monitors;
 } reach_host_dirty_state;
 
-typedef struct reach_host_window_list_state
-{
-    int32_t dwell_active;
-    size_t dwell_item;
-    double dwell_seconds;
-    size_t open_item;
-    double grace_seconds;
-} reach_host_window_list_state;
-
 typedef struct reach_host_pointer_move_state
 {
     int32_t subscriptions_initialized;
@@ -620,6 +611,7 @@ struct reach_host
     const reach_theme *theme;
 
     reach_window_tracking *window_tracking;
+    void (*pointer_moved_route)(void *user, reach_point_i32 point);
     float layout_dpi_scale;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_HOST_ANIMATION_COUNT];
@@ -631,7 +623,6 @@ struct reach_host
     int32_t top_bar_hidden;
     reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;
-    reach_host_window_list_state window_list;
     reach_clipboard_port clipboard;
     reach_search_service *search_service;
     reach_app_control *app_control;
@@ -823,10 +814,6 @@ reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
 
 
 
-void reach_host_dock_item_hovered(reach_host *host, size_t item_index);
-void reach_host_window_list_update(reach_host *host, double delta_seconds);
-int32_t reach_host_window_list_wants_frames(const reach_host *host);
-reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_index);
 reach_result reach_host_close_window(reach_host *host, uintptr_t window_id);
 
 int32_t reach_host_icon_size_px(const reach_host *host);

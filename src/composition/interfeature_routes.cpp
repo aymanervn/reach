@@ -53,13 +53,79 @@ static void reach_host_route_dock_item_context_menu(void *user, const reach_menu
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
 }
 
-static void reach_host_route_dock_item_hovered(void *user, size_t item_index)
+static void reach_host_open_window_list(reach_host *host, const reach_menu_request *request)
+{
+    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
+
+    reach_context_menu_window_entry entries[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
+    size_t entry_count = request->window_count < REACH_CONTEXT_MENU_MAX_ITEMS
+                             ? request->window_count
+                             : REACH_CONTEXT_MENU_MAX_ITEMS;
+    for (size_t index = 0; index < entry_count; ++index)
+    {
+        entries[index].window = request->windows[index].window;
+        entries[index].title = request->windows[index].title;
+    }
+
+    reach_context_menu_open_context ctx = reach_host_menu_open_context(host, request);
+    ctx.window_entries = entries;
+    ctx.window_entry_count = entry_count;
+    reach_context_menu_open_window_list(
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
+        request->target_index, &ctx);
+    reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                        request->drop_direction);
+}
+
+static void reach_host_route_dock_item_hovered(void *user, const reach_menu_request *request)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host != nullptr)
+    if (host == nullptr)
     {
-        reach_host_dock_item_hovered(host, item_index);
+        return;
     }
+
+    reach_context_menu *menu =
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    size_t open_target = reach_context_menu_window_list_target(menu);
+    if (request == nullptr)
+    {
+        return;
+    }
+    if (open_target == request->target_index)
+    {
+        return;
+    }
+    if (open_target == REACH_CONTEXT_MENU_NO_TARGET &&
+        reach_host_any_surface_open(host,
+                                    reach_surface_class_bit(REACH_SURFACE_CLASS_TRANSIENT) |
+                                        reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP) |
+                                        reach_surface_class_bit(REACH_SURFACE_CLASS_OVERLAY)))
+    {
+        return;
+    }
+
+    reach_host_open_window_list(host, request);
+}
+
+/* The window list is the only surface that must survive the pointer crossing the gap between
+   the control it hangs off and itself, so it decides when the pointer has truly left. */
+static void reach_host_route_pointer_moved(void *user, reach_point_i32 point)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_context_menu *menu =
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    if (reach_context_menu_window_list_target(menu) == REACH_CONTEXT_MENU_NO_TARGET ||
+        reach_context_menu_window_list_holds_pointer(menu, (float)point.x, (float)point.y))
+    {
+        return;
+    }
+    reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                        REACH_SURFACE_CLOSE_SUPERSEDED);
 }
 
 static void reach_host_route_dock_trigger_activated(void *user, size_t trigger)
@@ -143,6 +209,8 @@ void reach_host_bind_interfeature_routes(reach_host *host)
         return;
     }
 
+    host->pointer_moved_route = reach_host_route_pointer_moved;
+
     reach_dock_routes dock = {};
     dock.user = host;
     dock.item_context_menu = reach_host_route_dock_item_context_menu;
@@ -171,6 +239,7 @@ void reach_host_clear_interfeature_routes(reach_host *host)
 {
     if (host != nullptr)
     {
+        host->pointer_moved_route = nullptr;
         reach_dock_set_routes(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
                               nullptr);
         reach_top_bar_set_routes(

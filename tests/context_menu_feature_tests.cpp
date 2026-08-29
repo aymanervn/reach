@@ -281,8 +281,69 @@ static void test_menu_commands_execute_only_from_the_published_snapshot(void)
                 "power commands stay system actions and skip the item snapshot");
 }
 
+static void test_window_list_holds_the_pointer_across_the_gap(void)
+{
+    reach_context_menu *menu = nullptr;
+    if (reach_context_menu_create(&menu) != REACH_OK || menu == nullptr)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: context menu creation\n");
+        return;
+    }
+
+    expect_true(reach_context_menu_window_list_target(menu) == REACH_CONTEXT_MENU_NO_TARGET,
+                "a closed menu reports no window-list target");
+    expect_true(!reach_context_menu_window_list_holds_pointer(menu, 400.0f, 900.0f),
+                "a closed menu never holds the pointer");
+
+    reach_menu_request request = {};
+    request.target_index = 3;
+    request.anchored = 1;
+    request.anchor_button = {380.0f, 960.0f, 40.0f, 40.0f};
+    request.bar_edge_y = 1000.0f;
+    request.drop_direction = REACH_POPUP_DROP_UP;
+
+    reach_context_menu_window_entry entries[2] = {};
+    entries[0].window = 11;
+    entries[0].title = (const uint16_t *)L"one";
+    entries[1].window = 22;
+    entries[1].title = (const uint16_t *)L"two";
+
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = request.anchored;
+    ctx.anchor_button = request.anchor_button;
+    ctx.bar_edge_y = request.bar_edge_y;
+    ctx.drop_direction = request.drop_direction;
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    ctx.window_entries = entries;
+    ctx.window_entry_count = 2;
+    ctx.request = &request;
+    reach_context_menu_open_window_list(menu, request.target_index, &ctx);
+
+    const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
+    expect_true(reach_context_menu_window_list_target(menu) == 3,
+                "an open window list reports the item it belongs to");
+
+    float inside_x = state->bounds.x + state->bounds.width * 0.5f;
+    float inside_y = state->bounds.y + state->bounds.height * 0.5f;
+    expect_true(reach_context_menu_window_list_holds_pointer(menu, inside_x, inside_y),
+                "the pointer inside the list holds it open");
+
+    float gap_y = state->bounds.y + state->bounds.height + 4.0f;
+    expect_true(reach_context_menu_window_list_holds_pointer(menu, 400.0f, gap_y),
+                "the pointer in the gap between the item and the list holds it open");
+
+    expect_true(!reach_context_menu_window_list_holds_pointer(menu, 40.0f, 200.0f),
+                "the pointer well away from both dismisses the list");
+
+    reach_context_menu_destroy(menu);
+}
+
 int main(void)
 {
+    test_window_list_holds_the_pointer_across_the_gap();
     test_menu_commands_execute_only_from_the_published_snapshot();
     test_power_commands_and_text();
     test_window_list_remove();

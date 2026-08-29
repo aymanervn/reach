@@ -49,6 +49,7 @@ struct reach_dock
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
     reach_menu_request action_request;
+    reach_menu_request hover_request;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
@@ -509,12 +510,21 @@ static int32_t reach_dock_capsule_screen_y(const reach_dock *dock, int32_t local
                : local_y;
 }
 
-static void reach_dock_notify_item_hovered(const reach_dock *dock, size_t item_index)
+/* Hovering an item offers the same complete request a right-click does; an item with no
+   running windows offers nothing at all. */
+static void reach_dock_notify_item_hovered(reach_dock *dock, size_t item_index)
 {
-    if (dock != nullptr && dock->routes.item_hovered != nullptr)
+    if (dock == nullptr || dock->routes.item_hovered == nullptr)
     {
-        dock->routes.item_hovered(dock->routes.user, item_index);
+        return;
     }
+    if (!reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f, &dock->hover_request) ||
+        dock->hover_request.window_count == 0)
+    {
+        dock->routes.item_hovered(dock->routes.user, nullptr);
+        return;
+    }
+    dock->routes.item_hovered(dock->routes.user, &dock->hover_request);
 }
 
 static void
