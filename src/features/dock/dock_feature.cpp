@@ -21,7 +21,7 @@ enum reach_dock_slot_lifecycle
 struct reach_dock_slot
 {
     int32_t lifecycle;
-    reach_dock_order_key key;
+    uint32_t key;
 };
 
 static const double REACH_DOCK_SLOT_ANIMATION_SECONDS = 0.25;
@@ -51,6 +51,7 @@ struct reach_dock
     reach_menu_request action_request;
     reach_menu_request hover_request;
     reach_dock_model metrics;
+    uint32_t next_app_key;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
@@ -102,25 +103,7 @@ void reach_dock_touch_icons(reach_dock *dock, int32_t icon_size_px)
     for (size_t index = 0; index < dock->state.model.item_count; ++index)
     {
         const reach_dock_item_model *item = &dock->state.model.items[index];
-        const uint16_t *icon_path = nullptr;
-        if (item->pinned)
-        {
-            if (dock->pointer_pinned_apps != nullptr &&
-                item->pinned_index < dock->pointer_pinned_app_count)
-            {
-                const reach_pinned_app_model *app = &dock->pointer_pinned_apps[item->pinned_index];
-                icon_path = app->icon_ref[0] != 0 ? app->icon_ref : app->path;
-            }
-        }
-        else
-        {
-            const reach_window_snapshot *window =
-                reach_window_tracking_window_by_id(dock->windows, item->window);
-            if (window != nullptr)
-            {
-                icon_path = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
-            }
-        }
+        const uint16_t *icon_path = item->icon_ref;
         if (icon_path != nullptr && icon_path[0] != 0)
         {
             reach_icon_service_touch(dock->icons, icon_path, icon_size_px);
@@ -338,7 +321,8 @@ static void reach_dock_build_items(reach_dock *dock, const reach_pinned_app_mode
     {
         return;
     }
-    reach_dock_feature_model_build_items(&dock->state.model, pinned_apps, pinned_app_count,
+    reach_dock_feature_model_build_items(&dock->state.model, &dock->next_app_key, pinned_apps,
+                                         pinned_app_count,
                                          reach_window_tracking_windows(dock->windows),
                                          reach_window_tracking_window_group_ids(dock->windows),
                                          reach_window_tracking_window_count(dock->windows),
@@ -350,61 +334,24 @@ size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
                                        size_t pinned_app_count, reach_dock_item_window *out,
                                        size_t cap)
 {
+    (void)pinned_apps;
+    (void)pinned_app_count;
     if (dock == nullptr || out == nullptr || cap == 0 || item_index >= dock->state.model.item_count)
     {
         return 0;
     }
 
     const reach_dock_item_model *item = &dock->state.model.items[item_index];
-    const reach_window_snapshot *windows = reach_window_tracking_windows(dock->windows);
-    size_t window_count = reach_window_tracking_window_count(dock->windows);
-
-    const reach_pinned_app_model *app = nullptr;
-    reach_pinned_app_model window_app = {};
-    if (item->pinned && pinned_apps != nullptr && item->pinned_index < pinned_app_count)
+    size_t count = 0;
+    for (size_t index = 0; index < item->instance_count && count < cap; ++index)
     {
-        app = &pinned_apps[item->pinned_index];
+        const reach_window_snapshot *window =
+            reach_window_tracking_window_by_id(dock->windows, item->instances[index]);
+        out[count].window = item->instances[index];
+        out[count].title = window != nullptr ? window->title : nullptr;
+        ++count;
     }
-    else if (!item->pinned)
-    {
-        const reach_window_snapshot *representative =
-            reach_window_tracking_window_by_id(dock->windows, item->window);
-        if (representative != nullptr)
-        {
-            reach_copy_utf16(window_app.path, 260, representative->path);
-            reach_copy_utf16(window_app.app_user_model_id, 260, representative->app_user_model_id);
-            app = &window_app;
-        }
-    }
-
-    if (app != nullptr && windows != nullptr)
-    {
-        size_t indices[16];
-        size_t index_cap = cap < 16 ? cap : 16;
-        size_t count = reach_dock_collect_matching_windows(
-            app, windows, window_count, reach_window_tracking_focus_history(dock->windows),
-            reach_window_tracking_focus_history_count(dock->windows),
-            reach_dock_window_matches_app_thunk, nullptr, indices, index_cap);
-        for (size_t at = 0; at < count; ++at)
-        {
-            out[at].window = windows[indices[at]].id;
-            out[at].title = windows[indices[at]].title;
-        }
-        if (count > 0)
-        {
-            return count;
-        }
-    }
-
-    if (item->window == 0)
-    {
-        return 0;
-    }
-    const reach_window_snapshot *window =
-        reach_window_tracking_window_by_id(dock->windows, item->window);
-    out[0].window = item->window;
-    out[0].title = window != nullptr ? window->title : nullptr;
-    return 1;
+    return count;
 }
 
 static void reach_dock_capsule_reset(void *capsule)
@@ -560,8 +507,7 @@ static uint64_t reach_dock_pressable_target(const reach_dock *dock, reach_dock_h
     if (dock != nullptr && hit.type == REACH_DOCK_HIT_ITEM &&
         hit.index < dock->state.model.item_count)
     {
-        reach_dock_order_key key = reach_dock_item_key_at(&dock->state.model, hit.index);
-        return ((uint64_t)(key.pinned ? 1 : 0) << 32) | key.app_id;
+        return (uint64_t)reach_dock_item_key_at(&dock->state.model, hit.index);
     }
     if (button == REACH_POINTER_BUTTON_PRIMARY && hit.type == REACH_DOCK_HIT_TRIGGER)
     {
@@ -1041,29 +987,6 @@ const reach_bar_reveal_ops *reach_dock_reveal_ops(void)
     return &ops;
 }
 
-static reach_dock_order_key reach_dock_order_key_for_item(const reach_dock_item_model *item)
-{
-    reach_dock_order_key key = {};
-    if (item == nullptr)
-    {
-        return key;
-    }
-
-    key.pinned = item->pinned;
-    key.app_id = item->app_id;
-    return key;
-}
-
-static void reach_dock_set_order_key(reach_dock_feature_model *model, size_t index,
-                                     const reach_dock_item_model *item)
-{
-    if (model == nullptr || item == nullptr || index >= REACH_MAX_DOCK_ITEMS)
-    {
-        return;
-    }
-    model->order[index] = reach_dock_order_key_for_item(item);
-}
-
 size_t reach_dock_find_pinned_for_window(const reach_pinned_app_model *pinned_apps,
                                          size_t pinned_app_count,
                                          const reach_window_snapshot *window,
@@ -1086,15 +1009,37 @@ size_t reach_dock_find_pinned_for_window(const reach_pinned_app_model *pinned_ap
     return REACH_MAX_DOCK_ITEMS;
 }
 
-struct reach_dock_app_group
+static void reach_dock_item_set_identity(reach_dock_item_model *item, const uint16_t *path,
+                                         const uint16_t *app_user_model_id,
+                                         const uint16_t *icon_ref)
 {
-    int32_t pinned;
-    uint32_t app_id;
-    size_t pinned_index;
-    uintptr_t representative;
-};
+    reach_copy_utf16(item->path, REACH_DOCK_TEXT_CAPACITY, path);
+    reach_copy_utf16(item->app_user_model_id, REACH_DOCK_TEXT_CAPACITY, app_user_model_id);
+    reach_copy_utf16(item->icon_ref, REACH_DOCK_TEXT_CAPACITY,
+                     icon_ref != nullptr && icon_ref[0] != 0 ? icon_ref : path);
+}
 
-static void reach_dock_build_candidate_items(
+static void reach_dock_item_add_instance(reach_dock_item_model *item, uintptr_t window)
+{
+    if (window == 0 || item->instance_count >= REACH_DOCK_MAX_INSTANCES)
+    {
+        return;
+    }
+    for (size_t index = 0; index < item->instance_count; ++index)
+    {
+        if (item->instances[index] == window)
+        {
+            return;
+        }
+    }
+    item->instances[item->instance_count++] = window;
+    if (item->window == 0)
+    {
+        item->window = window;
+    }
+}
+
+void reach_dock_feature_model_build_candidates(
     reach_dock_item_model *items, size_t *item_count, const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count, const reach_window_snapshot *open_windows,
     const uint32_t *window_group_ids, size_t open_window_count,
@@ -1109,156 +1054,156 @@ static void reach_dock_build_candidate_items(
         return;
     }
 
-    reach_dock_app_group groups[REACH_MAX_DOCK_ITEMS] = {};
-    size_t group_count = 0;
-    size_t pinned_group_count = 0;
-    size_t running_group_count = 0;
+    uint32_t group_of[REACH_MAX_DOCK_ITEMS] = {};
+    size_t count = 0;
+    size_t running_count = 0;
 
     for (size_t index = 0;
-         pinned_apps != nullptr && index < pinned_app_count && group_count < REACH_MAX_DOCK_ITEMS;
+         pinned_apps != nullptr && index < pinned_app_count && count < REACH_MAX_DOCK_ITEMS;
          ++index)
     {
-        groups[group_count].pinned = 1;
-        groups[group_count].app_id = pinned_apps[index].id;
-        groups[group_count].pinned_index = index;
-        ++group_count;
+        reach_dock_item_model *item = &items[count];
+        *item = {};
+        item->pinned = 1;
+        item->pin_id = pinned_apps[index].id;
+        reach_dock_item_set_identity(item, pinned_apps[index].path,
+                                     pinned_apps[index].app_user_model_id,
+                                     pinned_apps[index].icon_ref);
+        ++count;
     }
-    pinned_group_count = group_count;
+    size_t pinned_count = count;
 
     for (size_t index = 0; open_windows != nullptr && index < open_window_count; ++index)
     {
+        const reach_window_snapshot *window = &open_windows[index];
         size_t pinned_index = reach_dock_find_pinned_for_window(
-            pinned_apps, pinned_app_count, &open_windows[index], window_matches_pinned, match_user);
-        if (pinned_index != REACH_MAX_DOCK_ITEMS)
+            pinned_apps, pinned_app_count, window, window_matches_pinned, match_user);
+        if (pinned_index != REACH_MAX_DOCK_ITEMS && pinned_index < pinned_count)
         {
-            if (pinned_index < pinned_group_count && groups[pinned_index].representative == 0)
-            {
-                groups[pinned_index].representative = open_windows[index].id;
-            }
+            reach_dock_item_add_instance(&items[pinned_index], window->id);
             continue;
         }
 
         uint32_t group_id = window_group_ids != nullptr ? window_group_ids[index] : 0;
-        int32_t grouped = 0;
-        for (size_t at = pinned_group_count; group_id != 0 && at < group_count; ++at)
+        size_t existing = REACH_MAX_DOCK_ITEMS;
+        for (size_t at = pinned_count; group_id != 0 && at < count; ++at)
         {
-            if (groups[at].app_id == group_id)
+            if (group_of[at] == group_id)
             {
-                grouped = 1;
+                existing = at;
                 break;
             }
         }
-        if (grouped || running_group_count >= REACH_MAX_DOCK_RUNNING_APPS ||
-            group_count >= REACH_MAX_DOCK_ITEMS)
+        if (existing != REACH_MAX_DOCK_ITEMS)
+        {
+            reach_dock_item_add_instance(&items[existing], window->id);
+            continue;
+        }
+        if (running_count >= REACH_MAX_DOCK_RUNNING_APPS || count >= REACH_MAX_DOCK_ITEMS)
         {
             continue;
         }
 
-        groups[group_count].pinned = 0;
-        groups[group_count].app_id = group_id;
-        groups[group_count].pinned_index = REACH_MAX_DOCK_ITEMS;
-        groups[group_count].representative = open_windows[index].id;
-        ++group_count;
-        ++running_group_count;
+        reach_dock_item_model *item = &items[count];
+        *item = {};
+        item->pinned = 0;
+        reach_dock_item_set_identity(item, window->path, window->app_user_model_id,
+                                     window->icon_ref);
+        reach_dock_item_add_instance(item, window->id);
+        group_of[count] = group_id;
+        ++count;
+        ++running_count;
     }
 
-    for (size_t index = 0; index < group_count; ++index)
+    *item_count = count;
+}
+
+/* A candidate inherits the key of the app it matches by identity, so an app keeps its dock slot
+   through being pinned, unpinned, or handed a new pin id by the config store. */
+static void reach_dock_assign_keys(reach_dock_feature_model *model, reach_dock_item_model *candidates,
+                                   size_t candidate_count, uint32_t *next_key)
+{
+    for (size_t index = 0; index < candidate_count; ++index)
     {
-        reach_dock_item_model item = {};
-        item.pinned = groups[index].pinned;
-        item.app_id = groups[index].app_id;
-        item.window = groups[index].representative;
-        item.pinned_index = groups[index].pinned_index;
-        items[(*item_count)++] = item;
+        reach_dock_item_model *candidate = &candidates[index];
+        candidate->key = 0;
+        for (size_t at = 0; at < model->item_count; ++at)
+        {
+            if (reach_dock_item_identity_equal(&model->items[at], candidate->path,
+                                               candidate->app_user_model_id))
+            {
+                candidate->key = model->items[at].key;
+                break;
+            }
+        }
+        if (candidate->key == 0)
+        {
+            candidate->key = (*next_key)++;
+        }
     }
 }
 
-static void reach_dock_apply_existing_order(reach_dock_feature_model *model,
-                                            const reach_dock_item_model *candidates,
-                                            size_t candidate_count, int32_t *used)
+static void reach_dock_order_candidates(reach_dock_feature_model *model,
+                                        const reach_dock_item_model *candidates,
+                                        size_t candidate_count)
 {
-    if (model == nullptr || candidates == nullptr || used == nullptr)
-    {
-        return;
-    }
-
-    model->item_count = 0;
+    reach_dock_item_model ordered[REACH_MAX_DOCK_ITEMS] = {};
+    int32_t used[REACH_MAX_DOCK_ITEMS] = {};
+    size_t ordered_count = 0;
 
     for (size_t order_index = 0;
-         order_index < model->order_count && model->item_count < REACH_MAX_DOCK_ITEMS;
-         ++order_index)
+         order_index < model->order_count && ordered_count < REACH_MAX_DOCK_ITEMS; ++order_index)
     {
-        for (size_t candidate_index = 0; candidate_index < candidate_count; ++candidate_index)
+        for (size_t index = 0; index < candidate_count; ++index)
         {
-            reach_dock_order_key candidate_key =
-                reach_dock_order_key_for_item(&candidates[candidate_index]);
-            if (!used[candidate_index] &&
-                reach_dock_key_equal(&model->order[order_index], &candidate_key))
+            if (!used[index] && candidates[index].key == model->order[order_index])
             {
-                model->items[model->item_count++] = candidates[candidate_index];
-                used[candidate_index] = 1;
+                ordered[ordered_count++] = candidates[index];
+                used[index] = 1;
                 break;
             }
         }
     }
-}
 
-static void reach_dock_append_new_items(reach_dock_feature_model *model,
-                                        const reach_dock_item_model *candidates,
-                                        size_t candidate_count, const int32_t *used)
-{
-    if (model == nullptr || candidates == nullptr || used == nullptr)
+    for (size_t index = 0; index < candidate_count && ordered_count < REACH_MAX_DOCK_ITEMS; ++index)
     {
-        return;
-    }
-
-    for (size_t candidate_index = 0;
-         candidate_index < candidate_count && model->item_count < REACH_MAX_DOCK_ITEMS;
-         ++candidate_index)
-    {
-        if (!used[candidate_index])
+        if (!used[index])
         {
-            model->items[model->item_count++] = candidates[candidate_index];
+            ordered[ordered_count++] = candidates[index];
         }
     }
-}
 
-static void reach_dock_store_current_order(reach_dock_feature_model *model)
-{
-    if (model == nullptr)
+    model->item_count = ordered_count;
+    model->order_count = ordered_count;
+    for (size_t index = 0; index < ordered_count; ++index)
     {
-        return;
-    }
-
-    model->order_count = model->item_count;
-    for (size_t index = 0; index < model->item_count; ++index)
-    {
-        reach_dock_set_order_key(model, index, &model->items[index]);
+        model->items[index] = ordered[index];
+        model->order[index] = ordered[index].key;
     }
 }
 
 void reach_dock_feature_model_build_items(
-    reach_dock_feature_model *model, const reach_pinned_app_model *pinned_apps,
+    reach_dock_feature_model *model, uint32_t *next_key, const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count, const reach_window_snapshot *open_windows,
     const uint32_t *window_group_ids, size_t open_window_count,
     reach_dock_window_matches_pinned_fn window_matches_pinned, void *match_user)
 {
-    if (model == nullptr)
+    if (model == nullptr || next_key == nullptr)
     {
         return;
     }
+    if (*next_key == 0)
+    {
+        *next_key = 1;
+    }
 
-    reach_dock_item_model candidates[REACH_MAX_DOCK_ITEMS] = {};
-    int32_t used[REACH_MAX_DOCK_ITEMS] = {};
+    static reach_dock_item_model candidates[REACH_MAX_DOCK_ITEMS];
     size_t candidate_count = 0;
-
-    reach_dock_build_candidate_items(candidates, &candidate_count, pinned_apps, pinned_app_count,
-                                     open_windows, window_group_ids, open_window_count,
-                                     window_matches_pinned, match_user);
-
-    reach_dock_apply_existing_order(model, candidates, candidate_count, used);
-    reach_dock_append_new_items(model, candidates, candidate_count, used);
-    reach_dock_store_current_order(model);
+    reach_dock_feature_model_build_candidates(candidates, &candidate_count, pinned_apps,
+                                              pinned_app_count, open_windows, window_group_ids,
+                                              open_window_count, window_matches_pinned, match_user);
+    reach_dock_assign_keys(model, candidates, candidate_count, next_key);
+    reach_dock_order_candidates(model, candidates, candidate_count);
 }
 
 size_t reach_dock_item_count(reach_dock *dock)
@@ -1284,20 +1229,7 @@ size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_inde
     }
     const reach_dock_item_model *item = &dock->state.model.items[item_index];
 
-    const uint16_t *path = nullptr;
-    if (item->pinned)
-    {
-        path = item->pinned_index < dock->pointer_pinned_app_count
-                   ? dock->pointer_pinned_apps[item->pinned_index].path
-                   : nullptr;
-    }
-    else if (dock->windows != nullptr)
-    {
-        const reach_window_snapshot *window =
-            reach_window_tracking_window_by_id(dock->windows, item->window);
-        path = window != nullptr ? window->path : nullptr;
-    }
-    const int32_t has_path = path != nullptr;
+    const int32_t has_path = item->path[0] != 0;
     const int32_t has_window = item->window != 0;
 
     size_t count = 0;
@@ -1329,6 +1261,9 @@ size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_inde
     return count;
 }
 
+/* Nothing to rebase. An entry is identified by its application, not by the pin id the config
+   store happened to hand it, so pinning, unpinning and reissued ids only change properties on an
+   entry that keeps its key and therefore its place. */
 void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model *apps,
                                   size_t count)
 {
@@ -1345,110 +1280,11 @@ void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model
         count = REACH_MAX_PINNED_APPS;
     }
 
-    reach_dock_state *state = reach_dock_state_mut(dock);
-    reach_dock_order_key order[REACH_MAX_DOCK_ITEMS] = {};
-    size_t order_pin_slot[REACH_MAX_DOCK_ITEMS] = {};
-    uint16_t order_paths[REACH_MAX_PINNED_APPS][260] = {};
-    uint16_t order_aumids[REACH_MAX_PINNED_APPS][260] = {};
-    size_t pin_slot_count = 0;
-
-    size_t order_count = state->model.order_count;
-    if (order_count > REACH_MAX_DOCK_ITEMS)
-    {
-        order_count = REACH_MAX_DOCK_ITEMS;
-    }
-
-    for (size_t order_index = 0; order_index < order_count; ++order_index)
-    {
-        order_pin_slot[order_index] = REACH_MAX_PINNED_APPS;
-        order[order_index] = state->model.order[order_index];
-        if (!order[order_index].pinned)
-        {
-            continue;
-        }
-
-        for (size_t pin_index = 0; pin_index < dock->pinned_app_count; ++pin_index)
-        {
-            if (dock->pinned_apps[pin_index].id != order[order_index].app_id)
-            {
-                continue;
-            }
-            if (pin_slot_count < REACH_MAX_PINNED_APPS)
-            {
-                size_t slot = pin_slot_count++;
-                order_pin_slot[order_index] = slot;
-                reach_copy_utf16(order_paths[slot], 260, dock->pinned_apps[pin_index].path);
-                reach_copy_utf16(order_aumids[slot], 260,
-                                 dock->pinned_apps[pin_index].app_user_model_id);
-            }
-            break;
-        }
-    }
-
     dock->pinned_app_count = count;
     for (size_t index = 0; index < count; ++index)
     {
         dock->pinned_apps[index] = apps[index];
     }
-
-    const reach_window_snapshot *open_windows = reach_window_tracking_windows(dock->windows);
-    const uint32_t *window_group_ids = reach_window_tracking_window_group_ids(dock->windows);
-    size_t open_window_count = reach_window_tracking_window_count(dock->windows);
-    for (size_t order_index = 0; order_index < order_count; ++order_index)
-    {
-        size_t pin_slot = order_pin_slot[order_index];
-        if (order[order_index].pinned && pin_slot < REACH_MAX_PINNED_APPS &&
-            order_paths[pin_slot][0] != 0)
-        {
-            int32_t still_pinned = 0;
-            for (size_t pin_index = 0; pin_index < dock->pinned_app_count; ++pin_index)
-            {
-                if (reach_path_equals(dock->pinned_apps[pin_index].path, order_paths[pin_slot]))
-                {
-                    order[order_index].app_id = dock->pinned_apps[pin_index].id;
-                    still_pinned = 1;
-                    break;
-                }
-            }
-            if (!still_pinned)
-            {
-                reach_pinned_app_model unpinned_app = {};
-                reach_copy_utf16(unpinned_app.path, 260, order_paths[pin_slot]);
-                reach_copy_utf16(unpinned_app.app_user_model_id, 260, order_aumids[pin_slot]);
-                uint32_t group_id =
-                    reach_window_tracking_group_id_for_app(dock->windows, &unpinned_app);
-                if (group_id != 0)
-                {
-                    order[order_index].pinned = 0;
-                    order[order_index].app_id = group_id;
-                }
-            }
-        }
-        else if (!order[order_index].pinned && order[order_index].app_id != 0 &&
-                 open_windows != nullptr && window_group_ids != nullptr)
-        {
-            for (size_t window_index = 0; window_index < open_window_count; ++window_index)
-            {
-                if (window_group_ids[window_index] != order[order_index].app_id)
-                {
-                    continue;
-                }
-                for (size_t pin_index = 0; pin_index < dock->pinned_app_count; ++pin_index)
-                {
-                    if (reach_window_tracking_window_matches_app(&dock->pinned_apps[pin_index],
-                                                                 &open_windows[window_index]))
-                    {
-                        order[order_index].pinned = 1;
-                        order[order_index].app_id = dock->pinned_apps[pin_index].id;
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    reach_dock_restore_order(dock, order, order_count);
     reach_dock_mark_items_changed(dock);
 }
 
@@ -1468,31 +1304,21 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
 
     const reach_dock_item_model *item = reach_dock_item_at(dock, item_index);
     out_request->window = item->window;
-
-    const reach_pinned_app_model *pinned_app =
-        item->pinned && item->pinned_index < dock->pinned_app_count
-            ? &dock->pinned_apps[item->pinned_index]
-            : nullptr;
-    if (pinned_app != nullptr)
+    out_request->pin_id = item->pin_id;
+    reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, item->path);
+    reach_copy_utf16(out_request->app_user_model_id, REACH_MENU_TEXT_CAPACITY,
+                     item->app_user_model_id);
+    reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY, item->icon_ref);
+    if (item->pinned)
     {
-        out_request->pin_id = pinned_app->id;
-        reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, pinned_app->path);
-        reach_copy_utf16(out_request->arguments, REACH_MENU_TEXT_CAPACITY, pinned_app->arguments);
-        reach_copy_utf16(out_request->app_user_model_id, REACH_MENU_TEXT_CAPACITY,
-                         pinned_app->app_user_model_id);
-        reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY, pinned_app->icon_ref);
-    }
-    else
-    {
-        const reach_window_snapshot *window =
-            reach_window_tracking_window_by_id(dock->windows, item->window);
-        if (window != nullptr)
+        for (size_t index = 0; index < dock->pinned_app_count; ++index)
         {
-            reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, window->path);
-            reach_copy_utf16(out_request->app_user_model_id, REACH_MENU_TEXT_CAPACITY,
-                             window->app_user_model_id);
-            reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY,
-                             window->icon_ref[0] != 0 ? window->icon_ref : window->path);
+            if (dock->pinned_apps[index].id == item->pin_id)
+            {
+                reach_copy_utf16(out_request->arguments, REACH_MENU_TEXT_CAPACITY,
+                                 dock->pinned_apps[index].arguments);
+                break;
+            }
         }
     }
 
@@ -1527,17 +1353,16 @@ size_t reach_dock_order_count(reach_dock *dock)
     return dock != nullptr ? reach_dock_state_mut(dock)->model.order_count : 0;
 }
 
-reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index)
+uint32_t reach_dock_order_key_at(reach_dock *dock, size_t index)
 {
-    reach_dock_order_key key = {};
     if (dock == nullptr || index >= reach_dock_state_mut(dock)->model.order_count)
     {
-        return key;
+        return 0;
     }
     return reach_dock_state_mut(dock)->model.order[index];
 }
 
-void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys, size_t count)
+void reach_dock_restore_order(reach_dock *dock, const uint32_t *keys, size_t count)
 {
     if (dock == nullptr || keys == nullptr || count > REACH_MAX_DOCK_ITEMS)
     {
@@ -1637,12 +1462,12 @@ static size_t reach_dock_slot_alloc(reach_dock *dock)
     return REACH_DOCK_SLOT_CAPACITY;
 }
 
-static size_t reach_dock_slot_find(reach_dock *dock, reach_dock_order_key key)
+static size_t reach_dock_slot_find(reach_dock *dock, uint32_t key)
 {
     for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
-        if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_EMPTY &&
-            reach_dock_key_equal(&dock->slots[pool].key, &key))
+        if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_EMPTY && key != 0 &&
+            dock->slots[pool].key == key)
         {
             return pool;
         }
@@ -1711,8 +1536,7 @@ static void reach_dock_sync_slots(reach_dock *dock)
         int32_t found = 0;
         for (size_t index = 0; index < item_count; ++index)
         {
-            reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
-            if (reach_dock_key_equal(&slot->key, &item_key))
+            if (slot->key != 0 && slot->key == reach_dock_item_key_at(&state->model, index))
             {
                 found = 1;
                 break;
@@ -1746,7 +1570,7 @@ static void reach_dock_sync_slots(reach_dock *dock)
     size_t new_count = 0;
     for (size_t index = 0; index < item_count; ++index)
     {
-        reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
+        uint32_t item_key = reach_dock_item_key_at(&state->model, index);
         size_t pool = reach_dock_slot_find(dock, item_key);
         if (pool < REACH_DOCK_SLOT_CAPACITY)
         {
@@ -1844,7 +1668,7 @@ float reach_dock_item_reveal(reach_dock *dock, size_t item_index)
     {
         return 0.0f;
     }
-    reach_dock_order_key key = reach_dock_item_key_at(&dock->state.model, item_index);
+    uint32_t key = reach_dock_item_key_at(&dock->state.model, item_index);
     size_t pool = reach_dock_slot_find(dock, key);
     if (pool >= REACH_DOCK_SLOT_CAPACITY)
     {
@@ -2160,17 +1984,17 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
     {
         float target_x = reach_dock_slot_box_x(theme, layout, index);
         float from_x = target_x;
-        reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
+        uint32_t item_key = reach_dock_item_key_at(&state->model, index);
         for (size_t old_index = 0; old_index < snapshot->count; ++old_index)
         {
-            if (reach_dock_key_equal(&snapshot->keys[old_index], &item_key))
+            if (item_key != 0 && snapshot->keys[old_index] == item_key)
             {
                 from_x = snapshot->x[old_index];
                 break;
             }
         }
         state->item_x_keys[index] = item_key;
-        if (reach_dock_key_equal(&state->drag.key, &item_key) &&
+        if (item_key != 0 && state->drag.key == item_key &&
             (reach_draggable_tracking(&state->drag.gesture) ||
              reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP)))
         {

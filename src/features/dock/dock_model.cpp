@@ -10,13 +10,12 @@ void reach_dock_feature_model_init(reach_dock_feature_model *model)
     *model = {};
 }
 
-int32_t reach_dock_key_equal(const reach_dock_order_key *a, const reach_dock_order_key *b)
+int32_t reach_dock_item_identity_equal(const reach_dock_item_model *item, const uint16_t *path,
+                                       const uint16_t *app_user_model_id)
 {
-    if (a == nullptr || b == nullptr)
-    {
-        return 0;
-    }
-    return a->pinned == b->pinned && a->app_id != 0 && a->app_id == b->app_id;
+    return item != nullptr && reach_window_tracking_identity_equal(item->path,
+                                                                   item->app_user_model_id, path,
+                                                                   app_user_model_id);
 }
 
 uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *model, size_t index)
@@ -25,43 +24,23 @@ uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *mo
     {
         return 0;
     }
-    return model->items[index].app_id;
+    return model->items[index].pin_id;
 }
 
-reach_dock_order_key reach_dock_item_key_at(const reach_dock_feature_model *model, size_t index)
+uint32_t reach_dock_item_key_at(const reach_dock_feature_model *model, size_t index)
 {
-    reach_dock_order_key key = {};
-    if (model == nullptr || index >= model->item_count)
-    {
-        return key;
-    }
-    key.pinned = model->items[index].pinned;
-    key.app_id = model->items[index].app_id;
-    return key;
+    return model != nullptr && index < model->item_count ? model->items[index].key : 0;
 }
 
-int32_t reach_dock_feature_model_item_matches_key(const reach_dock_feature_model *model,
-                                                  size_t index, reach_dock_order_key key)
+size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *model, uint32_t key)
 {
-    if (model == nullptr || index >= model->item_count)
-    {
-        return 0;
-    }
-
-    reach_dock_order_key item_key = reach_dock_item_key_at(model, index);
-    return reach_dock_key_equal(&item_key, &key);
-}
-
-size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *model,
-                                              reach_dock_order_key key)
-{
-    if (model == nullptr)
+    if (model == nullptr || key == 0)
     {
         return REACH_MAX_DOCK_ITEMS;
     }
     for (size_t index = 0; index < model->item_count; ++index)
     {
-        if (reach_dock_feature_model_item_matches_key(model, index, key))
+        if (model->items[index].key == key)
         {
             return index;
         }
@@ -69,16 +48,15 @@ size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *mo
     return REACH_MAX_DOCK_ITEMS;
 }
 
-size_t reach_dock_feature_model_find_order_key(const reach_dock_feature_model *model,
-                                               reach_dock_order_key key)
+size_t reach_dock_feature_model_find_order_key(const reach_dock_feature_model *model, uint32_t key)
 {
-    if (model == nullptr)
+    if (model == nullptr || key == 0)
     {
         return REACH_MAX_DOCK_ITEMS;
     }
     for (size_t index = 0; index < model->order_count; ++index)
     {
-        if (reach_dock_key_equal(&model->order[index], &key))
+        if (model->order[index] == key)
         {
             return index;
         }
@@ -95,7 +73,7 @@ void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t
         return;
     }
 
-    reach_dock_order_key key = model->order[source];
+    uint32_t key = model->order[source];
     if (source < target)
     {
         for (size_t index = source; index < target; ++index)
@@ -178,16 +156,17 @@ size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_mode
     }
 
     size_t pinned_index = 0;
-    for (size_t index = 0; index < model->order_count; ++index)
+    for (size_t index = 0; index < model->item_count; ++index)
     {
-        if (model->order[index].pinned)
+        if (!model->items[index].pinned)
         {
-            if (model->order[index].app_id == pin_id)
-            {
-                return pinned_index;
-            }
-            ++pinned_index;
+            continue;
         }
+        if (model->items[index].pin_id == pin_id)
+        {
+            return pinned_index;
+        }
+        ++pinned_index;
     }
     return REACH_MAX_DOCK_ITEMS;
 }

@@ -63,16 +63,14 @@ reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature
     {
         action.type = REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW;
         action.window = item->window;
-        action.pinned_index = item->pinned_index;
-        action.pin_id = item->pinned ? item->app_id : 0;
+        action.pin_id = item->pin_id;
         return action;
     }
 
-    if (item->pinned)
+    if (item->path[0] != 0)
     {
         action.type = REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED;
-        action.pinned_index = item->pinned_index;
-        action.pin_id = item->app_id;
+        action.pin_id = item->pin_id;
     }
 
     return action;
@@ -124,8 +122,8 @@ static void reach_dock_drag_begin(reach_dock *dock, size_t index, int32_t x, int
         return;
     }
 
-    reach_dock_order_key key = reach_dock_item_key_at(&state->model, index);
-    uint64_t target = ((uint64_t)(key.pinned ? 1 : 0) << 32) | key.app_id;
+    uint32_t key = reach_dock_item_key_at(&state->model, index);
+    uint64_t target = (uint64_t)key;
     reach_draggable_begin(&state->drag.gesture, target, x, y);
     state->drag.target_index = index;
     state->drag.key = key;
@@ -220,14 +218,15 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
         return;
     }
 
-    uint32_t pin_id = state->drag.key.pinned ? state->drag.key.app_id : 0;
-    int32_t dragged_pinned = state->drag.key.pinned;
+    size_t target_index = reach_dock_feature_model_find_item_key(&state->model, state->drag.key);
+    uint32_t pin_id = target_index < state->model.item_count
+                          ? reach_dock_feature_model_item_pin_id(&state->model, target_index)
+                          : 0;
+    int32_t dragged_pinned = pin_id != 0;
     int32_t moved = reach_draggable_moved(&state->drag.gesture);
     size_t target_pinned_index =
         dragged_pinned ? reach_dock_feature_model_pinned_order_index(&state->model, pin_id)
                        : REACH_MAX_DOCK_ITEMS;
-
-    size_t target_index = reach_dock_feature_model_find_item_key(&state->model, state->drag.key);
 
     reach_draggable_end(&state->drag.gesture, nullptr);
     out->redraw = 1;
