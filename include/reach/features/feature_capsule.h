@@ -137,6 +137,11 @@ extern "C"
 
         void (*handle_event)(void *capsule, const reach_ui_event *event,
                              reach_capsule_event_result *out);
+
+        /* Which of this surface's own controls sits under a screen point, so a press can be
+           matched against the control a popup hangs off without naming either feature. */
+        int32_t (*control_at_point)(const void *capsule, int32_t screen_x, int32_t screen_y,
+                                    reach_feature_control *out);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

@@ -23,32 +23,63 @@ static int32_t reach_host_surface_contains_point(const reach_feature_runtime *de
            (float)point.y >= bounds.y && (float)point.y <= bounds.y + bounds.height;
 }
 
-static int32_t
-reach_host_bar_cluster_holds_surface_open(reach_host *host, const reach_feature_runtime *desc,
-                                          reach_dock_pointer_region dock_region,
-                                          reach_top_bar_pointer_region top_bar_region)
+/* A press on the control a surface hangs off belongs to that control, not to the dismissal
+   hook: the control's own handler decides whether to toggle, replace or leave the surface
+   alone. The control is named by the surface's layout anchor, or declared outright by a
+   surface that has no anchor. */
+static int32_t reach_host_press_holds_surface_open(reach_host *host,
+                                                   const reach_feature_runtime *desc,
+                                                   reach_point_i32 point)
 {
-    (void)host;
-    switch (desc->definition->id)
+    const reach_surface_spec *spec = &desc->definition->surface;
+    reach_feature_layout_anchor anchor = {};
+    int32_t match_index = 0;
+
+    if (spec->dismiss_guard_surface < REACH_HOST_SURFACE_COUNT)
     {
-    case REACH_SURFACE_ID_TRAY:
-        return top_bar_region == REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW;
-    case REACH_SURFACE_ID_QUICK_SETTINGS:
-        return top_bar_region == REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON;
-    case REACH_SURFACE_ID_BATTERY:
-        return top_bar_region == REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON;
-    case REACH_SURFACE_ID_CONTEXT_MENU:
-        return reach_context_menu_state_ptr(reach_host_feature_capsule<reach_context_menu>(
-                                                host, REACH_SURFACE_ID_CONTEXT_MENU))
-                   ->power_open &&
-               top_bar_region == REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
-    case REACH_SURFACE_ID_LAUNCHER:
-        return dock_region != REACH_DOCK_POINTER_REGION_NONE;
-    case REACH_SURFACE_ID_STAGE:
-        return dock_region == REACH_DOCK_POINTER_REGION_TRIGGER;
-    default:
+        anchor.surface = spec->dismiss_guard_surface;
+        anchor.slot = spec->dismiss_guard_slot;
+    }
+    else
+    {
+        anchor.surface = desc->definition->layout.anchor;
+        anchor.slot = desc->definition->layout.anchor_slot;
+        if (desc->definition->surface_ops != nullptr &&
+            desc->definition->surface_ops->layout_anchor != nullptr)
+        {
+            if (!desc->definition->surface_ops->layout_anchor(desc->capsule, &anchor))
+            {
+                return 0;
+            }
+            match_index = 1;
+        }
+    }
+
+    if (anchor.surface >= REACH_HOST_SURFACE_COUNT)
+    {
         return 0;
     }
+
+    const reach_feature_runtime *owner = &host->feature_runtimes[anchor.surface];
+    if (owner->capsule == nullptr || owner->definition->capsule_ops == nullptr ||
+        owner->definition->capsule_ops->control_at_point == nullptr)
+    {
+        return 0;
+    }
+
+    reach_feature_control control = {};
+    if (!owner->definition->capsule_ops->control_at_point(owner->capsule, point.x, point.y,
+                                                          &control) ||
+        !control.valid)
+    {
+        return 0;
+    }
+
+    if (spec->dismiss_guard_any_control)
+    {
+        return 1;
+    }
+    return control.slot == anchor.slot && (!match_index || control.index == anchor.index);
 }
 
 static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i32 point)
@@ -57,23 +88,6 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
     {
         return;
     }
-
-    reach_point_i32 dock_point = host->has_layout
-                                     ? reach_dock_local_point(&host->layout.dock, point.x, point.y)
-                                     : reach_point_i32{};
-    reach_dock_pointer_region dock_region =
-        host->has_layout ? reach_dock_pointer_region_at(
-                               reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
-                               dock_point.x, dock_point.y)
-                         : REACH_DOCK_POINTER_REGION_NONE;
-
-    const reach_top_bar_state *top_bar_state = reach_top_bar_state_ptr(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR));
-    reach_point_i32 top_bar_point =
-        reach_top_bar_local_point(&top_bar_state->layout, point.x, point.y);
-    reach_top_bar_pointer_region top_bar_region = reach_top_bar_pointer_region_at(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), top_bar_point.x,
-        top_bar_point.y);
 
     int32_t closed_any = 0;
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
@@ -86,7 +100,7 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
         }
         if (!reach_host_surface_closable(desc) || !reach_host_surface_is_open(desc) ||
             reach_host_surface_contains_point(desc, point) ||
-            reach_host_bar_cluster_holds_surface_open(host, desc, dock_region, top_bar_region))
+            reach_host_press_holds_surface_open(host, desc, point))
         {
             continue;
         }

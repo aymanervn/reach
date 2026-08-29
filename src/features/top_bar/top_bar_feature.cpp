@@ -1279,6 +1279,42 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
     reach_top_bar_capsule_apply_event_result(&event_result, out);
 }
 
+static int32_t reach_top_bar_capsule_control_at_point(const void *capsule, int32_t screen_x,
+                                                      int32_t screen_y,
+                                                      reach_feature_control *out)
+{
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    if (top_bar == nullptr || out == nullptr)
+    {
+        return 0;
+    }
+
+    const reach_top_bar_layout *layout = &reach_top_bar_state_ptr(top_bar)->layout;
+    reach_point_i32 local = reach_top_bar_local_point(layout, screen_x, screen_y);
+    reach_top_bar_pointer_region region =
+        reach_top_bar_pointer_region_at(top_bar, local.x, local.y);
+    *out = {};
+    switch (region)
+    {
+    case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
+        out->slot = REACH_TOP_BAR_CONTROL_TRAY;
+        break;
+    case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
+        out->slot = REACH_TOP_BAR_CONTROL_QUICK_SETTINGS;
+        break;
+    case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
+        out->slot = REACH_TOP_BAR_CONTROL_BATTERY;
+        break;
+    case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
+        out->slot = REACH_TOP_BAR_CONTROL_POWER;
+        break;
+    default:
+        return 0;
+    }
+    out->valid = 1;
+    return 1;
+}
+
 const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
@@ -1287,6 +1323,8 @@ const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
         reach_top_bar_capsule_needs_frame,    reach_top_bar_capsule_wants_pointer_move,
         reach_top_bar_capsule_handle_pointer, reach_top_bar_capsule_pointer_sequence_active,
         reach_top_bar_capsule_input_regions,  reach_top_bar_capsule_surface_geometry,
+        nullptr,                              nullptr,
+        reach_top_bar_capsule_control_at_point,
     };
     return &ops;
 }
