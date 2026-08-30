@@ -1190,6 +1190,11 @@ static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
     return reach_top_bar_capsule_pointer_sequence_active(capsule);
 }
 
+static int32_t reach_top_bar_capsule_pointer_capture_active(const void *capsule)
+{
+    return reach_top_bar_capsule_pointer_sequence_active(capsule);
+}
+
 static void reach_top_bar_capsule_surface_geometry(const void *capsule,
                                                    reach_feature_surface_geometry *out)
 {
@@ -1272,7 +1277,6 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
         reach_top_bar_pointer_leave(top_bar, &event_result);
         break;
     case REACH_POINTER_EVENT_WHEEL:
-    case REACH_POINTER_EVENT_MIDDLE:
     default:
         return;
     }
@@ -1323,7 +1327,8 @@ const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
         reach_top_bar_capsule_needs_frame,    reach_top_bar_capsule_wants_pointer_move,
         reach_top_bar_capsule_handle_pointer, reach_top_bar_capsule_pointer_sequence_active,
         reach_top_bar_capsule_input_regions,  reach_top_bar_capsule_surface_geometry,
-        nullptr,                              nullptr,
+        reach_top_bar_capsule_pointer_capture_active,
+        nullptr,
         reach_top_bar_capsule_control_at_point,
     };
     return &ops;

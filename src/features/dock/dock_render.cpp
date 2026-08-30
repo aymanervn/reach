@@ -168,7 +168,7 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     if (input->click_feedback_index == index)
     {
         reach_push_icon_press_feedback(commands, icon_box, icon_box_radius, icon.id,
-                                       theme->bar_click_feedback, input->click_feedback_opacity,
+                                       theme->dock_background, input->click_feedback_opacity,
                                        reach_dock_metrics_values.click_feedback_min_opacity);
     }
 }

@@ -550,7 +550,6 @@ static void reach_clipboard_capsule_handle_pointer(void *capsule, const reach_po
         reach_clipboard_scrollbar_release(clipboard, &event_result);
         reach_clipboard_cancel_press(clipboard, &event_result);
         break;
-    case REACH_POINTER_EVENT_MIDDLE:
     default:
         return;
     }

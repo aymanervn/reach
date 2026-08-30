@@ -32,6 +32,18 @@ reach_host_menu_open_context(reach_host *host, const reach_menu_request *request
     return ctx;
 }
 
+static reach_feature_layout_anchor reach_host_menu_owner(reach_surface_id surface, uint32_t slot,
+                                                          size_t index)
+{
+    reach_feature_layout_anchor owner = {};
+    owner.surface = surface;
+    owner.slot = slot;
+    owner.index = index;
+    return owner;
+}
+
+static void reach_host_watch_window_list_pointer(reach_host *host);
+
 static void reach_host_route_dock_item_context_menu(void *user, const reach_menu_request *request)
 {
     reach_host *host = static_cast<reach_host *>(user);
@@ -40,14 +52,27 @@ static void reach_host_route_dock_item_context_menu(void *user, const reach_menu
         return;
     }
 
+    reach_context_menu *menu =
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    reach_feature_layout_anchor owner = reach_host_menu_owner(
+        REACH_SURFACE_ID_DOCK, REACH_DOCK_CONTROL_ITEM, request->target_index);
+    reach_popup_activation_mode mode =
+        reach_context_menu_window_list_target(menu) == request->target_index
+            ? REACH_POPUP_ACTIVATION_REPLACE
+            : REACH_POPUP_ACTIVATION_TOGGLE;
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
-    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
+    if (reach_host_prepare_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU, &owner, mode) !=
+        REACH_POPUP_ACTIVATION_PRESENT)
+    {
+        reach_host_watch_window_list_pointer(host);
+        (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
+        return;
+    }
     reach_context_menu_open_context ctx = reach_host_menu_open_context(host, request);
-    reach_context_menu_open_for_item(
-        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
-        request->target_index, &ctx);
+    reach_context_menu_open_for_item(menu, request->target_index, &ctx);
     reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
-                                       request->drop_direction);
+                                        owner.surface, request->drop_direction);
+    reach_host_watch_window_list_pointer(host);
     if (reach_dock_retain_context_feedback(
             reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK)))
     {
@@ -70,7 +95,14 @@ static void reach_host_watch_window_list_pointer(reach_host *host)
 
 static void reach_host_open_window_list(reach_host *host, const reach_menu_request *request)
 {
-    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
+    reach_feature_layout_anchor owner = reach_host_menu_owner(
+        REACH_SURFACE_ID_DOCK, REACH_DOCK_CONTROL_ITEM, request->target_index);
+    if (reach_host_prepare_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU, &owner,
+                                            REACH_POPUP_ACTIVATION_PASSIVE) !=
+        REACH_POPUP_ACTIVATION_PRESENT)
+    {
+        return;
+    }
 
     reach_context_menu_window_entry entries[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
     size_t entry_count = request->window_count < REACH_CONTEXT_MENU_MAX_ITEMS
@@ -89,7 +121,7 @@ static void reach_host_open_window_list(reach_host *host, const reach_menu_reque
         reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
         request->target_index, &ctx);
     reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
-                                        request->drop_direction);
+                                        owner.surface, request->drop_direction);
     reach_host_watch_window_list_pointer(host);
 }
 
@@ -197,12 +229,21 @@ static void reach_host_route_top_bar_power_activated(void *user)
         return;
     }
 
-    reach_host_surface_opening(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_DOCK);
+    reach_feature_layout_anchor owner =
+        reach_host_menu_owner(REACH_SURFACE_ID_TOP_BAR, REACH_TOP_BAR_CONTROL_POWER, 0);
+    if (reach_host_prepare_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU, &owner,
+                                            REACH_POPUP_ACTIVATION_TOGGLE) !=
+        REACH_POPUP_ACTIVATION_PRESENT)
+    {
+        reach_host_watch_window_list_pointer(host);
+        return;
+    }
     reach_context_menu_open_context ctx = reach_host_menu_open_context(host, &request);
     reach_context_menu_open_power(
         reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU), &ctx);
     reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU,
-                                       request.drop_direction);
+                                        owner.surface, request.drop_direction);
+    reach_host_watch_window_list_pointer(host);
 }
 
 static void reach_host_route_top_bar_quick_settings_activated(void *user)
@@ -210,7 +251,7 @@ static void reach_host_route_top_bar_quick_settings_activated(void *user)
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr)
     {
-        reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS);
+        reach_host_toggle_registered_popup(host, REACH_SURFACE_ID_QUICK_SETTINGS);
     }
 }
 
@@ -219,7 +260,7 @@ static void reach_host_route_top_bar_battery_activated(void *user)
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr)
     {
-        reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_BATTERY);
+        reach_host_toggle_registered_popup(host, REACH_SURFACE_ID_BATTERY);
     }
 }
 
@@ -228,7 +269,7 @@ static void reach_host_route_top_bar_tray_overflow_activated(void *user)
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr)
     {
-        reach_host_toggle_registered_surface(host, REACH_SURFACE_ID_TRAY);
+        reach_host_toggle_registered_popup(host, REACH_SURFACE_ID_TRAY);
     }
 }
 

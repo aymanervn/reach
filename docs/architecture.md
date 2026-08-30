@@ -105,8 +105,9 @@ Every capsule also implements the uniform hooks in
 `pointer_sequence_active`, `handle_event`);
 composition orchestrates through these, so adding a feature costs no
 feature-specific composition code. `handle_pointer` carries the complete
-down/up/move/wheel/leave/cancel/context/middle stream so cleanup semantics do
-not fall back to feature-specific host branches.
+down/up/move/wheel/leave/cancel/context stream, with primary, secondary, and middle
+button identity on down/up, so cleanup semantics do not fall back to feature-specific
+host branches.
 The Dock is fully migrated to this contract: it owns press/release, item
 feedback, drag/reorder, middle/context actions, and cancellation. The Top Bar
 owns the same for its hosted buttons — power, tray icons, tray overflow, quick

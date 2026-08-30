@@ -1021,7 +1021,7 @@ static int32_t reach_context_menu_surface_layout_anchor(const void *capsule,
     }
     out->surface = state->power_open ? REACH_SURFACE_ID_TOP_BAR : REACH_SURFACE_ID_DOCK;
     out->slot = state->power_open ? REACH_TOP_BAR_CONTROL_POWER : REACH_DOCK_CONTROL_ITEM;
-    out->index = state->target_index;
+    out->index = state->power_open ? 0 : state->target_index;
     return 1;
 }
 

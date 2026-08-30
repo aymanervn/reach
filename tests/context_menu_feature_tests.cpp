@@ -206,10 +206,17 @@ static void test_capsule_owns_popup_pointer_policy(void)
     pointer.owner_trigger = 1;
     reach_capsule_pointer_result result = {};
     reach_context_menu_capsule_ops()->handle_pointer(menu, &pointer, &result);
+    expect_true(result.handled && result.continue_source_sequence &&
+                    !result.cancel_source_sequence &&
+                    result.action.kind == REACH_FEATURE_ACTION_NONE,
+                "the power menu preserves its primary owner sequence until toggle release");
+
+    pointer.owner_trigger = 0;
+    reach_context_menu_capsule_ops()->handle_pointer(menu, &pointer, &result);
     expect_true(result.handled && result.cancel_source_sequence &&
                     !result.continue_source_sequence &&
                     result.action.kind == REACH_FEATURE_ACTION_CLOSE_SELF,
-                "the context menu closes and cancels its primary owner sequence");
+                "the context menu closes and cancels an arbitrary outside primary press");
 
     pointer.button = REACH_POINTER_BUTTON_SECONDARY;
     reach_context_menu_capsule_ops()->handle_pointer(menu, &pointer, &result);
@@ -217,6 +224,21 @@ static void test_capsule_owns_popup_pointer_policy(void)
                     !result.cancel_source_sequence &&
                     result.action.kind == REACH_FEATURE_ACTION_CLOSE_SELF,
                 "the context menu closes before continuing an outside secondary press");
+
+    reach_context_menu_window_entry entry = {11, (const uint16_t *)L"one"};
+    ctx.anchor_button = {700.0f, 1000.0f, 40.0f, 40.0f};
+    ctx.bar_edge_y = 1000.0f;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.window_entries = &entry;
+    ctx.window_entry_count = 1;
+    reach_context_menu_open_window_list(menu, 3, &ctx);
+    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+    pointer.owner_trigger = 1;
+    reach_context_menu_capsule_ops()->handle_pointer(menu, &pointer, &result);
+    expect_true(result.handled && result.continue_source_sequence &&
+                    !result.cancel_source_sequence &&
+                    result.action.kind == REACH_FEATURE_ACTION_CLOSE_SELF,
+                "the passive window list closes without cancelling its Dock owner sequence");
 
     reach_context_menu_destroy(menu);
 }
