@@ -73,8 +73,10 @@ void reach_host_finish_surface_transitions(reach_host *host)
     int32_t was_visible[REACH_HOST_SURFACE_COUNT] = {};
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
         was_visible[index] =
-            reach_host_surface_transition_visible(host->feature_runtimes[index].transition);
+            runtime->presentation_visible ||
+            reach_host_surface_transition_visible(runtime->transition);
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
@@ -83,9 +85,13 @@ void reach_host_finish_surface_transitions(reach_host *host)
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
-        if (!was_visible[index] || runtime->definition == nullptr ||
-            reach_host_surface_transition_visible(runtime->transition) ||
-            reach_host_surface_is_open(runtime))
+        int32_t visible = reach_host_surface_transition_visible(runtime->transition);
+        if (runtime->definition != nullptr)
+        {
+            visible = visible || reach_host_surface_presented(runtime);
+        }
+        runtime->presentation_visible = visible;
+        if (!was_visible[index] || runtime->definition == nullptr || visible)
         {
             continue;
         }

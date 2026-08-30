@@ -11,8 +11,14 @@
 enum
 {
     REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION = 0,
+    REACH_LAUNCHER_ANIMATION_SURFACE_Y,
+    REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY,
+    REACH_LAUNCHER_ANIMATION_SURFACE_SCALE,
     REACH_LAUNCHER_ANIMATION_COUNT
 };
+
+static const float REACH_LAUNCHER_SURFACE_OFFSET = 8.0f;
+static const float REACH_LAUNCHER_SURFACE_SCALE = 1.08f;
 
 struct reach_launcher
 {
@@ -26,7 +32,109 @@ struct reach_launcher
     reach_launcher_layout pointer_layout;
     int32_t pointer_layout_valid;
     reach_transform_f32 pointer_transform;
+    double surface_open_seconds;
+    double surface_close_seconds;
+    float surface_dpi_scale;
+    int32_t surface_visible;
+    int32_t surface_target_open;
 };
+
+static int32_t reach_launcher_surface_animation_active(const reach_launcher *launcher)
+{
+    return launcher != nullptr &&
+           (reach_animation_manager_active(&launcher->animations,
+                                           REACH_LAUNCHER_ANIMATION_SURFACE_Y) ||
+            reach_animation_manager_active(&launcher->animations,
+                                           REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY) ||
+            reach_animation_manager_active(&launcher->animations,
+                                           REACH_LAUNCHER_ANIMATION_SURFACE_SCALE));
+}
+
+static void reach_launcher_reset_surface_animation(reach_launcher *launcher)
+{
+    if (launcher == nullptr)
+    {
+        return;
+    }
+    launcher->surface_visible = 0;
+    launcher->surface_target_open = 0;
+    reach_animation_manager_set(&launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y,
+                                REACH_LAUNCHER_SURFACE_OFFSET);
+    reach_animation_manager_set(&launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY,
+                                0.0f);
+    reach_animation_manager_set(&launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_SCALE,
+                                REACH_LAUNCHER_SURFACE_SCALE);
+}
+
+static void reach_launcher_configure_surface_animation(reach_launcher *launcher,
+                                                       const reach_theme *theme, float dpi_scale)
+{
+    if (launcher == nullptr)
+    {
+        return;
+    }
+    const reach_theme *resolved_theme = theme != nullptr ? theme : reach_theme_default();
+    launcher->surface_open_seconds = resolved_theme->surface_open_seconds;
+    launcher->surface_close_seconds = resolved_theme->surface_close_seconds;
+    launcher->surface_dpi_scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+}
+
+static void reach_launcher_set_surface_animation_open(reach_launcher *launcher, int32_t open)
+{
+    if (launcher == nullptr)
+    {
+        return;
+    }
+    int32_t target_open = open ? 1 : 0;
+    launcher->surface_target_open = target_open;
+    if (target_open)
+    {
+        if (!launcher->surface_visible)
+        {
+            launcher->surface_visible = 1;
+            reach_animation_manager_set(&launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y,
+                                        REACH_LAUNCHER_SURFACE_OFFSET);
+            reach_animation_manager_set(&launcher->animations,
+                                        REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY, 0.0f);
+            reach_animation_manager_set(&launcher->animations,
+                                        REACH_LAUNCHER_ANIMATION_SURFACE_SCALE,
+                                        REACH_LAUNCHER_SURFACE_SCALE);
+        }
+        reach_animation_manager_animate_to(
+            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y, 0.0f,
+            launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
+        reach_animation_manager_animate_to(
+            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY, 1.0f,
+            launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
+        reach_animation_manager_animate_to(
+            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_SCALE, 1.0f,
+            launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
+    }
+    else if (launcher->surface_visible)
+    {
+        reach_animation_manager_animate_to(
+            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y,
+            REACH_LAUNCHER_SURFACE_OFFSET, launcher->surface_close_seconds,
+            REACH_EASING_EASE_IN);
+        reach_animation_manager_animate_to(
+            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY, 0.0f,
+            launcher->surface_close_seconds, REACH_EASING_EASE_IN);
+        reach_animation_manager_animate_to(
+            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_SCALE,
+            REACH_LAUNCHER_SURFACE_SCALE, launcher->surface_close_seconds,
+            REACH_EASING_EASE_IN);
+    }
+}
+
+static void reach_launcher_finish_surface_animation(reach_launcher *launcher)
+{
+    if (launcher == nullptr || launcher->surface_target_open || !launcher->surface_visible ||
+        reach_launcher_surface_animation_active(launcher))
+    {
+        return;
+    }
+    reach_launcher_reset_surface_animation(launcher);
+}
 
 static int32_t reach_launcher_results_attached(const reach_launcher_state *state)
 {
@@ -94,6 +202,7 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     {
         return 0;
     }
+    reach_launcher_configure_surface_animation(launcher, ctx->theme, ctx->dpi_scale);
 
     reach_ui_layout_input input = {};
     input.monitor_bounds = ctx->monitor_bounds;
@@ -488,6 +597,8 @@ reach_result reach_launcher_create(reach_launcher **out_launcher)
     }
     reach_animation_manager_init(&launcher->animations, launcher->animation_tracks,
                                  REACH_LAUNCHER_ANIMATION_COUNT);
+    reach_launcher_configure_surface_animation(launcher, reach_theme_default(), 1.0f);
+    reach_launcher_reset_surface_animation(launcher);
     reach_animation_manager_set(&launcher->animations, REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION,
                                 0.0f);
     reach_launcher_state_init(&launcher->state);
@@ -580,6 +691,7 @@ int32_t reach_launcher_set_open(reach_launcher *launcher, int32_t open)
     {
         (void)reach_launcher_close_state(&launcher->state);
     }
+    reach_launcher_set_surface_animation_open(launcher, open);
     return 1;
 }
 
@@ -899,18 +1011,28 @@ static void reach_launcher_capsule_tick(void *capsule, double delta_seconds,
         launcher != nullptr &&
         reach_animation_manager_active(&launcher->animations,
                                        REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION);
+    int32_t surface_was_active = reach_launcher_surface_animation_active(launcher);
+    int32_t surface_was_visible = launcher != nullptr && launcher->surface_visible;
     if (launcher != nullptr)
     {
         reach_animation_manager_tick(&launcher->animations, delta_seconds);
+        reach_launcher_finish_surface_animation(launcher);
     }
     int32_t expansion_active =
         launcher != nullptr &&
         reach_animation_manager_active(&launcher->animations,
                                        REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION);
+    int32_t surface_active = reach_launcher_surface_animation_active(launcher);
+    int32_t surface_visible = launcher != nullptr && launcher->surface_visible;
     if (out != nullptr && (reach_launcher_tick_caret(launcher, delta_seconds) ||
-                           expansion_was_active || expansion_active))
+                           expansion_was_active || expansion_active || surface_was_active ||
+                           surface_active || surface_was_visible != surface_visible))
     {
         out->redraw = 1;
+    }
+    if (out != nullptr && surface_visible)
+    {
+        out->request_update = 1;
     }
 }
 
@@ -922,7 +1044,9 @@ static int32_t reach_launcher_capsule_is_open(const void *capsule)
 
 static int32_t reach_launcher_capsule_needs_frame(const void *capsule)
 {
-    return reach_launcher_capsule_is_open(capsule);
+    const reach_launcher *launcher = static_cast<const reach_launcher *>(capsule);
+    return reach_launcher_capsule_is_open(capsule) ||
+           (launcher != nullptr && launcher->surface_visible);
 }
 
 static int32_t reach_launcher_capsule_wants_pointer_move(const void *capsule)
@@ -1210,6 +1334,7 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
     {
         return;
     }
+    *out = {};
     const reach_launcher *launcher = static_cast<const reach_launcher *>(capsule);
     if (launcher == nullptr || !launcher->pointer_layout_valid)
     {
@@ -1225,6 +1350,15 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
                                 : collapsed_height;
     out->visible_bounds.height = collapsed_height + (expanded_height - collapsed_height) *
                                                         reach_launcher_results_expansion(launcher);
+    out->presentation.managed = 1;
+    out->presentation.opacity = reach_animation_manager_value(
+        &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY);
+    out->presentation.y_offset =
+        reach_animation_manager_value(&launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y) *
+        launcher->surface_dpi_scale;
+    out->presentation.scale = reach_animation_manager_value(
+        &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_SCALE);
+    out->presentation.max_scale = REACH_LAUNCHER_SURFACE_SCALE;
 }
 
 const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)

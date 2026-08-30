@@ -449,7 +449,6 @@ static void test_registered_transition_completion(void)
     transition.visible = 1;
     transition.y_track = 0;
     transition.opacity_track = 1;
-    transition.scale_track = REACH_HOST_ANIMATION_COUNT;
     host->feature_runtimes[REACH_SURFACE_ID_SYSTEM_HUD].transition = &transition;
 
     reach_host_finish_surface_transitions(host);
@@ -462,30 +461,15 @@ static void test_registered_transition_completion(void)
 
 static void test_scaled_transition_keeps_native_envelope_stationary(void)
 {
-    reach_host *host = &transition_frame_host;
-    reach_animation_track tracks[REACH_HOST_ANIMATION_COUNT] = {};
-    reach_animation_manager_init(&host->animations, tracks, REACH_HOST_ANIMATION_COUNT);
-    host->layout_dpi_scale = 1.25f;
-
-    reach_host_surface_transition transition = {};
-    transition.visible = 1;
-    transition.y_track = 0;
-    transition.opacity_track = 1;
-    transition.scale_track = 2;
-    transition.start_scale = REACH_HOST_TRANSITION_SCALE_IN;
-
-    reach_animation_manager_set(&host->animations, transition.scale_track, 1.04f);
-    reach_animation_manager_set(&host->animations, transition.y_track, 8.0f);
     reach_host_surface_transition_frame offset_frame =
-        reach_host_surface_transition_frame_compute_in_envelope(
-            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f},
-            {});
+        reach_host_surface_presentation_frame_compute(
+            {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f}, {}, 10.0f,
+            1.04f, 1.08f);
 
-    reach_animation_manager_set(&host->animations, transition.y_track, 0.0f);
     reach_host_surface_transition_frame settled_frame =
-        reach_host_surface_transition_frame_compute_in_envelope(
-            host, &transition, {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f},
-            {});
+        reach_host_surface_presentation_frame_compute(
+            {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f}, {}, 0.0f,
+            1.04f, 1.08f);
 
     expect_true(
         reach_host_scalar_equal(offset_frame.window_bounds.y, settled_frame.window_bounds.y),
@@ -815,9 +799,14 @@ static void test_registered_feature_lifecycle(void)
 
     const reach_feature_definition *launcher =
         host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].definition;
-    expect_true(launcher->surface.scale_in_envelope &&
-                    launcher->surface_ops->set_pointer_transform != nullptr,
-                "Launcher declares its envelope transform contract");
+    expect_true(launcher->surface_ops->set_pointer_transform != nullptr &&
+                    host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].transition == nullptr,
+                "Launcher owns its presentation while composition applies its transform");
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_TRAY].transition == nullptr &&
+                    host->feature_runtimes[REACH_SURFACE_ID_QUICK_SETTINGS].transition == nullptr &&
+                    host->feature_runtimes[REACH_SURFACE_ID_BATTERY].transition == nullptr &&
+                    host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU].transition == nullptr,
+                "popup capsules own their shared presentation");
     expect_true(host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU]
                         .definition->surface_ops->layout_anchor != nullptr,
                 "Context Menu declares runtime-selected layout anchoring");

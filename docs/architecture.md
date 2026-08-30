@@ -527,12 +527,19 @@ A deferred launch is keyed on the surface that requested it, so composition wait
 surface's own close transition before running the launch rather than testing one named feature.
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
 own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
-pass. A surface also declares how it animates in — `settle_from_above` and `start_scale` on its
-spec — so transition setup is one loop over the runtime table rather than a list of features; the per-surface frame steps
+pass. Capsules also own feature-specific presentation animation. Launcher keeps its offset,
+opacity, and proportional scale tracks beside its results-expansion track in the Launcher animation
+manager. Popup capsules embed the shared `features/common/popup` transition, which owns direction,
+timing, reversal, and close visibility. Their geometry publishes only generic presentation values;
+composition applies those values to the platform window and, for scaled presentation, maintains a
+stable maximum envelope plus matching render and pointer transforms. Registry entries and popup
+call sites do not carry animation direction or scale policy. Surfaces that still use the generic
+host transition receive distinct indexed offset and opacity tracks. The per-surface frame steps
 (`host_surface_frames.cpp`, layout refresh → transition → window state →
 corners → show/render) run as one loop over the table in definition `layout.priority`
 order against a shared `reach_host_frame_context`. Transition completion is runtime-driven:
-every non-null runtime transition is finalized by the generic animation tick. Every definition
+composition observes both capsule-owned presentation and non-null runtime transitions before
+delivering `surface_hidden` and restoring focus. Every definition
 exposes uniform `surface_ops` for
 arrangement and render-command production. `reach_host_frame_registered_surface`
 then resolves the declared layout anchor, applies window geometry and visibility,

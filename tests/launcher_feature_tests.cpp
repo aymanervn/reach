@@ -187,17 +187,31 @@ int main()
     failed += expect_close(geometry.envelope_bounds.y, expansion_layout.bounds.y);
     failed +=
         expect_close(geometry.envelope_bounds.height, expansion_layout.envelope_bounds.height);
+    failed += expect(geometry.presentation.managed == 1);
+    failed += expect_close(geometry.presentation.opacity, 0.0f);
+    failed += expect_close(geometry.presentation.y_offset, 8.0f);
+    failed += expect_close(geometry.presentation.scale, 1.08f);
+    failed += expect_close(geometry.presentation.max_scale, 1.08f);
 
     reach_feature_tick_result tick = {};
     capsule_ops->tick(capsule, 0.08, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect(geometry.visible_bounds.height > expansion_layout.search_box.height &&
                      geometry.visible_bounds.height < expansion_layout.bounds.height);
+    failed += expect(geometry.presentation.opacity > 0.0f &&
+                     geometry.presentation.opacity < 1.0f);
+    failed += expect(geometry.presentation.y_offset > 0.0f &&
+                     geometry.presentation.y_offset < 8.0f);
+    failed += expect(geometry.presentation.scale > 1.0f &&
+                     geometry.presentation.scale < 1.08f);
     failed += expect(tick.redraw == 1);
     tick = {};
     capsule_ops->tick(capsule, 0.16, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect_close(geometry.visible_bounds.height, expansion_layout.bounds.height);
+    failed += expect_close(geometry.presentation.opacity, 1.0f);
+    failed += expect_close(geometry.presentation.y_offset, 0.0f);
+    failed += expect_close(geometry.presentation.scale, 1.0f);
 
     float result_row_height =
         expansion_layout.search_result_items.height / (float)state->model.result_count;
@@ -242,6 +256,18 @@ int main()
 
     (void)route(capsule, REACH_UI_EVENT_ESCAPE, 0);
     failed += expect(state->model.open == 0);
+    tick = {};
+    capsule_ops->tick(capsule, 0.06, &tick);
+    capsule_ops->surface_geometry(capsule, &geometry);
+    failed += expect(geometry.presentation.opacity > 0.0f &&
+                     geometry.presentation.opacity < 1.0f);
+    failed += expect(geometry.presentation.y_offset > 0.0f &&
+                     geometry.presentation.y_offset < 8.0f);
+    failed += expect(geometry.presentation.scale > 1.0f &&
+                     geometry.presentation.scale < 1.08f);
+    tick = {};
+    capsule_ops->tick(capsule, 0.12, &tick);
+    failed += expect(capsule_ops->needs_frame(capsule) == 0);
     reach_launcher_surface_hidden(capsule);
     failed += expect(state->model.result_count == 0);
     failed += expect(state->model.query_length == 0);

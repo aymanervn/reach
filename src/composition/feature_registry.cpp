@@ -711,27 +711,29 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               0, nullptr, reach_top_bar_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, 1, nullptr, reach_launcher_capsule_ops(),
+        host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, 0, nullptr,
+        reach_launcher_capsule_ops(),
         REACH_SURFACE_POINTER_RELAYOUT_REDRAWS | REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT, 1, reach_host_surface_clipboard_close,
-        reach_clipboard_feature_capsule_ops(), REACH_SURFACE_POINTER_SOURCE_GATED);
-    reach_host_define_feature(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP, 1, reach_host_surface_tray_close,
-                              reach_top_bar_tray_capsule_ops(),
+        host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT, 1,
+        reach_host_surface_clipboard_close, reach_clipboard_feature_capsule_ops(),
+        REACH_SURFACE_POINTER_SOURCE_GATED);
+    reach_host_define_feature(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP, 0,
+                              reach_host_surface_tray_close, reach_top_bar_tray_capsule_ops(),
                               REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_CLASS_POPUP, 1, reach_host_surface_quick_settings_close,
-        reach_quick_settings_capsule_ops(),
+        host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_CLASS_POPUP, 0,
+        reach_host_surface_quick_settings_close, reach_quick_settings_capsule_ops(),
         REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE | REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE);
-    reach_host_define_feature(host, REACH_SURFACE_ID_BATTERY, REACH_SURFACE_CLASS_POPUP,
-                              1,
+    reach_host_define_feature(host, REACH_SURFACE_ID_BATTERY, REACH_SURFACE_CLASS_POPUP, 0,
                               reach_host_surface_battery_close, reach_battery_capsule_ops(),
                               REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_SYSTEM_HUD, REACH_SURFACE_CLASS_PERSISTENT,
                               0, nullptr, reach_system_hud_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, 1, nullptr, reach_context_menu_capsule_ops(),
+        host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, 0, nullptr,
+        reach_context_menu_capsule_ops(),
         REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
     reach_host_define_feature(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY,
                               1, nullptr,
@@ -750,16 +752,13 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_CLIPBOARD].lifecycle.start = reach_feature_start_clipboard;
     definitions[REACH_SURFACE_ID_CLIPBOARD].lifecycle.stop = reach_feature_stop_clipboard;
     definitions[REACH_SURFACE_ID_TRAY].lifecycle.stop = reach_feature_stop_tray;
-    definitions[REACH_SURFACE_ID_TRAY].lifecycle.close_transition_on_stop = 1;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.attach =
         reach_feature_attach_quick_settings;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.start =
         reach_feature_start_quick_settings;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.stop = reach_feature_stop_quick_settings;
-    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.close_transition_on_stop = 1;
     definitions[REACH_SURFACE_ID_BATTERY].lifecycle.attach = reach_feature_attach_battery;
     definitions[REACH_SURFACE_ID_BATTERY].lifecycle.stop = reach_feature_stop_battery;
-    definitions[REACH_SURFACE_ID_BATTERY].lifecycle.close_transition_on_stop = 1;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.attach = reach_feature_attach_system_hud;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.stop = reach_feature_stop_system_hud;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].lifecycle.start = reach_feature_start_context_menu;
@@ -819,11 +818,6 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.close_on_persistent_press = 1;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.behavior_flags =
         REACH_SURFACE_BEHAVIOR_ACTIVATES | REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
-    definitions[REACH_SURFACE_ID_LAUNCHER].surface.scale_in_envelope = 1;
-    definitions[REACH_SURFACE_ID_LAUNCHER].surface.start_scale = REACH_HOST_TRANSITION_SCALE_IN;
-    definitions[REACH_SURFACE_ID_TRAY].surface.settle_from_above = 1;
-    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.settle_from_above = 1;
-    definitions[REACH_SURFACE_ID_BATTERY].surface.settle_from_above = 1;
     definitions[REACH_SURFACE_ID_TRAY].surface.role = REACH_SURFACE_TRAY_MENU;
     definitions[REACH_SURFACE_ID_TRAY].surface.pointer_priority = 40;
     definitions[REACH_SURFACE_ID_BATTERY].surface.role = REACH_SURFACE_BATTERY;

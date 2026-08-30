@@ -84,6 +84,47 @@ static void test_volume_icon_selection(void)
                 "high volume uses high icon");
 }
 
+static void test_popup_transition_owns_presentation(void)
+{
+    reach_popup_transition transition = {};
+    reach_popup_transition_init(&transition, REACH_POPUP_DROP_DOWN);
+    reach_popup_transition_configure(&transition, reach_theme_default(), 1.5f,
+                                     REACH_POPUP_DROP_DOWN);
+
+    expect_true(reach_popup_transition_set_open(&transition, 1),
+                "opening starts the shared popup transition");
+    reach_feature_surface_geometry geometry = {};
+    reach_popup_transition_presentation(&transition, &geometry);
+    expect_true(geometry.presentation.managed, "the popup reports managed presentation");
+    expect_near(geometry.presentation.opacity, 0.0f, 0.001f,
+                "the popup begins transparent");
+    expect_near(geometry.presentation.y_offset, -12.0f, 0.001f,
+                "a dropdown begins above its anchor at DPI-scaled distance");
+
+    (void)reach_popup_transition_tick(&transition, 1.0);
+    reach_popup_transition_presentation(&transition, &geometry);
+    expect_true(!reach_popup_transition_active(&transition),
+                "the settled popup does not request animation frames");
+    expect_true(reach_popup_transition_visible(&transition), "the settled popup stays visible");
+    expect_near(geometry.presentation.opacity, 1.0f, 0.001f,
+                "the popup settles opaque");
+    expect_near(geometry.presentation.y_offset, 0.0f, 0.001f,
+                "the popup settles on its anchor");
+
+    expect_true(reach_popup_transition_set_open(&transition, 0),
+                "closing reverses the shared popup transition");
+    (void)reach_popup_transition_tick(&transition, 1.0);
+    expect_true(!reach_popup_transition_visible(&transition),
+                "the popup hides after its close transition settles");
+
+    reach_popup_transition_configure(&transition, reach_theme_default(), 1.0f,
+                                     REACH_POPUP_DROP_UP);
+    reach_popup_transition_reset(&transition);
+    reach_popup_transition_presentation(&transition, &geometry);
+    expect_near(geometry.presentation.y_offset, 8.0f, 0.001f,
+                "an upward popup begins below its anchor");
+}
+
 static void test_expansion_keeps_popup_anchor_position(void)
 {
     reach_quick_settings *quick_settings = nullptr;
@@ -207,6 +248,7 @@ int main(void)
     test_model_clamps_volume();
     test_session_list_cap_is_respected();
     test_volume_icon_selection();
+    test_popup_transition_owns_presentation();
     test_expansion_keeps_popup_anchor_position();
     test_capsule_accepts_surface_local_pointer();
     test_capsule_owns_popup_pointer_policy();
