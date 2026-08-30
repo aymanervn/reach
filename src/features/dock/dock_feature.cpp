@@ -414,7 +414,7 @@ static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
 static int32_t reach_dock_capsule_pointer_capture_active(const void *capsule)
 {
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
-    return dock != nullptr && reach_draggable_tracking(&dock->state.drag.gesture);
+    return dock != nullptr && reach_pressable_tracking(&dock->state.pressable);
 }
 
 static void reach_dock_capsule_surface_geometry(const void *capsule,
@@ -578,11 +578,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         reach_pressable_press(&state->pressable, event->button, target, feedback_index, &feedback,
                               &pressable);
         reach_dock_capsule_apply_pressable_result(&pressable, out);
-        if (event->button == REACH_POINTER_BUTTON_SECONDARY)
-        {
-            out->handled = reach_pressable_tracking(&state->pressable);
-            return;
-        }
         if (hit.type == REACH_DOCK_HIT_TRIGGER)
         {
             out->handled = 1;
@@ -591,13 +586,18 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         }
         if (hit.type == REACH_DOCK_HIT_ITEM)
         {
-            reach_dock_interaction_result interaction = {};
-            reach_dock_item_press(dock, hit.index, reach_dock_capsule_screen_x(dock, event->x),
-                                  reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
-                                  &interaction);
-            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
             out->handled = 1;
-            out->control = {REACH_DOCK_CONTROL_ITEM, hit.index, 1};
+            out->control = {REACH_DOCK_CONTROL_ITEM, hit.index, 1,
+                            event->button == REACH_POINTER_BUTTON_SECONDARY};
+            if (event->button == REACH_POINTER_BUTTON_PRIMARY)
+            {
+                reach_dock_interaction_result interaction = {};
+                reach_dock_item_press(dock, hit.index,
+                                      reach_dock_capsule_screen_x(dock, event->x),
+                                      reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
+                                      &interaction);
+                reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
+            }
             return;
         }
         return;
@@ -656,6 +656,27 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                  hit.index < state->model.item_count)
         {
             size_t item_index = hit.index;
+            if (event->button == REACH_POINTER_BUTTON_MIDDLE)
+            {
+                out->handled = 1;
+                if (reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f,
+                                                  &dock->action_request) &&
+                    dock->action_request.path[0] != 0)
+                {
+                    out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
+                    out->action.flags |= REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE;
+                    out->action.target.kind = REACH_FEATURE_TARGET_APP;
+                    out->action.target.path = dock->action_request.path;
+                    out->action.target.arguments = dock->action_request.arguments[0] != 0
+                                                       ? dock->action_request.arguments
+                                                       : nullptr;
+                    out->action.target.app_user_model_id =
+                        dock->action_request.app_user_model_id[0] != 0
+                            ? dock->action_request.app_user_model_id
+                            : nullptr;
+                }
+                return;
+            }
             reach_dock_item_action item_action =
                 reach_dock_item_action_for_index(&state->model, item_index);
             out->handled = 1;
@@ -708,33 +729,6 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                 reach_dock_capsule_apply_pressable_result(&pressable, out);
             }
             out->handled = 1;
-        }
-        return;
-    }
-    if (event->kind == REACH_POINTER_EVENT_MIDDLE)
-    {
-        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
-        reach_pressable_result pressable = {};
-        reach_pressable_cancel(&state->pressable, &feedback, &pressable);
-        reach_dock_capsule_apply_pressable_result(&pressable, out);
-        if (hit.type == REACH_DOCK_HIT_ITEM)
-        {
-            out->handled = 1;
-            if (reach_dock_build_menu_request(dock, hit.index, 0.0f, 0.0f, &dock->action_request) &&
-                dock->action_request.path[0] != 0)
-            {
-                out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
-                out->action.flags |= REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE;
-                out->action.target.kind = REACH_FEATURE_TARGET_APP;
-                out->action.target.path = dock->action_request.path;
-                out->action.target.arguments = dock->action_request.arguments[0] != 0
-                                                   ? dock->action_request.arguments
-                                                   : nullptr;
-                out->action.target.app_user_model_id =
-                    dock->action_request.app_user_model_id[0] != 0
-                        ? dock->action_request.app_user_model_id
-                        : nullptr;
-            }
         }
         return;
     }

@@ -252,9 +252,6 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
         return;
     }
 
-    case REACH_POINTER_EVENT_MIDDLE:
-        return;
-
     case REACH_POINTER_EVENT_LEAVE:
     case REACH_POINTER_EVENT_CANCEL:
     {

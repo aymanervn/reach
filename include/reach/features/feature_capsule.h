@@ -28,8 +28,7 @@ extern "C"
         REACH_POINTER_EVENT_MOVE = 3,
         REACH_POINTER_EVENT_WHEEL = 4,
         REACH_POINTER_EVENT_LEAVE = 5,
-        REACH_POINTER_EVENT_CANCEL = 6,
-        REACH_POINTER_EVENT_MIDDLE = 8
+        REACH_POINTER_EVENT_CANCEL = 6
     } reach_pointer_event_kind;
 
     typedef enum reach_pointer_coordinate_space
@@ -50,6 +49,7 @@ extern "C"
         uint32_t slot;
         size_t index;
         int32_t valid;
+        int32_t popup_trigger;
     } reach_feature_control;
 
     typedef struct reach_pointer_event

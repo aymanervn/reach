@@ -296,22 +296,37 @@ static void reach_host_cancel_other_pointer_sequences(reach_host *host, reach_su
     }
 }
 
+int32_t reach_host_resolve_popup_owner(const reach_feature_runtime *popup,
+                                       reach_feature_layout_anchor *out)
+{
+    if (popup == nullptr || popup->definition == nullptr || out == nullptr)
+    {
+        return 0;
+    }
+    *out = {};
+    out->surface = popup->definition->layout.anchor;
+    out->slot = popup->definition->layout.anchor_slot;
+    if (popup->definition->surface_ops != nullptr &&
+        popup->definition->surface_ops->layout_anchor != nullptr)
+    {
+        (void)popup->definition->surface_ops->layout_anchor(popup->capsule, out);
+    }
+    return out->surface < REACH_HOST_SURFACE_COUNT;
+}
+
 int32_t reach_host_popup_owner_trigger(const reach_feature_runtime *popup,
                                        const reach_feature_runtime *source,
                                        const reach_capsule_pointer_result *source_result)
 {
-    if (popup == nullptr || source == nullptr || source_result == nullptr ||
-        !source_result->control.valid)
+    if (source == nullptr || source_result == nullptr || !source_result->control.valid)
     {
         return 0;
     }
 
     reach_feature_layout_anchor owner = {};
-    owner.surface = popup->definition->layout.anchor;
-    owner.slot = popup->definition->layout.anchor_slot;
-    if (popup->definition->surface_ops->layout_anchor != nullptr)
+    if (!reach_host_resolve_popup_owner(popup, &owner))
     {
-        (void)popup->definition->surface_ops->layout_anchor(popup->capsule, &owner);
+        return 0;
     }
     return owner.surface == source->definition->id && owner.slot == source_result->control.slot &&
            owner.index == source_result->control.index;
@@ -340,6 +355,10 @@ reach_host_route_open_popup_pointer_down(reach_host *host, const reach_ui_event 
         }
 
         int32_t owner_trigger = reach_host_popup_owner_trigger(popup, source, source_down);
+        if (!owner_trigger && source_down->control.popup_trigger)
+        {
+            return {REACH_OK, 0};
+        }
         reach_capsule_pointer_result popup_down = reach_host_dispatch_pointer_with_owner(
             host, popup->definition->id, event, REACH_POINTER_EVENT_DOWN, owner_trigger);
         if (!popup_down.handled && popup_down.action.kind == REACH_FEATURE_ACTION_NONE &&
@@ -438,14 +457,6 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
         return reach_host_handle_secondary_pointer_up(host, event, source);
     }
 
-    const reach_feature_runtime *exclusive = reach_host_pointer_exclusive_surface(host);
-    if (exclusive != nullptr)
-    {
-        reach_capsule_pointer_result exclusive_up = reach_host_dispatch_pointer(
-            host, exclusive->definition->id, event, REACH_POINTER_EVENT_UP);
-        return reach_host_apply_surface_action(host, exclusive->definition->id, &exclusive_up);
-    }
-
     const reach_feature_runtime *capture = reach_host_pointer_capture_owner(host, 0);
     if (capture != nullptr)
     {
@@ -457,6 +468,14 @@ static reach_result reach_host_handle_pointer_up(reach_host *host, const reach_u
             reach_host_cancel_other_pointer_sequences(host, capture->definition->id);
             return reach_host_apply_surface_action(host, capture->definition->id, &capture_up);
         }
+    }
+
+    const reach_feature_runtime *exclusive = reach_host_pointer_exclusive_surface(host);
+    if (exclusive != nullptr)
+    {
+        reach_capsule_pointer_result exclusive_up = reach_host_dispatch_pointer(
+            host, exclusive->definition->id, event, REACH_POINTER_EVENT_UP);
+        return reach_host_apply_surface_action(host, exclusive->definition->id, &exclusive_up);
     }
 
     reach_surface_id order[REACH_HOST_SURFACE_COUNT];
@@ -544,6 +563,7 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
     if (source_runtime != nullptr)
     {
         if (source_down.handled && event->button == REACH_POINTER_BUTTON_PRIMARY &&
+            !source_down.control.popup_trigger &&
             source_runtime->definition->surface.cls == REACH_SURFACE_CLASS_PERSISTENT)
         {
             reach_host_close_surfaces_on_persistent_press(host);
@@ -620,30 +640,6 @@ static reach_result reach_host_handle_pointer_move(reach_host *host, const reach
         {
             return reach_host_apply_surface_action(host, desc->definition->id, &move);
         }
-    }
-
-    return REACH_OK;
-}
-
-static reach_result reach_host_handle_pointer_middle(reach_host *host, const reach_ui_event *event,
-                                                     reach_surface_role source)
-{
-    if (host == nullptr || event == nullptr || !host->has_layout)
-    {
-        return REACH_OK;
-    }
-
-    reach_capsule_pointer_result tray_middle =
-        reach_host_dispatch_pointer(host, REACH_SURFACE_ID_TRAY, event, REACH_POINTER_EVENT_MIDDLE);
-    (void)reach_host_apply_surface_action(host, REACH_SURFACE_ID_TRAY, &tray_middle);
-
-    const reach_feature_runtime *src = reach_host_surface_for_role(host, source);
-    if (src != nullptr && src->definition->id != REACH_SURFACE_ID_TRAY &&
-        src->definition->capsule_ops->handle_pointer != nullptr)
-    {
-        reach_capsule_pointer_result middle = reach_host_dispatch_pointer(
-            host, src->definition->id, event, REACH_POINTER_EVENT_MIDDLE);
-        return reach_host_apply_surface_action(host, src->definition->id, &middle);
     }
 
     return REACH_OK;
@@ -764,11 +760,6 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     if (event->type == REACH_UI_EVENT_POINTER_WHEEL)
     {
         return reach_host_handle_pointer_wheel(host, event);
-    }
-
-    if (event->type == REACH_UI_EVENT_POINTER_MIDDLE)
-    {
-        return reach_host_handle_pointer_middle(host, event, source);
     }
 
     if (event->type == REACH_UI_EVENT_POINTER_LEAVE)

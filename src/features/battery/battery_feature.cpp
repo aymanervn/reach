@@ -432,7 +432,7 @@ static void reach_battery_capsule_handle_pointer(void *capsule, const reach_poin
         out->handled = 1;
         out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         out->cancel_source_sequence = event->button == REACH_POINTER_BUTTON_PRIMARY;
-        out->continue_source_sequence = event->button == REACH_POINTER_BUTTON_SECONDARY;
+        out->continue_source_sequence = event->button != REACH_POINTER_BUTTON_PRIMARY;
         return;
     }
     reach_battery_pointer_action_kind action =

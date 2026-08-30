@@ -290,6 +290,20 @@ typedef struct reach_feature_layout_anchor
     size_t index;
 } reach_feature_layout_anchor;
 
+typedef enum reach_popup_activation_mode
+{
+    REACH_POPUP_ACTIVATION_TOGGLE = 0,
+    REACH_POPUP_ACTIVATION_PASSIVE = 1,
+    REACH_POPUP_ACTIVATION_REPLACE = 2
+} reach_popup_activation_mode;
+
+typedef enum reach_popup_activation_decision
+{
+    REACH_POPUP_ACTIVATION_NONE = 0,
+    REACH_POPUP_ACTIVATION_PRESENT = 1,
+    REACH_POPUP_ACTIVATION_CLOSE = 2
+} reach_popup_activation_decision;
+
 typedef struct reach_feature_native_overlay_item
 {
     reach_window_id source;
@@ -451,8 +465,15 @@ void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
 void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
                                         reach_rect_f32 bounds, int32_t enabled);
 void reach_host_close_surfaces_on_persistent_press(reach_host *host);
+reach_popup_activation_decision reach_host_popup_activation_decide(
+    int32_t open, const reach_feature_layout_anchor *current,
+    const reach_feature_layout_anchor *requested, reach_popup_activation_mode mode);
+reach_popup_activation_decision reach_host_prepare_registered_popup(
+    reach_host *host, reach_surface_id id, const reach_feature_layout_anchor *owner,
+    reach_popup_activation_mode mode);
+void reach_host_toggle_registered_popup(reach_host *host, reach_surface_id id);
 void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
-                                         int32_t drop_direction);
+                                         reach_surface_id origin, int32_t drop_direction);
 int32_t reach_host_surface_closable(const reach_feature_runtime *runtime);
 void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtime *runtime,
                                           int32_t open);
@@ -744,6 +765,8 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
 int32_t reach_host_popup_owner_trigger(const reach_feature_runtime *popup,
                                        const reach_feature_runtime *source,
                                        const reach_capsule_pointer_result *source_result);
+int32_t reach_host_resolve_popup_owner(const reach_feature_runtime *popup,
+                                       reach_feature_layout_anchor *out);
 
 void reach_host_request_update(reach_host *host);
 void reach_host_on_registered_surface_event(void *user, const reach_ui_event *event);

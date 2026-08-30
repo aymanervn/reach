@@ -11,7 +11,8 @@ extern "C"
     typedef enum reach_pointer_button
     {
         REACH_POINTER_BUTTON_PRIMARY = 0,
-        REACH_POINTER_BUTTON_SECONDARY = 1
+        REACH_POINTER_BUTTON_SECONDARY = 1,
+        REACH_POINTER_BUTTON_MIDDLE = 2
     } reach_pointer_button;
 
     typedef enum reach_ui_event_type
@@ -24,7 +25,6 @@ extern "C"
         REACH_UI_EVENT_WALLPAPER_CHANGED = 9,
         REACH_UI_EVENT_POINTER_MOVE = 10,
         REACH_UI_EVENT_POINTER_LEAVE = 11,
-        REACH_UI_EVENT_POINTER_MIDDLE = 12,
         REACH_UI_EVENT_POINTER_DOWN = 13,
         REACH_UI_EVENT_APP_SWITCH_BEGIN = 14,
         REACH_UI_EVENT_APP_SWITCH_NEXT = 15,

@@ -586,14 +586,86 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
     reach_host_apply_feature_tick_result(host, runtime, &result);
 }
 
+static int32_t reach_host_layout_anchor_equal(const reach_feature_layout_anchor *left,
+                                              const reach_feature_layout_anchor *right)
+{
+    return left != nullptr && right != nullptr && left->surface == right->surface &&
+           left->slot == right->slot && left->index == right->index;
+}
+
+reach_popup_activation_decision reach_host_popup_activation_decide(
+    int32_t open, const reach_feature_layout_anchor *current,
+    const reach_feature_layout_anchor *requested, reach_popup_activation_mode mode)
+{
+    if (requested == nullptr || requested->surface >= REACH_HOST_SURFACE_COUNT)
+    {
+        return REACH_POPUP_ACTIVATION_NONE;
+    }
+    if (!open || !reach_host_layout_anchor_equal(current, requested))
+    {
+        return REACH_POPUP_ACTIVATION_PRESENT;
+    }
+    if (mode == REACH_POPUP_ACTIVATION_REPLACE)
+    {
+        return REACH_POPUP_ACTIVATION_PRESENT;
+    }
+    return mode == REACH_POPUP_ACTIVATION_TOGGLE ? REACH_POPUP_ACTIVATION_CLOSE
+                                                 : REACH_POPUP_ACTIVATION_NONE;
+}
+
+reach_popup_activation_decision reach_host_prepare_registered_popup(
+    reach_host *host, reach_surface_id id, const reach_feature_layout_anchor *owner,
+    reach_popup_activation_mode mode)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return REACH_POPUP_ACTIVATION_NONE;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    if (runtime->definition == nullptr ||
+        runtime->definition->surface.cls != REACH_SURFACE_CLASS_POPUP)
+    {
+        return REACH_POPUP_ACTIVATION_NONE;
+    }
+
+    reach_feature_layout_anchor current = {};
+    const int32_t open = reach_host_surface_is_open(runtime);
+    const reach_feature_layout_anchor *current_owner =
+        open && reach_host_resolve_popup_owner(runtime, &current) ? &current : nullptr;
+    reach_popup_activation_decision decision =
+        reach_host_popup_activation_decide(open, current_owner, owner, mode);
+    if (decision == REACH_POPUP_ACTIVATION_CLOSE)
+    {
+        reach_host_close_registered_surface(host, id, REACH_SURFACE_CLOSE_DISMISS);
+    }
+    return decision;
+}
+
+void reach_host_toggle_registered_popup(reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_layout_anchor owner = {};
+    if (!reach_host_resolve_popup_owner(&host->feature_runtimes[id], &owner) ||
+        reach_host_prepare_registered_popup(host, id, &owner, REACH_POPUP_ACTIVATION_TOGGLE) !=
+            REACH_POPUP_ACTIVATION_PRESENT)
+    {
+        return;
+    }
+    reach_host_set_registered_surface_open(host, id, 1);
+}
+
 void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
-                                         int32_t drop_direction)
+                                         reach_surface_id origin, int32_t drop_direction)
 {
     if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
     {
         return;
     }
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    reach_host_surface_opening(host, id, origin);
     reach_host_surface_transition_set_settle_offset(host, runtime->transition,
                                                     drop_direction == REACH_POPUP_DROP_DOWN
                                                         ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE

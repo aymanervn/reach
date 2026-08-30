@@ -740,13 +740,33 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         return;
     }
 
+    if (event->kind == REACH_POINTER_EVENT_DOWN && event->owner_trigger)
+    {
+        int32_t keep_open =
+            (menu->state.power_open && event->button == REACH_POINTER_BUTTON_PRIMARY) ||
+            (!menu->state.power_open && !menu->state.window_list_open &&
+             event->button == REACH_POINTER_BUTTON_SECONDARY);
+        out->handled = 1;
+        out->continue_source_sequence = 1;
+        if (!keep_open)
+        {
+            out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
+        }
+        return;
+    }
+
     if (event->kind == REACH_POINTER_EVENT_DOWN &&
         event->surface_relation == REACH_POINTER_SURFACE_OUTSIDE)
     {
         out->handled = 1;
         out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         out->cancel_source_sequence = event->button == REACH_POINTER_BUTTON_PRIMARY;
-        out->continue_source_sequence = event->button == REACH_POINTER_BUTTON_SECONDARY;
+        out->continue_source_sequence = event->button != REACH_POINTER_BUTTON_PRIMARY;
+        return;
+    }
+    if ((event->kind == REACH_POINTER_EVENT_DOWN || event->kind == REACH_POINTER_EVENT_UP) &&
+        event->button == REACH_POINTER_BUTTON_MIDDLE)
+    {
         return;
     }
 
@@ -873,7 +893,6 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     }
 
     case REACH_POINTER_EVENT_WHEEL:
-    case REACH_POINTER_EVENT_MIDDLE:
     default:
         break;
     }

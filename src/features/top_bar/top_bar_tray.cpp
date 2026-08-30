@@ -507,7 +507,12 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
         out->handled = 1;
         out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         out->cancel_source_sequence = event->button == REACH_POINTER_BUTTON_PRIMARY;
-        out->continue_source_sequence = event->button == REACH_POINTER_BUTTON_SECONDARY;
+        out->continue_source_sequence = event->button != REACH_POINTER_BUTTON_PRIMARY;
+        return;
+    }
+    if ((event->kind == REACH_POINTER_EVENT_DOWN || event->kind == REACH_POINTER_EVENT_UP) &&
+        event->button == REACH_POINTER_BUTTON_MIDDLE)
+    {
         return;
     }
     reach_top_bar_tray_popup *popup = top_bar->tray_popup;
@@ -578,7 +583,7 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
         return;
     }
 
-    if (event->kind == REACH_POINTER_EVENT_MIDDLE || event->kind == REACH_POINTER_EVENT_CANCEL)
+    if (event->kind == REACH_POINTER_EVENT_CANCEL)
     {
         int32_t was_tracking = reach_pressable_tracking(&popup->pressable);
         reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);

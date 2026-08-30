@@ -388,6 +388,10 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
     {
         return;
     }
+    if (button == REACH_POINTER_BUTTON_MIDDLE)
+    {
+        return;
+    }
 
     uint64_t target = reach_top_bar_pressable_target_at(top_bar, local_x, local_y, button);
     reach_top_bar_pointer_region region = reach_top_bar_pressable_region(target);
@@ -415,16 +419,16 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
     switch (region)
     {
     case REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON:
-        out->control = {REACH_TOP_BAR_CONTROL_POWER, 0, 1};
+        out->control = {REACH_TOP_BAR_CONTROL_POWER, 0, 1, 1};
         return;
     case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
-        out->control = {REACH_TOP_BAR_CONTROL_QUICK_SETTINGS, 0, 1};
+        out->control = {REACH_TOP_BAR_CONTROL_QUICK_SETTINGS, 0, 1, 1};
         return;
     case REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW:
-        out->control = {REACH_TOP_BAR_CONTROL_TRAY, 0, 1};
+        out->control = {REACH_TOP_BAR_CONTROL_TRAY, 0, 1, 1};
         return;
     case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
-        out->control = {REACH_TOP_BAR_CONTROL_BATTERY, 0, 1};
+        out->control = {REACH_TOP_BAR_CONTROL_BATTERY, 0, 1, 1};
         return;
     case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
     case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:

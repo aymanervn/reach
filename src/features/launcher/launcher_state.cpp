@@ -1197,7 +1197,6 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     case REACH_POINTER_EVENT_LEAVE:
         reach_launcher_pointer_leave(launcher, &event_result);
         break;
-    case REACH_POINTER_EVENT_MIDDLE:
     default:
         return;
     }

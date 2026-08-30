@@ -46,6 +46,9 @@ static reach_host focus_restore_host;
 static reach_host closable_host;
 static reach_host dismiss_guard_host;
 static reach_host bar_conditions_host;
+static reach_host pointer_release_host;
+static reach_host popup_trigger_host;
+static reach_host popup_owner_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
 static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
@@ -54,6 +57,67 @@ static size_t render_count;
 static size_t thumbnail_create_count;
 static size_t thumbnail_place_count;
 static size_t thumbnail_destroy_count;
+static int32_t captured_release_active;
+static int32_t exclusive_release_open;
+static size_t captured_release_count;
+static size_t exclusive_release_count;
+static int32_t fake_source_popup_trigger;
+static size_t unrelated_popup_down_count;
+
+static int32_t fake_captured_release_active(const void *capsule)
+{
+    return capsule != nullptr && captured_release_active;
+}
+
+static int32_t fake_exclusive_release_open(const void *capsule)
+{
+    return capsule != nullptr && exclusive_release_open;
+}
+
+static void fake_captured_release(void *capsule, const reach_pointer_event *event,
+                                  reach_capsule_pointer_result *out)
+{
+    if (capsule != nullptr && event != nullptr && out != nullptr &&
+        event->kind == REACH_POINTER_EVENT_UP)
+    {
+        ++captured_release_count;
+        out->handled = 1;
+    }
+}
+
+static void fake_exclusive_release(void *capsule, const reach_pointer_event *event,
+                                   reach_capsule_pointer_result *out)
+{
+    if (capsule != nullptr && event != nullptr && out != nullptr &&
+        event->kind == REACH_POINTER_EVENT_UP)
+    {
+        ++exclusive_release_count;
+        out->handled = 1;
+    }
+}
+
+static void fake_popup_trigger_source(void *capsule, const reach_pointer_event *event,
+                                      reach_capsule_pointer_result *out)
+{
+    if (capsule != nullptr && event != nullptr && out != nullptr &&
+        event->kind == REACH_POINTER_EVENT_DOWN)
+    {
+        out->handled = 1;
+        out->control = {REACH_TOP_BAR_CONTROL_BATTERY, 0, 1, fake_source_popup_trigger};
+    }
+}
+
+static void fake_unrelated_popup_down(void *capsule, const reach_pointer_event *event,
+                                      reach_capsule_pointer_result *out)
+{
+    if (capsule != nullptr && event != nullptr && out != nullptr &&
+        event->kind == REACH_POINTER_EVENT_DOWN)
+    {
+        ++unrelated_popup_down_count;
+        out->handled = 1;
+        out->cancel_source_sequence = 1;
+    }
+}
 
 static reach_result fake_get_window_manipulation(reach_input_source *source,
                                                  reach_window_manipulation *out_manipulation)
@@ -469,6 +533,144 @@ static void test_popup_pointer_coordinates_are_surface_local(void)
                 "non-popup pointer positions remain unchanged");
 }
 
+static void test_popup_activation_uses_owner_identity(void)
+{
+    reach_feature_layout_anchor top_bar_power = {
+        REACH_SURFACE_ID_TOP_BAR, REACH_TOP_BAR_CONTROL_POWER, 0};
+    reach_feature_layout_anchor dock_item = {
+        REACH_SURFACE_ID_DOCK, REACH_DOCK_CONTROL_ITEM, 3};
+
+    expect_true(reach_host_popup_activation_decide(
+                    0, nullptr, &top_bar_power, REACH_POPUP_ACTIVATION_TOGGLE) ==
+                    REACH_POPUP_ACTIVATION_PRESENT,
+                "a closed popup presents for its requested owner");
+    expect_true(reach_host_popup_activation_decide(
+                    1, &top_bar_power, &top_bar_power, REACH_POPUP_ACTIVATION_TOGGLE) ==
+                    REACH_POPUP_ACTIVATION_CLOSE,
+                "a repeated owner activation toggles its popup closed");
+    expect_true(reach_host_popup_activation_decide(
+                    1, &top_bar_power, &dock_item, REACH_POPUP_ACTIVATION_TOGGLE) ==
+                    REACH_POPUP_ACTIVATION_PRESENT,
+                "a different owner replaces the open popup");
+    expect_true(reach_host_popup_activation_decide(
+                    1, &dock_item, &dock_item, REACH_POPUP_ACTIVATION_PASSIVE) ==
+                    REACH_POPUP_ACTIVATION_NONE,
+                "repeated passive presentation for one owner is unchanged");
+    expect_true(reach_host_popup_activation_decide(
+                    1, &dock_item, &dock_item, REACH_POPUP_ACTIVATION_REPLACE) ==
+                    REACH_POPUP_ACTIVATION_PRESENT,
+                "an explicit content replacement preserves the owner");
+}
+
+static void test_power_popup_resolves_its_exact_top_bar_owner(void)
+{
+    reach_context_menu *menu = nullptr;
+    expect_true(reach_context_menu_create(&menu) == REACH_OK,
+                "a context menu is created for owner resolution");
+    if (menu == nullptr)
+    {
+        return;
+    }
+
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.dpi_scale = 1.0f;
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    ctx.anchor_button = {1800.0f, 8.0f, 32.0f, 24.0f};
+    ctx.bar_edge_y = 40.0f;
+    ctx.drop_direction = REACH_POPUP_DROP_DOWN;
+    ctx.anchored = 1;
+    reach_context_menu_open_power(menu, &ctx);
+
+    reach_host *host = &popup_owner_host;
+    reach_host_init_feature_registry(host);
+    host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU].capsule = menu;
+    reach_feature_layout_anchor owner = {};
+    expect_true(reach_host_resolve_popup_owner(
+                    &host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU], &owner) &&
+                    owner.surface == REACH_SURFACE_ID_TOP_BAR &&
+                    owner.slot == REACH_TOP_BAR_CONTROL_POWER && owner.index == 0,
+                "the Power popup owner exactly matches the Top Bar Power control token");
+
+    reach_context_menu_destroy(menu);
+}
+
+static void test_captured_release_precedes_exclusive_popup(void)
+{
+    reach_host *host = &pointer_release_host;
+    reach_host_init_feature_registry(host);
+    host->has_layout = 1;
+
+    reach_feature_capsule_ops capture_ops = {};
+    capture_ops.handle_pointer = fake_captured_release;
+    capture_ops.pointer_capture_active = fake_captured_release_active;
+    host->feature_definitions[REACH_SURFACE_ID_DOCK].capsule_ops = &capture_ops;
+    host->feature_runtimes[REACH_SURFACE_ID_DOCK].capsule = host;
+
+    reach_feature_capsule_ops exclusive_ops = {};
+    exclusive_ops.is_open = fake_exclusive_release_open;
+    exclusive_ops.handle_pointer = fake_exclusive_release;
+    host->feature_definitions[REACH_SURFACE_ID_CONTEXT_MENU].capsule_ops = &exclusive_ops;
+    host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU].capsule = host;
+
+    reach_host_surface_event_binding binding = {
+        host, &host->feature_runtimes[REACH_SURFACE_ID_DOCK]};
+    reach_ui_event event = {};
+    event.type = REACH_UI_EVENT_POINTER_UP;
+    event.button = REACH_POINTER_BUTTON_PRIMARY;
+
+    captured_release_active = 1;
+    exclusive_release_open = 1;
+    captured_release_count = 0;
+    exclusive_release_count = 0;
+    reach_host_on_registered_surface_event(&binding, &event);
+    expect_true(captured_release_count == 1 && exclusive_release_count == 0,
+                "a captured sequence receives release before an open exclusive popup");
+
+    captured_release_active = 0;
+    captured_release_count = 0;
+    exclusive_release_count = 0;
+    reach_host_on_registered_surface_event(&binding, &event);
+    expect_true(captured_release_count == 0 && exclusive_release_count == 1,
+                "an exclusive popup receives release when no captured sequence exists");
+}
+
+static void test_popup_trigger_press_bypasses_unrelated_open_popup(void)
+{
+    reach_host *host = &popup_trigger_host;
+    reach_host_init_feature_registry(host);
+    host->has_layout = 1;
+
+    reach_feature_capsule_ops source_ops = {};
+    source_ops.handle_pointer = fake_popup_trigger_source;
+    host->feature_definitions[REACH_SURFACE_ID_TOP_BAR].capsule_ops = &source_ops;
+    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].capsule = host;
+
+    reach_feature_capsule_ops popup_ops = {};
+    popup_ops.is_open = fake_exclusive_release_open;
+    popup_ops.handle_pointer = fake_unrelated_popup_down;
+    host->feature_definitions[REACH_SURFACE_ID_QUICK_SETTINGS].capsule_ops = &popup_ops;
+    host->feature_runtimes[REACH_SURFACE_ID_QUICK_SETTINGS].capsule = host;
+
+    reach_host_surface_event_binding binding = {
+        host, &host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]};
+    reach_ui_event event = {};
+    event.type = REACH_UI_EVENT_POINTER_DOWN;
+    event.button = REACH_POINTER_BUTTON_PRIMARY;
+
+    exclusive_release_open = 1;
+    fake_source_popup_trigger = 1;
+    unrelated_popup_down_count = 0;
+    reach_host_on_registered_surface_event(&binding, &event);
+    expect_true(unrelated_popup_down_count == 0,
+                "an open popup cannot cancel a press on a different popup trigger");
+
+    fake_source_popup_trigger = 0;
+    reach_host_on_registered_surface_event(&binding, &event);
+    expect_true(unrelated_popup_down_count == 1,
+                "an ordinary outside press is still offered to the open popup");
+}
+
 static void test_focus_restore_follows_the_close_intent(void)
 {
     reach_host *host = &focus_restore_host;
@@ -584,6 +786,11 @@ static void test_every_popup_names_the_control_that_holds_it_open(void)
                     host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
                             .definition->capsule_ops->control_at_point != nullptr,
                 "both bars can name the control under a screen point");
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_DOCK]
+                            .definition->capsule_ops->pointer_capture_active != nullptr &&
+                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
+                            .definition->capsule_ops->pointer_capture_active != nullptr,
+                "both bars publish captured pressable sequences to generic release routing");
 }
 
 static void test_registered_feature_lifecycle(void)
@@ -871,6 +1078,10 @@ int main(void)
     test_registered_transition_completion();
     test_scaled_transition_keeps_native_envelope_stationary();
     test_popup_pointer_coordinates_are_surface_local();
+    test_popup_activation_uses_owner_identity();
+    test_power_popup_resolves_its_exact_top_bar_owner();
+    test_captured_release_precedes_exclusive_popup();
+    test_popup_trigger_press_bypasses_unrelated_open_popup();
     test_focus_restore_follows_the_close_intent();
     test_every_dismissable_surface_reaches_the_shared_close_path();
     test_every_popup_names_the_control_that_holds_it_open();
