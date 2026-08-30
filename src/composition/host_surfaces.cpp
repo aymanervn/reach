@@ -125,39 +125,9 @@ void reach_host_surface_transition_init(reach_host *host, reach_host_surface_tra
     *transition = {};
     transition->y_track = y_track;
     transition->opacity_track = opacity_track;
-    transition->scale_track = REACH_HOST_ANIMATION_COUNT;
     transition->settle_offset = settle_offset;
-    transition->start_scale = 1.0f;
     reach_animation_manager_set(&host->animations, y_track, settle_offset);
     reach_animation_manager_set(&host->animations, opacity_track, 0.0f);
-}
-
-void reach_host_surface_transition_set_scale(reach_host *host,
-                                             reach_host_surface_transition *transition,
-                                             size_t scale_track, float start_scale)
-{
-    if (host == nullptr || transition == nullptr || scale_track >= REACH_HOST_ANIMATION_COUNT)
-    {
-        return;
-    }
-    transition->scale_track = scale_track;
-    transition->start_scale = start_scale > 0.0f ? start_scale : 1.0f;
-    reach_animation_manager_set(&host->animations, scale_track, transition->start_scale);
-}
-
-void reach_host_surface_transition_set_settle_offset(reach_host *host,
-                                                     reach_host_surface_transition *transition,
-                                                     float settle_offset)
-{
-    if (host == nullptr || transition == nullptr || transition->settle_offset == settle_offset)
-    {
-        return;
-    }
-    transition->settle_offset = settle_offset;
-    if (!transition->visible)
-    {
-        reach_animation_manager_set(&host->animations, transition->y_track, settle_offset);
-    }
 }
 
 void reach_host_surface_transitions_init(reach_host *host)
@@ -173,20 +143,11 @@ void reach_host_surface_transitions_init(reach_host *host)
         {
             continue;
         }
-        const reach_surface_spec *spec = &runtime->definition->surface;
         reach_surface_id id = runtime->definition->id;
         reach_host_surface_transition_init(host, runtime->transition,
                                            reach_host_surface_track(id, 0),
                                            reach_host_surface_track(id, 1),
-                                           spec->settle_from_above
-                                               ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE
-                                               : REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
-        if (spec->start_scale > 1.0f)
-        {
-            reach_host_surface_transition_set_scale(host, runtime->transition,
-                                                    reach_host_surface_track(id, 2),
-                                                    spec->start_scale);
-        }
+                                           REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
     }
 }
 
@@ -219,21 +180,11 @@ void reach_host_surface_transition_set(reach_host *host, reach_host_surface_tran
             reach_animation_manager_set(&host->animations, transition->y_track,
                                         transition->settle_offset);
             reach_animation_manager_set(&host->animations, transition->opacity_track, 0.0f);
-            if (transition->scale_track < REACH_HOST_ANIMATION_COUNT)
-            {
-                reach_animation_manager_set(&host->animations, transition->scale_track,
-                                            transition->start_scale);
-            }
         }
         reach_animation_manager_animate_to(&host->animations, transition->y_track, 0.0f,
                                            open_seconds, REACH_EASING_EASE_OUT);
         reach_animation_manager_animate_to(&host->animations, transition->opacity_track, 1.0f,
                                            open_seconds, REACH_EASING_EASE_OUT);
-        if (transition->scale_track < REACH_HOST_ANIMATION_COUNT)
-        {
-            reach_animation_manager_animate_to(&host->animations, transition->scale_track, 1.0f,
-                                               open_seconds, REACH_EASING_EASE_OUT);
-        }
     }
     else if (transition->visible)
     {
@@ -245,12 +196,6 @@ void reach_host_surface_transition_set(reach_host *host, reach_host_surface_tran
                                            REACH_EASING_EASE_IN);
         reach_animation_manager_animate_to(&host->animations, transition->opacity_track, 0.0f,
                                            close_seconds, REACH_EASING_EASE_IN);
-        if (transition->scale_track < REACH_HOST_ANIMATION_COUNT)
-        {
-            reach_animation_manager_animate_to(&host->animations, transition->scale_track,
-                                               transition->start_scale, close_seconds,
-                                               REACH_EASING_EASE_IN);
-        }
     }
     reach_host_request_update(host);
 }
@@ -275,39 +220,26 @@ float reach_host_surface_transition_opacity(const reach_host *host,
                : 0.0f;
 }
 
-reach_host_surface_transition_frame reach_host_surface_transition_frame_compute(
-    const reach_host *host, const reach_host_surface_transition *transition,
-    reach_rect_f32 target_bounds, reach_shadow_pad shadow_pad)
-{
-    return reach_host_surface_transition_frame_compute_in_envelope(host, transition, target_bounds,
-                                                                   target_bounds, shadow_pad);
-}
-
-reach_host_surface_transition_frame reach_host_surface_transition_frame_compute_in_envelope(
-    const reach_host *host, const reach_host_surface_transition *transition,
-    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad)
+reach_host_surface_transition_frame reach_host_surface_presentation_frame_compute(
+    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
+    float y_offset, float scale, float max_scale)
 {
     reach_host_surface_transition_frame frame = {};
-    frame.window_bounds = reach_host_surface_transition_bounds(host, transition, target_bounds);
+    frame.window_bounds = target_bounds;
     frame.content_rect = {shadow_pad.left, shadow_pad.top, target_bounds.width,
                           target_bounds.height};
     frame.render_transform = {1.0f, 1.0f, shadow_pad.left, shadow_pad.top};
-    frame.pointer_transform = {1.0f, 1.0f, 0.0f, frame.window_bounds.y - target_bounds.y};
+    frame.pointer_transform = {1.0f, 1.0f, 0.0f, y_offset};
     frame.scale = 1.0f;
 
-    if (host == nullptr || transition == nullptr || !transition->visible ||
-        transition->scale_track >= REACH_HOST_ANIMATION_COUNT)
+    if (scale <= 0.0f || max_scale <= 1.0f)
     {
+        frame.window_bounds.y += y_offset;
         return frame;
     }
 
-    float scale = reach_animation_manager_value(&host->animations, transition->scale_track);
-    scale = scale > 0.0f ? scale : 1.0f;
-    float max_scale = transition->start_scale > 1.0f ? transition->start_scale : 1.0f;
     float center_x = target_bounds.x + target_bounds.width * 0.5f;
     float center_y = target_bounds.y + target_bounds.height * 0.5f;
-    float y_offset = reach_animation_manager_value(&host->animations, transition->y_track) *
-                     reach_host_layout_dpi_scale(host);
 
     float envelope_center_x = envelope_bounds.x + envelope_bounds.width * 0.5f;
     float envelope_center_y = envelope_bounds.y + envelope_bounds.height * 0.5f;
@@ -340,9 +272,7 @@ int32_t reach_host_surface_transition_active(const reach_host *host,
 {
     return host != nullptr && transition != nullptr &&
            (reach_animation_manager_active(&host->animations, transition->y_track) ||
-            reach_animation_manager_active(&host->animations, transition->opacity_track) ||
-            (transition->scale_track < REACH_HOST_ANIMATION_COUNT &&
-             reach_animation_manager_active(&host->animations, transition->scale_track)));
+            reach_animation_manager_active(&host->animations, transition->opacity_track));
 }
 
 void reach_host_surface_transition_finish(reach_host *host,
@@ -356,11 +286,6 @@ void reach_host_surface_transition_finish(reach_host *host,
 
     transition->visible = 0;
     reach_animation_manager_set(&host->animations, transition->y_track, transition->settle_offset);
-    if (transition->scale_track < REACH_HOST_ANIMATION_COUNT)
-    {
-        reach_animation_manager_set(&host->animations, transition->scale_track,
-                                    transition->start_scale);
-    }
     reach_animation_manager_set(&host->animations, transition->opacity_track, 0.0f);
     reach_host_request_update(host);
 }
@@ -530,6 +455,7 @@ void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtim
     if (next)
     {
         reach_host_capture_focus_restore(host, runtime->definition->id);
+        runtime->presentation_visible = 1;
     }
     reach_host_surface_transition_set(host, runtime->transition, next);
     reach_host_sync_pointer_move_subscriptions(host);
@@ -658,7 +584,7 @@ void reach_host_toggle_registered_popup(reach_host *host, reach_surface_id id)
 }
 
 void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
-                                         reach_surface_id origin, int32_t drop_direction)
+                                         reach_surface_id origin)
 {
     if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
     {
@@ -666,11 +592,7 @@ void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
     }
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
     reach_host_surface_opening(host, id, origin);
-    reach_host_surface_transition_set_settle_offset(host, runtime->transition,
-                                                    drop_direction == REACH_POPUP_DROP_DOWN
-                                                        ? REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE
-                                                        : REACH_HOST_TRANSITION_SETTLE_FROM_BELOW);
-    reach_host_surface_transition_set(host, runtime->transition, 1);
+    reach_host_apply_surface_open_change(host, runtime, 1);
     if (runtime->surface != nullptr)
     {
         runtime->surface->dirty_flags = 1;

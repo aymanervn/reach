@@ -41,8 +41,6 @@
 #define REACH_SURFACE_NATIVE_OVERLAY_CAPACITY (REACH_MAX_OPEN_WINDOWS + 1)
 
 static const float REACH_HOST_TRANSITION_SETTLE_FROM_BELOW = 8.0f;
-static const float REACH_HOST_TRANSITION_SETTLE_FROM_ABOVE = -8.0f;
-static const float REACH_HOST_TRANSITION_SCALE_IN = 1.08f;
 
 typedef struct reach_host_surface_transition
 {
@@ -50,9 +48,7 @@ typedef struct reach_host_surface_transition
     int32_t target_open;
     size_t y_track;
     size_t opacity_track;
-    size_t scale_track;
     float settle_offset;
-    float start_scale;
     double open_seconds;
     double close_seconds;
 } reach_host_surface_transition;
@@ -91,7 +87,7 @@ typedef enum reach_surface_id
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
 
-#define REACH_HOST_ANIMATION_TRACKS_PER_SURFACE 3
+#define REACH_HOST_ANIMATION_TRACKS_PER_SURFACE 2
 #define REACH_HOST_ANIMATION_COUNT                                                                 \
     ((size_t)REACH_HOST_SURFACE_COUNT * REACH_HOST_ANIMATION_TRACKS_PER_SURFACE)
 
@@ -337,14 +333,11 @@ typedef struct reach_surface_spec
     reach_surface_role role;
     int32_t pointer_priority;
     int32_t has_transition;
-    int32_t scale_in_envelope;
     int32_t popup_chrome;
     int32_t bar_shown_while_open;
     int32_t restores_focus_on_close;
     int32_t close_on_persistent_press;
     int32_t refresh_world_on_open;
-    int32_t settle_from_above;
-    float start_scale;
 
     /* A press on the control this surface hangs off must not dismiss it. By default that is its
        layout anchor; a surface with no anchor names the control explicitly. */
@@ -401,6 +394,7 @@ typedef struct reach_feature_runtime
     reach_window_thumbnail_id native_overlay_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
     size_t native_overlay_generation;
     int32_t native_overlay_registered;
+    int32_t presentation_visible;
     const reach_feature_definition *definition;
 } reach_feature_runtime;
 
@@ -473,7 +467,7 @@ reach_popup_activation_decision reach_host_prepare_registered_popup(
     reach_popup_activation_mode mode);
 void reach_host_toggle_registered_popup(reach_host *host, reach_surface_id id);
 void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
-                                         reach_surface_id origin, int32_t drop_direction);
+                                         reach_surface_id origin);
 int32_t reach_host_surface_closable(const reach_feature_runtime *runtime);
 void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtime *runtime,
                                           int32_t open);
@@ -732,12 +726,6 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
                                            int32_t *opacity_valid, int32_t *out_changed);
 void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
                                         size_t y_track, size_t opacity_track, float settle_offset);
-void reach_host_surface_transition_set_scale(reach_host *host,
-                                             reach_host_surface_transition *transition,
-                                             size_t scale_track, float start_scale);
-void reach_host_surface_transition_set_settle_offset(reach_host *host,
-                                                     reach_host_surface_transition *transition,
-                                                     float settle_offset);
 void reach_host_surface_transitions_init(reach_host *host);
 void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
                                        int32_t open);
@@ -746,12 +734,9 @@ reach_rect_f32 reach_host_surface_transition_bounds(const reach_host *host,
                                                     reach_rect_f32 target_bounds);
 float reach_host_surface_transition_opacity(const reach_host *host,
                                             const reach_host_surface_transition *transition);
-reach_host_surface_transition_frame reach_host_surface_transition_frame_compute(
-    const reach_host *host, const reach_host_surface_transition *transition,
-    reach_rect_f32 target_bounds, reach_shadow_pad shadow_pad);
-reach_host_surface_transition_frame reach_host_surface_transition_frame_compute_in_envelope(
-    const reach_host *host, const reach_host_surface_transition *transition,
-    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad);
+reach_host_surface_transition_frame reach_host_surface_presentation_frame_compute(
+    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
+    float y_offset, float scale, float max_scale);
 int32_t reach_host_surface_transition_visible(const reach_host_surface_transition *transition);
 int32_t reach_host_surface_transition_active(const reach_host *host,
                                              const reach_host_surface_transition *transition);

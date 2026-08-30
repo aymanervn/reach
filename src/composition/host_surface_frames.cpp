@@ -250,7 +250,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     int32_t visible = desc->transition != nullptr
                           ? reach_host_surface_transition_visible(desc->transition)
                           : active;
-    int32_t frame_active = active || (desc->definition->surface.scale_in_envelope && visible);
+    int32_t frame_active = active || visible;
     if (!active && desc->definition->surface_ops->native_overlay != nullptr)
     {
         reach_host_release_native_overlay(host, desc);
@@ -323,25 +323,18 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     float applied_scale = 1.0f;
     int32_t scale_changed = 0;
     int32_t transition_frame_active = 0;
-    if (definition != nullptr && definition->surface.scale_in_envelope &&
-        desc->transition != nullptr)
+    if (geometry.presentation.managed && geometry.presentation.max_scale > 1.0f)
     {
+        float shadow_scale = geometry.presentation.max_scale;
+        shadow_pad.left *= shadow_scale;
+        shadow_pad.top *= shadow_scale;
+        shadow_pad.right *= shadow_scale;
+        shadow_pad.bottom *= shadow_scale;
         reach_host_surface_transition_frame frame =
-            reach_host_surface_transition_frame_compute_in_envelope(
-                host, desc->transition, geometry.visible_bounds, geometry.envelope_bounds,
-                shadow_pad);
-        if (frame.scale_envelope_active)
-        {
-            float shadow_scale =
-                desc->transition->start_scale > 1.0f ? desc->transition->start_scale : 1.0f;
-            shadow_pad.left *= shadow_scale;
-            shadow_pad.top *= shadow_scale;
-            shadow_pad.right *= shadow_scale;
-            shadow_pad.bottom *= shadow_scale;
-            frame = reach_host_surface_transition_frame_compute_in_envelope(
-                host, desc->transition, geometry.visible_bounds, geometry.envelope_bounds,
-                shadow_pad);
-        }
+            reach_host_surface_presentation_frame_compute(
+                geometry.visible_bounds, geometry.envelope_bounds, shadow_pad,
+                geometry.presentation.y_offset, geometry.presentation.scale,
+                geometry.presentation.max_scale);
         bounds = frame.window_bounds;
         surface_ctx.content_rect = frame.content_rect;
         surface_ctx.render_transform = frame.render_transform;
@@ -349,7 +342,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         applied_scale = frame.scale;
         scale_changed = !desc->surface->transition_scale_valid ||
                         !reach_host_scalar_equal(desc->surface->last_transition_scale, frame.scale);
-        transition_frame_active = reach_host_surface_transition_active(host, desc->transition);
+        transition_frame_active = needs_frame;
         if (desc->definition->surface_ops->set_pointer_transform != nullptr)
         {
             desc->definition->surface_ops->set_pointer_transform(desc->capsule,
@@ -371,12 +364,15 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             }
         }
     }
+    else if (geometry.presentation.managed)
+    {
+        bounds.y += geometry.presentation.y_offset;
+        opacity = geometry.presentation.opacity;
+        transition_frame_active = needs_frame;
+    }
     else if (desc->transition != nullptr)
     {
         bounds = reach_host_surface_transition_bounds(host, desc->transition, bounds);
-    }
-    if (desc->transition != nullptr)
-    {
         opacity = reach_host_surface_transition_opacity(host, desc->transition);
     }
     surface_ctx.render_bounds = bounds;
@@ -399,7 +395,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         return result;
     }
     result = reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
-    if (result == REACH_OK && definition != nullptr && definition->surface.scale_in_envelope)
+    if (result == REACH_OK && geometry.presentation.managed &&
+        geometry.presentation.max_scale > 1.0f)
     {
         desc->surface->last_transition_scale = applied_scale;
         desc->surface->transition_scale_valid = 1;

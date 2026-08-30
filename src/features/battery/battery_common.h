@@ -2,6 +2,7 @@
 #define REACH_FEATURES_BATTERY_COMMON_H
 
 #include "reach/features/battery.h"
+#include "reach/features/common/popup.h"
 #include "reach/features/common/pressable.h"
 
 #include "battery_metrics.h"
@@ -21,6 +22,7 @@ struct reach_battery
     double saver_pending_seconds;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_BATTERY_ANIMATION_COUNT];
+    reach_popup_transition popup_transition;
     reach_pressable pressable;
 };
 

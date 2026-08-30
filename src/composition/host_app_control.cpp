@@ -139,7 +139,7 @@ void reach_host_process_deferred_launch(reach_host *host)
         return;
     }
     const reach_feature_runtime *source = &host->feature_runtimes[host->deferred_launch.surface];
-    if (reach_host_surface_is_open(source) ||
+    if (reach_host_surface_is_open(source) || source->presentation_visible ||
         reach_host_surface_transition_visible(source->transition) ||
         reach_host_surface_transition_active(host, source->transition))
     {
