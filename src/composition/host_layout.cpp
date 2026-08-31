@@ -110,6 +110,12 @@ reach_host_layout_applied_entry(const reach_host *host, reach_layout_participant
     return nullptr;
 }
 
+static int32_t reach_host_layout_visibility_invalidated(const reach_host_layout_target *target)
+{
+    return target != nullptr && target->runtime != nullptr && target->runtime->surface != nullptr &&
+           target->runtime->surface->native_visibility_invalidated;
+}
+
 void reach_host_apply_layout(reach_host *host)
 {
     if (host == nullptr)
@@ -121,22 +127,35 @@ void reach_host_apply_layout(reach_host *host)
     reach_layout_resolve(&host->layout_manager, &plan);
     int32_t plan_changed = !host->has_applied_layout_plan ||
                            !reach_layout_plan_equal(&plan, &host->applied_layout_plan);
-    if (!plan_changed && !host->dirty.z_order)
+    int32_t visibility_invalidated = 0;
+    for (size_t index = 0; index < plan.count; ++index)
+    {
+        visibility_invalidated |= reach_host_layout_visibility_invalidated(
+            &host->layout_targets[plan.entries[index].participant]);
+    }
+    if (!plan_changed && !host->dirty.z_order && !visibility_invalidated)
     {
         return;
     }
 
-    if (plan_changed)
+    if (plan_changed || visibility_invalidated)
     {
         for (size_t index = 0; index < plan.count; ++index)
         {
             const reach_layout_entry *entry = &plan.entries[index];
             const reach_layout_entry *applied =
                 reach_host_layout_applied_entry(host, entry->participant);
-            if (applied == nullptr || applied->visible != entry->visible)
+            reach_host_layout_target *target = &host->layout_targets[entry->participant];
+            int32_t target_visibility_invalidated =
+                reach_host_layout_visibility_invalidated(target);
+            if (applied == nullptr || applied->visible != entry->visible ||
+                target_visibility_invalidated)
             {
-                reach_host_layout_apply_visibility(&host->layout_targets[entry->participant],
-                                                   entry->visible);
+                reach_host_layout_apply_visibility(target, entry->visible);
+                if (target_visibility_invalidated)
+                {
+                    target->runtime->surface->native_visibility_invalidated = 0;
+                }
             }
         }
     }
