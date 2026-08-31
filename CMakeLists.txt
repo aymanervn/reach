@@ -929,6 +929,23 @@ reach_configure_common(reach_window_tracking_tests)
 target_compile_features(reach_window_tracking_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_window_tracking_tests PRIVATE reach_services)
 
+add_executable(reach_window_query_tests
+    tests/window_query_tests.cpp
+    src/adapters/windows/window_management/window_query_win32.cpp
+)
+
+reach_configure_common(reach_window_query_tests)
+reach_configure_windows(reach_window_query_tests)
+target_compile_features(reach_window_query_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_window_query_tests PRIVATE
+    reach_support
+    user32
+    shell32
+    ole32
+    propsys
+    uuid
+)
+
 add_executable(reach_wifi_tests
     tests/wifi_tests.cpp
     src/adapters/windows/wifi_profile.cpp
@@ -1005,6 +1022,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_bar_visibility_tests COMMAND reach_bar_visibility_tests)
     add_test(NAME reach_loader_tests COMMAND reach_loader_tests)
     add_test(NAME reach_window_tracking_tests COMMAND reach_window_tracking_tests)
+    add_test(NAME reach_window_query_tests COMMAND reach_window_query_tests)
     add_test(
         NAME reach_architecture_checker_tests
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_architecture_tests.py

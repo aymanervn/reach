@@ -58,6 +58,7 @@ static LONG g_game_mode_active;
 static const wchar_t *REACH_SHELL_INSTANCE_MUTEX = REACH_SHELL_INSTANCE_MUTEX_NAME;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachServiceInstance";
 static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
+static const UINT REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG = WM_APP + 42;
 
 static reach_result reach_helper_execute(const reach_service_request *request,
                                          reach_service_response *response);
@@ -481,6 +482,16 @@ static void reach_helper_classify_window(reach_service_window_snapshot *snapshot
         return;
     }
 
+    if (snapshot->visible && !snapshot->iconic && GetAncestor(hwnd, GA_ROOT) == hwnd &&
+        reach_window_identity_is_explorer_dialog(
+            reinterpret_cast<const uint16_t *>(snapshot->process_path),
+            reinterpret_cast<const uint16_t *>(snapshot->class_name)))
+    {
+        snapshot->kind = REACH_SERVICE_WINDOW_DIALOG;
+        reach_helper_copy_wide(snapshot->classification_reason, 160, L"explorer dialog");
+        return;
+    }
+
     if (GetAncestor(hwnd, GA_ROOT) != hwnd)
     {
         snapshot->kind = REACH_SERVICE_WINDOW_HELPER;
@@ -885,6 +896,13 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
         {
             reach_window_management_prepare_minimize(hwnd);
         }
+        if (event == EVENT_OBJECT_SHOW && reach_window_is_explorer_dialog(hwnd) &&
+            g_session.window_event_thread_id != 0)
+        {
+            (void)PostThreadMessageW(g_session.window_event_thread_id,
+                                     REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG,
+                                     reinterpret_cast<WPARAM>(hwnd), 0);
+        }
 
         if (event == EVENT_SYSTEM_MOVESIZESTART)
         {
@@ -996,6 +1014,14 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
         {
             HWND hwnd = reinterpret_cast<HWND>(message.wParam);
             reach_helper_minimize_game(hwnd);
+        }
+        else if (message.message == REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG)
+        {
+            HWND hwnd = reinterpret_cast<HWND>(message.wParam);
+            if (reach_window_is_explorer_dialog(hwnd))
+            {
+                (void)reach_window_management_activate_exact(hwnd);
+            }
         }
     }
 
