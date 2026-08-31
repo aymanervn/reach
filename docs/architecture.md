@@ -210,7 +210,10 @@ Stage is the window overview: a fullscreen overlay capsule that shrinks every op
 window into a centered grid. It owns tile layout, the open/close animation, hover
 state, and hit resolution, and reports only activate/dismiss actions. It uses no
 generic host transition: its fullscreen surface remains fixed to the monitor while
-the capsule's theme-timed progress animates the backdrop and tiles. It never calls the
+the capsule's theme-timed progress animates the tiles. A dedicated managed backdrop
+track reaches full opacity during the opening animation's short initial segment, remains
+settled through most of close, and starts its cubic fade only when that same close
+timeline has one short fade duration remaining. It never calls the
 thumbnail port — it publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
 into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in

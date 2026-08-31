@@ -295,11 +295,10 @@ void reach_stage_apply_progress(reach_stage *stage)
         tile->current_rect =
             reach_stage_interpolate_rect(tile->source_rect, resolved, state->progress);
 
-        float border = reach_stage_tile_border(state);
         float bar = tile->bar_height * state->progress * tile->presence;
-        tile->current_bar.x = tile->current_rect.x - border;
+        tile->current_bar.x = tile->current_rect.x;
         tile->current_bar.y = tile->current_rect.y - bar;
-        tile->current_bar.width = tile->current_rect.width + border * 2.0f;
+        tile->current_bar.width = tile->current_rect.width;
         tile->current_bar.height = bar;
     }
 }

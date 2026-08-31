@@ -2,9 +2,6 @@
 
 #include "stage_common.h"
 
-#define REACH_STAGE_CLOSE_BUTTON_RATIO 1.05f
-#define REACH_STAGE_CLOSE_BUTTON_NUDGE_RATIO 0.18f
-
 static int32_t reach_stage_rect_contains(reach_rect_f32 rect, reach_point_f32 point)
 {
     return rect.width > 0.0f && rect.height > 0.0f && point.x >= rect.x &&
@@ -62,15 +59,14 @@ reach_rect_f32 reach_stage_tile_close_button_rect(const reach_stage *stage, size
         return rect;
     }
 
-    float size = tile->current_bar.height * REACH_STAGE_CLOSE_BUTTON_RATIO;
-    float nudge = tile->current_bar.height * REACH_STAGE_CLOSE_BUTTON_NUDGE_RATIO;
+    float size = tile->current_bar.height;
     if (size <= 0.0f || size > tile->current_bar.width)
     {
         return rect;
     }
 
-    rect.x = tile->current_bar.x + tile->current_bar.width - size + nudge;
-    rect.y = tile->current_bar.y + (tile->current_bar.height - size) * 0.5f - nudge;
+    rect.x = tile->current_bar.x + tile->current_bar.width - size;
+    rect.y = tile->current_bar.y;
     rect.width = size;
     rect.height = size;
     return rect;
