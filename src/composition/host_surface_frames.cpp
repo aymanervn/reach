@@ -62,9 +62,17 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
     {
         return reach_host_render_popup_surface(host, desc->definition->id, desc->surface,
                                                geometry->visible_bounds, geometry->notch_anchor_x,
-                                               geometry->notch_side, commands);
+                                               geometry->notch_side, commands,
+                                               geometry->presentation.managed
+                                                   ? geometry->presentation.opacity
+                                                   : 1.0f);
     }
     reach_host_stamp_surface_content(host, desc->definition->id, commands);
+    if (geometry->presentation.managed)
+    {
+        reach_render_command_buffer_multiply_opacity(commands,
+                                                     geometry->presentation.opacity);
+    }
     if (ctx->content_transform_active)
     {
         reach_render_command_buffer_set_content_transform(commands, ctx->content_rect,

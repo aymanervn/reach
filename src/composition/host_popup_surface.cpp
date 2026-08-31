@@ -3,7 +3,8 @@
 reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id surface_id,
                                              reach_surface_runtime *surface, reach_rect_f32 bounds,
                                              float notch_anchor_x, int32_t notch_side,
-                                             const reach_render_command_buffer *content_commands)
+                                             const reach_render_command_buffer *content_commands,
+                                             float opacity)
 {
     if (host == nullptr || surface == nullptr || surface->renderer.ops.begin_frame == nullptr)
     {
@@ -39,6 +40,8 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
             }
         }
     }
+
+    reach_render_command_buffer_multiply_opacity(commands, opacity);
 
     result = surface->renderer.ops.begin_frame(surface->renderer.backend);
     if (result != REACH_OK)

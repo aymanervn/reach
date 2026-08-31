@@ -241,7 +241,6 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
     backdrop.rect.width = ctx->bounds.width;
     backdrop.rect.height = ctx->bounds.height;
     backdrop.color = ctx->theme->stage_backdrop;
-    backdrop.color.a *= state->backdrop_opacity;
     reach_result result = reach_render_command_buffer_push(out_commands, &backdrop);
     if (result != REACH_OK)
     {

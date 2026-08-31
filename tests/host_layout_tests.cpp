@@ -49,11 +49,13 @@ static reach_host bar_conditions_host;
 static reach_host pointer_release_host;
 static reach_host popup_trigger_host;
 static reach_host popup_owner_host;
+static reach_host popup_render_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
 static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
 static reach_rect_f32 observed_bounds;
 static size_t render_count;
+static float observed_last_command_alpha;
 static size_t thumbnail_create_count;
 static size_t thumbnail_place_count;
 static size_t thumbnail_destroy_count;
@@ -63,6 +65,34 @@ static size_t captured_release_count;
 static size_t exclusive_release_count;
 static int32_t fake_source_popup_trigger;
 static size_t unrelated_popup_down_count;
+
+typedef struct fake_presentation_capsule
+{
+    int32_t open;
+    int32_t needs_frame;
+    int32_t presentation_visible;
+} fake_presentation_capsule;
+
+static int32_t fake_presentation_is_open(const void *capsule)
+{
+    const fake_presentation_capsule *state =
+        static_cast<const fake_presentation_capsule *>(capsule);
+    return state != nullptr && state->open;
+}
+
+static int32_t fake_presentation_needs_frame(const void *capsule)
+{
+    const fake_presentation_capsule *state =
+        static_cast<const fake_presentation_capsule *>(capsule);
+    return state != nullptr && state->needs_frame;
+}
+
+static int32_t fake_presentation_visible(const void *capsule)
+{
+    const fake_presentation_capsule *state =
+        static_cast<const fake_presentation_capsule *>(capsule);
+    return state != nullptr && state->presentation_visible;
+}
 
 static int32_t fake_captured_release_active(const void *capsule)
 {
@@ -246,6 +276,7 @@ static reach_result fake_execute(reach_render_backend *backend,
     if (commands != nullptr && commands->count > 0)
     {
         ++render_count;
+        observed_last_command_alpha = commands->commands[commands->count - 1].color.a;
     }
     return REACH_OK;
 }
@@ -816,6 +847,17 @@ static void test_registered_feature_lifecycle(void)
         "Stage declares its native overlay contract");
     expect_true(host->feature_runtimes[REACH_SURFACE_ID_STAGE].transition == nullptr,
                 "Stage owns its animation while its fullscreen surface remains stationary");
+    const reach_surface_id presentation_owned_surfaces[] = {
+        REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_ID_TRAY, REACH_SURFACE_ID_QUICK_SETTINGS,
+        REACH_SURFACE_ID_BATTERY,  REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_STAGE};
+    for (size_t index = 0;
+         index < sizeof(presentation_owned_surfaces) / sizeof(presentation_owned_surfaces[0]);
+         ++index)
+    {
+        expect_true(host->feature_runtimes[presentation_owned_surfaces[index]]
+                            .definition->capsule_ops->presentation_visible != nullptr,
+                    "every capsule-owned presentation declares when its native surface is visible");
+    }
     expect_true(
         host->feature_runtimes[REACH_SURFACE_ID_DOCK].definition->resolve_anchor != nullptr &&
             host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].definition->resolve_anchor != nullptr,
@@ -838,6 +880,60 @@ static void test_registered_feature_lifecycle(void)
         expect_true(host->feature_runtimes[index].capsule == nullptr,
                     "destroying registered features clears every surface capsule");
     }
+}
+
+static void test_frame_scheduling_does_not_present_a_closed_surface(void)
+{
+    fake_presentation_capsule capsule = {};
+    capsule.needs_frame = 1;
+
+    reach_feature_capsule_ops capsule_ops = {};
+    capsule_ops.is_open = fake_presentation_is_open;
+    capsule_ops.needs_frame = fake_presentation_needs_frame;
+    capsule_ops.presentation_visible = fake_presentation_visible;
+
+    reach_feature_definition definition = {};
+    definition.capsule_ops = &capsule_ops;
+
+    reach_feature_runtime runtime = {};
+    runtime.definition = &definition;
+    runtime.capsule = &capsule;
+
+    expect_true(reach_host_surface_needs_frame(&runtime),
+                "background work can keep scheduling a closed surface");
+    expect_true(!reach_host_surface_presented(&runtime),
+                "background frame scheduling does not present a closed native surface");
+
+    capsule.presentation_visible = 1;
+    expect_true(reach_host_surface_presented(&runtime),
+                "capsule-owned close presentation remains visible when declared explicitly");
+}
+
+static void test_popup_surface_applies_managed_opacity(void)
+{
+    reach_host *host = &popup_render_host;
+    host->layout_dpi_scale = 1.0f;
+
+    reach_surface_runtime surface = {};
+    surface.renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+    surface.renderer.ops.begin_frame = fake_begin_frame;
+    surface.renderer.ops.end_frame = fake_end_frame;
+    surface.renderer.ops.execute = fake_execute;
+
+    reach_render_command_buffer content = {};
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.color = {0.1f, 0.2f, 0.3f, 0.8f};
+    expect_true(reach_render_command_buffer_push(&content, &command) == REACH_OK,
+                "popup opacity test records its content command");
+
+    observed_last_command_alpha = -1.0f;
+    expect_true(reach_host_render_popup_surface(
+                    host, REACH_SURFACE_ID_QUICK_SETTINGS, &surface,
+                    {0.0f, 0.0f, 320.0f, 240.0f}, 160.0f, 0, &content, 0.25f) == REACH_OK,
+                "popup rendering succeeds with managed opacity");
+    expect_true(reach_host_scalar_equal(observed_last_command_alpha, 0.2f),
+                "managed opacity applies to the complete popup command buffer");
 }
 
 static void test_registered_surface_frame_uses_declared_anchor(void)
@@ -1079,6 +1175,8 @@ int main(void)
     test_every_dismissable_surface_reaches_the_shared_close_path();
     test_every_popup_names_the_control_that_holds_it_open();
     test_registered_feature_lifecycle();
+    test_frame_scheduling_does_not_present_a_closed_surface();
+    test_popup_surface_applies_managed_opacity();
     test_registered_surface_frame_uses_declared_anchor();
     test_registered_surface_frame_syncs_native_overlay();
     test_forced_bars_hold_through_a_closing_stage();

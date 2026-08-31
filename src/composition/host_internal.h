@@ -759,7 +759,8 @@ void reach_host_on_registered_surface_event(void *user, const reach_ui_event *ev
 reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id surface_id,
                                              reach_surface_runtime *surface, reach_rect_f32 bounds,
                                              float notch_anchor_x, int32_t notch_side,
-                                             const reach_render_command_buffer *content_commands);
+                                             const reach_render_command_buffer *content_commands,
+                                             float opacity);
 
 void reach_host_sync_popup_mouse_hook(reach_host *host);
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);

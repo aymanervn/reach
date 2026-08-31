@@ -454,6 +454,13 @@ static int32_t reach_top_bar_tray_is_open(const void *capsule)
     return reach_top_bar_tray_popup_is_open(static_cast<const reach_top_bar *>(capsule));
 }
 
+static int32_t reach_top_bar_tray_presentation_visible(const void *capsule)
+{
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    return top_bar != nullptr && top_bar->tray_popup != nullptr &&
+           reach_popup_transition_visible(&top_bar->tray_popup->popup_transition);
+}
+
 static int32_t reach_top_bar_tray_needs_frame(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
@@ -617,7 +624,11 @@ const reach_feature_capsule_ops *reach_top_bar_tray_capsule_ops(void)
                                                   reach_top_bar_tray_handle_pointer,
                                                   reach_top_bar_tray_wants_pointer_move,
                                                   nullptr,
-                                                  reach_top_bar_tray_surface_geometry};
+                                                  reach_top_bar_tray_surface_geometry,
+                                                  nullptr,
+                                                  nullptr,
+                                                  nullptr,
+                                                  reach_top_bar_tray_presentation_visible};
     return &ops;
 }
 

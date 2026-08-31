@@ -13,6 +13,7 @@
 #include "reach/core/ui_events.h"
 #include "reach/ports/window_manager.h"
 #include "reach/ports/icon_provider.h"
+#include "reach/ports/text_measure.h"
 #include "reach/support/animation.h"
 #include "reach/support/util.h"
 
@@ -44,6 +45,7 @@ extern "C"
         const reach_switcher_render_item *items;
         size_t item_count;
         float dpi_scale;
+        reach_text_measure_port text_measure;
         int32_t text_alignment_center;
         int32_t text_weight_demi_bold;
     } reach_switcher_render_input;
@@ -127,6 +129,7 @@ extern "C"
         reach_rect_f32 bounds;
         float dpi_scale;
         int32_t icon_size_px;
+        reach_text_measure_port text_measure;
     } reach_switcher_render_context;
 
     void reach_switcher_force_close(reach_switcher *switcher);
