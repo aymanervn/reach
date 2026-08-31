@@ -564,6 +564,15 @@ reach_popup_activation_decision reach_host_prepare_registered_popup(
     {
         reach_host_close_registered_surface(host, id, REACH_SURFACE_CLOSE_DISMISS);
     }
+    else if (decision == REACH_POPUP_ACTIVATION_PRESENT && open && runtime->surface != nullptr &&
+             runtime->surface->window.ops.hide != nullptr &&
+             runtime->surface->window.ops.hide(runtime->surface->window.window) == REACH_OK)
+    {
+        runtime->surface->activated = 0;
+        runtime->surface->native_visibility_invalidated = 1;
+        runtime->surface->dirty_flags = 1;
+        reach_host_request_update(host);
+    }
     return decision;
 }
 
