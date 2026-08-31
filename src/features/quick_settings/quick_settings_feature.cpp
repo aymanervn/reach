@@ -919,6 +919,13 @@ static int32_t reach_quick_settings_capsule_is_open(const void *capsule)
     return reach_quick_settings_is_open(static_cast<const reach_quick_settings *>(capsule));
 }
 
+static int32_t reach_quick_settings_capsule_presentation_visible(const void *capsule)
+{
+    const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
+    return quick_settings != nullptr &&
+           reach_popup_transition_visible(&quick_settings->popup_transition);
+}
+
 static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
 {
     const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
@@ -1286,6 +1293,9 @@ const reach_feature_capsule_ops *reach_quick_settings_capsule_ops(void)
         nullptr,
         reach_quick_settings_capsule_surface_geometry,
         reach_quick_settings_capsule_wants_pointer_move,
+        nullptr,
+        nullptr,
+        reach_quick_settings_capsule_presentation_visible,
     };
     return &ops;
 }

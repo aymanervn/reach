@@ -380,6 +380,12 @@ static int32_t reach_battery_capsule_needs_frame(const void *capsule)
               reach_animation_manager_any_active(&battery->animations))));
 }
 
+static int32_t reach_battery_capsule_presentation_visible(const void *capsule)
+{
+    const reach_battery *battery = static_cast<const reach_battery *>(capsule);
+    return battery != nullptr && reach_popup_transition_visible(&battery->popup_transition);
+}
+
 static int32_t reach_battery_capsule_wants_pointer_move(const void *capsule)
 {
     const reach_battery *battery = static_cast<const reach_battery *>(capsule);
@@ -540,6 +546,10 @@ const reach_feature_capsule_ops *reach_battery_capsule_ops(void)
         reach_battery_capsule_pointer_sequence_active,
         nullptr,
         reach_battery_capsule_surface_geometry,
+        nullptr,
+        nullptr,
+        nullptr,
+        reach_battery_capsule_presentation_visible,
     };
     return &ops;
 }

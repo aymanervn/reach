@@ -956,6 +956,12 @@ static int32_t reach_context_menu_capsule_needs_frame(const void *capsule)
             (menu->state.open && reach_animation_manager_any_active(&menu->animations)));
 }
 
+static int32_t reach_context_menu_capsule_presentation_visible(const void *capsule)
+{
+    const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
+    return menu != nullptr && reach_popup_transition_visible(&menu->popup_transition);
+}
+
 static int32_t reach_context_menu_capsule_pointer_sequence_active(const void *capsule)
 {
     const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
@@ -994,6 +1000,10 @@ const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void)
         reach_context_menu_capsule_pointer_sequence_active,
         nullptr,
         reach_context_menu_capsule_surface_geometry,
+        nullptr,
+        nullptr,
+        nullptr,
+        reach_context_menu_capsule_presentation_visible,
     };
     return &ops;
 }

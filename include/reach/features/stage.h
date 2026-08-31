@@ -50,7 +50,6 @@ extern "C"
         int32_t open;
         int32_t closing;
         float progress;
-        float backdrop_opacity;
         float reflow;
         float close_hover;
         float animation_seconds;

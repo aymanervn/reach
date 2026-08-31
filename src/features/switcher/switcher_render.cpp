@@ -18,7 +18,14 @@ static void reach_switcher_label_for_window(uint16_t *out_label, size_t out_coun
         return;
     }
 
-    reach_window_tracking_app_display_name(window, out_label, out_count);
+    if (window != nullptr && window->title[0] != 0)
+    {
+        (void)reach_copy_utf16(out_label, out_count, window->title);
+    }
+    else
+    {
+        reach_window_tracking_app_display_name(window, out_label, out_count);
+    }
     if (out_label[0] == 0)
     {
         const uint16_t fallback[] = {'A', 'p', 'p', 0};
@@ -69,6 +76,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     input.items = items;
     input.item_count = state->window_count;
     input.dpi_scale = ctx->dpi_scale;
+    input.text_measure = ctx->text_measure;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     input.text_weight_demi_bold = REACH_TEXT_WEIGHT_DEMIBOLD;
 
@@ -96,6 +104,8 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     float icon_top_offset = reach_switcher_input_scale(input, 4.0f);
     float label_top = reach_switcher_input_scale(input, 104.0f);
     float label_height = reach_switcher_input_scale(input, 20.0f);
+    float label_horizontal_padding = reach_switcher_input_scale(input, 6.0f);
+    float label_width = icon_box_size - label_horizontal_padding * 2.0f;
     float label_text_size = reach_switcher_input_scale(input, REACH_TEXT_SIZE_MEDIUM);
     const reach_theme *theme = input->theme;
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
@@ -170,20 +180,23 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
 
             if (selected)
             {
+                const uint16_t *label = input->items[index].label[0] != 0
+                                            ? input->items[index].label
+                                            : (const uint16_t *)L"App";
                 command = {};
                 command.type = REACH_RENDER_COMMAND_TEXT;
-                command.rect.x = item.x;
+                command.rect.x = box_x + label_horizontal_padding;
                 command.rect.y = item.y + label_top;
-                command.rect.width = item.width;
+                command.rect.width = label_width;
                 command.rect.height = label_height;
                 command.color = theme->switcher_label_text;
                 command.text_weight = input->text_weight_demi_bold;
                 command.text_alignment = input->text_alignment_center;
                 command.text_size = label_text_size;
-                command.text_ellipsis = 1;
-                reach_copy_utf16(command.text, 260,
-                                 input->items[index].label[0] != 0 ? input->items[index].label
-                                                                   : (const uint16_t *)L"App");
+                command.text_ellipsis =
+                    reach_text_width_or_estimate(&input->text_measure, label, label_text_size,
+                                                 input->text_weight_demi_bold, 0.62f) > label_width;
+                reach_copy_utf16(command.text, 260, label);
                 reach_render_command_buffer_push(out_commands, &command);
             }
         }

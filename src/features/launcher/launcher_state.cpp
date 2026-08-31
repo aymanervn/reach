@@ -1042,6 +1042,12 @@ static int32_t reach_launcher_capsule_is_open(const void *capsule)
         const_cast<reach_launcher *>(static_cast<const reach_launcher *>(capsule)));
 }
 
+static int32_t reach_launcher_capsule_presentation_visible(const void *capsule)
+{
+    const reach_launcher *launcher = static_cast<const reach_launcher *>(capsule);
+    return launcher != nullptr && launcher->surface_visible;
+}
+
 static int32_t reach_launcher_capsule_needs_frame(const void *capsule)
 {
     const reach_launcher *launcher = static_cast<const reach_launcher *>(capsule);
@@ -1376,6 +1382,8 @@ const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
         reach_launcher_capsule_surface_geometry,
         reach_launcher_capsule_wants_pointer_move,
         reach_launcher_capsule_handle_event,
+        nullptr,
+        reach_launcher_capsule_presentation_visible,
     };
     return &ops;
 }

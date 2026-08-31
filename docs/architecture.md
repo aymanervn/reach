@@ -71,10 +71,11 @@ system status, Now Playing, … Includes `ports`, `protocol`, `core`. The config
 the live configuration snapshot, publishes typed mutations before persistence, rebases pending
 mutations on the latest stored snapshot, coalesces background writes by generation, and
 reconciles external-change reloads. Features consume snapshot copies and never access the
-config-store port directly. Window tracking owns the one naming policy for a running app
-(`reach_window_tracking_app_display_name`: executable stem, window title as
-fallback); every surface that labels an app — the top bar's current-app pill, the
-switcher — reads it from there. Pinned apps do not persist a title; the Dock derives
+config-store port directly. Window tracking owns the naming policy for a running app
+(`reach_window_tracking_app_display_name`: executable stem, window title as fallback);
+the top bar's current-app pill reads it from there. Window-oriented surfaces that already
+show the app icon, including Switcher and Stage, label each window from its snapshot title
+without prepending the app identity. Pinned apps do not persist a title; the Dock derives
 its icon fallback from the executable path and never treats config as a live label. Now Playing
 publishes atomic core media generations immediately, enriches them with the latest
 generation's cover asynchronously, owns transport serialization and cover lifetime,
@@ -101,7 +102,7 @@ never another feature's internals.
 
 Every capsule also implements the uniform hooks in
 `reach/features/feature_capsule.h` (`reset`, `tick`, `is_open`, `force_close`,
-`on_game_mode`, `needs_frame`, `wants_pointer_move`, `handle_pointer`,
+`presentation_visible`, `on_game_mode`, `needs_frame`, `wants_pointer_move`, `handle_pointer`,
 `pointer_sequence_active`, `handle_event`);
 composition orchestrates through these, so adding a feature costs no
 feature-specific composition code. `handle_pointer` carries the complete
@@ -170,7 +171,8 @@ semantic actions into audio and system-control calls and retains popup policy.
 Quick Settings also attaches the system-status service directly (the
 launcher→search precedent): snapshot take/apply runs inside the capsule
 (`reach_quick_settings_process_changes`); its pending service work folds into
-`needs_frame`. A bluetooth toggle is resolved by the port, not by a timer: the
+`needs_frame`. That hook schedules capsule work only; it never implies that a closed
+native surface is presented. A bluetooth toggle is resolved by the port, not by a timer: the
 adapter raises `REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST` alongside
 `..._CHANGE_BLUETOOTH` when the requested set has run to completion, and the
 capsule clears its pending tile on the snapshot carrying that reason — or earlier,
@@ -210,10 +212,8 @@ Stage is the window overview: a fullscreen overlay capsule that shrinks every op
 window into a centered grid. It owns tile layout, the open/close animation, hover
 state, and hit resolution, and reports only activate/dismiss actions. It uses no
 generic host transition: its fullscreen surface remains fixed to the monitor while
-the capsule's theme-timed progress animates the tiles. A dedicated managed backdrop
-track reaches full opacity during the opening animation's short initial segment, remains
-settled through most of close, and starts its cubic fade only when that same close
-timeline has one short fade duration remaining. It never calls the
+the capsule's theme-timed progress animates the tiles. The backdrop uses the theme token's
+constant opacity for every visible frame. It never calls the
 thumbnail port — it publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
 into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in
@@ -414,10 +414,11 @@ move/size-loop events.
 Two separate inputs decide how another open surface affects the bars, and both
 apply to both bars identically. A surface that declares `bar_shown_while_open`
 _forces_ them shown for as long as it is *presented*, not merely while its capsule
-reports open: `reach_host_surface_presented` is `is_open || needs_frame`, the same
-predicate the frame pass uses to decide a surface is still on screen, so the force
-survives the whole close animation and lifts on the frame the surface actually
-leaves. Stage is the only such surface, because it is a window overview and wants
+reports open: `reach_host_surface_presented` is `is_open || presentation_visible`.
+The second hook is explicit capsule-owned presentation lifetime, so the force survives
+the whole close animation and lifts on the frame the surface actually leaves without
+conflating background frame scheduling with native visibility. Stage is the only such
+surface, because it is a window overview and wants
 the bars in frame. The distinction is load-bearing rather than pedantic: the Stage
 capsule reports closed the moment `reach_stage_begin_close` runs, while its tiles
 keep animating for the full close duration, and dropping the force there demotes
@@ -542,8 +543,10 @@ pass. Capsules also own feature-specific presentation animation. Launcher keeps 
 opacity, and proportional scale tracks beside its results-expansion track in the Launcher animation
 manager. Popup capsules embed the shared `features/common/popup` transition, which owns direction,
 timing, reversal, and close visibility. Their geometry publishes only generic presentation values;
-composition applies those values to the platform window and, for scaled presentation, maintains a
-stable maximum envelope plus matching render and pointer transforms. Registry entries and popup
+composition applies managed opacity to the complete rendered command buffer and, for scaled
+presentation, maintains a stable maximum envelope plus matching render and pointer transforms.
+Capsules whose close presentation outlives `is_open` expose that lifetime through
+`presentation_visible`; `needs_frame` remains scheduler-only. Registry entries and popup
 call sites do not carry animation direction or scale policy. Surfaces that still use the generic
 host transition receive distinct indexed offset and opacity tracks. The per-surface frame steps
 (`host_surface_frames.cpp`, layout refresh → transition → window state →

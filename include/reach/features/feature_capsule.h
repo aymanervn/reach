@@ -150,6 +150,8 @@ extern "C"
            matched against the control a popup hangs off without naming either feature. */
         int32_t (*control_at_point)(const void *capsule, int32_t screen_x, int32_t screen_y,
                                     reach_feature_control *out);
+
+        int32_t (*presentation_visible)(const void *capsule);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus
