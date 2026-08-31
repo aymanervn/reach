@@ -291,8 +291,10 @@ static void test_fit_metrics_keep_native_size_until_overflow(void)
 {
     reach_dock_fit_result fit = reach_dock_fit_metrics(64.0f, 40.0f, 12.0f, 1.0f, 600.0f, 10.0f);
     expect_near(fit.scale, 1.0f, 0.0001f, "fitting content stays at native scale");
-    expect_near(fit.width, 589.6f, 0.0001f,
-                "native width includes border and equal enlarged outer padding");
+    expect_near(fit.width, 590.0f, 0.0001f,
+                "native width encloses the Dock on a whole physical pixel");
+    expect_near(fit.outer_padding, 14.0f, 0.0001f,
+                "pixel alignment slack is shared by both outer paddings");
     expect_near(fit.height, 64.0f, 0.0001f, "native height is unchanged");
 
     reach_dock_fit_result wider_border =
@@ -406,7 +408,88 @@ static void test_dock_metrics_are_spaced_before_any_configuration_arrives(void)
                     "dock slots keep their icon size without configuration");
         expect_true(layout->app_slots[1].x > layout->app_slots[0].x + layout->app_slots[0].width,
                     "dock slots keep the gap between them without configuration");
+        float border = reach_theme_border_thickness(arrange.theme, arrange.dpi_scale);
+        float left_padding = layout->trigger_button.x - border;
+        const reach_rect_f32 *last = &layout->app_slots[layout->app_slot_count - 1];
+        float right_padding = layout->bounds.width - border - last->x - last->width;
+        expect_near(right_padding, left_padding, 0.0001f,
+                    "Dock content has identical left and right padding");
     }
+
+    reach_dock_destroy(dock);
+}
+
+static void test_pinned_item_pressable_release_opens_its_target(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "activation test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+
+    reach_pinned_app_model pin = make_pin(7, "C:\\apps\\brave.exe");
+    reach_copy_ascii_to_utf16(pin.arguments, 260, "--profile-directory=Default");
+    reach_copy_ascii_to_utf16(pin.app_user_model_id, 260, "Brave.App");
+    reach_dock_apply_pinned_apps(dock, &pin, 1);
+
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+    (void)reach_dock_arrange(dock, &arrange);
+
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    reach_feature_tick_result tick = {};
+    ops->tick(dock, 1.0, &tick);
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    expect_true(layout != nullptr && layout->app_slot_count == 1,
+                "activation test has one arranged pinned item");
+    if (layout == nullptr || layout->app_slot_count != 1)
+    {
+        reach_dock_destroy(dock);
+        return;
+    }
+
+    reach_pointer_event pointer = {};
+    pointer.kind = REACH_POINTER_EVENT_DOWN;
+    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+    pointer.x = (int32_t)(layout->bounds.x + layout->app_slots[0].x +
+                          layout->app_slots[0].width * 0.5f);
+    pointer.y = (int32_t)(layout->bounds.y + layout->app_slots[0].y +
+                          layout->app_slots[0].height * 0.5f);
+    reach_capsule_pointer_result result = {};
+    ops->handle_pointer(dock, &pointer, &result);
+    expect_true(result.handled && ops->pointer_sequence_active(dock),
+                "primary down starts one pressable sequence");
+
+    pointer.kind = REACH_POINTER_EVENT_UP;
+    ops->handle_pointer(dock, &pointer, &result);
+    expect_true(result.handled && !ops->pointer_sequence_active(dock),
+                "primary release completes the pressable sequence");
+    expect_true(result.action.kind == REACH_FEATURE_ACTION_OPEN_TARGET &&
+                    result.action.target.kind == REACH_FEATURE_TARGET_APP,
+                "primary release publishes the generic app target action");
+    expect_true(reach_test_utf16_equals_ascii(result.action.target.path,
+                                              "C:\\apps\\brave.exe"),
+                "the target carries the activated Dock item's path");
+    expect_true(reach_test_utf16_equals_ascii(result.action.target.arguments,
+                                              "--profile-directory=Default"),
+                "the target carries the pinned app arguments");
+    expect_true(reach_test_utf16_equals_ascii(result.action.target.app_user_model_id,
+                                              "Brave.App"),
+                "the target carries the pinned app identity");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE) == 0,
+                "primary release uses normal open-or-focus behavior");
+
+    pointer.kind = REACH_POINTER_EVENT_DOWN;
+    pointer.button = REACH_POINTER_BUTTON_MIDDLE;
+    ops->handle_pointer(dock, &pointer, &result);
+    pointer.kind = REACH_POINTER_EVENT_UP;
+    ops->handle_pointer(dock, &pointer, &result);
+    expect_true(result.action.kind == REACH_FEATURE_ACTION_OPEN_TARGET &&
+                    (result.action.flags & REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE) != 0,
+                "middle release reuses the target path and requests a new instance");
 
     reach_dock_destroy(dock);
 }
@@ -456,6 +539,7 @@ static void test_pinned_reorder_survives_the_config_round_trip(void)
 int main(void)
 {
     test_dock_metrics_are_spaced_before_any_configuration_arrives();
+    test_pinned_item_pressable_release_opens_its_target();
     test_pinned_reorder_survives_the_config_round_trip();
     test_unpinned_windows_group_into_one_item();
     test_pinned_app_claims_matching_windows();

@@ -25,14 +25,6 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
         reach_host_close_surface(host, desc);
         return REACH_OK;
 
-    case REACH_FEATURE_ACTION_OPEN_PINNED_APP:
-        return reach_host_open_pinned_app(host, action->index, 0, desc->definition->id, 0);
-
-    case REACH_FEATURE_ACTION_OPEN_PINNED_APP_BY_ID:
-        return reach_host_open_pinned_app_id(
-            host, (uint32_t)action->id, 0, desc->definition->id,
-            (action->flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0);
-
     case REACH_FEATURE_ACTION_MOVE_PIN:
         return reach_host_move_pin(host, (uint32_t)action->id, action->index);
 

@@ -1,3 +1,4 @@
+#include "reach/core/theme.h"
 #include "reach/features/stage.h"
 
 #include <math.h>
@@ -47,6 +48,9 @@ static void test_open_and_close_state_machine(void)
         return;
     }
 
+    expect_near(reach_stage_state_ptr(stage)->animation_seconds,
+                reach_theme_default()->stage_animation_seconds,
+                "stage animation duration comes from the theme");
     expect_true(!reach_stage_is_open(stage), "a new stage is closed");
 
     expect_true(reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, nullptr,
