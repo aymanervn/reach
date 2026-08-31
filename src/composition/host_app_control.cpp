@@ -361,41 +361,6 @@ reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const u
                                  defer_until_closed);
 }
 
-reach_result reach_host_open_pinned_app(reach_host *host, size_t pinned_index,
-                                        int32_t force_new_instance, reach_surface_id source,
-                                        int32_t defer_until_closed)
-{
-    if (host == nullptr || pinned_index >= host->pinned_app_count)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    const reach_pinned_app_model *app = &host->pinned_apps[pinned_index];
-    return reach_host_open_app(host, app->path, app->arguments, app->app_user_model_id,
-                               force_new_instance, source, defer_until_closed);
-}
-
-reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
-                                           int32_t force_new_instance, reach_surface_id source,
-                                           int32_t defer_until_closed)
-{
-    if (host == nullptr || pin_id == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    for (size_t index = 0; index < host->pinned_app_count; ++index)
-    {
-        if (host->pinned_apps[index].id == pin_id)
-        {
-            return reach_host_open_pinned_app(host, index, force_new_instance, source,
-                                              defer_until_closed);
-        }
-    }
-
-    return REACH_OK;
-}
-
 reach_result reach_host_schedule_open_terminal(reach_host *host)
 {
     return reach_host_schedule_terminal_command(host, (const uint16_t *)L"");

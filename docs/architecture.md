@@ -115,6 +115,12 @@ settings, language — plus its private Now Playing input. Composition translate
 only their semantic actions and cross-feature popup policy. Raw hit types and
 row/index results are feature-private; both bars expose only a semantic
 pointer-region query for the global popup mouse hook.
+Dock item activation is decided only by the shared pressable's release result.
+Primary and middle release converge on one item-target publisher and emit the
+generic `OPEN_TARGET` action; middle release adds only the new-instance flag.
+Dock width is enclosed to a physical pixel and the subpixel remainder is split
+between its capsule-owned outer insets, keeping the first and last controls equally
+spaced from the border at every DPI.
 Pressable controls that can become horizontal reorders compose the shared
 `reach_draggable` gesture and `reach_horizontal_reorder_target` helper. The common
 layer owns threshold and gesture lifecycle semantics; each capsule retains its item
@@ -202,8 +208,10 @@ surface lifecycle, semantic-action translation, and renderer-cache eviction befo
 icons are released.
 Stage is the window overview: a fullscreen overlay capsule that shrinks every open
 window into a centered grid. It owns tile layout, the open/close animation, hover
-state, and hit resolution, and reports only activate/dismiss actions. It never calls
-the thumbnail port — it publishes a read-only placement list
+state, and hit resolution, and reports only activate/dismiss actions. It uses no
+generic host transition: its fullscreen surface remains fixed to the monitor while
+the capsule's theme-timed progress animates the backdrop and tiles. It never calls the
+thumbnail port — it publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
 into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in
 screen space; the render pass converts to surface-local. Because DWM composites

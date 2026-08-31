@@ -56,8 +56,6 @@ struct reach_dock
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
     int32_t pointer_layout_valid;
-    const reach_pinned_app_model *pointer_pinned_apps;
-    size_t pointer_pinned_app_count;
     reach_rect_f32 coverage_shown_bounds;
     reach_rect_f32 coverage_monitor_bounds;
     float coverage_shadow_clearance;
@@ -330,12 +328,8 @@ static void reach_dock_build_items(reach_dock *dock, const reach_pinned_app_mode
 }
 
 size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
-                                       const reach_pinned_app_model *pinned_apps,
-                                       size_t pinned_app_count, reach_dock_item_window *out,
-                                       size_t cap)
+                                       reach_dock_item_window *out, size_t cap)
 {
-    (void)pinned_apps;
-    (void)pinned_app_count;
     if (dock == nullptr || out == nullptr || cap == 0 || item_index >= dock->state.model.item_count)
     {
         return 0;
@@ -439,8 +433,6 @@ static reach_dock_interaction_context reach_dock_capsule_interaction_context(rea
     {
         ctx.theme = dock->pointer_theme;
         ctx.layout = dock->pointer_layout_valid ? &dock->pointer_layout : nullptr;
-        ctx.pinned_apps = dock->pointer_pinned_apps;
-        ctx.pinned_app_count = dock->pointer_pinned_app_count;
     }
     return ctx;
 }
@@ -530,6 +522,28 @@ static void reach_dock_capsule_apply_pressable_result(const reach_pressable_resu
     }
     out->sync_pointer_subscriptions =
         out->sync_pointer_subscriptions || pressable->sync_pointer_subscriptions;
+}
+
+static int32_t reach_dock_capsule_publish_open_item(reach_dock *dock, size_t item_index,
+                                                    uint32_t flags,
+                                                    reach_capsule_pointer_result *out)
+{
+    if (dock == nullptr || out == nullptr ||
+        !reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f, &dock->action_request) ||
+        dock->action_request.path[0] == 0)
+    {
+        return 0;
+    }
+    out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
+    out->action.flags |= flags;
+    out->action.target.kind = REACH_FEATURE_TARGET_APP;
+    out->action.target.path = dock->action_request.path;
+    out->action.target.arguments =
+        dock->action_request.arguments[0] != 0 ? dock->action_request.arguments : nullptr;
+    out->action.target.app_user_model_id = dock->action_request.app_user_model_id[0] != 0
+                                               ? dock->action_request.app_user_model_id
+                                               : nullptr;
+    return 1;
 }
 
 static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
@@ -659,32 +673,16 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             if (event->button == REACH_POINTER_BUTTON_MIDDLE)
             {
                 out->handled = 1;
-                if (reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f,
-                                                  &dock->action_request) &&
-                    dock->action_request.path[0] != 0)
-                {
-                    out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
-                    out->action.flags |= REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE;
-                    out->action.target.kind = REACH_FEATURE_TARGET_APP;
-                    out->action.target.path = dock->action_request.path;
-                    out->action.target.arguments = dock->action_request.arguments[0] != 0
-                                                       ? dock->action_request.arguments
-                                                       : nullptr;
-                    out->action.target.app_user_model_id =
-                        dock->action_request.app_user_model_id[0] != 0
-                            ? dock->action_request.app_user_model_id
-                            : nullptr;
-                }
+                (void)reach_dock_capsule_publish_open_item(
+                    dock, item_index, REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE, out);
                 return;
             }
             reach_dock_item_action item_action =
                 reach_dock_item_action_for_index(&state->model, item_index);
             out->handled = 1;
-            if (item_action.type == REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED)
+            if (item_action.type == REACH_DOCK_ITEM_ACTION_OPEN_APP)
             {
-                out->action.kind = REACH_FEATURE_ACTION_OPEN_PINNED_APP;
-                out->action.index = item_action.pinned_index;
-                out->action.id = item_action.pin_id;
+                (void)reach_dock_capsule_publish_open_item(dock, item_index, 0, out);
             }
             else if (item_action.type == REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW)
             {
@@ -1247,8 +1245,7 @@ size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_inde
     {
         reach_dock_item_window item_windows[2] = {};
         size_t item_window_count =
-            reach_dock_collect_item_windows(dock, item_index, dock->pointer_pinned_apps,
-                                            dock->pointer_pinned_app_count, item_windows, 2);
+            reach_dock_collect_item_windows(dock, item_index, item_windows, 2);
         out_commands[count++] = item_window_count > 1 ? REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL
                                                       : REACH_CONTEXT_MENU_COMMAND_CLOSE;
     }
@@ -1320,9 +1317,8 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
         dock, item_index, out_request->commands, REACH_CONTEXT_MENU_MAX_ITEMS);
 
     reach_dock_item_window item_windows[REACH_MENU_MAX_WINDOWS] = {};
-    size_t window_count = reach_dock_collect_item_windows(
-        dock, item_index, dock->pinned_apps, dock->pinned_app_count, item_windows,
-        REACH_MENU_MAX_WINDOWS);
+    size_t window_count =
+        reach_dock_collect_item_windows(dock, item_index, item_windows, REACH_MENU_MAX_WINDOWS);
     out_request->window_count = window_count;
     for (size_t index = 0; index < window_count; ++index)
     {
@@ -1725,10 +1721,13 @@ reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_i
     {
         result.scale = available_width / native_width;
     }
-    result.width = native_width * result.scale;
+    const float scaled_width = native_width * result.scale;
+    result.width = result.scale < 1.0f ? scaled_width : ceilf(scaled_width);
     result.height = native_height * result.scale;
     result.icon_size = native_icon_size * result.scale;
     result.gap = native_gap * result.scale;
+    result.outer_padding = native_outer_padding * result.scale +
+                           (result.width - scaled_width) * 0.5f;
     return result;
 }
 
@@ -1741,9 +1740,6 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     }
 
     dock->pointer_theme = ctx->theme;
-    dock->pointer_pinned_apps = ctx->pinned_apps;
-    dock->pointer_pinned_app_count = ctx->pinned_app_count;
-
     reach_dock_build_items(dock, ctx->pinned_apps, ctx->pinned_app_count);
 
     layout->app_slot_count = dock->state.model.item_count;
@@ -1779,7 +1775,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
 
     const float top = (layout->bounds.height - icon_size) * 0.5f;
 
-    float x = border_thickness + gap * REACH_DOCK_OUTER_PADDING_SCALE;
+    float x = border_thickness + fit.outer_padding;
     layout->trigger_button.width = icon_size;
     layout->trigger_button.height = icon_size;
     layout->trigger_button.x = x;
@@ -1836,8 +1832,6 @@ reach_result reach_dock_append_surface_render_commands(reach_dock *dock,
     render.layout = &layout;
     render.focused_window =
         dock->windows != nullptr ? reach_window_tracking_foreground(dock->windows) : 0;
-    render.pinned_apps = dock->pointer_pinned_apps;
-    render.pinned_app_count = dock->pointer_pinned_app_count;
     render.icon_size_px = ctx->icon_size_px;
     render.dpi_scale = ctx->dpi_scale;
     return reach_dock_append_render_commands(dock, &render, out_commands);

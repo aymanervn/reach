@@ -49,8 +49,6 @@ reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature
 {
     reach_dock_item_action action = {};
     action.type = REACH_DOCK_ITEM_ACTION_NONE;
-    action.item_index = item_index;
-    action.pinned_index = REACH_MAX_DOCK_ITEMS;
 
     if (model == nullptr || item_index >= model->item_count)
     {
@@ -63,14 +61,12 @@ reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature
     {
         action.type = REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW;
         action.window = item->window;
-        action.pin_id = item->pin_id;
         return action;
     }
 
     if (item->path[0] != 0)
     {
-        action.type = REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED;
-        action.pin_id = item->pin_id;
+        action.type = REACH_DOCK_ITEM_ACTION_OPEN_APP;
     }
 
     return action;

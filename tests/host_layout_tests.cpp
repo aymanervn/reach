@@ -814,6 +814,8 @@ static void test_registered_feature_lifecycle(void)
         host->feature_runtimes[REACH_SURFACE_ID_STAGE].definition->surface_ops->native_overlay !=
             nullptr,
         "Stage declares its native overlay contract");
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_STAGE].transition == nullptr,
+                "Stage owns its animation while its fullscreen surface remains stationary");
     expect_true(
         host->feature_runtimes[REACH_SURFACE_ID_DOCK].definition->resolve_anchor != nullptr &&
             host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].definition->resolve_anchor != nullptr,
@@ -910,7 +912,6 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
         "Stage opens for native-overlay frame testing");
 
     reach_feature_runtime *stage = &host->feature_runtimes[REACH_SURFACE_ID_STAGE];
-    stage->transition = nullptr;
     stage->surface->window.window = reinterpret_cast<reach_platform_window *>(9);
     stage->surface->window.ops.set_bounds = fake_set_bounds;
     stage->surface->window.ops.native_id = fake_window_id;
@@ -928,10 +929,13 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     thumbnail_create_count = 0;
     thumbnail_place_count = 0;
     thumbnail_destroy_count = 0;
+    observed_bounds = {};
     reach_host_frame_context frame = {};
     frame.monitor_bounds = monitor;
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "generic frame renders a native-overlay surface");
+    expect_true(reach_rect_equal(observed_bounds, monitor),
+                "Stage animation keeps the fullscreen surface on the monitor bounds");
     expect_true(thumbnail_create_count == 1 && thumbnail_place_count == 1,
                 "generic frame registers and places the Stage thumbnail");
 

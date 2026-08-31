@@ -205,6 +205,7 @@ extern "C"
         float height;
         float icon_size;
         float gap;
+        float outer_padding;
     } reach_dock_fit_result;
 
     reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_icon_size,
@@ -250,8 +251,6 @@ extern "C"
         const reach_theme *theme;
         const reach_dock_layout *layout;
         uintptr_t focused_window;
-        const reach_pinned_app_model *pinned_apps;
-        size_t pinned_app_count;
         int32_t icon_size_px;
         float dpi_scale;
     } reach_dock_render_context;
@@ -321,9 +320,7 @@ extern "C"
                                                void *match_user, size_t *out_indices, size_t cap);
 
     size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
-                                           const reach_pinned_app_model *pinned_apps,
-                                           size_t pinned_app_count, reach_dock_item_window *out,
-                                           size_t cap);
+                                           reach_dock_item_window *out, size_t cap);
 
     int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float pointer_x,
                                           float pointer_y, reach_menu_request *out_request);

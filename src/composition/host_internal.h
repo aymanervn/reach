@@ -789,14 +789,6 @@ reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const u
                                  reach_surface_id source, int32_t defer_until_closed);
 reach_result reach_host_set_pinned_apps(reach_host *host, const reach_pinned_app_model *apps,
                                         size_t count);
-reach_result reach_host_open_pinned_app(reach_host *host, size_t pinned_index,
-                                        int32_t force_new_instance, reach_surface_id source,
-                                        int32_t defer_until_closed);
-reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
-                                           int32_t force_new_instance, reach_surface_id source,
-                                           int32_t defer_until_closed);
-
-
 
 reach_result reach_host_close_window(reach_host *host, uintptr_t window_id);
 

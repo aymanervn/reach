@@ -23,16 +23,13 @@ float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layou
 typedef enum reach_dock_item_action_type
 {
     REACH_DOCK_ITEM_ACTION_NONE = 0,
-    REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED = 1,
+    REACH_DOCK_ITEM_ACTION_OPEN_APP = 1,
     REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW = 2
 } reach_dock_item_action_type;
 
 typedef struct reach_dock_item_action
 {
     reach_dock_item_action_type type;
-    size_t item_index;
-    size_t pinned_index;
-    uint32_t pin_id;
     uintptr_t window;
 } reach_dock_item_action;
 
@@ -40,8 +37,6 @@ typedef struct reach_dock_interaction_context
 {
     const reach_theme *theme;
     const reach_dock_layout *layout;
-    const reach_pinned_app_model *pinned_apps;
-    size_t pinned_app_count;
 } reach_dock_interaction_context;
 
 typedef struct reach_dock_interaction_result

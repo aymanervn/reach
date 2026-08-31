@@ -739,7 +739,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               1, nullptr,
                               reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_CLASS_TRANSIENT,
-                              1, nullptr,
+                              0, nullptr,
                               reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
 
     reach_feature_definition *definitions = host->feature_definitions;
