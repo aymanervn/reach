@@ -329,7 +329,7 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
     next.media_cover = next.icon;
 
     float content_x = next.icon.x + next.icon.width + 14.0f * scale;
-    float trailing = 14.0f * scale + border;
+    float trailing = 18.0f * scale + border;
     float content_width = width - content_x - trailing;
 
     if (hud->state.kind == REACH_SYSTEM_HUD_MEDIA)

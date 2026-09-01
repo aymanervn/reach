@@ -144,7 +144,7 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = {0.0f, 0.0f, state->layout.bounds.width, state->layout.bounds.height};
-    shape.radius = 18.0f * ctx->dpi_scale;
+    shape.radius = shape.rect.height * 0.5f;
     reach_result result = reach_render_push_bordered_background(
         out_commands, &shape, ctx->theme->system_hud_background, ctx->theme->system_hud_border,
         reach_theme_border_thickness(ctx->theme, ctx->dpi_scale), &ctx->theme->popup_shadow,
