@@ -5,9 +5,8 @@
 #define REACH_STAGE_MAX_SECTIONS 8
 #define REACH_STAGE_BOX_LONG 16.0f
 #define REACH_STAGE_BOX_SHORT 9.0f
-#define REACH_STAGE_BAR_HEIGHT 20.0f
-#define REACH_STAGE_BAR_MAX_BOX_RATIO 0.10f
-#define REACH_STAGE_TILE_BORDER 2.0f
+#define REACH_STAGE_BAR_HEIGHT 32.0f
+#define REACH_STAGE_BAR_MAX_BOX_RATIO 0.20f
 #define REACH_STAGE_PRESENCE_MIN_SCALE 0.88f
 
 typedef struct reach_stage_section
@@ -54,11 +53,6 @@ float reach_stage_tile_bar_height(const reach_stage_state *state)
     return REACH_STAGE_BAR_HEIGHT * dpi_scale;
 }
 
-float reach_stage_tile_border(const reach_stage_state *state)
-{
-    float dpi_scale = state != nullptr && state->dpi_scale > 0.0f ? state->dpi_scale : 1.0f;
-    return REACH_STAGE_TILE_BORDER * dpi_scale;
-}
 
 static void reach_stage_collect_sections(const reach_stage_state *state,
                                          reach_stage_sections *sections)
@@ -164,7 +158,7 @@ static reach_rect_f32 reach_stage_fit_into_box(reach_rect_f32 box, reach_rect_f3
 
 static void reach_stage_place_section(reach_stage_state *state, const reach_stage_section *section,
                                       float scale, float gap, float origin_x, reach_rect_f32 area,
-                                      float bar_height)
+                                      float bar_height, float border_thickness)
 {
     float box_width = reach_stage_box_width(section) * scale;
     float box_height = reach_stage_box_height(section) * scale;
@@ -194,8 +188,18 @@ static void reach_stage_place_section(reach_stage_state *state, const reach_stag
         }
 
         reach_rect_f32 inner = box;
-        inner.y += bar;
-        inner.height -= bar;
+        inner.x += border_thickness;
+        inner.y += bar + border_thickness;
+        inner.width -= border_thickness * 2.0f;
+        inner.height -= bar + border_thickness * 2.0f;
+        if (inner.width < 0.0f)
+        {
+            inner.width = 0.0f;
+        }
+        if (inner.height < 0.0f)
+        {
+            inner.height = 0.0f;
+        }
 
         reach_stage_tile *tile = &state->tiles[section->indices[index]];
         tile->bar_height = bar;
@@ -251,6 +255,7 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     float scale = reach_stage_solve_box_scale(&sections, area, gap);
     float bar_height = reach_stage_tile_bar_height(state);
 
+    float border_thickness = reach_theme_border_thickness(reach_theme_default(), dpi_scale);
     float total_width = gap * (float)(sections.count - 1);
     for (size_t index = 0; index < sections.count; ++index)
     {
@@ -261,7 +266,8 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     for (size_t index = 0; index < sections.count; ++index)
     {
         const reach_stage_section *section = &sections.entries[index];
-        reach_stage_place_section(state, section, scale, gap, x, area, bar_height);
+        reach_stage_place_section(state, section, scale, gap, x, area, bar_height,
+                                  border_thickness);
         x += reach_stage_section_width(section, scale, gap) + gap;
     }
 }

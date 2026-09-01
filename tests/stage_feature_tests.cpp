@@ -39,6 +39,89 @@ static reach_stage_open_window make_window(uintptr_t id, reach_rect_f32 frame)
     return window;
 }
 
+static void advance_stage(reach_stage *stage, int steps, double delta_seconds)
+{
+    const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
+    reach_feature_tick_result tick = {};
+    for (int step = 0; step < steps; ++step)
+    {
+        ops->tick(stage, delta_seconds, &tick);
+    }
+}
+
+static void test_backdrop_uses_short_managed_fades(void)
+{
+    reach_stage *stage = nullptr;
+    expect_true(reach_stage_create(&stage) == REACH_OK && stage != nullptr,
+                "stage is created for backdrop timing");
+    if (stage == nullptr)
+    {
+        return;
+    }
+
+    reach_stage_set_animation_seconds(stage, 1.0f);
+    reach_stage_open_window window = make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f));
+    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, &window, 1);
+
+    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 0.0f,
+                "backdrop starts transparent");
+    advance_stage(stage, 1, 0.025);
+    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 0.0f,
+                "backdrop keeps the first presented frame transparent");
+    advance_stage(stage, 1, 0.35);
+    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 1.0f,
+                "backdrop reaches full opacity early");
+    expect_true(reach_stage_state_ptr(stage)->progress > 0.0f &&
+                    reach_stage_state_ptr(stage)->progress < 1.0f,
+                "tiles continue opening after the backdrop settles");
+
+    advance_stage(stage, 1, 0.65);
+    reach_stage_begin_close(stage);
+    advance_stage(stage, 60, 0.01);
+    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 1.0f,
+                "backdrop holds full opacity through most of close");
+
+    advance_stage(stage, 25, 0.01);
+    float fading = reach_stage_state_ptr(stage)->backdrop_opacity;
+    expect_true(fading > 0.0f && fading < 1.0f,
+                "backdrop fades during the final close segment");
+
+    advance_stage(stage, 15, 0.01);
+    expect_true(!reach_stage_is_open(stage), "backdrop fade ends with the stage close");
+    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 0.0f,
+                "closed stage clears backdrop opacity");
+
+    reach_stage_destroy(stage);
+}
+
+static void test_backdrop_close_preserves_interrupted_open_opacity(void)
+{
+    reach_stage *stage = nullptr;
+    expect_true(reach_stage_create(&stage) == REACH_OK && stage != nullptr,
+                "stage is created for interrupted backdrop timing");
+    if (stage == nullptr)
+    {
+        return;
+    }
+
+    reach_stage_set_animation_seconds(stage, 1.0f);
+    reach_stage_open_window window = make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f));
+    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, &window, 1);
+    advance_stage(stage, 1, 0.025);
+    advance_stage(stage, 1, 0.05);
+
+    float interrupted = reach_stage_state_ptr(stage)->backdrop_opacity;
+    expect_true(interrupted > 0.0f && interrupted < 1.0f,
+                "interrupted opening has partial backdrop opacity");
+    reach_stage_begin_close(stage);
+    advance_stage(stage, 50, 0.01);
+    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, interrupted,
+                "closing holds the interrupted backdrop opacity without a jump");
+
+    reach_stage_force_close(stage);
+    reach_stage_destroy(stage);
+}
+
 static void test_open_and_close_state_machine(void)
 {
     reach_stage *stage = nullptr;
@@ -260,6 +343,8 @@ static void test_closing_lands_on_the_current_window_frame(void)
 
 int main(void)
 {
+    test_backdrop_uses_short_managed_fades();
+    test_backdrop_close_preserves_interrupted_open_opacity();
     test_open_and_close_state_machine();
     test_force_close_keeps_configured_animation();
     test_closing_stage_finishes_without_external_wake_ups();

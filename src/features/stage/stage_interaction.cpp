@@ -59,14 +59,15 @@ reach_rect_f32 reach_stage_tile_close_button_rect(const reach_stage *stage, size
         return rect;
     }
 
-    float size = tile->current_bar.height;
+    float size = tile->current_bar.height * 0.5f;
+    float inset = (tile->current_bar.height - size) * 0.5f;
     if (size <= 0.0f || size > tile->current_bar.width)
     {
         return rect;
     }
 
-    rect.x = tile->current_bar.x + tile->current_bar.width - size;
-    rect.y = tile->current_bar.y;
+    rect.x = tile->current_bar.x + tile->current_bar.width - size - inset;
+    rect.y = tile->current_bar.y + inset;
     rect.width = size;
     rect.height = size;
     return rect;
