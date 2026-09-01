@@ -149,6 +149,7 @@ extern "C"
         reach_color stage_tile_highlight;
         reach_color stage_tile_label;
         reach_color stage_tile_header_background;
+        reach_color stage_close_background;
         reach_color stage_close_hover_background;
         reach_color stage_close_glyph;
         reach_color stage_close_hover_glyph;
