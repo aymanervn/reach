@@ -1,0 +1,238 @@
+#include "host_internal.h"
+
+static reach_window_id reach_host_layout_native_id(const reach_host_layout_target *target)
+{
+    if (target->runtime != nullptr && target->runtime->surface->window.ops.native_id != nullptr)
+    {
+        return target->runtime->surface->window.ops.native_id(
+            target->runtime->surface->window.window);
+    }
+    if (target->edge_reveal != nullptr && target->edge_reveal->ops.native_id != nullptr)
+    {
+        return target->edge_reveal->ops.native_id(target->edge_reveal->hotspot);
+    }
+    return 0;
+}
+
+static reach_result reach_host_layout_set_topmost(const reach_host_layout_target *target,
+                                                  int32_t enabled)
+{
+    if (target->runtime != nullptr && target->runtime->surface->window.ops.set_topmost != nullptr)
+    {
+        return target->runtime->surface->window.ops.set_topmost(
+            target->runtime->surface->window.window, enabled);
+    }
+    if (target->edge_reveal != nullptr && target->edge_reveal->ops.set_topmost != nullptr)
+    {
+        return target->edge_reveal->ops.set_topmost(target->edge_reveal->hotspot, enabled);
+    }
+    return REACH_NOT_IMPLEMENTED;
+}
+
+static reach_result reach_host_layout_place_behind(const reach_host_layout_target *target,
+                                                   reach_window_id above)
+{
+    if (target->runtime != nullptr && target->runtime->surface->window.ops.place_behind != nullptr)
+    {
+        return target->runtime->surface->window.ops.place_behind(
+            target->runtime->surface->window.window, above);
+    }
+    if (target->edge_reveal != nullptr && target->edge_reveal->ops.place_behind != nullptr)
+    {
+        return target->edge_reveal->ops.place_behind(target->edge_reveal->hotspot, above);
+    }
+    return REACH_NOT_IMPLEMENTED;
+}
+
+static void reach_host_layout_apply_visibility(const reach_host_layout_target *target,
+                                               int32_t visible)
+{
+    if (target->runtime != nullptr)
+    {
+        reach_surface_runtime *surface = target->runtime->surface;
+        int32_t activates = (target->runtime->definition->surface.behavior_flags &
+                             REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
+
+        if (!visible)
+        {
+            surface->activated = 0;
+            if (surface->window.ops.hide != nullptr)
+            {
+                (void)surface->window.ops.hide(surface->window.window);
+            }
+            return;
+        }
+
+        if (activates && surface->activated)
+        {
+            return;
+        }
+        if (surface->window.ops.show != nullptr)
+        {
+            (void)surface->window.ops.show(surface->window.window);
+            surface->activated = activates;
+        }
+        return;
+    }
+
+    if (target->edge_reveal == nullptr || target->edge_reveal->hotspot == nullptr)
+    {
+        return;
+    }
+    if (visible)
+    {
+        if (target->edge_reveal->ops.show != nullptr)
+        {
+            (void)target->edge_reveal->ops.show(target->edge_reveal->hotspot);
+        }
+    }
+    else if (target->edge_reveal->ops.hide != nullptr)
+    {
+        (void)target->edge_reveal->ops.hide(target->edge_reveal->hotspot);
+    }
+}
+
+static const reach_layout_entry *
+reach_host_layout_applied_entry(const reach_host *host, reach_layout_participant participant)
+{
+    if (!host->has_applied_layout_plan)
+    {
+        return nullptr;
+    }
+    for (size_t index = 0; index < host->applied_layout_plan.count; ++index)
+    {
+        const reach_layout_entry *entry = &host->applied_layout_plan.entries[index];
+        if (entry->participant == participant)
+        {
+            return entry;
+        }
+    }
+    return nullptr;
+}
+
+static int32_t reach_host_layout_visibility_invalidated(const reach_host_layout_target *target)
+{
+    return target != nullptr && target->runtime != nullptr && target->runtime->surface != nullptr &&
+           target->runtime->surface->native_visibility_invalidated;
+}
+
+void reach_host_apply_layout(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    reach_layout_plan plan = {};
+    reach_layout_resolve(&host->layout_manager, &plan);
+    int32_t plan_changed = !host->has_applied_layout_plan ||
+                           !reach_layout_plan_equal(&plan, &host->applied_layout_plan);
+    int32_t visibility_invalidated = 0;
+    for (size_t index = 0; index < plan.count; ++index)
+    {
+        visibility_invalidated |= reach_host_layout_visibility_invalidated(
+            &host->layout_targets[plan.entries[index].participant]);
+    }
+    if (!plan_changed && !host->dirty.z_order && !visibility_invalidated)
+    {
+        return;
+    }
+
+    if (plan_changed || visibility_invalidated)
+    {
+        for (size_t index = 0; index < plan.count; ++index)
+        {
+            const reach_layout_entry *entry = &plan.entries[index];
+            const reach_layout_entry *applied =
+                reach_host_layout_applied_entry(host, entry->participant);
+            reach_host_layout_target *target = &host->layout_targets[entry->participant];
+            int32_t target_visibility_invalidated =
+                reach_host_layout_visibility_invalidated(target);
+            if (applied == nullptr || applied->visible != entry->visible ||
+                target_visibility_invalidated)
+            {
+                reach_host_layout_apply_visibility(target, entry->visible);
+                if (target_visibility_invalidated)
+                {
+                    target->runtime->surface->native_visibility_invalidated = 0;
+                }
+            }
+        }
+    }
+
+    reach_window_id above = 0;
+    for (size_t index = 0; index < plan.count; ++index)
+    {
+        const reach_layout_entry *entry = &plan.entries[index];
+        const reach_host_layout_target *target = &host->layout_targets[entry->participant];
+
+        if (entry->layer == 0)
+        {
+            const reach_layout_entry *applied =
+                reach_host_layout_applied_entry(host, entry->participant);
+            if (applied != nullptr && applied->layer > 0)
+            {
+                (void)reach_host_layout_set_topmost(target, 0);
+            }
+            continue;
+        }
+        if (!entry->visible)
+        {
+            continue;
+        }
+
+        reach_window_id native = reach_host_layout_native_id(target);
+        if (native == 0)
+        {
+            continue;
+        }
+
+        if (above == 0)
+        {
+            (void)reach_host_layout_set_topmost(target, 1);
+        }
+        else
+        {
+            (void)reach_host_layout_place_behind(target, above);
+        }
+        above = native;
+    }
+
+    host->applied_layout_plan = plan;
+    host->has_applied_layout_plan = 1;
+    host->dirty.z_order = 0;
+}
+
+void reach_host_invalidate_surface_z_order(reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT || !host->has_applied_layout_plan)
+    {
+        return;
+    }
+
+    reach_layout_participant participant = host->surface_participants[id];
+    const reach_layout_entry *entry = reach_host_layout_applied_entry(host, participant);
+    if (entry == nullptr || !entry->visible || entry->layer <= 0)
+    {
+        return;
+    }
+
+    host->dirty.z_order = 1;
+    reach_host_request_update(host);
+}
+
+void reach_host_hide_all_surfaces(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    for (reach_layout_participant participant = 0;
+         participant < (reach_layout_participant)host->layout_manager.participant_count;
+         ++participant)
+    {
+        reach_layout_set_visible(&host->layout_manager, participant, 0);
+    }
+    reach_host_apply_layout(host);
+}

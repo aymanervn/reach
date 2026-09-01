@@ -3,22 +3,17 @@
 
 #include "reach/composition/host.h"
 
+#include "reach/core/menu_commands.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/ui_events.h"
 #include "reach/core/ui_layout.h"
 
+#include "reach/features/common/bar_visibility.h"
+#include "reach/features/common/layout.h"
 #include "reach/features/common/text_edit.h"
-#include "reach/features/context_menu.h"
 #include "reach/features/feature_capsule.h"
-#include "reach/features/clipboard.h"
-#include "reach/features/dock.h"
-#include "reach/features/launcher.h"
 #include "reach/services/pin_config.h"
-#include "reach/features/popup.h"
-#include "reach/features/quick_settings.h"
-#include "reach/features/switcher.h"
-#include "reach/features/tray.h"
-#include "reach/features/wallpaper.h"
+#include "reach/features/common/popup.h"
 
 #include "reach/core/runtime_policy.h"
 #include "reach/composition/surface_runtime.h"
@@ -28,8 +23,13 @@
 #include "reach/services/idle_watch.h"
 #include "reach/services/now_playing.h"
 #include "reach/services/search.h"
+#include "reach/services/tray.h"
+#include "reach/services/clock.h"
+#include "reach/services/input_language.h"
+#include "reach/services/system_stats.h"
 #include "reach/services/system_status.h"
 #include "reach/services/window_tracking.h"
+#include "reach/services/wallpaper.h"
 #include "reach/support/animation.h"
 
 #include <atomic>
@@ -37,30 +37,18 @@
 #include <mutex>
 #include <thread>
 
-typedef enum reach_host_animation_id
-{
-    REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y = 0,
-    REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
-    REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
-    REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
-    REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
-    REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_Y,
-    REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY,
-    REACH_HOST_ANIMATION_COUNT
-} reach_host_animation_id;
+#define REACH_HOST_MAX_ITEM_WINDOWS 16
+#define REACH_SURFACE_NATIVE_OVERLAY_CAPACITY (REACH_MAX_OPEN_WINDOWS + 1)
 
-typedef struct reach_host_surface_transition
+typedef struct reach_host_surface_presentation_frame
 {
-    int32_t visible;
-    int32_t target_open;
-    size_t y_track;
-    size_t opacity_track;
-} reach_host_surface_transition;
+    reach_rect_f32 window_bounds;
+    reach_rect_f32 content_rect;
+    reach_transform_f32 render_transform;
+    reach_transform_f32 pointer_transform;
+    float scale;
+    int32_t scale_envelope_active;
+} reach_host_surface_presentation_frame;
 
 typedef enum reach_surface_class
 {
@@ -73,97 +61,452 @@ typedef enum reach_surface_class
 typedef enum reach_surface_id
 {
     REACH_SURFACE_ID_DOCK = 0,
+    REACH_SURFACE_ID_TOP_BAR,
     REACH_SURFACE_ID_LAUNCHER,
     REACH_SURFACE_ID_CLIPBOARD,
     REACH_SURFACE_ID_TRAY,
     REACH_SURFACE_ID_QUICK_SETTINGS,
     REACH_SURFACE_ID_CONTEXT_MENU,
     REACH_SURFACE_ID_SWITCHER,
+    REACH_SURFACE_ID_STAGE,
+    REACH_SURFACE_ID_BATTERY,
+    REACH_SURFACE_ID_SYSTEM_HUD,
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
+
+typedef enum reach_surface_shadow
+{
+    REACH_SURFACE_SHADOW_NONE = 0,
+    REACH_SURFACE_SHADOW_BAR = 1,
+    REACH_SURFACE_SHADOW_POPUP = 2
+} reach_surface_shadow;
 
 typedef enum reach_surface_pointer_flags
 {
     REACH_SURFACE_POINTER_NONE = 0,
     REACH_SURFACE_POINTER_RELAYOUT_REDRAWS = 1u << 0,
-    REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY = 1u << 1,
+    REACH_SURFACE_POINTER_SOURCE_GATED = 1u << 1,
 
-    REACH_SURFACE_POINTER_SOURCE_GATED = 1u << 2,
+    REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED = 1u << 2,
 
-    REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED = 1u << 3,
+    REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED = 1u << 3,
 
-    REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED = 1u << 4
+    REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN = 1u << 4,
+
+    REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE = 1u << 5,
+
+    REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE = 1u << 6
 } reach_surface_pointer_flags;
 
 typedef enum reach_surface_behavior_flags
 {
     REACH_SURFACE_BEHAVIOR_NONE = 0,
 
-    REACH_SURFACE_BEHAVIOR_ACTIVATES = 1u << 0
+    REACH_SURFACE_BEHAVIOR_ACTIVATES = 1u << 0,
+
+    REACH_SURFACE_BEHAVIOR_EXCLUSIVE = 1u << 1,
+    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE = 1u << 2
 } reach_surface_behavior_flags;
 
-typedef struct reach_surface_desc
+typedef enum reach_edge_reveal_anchor
+{
+    REACH_EDGE_REVEAL_ANCHOR_MANAGED = 0,
+    REACH_EDGE_REVEAL_ANCHOR_TOP_LEFT,
+    REACH_EDGE_REVEAL_ANCHOR_TOP,
+    REACH_EDGE_REVEAL_ANCHOR_TOP_RIGHT,
+    REACH_EDGE_REVEAL_ANCHOR_RIGHT,
+    REACH_EDGE_REVEAL_ANCHOR_BOTTOM_RIGHT,
+    REACH_EDGE_REVEAL_ANCHOR_BOTTOM,
+    REACH_EDGE_REVEAL_ANCHOR_BOTTOM_LEFT,
+    REACH_EDGE_REVEAL_ANCHOR_LEFT
+} reach_edge_reveal_anchor;
+
+typedef struct reach_edge_reveal_geometry
+{
+    reach_edge_reveal_anchor anchor;
+    float width_dp;
+    float height_dp;
+    int32_t visible;
+} reach_edge_reveal_geometry;
+
+typedef struct reach_surface_edge_reveal_spec
+{
+    int32_t enabled;
+    int32_t layer;
+    reach_edge_reveal_geometry geometry;
+    void (*handle_event)(reach_host *host, reach_screen_hotspot_event event);
+} reach_surface_edge_reveal_spec;
+
+typedef struct reach_surface_bar_reveal_spec
+{
+    const reach_bar_reveal_ops *ops;
+    int32_t active_layer;
+    float span_start_inset_dp;
+} reach_surface_bar_reveal_spec;
+
+typedef struct reach_feature_factory
+{
+    reach_result (*create)(void **out_capsule);
+    void (*destroy)(void *capsule);
+} reach_feature_factory;
+
+typedef struct reach_feature_dependencies
+{
+    reach_search_service *search;
+    reach_icon_service *icons;
+    reach_window_tracking *windows;
+    reach_now_playing_service *now_playing;
+    reach_system_stats *system_stats;
+    reach_clock *clock;
+    reach_input_language_service *input_language;
+    reach_tray_service *tray;
+    reach_app_control *app_control;
+    reach_system_status *system_status;
+    const reach_clipboard_port *clipboard;
+    void (*request_update)(void *user);
+    void *request_update_user;
+    const uint16_t *terminal_icon_ref;
+} reach_feature_dependencies;
+
+typedef struct reach_feature_lifecycle_ops
+{
+    void (*attach)(void *capsule, const reach_feature_dependencies *dependencies);
+    reach_result (*start)(void *capsule);
+    void (*stop)(void *capsule);
+} reach_feature_lifecycle_ops;
+
+typedef enum reach_feature_notification_kind
+{
+    REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED = 1,
+    REACH_FEATURE_NOTIFICATION_NOW_PLAYING_CHANGED = 2,
+    REACH_FEATURE_NOTIFICATION_MEDIA_ACTION = 3,
+    REACH_FEATURE_NOTIFICATION_MAIN_VOLUME = 4,
+    REACH_FEATURE_NOTIFICATION_BRIGHTNESS = 5,
+    REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE = 6,
+    REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED = 7,
+    REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED = 8,
+    REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 9,
+    REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 10,
+    REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED = 11,
+    REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 12
+} reach_feature_notification_kind;
+
+typedef struct reach_feature_notification
+{
+    reach_feature_notification_kind kind;
+    reach_now_playing_action media_action;
+    reach_audio_volume_state volume;
+    reach_brightness_state brightness;
+    reach_window_tracking_refresh_report windows;
+    const reach_pinned_app_model *pinned_apps;
+    size_t pinned_app_count;
+    int32_t icon_size_px;
+    reach_display_environment display;
+    const reach_config_snapshot *config;
+    int32_t present;
+} reach_feature_notification;
+
+typedef struct reach_feature_render_resource
+{
+    uint64_t render_icon_id;
+    uint64_t source_id;
+    int32_t release_source;
+} reach_feature_render_resource;
+
+typedef struct reach_feature_render_resource_ops
+{
+    size_t (*take_retired)(void *capsule, reach_feature_render_resource *out, size_t cap);
+    size_t (*active_count)(const void *capsule);
+    int32_t (*active_at)(const void *capsule, size_t index, reach_feature_render_resource *out);
+    void (*release_source)(void *capsule, const reach_feature_render_resource *resource);
+    void (*clear_active)(void *capsule);
+} reach_feature_render_resource_ops;
+
+typedef struct reach_feature_control_ops
+{
+    int32_t (*set_open)(void *capsule, int32_t open, reach_feature_tick_result *out);
+    void (*surface_hidden)(void *capsule, reach_feature_tick_result *out);
+    void (*notify)(void *capsule, const reach_feature_notification *notification,
+                   reach_feature_tick_result *out);
+    int32_t (*blocks_position_only_frame)(const void *capsule);
+    const reach_feature_render_resource_ops *render_resources;
+} reach_feature_control_ops;
+
+typedef struct reach_feature_surface_context
+{
+    const reach_theme *theme;
+    reach_rect_f32 monitor_bounds;
+    reach_rect_f32 anchor_bounds;
+    reach_rect_f32 last_bounds;
+    reach_rect_f32 visible_bounds;
+    reach_rect_f32 render_bounds;
+    reach_rect_f32 content_rect;
+    reach_transform_f32 render_transform;
+    reach_text_measure_port text_measure;
+    float dpi_scale;
+    int32_t icon_size_px;
+    int32_t transition_visible;
+    int32_t bounds_valid;
+    reach_rect_f32 anchor_button;
+    float anchor_bar_edge_y;
+    float anchor_bar_height;
+    int32_t anchor_direction;
+    int32_t anchor_valid;
+    int32_t content_transform_active;
+} reach_feature_surface_context;
+
+typedef struct reach_feature_layout_anchor
+{
+    reach_surface_id surface;
+    uint32_t slot;
+    size_t index;
+} reach_feature_layout_anchor;
+
+typedef enum reach_popup_activation_mode
+{
+    REACH_POPUP_ACTIVATION_TOGGLE = 0,
+    REACH_POPUP_ACTIVATION_PASSIVE = 1,
+    REACH_POPUP_ACTIVATION_REPLACE = 2
+} reach_popup_activation_mode;
+
+typedef enum reach_popup_activation_decision
+{
+    REACH_POPUP_ACTIVATION_NONE = 0,
+    REACH_POPUP_ACTIVATION_PRESENT = 1,
+    REACH_POPUP_ACTIVATION_CLOSE = 2
+} reach_popup_activation_decision;
+
+typedef struct reach_feature_native_overlay_item
+{
+    reach_window_id source;
+    reach_window_thumbnail_placement placement;
+} reach_feature_native_overlay_item;
+
+typedef struct reach_feature_native_overlay_ops
+{
+    size_t (*generation)(const void *capsule);
+    size_t (*count)(const void *capsule);
+    reach_result (*item)(const void *capsule, size_t index, reach_feature_native_overlay_item *out);
+} reach_feature_native_overlay_ops;
+
+typedef struct reach_feature_surface_ops
+{
+    int32_t (*arrange)(void *capsule, const reach_feature_surface_context *ctx);
+    reach_result (*append_render_commands)(void *capsule, const reach_feature_surface_context *ctx,
+                                           reach_render_command_buffer *out_commands);
+    int32_t (*layout_anchor)(const void *capsule, reach_feature_layout_anchor *out);
+    void (*set_pointer_transform)(void *capsule, reach_transform_f32 transform);
+    const reach_feature_native_overlay_ops *native_overlay;
+} reach_feature_surface_ops;
+
+typedef struct reach_surface_spec
+{
+    reach_surface_class cls;
+    uint32_t pointer_flags;
+    reach_surface_shadow shadow;
+    uint32_t behavior_flags;
+    int32_t layer;
+    reach_surface_role role;
+    int32_t pointer_priority;
+    int32_t popup_chrome;
+    int32_t bar_shown_while_open;
+    int32_t restores_focus_on_close;
+    int32_t close_on_persistent_press;
+    int32_t refresh_world_on_open;
+
+    /* A press on the control this surface hangs off must not dismiss it. By default that is its
+       layout anchor; a surface with no anchor names the control explicitly. */
+    reach_surface_id dismiss_guard_surface;
+    uint32_t dismiss_guard_slot;
+    int32_t dismiss_guard_any_control;
+    reach_surface_id opening_origin;
+    reach_surface_edge_reveal_spec edge_reveal;
+    reach_surface_bar_reveal_spec bar_reveal;
+} reach_surface_spec;
+
+typedef struct reach_layout_spec
+{
+    reach_surface_id anchor;
+    uint32_t anchor_slot;
+    int32_t priority;
+} reach_layout_spec;
+
+typedef struct reach_feature_anchor
+{
+    reach_rect_f32 button;
+    float bar_edge_y;
+    float bar_height;
+    int32_t direction;
+} reach_feature_anchor;
+
+typedef struct reach_feature_definition
 {
     reach_surface_id id;
-    reach_surface_class cls;
-    reach_surface_runtime *surface;
-    reach_host_surface_transition *transition;
+    reach_feature_factory factory;
+    reach_feature_lifecycle_ops lifecycle;
+    const reach_feature_capsule_ops *capsule_ops;
+    const reach_feature_surface_ops *surface_ops;
+    const reach_feature_control_ops *control_ops;
+    int32_t (*resolve_anchor)(const void *capsule, uint32_t slot, size_t index,
+                              reach_feature_anchor *out);
+    reach_surface_spec surface;
+    reach_layout_spec layout;
 
     void (*force_close)(reach_host *host);
-
-    void *capsule;
-    const reach_feature_capsule_ops *capsule_ops;
-
-    uint32_t pointer_flags;
-
-    uint32_t behavior_flags;
-
-    reach_surface_role role;
-
-    int32_t pointer_priority;
-
-    reach_result (*apply_pointer_action)(reach_host *host, const reach_ui_event *event,
-                                         const reach_capsule_pointer_result *result);
-
-    void (*dismiss)(reach_host *host);
-
-    reach_result (*frame)(reach_host *host, const struct reach_host_frame_context *ctx);
-    int32_t frame_priority;
-
     const reach_ui_event_type *toggle_events;
     size_t toggle_event_count;
-    void (*toggle)(reach_host *host);
-
     const reach_ui_event_type *routed_events;
     size_t routed_event_count;
-    reach_result (*handle_routed)(reach_host *host, const reach_ui_event *event);
-} reach_surface_desc;
+} reach_feature_definition;
 
-void reach_host_init_surface_descriptors(reach_host *host);
+typedef struct reach_feature_runtime
+{
+    reach_surface_runtime *surface;
+    void *capsule;
+    reach_rect_f32 resolved_bounds;
+    int32_t resolved_bounds_valid;
+    reach_window_thumbnail_id native_overlay_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
+    size_t native_overlay_generation;
+    int32_t native_overlay_registered;
+    int32_t presentation_visible;
+    const reach_feature_definition *definition;
+} reach_feature_runtime;
 
-int32_t reach_host_surface_is_open(const reach_surface_desc *desc);
+typedef struct reach_host_surface_event_binding
+{
+    reach_host *host;
+    reach_feature_runtime *runtime;
+} reach_host_surface_event_binding;
+
+typedef struct reach_host_edge_reveal_runtime
+{
+    reach_host *host;
+    const reach_feature_runtime *owner;
+    reach_screen_hotspot_port port;
+    reach_layout_participant participant;
+    int32_t bounds_valid;
+    reach_rect_f32 bounds;
+} reach_host_edge_reveal_runtime;
+
+typedef struct reach_host_window_manipulation_state
+{
+    reach_window_manipulation manual;
+    reach_window_manipulation programmatic;
+    int32_t manual_relevant;
+    int32_t programmatic_relevant;
+    reach_window_id active_window;
+    int32_t relevant;
+} reach_host_window_manipulation_state;
+
+typedef struct reach_host_layout_target
+{
+    const reach_feature_runtime *runtime;
+    reach_screen_hotspot_port *edge_reveal;
+} reach_host_layout_target;
+
+void reach_host_init_feature_registry(reach_host *host);
+reach_result reach_host_apply_feature_action(reach_host *host, const reach_feature_runtime *runtime,
+                                             const reach_capsule_action *action);
+void reach_host_bind_interfeature_routes(reach_host *host);
+void reach_host_clear_interfeature_routes(reach_host *host);
+reach_result reach_host_create_registered_features(reach_host *host);
+void reach_host_bind_registered_surface_ports(reach_host *host,
+                                              const reach_host_dependencies *dependencies);
+void reach_host_init_registered_surfaces(reach_host *host);
+void reach_host_destroy_registered_surface_ports(reach_host *host);
+void reach_host_attach_registered_features(reach_host *host,
+                                           const reach_feature_dependencies *dependencies);
+reach_result reach_host_start_registered_features(reach_host *host);
+void reach_host_stop_registered_features(reach_host *host);
+void reach_host_destroy_registered_features(reach_host *host);
+void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtime *runtime,
+                                          const reach_feature_tick_result *result);
+typedef enum reach_surface_close_intent
+{
+    REACH_SURFACE_CLOSE_DISMISS = 0,
+    REACH_SURFACE_CLOSE_SUPERSEDED = 1
+} reach_surface_close_intent;
+
+void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id id, int32_t open);
+void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
+                                         reach_surface_close_intent intent);
+void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
+                                        reach_rect_f32 bounds, int32_t enabled);
+void reach_host_close_surfaces_on_persistent_press(reach_host *host);
+reach_popup_activation_decision reach_host_popup_activation_decide(
+    int32_t open, const reach_feature_layout_anchor *current,
+    const reach_feature_layout_anchor *requested, reach_popup_activation_mode mode);
+reach_popup_activation_decision reach_host_prepare_registered_popup(
+    reach_host *host, reach_surface_id id, const reach_feature_layout_anchor *owner,
+    reach_popup_activation_mode mode);
+void reach_host_toggle_registered_popup(reach_host *host, reach_surface_id id);
+void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
+                                         reach_surface_id origin);
+int32_t reach_host_surface_closable(const reach_feature_runtime *runtime);
+void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtime *runtime,
+                                          int32_t open);
+reach_result reach_host_dispatch_capsule_event(reach_host *host, reach_feature_runtime *runtime,
+                                               const reach_ui_event *event, int32_t *out_handled);
+void reach_host_capture_focus_restore(reach_host *host, reach_surface_id id);
+void reach_host_arm_focus_restore(reach_host *host, reach_surface_id id);
+void reach_host_cancel_focus_restore(reach_host *host, reach_surface_id id);
+void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id);
+void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id);
+reach_result reach_host_execute_power_command(reach_host *host, uint32_t command);
+void reach_host_post_feature_work_ready(reach_host *host);
+void reach_host_notify_windows_changed(reach_host *host);
+void reach_host_notify_display_changed(reach_host *host);
+void reach_host_notify_config_changed(reach_host *host, const reach_config_snapshot *snapshot);
+void reach_host_notify_popups_closed(reach_host *host);
+void reach_host_notify_windows_refreshed(reach_host *host,
+                                         const reach_window_tracking_refresh_report *report);
+void reach_host_notify_pinned_apps_changed(reach_host *host);
+void reach_host_notify_icons_retained(reach_host *host);
+void reach_host_stop_search_service(reach_host *host);
+void reach_host_notify_registered_features(reach_host *host,
+                                           const reach_feature_notification *notification);
+
+void reach_host_init_layout(reach_host *host);
+void reach_host_apply_layout(reach_host *host);
+void reach_host_invalidate_surface_z_order(reach_host *host, reach_surface_id id);
+void reach_host_hide_all_surfaces(reach_host *host);
+reach_host_edge_reveal_runtime *reach_host_edge_reveal_for_surface(reach_host *host,
+                                                                   reach_surface_id id);
+reach_result reach_host_create_edge_reveals(reach_host *host);
+reach_result reach_host_start_edge_reveals(reach_host *host);
+void reach_host_destroy_edge_reveals(reach_host *host);
+void reach_host_sync_edge_reveals(reach_host *host, reach_rect_f32 monitor_bounds);
+void reach_host_set_edge_reveal_bounds(reach_host_edge_reveal_runtime *runtime,
+                                       reach_rect_f32 bounds);
+void reach_host_on_surface_edge_reveal(reach_host *host, reach_screen_hotspot_event event);
+void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal_runtime *runtime,
+                                        int32_t visible);
+
+int32_t reach_host_surface_is_open(const reach_feature_runtime *runtime);
+int32_t reach_host_surface_needs_frame(const reach_feature_runtime *runtime);
+int32_t reach_host_surface_presented(const reach_feature_runtime *runtime);
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
 int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask);
 int32_t reach_host_any_surface_dirty(const reach_host *host);
+void reach_host_mark_all_surfaces_dirty(reach_host *host);
 
-void reach_host_close_other_popups(reach_host *host, reach_surface_id keep);
+#define REACH_SURFACE_ORIGIN_NONE REACH_HOST_SURFACE_COUNT
+
+void reach_host_surface_opening(reach_host *host, reach_surface_id opening,
+                                reach_surface_id origin);
 
 struct reach_host_frame_context
 {
-    int32_t game_mode;
     reach_rect_f32 monitor_bounds;
-    int32_t dock_layout_changed;
-    int32_t launcher_layout_changed;
 };
 typedef struct reach_host_frame_context reach_host_frame_context;
 
-reach_result reach_host_frame_launcher(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_clipboard(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_dock(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_tray(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_quick_settings(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_switcher(reach_host *host, const reach_host_frame_context *ctx);
-reach_result reach_host_frame_context_menu(reach_host *host, const reach_host_frame_context *ctx);
+void reach_host_sync_surface_input_regions(const reach_host *host,
+                                           const reach_feature_runtime *runtime);
+
+reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature_runtime *runtime,
+                                                 const reach_host_frame_context *ctx);
+reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id);
 
 static inline uint32_t reach_surface_class_bit(reach_surface_class cls)
 {
@@ -173,71 +516,64 @@ static inline uint32_t reach_surface_class_bit(reach_surface_class cls)
 typedef struct reach_host_deferred_launch
 {
     int32_t active;
+    reach_surface_id surface;
     reach_app_launch_request request;
 } reach_host_deferred_launch;
 
 typedef struct reach_host_dirty_state
 {
     int32_t layout;
+    int32_t z_order;
     int32_t render;
     int32_t update_requested;
     int32_t events_dispatched_this_cycle;
     int32_t monitors;
 } reach_host_dirty_state;
 
-typedef struct reach_host_window_list_state
+typedef struct reach_host_pointer_move_state
 {
-    int32_t dwell_active;
-    size_t dwell_item;
-    double dwell_seconds;
-    size_t open_item;
-    double grace_seconds;
-} reach_host_window_list_state;
-
-typedef struct reach_host_dock_reveal_state
-{
-    int32_t edge_visible;
-    int32_t edge_bounds_valid;
     int32_t subscriptions_initialized;
-    int32_t move_enabled[7];
-    reach_rect_f32 edge_bounds;
-} reach_host_dock_reveal_state;
+    int32_t move_enabled[REACH_HOST_SURFACE_COUNT];
+} reach_host_pointer_move_state;
 
 struct reach_host
 {
     reach_monitor_port monitors;
 
-    reach_dock_model dock_config;
+
+    reach_surface_runtime surfaces[REACH_HOST_SURFACE_COUNT];
 
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
-    reach_surface_runtime launcher;
-    reach_surface_runtime dock;
-    reach_dock_reveal_edge_port dock_reveal_edge;
-    reach_surface_runtime tray;
-    reach_surface_runtime switcher;
-    reach_surface_runtime context_menu;
-    reach_surface_runtime quick_settings;
-    reach_surface_runtime clipboard_surface;
-    reach_host_surface_transition launcher_transition;
-    int32_t launcher_restore_pending;
-    reach_host_surface_transition tray_transition;
-    reach_host_surface_transition switcher_transition;
-    reach_host_surface_transition context_menu_transition;
-    reach_host_surface_transition quick_settings_transition;
-    reach_host_surface_transition clipboard_transition;
+    reach_screen_hotspot_factory_port screen_hotspots;
+    reach_image_loader_port image_loader;
+    reach_window_thumbnail_port window_thumbnails;
+    reach_render_command_buffer render_commands;
+    reach_render_command_buffer popup_render_commands;
+    uintptr_t focus_restore_window[REACH_HOST_SURFACE_COUNT];
+    int32_t focus_restore_pending[REACH_HOST_SURFACE_COUNT];
 
-    reach_surface_desc surface_descs[REACH_HOST_SURFACE_COUNT];
+    reach_feature_definition feature_definitions[REACH_HOST_SURFACE_COUNT];
+    reach_feature_runtime feature_runtimes[REACH_HOST_SURFACE_COUNT];
+    reach_host_surface_event_binding surface_event_bindings[REACH_HOST_SURFACE_COUNT];
+    reach_host_edge_reveal_runtime edge_reveals[REACH_HOST_SURFACE_COUNT];
+    reach_layout layout_manager;
+    reach_host_layout_target layout_targets[REACH_LAYOUT_MAX_PARTICIPANTS];
+    reach_layout_participant surface_participants[REACH_HOST_SURFACE_COUNT];
+    reach_layout_plan applied_layout_plan;
+    int32_t has_applied_layout_plan;
     reach_input_source_port input_source;
+    reach_clock *clock;
+    reach_input_language_service *input_language;
     reach_window_manager_port window_manager;
     reach_foreground_watcher_port foreground_watcher;
     reach_config_store_port config_store;
-    reach_tray_provider_port tray_provider;
+    reach_tray_service *tray_service;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
+    reach_terminal_launcher_port terminal_launcher;
     reach_settings_launcher_port settings_launcher;
     reach_icon_service *icon_service;
-    reach_explorer_service_port explorer_service;
     reach_wallpaper_service_port wallpaper_service;
     reach_wallpaper_surface_port wallpaper_surface;
     reach_power_session_port power_session;
@@ -245,26 +581,20 @@ struct reach_host
     const reach_theme *theme;
 
     reach_window_tracking *window_tracking;
+    void (*pointer_moved_route)(void *user, reach_point_i32 point);
+    void (*pointer_region_route)(void *user, uint32_t region_id);
     float layout_dpi_scale;
-    reach_animation_manager animations;
-    reach_animation_track animation_tracks[REACH_HOST_ANIMATION_COUNT];
-    reach_ui_layout layout;
     int32_t has_layout;
     reach_host_dirty_state dirty;
     reach_config_service *config_service;
     reach_wallpaper *wallpaper;
-    reach_dock *dock_capsule;
-    reach_host_dock_reveal_state dock_reveal;
-    reach_host_window_list_state window_list;
-    reach_clipboard_feature *clipboard_capsule;
+    int32_t top_bar_hidden;
+    reach_host_window_manipulation_state window_manipulation;
+    reach_host_pointer_move_state pointer_move;
     reach_clipboard_port clipboard;
     reach_search_service *search_service;
     reach_app_control *app_control;
     reach_host_deferred_launch deferred_launch;
-    reach_tray *tray_capsule;
-    reach_switcher *switcher_capsule;
-    reach_context_menu *context_menu_capsule;
-    reach_launcher *launcher_capsule;
     int32_t running;
     reach_runtime_policy_state runtime_policy;
     reach_audio_volume_port audio_volume;
@@ -274,11 +604,25 @@ struct reach_host
 
     double popup_hook_reassert_seconds;
     int32_t high_refresh_rate;
+    int32_t bundled_font;
     std::atomic<uint32_t> quick_settings_system_change_flags;
+    std::atomic<uint32_t> audio_volume_changed;
     reach_system_status *system_status;
-    reach_quick_settings *quick_settings_capsule;
+    reach_system_stats *system_stats;
     reach_popup_capture_port popup_capture;
 };
+
+template <typename Feature>
+static inline Feature *reach_host_feature_capsule(reach_host *host, reach_surface_id id)
+{
+    return static_cast<Feature *>(host->feature_runtimes[id].capsule);
+}
+
+template <typename Feature>
+static inline Feature *reach_host_feature_capsule(const reach_host *host, reach_surface_id id)
+{
+    return static_cast<Feature *>(host->feature_runtimes[id].capsule);
+}
 
 static inline const reach_window_snapshot *reach_host_open_windows(const reach_host *host)
 {
@@ -311,129 +655,106 @@ static inline float reach_host_monitor_dpi_scale(const reach_monitor_info *monit
     return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
 }
 
-int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b);
-int32_t reach_host_opacity_equal(float a, float b);
+static inline int32_t reach_host_primary_monitor_bounds(const reach_host *host,
+                                                        reach_rect_f32 *out_bounds)
+{
+    if (host == nullptr || out_bounds == nullptr)
+    {
+        return 0;
+    }
 
+    *out_bounds = {};
+
+    if (host->monitors.list == nullptr || host->monitors.ops.primary == nullptr ||
+        host->monitors.ops.count == nullptr || host->monitors.ops.count(host->monitors.list) == 0)
+    {
+        return 0;
+    }
+
+    const reach_monitor_info *monitor = host->monitors.ops.primary(host->monitors.list);
+    if (monitor == nullptr)
+    {
+        return 0;
+    }
+
+    out_bounds->x = (float)monitor->bounds.left;
+    out_bounds->y = (float)monitor->bounds.top;
+    out_bounds->width = (float)(monitor->bounds.right - monitor->bounds.left);
+    out_bounds->height = (float)(monitor->bounds.bottom - monitor->bounds.top);
+    return out_bounds->width > 0.0f && out_bounds->height > 0.0f ? 1 : 0;
+}
+
+int32_t reach_host_scalar_equal(float a, float b);
+
+const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surface_id id);
+reach_shadow_pad reach_host_surface_shadow_pad(const reach_host *host, reach_surface_id id);
+void reach_host_stamp_surface_content(const reach_host *host, reach_surface_id id,
+                                      reach_render_command_buffer *commands);
 reach_result reach_host_apply_window_state(reach_platform_window_port *window,
-                                           reach_rect_f32 bounds, float opacity,
-                                           reach_rect_f32 *last_bounds, float *last_opacity,
-                                           int32_t *bounds_valid, int32_t *opacity_valid,
+                                           reach_rect_f32 bounds, reach_shadow_pad pad,
+                                           reach_rect_f32 *last_bounds, int32_t *bounds_valid,
                                            int32_t *out_changed);
-void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
-                                        size_t y_track, size_t opacity_track);
-void reach_host_surface_transitions_init(reach_host *host);
-void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
-                                       int32_t open);
-reach_rect_f32 reach_host_surface_transition_bounds(const reach_host *host,
-                                                    const reach_host_surface_transition *transition,
-                                                    reach_rect_f32 target_bounds);
-float reach_host_surface_transition_opacity(const reach_host *host,
-                                            const reach_host_surface_transition *transition);
-int32_t reach_host_surface_transition_visible(const reach_host_surface_transition *transition);
-int32_t reach_host_surface_transition_active(const reach_host *host,
-                                             const reach_host_surface_transition *transition);
-void reach_host_surface_transition_finish(reach_host *host,
-                                          reach_host_surface_transition *transition);
+reach_host_surface_presentation_frame reach_host_surface_presentation_frame_compute(
+    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
+    float y_offset, float scale, float max_scale);
+void reach_host_finish_surface_presentations(reach_host *host);
+
+reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
+                                                     const reach_ui_event *event,
+                                                     reach_pointer_event_kind kind);
+int32_t reach_host_popup_owner_trigger(const reach_feature_runtime *popup,
+                                       const reach_feature_runtime *source,
+                                       const reach_capsule_pointer_result *source_result);
+int32_t reach_host_resolve_popup_owner(const reach_feature_runtime *popup,
+                                       reach_feature_layout_anchor *out);
 
 void reach_host_request_update(reach_host *host);
-void reach_host_on_launcher_window_event(void *user, const reach_ui_event *event);
-void reach_host_on_dock_window_event(void *user, const reach_ui_event *event);
-void reach_host_on_tray_window_event(void *user, const reach_ui_event *event);
-void reach_host_on_switcher_window_event(void *user, const reach_ui_event *event);
-void reach_host_on_context_menu_window_event(void *user, const reach_ui_event *event);
-void reach_host_on_quick_settings_window_event(void *user, const reach_ui_event *event);
-void reach_host_on_clipboard_window_event(void *user, const reach_ui_event *event);
+void reach_host_on_registered_surface_event(void *user, const reach_ui_event *event);
 
-reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_runtime *surface,
-                                             reach_rect_f32 bounds, float notch_anchor_x,
-                                             const reach_render_command_buffer *content_commands);
+reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id surface_id,
+                                             reach_surface_runtime *surface, reach_rect_f32 bounds,
+                                             float notch_anchor_x, int32_t notch_side,
+                                             const reach_render_command_buffer *content_commands,
+                                             float opacity);
 
 void reach_host_sync_popup_mouse_hook(reach_host *host);
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);
+void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int32_t restore_focus);
 
-void reach_host_notify_launcher_search_ready(reach_host *host);
-void reach_host_cleanup_closed_launcher(reach_host *host);
-
-void reach_host_close_launcher(reach_host *host);
-void reach_host_close_launcher_without_focus_restore(reach_host *host);
-void reach_host_remember_launcher_restore_window(reach_host *host);
-
-void reach_host_toggle_launcher(reach_host *host);
-void reach_host_clear_launcher_restore_window(reach_host *host);
-void reach_host_restore_launcher_focus(reach_host *host);
-void reach_host_request_launcher_focus_restore(reach_host *host);
-void reach_host_flush_launcher_focus_restore(reach_host *host);
-reach_result reach_host_open_launcher_result(reach_host *host);
-reach_result reach_host_reveal_launcher_result(reach_host *host, size_t result_index);
 reach_result reach_host_schedule_app_launch(reach_host *host,
                                             const reach_app_launch_request *request);
 reach_result reach_host_schedule_reveal_path(reach_host *host, const uint16_t *path);
+reach_result reach_host_launch_settings_app(reach_host *host);
 void reach_host_stop_app_control(reach_host *host);
-void reach_host_process_deferred_launcher_app_launch(reach_host *host);
-reach_result
-reach_host_defer_app_launch_until_launcher_closed(reach_host *host,
-                                                  const reach_app_launch_request *request);
+void reach_host_process_deferred_launch(reach_host *host);
+reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
+                                                          const reach_app_launch_request *request);
+reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
+                                            const reach_feature_target *target, uint32_t flags);
+reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature_target *target,
+                                           uintptr_t window_id);
 
 reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
                                      int32_t minimize_if_foreground);
 reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
                                    const uint16_t *arguments, int32_t force_new_instance,
-                                   int32_t run_as_admin, int32_t defer_until_launcher_closed);
+                                   int32_t run_as_admin, reach_surface_id source,
+                                   int32_t defer_until_closed);
 reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const uint16_t *arguments,
                                  const uint16_t *app_user_model_id, int32_t force_new_instance,
-                                 int32_t defer_until_launcher_closed);
+                                 reach_surface_id source, int32_t defer_until_closed);
 reach_result reach_host_set_pinned_apps(reach_host *host, const reach_pinned_app_model *apps,
                                         size_t count);
-reach_result reach_host_open_pinned_app(reach_host *host, size_t pinned_index,
-                                        int32_t force_new_instance,
-                                        int32_t defer_until_launcher_closed);
-reach_result reach_host_open_pinned_app_id(reach_host *host, uint32_t pin_id,
-                                           int32_t force_new_instance,
-                                           int32_t defer_until_launcher_closed);
-void reach_host_apply_launcher_search_results(reach_host *host);
-void reach_host_stop_launcher_search_worker(reach_host *host);
 
-reach_result reach_host_apply_clipboard_pointer_action(reach_host *host,
-                                                       const reach_ui_event *event,
-                                                       const reach_capsule_pointer_result *result);
-void reach_host_release_clipboard_item(reach_host *host, const reach_clipboard_item *item);
-void reach_host_clear_clipboard(reach_host *host);
-void reach_host_set_clipboard_open(reach_host *host, int32_t open);
-void reach_host_toggle_clipboard(reach_host *host);
-void reach_host_process_clipboard_refresh(reach_host *host);
-void reach_host_release_clipboard_items(reach_host *host);
-reach_result reach_host_render_clipboard_surface(reach_host *host);
+reach_result reach_host_close_window(reach_host *host, uintptr_t window_id);
 
-void reach_host_set_tray_popup_open(reach_host *host, int32_t open);
-void reach_host_toggle_tray_popup(reach_host *host);
-reach_result reach_host_refresh_tray_items(reach_host *host);
-
-void reach_host_compute_tray_popup_layout(reach_host *host, const reach_dock_layout *dock_layout,
-                                          reach_rect_f32 *out_bounds);
-
-reach_result reach_host_apply_tray_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                  const reach_capsule_pointer_result *result);
-
-void reach_host_close_context_menu(reach_host *host);
-void reach_host_reanchor_context_menu(reach_host *host);
-reach_result reach_host_execute_context_command(reach_host *host, uint32_t command);
-reach_result reach_host_show_power_context_menu(reach_host *host);
-
-reach_result reach_host_show_dock_app_context_menu(reach_host *host, size_t item_index, int32_t x,
-                                                   int32_t y);
-
-void reach_host_dock_item_hovered(reach_host *host, size_t item_index);
-void reach_host_window_list_update(reach_host *host, double delta_seconds);
-int32_t reach_host_window_list_wants_frames(const reach_host *host);
-reach_result reach_host_show_dock_window_list(reach_host *host, size_t item_index);
-
-int32_t reach_host_dock_icon_size_px(const reach_host *host);
+int32_t reach_host_icon_size_px(const reach_host *host);
 
 void reach_host_release_render_icon(reach_host *host, uint64_t icon_id);
 
 void reach_host_drain_icon_evictions(reach_host *host);
-void reach_host_release_tray_render_icons(reach_host *host);
-void reach_host_release_quick_settings_audio_render_icons(reach_host *host);
+void reach_host_drain_registered_render_resources(reach_host *host);
+void reach_host_release_registered_render_resources(reach_host *host);
 void reach_host_drain_now_playing_retired_covers(reach_host *host);
 reach_result reach_host_refresh_open_windows(reach_host *host, int32_t *out_changed);
 void reach_host_note_foreground_window(reach_host *host, uintptr_t foreground_window);
@@ -445,71 +766,53 @@ reach_result reach_host_schedule_window_control(reach_host *host,
                                                 uintptr_t window_id);
 reach_result reach_host_schedule_minimize_open_windows(reach_host *host);
 reach_result reach_host_schedule_open_terminal(reach_host *host);
-reach_result reach_host_schedule_minimize_windows(reach_host *host, const uintptr_t *window_ids,
-                                                  size_t window_count);
+reach_result reach_host_schedule_terminal_command(reach_host *host, const uint16_t *command);
+reach_result reach_host_schedule_window_controls(reach_host *host,
+                                                 reach_window_control_action action,
+                                                 const uintptr_t *window_ids, size_t window_count);
 void reach_host_apply_window_control_result(reach_host *host);
 
-reach_dock_build_context reach_host_dock_build_context(reach_host *host);
 
-int32_t reach_host_dock_can_hide(const reach_host *host);
+void reach_host_invalidate_bar_coverage(reach_host *host);
+void reach_host_refresh_window_world(reach_host *host);
+void reach_host_sync_window_manipulation(reach_host *host);
+void reach_host_begin_programmatic_window_manipulation(reach_host *host, reach_window_id window);
+void reach_host_end_programmatic_window_manipulation(reach_host *host);
+int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32 *out_pointer);
 void reach_host_sync_pointer_move_subscriptions(reach_host *host);
-void reach_host_request_dock_visibility_update(reach_host *host);
+void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
+void reach_host_request_bar_visibility_update(reach_host *host);
+void reach_host_sync_bar_layout_conditions(reach_host *host);
 
-reach_rect_f32 reach_host_reconcile_dock_visibility(reach_host *host, reach_rect_f32 shown_bounds,
-                                                    reach_rect_f32 monitor_bounds);
+reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
+                                                   reach_rect_f32 shown_bounds,
+                                                   reach_rect_f32 monitor_bounds);
+reach_result reach_host_cycle_input_language(reach_host *host);
 
 reach_result reach_host_refresh_monitor_layout(reach_host *host);
-int32_t reach_host_can_move_dock_without_redraw(const reach_host *host);
-reach_result reach_host_move_dock_animation_frame(reach_host *host);
+int32_t reach_host_can_move_bars_without_redraw(const reach_host *host);
+reach_result reach_host_move_bar_animation_frame(reach_host *host);
 
-const uint16_t *reach_host_dock_item_path(const reach_host *host, size_t item_index);
 
-reach_result reach_host_launch_dock_item(reach_host *host, size_t item_index,
-                                         int32_t force_new_instance);
 
-void reach_host_clear_sticky_dock_feedback(reach_host *host);
-
-void reach_host_set_quick_settings_open(reach_host *host, int32_t open);
-void reach_host_toggle_quick_settings(reach_host *host);
-
-void reach_host_process_quick_settings_changes(reach_host *host, double delta_seconds);
-void reach_host_refresh_quick_settings_layout(reach_host *host);
 
 reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing_action action);
 reach_result reach_host_step_main_volume(reach_host *host, float delta);
 reach_result reach_host_toggle_main_volume_mute(reach_host *host);
 reach_result reach_host_step_brightness(reach_host *host, float delta);
 reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mode mode);
-void reach_host_relayout_quick_settings(reach_host *host, int32_t animate_height);
-
-void reach_host_update_quick_settings_animation(reach_host *host);
-
-reach_result
-reach_host_apply_quick_settings_pointer_action(reach_host *host, const reach_ui_event *event,
-                                               const reach_capsule_pointer_result *result);
-
-reach_result reach_host_apply_dock_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                  const reach_capsule_pointer_result *result);
-reach_result reach_host_apply_launcher_pointer_action(reach_host *host, const reach_ui_event *event,
-                                                      const reach_capsule_pointer_result *result);
-reach_result
-reach_host_apply_context_menu_pointer_action(reach_host *host, const reach_ui_event *event,
-                                             const reach_capsule_pointer_result *result);
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags);
+void reach_host_on_audio_volume_changed(void *user);
 
-size_t reach_host_switcher_visible_count(const reach_host *host);
-void reach_host_refresh_switcher_windows(reach_host *host);
 
-reach_result reach_host_handle_switcher_event(reach_host *host, const reach_ui_event *event);
 
-reach_result reach_host_schedule_config_reload(reach_host *host);
-reach_result reach_host_schedule_pin_app(reach_host *host, const reach_pinned_app_model *app);
-reach_result reach_host_schedule_unpin_id(reach_host *host, uint32_t pin_id);
-reach_result reach_host_schedule_move_pin(reach_host *host, uint32_t pin_id, size_t target_index);
-int32_t reach_host_apply_config_reload_result(reach_host *host);
-int32_t reach_host_config_reload_work_pending(const reach_host *host);
-void reach_host_stop_config_reload_worker(reach_host *host);
+reach_result reach_host_request_config_reload(reach_host *host);
+reach_result reach_host_pin_app(reach_host *host, const reach_pinned_app_model *app);
+reach_result reach_host_unpin_id(reach_host *host, uint32_t pin_id);
+reach_result reach_host_move_pin(reach_host *host, uint32_t pin_id, size_t target_index);
+int32_t reach_host_apply_config_update(reach_host *host);
+void reach_host_stop_config_service(reach_host *host);
 reach_result reach_host_apply_config_snapshot(reach_host *host,
                                               const reach_config_snapshot *snapshot,
                                               int32_t apply_pins, int32_t apply_wallpaper);
@@ -519,18 +822,12 @@ void reach_host_seed_or_apply_wallpaper(reach_host *host, reach_config_snapshot 
 
 void reach_host_reload_wallpaper(reach_host *host, int32_t force);
 
-reach_result reach_host_render_dock_surface(reach_host *host, const reach_dock_layout *layout);
+void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font);
 
-reach_result reach_host_render_tray_surface(reach_host *host, reach_rect_f32 bounds);
+void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme);
 
-reach_result reach_host_render_quick_settings_surface(reach_host *host);
+void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot);
 
-reach_result reach_host_render_switcher_surface(reach_host *host, reach_rect_f32 bounds);
-
-reach_result reach_host_render_launcher_surface(reach_host *host,
-                                                const reach_launcher_layout *layout);
-
-reach_result reach_host_render_context_menu_surface(reach_host *host);
 int32_t reach_host_game_mode_enabled(const reach_host *host);
 reach_result reach_host_update_game_mode(reach_host *host);
 #endif

@@ -55,20 +55,6 @@ struct reach_now_playing_service
     std::vector<uint64_t> retired_covers;
 };
 
-static int32_t reach_now_playing_text_equal(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
 static int32_t reach_now_playing_color_equal(reach_color a, reach_color b)
 {
     return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
@@ -77,9 +63,8 @@ static int32_t reach_now_playing_color_equal(reach_color a, reach_color b)
 static int32_t reach_now_playing_snapshot_equal(const reach_now_playing_snapshot *a,
                                                 const reach_now_playing_snapshot *b)
 {
-    return a->has_session == b->has_session && reach_now_playing_text_equal(a->title, b->title) &&
-           reach_now_playing_text_equal(a->artist, b->artist) &&
-           a->cover_image_id == b->cover_image_id &&
+    return a->has_session == b->has_session && reach_utf16_equal(a->title, b->title) &&
+           reach_utf16_equal(a->artist, b->artist) && a->cover_image_id == b->cover_image_id &&
            reach_now_playing_color_equal(a->cover_accent, b->cover_accent) &&
            a->playback == b->playback && a->previous_enabled == b->previous_enabled &&
            a->play_pause_enabled == b->play_pause_enabled && a->next_enabled == b->next_enabled &&

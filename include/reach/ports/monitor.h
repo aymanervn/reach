@@ -20,6 +20,7 @@ extern "C"
         int32_t dpi_x;
         int32_t dpi_y;
         int32_t primary;
+        int32_t refresh_rate_hz;
     } reach_monitor_info;
 
     typedef struct reach_monitor_list reach_monitor_list;

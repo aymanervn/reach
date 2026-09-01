@@ -82,9 +82,9 @@ static float reach_d2d_clamp_radius(D2D1_RECT_F rect, float radius)
     return radius > max_radius ? max_radius : radius;
 }
 
-static reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RECT_F rect,
-                                                     float radius, int32_t corner_mask,
-                                                     ID2D1Geometry **out_geometry)
+reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RECT_F rect,
+                                              float radius, int32_t corner_mask,
+                                              ID2D1Geometry **out_geometry)
 {
     if (target == nullptr || out_geometry == nullptr)
     {
@@ -278,7 +278,7 @@ static reach_result reach_d2d_create_bitmap_from_hbitmap(reach_render_backend *b
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, uintptr_t icon_id,
+static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, uint64_t icon_id,
                                                  ID2D1Bitmap **out_bitmap)
 {
     REACH_ASSERT(backend != nullptr);
@@ -291,8 +291,8 @@ static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, 
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_windows_icon *icon = reinterpret_cast<reach_windows_icon *>(icon_id);
-    if (icon == nullptr || icon->magic != REACH_WINDOWS_ICON_MAGIC)
+    reach_windows_icon *icon = reach_windows_icon_lookup(icon_id);
+    if (icon == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -351,7 +351,7 @@ static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, 
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reach_d2d_get_icon_bitmap(reach_render_backend *backend, uintptr_t icon_id,
+static reach_result reach_d2d_get_icon_bitmap(reach_render_backend *backend, uint64_t icon_id,
                                               ID2D1Bitmap **out_bitmap)
 {
     REACH_ASSERT(backend != nullptr);

@@ -22,6 +22,10 @@ struct reach_helper_session_state
     HWINEVENTHOOK foreground_hook;
     HWINEVENTHOOK location_hook;
     HWINEVENTHOOK name_hook;
+    HWINEVENTHOOK move_size_start_hook;
+    HWINEVENTHOOK move_size_end_hook;
+    HWND move_size_window;
+    int32_t move_size_relevant;
 };
 
 struct reach_helper_window_metadata
@@ -54,6 +58,7 @@ static LONG g_game_mode_active;
 static const wchar_t *REACH_SHELL_INSTANCE_MUTEX = REACH_SHELL_INSTANCE_MUTEX_NAME;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachServiceInstance";
 static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
+static const UINT REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG = WM_APP + 42;
 
 static reach_result reach_helper_execute(const reach_service_request *request,
                                          reach_service_response *response);
@@ -477,6 +482,16 @@ static void reach_helper_classify_window(reach_service_window_snapshot *snapshot
         return;
     }
 
+    if (snapshot->visible && !snapshot->iconic && GetAncestor(hwnd, GA_ROOT) == hwnd &&
+        reach_window_identity_is_explorer_dialog(
+            reinterpret_cast<const uint16_t *>(snapshot->process_path),
+            reinterpret_cast<const uint16_t *>(snapshot->class_name)))
+    {
+        snapshot->kind = REACH_SERVICE_WINDOW_DIALOG;
+        reach_helper_copy_wide(snapshot->classification_reason, 160, L"explorer dialog");
+        return;
+    }
+
     if (GetAncestor(hwnd, GA_ROOT) != hwnd)
     {
         snapshot->kind = REACH_SERVICE_WINDOW_HELPER;
@@ -603,10 +618,24 @@ static int32_t reach_helper_window_occupies_whole_monitor(HWND hwnd, RECT window
     return reach_helper_rect_matches_monitor(window_rect, info.rcMonitor);
 }
 
+static int32_t reach_helper_window_is_windowed(HWND hwnd)
+{
+    LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+    int32_t has_caption = (style & WS_CAPTION) == WS_CAPTION;
+    int32_t has_windowed_frame = (style & WS_THICKFRAME) != 0 && (style & WS_POPUP) == 0;
+    return has_caption || has_windowed_frame;
+}
+
 static int32_t reach_helper_window_is_game(HWND hwnd)
 {
     if (hwnd == nullptr || !IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
-        IsZoomed(hwnd))
+        IsZoomed(hwnd) || reach_helper_window_is_windowed(hwnd))
+    {
+        return 0;
+    }
+
+    LONG_PTR ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    if ((ex_style & WS_EX_TOOLWINDOW) != 0)
     {
         return 0;
     }
@@ -618,57 +647,6 @@ static int32_t reach_helper_window_is_game(HWND hwnd)
     }
 
     return reach_helper_window_occupies_whole_monitor(hwnd, rect);
-}
-
-static int32_t reach_helper_rect_contains_rect(RECT outer, RECT inner)
-{
-    const LONG tolerance = 2;
-    return inner.left >= outer.left - tolerance && inner.top >= outer.top - tolerance &&
-           inner.right <= outer.right + tolerance && inner.bottom <= outer.bottom + tolerance;
-}
-
-static int32_t reach_helper_rect_is_virtual_screen(RECT rect)
-{
-    RECT virtual_screen = {};
-    virtual_screen.left = GetSystemMetrics(SM_XVIRTUALSCREEN);
-    virtual_screen.top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    virtual_screen.right = virtual_screen.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
-    virtual_screen.bottom = virtual_screen.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
-    return reach_helper_rect_matches_monitor(rect, virtual_screen);
-}
-
-static void reach_helper_release_game_cursor_clip(HWND hwnd)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd))
-    {
-        return;
-    }
-
-    RECT clip = {};
-    if (!GetClipCursor(&clip) || reach_helper_rect_is_virtual_screen(clip))
-    {
-        return;
-    }
-
-    RECT window_rect = {};
-    if (!GetWindowRect(hwnd, &window_rect))
-    {
-        return;
-    }
-
-    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO info = {};
-    info.cbSize = sizeof(info);
-    if (monitor == nullptr || !GetMonitorInfoW(monitor, &info))
-    {
-        return;
-    }
-
-    if (reach_helper_rect_contains_rect(window_rect, clip) ||
-        reach_helper_rect_contains_rect(info.rcMonitor, clip))
-    {
-        (void)ClipCursor(nullptr);
-    }
 }
 
 static int32_t reach_helper_detect_game_mode(void)
@@ -728,24 +706,32 @@ static void reach_helper_build_snapshot_response(reach_service_response *respons
     reach_helper_prune_window_metadata(g_metadata_generation);
 }
 
-static void reach_helper_publish_window_state(void)
+static uint32_t reach_helper_collect_window_state(reach_service_window_snapshot *windows,
+                                                  uint32_t capacity)
 {
+    if (windows == nullptr || capacity == 0)
+    {
+        return 0;
+    }
+
     reach_service_response response = {};
     response.version = reach_service_protocol_version();
     reach_helper_build_snapshot_response(&response);
 
-    reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS] = {};
     uint32_t window_count = 0;
-    for (uint32_t index = 0;
-         index < response.window_count && window_count < REACH_SERVICE_MAX_WINDOWS; ++index)
+    for (uint32_t index = 0; index < response.window_count && window_count < capacity; ++index)
     {
         if (response.windows[index].include_in_switcher)
         {
             windows[window_count++] = response.windows[index];
         }
     }
+    return window_count;
+}
 
-    (void)reach_service_shared_publish_windows(windows, window_count);
+static void reach_helper_store_window_state(const reach_service_window_snapshot *windows,
+                                            uint32_t window_count)
+{
     reach_helper_lock_window_state();
     g_window_state.window_count = window_count;
     for (uint32_t index = 0; index < window_count; ++index)
@@ -757,6 +743,23 @@ static void reach_helper_publish_window_state(void)
         g_window_state.windows[index] = {};
     }
     reach_helper_unlock_window_state();
+}
+
+static void reach_helper_publish_window_state(void)
+{
+    reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS] = {};
+    uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
+    (void)reach_service_shared_publish_windows(windows, window_count);
+    reach_helper_store_window_state(windows, window_count);
+    reach_helper_publish_game_mode();
+}
+
+static void reach_helper_finish_window_manipulation(void)
+{
+    reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS] = {};
+    uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
+    (void)reach_service_shared_finish_window_manipulation(windows, window_count);
+    reach_helper_store_window_state(windows, window_count);
     reach_helper_publish_game_mode();
 }
 
@@ -813,35 +816,6 @@ static int32_t reach_helper_publish_foreground_change(void)
     return 1;
 }
 
-static int32_t reach_helper_publish_foreground_placement_change(HWND hwnd)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd) || !reach_helper_window_has_foreground(hwnd))
-    {
-        return 1;
-    }
-
-    reach_helper_window_state state = reach_helper_current_window_state();
-    uint64_t window_id = reinterpret_cast<uint64_t>(hwnd);
-    for (uint32_t index = 0; index < state.window_count; ++index)
-    {
-        if (state.windows[index].window != window_id)
-        {
-            continue;
-        }
-
-        int32_t maximized = IsZoomed(hwnd) ? 1 : 0;
-        if (state.windows[index].maximized != maximized)
-        {
-            state.windows[index].maximized = maximized;
-            reach_helper_publish_cached_window_state(&state);
-            reach_helper_publish_game_mode();
-        }
-        return 1;
-    }
-
-    return 0;
-}
-
 static int32_t reach_helper_publish_name_change(HWND hwnd)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
@@ -881,9 +855,12 @@ static int32_t reach_helper_publish_name_change(HWND hwnd)
 static void reach_helper_close_window_event_hooks(void)
 {
     HWINEVENTHOOK *hooks[] = {
-        &g_session.create_hook,     &g_session.destroy_hook,        &g_session.show_hook,
-        &g_session.hide_hook,       &g_session.minimize_start_hook, &g_session.minimize_end_hook,
-        &g_session.foreground_hook, &g_session.location_hook,       &g_session.name_hook,
+        &g_session.create_hook,         &g_session.destroy_hook,
+        &g_session.show_hook,           &g_session.hide_hook,
+        &g_session.minimize_start_hook, &g_session.minimize_end_hook,
+        &g_session.foreground_hook,     &g_session.location_hook,
+        &g_session.name_hook,           &g_session.move_size_start_hook,
+        &g_session.move_size_end_hook,
     };
     for (HWINEVENTHOOK *hook : hooks)
     {
@@ -908,19 +885,67 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
         if (event == EVENT_OBJECT_DESTROY)
         {
             reach_helper_forget_window_metadata(hwnd);
+            if (g_session.move_size_window == hwnd)
+            {
+                g_session.move_size_window = nullptr;
+                g_session.move_size_relevant = 0;
+                (void)reach_service_shared_publish_window_manipulation(0, 0);
+            }
         }
         if (event == EVENT_SYSTEM_MINIMIZESTART)
         {
             reach_window_management_prepare_minimize(hwnd);
+        }
+        if (event == EVENT_OBJECT_SHOW && reach_window_is_explorer_dialog(hwnd) &&
+            g_session.window_event_thread_id != 0)
+        {
+            (void)PostThreadMessageW(g_session.window_event_thread_id,
+                                     REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG,
+                                     reinterpret_cast<WPARAM>(hwnd), 0);
+        }
+
+        if (event == EVENT_SYSTEM_MOVESIZESTART)
+        {
+            g_session.move_size_window = hwnd;
+            reach_service_window_snapshot snapshot = reach_helper_inspect_window(hwnd);
+            g_session.move_size_relevant = snapshot.include_in_switcher ? 1 : 0;
+            (void)reach_service_shared_publish_window_manipulation(reinterpret_cast<uint64_t>(hwnd),
+                                                                   g_session.move_size_relevant);
+            return;
+        }
+        if (event == EVENT_SYSTEM_MOVESIZEEND)
+        {
+            int32_t relevant = g_session.move_size_relevant;
+            g_session.move_size_window = nullptr;
+            g_session.move_size_relevant = 0;
+            if (relevant)
+            {
+                reach_helper_finish_window_manipulation();
+            }
+            else
+            {
+                reach_helper_publish_window_state();
+                (void)reach_service_shared_bump_window_sequence();
+            }
+            return;
         }
 
         if (event == EVENT_SYSTEM_FOREGROUND && reach_helper_publish_foreground_change())
         {
             return;
         }
-        if (event == EVENT_OBJECT_LOCATIONCHANGE &&
-            reach_helper_publish_foreground_placement_change(hwnd))
+        if (event == EVENT_OBJECT_LOCATIONCHANGE)
         {
+            if (g_session.move_size_window == hwnd)
+            {
+                if (g_session.move_size_relevant)
+                {
+                    (void)reach_service_shared_publish_window_manipulation(
+                        reinterpret_cast<uint64_t>(hwnd), 1);
+                }
+                return;
+            }
+            reach_helper_publish_window_state();
             return;
         }
         if (event == EVENT_OBJECT_NAMECHANGE && reach_helper_publish_name_change(hwnd))
@@ -940,9 +965,7 @@ static void reach_helper_minimize_game(HWND hwnd)
         return;
     }
 
-    reach_helper_release_game_cursor_clip(hwnd);
-    (void)reach_window_management_minimize(hwnd);
-    reach_helper_release_game_cursor_clip(hwnd);
+    (void)reach_window_management_leave_game_to_desktop(hwnd);
     reach_helper_publish_window_state();
 }
 
@@ -976,6 +999,12 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
                         reach_helper_window_event_proc, 0, 0, flags);
     g_session.name_hook = SetWinEventHook(EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_NAMECHANGE, nullptr,
                                           reach_helper_window_event_proc, 0, 0, flags);
+    g_session.move_size_start_hook =
+        SetWinEventHook(EVENT_SYSTEM_MOVESIZESTART, EVENT_SYSTEM_MOVESIZESTART, nullptr,
+                        reach_helper_window_event_proc, 0, 0, flags);
+    g_session.move_size_end_hook =
+        SetWinEventHook(EVENT_SYSTEM_MOVESIZEEND, EVENT_SYSTEM_MOVESIZEEND, nullptr,
+                        reach_helper_window_event_proc, 0, 0, flags);
 
     reach_helper_publish_window_state();
 
@@ -985,6 +1014,14 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
         {
             HWND hwnd = reinterpret_cast<HWND>(message.wParam);
             reach_helper_minimize_game(hwnd);
+        }
+        else if (message.message == REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG)
+        {
+            HWND hwnd = reinterpret_cast<HWND>(message.wParam);
+            if (reach_window_is_explorer_dialog(hwnd))
+            {
+                (void)reach_window_management_activate_exact(hwnd);
+            }
         }
     }
 

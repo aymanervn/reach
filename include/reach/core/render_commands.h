@@ -9,7 +9,7 @@ extern "C"
 {
 #endif
 
-#define REACH_MAX_RENDER_COMMANDS 256
+#define REACH_MAX_RENDER_COMMANDS (REACH_MAX_DOCK_ITEMS * 2 + REACH_MAX_DOCK_RUNNING_APPS + 16)
 
     typedef enum reach_render_command_type
     {
@@ -17,18 +17,15 @@ extern "C"
         REACH_RENDER_COMMAND_RECT = 1,
         REACH_RENDER_COMMAND_TEXT = 2,
         REACH_RENDER_COMMAND_ICON = 3,
-        REACH_RENDER_COMMAND_BLUR_BACKGROUND = 4,
-        REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE = 5,
-        REACH_RENDER_COMMAND_RESERVED_6 = 6,
         REACH_RENDER_COMMAND_TRIANGLE = 7,
-        REACH_RENDER_COMMAND_NOTCH_STROKE = 8,
         REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT = 9,
         REACH_RENDER_COMMAND_VECTOR_ICON = 10,
         REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT = 11,
         REACH_RENDER_COMMAND_ICON_TINT = 13,
         REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
         REACH_RENDER_COMMAND_TEXTBOX = 15,
-        REACH_RENDER_COMMAND_ARC_STROKE = 16
+        REACH_RENDER_COMMAND_ARC_STROKE = 16,
+        REACH_RENDER_COMMAND_SHADOW = 17
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -39,6 +36,12 @@ extern "C"
         REACH_RENDER_CORNER_BOTTOM_LEFT = 8,
         REACH_RENDER_CORNER_ALL = 15
     } reach_render_corner_mask;
+
+    typedef enum reach_notch_side
+    {
+        REACH_NOTCH_SIDE_BOTTOM = 0,
+        REACH_NOTCH_SIDE_TOP = 1
+    } reach_notch_side;
 
     typedef enum reach_vector_icon_id
     {
@@ -60,7 +63,6 @@ extern "C"
         REACH_VECTOR_ICON_WIFI_LOW = 15,
         REACH_VECTOR_ICON_WIFI_MEDIUM = 16,
         REACH_VECTOR_ICON_WIFI_HIGH = 17,
-        REACH_VECTOR_ICON_BATTERY_SAVER = 18,
         REACH_VECTOR_ICON_PROJECT = 19,
         REACH_VECTOR_ICON_BRIGHTNESS = 20,
         REACH_VECTOR_ICON_BLUETOOTH_ON = 21,
@@ -81,7 +83,9 @@ extern "C"
         REACH_VECTOR_ICON_RESIZE = 36,
         REACH_VECTOR_ICON_SETTINGS = 37,
         REACH_VECTOR_ICON_SEARCH = 38,
-        REACH_VECTOR_ICON_EXECUTABLE = 39
+        REACH_VECTOR_ICON_EXECUTABLE = 39,
+        REACH_VECTOR_ICON_MENU = 40,
+        REACH_VECTOR_ICON_MUSIC_NOTE = 41
     } reach_vector_icon_id;
 
     typedef enum reach_text_weight
@@ -113,6 +117,8 @@ extern "C"
         reach_color color;
         float radius;
         float blur_radius;
+        float shadow_offset_x;
+        float shadow_offset_y;
         float image_contrast;
         float icon_fade_start;
         int32_t has_clip_rect;
@@ -127,12 +133,12 @@ extern "C"
         float notch_center_x;
         float notch_width;
         float notch_height;
+        int32_t notch_side;
         int32_t text_alignment;
         int32_t text_ellipsis;
         uint16_t text[260];
 
         reach_color text_color;
-        reach_color border_color;
         reach_color placeholder_color;
         reach_color selection_color;
         int32_t caret_index;
@@ -148,6 +154,8 @@ extern "C"
         size_t count;
         reach_rect_f32 scissor_rect;
         int32_t has_scissor;
+        reach_rect_f32 content_rect;
+        reach_transform_f32 content_transform;
     } reach_render_command_buffer;
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
@@ -155,6 +163,22 @@ extern "C"
                                                   const reach_render_command *command);
     void reach_render_command_buffer_set_scissor(reach_render_command_buffer *buffer,
                                                  reach_rect_f32 scissor_rect);
+    void reach_render_command_buffer_set_content_rect(reach_render_command_buffer *buffer,
+                                                      reach_rect_f32 content_rect);
+    void reach_render_command_buffer_set_content_transform(reach_render_command_buffer *buffer,
+                                                           reach_rect_f32 content_rect,
+                                                           reach_transform_f32 content_transform);
+    void reach_render_command_buffer_multiply_opacity(reach_render_command_buffer *buffer,
+                                                      float opacity);
+    reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
+                                          const reach_render_command *shape,
+                                          const reach_shadow *shadow, float dpi_scale);
+    reach_result reach_render_push_bordered_background(reach_render_command_buffer *buffer,
+                                                       const reach_render_command *shape,
+                                                       reach_color background_color,
+                                                       reach_color border_color,
+                                                       float border_thickness,
+                                                       const reach_shadow *shadow, float dpi_scale);
     void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buffer);
 
 #ifdef __cplusplus

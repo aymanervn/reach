@@ -13,55 +13,76 @@
 #define REACH_CONFIG_VERSION_WIDE_INNER(text) L##text
 #define REACH_CONFIG_VERSION_WIDE(text) REACH_CONFIG_VERSION_WIDE_INNER(text)
 
-static void reach_config_write_version_header(const wchar_t *path, const wchar_t *version)
+static const wchar_t reach_config_byte_order_mark = 0xFEFF;
+
+static reach_result reach_config_write_utf16_atomic(const wchar_t *path, const std::wstring &text)
 {
-    wchar_t comment[64] = {};
-    swprintf_s(comment, L"; reach v%s", version);
-
-    HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+    std::wstring temp_path(path);
+    temp_path.append(L".tmp");
+    HANDLE file = CreateFileW(temp_path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                               FILE_ATTRIBUTE_NORMAL, nullptr);
-    std::string existing;
-    if (file != INVALID_HANDLE_VALUE)
+    if (file == INVALID_HANDLE_VALUE)
     {
-        char buffer[4096];
-        DWORD read = 0;
-        while (ReadFile(file, buffer, sizeof(buffer), &read, nullptr) && read > 0)
-        {
-            existing.append(buffer, read);
-        }
-        CloseHandle(file);
+        return REACH_ERROR;
     }
 
-    char comment_utf8[128] = {};
-    WideCharToMultiByte(CP_UTF8, 0, comment, -1, comment_utf8, sizeof(comment_utf8), nullptr,
-                        nullptr);
-    std::string header(comment_utf8);
+    std::wstring output;
+    output.push_back(reach_config_byte_order_mark);
+    output.append(text);
 
-    size_t body_start = 0;
-    if (!existing.empty() && (existing[0] == ';' || existing[0] == '#'))
+    DWORD written = 0;
+    DWORD byte_count = (DWORD)(output.size() * sizeof(wchar_t));
+    int32_t ok = WriteFile(file, output.data(), byte_count, &written, nullptr) &&
+                 written == byte_count && FlushFileBuffers(file);
+    CloseHandle(file);
+    if (!ok ||
+        !MoveFileExW(temp_path.c_str(), path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     {
-        size_t line_end = existing.find('\n');
-        if (line_end != std::string::npos && existing.find("reach", 0) < line_end)
-        {
-            body_start = line_end + 1;
-        }
+        DeleteFileW(temp_path.c_str());
+        return REACH_ERROR;
     }
-
-    std::string output = header + "\r\n" + existing.substr(body_start);
-    HANDLE out = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
-                             nullptr);
-    if (out != INVALID_HANDLE_VALUE)
-    {
-        DWORD written = 0;
-        WriteFile(out, output.data(), (DWORD)output.size(), &written, nullptr);
-        CloseHandle(out);
-    }
+    return REACH_OK;
 }
 
 struct reach_config_store
 {
     uint16_t path[260];
+    HANDLE transaction_mutex;
 };
+
+static uint64_t reach_config_path_hash(const uint16_t *path)
+{
+    uint64_t hash = 1469598103934665603ull;
+    for (size_t index = 0; path != nullptr && path[index] != 0; ++index)
+    {
+        uint16_t value = path[index];
+        if (value >= 'A' && value <= 'Z')
+        {
+            value = (uint16_t)(value + ('a' - 'A'));
+        }
+        hash ^= value;
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+static reach_result reach_config_store_begin_transaction(reach_config_store *store)
+{
+    if (store == nullptr || store->transaction_mutex == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    DWORD wait = WaitForSingleObject(store->transaction_mutex, INFINITE);
+    return wait == WAIT_OBJECT_0 || wait == WAIT_ABANDONED ? REACH_OK : REACH_ERROR;
+}
+
+static void reach_config_store_end_transaction(reach_config_store *store)
+{
+    if (store != nullptr && store->transaction_mutex != nullptr)
+    {
+        ReleaseMutex(store->transaction_mutex);
+    }
+}
 
 static void reach_config_resolve_path(reach_config_store *store, uint16_t *path, size_t path_count)
 {
@@ -119,24 +140,42 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
-    out_snapshot->dock_width = (float)GetPrivateProfileIntW(L"dock", L"width", 560, path);
-    out_snapshot->dock_icon_size = (float)GetPrivateProfileIntW(L"dock", L"icon_size", 40, path);
+    out_snapshot->power_screen_off_minutes =
+        (int32_t)GetPrivateProfileIntW(L"power", L"screen_off_minutes", 10, path);
     out_snapshot->power_sleep_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"sleep_minutes", 30, path);
     out_snapshot->power_lock_minutes =
-        (int32_t)GetPrivateProfileIntW(L"power", L"lock_minutes", 0, path);
+        (int32_t)GetPrivateProfileIntW(L"power", L"lock_minutes", 15, path);
     out_snapshot->power_shutdown_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"shutdown_minutes", 0, path);
     out_snapshot->power_restart_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"restart_minutes", 0, path);
     out_snapshot->power_sleep_wait_apps =
-        (int32_t)GetPrivateProfileIntW(L"power", L"sleep_wait_apps", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"power", L"sleep_wait_apps", 1, path) != 0;
     out_snapshot->power_shutdown_wait_apps =
         (int32_t)GetPrivateProfileIntW(L"power", L"shutdown_wait_apps", 0, path) != 0;
     out_snapshot->power_restart_wait_apps =
-        (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"power", L"restart_wait_apps", 1, path) != 0;
     out_snapshot->high_refresh_rate =
-        (int32_t)GetPrivateProfileIntW(L"display", L"high_refresh_rate", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"display", L"high_refresh_rate", 1, path) != 0;
+    out_snapshot->bundled_font =
+        (int32_t)GetPrivateProfileIntW(L"display", L"bundled_font", 1, path) != 0;
+    out_snapshot->light_theme =
+        (int32_t)GetPrivateProfileIntW(L"display", L"light_theme", 0, path) != 0;
+    int32_t windows_system_theme =
+        (int32_t)GetPrivateProfileIntW(L"display", L"windows_system_theme", 0, path);
+    out_snapshot->windows_system_theme = windows_system_theme >= REACH_CONFIG_THEME_FOLLOW_REACH &&
+                                                 windows_system_theme <= REACH_CONFIG_THEME_DARK
+                                             ? (reach_config_theme_preference)windows_system_theme
+                                             : REACH_CONFIG_THEME_FOLLOW_REACH;
+    int32_t windows_app_theme =
+        (int32_t)GetPrivateProfileIntW(L"display", L"windows_app_theme", 0, path);
+    out_snapshot->windows_app_theme = windows_app_theme >= REACH_CONFIG_THEME_FOLLOW_REACH &&
+                                              windows_app_theme <= REACH_CONFIG_THEME_DARK
+                                          ? (reach_config_theme_preference)windows_app_theme
+                                          : REACH_CONFIG_THEME_FOLLOW_REACH;
+    out_snapshot->stage_animation_ms =
+        (int32_t)GetPrivateProfileIntW(L"stage", L"animation_ms", 280, path);
     GetPrivateProfileStringW(L"wallpaper", L"path", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->wallpaper_path), 260, path);
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)
@@ -153,9 +192,9 @@ static reach_result reach_config_store_load(reach_config_store *store,
     {
         wchar_t section[32] = {};
         swprintf_s(section, L"pinned.%u", (unsigned)index);
-        wchar_t title[128] = {};
-        GetPrivateProfileStringW(section, L"title", L"", title, 128, path);
-        if (title[0] == 0)
+        wchar_t app_path[260] = {};
+        GetPrivateProfileStringW(section, L"path", L"", app_path, 260, path);
+        if (app_path[0] == 0)
         {
             continue;
         }
@@ -163,9 +202,7 @@ static reach_result reach_config_store_load(reach_config_store *store,
         reach_pinned_app_model *app = &out_snapshot->pinned_apps[out_snapshot->pinned_app_count];
         app->id = (uint32_t)GetPrivateProfileIntW(section, L"id",
                                                   (int)(out_snapshot->pinned_app_count + 1), path);
-        reach_copy_utf16(app->title, 128, reinterpret_cast<const uint16_t *>(title));
-        GetPrivateProfileStringW(section, L"path", L"", reinterpret_cast<wchar_t *>(app->path), 260,
-                                 path);
+        reach_copy_utf16(app->path, 260, reinterpret_cast<const uint16_t *>(app_path));
         GetPrivateProfileStringW(section, L"arguments", L"",
                                  reinterpret_cast<wchar_t *>(app->arguments), 260, path);
         GetPrivateProfileStringW(section, L"icon", L"", reinterpret_cast<wchar_t *>(app->icon_ref),
@@ -188,82 +225,85 @@ static reach_result reach_config_store_save(reach_config_store *store,
         return REACH_INVALID_ARGUMENT;
     }
 
-    const wchar_t *path = reinterpret_cast<const wchar_t *>(store->path);
-    WritePrivateProfileStringW(L"reach", L"version",
-                               REACH_CONFIG_VERSION_WIDE(REACH_VERSION_STRING), path);
-    wchar_t value[32] = {};
-    swprintf_s(value, L"%.0f", snapshot->dock_height);
-    WritePrivateProfileStringW(L"dock", L"height", value, path);
-    swprintf_s(value, L"%.0f", snapshot->dock_width);
-    WritePrivateProfileStringW(L"dock", L"width", value, path);
-    swprintf_s(value, L"%.0f", snapshot->dock_icon_size);
-    WritePrivateProfileStringW(L"dock", L"icon_size", value, path);
-    swprintf_s(value, L"%d", snapshot->power_sleep_minutes);
-    WritePrivateProfileStringW(L"power", L"sleep_minutes", value, path);
-    swprintf_s(value, L"%d", snapshot->power_lock_minutes);
-    WritePrivateProfileStringW(L"power", L"lock_minutes", value, path);
-    swprintf_s(value, L"%d", snapshot->power_shutdown_minutes);
-    WritePrivateProfileStringW(L"power", L"shutdown_minutes", value, path);
-    swprintf_s(value, L"%d", snapshot->power_restart_minutes);
-    WritePrivateProfileStringW(L"power", L"restart_minutes", value, path);
-    swprintf_s(value, L"%d", snapshot->power_sleep_wait_apps ? 1 : 0);
-    WritePrivateProfileStringW(L"power", L"sleep_wait_apps", value, path);
-    swprintf_s(value, L"%d", snapshot->power_shutdown_wait_apps ? 1 : 0);
-    WritePrivateProfileStringW(L"power", L"shutdown_wait_apps", value, path);
-    swprintf_s(value, L"%d", snapshot->power_restart_wait_apps ? 1 : 0);
-    WritePrivateProfileStringW(L"power", L"restart_wait_apps", value, path);
-    swprintf_s(value, L"%d", snapshot->high_refresh_rate ? 1 : 0);
-    WritePrivateProfileStringW(L"display", L"high_refresh_rate", value, path);
-    WritePrivateProfileStringW(L"wallpaper", L"path",
-                               reinterpret_cast<const wchar_t *>(snapshot->wallpaper_path), path);
+    std::wstring text;
+    text.append(L"; reach v");
+    text.append(REACH_CONFIG_VERSION_WIDE(REACH_VERSION_STRING));
+    text.append(L"\r\n[reach]\r\nversion=");
+    text.append(REACH_CONFIG_VERSION_WIDE(REACH_VERSION_STRING));
+    text.append(L"\r\n\r\n[dock]\r\nheight=");
+    text.append(std::to_wstring((int32_t)snapshot->dock_height));
+    text.append(L"\r\n\r\n[power]\r\nscreen_off_minutes=");
+    text.append(std::to_wstring(snapshot->power_screen_off_minutes));
+    text.append(L"\r\nsleep_minutes=");
+    text.append(std::to_wstring(snapshot->power_sleep_minutes));
+    text.append(L"\r\nlock_minutes=");
+    text.append(std::to_wstring(snapshot->power_lock_minutes));
+    text.append(L"\r\nshutdown_minutes=");
+    text.append(std::to_wstring(snapshot->power_shutdown_minutes));
+    text.append(L"\r\nrestart_minutes=");
+    text.append(std::to_wstring(snapshot->power_restart_minutes));
+    text.append(L"\r\nsleep_wait_apps=");
+    text.append(std::to_wstring(snapshot->power_sleep_wait_apps ? 1 : 0));
+    text.append(L"\r\nshutdown_wait_apps=");
+    text.append(std::to_wstring(snapshot->power_shutdown_wait_apps ? 1 : 0));
+    text.append(L"\r\nrestart_wait_apps=");
+    text.append(std::to_wstring(snapshot->power_restart_wait_apps ? 1 : 0));
+    text.append(L"\r\n\r\n[display]\r\nhigh_refresh_rate=");
+    text.append(std::to_wstring(snapshot->high_refresh_rate ? 1 : 0));
+    text.append(L"\r\nbundled_font=");
+    text.append(std::to_wstring(snapshot->bundled_font ? 1 : 0));
+    text.append(L"\r\nlight_theme=");
+    text.append(std::to_wstring(snapshot->light_theme ? 1 : 0));
+    text.append(L"\r\nwindows_system_theme=");
+    text.append(std::to_wstring((int32_t)snapshot->windows_system_theme));
+    text.append(L"\r\nwindows_app_theme=");
+    text.append(std::to_wstring((int32_t)snapshot->windows_app_theme));
+    text.append(L"\r\n\r\n[stage]\r\nanimation_ms=");
+    text.append(std::to_wstring(snapshot->stage_animation_ms));
+    text.append(L"\r\n\r\n[wallpaper]\r\npath=");
+    text.append(reinterpret_cast<const wchar_t *>(snapshot->wallpaper_path));
+    text.append(L"\r\n");
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)
     {
-        wchar_t section[48] = {};
-        swprintf_s(section, L"wallpaper.monitor.%u", (unsigned)(index + 1));
         if (snapshot->monitor_wallpaper_paths[index][0] != 0)
         {
-            WritePrivateProfileStringW(
-                section, L"path",
-                reinterpret_cast<const wchar_t *>(snapshot->monitor_wallpaper_paths[index]), path);
-        }
-        else
-        {
-            WritePrivateProfileStringW(section, nullptr, nullptr, path);
+            text.append(L"\r\n[wallpaper.monitor.");
+            text.append(std::to_wstring(index + 1));
+            text.append(L"]\r\npath=");
+            text.append(
+                reinterpret_cast<const wchar_t *>(snapshot->monitor_wallpaper_paths[index]));
+            text.append(L"\r\n");
         }
     }
 
     for (size_t index = 0; index < snapshot->pinned_app_count && index < REACH_MAX_PINNED_APPS;
          ++index)
     {
-        wchar_t section[32] = {};
-        swprintf_s(section, L"pinned.%u", (unsigned)index);
         const reach_pinned_app_model *app = &snapshot->pinned_apps[index];
-        swprintf_s(value, L"%u", (unsigned)app->id);
-        WritePrivateProfileStringW(section, L"id", value, path);
-        WritePrivateProfileStringW(section, L"title", reinterpret_cast<const wchar_t *>(app->title),
-                                   path);
-        WritePrivateProfileStringW(section, L"path", reinterpret_cast<const wchar_t *>(app->path),
-                                   path);
-        WritePrivateProfileStringW(section, L"arguments",
-                                   reinterpret_cast<const wchar_t *>(app->arguments), path);
-        WritePrivateProfileStringW(section, L"icon",
-                                   reinterpret_cast<const wchar_t *>(app->icon_ref), path);
-        WritePrivateProfileStringW(section, L"app_user_model_id",
-                                   reinterpret_cast<const wchar_t *>(app->app_user_model_id), path);
-    }
-    for (size_t index = snapshot->pinned_app_count; index < REACH_MAX_PINNED_APPS; ++index)
-    {
-        wchar_t section[32] = {};
-        swprintf_s(section, L"pinned.%u", (unsigned)index);
-        WritePrivateProfileStringW(section, nullptr, nullptr, path);
+        text.append(L"\r\n[pinned.");
+        text.append(std::to_wstring(index));
+        text.append(L"]\r\nid=");
+        text.append(std::to_wstring(app->id));
+        text.append(L"\r\npath=");
+        text.append(reinterpret_cast<const wchar_t *>(app->path));
+        text.append(L"\r\narguments=");
+        text.append(reinterpret_cast<const wchar_t *>(app->arguments));
+        text.append(L"\r\nicon=");
+        text.append(reinterpret_cast<const wchar_t *>(app->icon_ref));
+        text.append(L"\r\napp_user_model_id=");
+        text.append(reinterpret_cast<const wchar_t *>(app->app_user_model_id));
+        text.append(L"\r\n");
     }
 
-    reach_config_write_version_header(path, REACH_CONFIG_VERSION_WIDE(REACH_VERSION_STRING));
-    return REACH_OK;
+    return reach_config_write_utf16_atomic(reinterpret_cast<const wchar_t *>(store->path), text);
 }
 
 static void reach_config_store_destroy(reach_config_store *store)
 {
+    if (store != nullptr && store->transaction_mutex != nullptr)
+    {
+        CloseHandle(store->transaction_mutex);
+    }
     delete store;
 }
 
@@ -315,7 +355,18 @@ reach_result reach_windows_create_config_store(const uint16_t *path,
     }
 
     reach_copy_utf16(store->path, 260, path);
+    wchar_t mutex_name[64] = {};
+    swprintf_s(mutex_name, L"Local\\ReachConfig-%016llX",
+               (unsigned long long)reach_config_path_hash(path));
+    store->transaction_mutex = CreateMutexW(nullptr, FALSE, mutex_name);
+    if (store->transaction_mutex == nullptr)
+    {
+        delete store;
+        return REACH_ERROR;
+    }
     out_port->store = store;
+    out_port->ops.begin_transaction = reach_config_store_begin_transaction;
+    out_port->ops.end_transaction = reach_config_store_end_transaction;
     out_port->ops.load = reach_config_store_load;
     out_port->ops.save = reach_config_store_save;
     out_port->ops.destroy = reach_config_store_destroy;

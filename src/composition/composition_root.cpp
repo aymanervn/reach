@@ -34,6 +34,11 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
 
     if (result == REACH_OK)
     {
+        result = reach_windows_create_screen_hotspot_factory(&dependencies.screen_hotspots);
+    }
+
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_explorer_desktop_compat_host();
     }
 
@@ -64,7 +69,13 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dock_reveal_edge(&dependencies.dock_reveal_edge);
+        result = reach_windows_create_platform_window(REACH_SURFACE_TOP_BAR,
+                                                      &dependencies.top_bar_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.top_bar_window.window,
+                                                           &dependencies.top_bar_renderer);
     }
     if (result == REACH_OK)
     {
@@ -88,6 +99,36 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result =
+            reach_windows_create_platform_window(REACH_SURFACE_STAGE, &dependencies.stage_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.stage_window.window,
+                                                           &dependencies.stage_renderer);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_window_thumbnails(&dependencies.window_thumbnails);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_image_loader(&dependencies.image_loader);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_clock(&dependencies.clock);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_input_language(&dependencies.input_language);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_system_stats(&dependencies.system_stats);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_platform_window(REACH_SURFACE_CONTEXT_MENU,
                                                       &dependencies.context_menu_window);
     }
@@ -108,6 +149,26 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_platform_window(REACH_SURFACE_BATTERY,
+                                                      &dependencies.battery_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.battery_window.window,
+                                                           &dependencies.battery_renderer);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_platform_window(REACH_SURFACE_SYSTEM_HUD,
+                                                      &dependencies.system_hud_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(dependencies.system_hud_window.window,
+                                                           &dependencies.system_hud_renderer);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_platform_window(REACH_SURFACE_CLIPBOARD,
                                                       &dependencies.clipboard_window);
     }
@@ -123,6 +184,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     if (result == REACH_OK)
     {
         result = reach_windows_create_app_launcher(&dependencies.app_launcher);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_terminal_launcher(&dependencies.terminal_launcher);
     }
     if (result == REACH_OK)
     {
@@ -207,6 +272,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
+            dependencies.battery_window = {};
+            dependencies.battery_renderer = {};
+            dependencies.system_hud_window = {};
+            dependencies.system_hud_renderer = {};
             dependencies.clipboard_window = {};
             dependencies.clipboard_renderer = {};
             dependencies.clipboard = {};
@@ -227,9 +296,21 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         {
             dependencies.dock_window.ops.destroy(dependencies.dock_window.window);
         }
+        if (dependencies.top_bar_window.ops.destroy != nullptr)
+        {
+            dependencies.top_bar_window.ops.destroy(dependencies.top_bar_window.window);
+        }
         if (dependencies.clipboard_window.ops.destroy != nullptr)
         {
             dependencies.clipboard_window.ops.destroy(dependencies.clipboard_window.window);
+        }
+        if (dependencies.system_hud_window.ops.destroy != nullptr)
+        {
+            dependencies.system_hud_window.ops.destroy(dependencies.system_hud_window.window);
+        }
+        if (dependencies.system_hud_renderer.ops.destroy != nullptr)
+        {
+            dependencies.system_hud_renderer.ops.destroy(dependencies.system_hud_renderer.backend);
         }
         if (dependencies.clipboard_renderer.ops.destroy != nullptr)
         {
@@ -242,6 +323,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.dock_renderer.ops.destroy != nullptr)
         {
             dependencies.dock_renderer.ops.destroy(dependencies.dock_renderer.backend);
+        }
+        if (dependencies.top_bar_renderer.ops.destroy != nullptr)
+        {
+            dependencies.top_bar_renderer.ops.destroy(dependencies.top_bar_renderer.backend);
         }
         if (dependencies.tray_window.ops.destroy != nullptr)
         {
@@ -309,6 +394,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.app_launcher.ops.destroy != nullptr)
         {
             dependencies.app_launcher.ops.destroy(dependencies.app_launcher.launcher);
+        }
+        if (dependencies.terminal_launcher.ops.destroy != nullptr)
+        {
+            dependencies.terminal_launcher.ops.destroy(dependencies.terminal_launcher.launcher);
         }
         if (dependencies.settings_launcher.ops.destroy != nullptr)
         {
@@ -436,6 +525,17 @@ int32_t reach_app_needs_frame(const reach_app *app)
 int32_t reach_app_frame_interval_ms(const reach_app *app)
 {
     return app != nullptr && app->host != nullptr ? reach_host_frame_interval_ms(app->host) : 16;
+}
+
+uint32_t reach_app_idle_wait_ms(const reach_app *app)
+{
+    if (app == nullptr || app->host == nullptr)
+    {
+        return REACH_APP_WAIT_FOREVER;
+    }
+
+    uint32_t wait_ms = reach_host_idle_wait_ms(app->host);
+    return wait_ms == REACH_CLOCK_WAIT_FOREVER ? REACH_APP_WAIT_FOREVER : wait_ms;
 }
 
 void reach_app_destroy(reach_app *app)

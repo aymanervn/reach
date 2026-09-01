@@ -1,6 +1,7 @@
 #ifndef REACH_PORTS_SYSTEM_CONTROLS_H
 #define REACH_PORTS_SYSTEM_CONTROLS_H
 
+#include "reach/core/theme.h"
 #include "reach/support/util.h"
 
 #include <stdint.h>
@@ -16,6 +17,12 @@ extern "C"
 #define REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH (1u << 1)
 #define REACH_SYSTEM_CONTROLS_CHANGE_POWER (1u << 2)
 #define REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS (1u << 3)
+/* Raised, together with CHANGE_BLUETOOTH, when a `request_bluetooth_enabled` call has run to
+   completion — whether or not it changed the radio. Not a capability, so not in CHANGE_ALL. */
+#define REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST (1u << 4)
+#define REACH_SYSTEM_CONTROLS_CHANGE_ALL                                                           \
+    (REACH_SYSTEM_CONTROLS_CHANGE_NETWORK | REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH |               \
+     REACH_SYSTEM_CONTROLS_CHANGE_POWER | REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS)
 
     typedef void (*reach_system_controls_change_callback)(void *user, uint32_t change_flags);
 
@@ -45,6 +52,7 @@ extern "C"
         int32_t has_battery;
         int32_t battery_percent;
         int32_t battery_saver_on;
+        int32_t battery_charging;
     } reach_power_state;
 
     typedef struct reach_brightness_state
@@ -76,6 +84,9 @@ extern "C"
         reach_result (*open_project_menu)(void *userdata);
 
         reach_result (*open_system_quick_settings)(void *userdata);
+
+        reach_result (*set_theme_modes)(void *userdata, reach_theme_mode system_mode,
+                                        reach_theme_mode app_mode);
 
         reach_result (*start_watching)(void *userdata,
                                        reach_system_controls_change_callback callback,

@@ -8,6 +8,10 @@
 #include "reach/ports/config_store.h"
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
+#include "reach/ports/clock.h"
+#include "reach/ports/input_language.h"
+#include "reach/ports/system_stats.h"
+#include "reach/ports/terminal_launcher.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/media_controls.h"
 #include "reach/ports/monitor.h"
@@ -22,8 +26,10 @@
 #include "reach/ports/wallpaper_service.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
+#include "reach/ports/window_thumbnail.h"
 #include "reach/ports/audio_volume.h"
-#include "reach/ports/dock_reveal_edge.h"
+#include "reach/ports/image_loader.h"
+#include "reach/ports/screen_hotspot.h"
 #include "reach/ports/foreground_watcher.h"
 #include "reach/ports/clipboard.h"
 #include "reach/support/util.h"
@@ -46,18 +52,31 @@ extern "C"
         reach_render_backend_port launcher_renderer;
         reach_platform_window_port dock_window;
         reach_render_backend_port dock_renderer;
-        reach_dock_reveal_edge_port dock_reveal_edge;
+        reach_platform_window_port top_bar_window;
+        reach_render_backend_port top_bar_renderer;
+        reach_screen_hotspot_factory_port screen_hotspots;
+        reach_image_loader_port image_loader;
         reach_platform_window_port tray_window;
         reach_render_backend_port tray_renderer;
         reach_platform_window_port switcher_window;
         reach_render_backend_port switcher_renderer;
+        reach_platform_window_port stage_window;
+        reach_render_backend_port stage_renderer;
+        reach_window_thumbnail_port window_thumbnails;
         reach_platform_window_port context_menu_window;
         reach_render_backend_port context_menu_renderer;
         reach_platform_window_port quick_settings_window;
         reach_render_backend_port quick_settings_renderer;
+        reach_platform_window_port battery_window;
+        reach_render_backend_port battery_renderer;
+        reach_platform_window_port system_hud_window;
+        reach_render_backend_port system_hud_renderer;
         reach_platform_window_port clipboard_window;
         reach_render_backend_port clipboard_renderer;
         reach_input_source_port input_source;
+        reach_clock_port clock;
+        reach_input_language_port input_language;
+        reach_system_stats_port system_stats;
         reach_monitor_port monitors;
         reach_window_manager_port window_manager;
         reach_foreground_watcher_port foreground_watcher;
@@ -65,6 +84,7 @@ extern "C"
         reach_tray_provider_port tray_provider;
         reach_search_provider_port search_provider;
         reach_app_launcher_port app_launcher;
+        reach_terminal_launcher_port terminal_launcher;
         reach_settings_launcher_port settings_launcher;
         reach_icon_provider_port icon_provider;
         reach_explorer_service_port explorer_service;
@@ -91,6 +111,9 @@ extern "C"
     reach_result reach_host_update(reach_host *host, double delta_seconds);
     int32_t reach_host_needs_frame(const reach_host *host);
     int32_t reach_host_frame_interval_ms(const reach_host *host);
+    uint32_t reach_host_idle_wait_ms(const reach_host *host);
+    reach_theme_mode reach_host_theme_mode(const reach_host *host);
+    void reach_host_set_theme_mode(reach_host *host, reach_theme_mode mode);
 
 #ifdef __cplusplus
 }

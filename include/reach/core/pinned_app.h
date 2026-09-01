@@ -3,17 +3,16 @@
 
 #include <stdint.h>
 
+#include "reach/core/limits.h"
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-#define REACH_MAX_PINNED_APPS 12
-
     typedef struct reach_pinned_app_model
     {
         uint32_t id;
-        uint16_t title[128];
         uint16_t path[260];
         uint16_t arguments[260];
         uint16_t icon_ref[260];

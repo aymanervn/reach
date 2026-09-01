@@ -64,13 +64,20 @@ target_link_libraries(reach_protocol PUBLIC
 
 add_library(reach_services STATIC
     src/services/app_control.cpp
+    src/services/bluetooth.cpp
     src/services/config.cpp
     src/services/icon_service.cpp
     src/services/idle_watch.cpp
     src/services/now_playing.cpp
     src/services/pin_config.cpp
     src/services/search.cpp
+    src/services/clock.cpp
+    src/services/input_language.cpp
+    src/services/system_stats.cpp
     src/services/system_status.cpp
+    src/services/tray.cpp
+    src/services/wallpaper.cpp
+    src/services/wifi.cpp
     src/services/window_tracking.cpp
 )
 
@@ -84,7 +91,9 @@ target_link_libraries(reach_services PUBLIC
 
 add_library(reach_core STATIC
     src/core/app_update.c
+    src/core/bluetooth.c
     src/core/clipboard.c
+    src/core/loader.c
     src/core/scrollbar.cpp
     src/core/ui_state.c
     src/core/ui_layout.c
@@ -92,6 +101,7 @@ add_library(reach_core STATIC
     src/core/runtime_policy.c
     src/core/startup_apps.c
     src/core/theme.c
+    src/core/wifi.c
 )
 
 reach_configure_common(reach_core)
@@ -101,9 +111,22 @@ target_compile_features(reach_core PUBLIC
 )
 
 add_library(reach_features STATIC
+    src/features/common/bar_visibility/bar_visibility.cpp
+    src/features/common/draggable/draggable.cpp
+    src/features/common/icon_feedback/icon_feedback.cpp
+    src/features/common/layout/layout.cpp
+    src/features/common/level_presentation/level_presentation.cpp
+    src/features/common/loader/loader_render.cpp
+    src/features/common/marquee/marquee.cpp
+    src/features/common/progress_bar/progress_bar_render.cpp
+    src/features/common/pressable/pressable.cpp
     src/features/common/scrollbar/scrollbar_render.cpp
+    src/features/common/section_reveal/section_reveal.cpp
     src/features/common/text_edit/text_edit.cpp
     src/features/common/ui_controls/ui_controls.cpp
+    src/features/battery/battery_feature.cpp
+    src/features/battery/battery_interaction.cpp
+    src/features/battery/battery_render.cpp
     src/features/clipboard/clipboard_feature.cpp
     src/features/clipboard/clipboard_interaction.cpp
     src/features/clipboard/clipboard_model.cpp
@@ -114,23 +137,30 @@ add_library(reach_features STATIC
     src/features/dock/dock_feature.cpp
     src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
-    src/features/dock/dock_now_playing.cpp
     src/features/dock/dock_render.cpp
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
     src/features/launcher/launcher_state.cpp
-    src/features/popup/popup_render.cpp
+    src/features/common/presentation/presentation_animation.cpp
+    src/features/common/popup/popup_render.cpp
     src/features/quick_settings/quick_settings_feature.cpp
     src/features/quick_settings/quick_settings_interaction.cpp
     src/features/quick_settings/quick_settings_render.cpp
+    src/features/stage/stage_feature.cpp
+    src/features/stage/stage_interaction.cpp
+    src/features/stage/stage_layout.cpp
+    src/features/stage/stage_render.cpp
+    src/features/system_hud/system_hud_feature.cpp
+    src/features/system_hud/system_hud_render.cpp
+    src/features/top_bar/top_bar_feature.cpp
+    src/features/top_bar/top_bar_now_playing.cpp
+    src/features/top_bar/top_bar_window_push.cpp
+    src/features/top_bar/top_bar_interaction.cpp
+    src/features/top_bar/top_bar_render.cpp
+    src/features/top_bar/top_bar_tray.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
-    src/features/tray/tray_feature.cpp
-    src/features/tray/tray_interaction.cpp
-    src/features/tray/tray_model.cpp
-    src/features/tray/tray_render.cpp
-    src/features/wallpaper/wallpaper_feature.cpp
 )
 
 reach_configure_common(reach_features)
@@ -154,7 +184,9 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_frame.cpp
     src/adapters/windows/render_d2d/render_d2d_icons.cpp
     src/adapters/windows/render_d2d/render_d2d_svg.cpp
+    src/adapters/windows/render_d2d/render_d2d_svg_document.cpp
     src/adapters/windows/render_d2d/render_d2d_shapes.cpp
+    src/adapters/windows/render_d2d/render_d2d_shadow.cpp
     src/adapters/windows/render_d2d/render_d2d_text.cpp
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/search_retriever_win32.cpp
@@ -164,6 +196,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
     src/adapters/windows/windows_icon_handle.cpp
+    src/adapters/windows/input_language_win32.cpp
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/media_controls_win32.cpp
     src/adapters/windows/config_ini.cpp
@@ -177,12 +210,20 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/explorer_service_win32.cpp
     src/adapters/windows/wallpaper_win32.cpp
     src/adapters/windows/wallpaper_surface_win32.cpp
+    src/adapters/windows/mouse_hook_thread_win32.cpp
     src/adapters/windows/popup_capture_win32.cpp
     src/adapters/windows/power_session_win32.cpp
     src/adapters/windows/audio_volume_win32.cpp
     src/adapters/windows/system_controls_network.cpp
     src/adapters/windows/system_controls_win32.cpp
-    src/adapters/windows/dock_reveal_edge_win32.cpp
+    src/adapters/windows/wifi_profile.cpp
+    src/adapters/windows/wifi_wlanapi.cpp
+    src/adapters/windows/bluetooth_winrt.cpp
+    src/adapters/windows/clock_win32.cpp
+    src/adapters/windows/system_stats_win32.cpp
+    src/adapters/windows/image_loader_win32.cpp
+    src/adapters/windows/screen_hotspot_win32.cpp
+    src/adapters/windows/window_thumbnail_dwm.cpp
     src/adapters/windows/foreground_watcher_win32.cpp
     src/adapters/windows/monitor_win32.cpp
     src/adapters/windows/startup_apps_win32.cpp
@@ -217,6 +258,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     shlwapi
     shcore
     advapi32
+    crypt32
     ole32
     oleaut32
     taskschd
@@ -233,31 +275,26 @@ target_link_libraries(reach_windows_adapters PRIVATE
 )
 
 add_library(reach_composition STATIC
-    src/composition/host_clipboard.cpp
+    src/composition/feature_registry.cpp
     src/composition/host_app_control.cpp
-    src/composition/host_context_menu_orchestration.cpp
     src/composition/host_config.cpp
-    src/composition/host_dock_layout.cpp
-    src/composition/host_dock_orchestration.cpp
+    src/composition/host_bar_layout.cpp
     src/composition/host_event_dispatch.cpp
-    src/composition/host_feedback.cpp
     src/composition/host_game_mode.cpp
+    src/composition/host_edge_reveals.cpp
     src/composition/host_icons.cpp
+    src/composition/host_feature_actions.cpp
     src/composition/host_input.cpp
-    src/composition/host_launcher_orchestration.cpp
-    src/composition/host_launcher_search.cpp
+    src/composition/interfeature_routes.cpp
+    src/composition/host_focus_restore.cpp
+    src/composition/host_layout.cpp
     src/composition/host_lifecycle.cpp
     src/composition/host_popup.cpp
     src/composition/host_popup_surface.cpp
-    src/composition/host_quick_settings.cpp
-    src/composition/host_render.cpp
     src/composition/host_surface_frames.cpp
     src/composition/host_surfaces.cpp
     src/composition/host_system_actions.cpp
-    src/composition/host_switcher_input.cpp
-    src/composition/host_tray_orchestration.cpp
     src/composition/host_update.cpp
-    src/composition/host_window_list_orchestration.cpp
     src/composition/host_window_tracking.cpp
     src/composition/surface_runtime.cpp
     src/composition/composition_root.cpp
@@ -328,14 +365,19 @@ target_link_libraries(reach PRIVATE
 add_library(reach_settings_feature STATIC
     src/apps/settings/feature/settings_account.cpp
     src/apps/settings/feature/settings_bluetooth.cpp
+    src/apps/settings/feature/settings_bluetooth_layout.cpp
+    src/apps/settings/feature/settings_bluetooth_render.cpp
     src/apps/settings/feature/settings_feature.cpp
     src/apps/settings/feature/settings_monitors_scaling.cpp
     src/apps/settings/feature/settings_power_sleep.cpp
     src/apps/settings/feature/settings_render.cpp
+    src/apps/settings/feature/settings_render_common.cpp
     src/apps/settings/feature/settings_startup_apps.cpp
     src/apps/settings/feature/settings_update.cpp
     src/apps/settings/feature/windows_update_policy.cpp
     src/apps/settings/feature/settings_wifi.cpp
+    src/apps/settings/feature/settings_wifi_layout.cpp
+    src/apps/settings/feature/settings_wifi_render.cpp
 )
 reach_configure_common(reach_settings_feature)
 target_compile_features(reach_settings_feature PUBLIC cxx_std_17)
@@ -600,6 +642,34 @@ target_link_libraries(reach_tray_probe PRIVATE
 )
 
 if(REACH_BUILD_TESTS)
+add_executable(reach_svg_document_tests
+    tests/svg_document_tests.cpp
+    src/adapters/windows/render_d2d/render_d2d_svg_document.cpp
+)
+
+reach_configure_common(reach_svg_document_tests)
+target_compile_features(reach_svg_document_tests PRIVATE
+    cxx_std_17
+)
+target_include_directories(reach_svg_document_tests PRIVATE
+    src/adapters/windows/render_d2d
+)
+target_compile_definitions(reach_svg_document_tests PRIVATE
+    REACH_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_executable(reach_util_tests
+    tests/util_tests.cpp
+)
+
+reach_configure_common(reach_util_tests)
+target_compile_features(reach_util_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_util_tests PRIVATE
+    reach_support
+)
+
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
 )
@@ -612,6 +682,55 @@ target_link_libraries(reach_pin_config_tests PRIVATE
     reach_services
 )
 
+add_executable(reach_config_service_tests
+    tests/config_service_tests.cpp
+)
+
+reach_configure_common(reach_config_service_tests)
+target_compile_features(reach_config_service_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_config_service_tests PRIVATE
+    reach_services
+)
+
+add_executable(reach_config_ini_tests
+    tests/config_ini_tests.cpp
+)
+
+reach_configure_common(reach_config_ini_tests)
+reach_configure_windows(reach_config_ini_tests)
+target_compile_features(reach_config_ini_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_config_ini_tests PRIVATE
+    reach_windows_adapters
+)
+
+add_executable(reach_layout_tests
+    tests/layout_tests.cpp
+)
+
+reach_configure_common(reach_layout_tests)
+target_compile_features(reach_layout_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_layout_tests PRIVATE
+    reach_features
+)
+
+add_executable(reach_host_layout_tests
+    tests/host_layout_tests.cpp
+)
+
+reach_configure_common(reach_host_layout_tests)
+reach_configure_windows(reach_host_layout_tests)
+target_include_directories(reach_host_layout_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/composition
+)
+target_compile_features(reach_host_layout_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_host_layout_tests PRIVATE reach_composition)
+
 add_executable(reach_quick_settings_feature_tests
     tests/quick_settings_feature_tests.cpp
 )
@@ -621,6 +740,30 @@ target_compile_features(reach_quick_settings_feature_tests PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_quick_settings_feature_tests PRIVATE
+    reach_features
+)
+
+add_executable(reach_battery_feature_tests
+    tests/battery_feature_tests.cpp
+)
+
+reach_configure_common(reach_battery_feature_tests)
+target_compile_features(reach_battery_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_battery_feature_tests PRIVATE
+    reach_features
+)
+
+add_executable(reach_system_hud_feature_tests
+    tests/system_hud_feature_tests.cpp
+)
+
+reach_configure_common(reach_system_hud_feature_tests)
+target_compile_features(reach_system_hud_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_system_hud_feature_tests PRIVATE
     reach_features
 )
 
@@ -636,16 +779,28 @@ target_link_libraries(reach_context_menu_feature_tests PRIVATE
     reach_features
 )
 
-add_executable(reach_wallpaper_feature_tests
-    tests/wallpaper_feature_tests.cpp
+add_executable(reach_app_control_tests
+    tests/app_control_tests.cpp
 )
 
-reach_configure_common(reach_wallpaper_feature_tests)
-target_compile_features(reach_wallpaper_feature_tests PRIVATE
+reach_configure_common(reach_app_control_tests)
+target_compile_features(reach_app_control_tests PRIVATE
     cxx_std_17
 )
-target_link_libraries(reach_wallpaper_feature_tests PRIVATE
-    reach_features
+target_link_libraries(reach_app_control_tests PRIVATE
+    reach_services
+)
+
+add_executable(reach_wallpaper_service_tests
+    tests/wallpaper_service_tests.cpp
+)
+
+reach_configure_common(reach_wallpaper_service_tests)
+target_compile_features(reach_wallpaper_service_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_wallpaper_service_tests PRIVATE
+    reach_services
 )
 
 add_executable(reach_now_playing_service_tests
@@ -679,6 +834,19 @@ add_executable(reach_settings_feature_tests
 reach_configure_common(reach_settings_feature_tests)
 target_compile_features(reach_settings_feature_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_settings_feature_tests PRIVATE reach_settings_feature)
+
+add_executable(reach_stage_feature_tests
+    tests/stage_feature_tests.cpp
+)
+
+reach_configure_common(reach_stage_feature_tests)
+target_compile_features(reach_stage_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_stage_feature_tests PRIVATE
+    reach_features
+    reach_support
+)
 
 add_executable(reach_launcher_feature_tests
     tests/launcher_feature_tests.cpp
@@ -729,6 +897,30 @@ reach_configure_common(reach_dock_model_tests)
 target_compile_features(reach_dock_model_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_dock_model_tests PRIVATE reach_features)
 
+add_executable(reach_pressable_tests
+    tests/pressable_tests.cpp
+)
+
+reach_configure_common(reach_pressable_tests)
+target_compile_features(reach_pressable_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_pressable_tests PRIVATE reach_features)
+
+add_executable(reach_bar_visibility_tests
+    tests/bar_visibility_tests.cpp
+)
+
+reach_configure_common(reach_bar_visibility_tests)
+target_compile_features(reach_bar_visibility_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_bar_visibility_tests PRIVATE reach_features)
+
+add_executable(reach_loader_tests
+    tests/loader_tests.cpp
+)
+
+reach_configure_common(reach_loader_tests)
+target_compile_features(reach_loader_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_loader_tests PRIVATE reach_core)
+
 add_executable(reach_window_tracking_tests
     tests/window_tracking_tests.cpp
 )
@@ -736,6 +928,58 @@ add_executable(reach_window_tracking_tests
 reach_configure_common(reach_window_tracking_tests)
 target_compile_features(reach_window_tracking_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_window_tracking_tests PRIVATE reach_services)
+
+add_executable(reach_window_query_tests
+    tests/window_query_tests.cpp
+    src/adapters/windows/window_management/window_query_win32.cpp
+)
+
+reach_configure_common(reach_window_query_tests)
+reach_configure_windows(reach_window_query_tests)
+target_compile_features(reach_window_query_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_window_query_tests PRIVATE
+    reach_support
+    user32
+    shell32
+    ole32
+    propsys
+    uuid
+)
+
+add_executable(reach_wifi_tests
+    tests/wifi_tests.cpp
+    src/adapters/windows/wifi_profile.cpp
+)
+
+reach_configure_common(reach_wifi_tests)
+target_compile_features(reach_wifi_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_wifi_tests PRIVATE
+    reach_core
+    reach_support
+)
+
+add_executable(reach_bluetooth_tests
+    tests/bluetooth_tests.cpp
+)
+
+reach_configure_common(reach_bluetooth_tests)
+target_compile_features(reach_bluetooth_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_bluetooth_tests PRIVATE
+    reach_core
+    reach_support
+)
+
+add_executable(reach_system_status_tests
+    tests/system_status_tests.cpp
+)
+
+reach_configure_common(reach_system_status_tests)
+target_compile_features(reach_system_status_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_system_status_tests PRIVATE
+    reach_services
+    reach_core
+    reach_support
+)
 
 add_executable(reach_system_controls_network_tests
     tests/system_controls_network_tests.cpp
@@ -748,20 +992,41 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     cxx_std_17
 )
 
+    add_test(NAME reach_svg_document_tests COMMAND reach_svg_document_tests)
+    add_test(NAME reach_util_tests COMMAND reach_util_tests)
+    add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
+    add_test(NAME reach_bluetooth_tests COMMAND reach_bluetooth_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
+    add_test(NAME reach_config_service_tests COMMAND reach_config_service_tests)
+    add_test(NAME reach_config_ini_tests COMMAND reach_config_ini_tests)
+    add_test(NAME reach_layout_tests COMMAND reach_layout_tests)
+    add_test(NAME reach_host_layout_tests COMMAND reach_host_layout_tests)
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
+    add_test(NAME reach_battery_feature_tests COMMAND reach_battery_feature_tests)
+    add_test(NAME reach_system_status_tests COMMAND reach_system_status_tests)
+    add_test(NAME reach_system_hud_feature_tests COMMAND reach_system_hud_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
-    add_test(NAME reach_wallpaper_feature_tests COMMAND reach_wallpaper_feature_tests)
+    add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)
+    add_test(NAME reach_wallpaper_service_tests COMMAND reach_wallpaper_service_tests)
     add_test(NAME reach_now_playing_service_tests COMMAND reach_now_playing_service_tests)
     add_test(NAME reach_idle_watch_tests COMMAND reach_idle_watch_tests)
     add_test(NAME reach_settings_feature_tests COMMAND reach_settings_feature_tests)
     add_test(NAME reach_launcher_feature_tests COMMAND reach_launcher_feature_tests)
+    add_test(NAME reach_stage_feature_tests COMMAND reach_stage_feature_tests)
     add_test(NAME reach_clipboard_feature_tests COMMAND reach_clipboard_feature_tests)
     add_test(NAME reach_text_edit_tests COMMAND reach_text_edit_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
     add_test(NAME reach_dock_model_tests COMMAND reach_dock_model_tests)
+    add_test(NAME reach_pressable_tests COMMAND reach_pressable_tests)
+    add_test(NAME reach_bar_visibility_tests COMMAND reach_bar_visibility_tests)
+    add_test(NAME reach_loader_tests COMMAND reach_loader_tests)
     add_test(NAME reach_window_tracking_tests COMMAND reach_window_tracking_tests)
+    add_test(NAME reach_window_query_tests COMMAND reach_window_query_tests)
+    add_test(
+        NAME reach_architecture_checker_tests
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_architecture_tests.py
+    )
 endif()
 
 if(REACH_RUN_ARCHITECTURE_CHECK)

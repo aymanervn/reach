@@ -2,44 +2,91 @@
 
 #include <math.h>
 
-static const float REACH_HOST_TRANSITION_OFFSET = 8.0f;
-static const double REACH_HOST_TRANSITION_OPEN_SECONDS = 0.16;
-static const double REACH_HOST_TRANSITION_CLOSE_SECONDS = 0.12;
-
-int32_t reach_host_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
-{
-    return fabsf(a.x - b.x) < 0.5f && fabsf(a.y - b.y) < 0.5f && fabsf(a.width - b.width) < 0.5f &&
-           fabsf(a.height - b.height) < 0.5f;
-}
-
-int32_t reach_host_opacity_equal(float a, float b)
+int32_t reach_host_scalar_equal(float a, float b)
 {
     return fabsf(a - b) < 0.001f;
 }
 
+const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return nullptr;
+    }
+
+    const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    switch (host->feature_runtimes[id].definition->surface.shadow)
+    {
+    case REACH_SURFACE_SHADOW_BAR:
+        return &theme->bar_shadow;
+    case REACH_SURFACE_SHADOW_POPUP:
+        return &theme->popup_shadow;
+    default:
+        return nullptr;
+    }
+}
+
+reach_shadow_pad reach_host_surface_shadow_pad(const reach_host *host, reach_surface_id id)
+{
+    reach_shadow_pad pad = {};
+    const reach_shadow *shadow = reach_host_surface_shadow(host, id);
+    if (shadow == nullptr)
+    {
+        return pad;
+    }
+    return reach_theme_shadow_pad(shadow, reach_host_layout_dpi_scale(host));
+}
+
+static reach_rect_f32 reach_host_surface_window_bounds(reach_rect_f32 content, reach_shadow_pad pad)
+{
+    content.x -= pad.left;
+    content.y -= pad.top;
+    content.width += pad.left + pad.right;
+    content.height += pad.top + pad.bottom;
+    return content;
+}
+
+void reach_host_stamp_surface_content(const reach_host *host, reach_surface_id id,
+                                      reach_render_command_buffer *commands)
+{
+    if (host == nullptr || commands == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+
+    const reach_surface_runtime *surface = host->feature_runtimes[id].surface;
+    if (surface == nullptr || !surface->bounds_valid)
+    {
+        return;
+    }
+
+    reach_shadow_pad pad = reach_host_surface_shadow_pad(host, id);
+    reach_rect_f32 content = {pad.left, pad.top, surface->last_bounds.width,
+                              surface->last_bounds.height};
+    reach_render_command_buffer_set_content_rect(commands, content);
+}
+
 reach_result reach_host_apply_window_state(reach_platform_window_port *window,
-                                           reach_rect_f32 bounds, float opacity,
-                                           reach_rect_f32 *last_bounds, float *last_opacity,
-                                           int32_t *bounds_valid, int32_t *opacity_valid,
+                                           reach_rect_f32 bounds, reach_shadow_pad pad,
+                                           reach_rect_f32 *last_bounds, int32_t *bounds_valid,
                                            int32_t *out_changed)
 {
     REACH_ASSERT(window != nullptr);
     REACH_ASSERT(last_bounds != nullptr);
-    REACH_ASSERT(last_opacity != nullptr);
     REACH_ASSERT(bounds_valid != nullptr);
-    REACH_ASSERT(opacity_valid != nullptr);
     REACH_ASSERT(out_changed != nullptr);
-    if (window == nullptr || last_bounds == nullptr || last_opacity == nullptr ||
-        bounds_valid == nullptr || opacity_valid == nullptr || out_changed == nullptr)
+    if (window == nullptr || last_bounds == nullptr || bounds_valid == nullptr ||
+        out_changed == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
     *out_changed = 0;
     if (window->ops.set_bounds != nullptr &&
-        (!*bounds_valid || !reach_host_rect_equal(*last_bounds, bounds)))
+        (!*bounds_valid || !reach_rect_equal(*last_bounds, bounds)))
     {
-        reach_result result = window->ops.set_bounds(window->window, bounds);
+        reach_result result =
+            window->ops.set_bounds(window->window, reach_host_surface_window_bounds(bounds, pad));
         if (result != REACH_OK)
         {
             return result;
@@ -49,301 +96,372 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
         *out_changed = 1;
     }
 
-    if (window->ops.set_opacity != nullptr &&
-        (!*opacity_valid || !reach_host_opacity_equal(*last_opacity, opacity)))
-    {
-        reach_result result = window->ops.set_opacity(window->window, opacity);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-        *last_opacity = opacity;
-        *opacity_valid = 1;
-        *out_changed = 1;
-    }
-
     return REACH_OK;
 }
 
-void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
-                                        size_t y_track, size_t opacity_track)
+reach_host_surface_presentation_frame reach_host_surface_presentation_frame_compute(
+    reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
+    float y_offset, float scale, float max_scale)
 {
-    if (host == nullptr || transition == nullptr)
+    reach_host_surface_presentation_frame frame = {};
+    frame.window_bounds = target_bounds;
+    frame.content_rect = {shadow_pad.left, shadow_pad.top, target_bounds.width,
+                          target_bounds.height};
+    frame.render_transform = {1.0f, 1.0f, shadow_pad.left, shadow_pad.top};
+    frame.pointer_transform = {1.0f, 1.0f, 0.0f, y_offset};
+    frame.scale = 1.0f;
+
+    if (scale <= 0.0f || max_scale <= 1.0f)
+    {
+        frame.window_bounds.y += y_offset;
+        return frame;
+    }
+
+    float center_x = target_bounds.x + target_bounds.width * 0.5f;
+    float center_y = target_bounds.y + target_bounds.height * 0.5f;
+
+    float envelope_center_x = envelope_bounds.x + envelope_bounds.width * 0.5f;
+    float envelope_center_y = envelope_bounds.y + envelope_bounds.height * 0.5f;
+    frame.window_bounds.width = envelope_bounds.width * max_scale;
+    frame.window_bounds.height = envelope_bounds.height * max_scale;
+    frame.window_bounds.x = envelope_center_x - frame.window_bounds.width * 0.5f;
+    frame.window_bounds.y = envelope_center_y - frame.window_bounds.height * 0.5f;
+
+    frame.content_rect.width = target_bounds.width * scale;
+    frame.content_rect.height = target_bounds.height * scale;
+    float transformed_x = center_x - frame.content_rect.width * 0.5f;
+    float transformed_y = center_y - frame.content_rect.height * 0.5f + y_offset;
+    frame.content_rect.x = shadow_pad.left + transformed_x - frame.window_bounds.x;
+    frame.content_rect.y = shadow_pad.top + transformed_y - frame.window_bounds.y;
+    frame.render_transform = {scale, scale, frame.content_rect.x, frame.content_rect.y};
+    frame.pointer_transform = {scale, scale, center_x - center_x * scale,
+                               center_y + y_offset - center_y * scale};
+    frame.scale = scale;
+    frame.scale_envelope_active = 1;
+    return frame;
+}
+
+static void reach_host_register_edge_reveal_participant(reach_host *host,
+                                                        reach_host_edge_reveal_runtime *runtime)
+{
+    reach_layout_participant participant = 0;
+    reach_result result = reach_layout_register(
+        &host->layout_manager, runtime->owner->definition->surface.edge_reveal.layer, &participant);
+    REACH_ASSERT(result == REACH_OK);
+    if (result != REACH_OK)
     {
         return;
     }
-    *transition = {};
-    transition->y_track = y_track;
-    transition->opacity_track = opacity_track;
-    reach_animation_manager_set(&host->animations, y_track, REACH_HOST_TRANSITION_OFFSET);
-    reach_animation_manager_set(&host->animations, opacity_track, 0.0f);
+    runtime->participant = participant;
+    host->layout_targets[participant].edge_reveal = &runtime->port;
+    reach_layout_set_visible(&host->layout_manager, participant, 0);
 }
 
-void reach_host_surface_transitions_init(reach_host *host)
+void reach_host_init_layout(reach_host *host)
 {
+    REACH_ASSERT(host != nullptr);
     if (host == nullptr)
     {
         return;
     }
-    reach_host_surface_transition_init(host, &host->launcher_transition,
-                                       REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_LAUNCHER_TRANSITION_OPACITY);
-    reach_host_surface_transition_init(host, &host->tray_transition,
-                                       REACH_HOST_ANIMATION_TRAY_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_TRAY_TRANSITION_OPACITY);
-    reach_host_surface_transition_init(host, &host->quick_settings_transition,
-                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_QUICK_SETTINGS_TRANSITION_OPACITY);
-    reach_host_surface_transition_init(host, &host->switcher_transition,
-                                       REACH_HOST_ANIMATION_SWITCHER_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_SWITCHER_TRANSITION_OPACITY);
-    reach_host_surface_transition_init(host, &host->context_menu_transition,
-                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_CONTEXT_MENU_TRANSITION_OPACITY);
-    reach_host_surface_transition_init(host, &host->clipboard_transition,
-                                       REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_Y,
-                                       REACH_HOST_ANIMATION_CLIPBOARD_TRANSITION_OPACITY);
-}
 
-void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
-                                       int32_t open)
-{
-    if (host == nullptr || transition == nullptr)
+    host->layout_manager = {};
+    host->applied_layout_plan = {};
+    host->has_applied_layout_plan = 0;
+    host->dirty.z_order = 0;
+    for (size_t index = 0; index < REACH_LAYOUT_MAX_PARTICIPANTS; ++index)
     {
-        return;
+        host->layout_targets[index] = {};
     }
 
-    int32_t target_open = open ? 1 : 0;
-    if (transition->target_open == target_open && (target_open || !transition->visible))
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        return;
-    }
-
-    transition->target_open = target_open;
-    if (target_open)
-    {
-        if (!transition->visible)
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
+        reach_layout_participant participant = 0;
+        reach_result result = reach_layout_register(&host->layout_manager,
+                                                    desc->definition->surface.layer, &participant);
+        REACH_ASSERT(result == REACH_OK);
+        if (result != REACH_OK)
         {
-            transition->visible = 1;
-            reach_animation_manager_set(&host->animations, transition->y_track,
-                                        REACH_HOST_TRANSITION_OFFSET);
-            reach_animation_manager_set(&host->animations, transition->opacity_track, 0.0f);
+            continue;
         }
-        reach_animation_manager_animate_to(&host->animations, transition->y_track, 0.0f,
-                                           REACH_HOST_TRANSITION_OPEN_SECONDS,
-                                           REACH_EASING_EASE_OUT);
-        reach_animation_manager_animate_to(&host->animations, transition->opacity_track, 1.0f,
-                                           REACH_HOST_TRANSITION_OPEN_SECONDS,
-                                           REACH_EASING_EASE_OUT);
+        host->layout_targets[participant].runtime = desc;
+        host->surface_participants[index] = participant;
+        reach_layout_set_visible(&host->layout_manager, participant, 0);
     }
-    else if (transition->visible)
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_animation_manager_animate_to(
-            &host->animations, transition->y_track, REACH_HOST_TRANSITION_OFFSET,
-            REACH_HOST_TRANSITION_CLOSE_SECONDS, REACH_EASING_EASE_IN);
-        reach_animation_manager_animate_to(&host->animations, transition->opacity_track, 0.0f,
-                                           REACH_HOST_TRANSITION_CLOSE_SECONDS,
-                                           REACH_EASING_EASE_IN);
+        reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
+        if (runtime->port.hotspot != nullptr)
+        {
+            reach_host_register_edge_reveal_participant(host, runtime);
+        }
     }
-    reach_host_request_update(host);
-}
 
-reach_rect_f32 reach_host_surface_transition_bounds(const reach_host *host,
-                                                    const reach_host_surface_transition *transition,
-                                                    reach_rect_f32 target_bounds)
-{
-    if (host != nullptr && transition != nullptr)
+    for (reach_layout_participant participant = 0;
+         participant < (reach_layout_participant)host->layout_manager.participant_count;
+         ++participant)
     {
-        target_bounds.y += reach_animation_manager_value(&host->animations, transition->y_track) *
-                           reach_host_layout_dpi_scale(host);
+        const reach_host_layout_target *target = &host->layout_targets[participant];
+        if (target->runtime != nullptr && (target->runtime->definition->surface.behavior_flags &
+                                           REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0)
+        {
+            continue;
+        }
+        reach_layout_register_visibility(&host->layout_manager, participant,
+                                         REACH_LAYOUT_CONDITION_GAME_MODE, 0);
     }
-    return target_bounds;
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->surface.bar_reveal.ops == nullptr ||
+            desc->definition->surface.bar_reveal.active_layer <= 0)
+        {
+            continue;
+        }
+        reach_layout_participant participant = host->surface_participants[index];
+        reach_layout_register_override(&host->layout_manager, participant,
+                                       REACH_LAYOUT_CONDITION_BARS_FORCED,
+                                       desc->definition->surface.bar_reveal.active_layer);
+        reach_layout_register_override(&host->layout_manager, participant,
+                                       REACH_LAYOUT_CONDITION_BARS_HELD,
+                                       desc->definition->surface.bar_reveal.active_layer);
+    }
 }
 
-float reach_host_surface_transition_opacity(const reach_host *host,
-                                            const reach_host_surface_transition *transition)
+void reach_host_surface_opening(reach_host *host, reach_surface_id opening, reach_surface_id origin)
 {
-    return host != nullptr && transition != nullptr
-               ? reach_animation_manager_value(&host->animations, transition->opacity_track)
-               : 0.0f;
-}
-
-int32_t reach_host_surface_transition_visible(const reach_host_surface_transition *transition)
-{
-    return transition != nullptr && transition->visible;
-}
-
-int32_t reach_host_surface_transition_active(const reach_host *host,
-                                             const reach_host_surface_transition *transition)
-{
-    return host != nullptr && transition != nullptr &&
-           (reach_animation_manager_active(&host->animations, transition->y_track) ||
-            reach_animation_manager_active(&host->animations, transition->opacity_track));
-}
-
-void reach_host_surface_transition_finish(reach_host *host,
-                                          reach_host_surface_transition *transition)
-{
-    if (host == nullptr || transition == nullptr || transition->target_open ||
-        !transition->visible || reach_host_surface_transition_active(host, transition))
+    if (host == nullptr || opening >= REACH_HOST_SURFACE_COUNT)
     {
         return;
     }
 
-    transition->visible = 0;
-    reach_animation_manager_set(&host->animations, transition->y_track,
-                                REACH_HOST_TRANSITION_OFFSET);
-    reach_animation_manager_set(&host->animations, transition->opacity_track, 0.0f);
-    reach_host_request_update(host);
+    const reach_feature_runtime *self = &host->feature_runtimes[opening];
+    const int32_t self_exclusive =
+        (self->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_EXCLUSIVE) != 0;
+    const int32_t self_dismissable =
+        self->definition->surface.cls == REACH_SURFACE_CLASS_TRANSIENT ||
+        self->definition->surface.cls == REACH_SURFACE_CLASS_POPUP;
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->id == opening || desc->definition->id == origin ||
+            !reach_host_surface_closable(desc) || !reach_host_surface_is_open(desc))
+        {
+            continue;
+        }
+
+        const int32_t other_exclusive =
+            (desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_EXCLUSIVE) != 0;
+        const int32_t other_dismissable =
+            desc->definition->surface.cls == REACH_SURFACE_CLASS_TRANSIENT ||
+            desc->definition->surface.cls == REACH_SURFACE_CLASS_POPUP;
+
+        if (other_exclusive || ((self_exclusive || self_dismissable) && other_dismissable))
+        {
+            reach_host_close_registered_surface(host, desc->definition->id,
+                                                REACH_SURFACE_CLOSE_SUPERSEDED);
+        }
+    }
+
+    if (self_exclusive)
+    {
+        reach_host_notify_popups_closed(host);
+    }
 }
 
-static void reach_host_surface_launcher_close(reach_host *host)
+void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtime *runtime,
+                                          const reach_feature_tick_result *result)
 {
-    reach_host_close_launcher_without_focus_restore(host);
-}
-
-static void reach_host_surface_clipboard_close(reach_host *host)
-{
-    reach_host_set_clipboard_open(host, 0);
-}
-
-static void reach_host_surface_tray_close(reach_host *host)
-{
-    reach_host_set_tray_popup_open(host, 0);
-}
-
-static void reach_host_surface_quick_settings_close(reach_host *host)
-{
-    reach_host_set_quick_settings_open(host, 0);
-}
-
-static void reach_host_surface_context_menu_close(reach_host *host)
-{
-    reach_host_close_context_menu(host);
-}
-
-void reach_host_init_surface_descriptors(reach_host *host)
-{
-    if (host == nullptr)
+    if (host == nullptr || runtime == nullptr || result == nullptr)
     {
         return;
     }
-
-    reach_surface_desc *descs = host->surface_descs;
-
-    descs[REACH_SURFACE_ID_DOCK] = {REACH_SURFACE_ID_DOCK,
-                                    REACH_SURFACE_CLASS_PERSISTENT,
-                                    &host->dock,
-                                    nullptr,
-                                    nullptr,
-                                    host->dock_capsule,
-                                    reach_dock_capsule_ops(),
-                                    REACH_SURFACE_POINTER_UPDATES_DOCK_VISIBILITY |
-                                        REACH_SURFACE_POINTER_SOURCE_GATED};
-    descs[REACH_SURFACE_ID_LAUNCHER] = {REACH_SURFACE_ID_LAUNCHER,
-                                        REACH_SURFACE_CLASS_TRANSIENT,
-                                        &host->launcher,
-                                        &host->launcher_transition,
-                                        reach_host_surface_launcher_close,
-                                        host->launcher_capsule,
-                                        reach_launcher_capsule_ops(),
-                                        REACH_SURFACE_POINTER_RELAYOUT_REDRAWS |
-                                            REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED};
-    descs[REACH_SURFACE_ID_CLIPBOARD] = {REACH_SURFACE_ID_CLIPBOARD,
-                                         REACH_SURFACE_CLASS_TRANSIENT,
-                                         &host->clipboard_surface,
-                                         &host->clipboard_transition,
-                                         reach_host_surface_clipboard_close,
-                                         host->clipboard_capsule,
-                                         reach_clipboard_feature_capsule_ops(),
-                                         REACH_SURFACE_POINTER_SOURCE_GATED};
-    descs[REACH_SURFACE_ID_TRAY] = {REACH_SURFACE_ID_TRAY,
-                                    REACH_SURFACE_CLASS_POPUP,
-                                    &host->tray,
-                                    &host->tray_transition,
-                                    reach_host_surface_tray_close,
-                                    host->tray_capsule,
-                                    reach_tray_capsule_ops(),
-                                    REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED};
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS] = {REACH_SURFACE_ID_QUICK_SETTINGS,
-                                              REACH_SURFACE_CLASS_POPUP,
-                                              &host->quick_settings,
-                                              &host->quick_settings_transition,
-                                              reach_host_surface_quick_settings_close,
-                                              host->quick_settings_capsule,
-                                              reach_quick_settings_capsule_ops(),
-                                              REACH_SURFACE_POINTER_NONE};
-    descs[REACH_SURFACE_ID_CONTEXT_MENU] = {REACH_SURFACE_ID_CONTEXT_MENU,
-                                            REACH_SURFACE_CLASS_POPUP,
-                                            &host->context_menu,
-                                            &host->context_menu_transition,
-                                            reach_host_surface_context_menu_close,
-                                            host->context_menu_capsule,
-                                            reach_context_menu_capsule_ops(),
-                                            REACH_SURFACE_POINTER_NONE};
-    descs[REACH_SURFACE_ID_SWITCHER] = {REACH_SURFACE_ID_SWITCHER,
-                                        REACH_SURFACE_CLASS_OVERLAY,
-                                        &host->switcher,
-                                        &host->switcher_transition,
-                                        nullptr,
-                                        host->switcher_capsule,
-                                        reach_switcher_capsule_ops(),
-                                        REACH_SURFACE_POINTER_NONE};
-
-    descs[REACH_SURFACE_ID_CONTEXT_MENU].role = REACH_SURFACE_CONTEXT_MENU;
-    descs[REACH_SURFACE_ID_CONTEXT_MENU].pointer_priority = 10;
-    descs[REACH_SURFACE_ID_CONTEXT_MENU].apply_pointer_action =
-        reach_host_apply_context_menu_pointer_action;
-    descs[REACH_SURFACE_ID_CLIPBOARD].role = REACH_SURFACE_CLIPBOARD;
-    descs[REACH_SURFACE_ID_CLIPBOARD].pointer_priority = 20;
-    descs[REACH_SURFACE_ID_CLIPBOARD].apply_pointer_action =
-        reach_host_apply_clipboard_pointer_action;
-    descs[REACH_SURFACE_ID_LAUNCHER].role = REACH_SURFACE_LAUNCHER;
-    descs[REACH_SURFACE_ID_LAUNCHER].pointer_priority = 30;
-    descs[REACH_SURFACE_ID_LAUNCHER].apply_pointer_action =
-        reach_host_apply_launcher_pointer_action;
-    descs[REACH_SURFACE_ID_LAUNCHER].dismiss = reach_host_close_launcher;
-    descs[REACH_SURFACE_ID_LAUNCHER].behavior_flags = REACH_SURFACE_BEHAVIOR_ACTIVATES;
-    descs[REACH_SURFACE_ID_TRAY].role = REACH_SURFACE_TRAY_MENU;
-    descs[REACH_SURFACE_ID_TRAY].pointer_priority = 40;
-    descs[REACH_SURFACE_ID_TRAY].apply_pointer_action = reach_host_apply_tray_pointer_action;
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS].role = REACH_SURFACE_QUICK_SETTINGS;
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS].pointer_priority = 50;
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS].apply_pointer_action =
-        reach_host_apply_quick_settings_pointer_action;
-    descs[REACH_SURFACE_ID_DOCK].role = REACH_SURFACE_DOCK;
-    descs[REACH_SURFACE_ID_DOCK].pointer_priority = 90;
-    descs[REACH_SURFACE_ID_DOCK].apply_pointer_action = reach_host_apply_dock_pointer_action;
-    descs[REACH_SURFACE_ID_SWITCHER].role = REACH_SURFACE_SWITCHER;
-    descs[REACH_SURFACE_ID_SWITCHER].pointer_priority = 100;
-
-    descs[REACH_SURFACE_ID_LAUNCHER].frame = reach_host_frame_launcher;
-    descs[REACH_SURFACE_ID_LAUNCHER].frame_priority = 10;
-    descs[REACH_SURFACE_ID_CLIPBOARD].frame = reach_host_frame_clipboard;
-    descs[REACH_SURFACE_ID_CLIPBOARD].frame_priority = 20;
-    descs[REACH_SURFACE_ID_DOCK].frame = reach_host_frame_dock;
-    descs[REACH_SURFACE_ID_DOCK].frame_priority = 30;
-    descs[REACH_SURFACE_ID_TRAY].frame = reach_host_frame_tray;
-    descs[REACH_SURFACE_ID_TRAY].frame_priority = 40;
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame = reach_host_frame_quick_settings;
-    descs[REACH_SURFACE_ID_QUICK_SETTINGS].frame_priority = 50;
-    descs[REACH_SURFACE_ID_SWITCHER].frame = reach_host_frame_switcher;
-    descs[REACH_SURFACE_ID_SWITCHER].frame_priority = 60;
-    descs[REACH_SURFACE_ID_CONTEXT_MENU].frame = reach_host_frame_context_menu;
-    descs[REACH_SURFACE_ID_CONTEXT_MENU].frame_priority = 70;
-
-    descs[REACH_SURFACE_ID_LAUNCHER].toggle_events =
-        reach_launcher_activation_events(&descs[REACH_SURFACE_ID_LAUNCHER].toggle_event_count);
-    descs[REACH_SURFACE_ID_LAUNCHER].toggle = reach_host_toggle_launcher;
-    descs[REACH_SURFACE_ID_CLIPBOARD].toggle_events =
-        reach_clipboard_activation_events(&descs[REACH_SURFACE_ID_CLIPBOARD].toggle_event_count);
-    descs[REACH_SURFACE_ID_CLIPBOARD].toggle = reach_host_toggle_clipboard;
-    descs[REACH_SURFACE_ID_SWITCHER].routed_events =
-        reach_switcher_routed_events(&descs[REACH_SURFACE_ID_SWITCHER].routed_event_count);
-    descs[REACH_SURFACE_ID_SWITCHER].handle_routed = reach_host_handle_switcher_event;
+    if (result->redraw && runtime->surface != nullptr)
+    {
+        runtime->surface->dirty_flags = 1;
+        host->dirty.render = 1;
+    }
+    if (result->relayout)
+    {
+        host->dirty.layout = 1;
+    }
+    if (result->request_update)
+    {
+        reach_host_request_update(host);
+    }
 }
 
-void reach_host_close_other_popups(reach_host *host, reach_surface_id keep)
+void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtime *runtime,
+                                          int32_t open)
+{
+    if (host == nullptr || runtime == nullptr)
+    {
+        return;
+    }
+    int32_t next = open ? 1 : 0;
+    if (next)
+    {
+        reach_host_capture_focus_restore(host, runtime->definition->id);
+        runtime->presentation_visible = 1;
+    }
+    reach_host_sync_pointer_move_subscriptions(host);
+    reach_host_sync_popup_mouse_hook(host);
+    if (!next)
+    {
+        reach_host_request_bar_visibility_update(host);
+    }
+}
+
+int32_t reach_host_surface_closable(const reach_feature_runtime *runtime)
+{
+    if (runtime == nullptr || runtime->definition == nullptr)
+    {
+        return 0;
+    }
+    const reach_feature_control_ops *control = runtime->definition->control_ops;
+    return (runtime->capsule != nullptr && control != nullptr && control->set_open != nullptr) ||
+           runtime->definition->force_close != nullptr;
+}
+
+void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id id, int32_t open)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    const reach_feature_control_ops *control = runtime->definition->control_ops;
+    if (runtime->capsule == nullptr || control == nullptr || control->set_open == nullptr)
+    {
+        return;
+    }
+    int32_t next = open ? 1 : 0;
+    if (next && !reach_host_surface_is_open(runtime))
+    {
+        if (runtime->definition->surface.refresh_world_on_open)
+        {
+            if (host->monitors.list != nullptr && host->monitors.ops.refresh != nullptr)
+            {
+                (void)host->monitors.ops.refresh(host->monitors.list);
+            }
+            reach_host_refresh_window_world(host);
+            reach_host_notify_display_changed(host);
+        }
+        reach_host_surface_opening(host, id, runtime->definition->surface.opening_origin);
+    }
+    reach_feature_tick_result result = {};
+    if (!control->set_open(runtime->capsule, next, &result))
+    {
+        return;
+    }
+    reach_host_apply_surface_open_change(host, runtime, next);
+    reach_host_apply_feature_tick_result(host, runtime, &result);
+}
+
+static int32_t reach_host_layout_anchor_equal(const reach_feature_layout_anchor *left,
+                                              const reach_feature_layout_anchor *right)
+{
+    return left != nullptr && right != nullptr && left->surface == right->surface &&
+           left->slot == right->slot && left->index == right->index;
+}
+
+reach_popup_activation_decision reach_host_popup_activation_decide(
+    int32_t open, const reach_feature_layout_anchor *current,
+    const reach_feature_layout_anchor *requested, reach_popup_activation_mode mode)
+{
+    if (requested == nullptr || requested->surface >= REACH_HOST_SURFACE_COUNT)
+    {
+        return REACH_POPUP_ACTIVATION_NONE;
+    }
+    if (!open || !reach_host_layout_anchor_equal(current, requested))
+    {
+        return REACH_POPUP_ACTIVATION_PRESENT;
+    }
+    if (mode == REACH_POPUP_ACTIVATION_REPLACE)
+    {
+        return REACH_POPUP_ACTIVATION_PRESENT;
+    }
+    return mode == REACH_POPUP_ACTIVATION_TOGGLE ? REACH_POPUP_ACTIVATION_CLOSE
+                                                 : REACH_POPUP_ACTIVATION_NONE;
+}
+
+reach_popup_activation_decision reach_host_prepare_registered_popup(
+    reach_host *host, reach_surface_id id, const reach_feature_layout_anchor *owner,
+    reach_popup_activation_mode mode)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return REACH_POPUP_ACTIVATION_NONE;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    if (runtime->definition == nullptr ||
+        runtime->definition->surface.cls != REACH_SURFACE_CLASS_POPUP)
+    {
+        return REACH_POPUP_ACTIVATION_NONE;
+    }
+
+    reach_feature_layout_anchor current = {};
+    const int32_t open = reach_host_surface_is_open(runtime);
+    const reach_feature_layout_anchor *current_owner =
+        open && reach_host_resolve_popup_owner(runtime, &current) ? &current : nullptr;
+    reach_popup_activation_decision decision =
+        reach_host_popup_activation_decide(open, current_owner, owner, mode);
+    if (decision == REACH_POPUP_ACTIVATION_CLOSE)
+    {
+        reach_host_close_registered_surface(host, id, REACH_SURFACE_CLOSE_DISMISS);
+    }
+    else if (decision == REACH_POPUP_ACTIVATION_PRESENT && open && runtime->surface != nullptr &&
+             runtime->surface->window.ops.hide != nullptr &&
+             runtime->surface->window.ops.hide(runtime->surface->window.window) == REACH_OK)
+    {
+        runtime->surface->activated = 0;
+        runtime->surface->native_visibility_invalidated = 1;
+        runtime->surface->dirty_flags = 1;
+        reach_host_request_update(host);
+    }
+    return decision;
+}
+
+void reach_host_toggle_registered_popup(reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_layout_anchor owner = {};
+    if (!reach_host_resolve_popup_owner(&host->feature_runtimes[id], &owner) ||
+        reach_host_prepare_registered_popup(host, id, &owner, REACH_POPUP_ACTIVATION_TOGGLE) !=
+            REACH_POPUP_ACTIVATION_PRESENT)
+    {
+        return;
+    }
+    reach_host_set_registered_surface_open(host, id, 1);
+}
+
+void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
+                                         reach_surface_id origin)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    reach_host_surface_opening(host, id, origin);
+    reach_host_apply_surface_open_change(host, runtime, 1);
+    if (runtime->surface != nullptr)
+    {
+        runtime->surface->dirty_flags = 1;
+    }
+    reach_host_sync_pointer_move_subscriptions(host);
+    reach_host_sync_popup_mouse_hook(host);
+    reach_host_request_bar_visibility_update(host);
+}
+
+void reach_host_close_surfaces_on_persistent_press(reach_host *host)
 {
     if (host == nullptr)
     {
@@ -351,18 +469,132 @@ void reach_host_close_other_popups(reach_host *host, reach_surface_id keep)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->cls == REACH_SURFACE_CLASS_POPUP && desc->id != keep &&
-            desc->force_close != nullptr)
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->definition->surface.close_on_persistent_press &&
+            reach_host_surface_is_open(runtime))
         {
-            desc->force_close(host);
+            reach_host_close_registered_surface(host, runtime->definition->id,
+                                                REACH_SURFACE_CLOSE_SUPERSEDED);
         }
     }
 }
 
-int32_t reach_host_surface_is_open(const reach_surface_desc *desc)
+void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
+                                         reach_surface_close_intent intent)
 {
-    return desc->capsule_ops->is_open == nullptr || desc->capsule_ops->is_open(desc->capsule);
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    if (!reach_host_surface_is_open(runtime))
+    {
+        return;
+    }
+    if (intent == REACH_SURFACE_CLOSE_DISMISS)
+    {
+        reach_host_arm_focus_restore(host, id);
+    }
+    else
+    {
+        reach_host_cancel_focus_restore(host, id);
+    }
+
+    const reach_feature_control_ops *control = runtime->definition->control_ops;
+    if (runtime->capsule != nullptr && control != nullptr && control->set_open != nullptr)
+    {
+        reach_host_set_registered_surface_open(host, id, 0);
+        return;
+    }
+    if (runtime->definition->force_close != nullptr)
+    {
+        runtime->definition->force_close(host);
+    }
+}
+
+void reach_host_post_feature_work_ready(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_surface_runtime *surface = host->feature_runtimes[index].surface;
+        if (surface != nullptr && surface->window.ops.post_event != nullptr)
+        {
+            (void)surface->window.ops.post_event(surface->window.window,
+                                                 REACH_UI_EVENT_FEATURE_WORK_READY);
+            return;
+        }
+    }
+    reach_host_request_update(host);
+}
+
+void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id)
+{
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    {
+        return;
+    }
+    if (reach_host_surface_is_open(&host->feature_runtimes[id]))
+    {
+        reach_host_close_registered_surface(host, id, REACH_SURFACE_CLOSE_DISMISS);
+    }
+    else
+    {
+        reach_host_set_registered_surface_open(host, id, 1);
+    }
+}
+
+void reach_host_notify_registered_features(reach_host *host,
+                                           const reach_feature_notification *notification)
+{
+    if (host == nullptr || notification == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        const reach_feature_control_ops *control = runtime->definition->control_ops;
+        if (runtime->capsule == nullptr || control == nullptr || control->notify == nullptr)
+        {
+            continue;
+        }
+        int32_t was_open = reach_host_surface_is_open(runtime);
+        reach_feature_tick_result result = {};
+        control->notify(runtime->capsule, notification, &result);
+        int32_t open = reach_host_surface_is_open(runtime);
+        if (open != was_open)
+        {
+            if (!open)
+            {
+                reach_host_cancel_focus_restore(host, runtime->definition->id);
+            }
+            reach_host_apply_surface_open_change(host, runtime, open);
+        }
+        reach_host_apply_feature_tick_result(host, runtime, &result);
+    }
+}
+
+int32_t reach_host_surface_is_open(const reach_feature_runtime *desc)
+{
+    return desc->definition->capsule_ops->is_open == nullptr ||
+           desc->definition->capsule_ops->is_open(desc->capsule);
+}
+
+int32_t reach_host_surface_needs_frame(const reach_feature_runtime *desc)
+{
+    return desc->definition->capsule_ops->needs_frame != nullptr &&
+           desc->definition->capsule_ops->needs_frame(desc->capsule);
+}
+
+int32_t reach_host_surface_presented(const reach_feature_runtime *desc)
+{
+    return reach_host_surface_is_open(desc) ||
+           (desc->definition->capsule_ops->presentation_visible != nullptr &&
+            desc->definition->capsule_ops->presentation_visible(desc->capsule));
 }
 
 void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
@@ -374,9 +606,9 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if ((desc->behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0 ||
-            desc->force_close == nullptr || !reach_host_surface_is_open(desc))
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if ((desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0 ||
+            !reach_host_surface_closable(desc) || !reach_host_surface_is_open(desc))
         {
             continue;
         }
@@ -387,7 +619,8 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
             continue;
         }
 
-        desc->force_close(host);
+        reach_host_close_registered_surface(host, desc->definition->id,
+                                            REACH_SURFACE_CLOSE_SUPERSEDED);
     }
 }
 
@@ -399,15 +632,33 @@ int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
-        if ((class_mask & reach_surface_class_bit(desc->cls)) != 0 &&
-            desc->cls != REACH_SURFACE_CLASS_PERSISTENT && desc->capsule_ops != nullptr &&
-            desc->capsule_ops->is_open != nullptr && desc->capsule_ops->is_open(desc->capsule))
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if ((class_mask & reach_surface_class_bit(desc->definition->surface.cls)) != 0 &&
+            desc->definition->surface.cls != REACH_SURFACE_CLASS_PERSISTENT &&
+            desc->definition->capsule_ops != nullptr &&
+            desc->definition->capsule_ops->is_open != nullptr &&
+            desc->definition->capsule_ops->is_open(desc->capsule))
         {
             return 1;
         }
     }
     return 0;
+}
+
+void reach_host_mark_all_surfaces_dirty(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_surface_runtime *surface = host->feature_runtimes[index].surface;
+        if (surface != nullptr)
+        {
+            surface->dirty_flags = 1;
+        }
+    }
 }
 
 int32_t reach_host_any_surface_dirty(const reach_host *host)
@@ -418,7 +669,7 @@ int32_t reach_host_any_surface_dirty(const reach_host *host)
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_surface_desc *desc = &host->surface_descs[index];
+        const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->surface != nullptr && desc->surface->dirty_flags)
         {
             return 1;

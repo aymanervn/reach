@@ -52,6 +52,13 @@ static BOOL CALLBACK reach_monitor_enum_proc(HMONITOR monitor, HDC dc, LPRECT re
         item.dpi_y = static_cast<int32_t>(dpi_y);
     }
 
+    DEVMODEW devmode = {};
+    devmode.dmSize = sizeof(devmode);
+    if (EnumDisplaySettingsW(info.szDevice, ENUM_CURRENT_SETTINGS, &devmode))
+    {
+        item.refresh_rate_hz = static_cast<int32_t>(devmode.dmDisplayFrequency);
+    }
+
     list->monitors.push_back(item);
     return TRUE;
 }

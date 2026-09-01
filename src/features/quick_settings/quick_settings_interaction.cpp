@@ -68,12 +68,6 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
         return result;
     }
 
-    if (reach_quick_settings_point_in_rect(layout->battery_saver_tile.bounds, x, y))
-    {
-        result.type = REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE;
-        return result;
-    }
-
     if (reach_quick_settings_point_in_rect(layout->project_tile.bounds, x, y))
     {
         result.type = REACH_QUICK_SETTINGS_HIT_PROJECT_TILE;
@@ -97,44 +91,48 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
         return result;
     }
 
-    if (reach_quick_settings_point_in_rect(layout->output_device_button, x, y) ||
-        reach_quick_settings_point_in_rect(layout->output_devices_title_chevron, x, y))
+    if (reach_quick_settings_point_in_rect(layout->output_device_button, x, y))
     {
         result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON;
         return result;
     }
 
-    for (size_t index = 0; index < layout->output_device_row_count; ++index)
+    if (reach_quick_settings_point_in_rect(layout->output_devices_clip, x, y))
     {
-        if (reach_quick_settings_point_in_rect(layout->output_device_rows[index].bounds, x, y))
+        for (size_t index = 0; index < layout->output_device_row_count; ++index)
         {
-            result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW;
-            result.output_device_index = index;
-            if (model != nullptr && index < model->output_devices.count)
+            if (reach_quick_settings_point_in_rect(layout->output_device_rows[index].bounds, x, y))
             {
-                reach_quick_settings_copy_utf16(result.output_device_id,
-                                                REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
-                                                model->output_devices.devices[index].device_id);
+                result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW;
+                result.output_device_index = index;
+                if (model != nullptr && index < model->output_devices.count)
+                {
+                    reach_copy_utf16(result.output_device_id, REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
+                                     model->output_devices.devices[index].device_id);
+                }
+                return result;
             }
-            return result;
         }
     }
 
-    for (size_t index = 0; index < layout->app_volume_row_count; ++index)
+    if (reach_quick_settings_point_in_rect(layout->app_volumes_clip, x, y))
     {
-        if (reach_quick_settings_point_in_app_slider(&layout->app_volume_rows[index], x, y))
+        for (size_t index = 0; index < layout->app_volume_row_count; ++index)
         {
-            result.type = REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER;
-            result.session_index = index;
-            result.volume_level = reach_quick_settings_level_for_slider_line(
-                layout->app_volume_rows[index].slider_full_range_line, x);
-            if (model != nullptr && index < model->sessions.count)
+            if (reach_quick_settings_point_in_app_slider(&layout->app_volume_rows[index], x, y))
             {
-                reach_quick_settings_copy_utf16(
-                    result.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
-                    model->sessions.sessions[index].session_instance_id);
+                result.type = REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER;
+                result.session_index = index;
+                result.volume_level = reach_quick_settings_level_for_slider_line(
+                    layout->app_volume_rows[index].slider_full_range_line, x);
+                if (model != nullptr && index < model->sessions.count)
+                {
+                    reach_copy_utf16(result.session_instance_id,
+                                     REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                                     model->sessions.sessions[index].session_instance_id);
+                }
+                return result;
             }
-            return result;
         }
     }
 
@@ -165,9 +163,8 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
         action.volume_level = reach_quick_settings_clamp01(hit.volume_level);
         action.session_index = hit.session_index;
-        reach_quick_settings_copy_utf16(action.session_instance_id,
-                                        REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
-                                        hit.session_instance_id);
+        reach_copy_utf16(action.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                         hit.session_instance_id);
         return action;
     }
 
@@ -190,12 +187,6 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
         return action;
     }
 
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE)
-    {
-        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER;
-        return action;
-    }
-
     if (hit.type == REACH_QUICK_SETTINGS_HIT_PROJECT_TILE)
     {
         action.type = REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT;
@@ -212,8 +203,8 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
     {
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE;
         action.output_device_index = hit.output_device_index;
-        reach_quick_settings_copy_utf16(
-            action.output_device_id, REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY, hit.output_device_id);
+        reach_copy_utf16(action.output_device_id, REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
+                         hit.output_device_id);
         return action;
     }
 
@@ -227,7 +218,8 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
 }
 
 reach_quick_settings_action
-reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int32_t x, int32_t y)
+reach_quick_settings_begin_slider_gesture_if_hit(reach_quick_settings *quick_settings, int32_t x,
+                                                 int32_t y)
 {
     reach_quick_settings_action action = {};
     if (quick_settings == nullptr)
@@ -236,25 +228,72 @@ reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
 
-    reach_quick_settings_hit_result hit = reach_quick_settings_hit_test(
-        &state->layout, &state->model, (float)x - state->bounds.x, (float)y - state->bounds.y);
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(&state->layout, &state->model, (float)x, (float)y);
     action = reach_quick_settings_action_for_hit(hit);
-    if (action.type == REACH_QUICK_SETTINGS_ACTION_NONE)
+    if (action.type != REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME &&
+        action.type != REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME &&
+        action.type != REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS)
     {
+        action = {};
         return action;
     }
 
-    state->drag.active = action.type == REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME ||
-                         action.type == REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME ||
-                         action.type == REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
+    state->drag.active = 1;
     state->drag.type = hit.type;
     state->drag.last_level = action.volume_level;
     state->drag.level_valid = state->drag.active;
     state->drag.session_index = hit.session_index;
-    reach_quick_settings_copy_utf16(state->drag.session_instance_id,
-                                    REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
-                                    hit.session_instance_id);
+    reach_copy_utf16(state->drag.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                     hit.session_instance_id);
     return action;
+}
+
+uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result hit)
+{
+    reach_quick_settings_press_target_kind kind = REACH_QUICK_SETTINGS_PRESS_TARGET_NONE;
+    size_t index = 0;
+    switch (hit.type)
+    {
+    case REACH_QUICK_SETTINGS_HIT_NETWORK_TILE:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_NETWORK_TILE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_TILE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_PROJECT_TILE:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_PROJECT_TILE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW;
+        index = hit.output_device_index;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_NONE:
+    case REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER:
+    case REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER:
+    case REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER:
+    default:
+        return REACH_PRESSABLE_TARGET_NONE;
+    }
+    return (static_cast<uint64_t>(kind) << 32) | static_cast<uint32_t>(index);
+}
+
+reach_quick_settings_press_target_kind reach_quick_settings_pressable_target_kind(uint64_t target)
+{
+    return target == REACH_PRESSABLE_TARGET_NONE
+               ? REACH_QUICK_SETTINGS_PRESS_TARGET_NONE
+               : static_cast<reach_quick_settings_press_target_kind>(target >> 32);
+}
+
+size_t reach_quick_settings_pressable_target_index(uint64_t target)
+{
+    return target == REACH_PRESSABLE_TARGET_NONE ? 0 : static_cast<size_t>(target & UINT32_MAX);
 }
 
 reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings *quick_settings,
@@ -284,8 +323,7 @@ reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings 
         return action;
     }
 
-    float local_x = (float)x - state->bounds.x;
-    float next_level = reach_quick_settings_clamp01((local_x - track.x) / track.width);
+    float next_level = reach_quick_settings_clamp01(((float)x - track.x) / track.width);
 
     if (state->drag.level_valid && (next_level == state->drag.last_level ||
                                     (fabsf(next_level - state->drag.last_level) < 0.005f &&
@@ -312,9 +350,8 @@ reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings 
 
     action.volume_level = next_level;
     action.session_index = state->drag.session_index;
-    reach_quick_settings_copy_utf16(action.session_instance_id,
-                                    REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
-                                    state->drag.session_instance_id);
+    reach_copy_utf16(action.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
+                     state->drag.session_instance_id);
     return action;
 }
 

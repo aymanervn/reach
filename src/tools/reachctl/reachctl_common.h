@@ -18,6 +18,4 @@ reach_result reachctl_run_process_wait(const wchar_t *path, const wchar_t *argum
 
 reach_result reachctl_notify_config_changed(void);
 
-int32_t reachctl_path_equals_ci(const uint16_t *a, const uint16_t *b);
-
 #endif

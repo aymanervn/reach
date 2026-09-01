@@ -16,6 +16,7 @@ extern "C"
         reach_color disabled_text;
         float radius;
         float text_size;
+        float pressed_darken;
         int32_t text_weight;
     } reach_ui_button_style;
 
@@ -24,7 +25,7 @@ extern "C"
         reach_color background;
         reach_color accent;
         reach_color text;
-        float stroke_width;
+        float border_width;
         float text_size;
         int32_t text_weight;
     } reach_ui_selection_item_style;

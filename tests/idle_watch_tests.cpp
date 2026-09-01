@@ -177,9 +177,28 @@ static void test_multiple_actions_fire_together(void)
 
     reach_idle_watch_sample sample = make_sample(2 * MINUTE, 2 * MINUTE, 0);
     uint32_t mask = reach_idle_watch_evaluate(&state, &config, &sample, POLL * 5);
-    expect_true(mask == ((1u << REACH_IDLE_WATCH_ACTION_LOCK) |
-                         (1u << REACH_IDLE_WATCH_ACTION_SLEEP)),
+    expect_true(mask ==
+                    ((1u << REACH_IDLE_WATCH_ACTION_LOCK) | (1u << REACH_IDLE_WATCH_ACTION_SLEEP)),
                 "actions sharing a timeout report together");
+}
+
+static void test_screen_off_has_independent_threshold(void)
+{
+    reach_idle_watch_config config = {};
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_SCREEN_OFF] = 1;
+    config.timeout_minutes[REACH_IDLE_WATCH_ACTION_LOCK] = 2;
+    reach_idle_watch_state state = {};
+    reach_idle_watch_state_init(&state, 0);
+
+    reach_idle_watch_sample sample = make_sample(MINUTE, MINUTE, 0);
+    expect_true(reach_idle_watch_evaluate(&state, &config, &sample, POLL * 5) ==
+                    (1u << REACH_IDLE_WATCH_ACTION_SCREEN_OFF),
+                "screen off fires at its own threshold");
+
+    sample = make_sample(2 * MINUTE, 2 * MINUTE, 0);
+    expect_true(reach_idle_watch_evaluate(&state, &config, &sample, POLL * 5) ==
+                    (1u << REACH_IDLE_WATCH_ACTION_LOCK),
+                "lock fires later without repeating screen off");
 }
 
 int main(void)
@@ -191,5 +210,6 @@ int main(void)
     test_baseline_caps_stale_idle_at_start();
     test_resume_resets_baseline();
     test_multiple_actions_fire_together();
+    test_screen_off_has_independent_threshold();
     return failures == 0 ? 0 : 1;
 }

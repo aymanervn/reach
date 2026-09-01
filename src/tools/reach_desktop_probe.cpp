@@ -714,7 +714,8 @@ static void MinimizeLabRun(HWND msgWnd)
 
     MINIMIZEDMETRICS original{};
     original.cbSize = sizeof(original);
-    BOOL haveOriginal = SystemParametersInfoW(SPI_GETMINIMIZEDMETRICS, sizeof(original), &original, 0);
+    BOOL haveOriginal =
+        SystemParametersInfoW(SPI_GETMINIMIZEDMETRICS, sizeof(original), &original, 0);
 
     MINIMIZEDMETRICS hidden = original;
     hidden.cbSize = sizeof(hidden);
@@ -745,14 +746,14 @@ static void MinimizeLabRun(HWND msgWnd)
     MinimizeLabTest(L"shell_hook");
 
     typedef BOOL(WINAPI * SetTaskmanWindowFn)(HWND);
-    SetTaskmanWindowFn setTaskman = (SetTaskmanWindowFn)GetProcAddress(
-        GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow");
+    SetTaskmanWindowFn setTaskman =
+        (SetTaskmanWindowFn)GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow");
     if (setTaskman)
     {
         BOOL taskmanOk = setTaskman(msgWnd);
         std::wstringstream ss;
-        ss << L"\"hwnd\":\"" << HwndHex(msgWnd) << L"\",\"ok\":"
-           << (taskmanOk ? L"true" : L"false") << L",\"lastError\":" << GetLastError();
+        ss << L"\"hwnd\":\"" << HwndHex(msgWnd) << L"\",\"ok\":" << (taskmanOk ? L"true" : L"false")
+           << L",\"lastError\":" << GetLastError();
         LogEvent(L"minimize_lab_set_taskman_window", ss.str());
         MinimizeLabTest(L"shell_hook+taskman");
     }
@@ -883,8 +884,8 @@ int wmain(int argc, wchar_t **argv)
     {
         BOOL hookOk = msgWnd ? RegisterShellHookWindow(msgWnd) : FALSE;
         typedef BOOL(WINAPI * SetTaskmanWindowFn)(HWND);
-        SetTaskmanWindowFn setTaskman = (SetTaskmanWindowFn)GetProcAddress(
-            GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow");
+        SetTaskmanWindowFn setTaskman =
+            (SetTaskmanWindowFn)GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetTaskmanWindow");
         BOOL taskmanOk = (msgWnd && setTaskman) ? setTaskman(msgWnd) : FALSE;
         std::wstringstream ss;
         ss << L"\"hwnd\":\"" << HwndHex(msgWnd) << L"\",\"shellHookOk\":"

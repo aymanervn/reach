@@ -5,6 +5,15 @@
 
 reach_clipboard_state *reach_clipboard_feature_state_mut(reach_clipboard_feature *clipboard);
 
+static inline size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
+{
+    if (model == nullptr)
+    {
+        return 0;
+    }
+    return model->count <= REACH_CLIPBOARD_MAX_ITEMS ? model->count : REACH_CLIPBOARD_MAX_ITEMS;
+}
+
 typedef enum reach_clipboard_hit_type
 {
     REACH_CLIPBOARD_HIT_NONE = 0,
@@ -60,6 +69,7 @@ typedef struct reach_clipboard_event_result
     int32_t relayout;
     int32_t request_update;
     int32_t capture_pointer;
+    int32_t sync_pointer_subscriptions;
     reach_clipboard_action_type action;
     size_t item_index;
     uint64_t item_id;
@@ -77,7 +87,8 @@ void reach_clipboard_pointer_move(reach_clipboard_feature *clipboard, int32_t x,
                                   reach_clipboard_event_result *out);
 void reach_clipboard_wheel(reach_clipboard_feature *clipboard, int32_t x, int32_t y,
                            int32_t wheel_delta, reach_clipboard_event_result *out);
-void reach_clipboard_clear_press_state(reach_clipboard_feature *clipboard);
+void reach_clipboard_cancel_press(reach_clipboard_feature *clipboard,
+                                  reach_clipboard_event_result *out);
 int32_t reach_clipboard_pointer_leave(reach_clipboard_feature *clipboard);
 
 #endif

@@ -40,7 +40,8 @@ extern "C"
         REACH_WINDOWS_UPDATE_REBOOT_REQUIRED_BEFORE_INSTALL,
         REACH_WINDOWS_UPDATE_SUPERSEDED_OR_NO_LONGER_APPLICABLE,
         REACH_WINDOWS_UPDATE_POLICY_BLOCKED,
-        REACH_WINDOWS_UPDATE_ANOTHER_OPERATION_IN_PROGRESS
+        REACH_WINDOWS_UPDATE_ANOTHER_OPERATION_IN_PROGRESS,
+        REACH_WINDOWS_UPDATE_USER_CANCELLED
     } reach_windows_update_failure_class;
 
     typedef enum reach_windows_update_verification_status
@@ -87,6 +88,23 @@ extern "C"
         reach_windows_update_item updates[REACH_WINDOWS_UPDATE_MAX_UPDATES];
         size_t count;
     } reach_windows_update_list;
+
+    typedef enum reach_windows_update_journal_state
+    {
+        REACH_WINDOWS_UPDATE_JOURNAL_IDLE = 0,
+        REACH_WINDOWS_UPDATE_JOURNAL_STARTED,
+        REACH_WINDOWS_UPDATE_JOURNAL_COMPLETED
+    } reach_windows_update_journal_state;
+
+    typedef struct reach_windows_update_journal
+    {
+        reach_windows_update_journal_state state;
+        uint32_t helper_process_id;
+        uint64_t started_filetime;
+        reach_windows_update_identity updates[REACH_WINDOWS_UPDATE_MAX_UPDATES];
+        size_t count;
+        int32_t helper_running;
+    } reach_windows_update_journal;
 
     typedef struct reach_windows_update_operation_result
     {

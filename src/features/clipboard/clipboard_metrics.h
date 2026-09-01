@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "reach/core/render_commands.h"
+#include "reach/core/typography.h"
 
 struct reach_clipboard_metrics
 {
@@ -39,7 +40,6 @@ struct reach_clipboard_metrics
     float track_width;
     float thumb_size;
 
-    float item_radius;
     float thumbnail_padding;
     float thumbnail_height;
     float thumbnail_text_gap;
@@ -56,9 +56,9 @@ static constexpr reach_clipboard_metrics reach_clipboard_make_metrics()
 
     metrics.title_height = 32.0f;
     metrics.title_gap = 8.0f;
-    metrics.title_font_size = 15.0f;
+    metrics.title_font_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.title_font_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
-    metrics.items_font_size = 12.0f;
+    metrics.items_font_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.clear_button_width = 54.0f;
     metrics.clear_button_height = 24.0f;
     metrics.clear_button_gap = 8.0f;
@@ -82,7 +82,6 @@ static constexpr reach_clipboard_metrics reach_clipboard_make_metrics()
     metrics.track_width = 4.0f;
     metrics.thumb_size = 24.0f;
 
-    metrics.item_radius = 6.0f;
     metrics.thumbnail_padding = 12.0f;
     metrics.thumbnail_height = 72.0f;
     metrics.thumbnail_text_gap = 12.0f;
@@ -138,7 +137,6 @@ static inline reach_clipboard_metrics reach_clipboard_metrics_for_scale(float dp
     metrics.track_width = reach_clipboard_scale_value(metrics.track_width, dpi_scale);
     metrics.thumb_size = reach_clipboard_scale_value(metrics.thumb_size, dpi_scale);
 
-    metrics.item_radius = reach_clipboard_scale_value(metrics.item_radius, dpi_scale);
     metrics.thumbnail_padding = reach_clipboard_scale_value(metrics.thumbnail_padding, dpi_scale);
     metrics.thumbnail_height = reach_clipboard_scale_value(metrics.thumbnail_height, dpi_scale);
     metrics.thumbnail_text_gap = reach_clipboard_scale_value(metrics.thumbnail_text_gap, dpi_scale);

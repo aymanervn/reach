@@ -33,6 +33,7 @@ static const size_t REACH_TRAY_WIRE_EXE_PATH_OFFSET = 0x3C4;
 static const UINT_PTR REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER = 1001;
 static const size_t REACH_TRAY_TOMBSTONE_COUNT = REACH_MAX_TRAY_ITEMS;
 static const DWORD REACH_TRAY_TOMBSTONE_TTL_MS = 30000;
+static const size_t REACH_TRAY_RETIRED_ICON_COUNT = REACH_MAX_TRAY_ITEMS * 4;
 
 struct reach_tray_native_item
 {
@@ -75,6 +76,8 @@ struct reach_tray_provider
     uint32_t next_item_id;
     int32_t dirty;
     reach_tray_tombstone tombstones[REACH_TRAY_TOMBSTONE_COUNT];
+    uint64_t retired_icons[REACH_TRAY_RETIRED_ICON_COUNT];
+    size_t retired_icon_count;
 };
 
 static uint32_t reach_tray_read_u32(const BYTE *bytes, size_t count, size_t offset)
@@ -206,16 +209,27 @@ static void reach_tray_copy_payload_wstring(uint16_t *dst, size_t dst_count, con
     reach_tray_copy_wide_to_u16(dst, dst_count, src, available_wchars);
 }
 
-static void reach_tray_release_item_icon(reach_tray_native_item *item)
+static void reach_tray_retire_item_icon(reach_tray_provider *provider, reach_tray_native_item *item)
 {
-    if (item != nullptr && item->item.icon_id != 0)
+    if (item == nullptr || item->item.icon_id == 0)
     {
-        reach_windows_icon_id_release(item->item.icon_id);
-        item->item.icon_id = 0;
+        return;
     }
+
+    uint64_t icon_id = item->item.icon_id;
+    item->item.icon_id = 0;
+
+    if (provider != nullptr && provider->retired_icon_count < REACH_TRAY_RETIRED_ICON_COUNT)
+    {
+        provider->retired_icons[provider->retired_icon_count++] = icon_id;
+        return;
+    }
+
+    reach_windows_icon_id_release(icon_id);
 }
 
-static void reach_tray_update_item_icon(reach_tray_native_item *item, uint32_t raw_icon)
+static void reach_tray_update_item_icon(reach_tray_provider *provider, reach_tray_native_item *item,
+                                        uint32_t raw_icon)
 {
     if (item == nullptr)
     {
@@ -237,7 +251,7 @@ static void reach_tray_update_item_icon(reach_tray_native_item *item, uint32_t r
         return;
     }
 
-    reach_tray_release_item_icon(item);
+    reach_tray_retire_item_icon(provider, item);
     item->item.icon_id = icon_id;
 }
 
@@ -324,7 +338,7 @@ static void reach_tray_remove_item_at(reach_tray_provider *provider, size_t inde
         return;
     }
 
-    reach_tray_release_item_icon(&provider->items[index]);
+    reach_tray_retire_item_icon(provider, &provider->items[index]);
 
     for (size_t next = index + 1; next < provider->item_count; ++next)
     {
@@ -434,7 +448,8 @@ static int32_t reach_tray_take_tombstone(reach_tray_provider *provider,
     return 0;
 }
 
-static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *bytes, size_t count)
+static void reach_tray_apply_payload(reach_tray_provider *provider, reach_tray_native_item *item,
+                                     const BYTE *bytes, size_t count)
 {
     if (item == nullptr || bytes == nullptr || count < REACH_TRAY_WIRE_BASE_MIN_SIZE)
     {
@@ -452,7 +467,7 @@ static void reach_tray_apply_payload(reach_tray_native_item *item, const BYTE *b
     if ((flags & NIF_ICON) != 0)
     {
         uint32_t raw_icon = reach_tray_read_u32(bytes, count, REACH_TRAY_WIRE_ICON_OFFSET);
-        reach_tray_update_item_icon(item, raw_icon);
+        reach_tray_update_item_icon(provider, item, raw_icon);
     }
 
     if ((flags & NIF_TIP) != 0)
@@ -545,7 +560,7 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider,
     {
         if (index != REACH_MAX_TRAY_ITEMS)
         {
-            reach_tray_apply_payload(&provider->items[index], bytes, count);
+            reach_tray_apply_payload(provider, &provider->items[index], bytes, count);
             provider->dirty = 1;
         }
         return REACH_OK;
@@ -594,14 +609,14 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider,
         else
         {
             uint32_t stable_public_id = provider->items[index].item.id;
-            reach_tray_release_item_icon(&provider->items[index]);
+            reach_tray_retire_item_icon(provider, &provider->items[index]);
             reach_tray_initialize_item(provider, &provider->items[index], owner, owner_id, &guid,
                                        has_guid);
             provider->items[index].item.id = stable_public_id;
         }
 
         provider->items[index].version = 0;
-        reach_tray_apply_payload(&provider->items[index], bytes, count);
+        reach_tray_apply_payload(provider, &provider->items[index], bytes, count);
         provider->dirty = 1;
         return REACH_OK;
     }
@@ -864,13 +879,39 @@ static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t 
     return REACH_INVALID_ARGUMENT;
 }
 
+static int32_t reach_tray_take_retired_icon(reach_tray_provider *provider, uint64_t *out_icon_id)
+{
+    if (provider == nullptr || out_icon_id == nullptr || provider->retired_icon_count == 0)
+    {
+        return 0;
+    }
+
+    *out_icon_id = provider->retired_icons[--provider->retired_icon_count];
+    provider->retired_icons[provider->retired_icon_count] = 0;
+    return 1;
+}
+
+static void reach_tray_release_retired_icon(reach_tray_provider *provider, uint64_t icon_id)
+{
+    if (provider != nullptr && icon_id != 0)
+    {
+        reach_windows_icon_id_release(icon_id);
+    }
+}
+
 static void reach_tray_destroy(reach_tray_provider *provider)
 {
     if (provider != nullptr)
     {
         for (size_t index = 0; index < provider->item_count; ++index)
         {
-            reach_tray_release_item_icon(&provider->items[index]);
+            reach_tray_retire_item_icon(provider, &provider->items[index]);
+        }
+
+        uint64_t retired = 0;
+        while (reach_tray_take_retired_icon(provider, &retired))
+        {
+            reach_windows_icon_id_release(retired);
         }
 
         if (provider->host_window != nullptr)
@@ -919,6 +960,8 @@ reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_po
     out_port->ops.item_count = reach_tray_item_count;
     out_port->ops.item_at = reach_tray_item_at;
     out_port->ops.activate = reach_tray_activate;
+    out_port->ops.take_retired_icon = reach_tray_take_retired_icon;
+    out_port->ops.release_retired_icon = reach_tray_release_retired_icon;
     out_port->ops.cancel_active_menu = reach_tray_cancel_active_menu;
     out_port->ops.destroy = reach_tray_destroy;
 

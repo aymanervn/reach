@@ -1,5 +1,307 @@
 #include "render_d2d_internal.h"
 
+#include "reach/core/typography.h"
+
+static const wchar_t reach_d2d_font_fallback[] = L"Segoe UI";
+static const wchar_t reach_d2d_bundled_font_family[] = L"JetBrains Mono";
+static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend);
+static const UINT reach_d2d_bundled_font_resources[] = {300, 301, 302, 303};
+
+static int32_t reach_d2d_load_font_resource(UINT resource_id, const void **out_data,
+                                            UINT32 *out_size)
+{
+    HMODULE module = GetModuleHandleW(nullptr);
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resource_id), RT_RCDATA);
+    if (resource == nullptr)
+    {
+        return 0;
+    }
+    HGLOBAL loaded = LoadResource(module, resource);
+    DWORD size = SizeofResource(module, resource);
+    const void *data = loaded != nullptr ? LockResource(loaded) : nullptr;
+    if (data == nullptr || size == 0)
+    {
+        return 0;
+    }
+    *out_data = data;
+    *out_size = (UINT32)size;
+    return 1;
+}
+
+static IDWriteFontCollection *reach_d2d_build_bundled_collection(reach_render_backend *backend)
+{
+    IDWriteFactory5 *factory5 = nullptr;
+    if (backend->text_factory == nullptr ||
+        FAILED(backend->text_factory->QueryInterface(__uuidof(IDWriteFactory5),
+                                                     reinterpret_cast<void **>(&factory5))) ||
+        factory5 == nullptr)
+    {
+        return nullptr;
+    }
+
+    IDWriteInMemoryFontFileLoader *loader = nullptr;
+    IDWriteFontSetBuilder1 *builder = nullptr;
+    IDWriteFontSet *font_set = nullptr;
+    IDWriteFontCollection1 *collection = nullptr;
+
+    HRESULT hr = factory5->CreateInMemoryFontFileLoader(&loader);
+    if (SUCCEEDED(hr))
+    {
+        hr = factory5->RegisterFontFileLoader(loader);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = factory5->CreateFontSetBuilder(&builder);
+    }
+
+    size_t added = 0;
+    if (SUCCEEDED(hr))
+    {
+        for (size_t index = 0; index < sizeof(reach_d2d_bundled_font_resources) / sizeof(UINT);
+             ++index)
+        {
+            const void *data = nullptr;
+            UINT32 size = 0;
+            if (!reach_d2d_load_font_resource(reach_d2d_bundled_font_resources[index], &data,
+                                              &size))
+            {
+                continue;
+            }
+            IDWriteFontFile *file = nullptr;
+            if (FAILED(loader->CreateInMemoryFontFileReference(factory5, data, size, nullptr,
+                                                               &file)) ||
+                file == nullptr)
+            {
+                continue;
+            }
+            if (SUCCEEDED(builder->AddFontFile(file)))
+            {
+                added += 1;
+            }
+            file->Release();
+        }
+    }
+
+    if (SUCCEEDED(hr) && added == 0)
+    {
+        hr = E_FAIL;
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = builder->CreateFontSet(&font_set);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = factory5->CreateFontCollectionFromFontSet(font_set, &collection);
+    }
+
+    if (font_set != nullptr)
+    {
+        font_set->Release();
+    }
+    if (builder != nullptr)
+    {
+        builder->Release();
+    }
+    if (FAILED(hr) || collection == nullptr)
+    {
+        if (loader != nullptr)
+        {
+            (void)factory5->UnregisterFontFileLoader(loader);
+            loader->Release();
+        }
+        factory5->Release();
+        reach_d2d_log_hresult(L"bundled font collection", hr);
+        return nullptr;
+    }
+
+    backend->bundled_font_loader = loader;
+    factory5->Release();
+    return collection;
+}
+
+static IDWriteFontCollection *reach_d2d_ui_font_collection(reach_render_backend *backend)
+{
+    if (backend == nullptr || !backend->use_bundled_font)
+    {
+        return nullptr;
+    }
+    if (!backend->bundled_font_attempted)
+    {
+        backend->bundled_font_attempted = 1;
+        backend->bundled_font_collection = reach_d2d_build_bundled_collection(backend);
+    }
+    return backend->bundled_font_collection;
+}
+
+void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_font)
+{
+    if (backend == nullptr)
+    {
+        return;
+    }
+    backend->use_bundled_font = use_bundled_font ? 1 : 0;
+    backend->ui_font_family[0] = 0;
+}
+
+reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float text_size,
+                                    int32_t text_weight, float *out_width)
+{
+    reach_render_backend *backend = static_cast<reach_render_backend *>(context);
+    if (backend == nullptr || text == nullptr || out_width == nullptr || text_size <= 0.0f ||
+        backend->text_factory == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_width = 0.0f;
+    const wchar_t *value = reinterpret_cast<const wchar_t *>(text);
+    const UINT32 length = static_cast<UINT32>(wcslen(value));
+    if (length == 0)
+    {
+        return REACH_OK;
+    }
+
+    const DWRITE_FONT_WEIGHT weight =
+        text_weight > 0 ? static_cast<DWRITE_FONT_WEIGHT>(text_weight) : DWRITE_FONT_WEIGHT_NORMAL;
+    IDWriteTextFormat *format = nullptr;
+    HRESULT hr = backend->text_factory->CreateTextFormat(
+        reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, text_size, L"", &format);
+    if (FAILED(hr) || format == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+    IDWriteTextLayout *layout = nullptr;
+    hr = backend->text_factory->CreateTextLayout(value, length, format, 1000000.0f,
+                                                 text_size * 4.0f, &layout);
+    format->Release();
+    if (FAILED(hr) || layout == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    DWRITE_TEXT_METRICS metrics = {};
+    hr = layout->GetMetrics(&metrics);
+    layout->Release();
+    if (FAILED(hr))
+    {
+        return REACH_ERROR;
+    }
+
+    *out_width = metrics.widthIncludingTrailingWhitespace;
+    return REACH_OK;
+}
+
+void reach_d2d_release_fonts(reach_render_backend *backend)
+{
+    if (backend == nullptr)
+    {
+        return;
+    }
+    if (backend->bundled_font_collection != nullptr)
+    {
+        backend->bundled_font_collection->Release();
+        backend->bundled_font_collection = nullptr;
+    }
+    if (backend->bundled_font_loader != nullptr)
+    {
+        IDWriteFactory5 *factory5 = nullptr;
+        if (backend->text_factory != nullptr &&
+            SUCCEEDED(backend->text_factory->QueryInterface(
+                __uuidof(IDWriteFactory5), reinterpret_cast<void **>(&factory5))) &&
+            factory5 != nullptr)
+        {
+            (void)factory5->UnregisterFontFileLoader(backend->bundled_font_loader);
+            factory5->Release();
+        }
+        backend->bundled_font_loader->Release();
+        backend->bundled_font_loader = nullptr;
+    }
+}
+
+static int32_t reach_d2d_font_family_exists(IDWriteFactory *factory, const wchar_t *family)
+{
+    if (factory == nullptr || family == nullptr || family[0] == 0)
+    {
+        return 0;
+    }
+    IDWriteFontCollection *collection = nullptr;
+    if (FAILED(factory->GetSystemFontCollection(&collection, FALSE)) || collection == nullptr)
+    {
+        return 0;
+    }
+    UINT32 index = 0;
+    BOOL exists = FALSE;
+    HRESULT hr = collection->FindFamilyName(family, &index, &exists);
+    collection->Release();
+    return SUCCEEDED(hr) && exists;
+}
+
+static void reach_d2d_query_font_substitute(const wchar_t *family, wchar_t *out, size_t out_count)
+{
+    out[0] = 0;
+    DWORD bytes = (DWORD)(out_count * sizeof(wchar_t));
+    if (RegGetValueW(HKEY_LOCAL_MACHINE,
+                     L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes", family,
+                     RRF_RT_REG_SZ, nullptr, out, &bytes) != ERROR_SUCCESS)
+    {
+        out[0] = 0;
+        return;
+    }
+    wchar_t *charset = wcschr(out, L',');
+    if (charset != nullptr)
+    {
+        *charset = 0;
+    }
+}
+
+static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend)
+{
+    if (backend == nullptr)
+    {
+        return reach_d2d_font_fallback;
+    }
+    if (backend->ui_font_family[0] != 0)
+    {
+        return backend->ui_font_family;
+    }
+    if (reach_d2d_ui_font_collection(backend) != nullptr)
+    {
+        wcsncpy_s(backend->ui_font_family, reach_d2d_bundled_font_family, _TRUNCATE);
+        return backend->ui_font_family;
+    }
+
+    wchar_t family[LF_FACESIZE] = {};
+    NONCLIENTMETRICSW metrics = {};
+    metrics.cbSize = sizeof(metrics);
+    if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0) &&
+        metrics.lfMessageFont.lfFaceName[0] != 0)
+    {
+        wcsncpy_s(family, metrics.lfMessageFont.lfFaceName, _TRUNCATE);
+    }
+    else
+    {
+        wcsncpy_s(family, reach_d2d_font_fallback, _TRUNCATE);
+    }
+
+    wchar_t substitute[LF_FACESIZE] = {};
+    reach_d2d_query_font_substitute(family, substitute, LF_FACESIZE);
+    if (reach_d2d_font_family_exists(backend->text_factory, substitute))
+    {
+        wcsncpy_s(family, substitute, _TRUNCATE);
+    }
+    else if (!reach_d2d_font_family_exists(backend->text_factory, family))
+    {
+        wcsncpy_s(family, reach_d2d_font_fallback, _TRUNCATE);
+    }
+
+    wcsncpy_s(backend->ui_font_family, family, _TRUNCATE);
+    return backend->ui_font_family;
+}
+
 reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_render_command *command)
 {
     if (backend == nullptr || command == nullptr)
@@ -26,11 +328,11 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_rend
                                     ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
                                     : DWRITE_FONT_WEIGHT_NORMAL;
 
-    float text_size = command->text_size > 0.0f ? command->text_size : 16.0f;
+    float text_size = command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
 
     HRESULT hr = backend->text_factory->CreateTextFormat(
-        L"Segoe UI", nullptr, weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-        text_size, L"", &format);
+        reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, text_size, L"", &format);
 
     if (SUCCEEDED(hr))
     {
@@ -50,11 +352,10 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_rend
 
         (void)format->SetTextAlignment(alignment);
         (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 
         if (command->text_ellipsis)
         {
-            (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-
             IDWriteInlineObject *ellipsis = nullptr;
             HRESULT trim_hr = backend->text_factory->CreateEllipsisTrimmingSign(format, &ellipsis);
 
@@ -131,25 +432,6 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
         }
     }
 
-    if (command->stroke_width > 0.0f && command->border_color.a > 0.0f)
-    {
-        ID2D1SolidColorBrush *border = nullptr;
-        if (SUCCEEDED(
-                target->CreateSolidColorBrush(reach_d2d_color(command->border_color), &border)))
-        {
-            if (radius > 0.0f)
-            {
-                target->DrawRoundedRectangle(D2D1::RoundedRect(bounds, radius, radius), border,
-                                             command->stroke_width);
-            }
-            else
-            {
-                target->DrawRectangle(bounds, border, command->stroke_width);
-            }
-            border->Release();
-        }
-    }
-
     const wchar_t *text = reinterpret_cast<const wchar_t *>(command->text);
     const wchar_t *placeholder = reinterpret_cast<const wchar_t *>(command->placeholder);
     const UINT32 text_length = static_cast<UINT32>(wcslen(text));
@@ -157,7 +439,7 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
     const wchar_t *display = showing_placeholder ? placeholder : text;
     const UINT32 display_length = static_cast<UINT32>(wcslen(display));
 
-    const float font_size = command->text_size > 0.0f ? command->text_size : 16.0f;
+    const float font_size = command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
     const DWRITE_FONT_WEIGHT weight = command->text_weight > 0
                                           ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
                                           : DWRITE_FONT_WEIGHT_NORMAL;
@@ -171,8 +453,8 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
 
     IDWriteTextFormat *format = nullptr;
     HRESULT hr = backend->text_factory->CreateTextFormat(
-        L"Segoe UI", nullptr, weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-        font_size, L"", &format);
+        reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, L"", &format);
     if (FAILED(hr))
     {
         return REACH_ERROR;

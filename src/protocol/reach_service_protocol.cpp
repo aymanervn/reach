@@ -2,7 +2,7 @@
 
 uint32_t reach_service_protocol_version(void)
 {
-    return 8;
+    return 9;
 }
 
 int32_t reach_service_command_valid(uint32_t command)

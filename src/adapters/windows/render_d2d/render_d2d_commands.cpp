@@ -31,19 +31,19 @@ static reach_result reach_d2d_execute_command(reach_render_backend *backend,
         return reach_d2d_draw_vector_icon(backend, command);
     }
 
+    if (command->type == REACH_RENDER_COMMAND_SHADOW)
+    {
+        return reach_d2d_draw_shadow(backend, command);
+    }
+
     if (command->type == REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT)
     {
-        return reach_d2d_draw_notched_rounded_rect(target, command);
+        return reach_d2d_fill_notched_rounded_rect(target, command);
     }
 
     if (command->type == REACH_RENDER_COMMAND_TRIANGLE)
     {
         return reach_d2d_draw_triangle(target, command);
-    }
-
-    if (command->type == REACH_RENDER_COMMAND_NOTCH_STROKE)
-    {
-        return reach_d2d_draw_notch_stroke(target, command);
     }
 
     if (command->type == REACH_RENDER_COMMAND_ICON_TINT)
@@ -57,10 +57,9 @@ static reach_result reach_d2d_execute_command(reach_render_backend *backend,
         return REACH_OK;
     }
 
-    if (command->type == REACH_RENDER_COMMAND_RECT ||
-        command->type == REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE)
+    if (command->type == REACH_RENDER_COMMAND_RECT)
     {
-        return reach_d2d_draw_rect_or_rounded_rect(target, command);
+        return reach_d2d_fill_rect_or_rounded_rect(target, command);
     }
 
     if (command->type == REACH_RENDER_COMMAND_ARC_STROKE)
@@ -103,16 +102,24 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
         return REACH_INVALID_ARGUMENT;
     }
 
-    for (size_t index = 0; index < commands->count; ++index)
+    const int32_t has_content_rect =
+        commands->content_rect.width > 0.0f && commands->content_rect.height > 0.0f;
+    if (has_content_rect)
+    {
+        (void)reach_wuc_apply_content_clip(backend, commands->content_rect);
+        target->SetTransform(D2D1::Matrix3x2F::Scale(commands->content_transform.scale_x,
+                                                     commands->content_transform.scale_y) *
+                             D2D1::Matrix3x2F::Translation(commands->content_transform.offset_x,
+                                                           commands->content_transform.offset_y));
+    }
+
+    reach_result outcome = REACH_OK;
+    for (size_t index = 0; index < commands->count && outcome == REACH_OK; ++index)
     {
         const reach_render_command *command = &commands->commands[index];
         if (!command->has_scissor)
         {
-            reach_result result = reach_d2d_execute_command(backend, target, command);
-            if (result != REACH_OK)
-            {
-                return result;
-            }
+            outcome = reach_d2d_execute_command(backend, target, command);
             continue;
         }
 
@@ -121,18 +128,18 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             continue;
         }
 
-        D2D1_RECT_F scissor = D2D1::RectF(
-            command->scissor_rect.x, command->scissor_rect.y,
-            command->scissor_rect.x + command->scissor_rect.width,
-            command->scissor_rect.y + command->scissor_rect.height);
+        D2D1_RECT_F scissor = D2D1::RectF(command->scissor_rect.x, command->scissor_rect.y,
+                                          command->scissor_rect.x + command->scissor_rect.width,
+                                          command->scissor_rect.y + command->scissor_rect.height);
         target->PushAxisAlignedClip(scissor, D2D1_ANTIALIAS_MODE_ALIASED);
-        reach_result result = reach_d2d_execute_command(backend, target, command);
+        outcome = reach_d2d_execute_command(backend, target, command);
         target->PopAxisAlignedClip();
-        if (result != REACH_OK)
-        {
-            return result;
-        }
     }
 
-    return REACH_OK;
+    if (has_content_rect)
+    {
+        target->SetTransform(D2D1::Matrix3x2F::Identity());
+    }
+
+    return outcome;
 }

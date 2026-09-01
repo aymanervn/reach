@@ -19,5 +19,8 @@ int32_t reach_window_process_app_user_model_id(HWND hwnd, uint16_t *out_id, size
 int32_t reach_window_query_process_path(HWND hwnd, uint16_t *out_path, size_t out_path_count);
 int32_t reach_window_query_process_path_for_process(DWORD process_id, uint16_t *out_path,
                                                     size_t out_path_count);
+int32_t reach_window_identity_is_explorer_dialog(const uint16_t *process_path,
+                                                 const uint16_t *class_name);
+int32_t reach_window_is_explorer_dialog(HWND hwnd);
 
 #endif

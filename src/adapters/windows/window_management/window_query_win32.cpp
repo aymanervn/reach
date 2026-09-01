@@ -3,6 +3,64 @@
 #include <appmodel.h>
 #include <propvarutil.h>
 
+static const uint16_t *reach_window_path_filename(const uint16_t *path)
+{
+    if (path == nullptr)
+    {
+        return nullptr;
+    }
+
+    const uint16_t *filename = path;
+    for (const uint16_t *cursor = path; *cursor != 0; ++cursor)
+    {
+        if (*cursor == '\\' || *cursor == '/')
+        {
+            filename = cursor + 1;
+        }
+    }
+    return filename;
+}
+
+int32_t reach_window_identity_is_explorer_dialog(const uint16_t *process_path,
+                                                 const uint16_t *class_name)
+{
+    if (process_path == nullptr || class_name == nullptr)
+    {
+        return 0;
+    }
+
+    const uint16_t *filename = reach_window_path_filename(process_path);
+    int32_t explorer = filename != nullptr &&
+                       reach_utf16_equal_ascii_case_insensitive(
+                           filename, reinterpret_cast<const uint16_t *>(u"explorer.exe"));
+    int32_t dialog_class =
+        reach_utf16_equal_ascii_case_insensitive(
+            class_name, reinterpret_cast<const uint16_t *>(u"OperationStatusWindow")) ||
+        reach_utf16_equal_ascii_case_insensitive(
+            class_name, reinterpret_cast<const uint16_t *>(u"#32770"));
+    return explorer && dialog_class;
+}
+
+int32_t reach_window_is_explorer_dialog(HWND hwnd)
+{
+    if (hwnd == nullptr || !IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
+        GetAncestor(hwnd, GA_ROOT) != hwnd)
+    {
+        return 0;
+    }
+
+    wchar_t class_name[128] = {};
+    uint16_t process_path[260] = {};
+    if (GetClassNameW(hwnd, class_name, 128) == 0 ||
+        !reach_window_query_process_path(hwnd, process_path, 260))
+    {
+        return 0;
+    }
+
+    return reach_window_identity_is_explorer_dialog(
+        process_path, reinterpret_cast<const uint16_t *>(class_name));
+}
+
 int32_t reach_window_property_string(IPropertyStore *store, const PROPERTYKEY &key,
                                      uint16_t *out_value, size_t out_count)
 {

@@ -57,21 +57,6 @@ static int32_t contains_kb_id(const uint16_t *kb_ids, const char *expected)
     return 0;
 }
 
-static void copy_ascii(uint16_t *destination, size_t capacity, const char *source)
-{
-    if (destination == nullptr || capacity == 0)
-    {
-        return;
-    }
-    size_t index = 0;
-    while (source != nullptr && source[index] != 0 && index + 1 < capacity)
-    {
-        destination[index] = (uint16_t)(unsigned char)source[index];
-        ++index;
-    }
-    destination[index] = 0;
-}
-
 extern "C" int32_t
 reach_windows_update_matches_security_maintenance(const reach_windows_update_item *update)
 {
@@ -117,8 +102,8 @@ extern "C" void reach_windows_update_apply_default_selection(reach_windows_updat
         update->state =
             update->selected ? REACH_WINDOWS_UPDATE_SELECTED : REACH_WINDOWS_UPDATE_DISCOVERED;
         if (update->selected)
-            copy_ascii(update->selected_reason, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
-                       "SecurityMaintenance");
+            reach_copy_ascii_to_utf16(update->selected_reason, REACH_WINDOWS_UPDATE_TEXT_CAPACITY,
+                                      "SecurityMaintenance");
         else
             update->selected_reason[0] = 0;
     }

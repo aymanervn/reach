@@ -7,6 +7,8 @@
 #include "reach/core/theme.h"
 #include "reach/core/clipboard.h"
 #include "reach/core/scrollbar.h"
+#include "reach/features/common/pressable.h"
+#include "reach/ports/clipboard.h"
 #include "reach/support/animation.h"
 #include "reach/support/util.h"
 
@@ -22,9 +24,6 @@ extern "C"
         reach_clipboard_item items[REACH_CLIPBOARD_MAX_ITEMS];
         size_t count;
         size_t hovered_index;
-        size_t pressed_index;
-        int32_t pressed_hit_type;
-        uint64_t pressed_item_id;
         reach_scrollbar_model scrollbar;
     } reach_clipboard_model;
 
@@ -61,7 +60,6 @@ extern "C"
     } reach_clipboard_render_input;
 
     void reach_clipboard_model_init(reach_clipboard_model *model);
-    void reach_clipboard_model_clear_press(reach_clipboard_model *model);
     void reach_clipboard_model_clear_items(reach_clipboard_model *model);
     reach_clipboard_insert_result reach_clipboard_model_insert(reach_clipboard_model *model,
                                                                reach_clipboard_item item);
@@ -70,10 +68,10 @@ extern "C"
     reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *model,
                                                           reach_rect_f32 monitor_bounds,
                                                           reach_rect_f32 launcher_bounds,
-                                                          float dpi_scale);
+                                                          float dpi_scale, float border_thickness);
     reach_clipboard_layout reach_clipboard_compute_layout_animated(
         reach_clipboard_model *model, reach_rect_f32 monitor_bounds, reach_rect_f32 launcher_bounds,
-        float dpi_scale, float animated_height, float animated_item_width);
+        float dpi_scale, float border_thickness, float animated_height, float animated_item_width);
     reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_input *input,
                                                        reach_render_command_buffer *commands);
 
@@ -87,6 +85,8 @@ extern "C"
         reach_clipboard_model model;
         reach_clipboard_layout layout;
         reach_scrollbar_drag scrollbar_drag;
+        reach_pressable pressable;
+        uint64_t press_identity;
     } reach_clipboard_state;
 
     const reach_clipboard_state *
@@ -95,17 +95,10 @@ extern "C"
     const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void);
 
     int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
+                                             const reach_theme *theme,
                                              reach_rect_f32 monitor_bounds,
                                              reach_rect_f32 launcher_bounds, float dpi_scale,
                                              int32_t *out_animating);
-
-    typedef enum reach_clipboard_pointer_action_kind
-    {
-        REACH_CLIPBOARD_POINTER_ACTION_NONE = 0,
-        REACH_CLIPBOARD_POINTER_ACTION_CLEAR_ALL = 1,
-        REACH_CLIPBOARD_POINTER_ACTION_REMOVE_ITEM = 2,
-        REACH_CLIPBOARD_POINTER_ACTION_RESTORE_ITEM = 3
-    } reach_clipboard_pointer_action_kind;
 
     int32_t reach_clipboard_is_open(reach_clipboard_feature *clipboard);
     size_t reach_clipboard_item_count(reach_clipboard_feature *clipboard);
@@ -145,6 +138,23 @@ extern "C"
     void reach_clipboard_feature_request_refresh(reach_clipboard_feature *clipboard);
     void reach_clipboard_feature_clear_refresh(reach_clipboard_feature *clipboard);
     int32_t reach_clipboard_feature_take_refresh(reach_clipboard_feature *clipboard);
+
+    typedef struct reach_clipboard_retired_resource
+    {
+        uint64_t item_id;
+        uint64_t thumbnail_id;
+    } reach_clipboard_retired_resource;
+
+    void reach_clipboard_feature_attach_port(reach_clipboard_feature *clipboard,
+                                             const reach_clipboard_port *port,
+                                             void (*request_update)(void *user), void *user);
+    reach_result reach_clipboard_feature_start(reach_clipboard_feature *clipboard);
+    void reach_clipboard_feature_stop(reach_clipboard_feature *clipboard);
+    size_t reach_clipboard_feature_take_retired_resources(reach_clipboard_feature *clipboard,
+                                                          reach_clipboard_retired_resource *out,
+                                                          size_t cap);
+    void reach_clipboard_feature_release_resource(reach_clipboard_feature *clipboard,
+                                                  const reach_clipboard_retired_resource *resource);
 
 #ifdef __cplusplus
 }

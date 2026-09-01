@@ -1,0 +1,4 @@
+300 RCDATA "../third_party/jetbrains-mono/fonts/JetBrainsMono-Regular.ttf"
+301 RCDATA "../third_party/jetbrains-mono/fonts/JetBrainsMono-Medium.ttf"
+302 RCDATA "../third_party/jetbrains-mono/fonts/JetBrainsMono-SemiBold.ttf"
+303 RCDATA "../third_party/jetbrains-mono/fonts/JetBrainsMono-Bold.ttf"

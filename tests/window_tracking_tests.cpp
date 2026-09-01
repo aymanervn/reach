@@ -1,3 +1,4 @@
+#include "reach/support/util.h"
 #include "reach/services/window_tracking.h"
 
 #include <stdio.h>
@@ -13,29 +14,19 @@ static void expect_true(int condition, const char *message)
     }
 }
 
-static void copy_ascii(uint16_t *dst, size_t cap, const char *src)
-{
-    size_t index = 0;
-    while (src != nullptr && src[index] != 0 && index + 1 < cap)
-    {
-        dst[index] = (uint16_t)(unsigned char)src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
 static reach_window_snapshot make_window(uintptr_t id, const char *path, const char *aumid)
 {
     reach_window_snapshot window = {};
     window.id = id;
     window.visible = 1;
-    copy_ascii(window.title, 260, "window");
-    copy_ascii(window.path, 260, path);
-    copy_ascii(window.app_user_model_id, 260, aumid);
+    reach_copy_ascii_to_utf16(window.title, 260, "window");
+    reach_copy_ascii_to_utf16(window.path, 260, path);
+    reach_copy_ascii_to_utf16(window.app_user_model_id, 260, aumid);
     return window;
 }
 
-static reach_window_snapshot fake_windows[REACH_MAX_PINNED_APPS];
+static reach_window_snapshot fake_windows[REACH_MAX_OPEN_WINDOWS];
+static reach_rect_f32 fake_window_bounds[REACH_MAX_OPEN_WINDOWS];
 static size_t fake_window_count;
 
 static size_t fake_window_count_op(const reach_window_manager *manager)
@@ -56,11 +47,31 @@ static reach_result fake_window_at_op(const reach_window_manager *manager, size_
     return REACH_OK;
 }
 
+static reach_result fake_outer_bounds_op(const reach_window_manager *manager,
+                                         reach_window_id window_id, reach_rect_f32 *out_bounds)
+{
+    (void)manager;
+    if (out_bounds == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < fake_window_count; ++index)
+    {
+        if (fake_windows[index].id == window_id)
+        {
+            *out_bounds = fake_window_bounds[index];
+            return REACH_OK;
+        }
+    }
+    return REACH_ERROR;
+}
+
 static reach_window_tracking *make_service(void)
 {
     reach_window_manager_port port = {};
     port.ops.window_count = fake_window_count_op;
     port.ops.window_at = fake_window_at_op;
+    port.ops.outer_bounds = fake_outer_bounds_op;
     reach_window_tracking *service = nullptr;
     if (reach_window_tracking_create(port, &service) != REACH_OK)
     {
@@ -75,7 +86,47 @@ static void set_windows(const reach_window_snapshot *windows, size_t count)
     for (size_t index = 0; index < count; ++index)
     {
         fake_windows[index] = windows[index];
+        fake_window_bounds[index] = {};
     }
+}
+
+static void test_trespass_uses_protected_band_and_monitor(void)
+{
+    reach_window_tracking *service = make_service();
+    if (service == nullptr)
+    {
+        ++failures;
+        return;
+    }
+
+    reach_window_snapshot windows[3] = {
+        make_window(41, "C:\\apps\\bottom.exe", ""),
+        make_window(42, "C:\\apps\\middle.exe", ""),
+        make_window(43, "C:\\apps\\secondary.exe", ""),
+    };
+    set_windows(windows, 3);
+    fake_window_bounds[0] = {100.0f, 200.0f, 600.0f, 580.0f};
+    fake_window_bounds[1] = {100.0f, 200.0f, 600.0f, 400.0f};
+    fake_window_bounds[2] = {1100.0f, 100.0f, 600.0f, 700.0f};
+    (void)reach_window_tracking_refresh(service, nullptr);
+
+    reach_rect_f32 monitor = {0.0f, 0.0f, 1000.0f, 800.0f};
+    reach_rect_f32 bottom_band = {0.0f, 744.0f, 1000.0f, 56.0f};
+    expect_true(reach_window_tracking_any_trespassing(service, monitor, bottom_band, 0),
+                "floating window trespassing the Dock band is detected");
+    expect_true(!reach_window_tracking_any_trespassing(service, monitor, bottom_band, 41),
+                "the actively manipulated window can be excluded");
+
+    windows[0].minimized = 1;
+    set_windows(windows, 3);
+    fake_window_bounds[0] = {100.0f, 200.0f, 600.0f, 580.0f};
+    fake_window_bounds[1] = {100.0f, 200.0f, 600.0f, 400.0f};
+    fake_window_bounds[2] = {1100.0f, 100.0f, 600.0f, 700.0f};
+    (void)reach_window_tracking_refresh(service, nullptr);
+    expect_true(!reach_window_tracking_any_trespassing(service, monitor, bottom_band, 0),
+                "minimized and other-monitor windows do not trespass the bar band");
+
+    reach_window_tracking_destroy(service);
 }
 
 static uint32_t group_of(const reach_window_tracking *service, uintptr_t window_id)
@@ -108,14 +159,14 @@ static void test_identity_rule(void)
                 "empty identities never match each other");
 
     reach_pinned_app_model app = {};
-    copy_ascii(app.path, 260, "C:\\apps\\brave.exe");
+    reach_copy_ascii_to_utf16(app.path, 260, "C:\\apps\\brave.exe");
     expect_true(reach_window_tracking_window_matches_app(&app, &browser_a),
                 "pinned path matches browser window");
     expect_true(reach_window_tracking_window_matches_app(&app, &pwa),
                 "pinned app without aumid falls back to path");
     reach_pinned_app_model pwa_pin = {};
-    copy_ascii(pwa_pin.path, 260, "C:\\apps\\brave.exe");
-    copy_ascii(pwa_pin.app_user_model_id, 260, "Brave._crx_abc");
+    reach_copy_ascii_to_utf16(pwa_pin.path, 260, "C:\\apps\\brave.exe");
+    reach_copy_ascii_to_utf16(pwa_pin.app_user_model_id, 260, "Brave._crx_abc");
     expect_true(reach_window_tracking_window_matches_app(&pwa_pin, &browser_a),
                 "pinned pwa matches by path when window has no aumid");
     expect_true(!reach_window_tracking_window_matches_app(&pwa_pin, &uwp_a),
@@ -180,8 +231,8 @@ static void test_empty_identity_and_aumid_split(void)
         make_window(33, "C:\\apps\\brave.exe", "Brave._crx_abc"),
         make_window(34, "C:\\apps\\brave.exe", "Brave._crx_xyz"),
     };
-    copy_ascii(windows[0].title, 260, "bare one");
-    copy_ascii(windows[1].title, 260, "bare two");
+    reach_copy_ascii_to_utf16(windows[0].title, 260, "bare one");
+    reach_copy_ascii_to_utf16(windows[1].title, 260, "bare two");
     set_windows(windows, 4);
     (void)reach_window_tracking_refresh(service, nullptr);
 
@@ -204,5 +255,6 @@ int main(void)
     test_identity_rule();
     test_group_id_assignment_and_stability();
     test_empty_identity_and_aumid_split();
+    test_trespass_uses_protected_band_and_monitor();
     return failures == 0 ? 0 : 1;
 }

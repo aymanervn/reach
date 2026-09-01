@@ -26,26 +26,6 @@ struct reach_search_provider
     size_t result_count;
 };
 
-static void reach_search_copy_utf16(uint16_t *dst, size_t dst_count, const uint16_t *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    if (src == nullptr)
-    {
-        dst[0] = 0;
-        return;
-    }
-    size_t index = 0;
-    while (index + 1 < dst_count && src[index] != 0)
-    {
-        dst[index] = src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
 static const uint16_t *reach_search_file_name(const uint16_t *path)
 {
     const uint16_t *name = path;
@@ -66,24 +46,6 @@ static const uint16_t *reach_search_file_name(const uint16_t *path)
 static uint16_t reach_search_lower(uint16_t ch)
 {
     return ch >= 'A' && ch <= 'Z' ? (uint16_t)(ch - 'A' + 'a') : ch;
-}
-
-static int32_t reach_search_path_equals_ci(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr || b == nullptr)
-    {
-        return 0;
-    }
-    size_t index = 0;
-    while (a[index] != 0 && b[index] != 0)
-    {
-        if (reach_search_lower(a[index]) != reach_search_lower(b[index]))
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return a[index] == 0 && b[index] == 0;
 }
 
 static int32_t reach_search_path_has_extension_ci(const uint16_t *path, const char *extension)
@@ -266,16 +228,16 @@ static void reach_search_add_candidate(std::vector<reach_search_candidate> *cand
 
     for (const reach_search_candidate &candidate : *candidates)
     {
-        if (reach_search_path_equals_ci(candidate.path, path) && candidate.arguments[0] == 0)
+        if (reach_path_equals(candidate.path, path) && candidate.arguments[0] == 0)
         {
             return;
         }
     }
 
     reach_search_candidate candidate = {};
-    reach_search_copy_utf16(candidate.path, REACH_SEARCH_RESULT_PATH_CAPACITY, path);
-    reach_search_copy_utf16(candidate.name, REACH_SEARCH_RESULT_NAME_CAPACITY,
-                            reach_search_file_name(path));
+    reach_copy_utf16(candidate.path, REACH_SEARCH_RESULT_PATH_CAPACITY, path);
+    reach_copy_utf16(candidate.name, REACH_SEARCH_RESULT_NAME_CAPACITY,
+                     reach_search_file_name(path));
     candidate.is_directory = 0;
     candidate.kind = reach_search_classify_result(candidate.path, 0);
     candidates->push_back(candidate);
@@ -290,9 +252,9 @@ static void reach_retriever_accept_line(const char *line, size_t length,
     }
 
     uint16_t path[REACH_SEARCH_RESULT_PATH_CAPACITY] = {};
-    int converted = MultiByteToWideChar(CP_UTF8, 0, line, (int)length,
-                                        reinterpret_cast<LPWSTR>(path),
-                                        REACH_SEARCH_RESULT_PATH_CAPACITY - 1);
+    int converted =
+        MultiByteToWideChar(CP_UTF8, 0, line, (int)length, reinterpret_cast<LPWSTR>(path),
+                            REACH_SEARCH_RESULT_PATH_CAPACITY - 1);
     if (converted <= 0)
     {
         return;
@@ -345,8 +307,8 @@ static reach_result reach_retriever_collect(reach_search_provider *provider, con
         while (parse_offset < response.size())
         {
             const char *line_start = response.data() + parse_offset;
-            const char *newline = static_cast<const char *>(
-                memchr(line_start, '\n', response.size() - parse_offset));
+            const char *newline =
+                static_cast<const char *>(memchr(line_start, '\n', response.size() - parse_offset));
             if (newline == nullptr)
             {
                 break;
@@ -405,21 +367,18 @@ static reach_result reach_search_retriever_query(reach_search_provider *provider
 
     if (modes & REACH_RETRIEVER_MODE_NAME)
     {
-        any_pass_ok |=
-            reach_retriever_collect(provider, "name", query_utf8, deadline_ms, &candidates) ==
-            REACH_OK;
+        any_pass_ok |= reach_retriever_collect(provider, "name", query_utf8, deadline_ms,
+                                               &candidates) == REACH_OK;
     }
     if (modes & REACH_RETRIEVER_MODE_PATH)
     {
-        any_pass_ok |=
-            reach_retriever_collect(provider, "path", query_utf8, deadline_ms, &candidates) ==
-            REACH_OK;
+        any_pass_ok |= reach_retriever_collect(provider, "path", query_utf8, deadline_ms,
+                                               &candidates) == REACH_OK;
     }
     if (modes & REACH_RETRIEVER_MODE_REGEX)
     {
-        any_pass_ok |=
-            reach_retriever_collect(provider, "regex", query_utf8, deadline_ms, &candidates) ==
-            REACH_OK;
+        any_pass_ok |= reach_retriever_collect(provider, "regex", query_utf8, deadline_ms,
+                                               &candidates) == REACH_OK;
     }
 
     if (!any_pass_ok && catalog_count == 0)
@@ -464,12 +423,11 @@ static reach_result reach_search_retriever_result_at(const reach_search_provider
     const reach_search_candidate *candidate = &provider->results[index];
     *out_result = {};
     out_result->id = (uint32_t)(index + 1);
-    reach_search_copy_utf16(out_result->title, REACH_SEARCH_RESULT_NAME_CAPACITY, candidate->name);
-    reach_search_copy_utf16(out_result->subtitle, REACH_SEARCH_RESULT_PATH_CAPACITY,
-                            candidate->path);
-    reach_search_copy_utf16(out_result->path, REACH_SEARCH_RESULT_PATH_CAPACITY, candidate->path);
-    reach_search_copy_utf16(out_result->arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
-                            candidate->arguments);
+    reach_copy_utf16(out_result->title, REACH_SEARCH_RESULT_NAME_CAPACITY, candidate->name);
+    reach_copy_utf16(out_result->subtitle, REACH_SEARCH_RESULT_PATH_CAPACITY, candidate->path);
+    reach_copy_utf16(out_result->path, REACH_SEARCH_RESULT_PATH_CAPACITY, candidate->path);
+    reach_copy_utf16(out_result->arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
+                     candidate->arguments);
     out_result->kind = candidate->kind;
     out_result->is_directory = candidate->is_directory;
     out_result->score = candidate->score;

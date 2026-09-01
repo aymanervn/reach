@@ -198,7 +198,6 @@ static int32_t reach_window_management_focus_target(HWND target)
     (void)SetActiveWindow(target);
     (void)SetFocus(target);
     BOOL foreground_ok = SetForegroundWindow(target);
-    BringWindowToTop(target);
 
     if (attached_foreground)
     {
@@ -212,7 +211,7 @@ static int32_t reach_window_management_focus_target(HWND target)
     return foreground_ok || reach_window_management_foreground_matches(target);
 }
 
-reach_result reach_window_management_activate(HWND hwnd)
+static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
     {
@@ -241,7 +240,7 @@ reach_result reach_window_management_activate(HWND hwnd)
         ShowWindow(hwnd, SW_SHOW);
     }
 
-    HWND target = reach_window_management_activation_target(hwnd);
+    HWND target = exact ? hwnd : reach_window_management_activation_target(hwnd);
     if (target == nullptr)
     {
         return REACH_ERROR;
@@ -259,6 +258,16 @@ reach_result reach_window_management_activate(HWND hwnd)
     reach_window_action_state state = reach_window_management_capture_state(target);
     reach_window_management_log_failure("activate.foreground", target, &state, &state);
     return REACH_ERROR;
+}
+
+reach_result reach_window_management_activate(HWND hwnd)
+{
+    return reach_window_management_activate_impl(hwnd, 0);
+}
+
+reach_result reach_window_management_activate_exact(HWND hwnd)
+{
+    return reach_window_management_activate_impl(hwnd, 1);
 }
 
 reach_result reach_window_management_minimize(HWND hwnd)
@@ -283,6 +292,31 @@ reach_result reach_window_management_minimize(HWND hwnd)
     reach_window_action_state after = reach_window_management_capture_state(target);
     reach_window_management_log_failure("minimize", target, &before, &after);
     return REACH_ERROR;
+}
+
+reach_result reach_window_management_leave_game_to_desktop(HWND game)
+{
+    if (game == nullptr || !IsWindow(game))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND desktop = GetShellWindow();
+    if (desktop == nullptr || !IsWindow(desktop) || desktop == game)
+    {
+        return REACH_ERROR;
+    }
+
+    if (!reach_window_management_focus_target(desktop))
+    {
+        reach_window_action_state state = reach_window_management_capture_state(game);
+        reach_window_management_log_failure("leave_game.foreground", game, &state, &state);
+        return REACH_ERROR;
+    }
+
+    reach_result result = reach_window_management_minimize(game);
+    (void)ClipCursor(nullptr);
+    return result;
 }
 
 static int32_t reach_window_management_frame_bounds(HWND hwnd, RECT *out_frame)

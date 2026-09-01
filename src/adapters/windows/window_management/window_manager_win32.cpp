@@ -559,100 +559,6 @@ static reach_result reach_window_manager_snap(reach_window_manager *manager, uin
     return result;
 }
 
-static int32_t reach_window_manager_window_on_primary_monitor(uint64_t window)
-{
-    HWND hwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(window));
-    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO info = {};
-    info.cbSize = sizeof(info);
-    if (monitor == nullptr || !GetMonitorInfoW(monitor, &info))
-    {
-        return 0;
-    }
-    return (info.dwFlags & MONITORINFOF_PRIMARY) != 0;
-}
-
-static int32_t
-reach_window_manager_any_window_maximized_on_primary(const reach_window_manager *manager)
-{
-    if (manager == nullptr)
-    {
-        return 0;
-    }
-
-    reach_window_manager_lock(manager);
-    int32_t maximized = 0;
-    for (const reach_service_window_snapshot &snapshot : manager->helper_windows)
-    {
-        if (!snapshot.maximized || snapshot.iconic || !snapshot.visible)
-        {
-            continue;
-        }
-        if (reach_window_manager_window_on_primary_monitor(snapshot.window))
-        {
-            maximized = 1;
-            break;
-        }
-    }
-    reach_window_manager_unlock(manager);
-    return maximized;
-}
-
-static int32_t
-reach_window_manager_window_is_snapped_on_primary(const reach_window_manager *manager,
-                                                  reach_window_id window_id)
-{
-    if (window_id == 0)
-    {
-        return 0;
-    }
-
-    reach_window_manager_lock(manager);
-    uint64_t window = 0;
-    for (const reach_service_window_snapshot &snapshot : manager->helper_windows)
-    {
-        if (snapshot.window == static_cast<uint64_t>(window_id))
-        {
-            if (!snapshot.maximized && !snapshot.iconic)
-            {
-                window = snapshot.window;
-            }
-            break;
-        }
-    }
-    reach_window_manager_unlock(manager);
-    if (window == 0)
-    {
-        return 0;
-    }
-
-    HWND hwnd = reinterpret_cast<HWND>(static_cast<uintptr_t>(window));
-    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO info = {};
-    info.cbSize = sizeof(info);
-    if (monitor == nullptr || !GetMonitorInfoW(monitor, &info) ||
-        (info.dwFlags & MONITORINFOF_PRIMARY) == 0)
-    {
-        return 0;
-    }
-
-    RECT frame = {};
-    if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) &&
-        !GetWindowRect(hwnd, &frame))
-    {
-        return 0;
-    }
-
-    reach_rect_i32 work_area = {info.rcWork.left, info.rcWork.top, info.rcWork.right,
-                                info.rcWork.bottom};
-    reach_rect_i32 rect = {frame.left, frame.top, frame.right, frame.bottom};
-    const int32_t tolerance = 8;
-
-    return reach_layout_rect_matches_split(work_area, rect, REACH_SPLIT_LEFT, tolerance) ||
-           reach_layout_rect_matches_split(work_area, rect, REACH_SPLIT_RIGHT, tolerance) ||
-           reach_layout_rect_matches_split(work_area, rect, REACH_SPLIT_BOTTOM, tolerance);
-}
-
 static int32_t reach_window_manager_game_mode_active(const reach_window_manager *manager)
 {
     if (manager == nullptr)
@@ -723,6 +629,104 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
     return REACH_OK;
 }
 
+static reach_result reach_window_manager_frame_bounds(const reach_window_manager *manager,
+                                                      reach_window_id window_id,
+                                                      reach_rect_f32 *out_bounds)
+{
+    if (manager == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_bounds = {};
+
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    if (!IsWindow(hwnd))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    RECT frame = {};
+    if (IsIconic(hwnd))
+    {
+        WINDOWPLACEMENT placement = {};
+        placement.length = sizeof(placement);
+        if (!GetWindowPlacement(hwnd, &placement) ||
+            placement.rcNormalPosition.right <= placement.rcNormalPosition.left ||
+            placement.rcNormalPosition.bottom <= placement.rcNormalPosition.top)
+        {
+            return REACH_ERROR;
+        }
+        frame = placement.rcNormalPosition;
+    }
+    else if (FAILED(
+                 DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) &&
+             !GetWindowRect(hwnd, &frame))
+    {
+        return REACH_ERROR;
+    }
+
+    out_bounds->x = (float)frame.left;
+    out_bounds->y = (float)frame.top;
+    out_bounds->width = (float)(frame.right - frame.left);
+    out_bounds->height = (float)(frame.bottom - frame.top);
+    return REACH_OK;
+}
+
+static reach_result reach_window_manager_outer_bounds(const reach_window_manager *manager,
+                                                      reach_window_id window_id,
+                                                      reach_rect_f32 *out_bounds)
+{
+    if (manager == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *out_bounds = {};
+
+    HWND hwnd = reinterpret_cast<HWND>(window_id);
+    RECT rect = {};
+    if (!IsWindow(hwnd) || IsIconic(hwnd) || !GetWindowRect(hwnd, &rect))
+    {
+        return REACH_ERROR;
+    }
+
+    out_bounds->x = (float)rect.left;
+    out_bounds->y = (float)rect.top;
+    out_bounds->width = (float)(rect.right - rect.left);
+    out_bounds->height = (float)(rect.bottom - rect.top);
+    return REACH_OK;
+}
+
+static reach_result reach_window_manager_move_windows(reach_window_manager *manager,
+                                                      const reach_window_move *windows,
+                                                      size_t count)
+{
+    if (manager == nullptr || windows == nullptr || count == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_result result = REACH_OK;
+    for (size_t index = 0; index < count; ++index)
+    {
+        HWND hwnd = reinterpret_cast<HWND>(windows[index].window);
+        if (!IsWindow(hwnd))
+        {
+            continue;
+        }
+        const reach_point_f32 *position = &windows[index].position;
+        if (!SetWindowPos(hwnd, nullptr, (int)position->x, (int)position->y, 0, 0,
+                          SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING |
+                              SWP_ASYNCWINDOWPOS))
+        {
+            result = REACH_ERROR;
+        }
+    }
+
+    return result;
+}
+
 static reach_result reach_window_manager_pin_app_for_window(reach_window_manager *manager,
                                                             uintptr_t window_id,
                                                             const reach_window_snapshot *snapshot,
@@ -746,7 +750,6 @@ static reach_result reach_window_manager_pin_app_for_window(reach_window_manager
     *out_app = {};
     (void)reach_copy_utf16(out_app->path, 260,
                            reinterpret_cast<const uint16_t *>(helper->process_path));
-    (void)reach_copy_utf16(out_app->title, 128, reinterpret_cast<const uint16_t *>(helper->title));
     reach_window_manager_icon_ref_for_helper(*helper, out_app->icon_ref, 260);
     (void)reach_copy_utf16(out_app->app_user_model_id, 260,
                            reinterpret_cast<const uint16_t *>(helper->app_user_model_id));
@@ -813,13 +816,13 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.stop = reach_window_manager_stop;
     out_port->ops.refresh = reach_window_manager_refresh;
     out_port->ops.snap = reach_window_manager_snap;
-    out_port->ops.any_window_maximized_on_primary =
-        reach_window_manager_any_window_maximized_on_primary;
-    out_port->ops.window_is_snapped_on_primary = reach_window_manager_window_is_snapped_on_primary;
     out_port->ops.game_mode_active = reach_window_manager_game_mode_active;
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;
+    out_port->ops.frame_bounds = reach_window_manager_frame_bounds;
+    out_port->ops.outer_bounds = reach_window_manager_outer_bounds;
+    out_port->ops.move_windows = reach_window_manager_move_windows;
     out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
     out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;
