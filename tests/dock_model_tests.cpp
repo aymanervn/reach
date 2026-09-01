@@ -36,6 +36,62 @@ static reach_window_snapshot make_window(uintptr_t id, const char *path, const c
     return window;
 }
 
+static reach_window_snapshot dock_test_window;
+static reach_rect_f32 dock_test_window_bounds;
+static size_t dock_test_window_count;
+
+static size_t dock_test_window_count_op(const reach_window_manager *manager)
+{
+    (void)manager;
+    return dock_test_window_count;
+}
+
+static reach_result dock_test_window_at_op(const reach_window_manager *manager, size_t index,
+                                           reach_window_snapshot *out_window)
+{
+    (void)manager;
+    if (index != 0 || dock_test_window_count == 0 || out_window == nullptr)
+    {
+        return REACH_ERROR;
+    }
+    *out_window = dock_test_window;
+    return REACH_OK;
+}
+
+static reach_result dock_test_outer_bounds_op(const reach_window_manager *manager,
+                                              reach_window_id window_id,
+                                              reach_rect_f32 *out_bounds)
+{
+    (void)manager;
+    if (window_id != dock_test_window.id || out_bounds == nullptr)
+    {
+        return REACH_ERROR;
+    }
+    *out_bounds = dock_test_window_bounds;
+    return REACH_OK;
+}
+
+static reach_window_tracking *make_dock_test_window_service(void)
+{
+    reach_window_manager_port port = {};
+    port.ops.window_count = dock_test_window_count_op;
+    port.ops.window_at = dock_test_window_at_op;
+    port.ops.outer_bounds = dock_test_outer_bounds_op;
+    reach_window_tracking *service = nullptr;
+    if (reach_window_tracking_create(port, &service) != REACH_OK)
+    {
+        return nullptr;
+    }
+    return service;
+}
+
+static void refresh_dock_test_window(reach_window_tracking *service, float x, float width)
+{
+    dock_test_window_count = 1;
+    dock_test_window_bounds = {x, 500.0f, width, 600.0f};
+    (void)reach_window_tracking_refresh(service, nullptr);
+}
+
 static reach_pinned_app_model make_pin(uint32_t id, const char *path)
 {
     reach_pinned_app_model app = {};
@@ -536,6 +592,57 @@ static void test_pinned_reorder_survives_the_config_round_trip(void)
     reach_dock_destroy(dock);
 }
 
+static void test_dock_trespass_uses_current_horizontal_span(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "trespass test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+
+    dock_test_window = make_window(1, "C:\\apps\\window.exe", "");
+    reach_window_tracking *windows = make_dock_test_window_service();
+    expect_true(windows != nullptr, "trespass test creates a window service");
+    if (windows == nullptr)
+    {
+        reach_dock_destroy(dock);
+        return;
+    }
+
+    refresh_dock_test_window(windows, 100.0f, 200.0f);
+    reach_dock_attach_services(dock, nullptr, windows);
+
+    reach_bar_visibility_request request = {};
+    request.shown_bounds = {400.0f, 1016.0f, 200.0f, 64.0f};
+    request.monitor_bounds = {0.0f, 0.0f, 1000.0f, 1080.0f};
+    request.reveal_seconds = 0.25f;
+    const reach_bar_reveal_ops *ops = reach_dock_reveal_ops();
+    reach_bar_visibility_result result = ops->update_visibility(dock, &request);
+    expect_true(!result.reveal_edge_shown,
+                "a window below the monitor outside the Dock span does not hide the Dock");
+
+    refresh_dock_test_window(windows, 350.0f, 200.0f);
+    ops->invalidate_coverage(dock);
+    result = ops->update_visibility(dock, &request);
+    expect_true(result.reveal_edge_shown,
+                "a window overlapping the Dock span hides the Dock");
+
+    refresh_dock_test_window(windows, 250.0f, 100.0f);
+    ops->invalidate_coverage(dock);
+    result = ops->update_visibility(dock, &request);
+    expect_true(!result.reveal_edge_shown,
+                "a window outside the current Dock span stops hiding the Dock");
+
+    request.shown_bounds = {300.0f, 1016.0f, 300.0f, 64.0f};
+    result = ops->update_visibility(dock, &request);
+    expect_true(result.reveal_edge_shown,
+                "a changed Dock position and width update the trespass span");
+
+    reach_window_tracking_destroy(windows);
+    reach_dock_destroy(dock);
+}
+
 int main(void)
 {
     test_dock_metrics_are_spaced_before_any_configuration_arrives();
@@ -552,5 +659,6 @@ int main(void)
     test_fit_metrics_keep_native_size_until_overflow();
     test_fit_metrics_scale_every_dimension_without_a_minimum();
     test_adaptive_layout_rebuild_keeps_native_height();
+    test_dock_trespass_uses_current_horizontal_span();
     return failures == 0 ? 0 : 1;
 }
