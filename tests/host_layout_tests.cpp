@@ -36,7 +36,6 @@ static reach_host order_repair_host;
 static reach_host app_band_host;
 static reach_host manipulation_host;
 static reach_host monitor_entry_host;
-static reach_host transition_host;
 static reach_host transition_frame_host;
 static reach_host registry_host;
 static reach_host generic_frame_host;
@@ -470,34 +469,14 @@ static void test_window_manipulation_tracks_pointer_monitor_membership(void)
                 "ending a drag that entered the monitor releases suppression");
 }
 
-static void test_registered_transition_completion(void)
+static void test_scaled_presentation_keeps_native_envelope_stationary(void)
 {
-    reach_host *host = &transition_host;
-    reach_animation_track tracks[REACH_HOST_ANIMATION_COUNT] = {};
-    reach_animation_manager_init(&host->animations, tracks, REACH_HOST_ANIMATION_COUNT);
-
-    reach_host_surface_transition transition = {};
-    transition.visible = 1;
-    transition.y_track = 0;
-    transition.opacity_track = 1;
-    host->feature_runtimes[REACH_SURFACE_ID_SYSTEM_HUD].transition = &transition;
-
-    reach_host_finish_surface_transitions(host);
-
-    expect_true(!transition.visible,
-                "a transition registered only in the feature runtime completes");
-    expect_true(host->dirty.update_requested,
-                "finishing a registered transition schedules reconciliation");
-}
-
-static void test_scaled_transition_keeps_native_envelope_stationary(void)
-{
-    reach_host_surface_transition_frame offset_frame =
+    reach_host_surface_presentation_frame offset_frame =
         reach_host_surface_presentation_frame_compute(
             {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f}, {}, 10.0f,
             1.04f, 1.08f);
 
-    reach_host_surface_transition_frame settled_frame =
+    reach_host_surface_presentation_frame settled_frame =
         reach_host_surface_presentation_frame_compute(
             {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f}, {}, 0.0f,
             1.04f, 1.08f);
@@ -743,8 +722,6 @@ static void test_every_dismissable_surface_reaches_the_shared_close_path(void)
                     reach_host_surface_closable(launcher),
                 "a capsule-controlled surface is closable without a force_close callback");
 
-    reach_animation_track tracks[REACH_HOST_ANIMATION_COUNT] = {};
-    reach_animation_manager_init(&host->animations, tracks, REACH_HOST_ANIMATION_COUNT);
     expect_true(launcher->definition->control_ops->set_open(launcher->capsule, 1, nullptr),
                 "the launcher capsule opens through its control operation");
     reach_host_close_registered_surface(host, REACH_SURFACE_ID_LAUNCHER,
@@ -830,14 +807,8 @@ static void test_registered_feature_lifecycle(void)
 
     const reach_feature_definition *launcher =
         host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].definition;
-    expect_true(launcher->surface_ops->set_pointer_transform != nullptr &&
-                    host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].transition == nullptr,
+    expect_true(launcher->surface_ops->set_pointer_transform != nullptr,
                 "Launcher owns its presentation while composition applies its transform");
-    expect_true(host->feature_runtimes[REACH_SURFACE_ID_TRAY].transition == nullptr &&
-                    host->feature_runtimes[REACH_SURFACE_ID_QUICK_SETTINGS].transition == nullptr &&
-                    host->feature_runtimes[REACH_SURFACE_ID_BATTERY].transition == nullptr &&
-                    host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU].transition == nullptr,
-                "popup capsules own their shared presentation");
     expect_true(host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU]
                         .definition->surface_ops->layout_anchor != nullptr,
                 "Context Menu declares runtime-selected layout anchoring");
@@ -845,11 +816,10 @@ static void test_registered_feature_lifecycle(void)
         host->feature_runtimes[REACH_SURFACE_ID_STAGE].definition->surface_ops->native_overlay !=
             nullptr,
         "Stage declares its native overlay contract");
-    expect_true(host->feature_runtimes[REACH_SURFACE_ID_STAGE].transition == nullptr,
-                "Stage owns its animation while its fullscreen surface remains stationary");
     const reach_surface_id presentation_owned_surfaces[] = {
-        REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_ID_TRAY, REACH_SURFACE_ID_QUICK_SETTINGS,
-        REACH_SURFACE_ID_BATTERY,  REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_STAGE};
+        REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_ID_TRAY,
+        REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_ID_BATTERY,
+        REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_ID_STAGE};
     for (size_t index = 0;
          index < sizeof(presentation_owned_surfaces) / sizeof(presentation_owned_surfaces[0]);
          ++index)
@@ -1164,8 +1134,7 @@ int main(void)
     test_app_band_surface_does_not_invalidate_topmost_order();
     test_window_manipulation_relevance_survives_unavailable_pointer();
     test_window_manipulation_tracks_pointer_monitor_membership();
-    test_registered_transition_completion();
-    test_scaled_transition_keeps_native_envelope_stationary();
+    test_scaled_presentation_keeps_native_envelope_stationary();
     test_popup_pointer_coordinates_are_surface_local();
     test_popup_activation_uses_owner_identity();
     test_power_popup_resolves_its_exact_top_bar_owner();

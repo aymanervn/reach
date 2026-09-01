@@ -104,12 +104,6 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
         {
             continue;
         }
-        if (desc->transition != nullptr && desc->transition->target_open &&
-            reach_host_surface_transition_active(host, desc->transition))
-        {
-            continue;
-        }
-
         reach_host_close_registered_surface(host, desc->definition->id,
                                             REACH_SURFACE_CLOSE_SUPERSEDED);
         closed_any = 1;

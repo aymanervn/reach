@@ -1,4 +1,5 @@
 #include "reach/features/clipboard.h"
+#include "reach/features/common/presentation.h"
 
 #include "clipboard_common.h"
 #include "clipboard_metrics.h"
@@ -269,6 +270,7 @@ struct reach_clipboard_feature
 {
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_CLIPBOARD_ANIMATION_COUNT];
+    reach_feature_transition surface_transition;
     reach_clipboard_state state;
     std::atomic<int32_t> refresh_requested;
     reach_clipboard_port port;
@@ -334,6 +336,7 @@ void reach_clipboard_feature_reset(reach_clipboard_feature *clipboard)
         reach_pressable_reset(&clipboard->state.pressable, nullptr);
         clipboard->state.press_identity = 0;
         reach_clipboard_model_init(&clipboard->state.model);
+        reach_feature_transition_reset(&clipboard->surface_transition);
     }
 }
 
@@ -344,9 +347,10 @@ static int32_t reach_clipboard_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 }
 
 int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
+                                         const reach_theme *theme,
                                          reach_rect_f32 monitor_bounds,
                                          reach_rect_f32 launcher_bounds, float dpi_scale,
-                                         float border_thickness, int32_t *out_animating)
+                                         int32_t *out_animating)
 {
     if (out_animating != nullptr)
     {
@@ -357,6 +361,10 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
         return 0;
     }
 
+    const reach_theme *resolved_theme = theme != nullptr ? theme : reach_theme_default();
+    reach_feature_transition_configure(&clipboard->surface_transition, resolved_theme, dpi_scale,
+                                       REACH_FEATURE_TRANSITION_FROM_BELOW);
+    float border_thickness = reach_theme_border_thickness(resolved_theme, dpi_scale);
     reach_clipboard_state *state = &clipboard->state;
     reach_clipboard_layout previous_layout = state->layout;
     reach_clipboard_layout target_layout = reach_clipboard_compute_layout(
@@ -389,8 +397,15 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
     {
         *out = {};
     }
+    int32_t transition_changed =
+        reach_feature_transition_tick(&clipboard->surface_transition, delta_seconds);
     reach_clipboard_feature_tick(clipboard, delta_seconds);
     reach_clipboard_feature_capture(clipboard, out);
+    if (out != nullptr && transition_changed)
+    {
+        out->redraw = 1;
+        out->request_update = reach_feature_transition_active(&clipboard->surface_transition);
+    }
     if (out != nullptr && reach_clipboard_tick_scroll(clipboard, delta_seconds))
     {
         out->redraw = 1;
@@ -417,6 +432,16 @@ static int32_t reach_clipboard_capsule_is_open(const void *capsule)
     return reach_clipboard_is_open(clipboard);
 }
 
+static void reach_clipboard_capsule_on_game_mode(void *capsule, int32_t enabled)
+{
+    reach_clipboard_feature *clipboard = static_cast<reach_clipboard_feature *>(capsule);
+    if (enabled && clipboard != nullptr)
+    {
+        (void)reach_clipboard_set_open(clipboard, 0);
+        reach_feature_transition_reset(&clipboard->surface_transition);
+    }
+}
+
 static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
 {
     reach_clipboard_feature *clipboard = const_cast<reach_clipboard_feature *>(
@@ -425,8 +450,17 @@ static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
     {
         return 0;
     }
-    return reach_clipboard_feature_any_animation_active(clipboard) ||
+    return reach_feature_transition_active(&clipboard->surface_transition) ||
+           reach_clipboard_feature_any_animation_active(clipboard) ||
            clipboard->state.scrollbar_drag.active;
+}
+
+static int32_t reach_clipboard_capsule_presentation_visible(const void *capsule)
+{
+    const reach_clipboard_feature *clipboard =
+        static_cast<const reach_clipboard_feature *>(capsule);
+    return clipboard != nullptr &&
+           reach_feature_transition_visible(&clipboard->surface_transition);
 }
 
 static int32_t reach_clipboard_capsule_wants_pointer_move(const void *capsule)
@@ -572,6 +606,7 @@ static void reach_clipboard_capsule_surface_geometry(const void *capsule,
     }
     out->visible_bounds = clipboard->state.layout.bounds;
     out->envelope_bounds = clipboard->state.layout.bounds;
+    reach_feature_transition_presentation(&clipboard->surface_transition, out);
 }
 
 const reach_ui_event_type *reach_clipboard_activation_events(size_t *out_count)
@@ -590,7 +625,7 @@ const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void)
         reach_clipboard_capsule_reset,
         reach_clipboard_capsule_tick,
         reach_clipboard_capsule_is_open,
-        nullptr,
+        reach_clipboard_capsule_on_game_mode,
         reach_clipboard_capsule_needs_frame,
         reach_clipboard_capsule_wants_pointer_move,
         reach_clipboard_capsule_handle_pointer,
@@ -603,6 +638,10 @@ const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void)
         },
         nullptr,
         reach_clipboard_capsule_surface_geometry,
+        nullptr,
+        nullptr,
+        nullptr,
+        reach_clipboard_capsule_presentation_visible,
     };
     return &ops;
 }
@@ -652,6 +691,8 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     }
     reach_animation_manager_init(&clipboard->animations, clipboard->animation_tracks,
                                  REACH_CLIPBOARD_ANIMATION_COUNT);
+    reach_feature_transition_init(&clipboard->surface_transition,
+                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&clipboard->state.pressable);
     clipboard->refresh_requested.store(0);
     clipboard->port = {};
@@ -941,6 +982,7 @@ int32_t reach_clipboard_set_open(reach_clipboard_feature *clipboard, int32_t ope
     state->press_identity = 0;
     reach_scrollbar_end_drag(&state->scrollbar_drag);
     reach_clipboard_feature_collapse_all_hover(clipboard);
+    (void)reach_feature_transition_set_open(&clipboard->surface_transition, next);
     return 1;
 }
 

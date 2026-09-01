@@ -279,8 +279,6 @@ extern "C"
         reach_loader_model wifi_loader;
         reach_animation_track wifi_row_tracks[REACH_WIFI_MAX_NETWORKS + 1];
         reach_animation_manager wifi_row_animations;
-        reach_animation_track wifi_view_track;
-        reach_animation_manager wifi_view_animation;
         reach_animation_track wifi_radio_track;
         reach_animation_manager wifi_radio_animation;
         reach_bluetooth_device_list bluetooth_devices;

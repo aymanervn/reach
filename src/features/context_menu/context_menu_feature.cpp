@@ -94,7 +94,7 @@ struct reach_context_menu
     reach_context_menu_state state;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_CONTEXT_MENU_ANIM_COUNT];
-    reach_popup_transition popup_transition;
+    reach_feature_transition popup_transition;
     reach_pressable pressable;
     uint64_t pressable_identity;
 
@@ -127,7 +127,7 @@ void reach_context_menu_force_close(reach_context_menu *menu)
         reach_pressable_reset(&menu->pressable, nullptr);
         menu->pressable_identity = 0;
         menu->state.open = 0;
-        reach_popup_transition_reset(&menu->popup_transition);
+        reach_feature_transition_reset(&menu->popup_transition);
     }
 }
 
@@ -202,7 +202,7 @@ int32_t reach_context_menu_set_open(reach_context_menu *menu, int32_t open)
     menu->state.open = 0;
     reach_pressable_reset(&menu->pressable, nullptr);
     menu->pressable_identity = 0;
-    (void)reach_popup_transition_set_open(&menu->popup_transition, 0);
+    (void)reach_feature_transition_set_open(&menu->popup_transition, 0);
     return 1;
 }
 
@@ -229,16 +229,16 @@ void reach_context_menu_reset(reach_context_menu *menu)
     }
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER, 0.0f);
-    reach_popup_transition_reset(&menu->popup_transition);
+    reach_feature_transition_reset(&menu->popup_transition);
 }
 
 static void reach_context_menu_present(reach_context_menu *menu,
                                        const reach_context_menu_open_context *ctx)
 {
-    reach_popup_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
+    reach_feature_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
                                      ctx->drop_direction);
     menu->state.open = 1;
-    (void)reach_popup_transition_set_open(&menu->popup_transition, 1);
+    (void)reach_feature_transition_set_open(&menu->popup_transition, 1);
 }
 
 int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu)
@@ -654,7 +654,7 @@ void reach_context_menu_reanchor(reach_context_menu *menu,
                             ? reach_context_menu_window_list_width(&menu->state, ctx)
                             : menu->state.anchor_popup_width;
     reach_context_menu_place(&menu->state, ctx, popup_width, menu->state.anchor_ratio);
-    reach_popup_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
+    reach_feature_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
                                      ctx->drop_direction);
 }
 
@@ -934,14 +934,14 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
             out->request_update = 1;
         }
     }
-    int32_t popup_was_visible = reach_popup_transition_visible(&menu->popup_transition);
-    if (reach_popup_transition_tick(&menu->popup_transition, delta_seconds))
+    int32_t popup_was_visible = reach_feature_transition_visible(&menu->popup_transition);
+    if (reach_feature_transition_tick(&menu->popup_transition, delta_seconds))
     {
         out->redraw = 1;
         out->request_update =
-            reach_popup_transition_active(&menu->popup_transition);
+            reach_feature_transition_active(&menu->popup_transition);
     }
-    if (popup_was_visible && !reach_popup_transition_visible(&menu->popup_transition) &&
+    if (popup_was_visible && !reach_feature_transition_visible(&menu->popup_transition) &&
         !menu->state.open)
     {
         reach_context_menu_reset(menu);
@@ -952,14 +952,14 @@ static int32_t reach_context_menu_capsule_needs_frame(const void *capsule)
 {
     const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
     return menu != nullptr &&
-           (reach_popup_transition_active(&menu->popup_transition) ||
+           (reach_feature_transition_active(&menu->popup_transition) ||
             (menu->state.open && reach_animation_manager_any_active(&menu->animations)));
 }
 
 static int32_t reach_context_menu_capsule_presentation_visible(const void *capsule)
 {
     const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
-    return menu != nullptr && reach_popup_transition_visible(&menu->popup_transition);
+    return menu != nullptr && reach_feature_transition_visible(&menu->popup_transition);
 }
 
 static int32_t reach_context_menu_capsule_pointer_sequence_active(const void *capsule)
@@ -983,7 +983,7 @@ static void reach_context_menu_capsule_surface_geometry(const void *capsule,
         out->envelope_bounds = menu->state.bounds;
         out->notch_anchor_x = menu->state.notch_anchor_x;
         out->notch_side = reach_popup_notch_side(menu->state.drop_direction);
-        reach_popup_transition_presentation(&menu->popup_transition, out);
+        reach_feature_transition_presentation(&menu->popup_transition, out);
     }
 }
 
@@ -1021,7 +1021,8 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
     }
     reach_animation_manager_init(&menu->animations, menu->animation_tracks,
                                  REACH_CONTEXT_MENU_ANIM_COUNT);
-    reach_popup_transition_init(&menu->popup_transition, REACH_POPUP_DROP_UP);
+    reach_feature_transition_init(&menu->popup_transition,
+                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&menu->pressable);
     reach_context_menu_reset(menu);
     *out_menu = menu;

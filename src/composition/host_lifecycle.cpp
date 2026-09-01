@@ -285,9 +285,6 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     reach_result result = REACH_OK;
 
-    reach_animation_manager_init(&host->animations, host->animation_tracks,
-                                 REACH_HOST_ANIMATION_COUNT);
-    reach_host_surface_transitions_init(host);
     reach_host_init_feature_registry(host);
     reach_host_init_registered_surfaces(host);
     if (reach_host_create_registered_features(host) != REACH_OK)

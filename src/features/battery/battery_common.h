@@ -22,7 +22,7 @@ struct reach_battery
     double saver_pending_seconds;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_BATTERY_ANIMATION_COUNT];
-    reach_popup_transition popup_transition;
+    reach_feature_transition popup_transition;
     reach_pressable pressable;
 };
 

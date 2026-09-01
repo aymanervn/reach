@@ -662,7 +662,7 @@ struct reach_quick_settings
 {
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_QUICK_SETTINGS_ANIMATION_COUNT];
-    reach_popup_transition popup_transition;
+    reach_feature_transition popup_transition;
     reach_pressable pressable;
     reach_quick_settings_action press_action;
     reach_quick_settings_state state;
@@ -781,7 +781,7 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
         return 0;
     }
     state->open = next_open;
-    (void)reach_popup_transition_set_open(&quick_settings->popup_transition, next_open);
+    (void)reach_feature_transition_set_open(&quick_settings->popup_transition, next_open);
     state->drag.active = 0;
     state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     state->drag.level_valid = 0;
@@ -804,7 +804,7 @@ void reach_quick_settings_force_close(reach_quick_settings *quick_settings)
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
     state->open = 0;
-    reach_popup_transition_reset(&quick_settings->popup_transition);
+    reach_feature_transition_reset(&quick_settings->popup_transition);
     state->drag.active = 0;
     state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     reach_quick_settings_reset_pressable(quick_settings);
@@ -833,7 +833,7 @@ void reach_quick_settings_reset(reach_quick_settings *quick_settings)
     state->app_volumes_expansion = 0.0f;
     state->layout = {};
     state->drag = {};
-    reach_popup_transition_reset(&quick_settings->popup_transition);
+    reach_feature_transition_reset(&quick_settings->popup_transition);
     reach_quick_settings_reset_pressable(quick_settings);
 
     quick_settings->retired_render_icon_count = 0;
@@ -891,7 +891,7 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
     reach_quick_settings_tick(quick_settings, delta_seconds);
     int32_t popup_changed =
         quick_settings != nullptr
-            ? reach_popup_transition_tick(&quick_settings->popup_transition, delta_seconds)
+            ? reach_feature_transition_tick(&quick_settings->popup_transition, delta_seconds)
             : 0;
     if (quick_settings != nullptr)
     {
@@ -910,7 +910,7 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
         out->request_update =
             changes.request_update ||
             (quick_settings != nullptr &&
-             reach_popup_transition_active(&quick_settings->popup_transition));
+             reach_feature_transition_active(&quick_settings->popup_transition));
     }
 }
 
@@ -923,7 +923,7 @@ static int32_t reach_quick_settings_capsule_presentation_visible(const void *cap
 {
     const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
     return quick_settings != nullptr &&
-           reach_popup_transition_visible(&quick_settings->popup_transition);
+           reach_feature_transition_visible(&quick_settings->popup_transition);
 }
 
 static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
@@ -933,7 +933,7 @@ static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
     {
         return 0;
     }
-    return reach_popup_transition_active(&quick_settings->popup_transition) ||
+    return reach_feature_transition_active(&quick_settings->popup_transition) ||
            reach_animation_manager_any_active(&quick_settings->animations) ||
            (quick_settings->status != nullptr &&
             (reach_system_status_audio_pending(quick_settings->status) ||
@@ -965,7 +965,7 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
     out->envelope_bounds = quick_settings->state.target_bounds;
     out->notch_anchor_x = quick_settings->state.notch_anchor_x;
     out->notch_side = reach_popup_notch_side(quick_settings->state.drop_direction);
-    reach_popup_transition_presentation(&quick_settings->popup_transition, out);
+    reach_feature_transition_presentation(&quick_settings->popup_transition, out);
 }
 
 static reach_quick_settings_hit_result
@@ -1313,7 +1313,8 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
     }
     reach_animation_manager_init(&quick_settings->animations, quick_settings->animation_tracks,
                                  REACH_QUICK_SETTINGS_ANIMATION_COUNT);
-    reach_popup_transition_init(&quick_settings->popup_transition, REACH_POPUP_DROP_DOWN);
+    reach_feature_transition_init(&quick_settings->popup_transition,
+                                  REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&quick_settings->pressable);
     reach_quick_settings_model_init(&quick_settings->state.model);
     *out_quick_settings = quick_settings;
@@ -1614,7 +1615,7 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     }
 
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-    reach_popup_transition_configure(&quick_settings->popup_transition, ctx->theme, ctx->dpi_scale,
+    reach_feature_transition_configure(&quick_settings->popup_transition, ctx->theme, ctx->dpi_scale,
                                      ctx->drop_direction);
 
     reach_rect_f32 previous_target = state->target_bounds;

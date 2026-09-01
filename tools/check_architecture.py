@@ -377,7 +377,7 @@ FEATURE_ACTION_POLICY_ALLOWED: set[str] = set()
 GENERIC_SURFACE_LOOPS = (
     ("src/composition/host_lifecycle.cpp", "reach_host_create_with_dependencies", "lifecycle"),
     ("src/composition/host_surfaces.cpp", "reach_host_init_layout", "layout"),
-    ("src/composition/host_update.cpp", "reach_host_finish_surface_transitions", "transition"),
+    ("src/composition/host_update.cpp", "reach_host_finish_surface_presentations", "presentation"),
     ("src/composition/host_input.cpp", "reach_host_pointer_order", "input"),
     ("src/composition/host_update.cpp", "reach_host_update", "frame"),
 )
