@@ -12,11 +12,12 @@ extern "C"
 
     typedef enum reach_idle_watch_action
     {
-        REACH_IDLE_WATCH_ACTION_SLEEP = 0,
-        REACH_IDLE_WATCH_ACTION_LOCK = 1,
-        REACH_IDLE_WATCH_ACTION_SHUTDOWN = 2,
-        REACH_IDLE_WATCH_ACTION_RESTART = 3,
-        REACH_IDLE_WATCH_ACTION_COUNT = 4
+        REACH_IDLE_WATCH_ACTION_SCREEN_OFF = 0,
+        REACH_IDLE_WATCH_ACTION_SLEEP = 1,
+        REACH_IDLE_WATCH_ACTION_LOCK = 2,
+        REACH_IDLE_WATCH_ACTION_SHUTDOWN = 3,
+        REACH_IDLE_WATCH_ACTION_RESTART = 4,
+        REACH_IDLE_WATCH_ACTION_COUNT = 5
     } reach_idle_watch_action;
 
     typedef struct reach_idle_watch_config

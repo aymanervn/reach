@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 25 25" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <rect id="wifi_high" x="0" y="0" width="25" height="25" style="fill-opacity:0;"/>
+<svg width="100%" height="100%" viewBox="0 0 27 25" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <rect id="wifi_high" x="0" y="0" width="27" height="25" style="fill-opacity:0;"/>
     <g id="wifi_high1" serif:id="wifi_high">
-        <path d="M3.572,14.018L-0,11.531C2.754,7.586 7.328,5.002 12.5,5.002C17.672,5.002 22.246,7.586 25,11.531L21.428,14.018C19.461,11.2 16.194,9.354 12.5,9.354C8.806,9.354 5.539,11.2 3.572,14.018ZM20.535,14.64L16.964,17.126C15.981,15.717 14.347,14.795 12.5,14.795C10.653,14.795 9.019,15.717 8.036,17.126L4.465,14.64C6.235,12.103 9.175,10.442 12.5,10.442C15.825,10.442 18.765,12.103 20.535,14.64ZM16.071,17.748C16.071,17.748 14.143,19.091 13.12,19.803C12.747,20.063 12.253,20.063 11.88,19.803C10.857,19.091 8.929,17.748 8.929,17.748C9.716,16.621 11.022,15.883 12.5,15.883C13.978,15.883 15.284,16.621 16.071,17.748Z"/>
+        <path d="M4.572,14.376L1,11.303C3.754,6.428 8.328,3.236 13.5,3.236C18.672,3.236 23.246,6.428 26,11.303L22.428,14.376C20.461,10.893 17.194,8.613 13.5,8.613C9.806,8.613 6.539,10.893 4.572,14.376ZM21.535,15.144L17.964,18.217C16.981,16.475 15.347,15.335 13.5,15.335C11.653,15.335 10.019,16.475 9.036,18.217L5.465,15.144C7.235,12.01 10.175,9.958 13.5,9.958C16.825,9.958 19.765,12.01 21.535,15.144ZM17.071,18.985C17.071,18.985 15.143,20.644 14.12,21.524C13.747,21.845 13.253,21.845 12.88,21.524C11.857,20.644 9.929,18.985 9.929,18.985C10.716,17.592 12.022,16.68 13.5,16.68C14.978,16.68 16.284,17.592 17.071,18.985Z"/>
     </g>
 </svg>

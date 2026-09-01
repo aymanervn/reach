@@ -39,6 +39,8 @@ extern "C"
         reach_result (*activate)(reach_tray_provider *provider, uint32_t item_id,
                                  reach_tray_action action);
         reach_result (*cancel_active_menu)(reach_tray_provider *provider);
+        int32_t (*take_retired_icon)(reach_tray_provider *provider, uint64_t *out_icon_id);
+        void (*release_retired_icon)(reach_tray_provider *provider, uint64_t icon_id);
         void (*destroy)(reach_tray_provider *provider);
     } reach_tray_provider_ops;
 

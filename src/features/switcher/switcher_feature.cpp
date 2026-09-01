@@ -1,4 +1,5 @@
 #include "reach/features/switcher.h"
+#include "reach/features/common/presentation.h"
 
 #include "switcher_common.h"
 
@@ -22,18 +23,23 @@ static float reach_switcher_scale(float value, float dpi_scale)
 
 reach_rect_f32 reach_switcher_bounds_for_count(reach_rect_f32 monitor_bounds, size_t visible_count)
 {
-    return reach_switcher_bounds_for_count_scaled(monitor_bounds, visible_count, 1.0f);
+    return reach_switcher_bounds_for_count_scaled(
+        monitor_bounds, visible_count, 1.0f,
+        reach_theme_border_thickness(reach_theme_default(), 1.0f));
 }
 
 reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bounds,
-                                                      size_t visible_count, float dpi_scale)
+                                                      size_t visible_count, float dpi_scale,
+                                                      float border_thickness)
 {
     float padding = reach_switcher_scale(24.0f, dpi_scale);
     float item_size = reach_switcher_scale(112.0f, dpi_scale);
     float gap = reach_switcher_scale(14.0f, dpi_scale);
     reach_rect_f32 bounds = {};
     size_t count = visible_count > 0 ? visible_count : 1;
-    bounds.width = padding * 2.0f + (float)count * item_size + (float)(count - 1) * gap;
+    border_thickness = border_thickness > 0.0f ? border_thickness : 0.0f;
+    bounds.width = border_thickness * 2.0f + padding * 2.0f + (float)count * item_size +
+                   (float)(count - 1) * gap;
     float max_width = monitor_bounds.width - reach_switcher_scale(48.0f, dpi_scale);
     if (bounds.width > max_width)
     {
@@ -44,7 +50,7 @@ reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bou
     {
         bounds.width = monitor_bounds.width < min_width ? monitor_bounds.width : min_width;
     }
-    bounds.height = reach_switcher_scale(184.0f, dpi_scale);
+    bounds.height = reach_switcher_scale(184.0f, dpi_scale) + border_thickness * 2.0f;
     bounds.x = monitor_bounds.x + (monitor_bounds.width - bounds.width) * 0.5f;
     bounds.y = monitor_bounds.y + (monitor_bounds.height - bounds.height) * 0.5f;
     return bounds;
@@ -100,6 +106,7 @@ struct reach_switcher
 {
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_SWITCHER_ANIMATION_COUNT];
+    reach_feature_transition surface_transition;
     reach_switcher_state state;
     reach_icon_service *icons;
     reach_window_tracking *windows;
@@ -156,7 +163,18 @@ static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
                                         reach_feature_tick_result *out)
 {
     reach_switcher *switcher = static_cast<reach_switcher *>(capsule);
+    if (out != nullptr)
+    {
+        *out = {};
+    }
+    int32_t transition_changed =
+        reach_feature_transition_tick(&switcher->surface_transition, delta_seconds);
     reach_switcher_tick(switcher, delta_seconds);
+    if (out != nullptr && transition_changed)
+    {
+        out->redraw = 1;
+        out->request_update = reach_feature_transition_active(&switcher->surface_transition);
+    }
     if (out != nullptr && reach_switcher_width_animation_active(switcher))
     {
         out->redraw = 1;
@@ -168,14 +186,37 @@ static int32_t reach_switcher_capsule_is_open(const void *capsule)
     return reach_switcher_is_open(static_cast<const reach_switcher *>(capsule));
 }
 
-static void reach_switcher_capsule_force_close(void *capsule)
-{
-    reach_switcher_force_close(static_cast<reach_switcher *>(capsule));
-}
-
 static int32_t reach_switcher_capsule_needs_frame(const void *capsule)
 {
-    return reach_switcher_width_animation_active(static_cast<const reach_switcher *>(capsule));
+    const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
+    return switcher != nullptr &&
+           (reach_feature_transition_active(&switcher->surface_transition) ||
+            reach_switcher_width_animation_active(switcher));
+}
+
+static int32_t reach_switcher_capsule_presentation_visible(const void *capsule)
+{
+    const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
+    return switcher != nullptr &&
+           reach_feature_transition_visible(&switcher->surface_transition);
+}
+
+static void reach_switcher_capsule_surface_geometry(const void *capsule,
+                                                    reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
+    {
+        return;
+    }
+    *out = {};
+    const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
+    if (switcher == nullptr)
+    {
+        return;
+    }
+    out->visible_bounds = switcher->state.bounds;
+    out->envelope_bounds = switcher->state.bounds;
+    reach_feature_transition_presentation(&switcher->surface_transition, out);
 }
 
 static reach_switcher_action
@@ -212,16 +253,108 @@ const reach_ui_event_type *reach_switcher_routed_events(size_t *out_count)
     return events;
 }
 
+static void reach_switcher_apply_action(reach_switcher *switcher, reach_switcher_action action,
+                                        reach_capsule_event_result *out)
+{
+    if (switcher != nullptr && action.type == REACH_SWITCHER_ACTION_OPENED)
+    {
+        (void)reach_feature_transition_set_open(&switcher->surface_transition, 1);
+    }
+    else if (switcher != nullptr &&
+             (action.type == REACH_SWITCHER_ACTION_CLOSED ||
+              action.type == REACH_SWITCHER_ACTION_COMMITTED))
+    {
+        (void)reach_feature_transition_set_open(&switcher->surface_transition, 0);
+    }
+    switch (action.type)
+    {
+    case REACH_SWITCHER_ACTION_OPENED:
+    case REACH_SWITCHER_ACTION_CLOSED:
+        out->handled = 1;
+        out->redraw = 1;
+        out->request_update = 1;
+        break;
+    case REACH_SWITCHER_ACTION_CHANGED:
+        out->handled = 1;
+        out->redraw = 1;
+        out->request_update = 1;
+        break;
+    case REACH_SWITCHER_ACTION_COMMITTED:
+        out->handled = 1;
+        out->redraw = 1;
+        out->request_update = 1;
+        out->action.kind = REACH_FEATURE_ACTION_ACTIVATE_WINDOW;
+        out->action.window = action.window;
+        break;
+    case REACH_SWITCHER_ACTION_NONE:
+    default:
+        break;
+    }
+}
+
+static void reach_switcher_capsule_on_game_mode(void *capsule, int32_t enabled)
+{
+    if (enabled)
+    {
+        reach_switcher_force_close(static_cast<reach_switcher *>(capsule));
+    }
+}
+
+static void reach_switcher_capsule_handle_event(void *capsule, const reach_ui_event *event,
+                                                reach_capsule_event_result *out)
+{
+    reach_switcher *switcher = static_cast<reach_switcher *>(capsule);
+    if (switcher == nullptr || event == nullptr || out == nullptr)
+    {
+        return;
+    }
+    reach_switcher_apply_action(switcher, reach_switcher_handle_event(switcher, event), out);
+}
+
+int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open)
+{
+    if (switcher == nullptr || open || !reach_switcher_is_open(switcher))
+    {
+        return 0;
+    }
+    reach_switcher_state *state = reach_switcher_state_mut(switcher);
+    state->open = 0;
+    state->selected_index = 0;
+    state->visible_start = 0;
+    (void)reach_feature_transition_set_open(&switcher->surface_transition, 0);
+    return 1;
+}
+
+void reach_switcher_notify_windows_changed(reach_switcher *switcher,
+                                           reach_feature_tick_result *out)
+{
+    if (switcher == nullptr || out == nullptr)
+    {
+        return;
+    }
+    reach_capsule_event_result result = {};
+    reach_switcher_apply_action(switcher, reach_switcher_sync_windows(switcher), &result);
+    out->redraw = result.redraw;
+    out->request_update = result.request_update;
+}
+
 const reach_feature_capsule_ops *reach_switcher_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
         nullptr,
         reach_switcher_capsule_tick,
         reach_switcher_capsule_is_open,
-        reach_switcher_capsule_force_close,
-        nullptr,
+        reach_switcher_capsule_on_game_mode,
         reach_switcher_capsule_needs_frame,
         nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        reach_switcher_capsule_surface_geometry,
+        nullptr,
+        reach_switcher_capsule_handle_event,
+        nullptr,
+        reach_switcher_capsule_presentation_visible,
     };
     return &ops;
 }
@@ -239,6 +372,8 @@ reach_result reach_switcher_create(reach_switcher **out_switcher)
     }
     reach_animation_manager_init(&switcher->animations, switcher->animation_tracks,
                                  REACH_SWITCHER_ANIMATION_COUNT);
+    reach_feature_transition_init(&switcher->surface_transition,
+                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
     *out_switcher = switcher;
     return REACH_OK;
 }
@@ -334,7 +469,7 @@ static void reach_switcher_append_ring_window(reach_switcher_state *state,
                                               const reach_switcher_window_context *ctx,
                                               uintptr_t window_id)
 {
-    if (state == nullptr || window_id == 0 || state->window_count >= REACH_MAX_PINNED_APPS ||
+    if (state == nullptr || window_id == 0 || state->window_count >= REACH_MAX_OPEN_WINDOWS ||
         reach_switcher_state_contains(state, window_id) ||
         !reach_switcher_ctx_open_index(ctx, window_id, nullptr))
     {
@@ -347,7 +482,7 @@ static void reach_switcher_rebuild_ring(reach_switcher_state *state,
                                         const reach_switcher_window_context *ctx)
 {
     state->window_count = 0;
-    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = 0; index < REACH_MAX_OPEN_WINDOWS; ++index)
     {
         state->windows[index] = 0;
     }
@@ -554,6 +689,30 @@ reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
     return animated;
 }
 
+int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_arrange_context *ctx)
+{
+    if (switcher == nullptr || ctx == nullptr || ctx->theme == nullptr)
+    {
+        return 0;
+    }
+
+    reach_feature_transition_configure(&switcher->surface_transition, ctx->theme, ctx->dpi_scale,
+                                       REACH_FEATURE_TRANSITION_FROM_BELOW);
+    float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
+    reach_rect_f32 target = reach_switcher_bounds_for_count_scaled(
+        ctx->monitor_bounds, reach_switcher_visible_count(switcher->state.window_count),
+        ctx->dpi_scale, border);
+    reach_rect_f32 bounds = reach_switcher_apply_width_animation(
+        switcher, ctx->transition_visible, switcher->state.open, ctx->bounds_valid,
+        ctx->last_bounds.width, target, nullptr);
+    int32_t changed = fabsf(bounds.x - switcher->state.bounds.x) >= 0.5f ||
+                      fabsf(bounds.y - switcher->state.bounds.y) >= 0.5f ||
+                      fabsf(bounds.width - switcher->state.bounds.width) >= 0.5f ||
+                      fabsf(bounds.height - switcher->state.bounds.height) >= 0.5f;
+    switcher->state.bounds = bounds;
+    return changed;
+}
+
 void reach_switcher_force_close(reach_switcher *switcher)
 {
     if (switcher == nullptr)
@@ -565,4 +724,5 @@ void reach_switcher_force_close(reach_switcher *switcher)
     state->open = 0;
     state->selected_index = 0;
     state->visible_start = 0;
+    reach_feature_transition_reset(&switcher->surface_transition);
 }

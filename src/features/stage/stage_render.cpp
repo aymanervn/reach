@@ -1,0 +1,293 @@
+#include "reach/features/stage.h"
+
+#include "stage_common.h"
+
+#include "reach/core/typography.h"
+
+static reach_color reach_stage_rgba(float r, float g, float b, float a)
+{
+    reach_color color = {};
+    color.r = r;
+    color.g = g;
+    color.b = b;
+    color.a = a;
+    return color;
+}
+
+static float reach_stage_scaled(const reach_stage_render_context *ctx, float value)
+{
+    float scale = ctx != nullptr && ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    return value * scale;
+}
+
+static float reach_stage_header_radius(const reach_stage_render_context *ctx,
+                                       reach_rect_f32 header)
+{
+    float radius = reach_stage_scaled(ctx, ctx->theme->radius_small);
+    float limit = header.height * 0.5f;
+    return radius < limit ? radius : limit;
+}
+
+static reach_result reach_stage_push_tile_background(const reach_stage_render_context *ctx,
+                                                     reach_render_command_buffer *commands,
+                                                     reach_rect_f32 item, float header_radius,
+                                                     float width, float hover, float alpha)
+{
+    if (ctx == nullptr || commands == nullptr || width <= 0.0f)
+    {
+        return REACH_OK;
+    }
+
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = {item.x - width, item.y - width, item.width + width * 2.0f,
+                  item.height + width * 2.0f};
+    shape.radius = header_radius + width;
+    shape.corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_TOP_RIGHT;
+
+    reach_color background = ctx->theme->stage_backdrop;
+    background.a = 1.0f;
+    reach_color border = ctx->theme->bar_border;
+    border.a = 1.0f;
+    reach_color highlight = ctx->theme->stage_tile_highlight;
+    float highlight_opacity = highlight.a * hover;
+    highlight.a = 1.0f;
+    border = reach_theme_color_mix(border, highlight, highlight_opacity);
+    border = reach_theme_color_mix(background, border, alpha);
+    return reach_render_push_bordered_background(commands, &shape, background, border, width,
+                                                 nullptr, ctx->dpi_scale);
+}
+
+static reach_result reach_stage_push_tile_placeholder(const reach_stage_render_context *ctx,
+                                                      const reach_stage_tile *tile,
+                                                      reach_rect_f32 rect, float alpha,
+                                                      reach_render_command_buffer *out_commands)
+{
+    reach_render_command plate = {};
+    plate.type = REACH_RENDER_COMMAND_RECT;
+    plate.rect = rect;
+    plate.color = reach_theme_color_alpha(ctx->theme->stage_tile_placeholder, alpha);
+    reach_result result = reach_render_command_buffer_push(out_commands, &plate);
+    if (result != REACH_OK || tile->icon_id == 0)
+    {
+        return result;
+    }
+
+    float icon_size = reach_stage_scaled(ctx, 48.0f);
+    if (icon_size > rect.width * 0.5f)
+    {
+        icon_size = rect.width * 0.5f;
+    }
+    if (icon_size > rect.height * 0.5f)
+    {
+        icon_size = rect.height * 0.5f;
+    }
+
+    reach_render_command icon = {};
+    icon.type = REACH_RENDER_COMMAND_ICON;
+    icon.icon_id = tile->icon_id;
+    icon.rect.x = rect.x + (rect.width - icon_size) * 0.5f;
+    icon.rect.y = rect.y + (rect.height - icon_size) * 0.5f;
+    icon.rect.width = icon_size;
+    icon.rect.height = icon_size;
+    icon.color = reach_stage_rgba(1.0f, 1.0f, 1.0f, alpha);
+    return reach_render_command_buffer_push(out_commands, &icon);
+}
+
+static reach_result reach_stage_push_close_button(reach_stage *stage,
+                                                  const reach_stage_render_context *ctx,
+                                                  size_t index, float alpha,
+                                                  reach_render_command_buffer *out_commands)
+{
+    const reach_stage_state *state = &stage->state;
+    const reach_stage_tile *tile = &state->tiles[index];
+    if (tile->desktop || tile->departing)
+    {
+        return REACH_OK;
+    }
+
+    reach_rect_f32 button = reach_stage_tile_close_button_rect(stage, index);
+    if (button.width <= 0.0f || button.height <= 0.0f)
+    {
+        return REACH_OK;
+    }
+
+    button.x -= ctx->bounds.x;
+    button.y -= ctx->bounds.y;
+
+    float hover = state->close_hover_index == index ? state->close_hover : 0.0f;
+    const reach_theme *theme = ctx->theme;
+    reach_render_command backing = {};
+    backing.type = REACH_RENDER_COMMAND_RECT;
+    backing.rect = button;
+    backing.radius = button.width * 0.5f;
+    backing.color = reach_theme_color_mix(theme->stage_close_background,
+                                          theme->stage_close_hover_background, hover);
+    backing.color.a *= alpha;
+    reach_result result = reach_render_command_buffer_push(out_commands, &backing);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    float inset = button.width * 0.24f;
+    reach_render_command glyph = {};
+    glyph.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    glyph.icon_id = REACH_VECTOR_ICON_CLOSE;
+    glyph.rect.x = button.x + inset;
+    glyph.rect.y = button.y + inset;
+    glyph.rect.width = button.width - inset * 2.0f;
+    glyph.rect.height = button.height - inset * 2.0f;
+    glyph.color =
+        reach_theme_color_mix(theme->stage_close_glyph, theme->stage_close_hover_glyph, hover);
+    glyph.color.a *= alpha;
+    return reach_render_command_buffer_push(out_commands, &glyph);
+}
+
+static reach_result reach_stage_push_tile_header(reach_stage *stage,
+                                                 const reach_stage_render_context *ctx,
+                                                 size_t index, float alpha,
+                                                 reach_render_command_buffer *out_commands)
+{
+    const reach_stage_tile *tile = &stage->state.tiles[index];
+    reach_rect_f32 header = tile->current_bar;
+    if (header.width <= 0.0f || header.height <= 0.0f)
+    {
+        return REACH_OK;
+    }
+
+    header.x -= ctx->bounds.x;
+    header.y -= ctx->bounds.y;
+
+    reach_render_command background = {};
+    background.type = REACH_RENDER_COMMAND_RECT;
+    background.rect = header;
+    background.radius = reach_stage_header_radius(ctx, header);
+    background.corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_TOP_RIGHT;
+    background.color = ctx->theme->stage_tile_header_background;
+    background.color.a *= alpha;
+    reach_result result = reach_render_command_buffer_push(out_commands, &background);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    reach_rect_f32 button = reach_stage_tile_close_button_rect(stage, index);
+    float padding = reach_stage_scaled(ctx, 8.0f);
+    float trailing = button.width > 0.0f ? button.width + padding : padding;
+    float label_width = header.width - padding - trailing;
+    if (tile->label[0] != 0 && label_width > 0.0f)
+    {
+        reach_render_command label = {};
+        label.type = REACH_RENDER_COMMAND_TEXT;
+        label.rect.x = header.x + padding;
+        label.rect.y = header.y;
+        label.rect.width = label_width;
+        label.rect.height = header.height;
+        label.text_size = reach_stage_scaled(ctx, REACH_TEXT_SIZE_MEDIUM);
+        label.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+        label.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
+        label.text_ellipsis = 1;
+        label.color = ctx->theme->stage_tile_label;
+        label.color.a *= alpha;
+        label.text_color = label.color;
+        (void)reach_copy_utf16(label.text, 260, tile->label);
+        result = reach_render_command_buffer_push(out_commands, &label);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
+
+    return reach_stage_push_close_button(stage, ctx, index, alpha, out_commands);
+}
+
+reach_result reach_stage_append_render_commands(reach_stage *stage,
+                                                const reach_stage_render_context *ctx,
+                                                reach_render_command_buffer *out_commands)
+{
+    REACH_ASSERT(out_commands != nullptr);
+    if (stage == nullptr || ctx == nullptr || out_commands == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_render_command_buffer_clear(out_commands);
+
+    const reach_stage_state *state = &stage->state;
+    if (!state->open || state->tile_count == 0)
+    {
+        return REACH_OK;
+    }
+
+    float eased = state->progress;
+
+    reach_render_command backdrop = {};
+    backdrop.type = REACH_RENDER_COMMAND_RECT;
+    backdrop.rect.x = 0.0f;
+    backdrop.rect.y = 0.0f;
+    backdrop.rect.width = ctx->bounds.width;
+    backdrop.rect.height = ctx->bounds.height;
+    backdrop.color = ctx->theme->stage_backdrop;
+    backdrop.color.a *= state->backdrop_opacity;
+    reach_result result = reach_render_command_buffer_push(out_commands, &backdrop);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
+    for (size_t index = 0; index < state->tile_count; ++index)
+    {
+        const reach_stage_tile *tile = &state->tiles[index];
+        if (state->closing && state->has_selection && index != state->selected_index)
+        {
+            continue;
+        }
+
+        reach_rect_f32 rect = tile->current_rect;
+        if (rect.width <= 0.0f || rect.height <= 0.0f)
+        {
+            continue;
+        }
+
+        float alpha = eased * tile->presence;
+        if (alpha <= 0.0f)
+        {
+            continue;
+        }
+
+        rect.x -= ctx->bounds.x;
+        rect.y -= ctx->bounds.y;
+
+        reach_rect_f32 item = rect;
+        item.y -= tile->current_bar.height;
+        item.height += tile->current_bar.height;
+        float hover = state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
+        result = reach_stage_push_tile_background(
+            ctx, out_commands, item, reach_stage_header_radius(ctx, tile->current_bar), border,
+            hover, alpha);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+
+        result = reach_stage_push_tile_header(stage, ctx, index, alpha, out_commands);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+
+        if ((tile->minimized || tile->departing) && !tile->desktop)
+        {
+            result = reach_stage_push_tile_placeholder(ctx, tile, rect, alpha, out_commands);
+            if (result != REACH_OK)
+            {
+                return result;
+            }
+        }
+
+    }
+
+    return REACH_OK;
+}

@@ -92,6 +92,7 @@ enum reach_service_hotkey_key : uint32_t
     REACH_SERVICE_HOTKEY_ARROW_RIGHT = 10,
     REACH_SERVICE_HOTKEY_ARROW_UP = 11,
     REACH_SERVICE_HOTKEY_ARROW_DOWN = 12,
+    REACH_SERVICE_HOTKEY_V = 13,
 };
 
 enum reach_service_hotkey_action : uint32_t
@@ -114,6 +115,7 @@ static const reach_service_win_chord REACH_SERVICE_WIN_CHORDS[] = {
     {0x27, REACH_SERVICE_HOTKEY_ARROW_RIGHT, REACH_UI_EVENT_SNAP_RIGHT},
     {0x26, REACH_SERVICE_HOTKEY_ARROW_UP, REACH_UI_EVENT_SNAP_TOP},
     {0x28, REACH_SERVICE_HOTKEY_ARROW_DOWN, REACH_UI_EVENT_SNAP_BOTTOM},
+    {0x56, REACH_SERVICE_HOTKEY_V, REACH_UI_EVENT_CLIPBOARD_TOGGLE},
 };
 
 static const size_t REACH_SERVICE_WIN_CHORD_COUNT =
@@ -148,10 +150,13 @@ struct reach_service_shared_state
     uint64_t window_sequence;
     uint64_t hotkey_sequence;
     uint64_t game_mode_sequence;
+    uint64_t manipulation_sequence;
+    uint64_t manipulation_window;
     uint32_t window_count;
     uint32_t hotkey_queue_start;
     uint32_t hotkey_queue_count;
     int32_t game_mode_active;
+    int32_t manipulation_active;
     uint64_t first_hotkey_event_number;
     uint64_t last_hotkey_event_number;
     reach_service_window_snapshot windows[REACH_SERVICE_MAX_WINDOWS];

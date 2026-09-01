@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/features/common/level_presentation.h"
+#include "reach/features/common/pressable.h"
+
 typedef struct reach_quick_settings reach_quick_settings;
 typedef struct reach_quick_settings_state reach_quick_settings_state;
 
@@ -15,12 +18,22 @@ typedef enum reach_quick_settings_hit_type
     REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER,
     REACH_QUICK_SETTINGS_HIT_NETWORK_TILE,
     REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE,
-    REACH_QUICK_SETTINGS_HIT_BATTERY_SAVER_TILE,
     REACH_QUICK_SETTINGS_HIT_PROJECT_TILE,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
     REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON
 } reach_quick_settings_hit_type;
+
+typedef enum reach_quick_settings_press_target_kind
+{
+    REACH_QUICK_SETTINGS_PRESS_TARGET_NONE = 0,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_NETWORK_TILE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_TILE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_PROJECT_TILE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON
+} reach_quick_settings_press_target_kind;
 #ifdef __cplusplus
 extern "C"
 {
@@ -32,6 +45,8 @@ extern "C"
     void reach_quick_settings_start_height_animation(reach_quick_settings *quick_settings,
                                                      float from_height, float to_height);
     float reach_quick_settings_height_animation_value(const reach_quick_settings *quick_settings);
+    uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings);
+    float reach_quick_settings_press_feedback_value(reach_quick_settings *quick_settings);
 #ifdef __cplusplus
 }
 #endif
@@ -41,11 +56,9 @@ typedef enum reach_quick_settings_action_type
     REACH_QUICK_SETTINGS_ACTION_NONE = 0,
     REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME,
     REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME,
-    REACH_QUICK_SETTINGS_ACTION_SET_SESSION_MUTED,
     REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS,
     REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH,
-    REACH_QUICK_SETTINGS_ACTION_TOGGLE_BATTERY_SAVER,
     REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES,
     REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE,
@@ -66,7 +79,6 @@ typedef struct reach_quick_settings_action
 {
     reach_quick_settings_action_type type;
     float volume_level;
-    int32_t muted;
     size_t session_index;
     size_t output_device_index;
     uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
@@ -79,48 +91,24 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
 reach_quick_settings_action
 reach_quick_settings_action_for_hit(reach_quick_settings_hit_result hit);
 reach_quick_settings_action
-reach_quick_settings_begin_drag_if_hit(reach_quick_settings *quick_settings, int32_t x, int32_t y);
+reach_quick_settings_begin_slider_gesture_if_hit(reach_quick_settings *quick_settings, int32_t x,
+                                                 int32_t y);
 reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings *quick_settings,
                                                            int32_t x, int32_t y);
 void reach_quick_settings_end_drag(reach_quick_settings *quick_settings);
 int32_t reach_quick_settings_drag_active(const reach_quick_settings *quick_settings);
+uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result hit);
+reach_quick_settings_press_target_kind reach_quick_settings_pressable_target_kind(uint64_t target);
+size_t reach_quick_settings_pressable_target_index(uint64_t target);
 
 static inline float reach_quick_settings_clamp01(float value)
 {
-    if (value < 0.0f)
-    {
-        return 0.0f;
-    }
-    if (value > 1.0f)
-    {
-        return 1.0f;
-    }
-    return value;
+    return reach_level_clamp01(value);
 }
 
 static inline float reach_quick_settings_clamp_min0(float value)
 {
     return value < 0.0f ? 0.0f : value;
-}
-
-static inline void reach_quick_settings_copy_utf16(uint16_t *dst, size_t dst_count,
-                                                   const uint16_t *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
 }
 
 #endif

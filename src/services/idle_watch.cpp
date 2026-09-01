@@ -38,9 +38,8 @@ uint32_t reach_idle_watch_evaluate(reach_idle_watch_state *state,
     }
     state->last_sample_milliseconds = now;
 
-    uint64_t since_baseline = now >= state->baseline_milliseconds
-                                  ? now - state->baseline_milliseconds
-                                  : 0;
+    uint64_t since_baseline =
+        now >= state->baseline_milliseconds ? now - state->baseline_milliseconds : 0;
     uint64_t idle = sample->input_idle_milliseconds < since_baseline
                         ? sample->input_idle_milliseconds
                         : since_baseline;
@@ -117,6 +116,10 @@ static void reach_idle_watch_fire(reach_idle_watch *service, uint32_t mask)
             (void)ops->restart(session);
         }
         return;
+    }
+    if ((mask & (1u << REACH_IDLE_WATCH_ACTION_SCREEN_OFF)) && ops->screen_off != nullptr)
+    {
+        (void)ops->screen_off(session);
     }
     if ((mask & (1u << REACH_IDLE_WATCH_ACTION_LOCK)) && ops->lock != nullptr)
     {

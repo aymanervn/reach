@@ -74,6 +74,7 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
 
         backend->target_width = width;
         backend->target_height = height;
+        backend->backdrop_content_rect = {};
     }
 
     target = reach_d2d_target(backend);
@@ -103,6 +104,8 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
     if (hr == D2DERR_RECREATE_TARGET)
     {
         reach_d2d_clear_icon_cache(backend);
+        reach_d2d_clear_shadow_cache(backend);
+        reach_d2d_release_shadow_bake_context(backend);
 
         if (backend->target != nullptr)
         {

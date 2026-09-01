@@ -294,7 +294,11 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
     HICON hicon = nullptr;
     const wchar_t *extension = PathFindExtensionW(icon_path);
     int32_t is_exe = lstrcmpiW(extension, L".exe") == 0;
-    if (is_exe)
+    // A "file,index" reference names one icon resource inside a container such as a DLL. The
+    // shell item, system image list and file info paths all ignore the index and would return
+    // the container file's own icon instead, so an indexed reference must be extracted first.
+    int32_t indexed = resource_ref || is_exe;
+    if (indexed)
     {
         hicon = reach_icon_from_extract_icon(icon_path, request->size_px, icon_index);
         icon_id = reach_windows_icon_id_from_hicon(hicon);
@@ -320,7 +324,7 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
         hicon = reach_icon_from_shell_file_info(icon_path, request->size_px);
         icon_id = reach_windows_icon_id_from_hicon(hicon);
     }
-    if (icon_id == 0 && !is_exe)
+    if (icon_id == 0 && !indexed)
     {
         hicon = reach_icon_from_extract_icon(icon_path, request->size_px, icon_index);
         icon_id = reach_windows_icon_id_from_hicon(hicon);

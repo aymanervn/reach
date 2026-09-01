@@ -55,6 +55,8 @@ extern "C"
         size_t count;
     } reach_audio_output_device_list;
 
+    typedef void (*reach_audio_volume_change_callback)(void *user);
+
     typedef struct reach_audio_volume_port
     {
         void *userdata;
@@ -77,6 +79,11 @@ extern "C"
                                           int32_t muted);
 
         reach_result (*set_default_output_device)(void *userdata, const uint16_t *device_id);
+
+        reach_result (*start_watching)(void *userdata, reach_audio_volume_change_callback callback,
+                                       void *user);
+
+        void (*stop_watching)(void *userdata);
 
         void (*destroy)(void *userdata);
     } reach_audio_volume_port;

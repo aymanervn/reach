@@ -558,8 +558,7 @@ static void reach_windows_startup_enumerate_run_key(reach_startup_app_list *list
             command = expanded;
         }
 
-        reach_startup_app_entry *entry =
-            reach_windows_startup_add_entry(list, source, value_name);
+        reach_startup_app_entry *entry = reach_windows_startup_add_entry(list, source, value_name);
         if (entry == nullptr)
         {
             break;
@@ -608,10 +607,9 @@ static LONG reach_windows_startup_write_approved(reach_startup_app_source source
                                                  const wchar_t *value_name, int32_t enabled)
 {
     HKEY key = nullptr;
-    LONG open_result = RegCreateKeyExW(reach_windows_startup_source_root(source),
-                                       reach_windows_startup_approved_path(source), 0, nullptr,
-                                       REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, nullptr, &key,
-                                       nullptr);
+    LONG open_result = RegCreateKeyExW(
+        reach_windows_startup_source_root(source), reach_windows_startup_approved_path(source), 0,
+        nullptr, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, nullptr, &key, nullptr);
     if (open_result != ERROR_SUCCESS)
     {
         return open_result;
@@ -664,11 +662,10 @@ static reach_result reach_windows_startup_set_enabled_elevated(reach_startup_app
     }
 
     wchar_t parameters[1024] = {};
-    if (FAILED(StringCchPrintfW(parameters, _countof(parameters),
-                                L"startup-set-enabled %ls %d \"%ls\"",
-                                reach_windows_startup_source_is_run(source) ? L"machine-run"
-                                                                            : L"machine-folder",
-                                enabled ? 1 : 0, value_name)))
+    if (FAILED(StringCchPrintfW(
+            parameters, _countof(parameters), L"startup-set-enabled %ls %d \"%ls\"",
+            reach_windows_startup_source_is_run(source) ? L"machine-run" : L"machine-folder",
+            enabled ? 1 : 0, value_name)))
     {
         return REACH_ERROR;
     }

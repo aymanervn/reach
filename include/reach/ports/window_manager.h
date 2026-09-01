@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "reach/core/geometry.h"
 #include "reach/core/pinned_app.h"
 #include "reach/core/window_id.h"
 #include "reach/support/layout.h"
@@ -27,6 +28,12 @@ extern "C"
         int32_t minimized;
     } reach_window_snapshot;
 
+    typedef struct reach_window_move
+    {
+        reach_window_id window;
+        reach_point_f32 position;
+    } reach_window_move;
+
     typedef struct reach_window_manager_ops
     {
         reach_result (*start)(reach_window_manager *manager);
@@ -35,15 +42,17 @@ extern "C"
         reach_result (*snap)(reach_window_manager *manager, reach_window_id window_id,
                              reach_split_mode mode);
 
-        int32_t (*any_window_maximized_on_primary)(const reach_window_manager *manager);
-
-        int32_t (*window_is_snapped_on_primary)(const reach_window_manager *manager,
-                                                reach_window_id window_id);
         int32_t (*game_mode_active)(const reach_window_manager *manager);
         int32_t (*needs_refresh)(const reach_window_manager *manager);
         size_t (*window_count)(const reach_window_manager *manager);
         reach_result (*window_at)(const reach_window_manager *manager, size_t index,
                                   reach_window_snapshot *out_window);
+        reach_result (*frame_bounds)(const reach_window_manager *manager, reach_window_id window_id,
+                                     reach_rect_f32 *out_bounds);
+        reach_result (*outer_bounds)(const reach_window_manager *manager, reach_window_id window_id,
+                                     reach_rect_f32 *out_bounds);
+        reach_result (*move_windows)(reach_window_manager *manager,
+                                     const reach_window_move *windows, size_t count);
         reach_result (*pin_app_for_window)(reach_window_manager *manager, reach_window_id window_id,
                                            const reach_window_snapshot *snapshot,
                                            reach_pinned_app_model *out_app);

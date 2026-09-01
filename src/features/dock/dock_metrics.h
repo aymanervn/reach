@@ -13,24 +13,7 @@ struct reach_dock_metrics
     float running_indicator_unfocused_alpha;
 
     float click_feedback_min_opacity;
-    float system_icon_box_scale;
-
-    float clock_time_top_offset;
-    float clock_time_height_ratio;
-    float clock_time_text_size;
-    int32_t clock_time_text_weight;
-    float clock_date_top_ratio;
-    float clock_date_height_ratio;
-    float clock_date_text_size;
-    int32_t clock_date_text_weight;
-
     float reorder_neighbor_threshold_ratio;
-
-    float power_ring_stroke_width;
-    float power_ring_inset;
-    float power_ring_track_alpha;
-    float power_percent_text_size;
-    int32_t power_percent_text_weight;
 };
 
 static constexpr reach_dock_metrics reach_dock_make_metrics()
@@ -45,24 +28,7 @@ static constexpr reach_dock_metrics reach_dock_make_metrics()
     metrics.running_indicator_unfocused_alpha = 0.5f;
 
     metrics.click_feedback_min_opacity = 0.001f;
-    metrics.system_icon_box_scale = 0.50f;
-
-    metrics.clock_time_top_offset = 2.0f;
-    metrics.clock_time_height_ratio = 0.48f;
-    metrics.clock_time_text_size = 17.0f;
-    metrics.clock_time_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
-    metrics.clock_date_top_ratio = 0.44f;
-    metrics.clock_date_height_ratio = 0.56f;
-    metrics.clock_date_text_size = 12.0f;
-    metrics.clock_date_text_weight = REACH_TEXT_WEIGHT_NORMAL;
-
     metrics.reorder_neighbor_threshold_ratio = 0.25f;
-
-    metrics.power_ring_stroke_width = 2.25f;
-    metrics.power_ring_inset = 0.5f;
-    metrics.power_ring_track_alpha = 0.16f;
-    metrics.power_percent_text_size = 13.0f;
-    metrics.power_percent_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
 
     return metrics;
 }

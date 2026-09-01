@@ -2,12 +2,13 @@
 
 #include "dock_common_state.h"
 #include "dock_interaction.h"
-#include "dock_now_playing.h"
 
 #include <math.h>
 #include <new>
 #include <stdio.h>
 #include <time.h>
+
+static const reach_bar_edge REACH_DOCK_EDGE = REACH_BAR_EDGE_BOTTOM;
 
 enum reach_dock_slot_lifecycle
 {
@@ -20,12 +21,12 @@ enum reach_dock_slot_lifecycle
 struct reach_dock_slot
 {
     int32_t lifecycle;
-    reach_dock_order_key key;
-    float target_width;
+    uint32_t key;
 };
 
 static const double REACH_DOCK_SLOT_ANIMATION_SECONDS = 0.25;
 static const float REACH_DOCK_SLOT_REVEAL_THRESHOLD = 0.7f;
+static const float REACH_DOCK_OUTER_PADDING_SCALE = 1.15f;
 
 struct reach_dock;
 static void reach_dock_settle_slots(reach_dock *dock);
@@ -39,38 +40,45 @@ struct reach_dock
     reach_dock_state state;
 
     reach_dock_slot slots[REACH_DOCK_SLOT_CAPACITY];
-    uint8_t slot_order[REACH_DOCK_SLOT_CAPACITY];
+    uint16_t slot_order[REACH_DOCK_SLOT_CAPACITY];
     size_t slot_order_count;
     int32_t slots_synced;
 
-    int32_t np_content_armed;
-    double np_content_delay;
     reach_icon_service *icons;
     reach_window_tracking *windows;
-    reach_now_playing_service *now_playing;
-    reach_dock_now_playing *now_playing_subfeature;
+    reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
+    size_t pinned_app_count;
+    reach_menu_request action_request;
+    reach_menu_request hover_request;
+    reach_dock_model metrics;
+    uint32_t next_app_key;
+    reach_dock_routes routes;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
     int32_t pointer_layout_valid;
-    const reach_pinned_app_model *pointer_pinned_apps;
-    size_t pointer_pinned_app_count;
+    reach_rect_f32 coverage_shown_bounds;
+    reach_rect_f32 coverage_monitor_bounds;
+    float coverage_shadow_clearance;
+    int32_t coverage_valid;
+    int32_t coverage_trespassed;
 };
 
+void reach_dock_set_routes(reach_dock *dock, const reach_dock_routes *routes)
+{
+    if (dock != nullptr)
+    {
+        dock->routes = routes != nullptr ? *routes : reach_dock_routes{};
+    }
+}
+
 void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
-                                reach_window_tracking *windows,
-                                reach_now_playing_service *now_playing)
+                                reach_window_tracking *windows)
 {
     if (dock != nullptr)
     {
         dock->icons = icons;
         dock->windows = windows;
-        dock->now_playing = now_playing;
     }
-}
-
-reach_dock_now_playing *reach_dock_now_playing_subfeature(reach_dock *dock)
-{
-    return dock != nullptr ? dock->now_playing_subfeature : nullptr;
 }
 
 reach_icon_service *reach_dock_icons(reach_dock *dock)
@@ -93,25 +101,7 @@ void reach_dock_touch_icons(reach_dock *dock, int32_t icon_size_px)
     for (size_t index = 0; index < dock->state.model.item_count; ++index)
     {
         const reach_dock_item_model *item = &dock->state.model.items[index];
-        const uint16_t *icon_path = nullptr;
-        if (item->pinned)
-        {
-            if (dock->pointer_pinned_apps != nullptr &&
-                item->pinned_index < dock->pointer_pinned_app_count)
-            {
-                const reach_pinned_app_model *app = &dock->pointer_pinned_apps[item->pinned_index];
-                icon_path = app->icon_ref[0] != 0 ? app->icon_ref : app->path;
-            }
-        }
-        else
-        {
-            const reach_window_snapshot *window =
-                reach_window_tracking_window_by_id(dock->windows, item->window);
-            if (window != nullptr)
-            {
-                icon_path = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
-            }
-        }
+        const uint16_t *icon_path = item->icon_ref;
         if (icon_path != nullptr && icon_path[0] != 0)
         {
             reach_icon_service_touch(dock->icons, icon_path, icon_size_px);
@@ -129,6 +119,22 @@ reach_dock_state *reach_dock_state_mut(reach_dock *animations)
     return animations != nullptr ? &animations->state : nullptr;
 }
 
+static reach_pressable_feedback_style reach_dock_pressable_feedback(reach_dock *dock)
+{
+    reach_pressable_feedback_style feedback = {};
+    if (dock != nullptr)
+    {
+        feedback.animations = &dock->manager;
+        feedback.track = REACH_DOCK_ANIM_FEEDBACK_OPACITY;
+        feedback.pressed_value = 0.50f;
+        feedback.press_seconds = 0.055;
+        feedback.release_seconds = 0.055;
+        feedback.press_easing = REACH_EASING_EASE_IN_OUT;
+        feedback.release_easing = REACH_EASING_EASE_IN_OUT;
+    }
+    return feedback;
+}
+
 reach_result reach_dock_create(reach_dock **out_animations)
 {
     if (out_animations == nullptr)
@@ -140,28 +146,18 @@ reach_result reach_dock_create(reach_dock **out_animations)
     {
         return REACH_ERROR;
     }
+    reach_dock_model_defaults(&animations->metrics);
     reach_animation_manager_init(&animations->manager, animations->tracks, REACH_DOCK_ANIM_COUNT);
-    if (reach_dock_now_playing_create(&animations->now_playing_subfeature) != REACH_OK)
-    {
-        delete animations;
-        return REACH_ERROR;
-    }
-    animations->state.drag.source_index = REACH_MAX_PINNED_APPS;
-    animations->state.drag.target_index = REACH_MAX_PINNED_APPS;
-    animations->state.pressed_index = REACH_MAX_PINNED_APPS;
-    animations->state.pressed_control = REACH_DOCK_HIT_NONE;
-    animations->state.hovered_item = REACH_MAX_PINNED_APPS;
-    animations->state.feedback_index = REACH_DOCK_FEEDBACK_NONE;
+    reach_draggable_init(&animations->state.drag.gesture);
+    animations->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
+    animations->state.hovered_item = REACH_MAX_DOCK_ITEMS;
+    reach_pressable_init(&animations->state.pressable);
     *out_animations = animations;
     return REACH_OK;
 }
 
 void reach_dock_destroy(reach_dock *animations)
 {
-    if (animations != nullptr)
-    {
-        reach_dock_now_playing_destroy(animations->now_playing_subfeature);
-    }
     delete animations;
 }
 
@@ -179,29 +175,11 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
     reach_dock_state *state = &animations->state;
     reach_animation_manager *manager = &animations->manager;
 
-    reach_dock_now_playing_update_result now_playing = {};
-    reach_dock_now_playing_sync(animations->now_playing_subfeature, animations->now_playing,
-                                &now_playing);
-    if (now_playing.changed && out != nullptr)
-    {
-        out->redraw = 1;
-    }
-    if (now_playing.visibility_changed)
-    {
-        state->items_changed = 1;
-        if (out != nullptr)
-        {
-            out->relayout = 1;
-        }
-    }
-
     int32_t feedback_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
-    int32_t power_hover_was_active =
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_POWER_HOVER);
     int32_t drag_snap_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP);
-    int32_t item_was_active[REACH_MAX_PINNED_APPS] = {};
+    int32_t item_was_active[REACH_MAX_DOCK_ITEMS] = {};
     for (size_t index = 0; index < state->model.item_count; ++index)
     {
         item_was_active[index] =
@@ -209,8 +187,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
     }
 
     int32_t slots_were_animating = reach_dock_slots_animating(animations);
-    int32_t content_was_active =
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
 
     reach_animation_manager_tick(manager, delta_seconds);
 
@@ -221,20 +197,8 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
         redraw = 1;
     }
 
-    if (power_hover_was_active ||
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_POWER_HOVER))
-    {
-        redraw = 1;
-    }
-
-    if (feedback_was_active &&
-        !reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY) &&
-        !state->feedback_pressed && !state->feedback_sticky &&
-        reach_animation_manager_value(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY) <= 0.001f)
-    {
-        reach_animation_manager_set(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY, 0.0f);
-        state->feedback_index = REACH_DOCK_FEEDBACK_NONE;
-    }
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(animations);
+    reach_pressable_settle_feedback(&state->pressable, &feedback);
 
     for (size_t index = 0; index < state->model.item_count; ++index)
     {
@@ -253,8 +217,7 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     if (drag_snap_was_active && !reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
     {
-        state->drag.source_index = REACH_MAX_PINNED_APPS;
-        state->drag.target_index = REACH_MAX_PINNED_APPS;
+        state->drag.target_index = REACH_MAX_DOCK_ITEMS;
         state->drag.key = {};
     }
 
@@ -265,54 +228,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
         if (out != nullptr)
         {
             out->relayout = 1;
-        }
-    }
-
-    {
-        const reach_animation_track *np_track = &animations->tracks[REACH_DOCK_ANIM_SLOT_BASE];
-        const float np_target = animations->slots[0].target_width;
-        const int32_t content_active =
-            reach_animation_manager_active(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
-        const float content_value =
-            reach_animation_manager_value(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
-        if (np_target > 0.0f && !content_active && content_value < 1.0f)
-        {
-            if (np_track->active)
-            {
-                if (!animations->np_content_armed)
-                {
-                    animations->np_content_delay = reach_animation_track_time_to_value(
-                        np_track, np_target * REACH_DOCK_SLOT_REVEAL_THRESHOLD);
-                    animations->np_content_armed = 1;
-                }
-                else
-                {
-                    animations->np_content_delay -= delta_seconds;
-                }
-                if (animations->np_content_delay <= 0.0)
-                {
-                    double land_seconds = reach_animation_track_time_to_value(np_track, np_target);
-                    if (land_seconds < 0.05)
-                    {
-                        land_seconds = 0.05;
-                    }
-                    reach_animation_manager_start(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
-                                                  0.0f, 1.0f, land_seconds, REACH_EASING_EASE_OUT);
-                    animations->np_content_armed = 0;
-                }
-            }
-            else
-            {
-
-                animations->np_content_armed = 0;
-                reach_animation_manager_start(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT, 0.0f,
-                                              1.0f, 0.1, REACH_EASING_EASE_OUT);
-            }
-        }
-        if (content_was_active ||
-            reach_animation_manager_active(manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT))
-        {
-            redraw = 1;
         }
     }
 
@@ -340,11 +255,6 @@ int32_t reach_dock_take_items_changed(reach_dock *dock)
     return 1;
 }
 
-int32_t reach_dock_pointer_sequence_active(const reach_dock *dock)
-{
-    return dock != nullptr && dock->state.pointer_sequence_active;
-}
-
 reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
                                                        int32_t local_y)
 {
@@ -358,69 +268,20 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
     {
     case REACH_DOCK_HIT_ITEM:
         return REACH_DOCK_POINTER_REGION_ITEM;
-    case REACH_DOCK_HIT_TRAY_BUTTON:
-        return REACH_DOCK_POINTER_REGION_TRAY_BUTTON;
-    case REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON:
-        return REACH_DOCK_POINTER_REGION_QUICK_SETTINGS_BUTTON;
-    case REACH_DOCK_HIT_POWER_BUTTON:
-        return REACH_DOCK_POINTER_REGION_POWER_BUTTON;
+    case REACH_DOCK_HIT_TRIGGER:
+        return REACH_DOCK_POINTER_REGION_TRIGGER;
     case REACH_DOCK_HIT_NONE:
     default:
         return REACH_DOCK_POINTER_REGION_NONE;
     }
 }
 
-static int32_t reach_dock_begin_pointer_sequence(reach_dock *dock)
+static void reach_dock_bar_begin_session(void *capsule)
 {
-    if (dock == nullptr || dock->state.pointer_sequence_active)
-    {
-        return 0;
-    }
-    dock->state.pointer_sequence_active = 1;
-    return 1;
-}
-
-static int32_t reach_dock_end_pointer_sequence(reach_dock *dock)
-{
-    if (dock == nullptr || !dock->state.pointer_sequence_active)
-    {
-        return 0;
-    }
-    dock->state.pointer_sequence_active = 0;
-    return 1;
-}
-
-void reach_dock_suppress_power_release(reach_dock *dock)
-{
+    reach_dock *dock = static_cast<reach_dock *>(capsule);
     if (dock != nullptr)
     {
-        dock->state.power_release_suppressed = 1;
-    }
-}
-
-int32_t reach_dock_take_power_release_suppressed(reach_dock *dock)
-{
-    if (dock == nullptr || !dock->state.power_release_suppressed)
-    {
-        return 0;
-    }
-    dock->state.power_release_suppressed = 0;
-    return 1;
-}
-
-void reach_dock_clear_power_release_suppressed(reach_dock *dock)
-{
-    if (dock != nullptr)
-    {
-        dock->state.power_release_suppressed = 0;
-    }
-}
-
-void reach_dock_begin_reveal_session(reach_dock *dock)
-{
-    if (dock != nullptr)
-    {
-        dock->state.reveal_session_active = 1;
+        reach_bar_begin_reveal_session(&dock->state.visibility);
     }
 }
 
@@ -430,9 +291,9 @@ static void reach_dock_reset_reveal_state(reach_dock *dock)
     {
         return;
     }
-    dock->state.dock_animation_initialized = 0;
-    dock->state.reveal_session_active = 0;
-    dock->state.pointer_sequence_active = 0;
+    reach_bar_visibility_reset(&dock->state.visibility);
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+    reach_pressable_reset(&dock->state.pressable, &feedback);
 }
 
 static void reach_dock_reset_model(reach_dock *dock)
@@ -458,7 +319,8 @@ static void reach_dock_build_items(reach_dock *dock, const reach_pinned_app_mode
     {
         return;
     }
-    reach_dock_feature_model_build_items(&dock->state.model, pinned_apps, pinned_app_count,
+    reach_dock_feature_model_build_items(&dock->state.model, &dock->next_app_key, pinned_apps,
+                                         pinned_app_count,
                                          reach_window_tracking_windows(dock->windows),
                                          reach_window_tracking_window_group_ids(dock->windows),
                                          reach_window_tracking_window_count(dock->windows),
@@ -466,67 +328,24 @@ static void reach_dock_build_items(reach_dock *dock, const reach_pinned_app_mode
 }
 
 size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
-                                       const reach_pinned_app_model *pinned_apps,
-                                       size_t pinned_app_count, reach_dock_item_window *out,
-                                       size_t cap)
+                                       reach_dock_item_window *out, size_t cap)
 {
-    if (dock == nullptr || out == nullptr || cap == 0 ||
-        item_index >= dock->state.model.item_count)
+    if (dock == nullptr || out == nullptr || cap == 0 || item_index >= dock->state.model.item_count)
     {
         return 0;
     }
 
     const reach_dock_item_model *item = &dock->state.model.items[item_index];
-    const reach_window_snapshot *windows = reach_window_tracking_windows(dock->windows);
-    size_t window_count = reach_window_tracking_window_count(dock->windows);
-
-    const reach_pinned_app_model *app = nullptr;
-    reach_pinned_app_model window_app = {};
-    if (item->pinned && pinned_apps != nullptr && item->pinned_index < pinned_app_count)
+    size_t count = 0;
+    for (size_t index = 0; index < item->instance_count && count < cap; ++index)
     {
-        app = &pinned_apps[item->pinned_index];
+        const reach_window_snapshot *window =
+            reach_window_tracking_window_by_id(dock->windows, item->instances[index]);
+        out[count].window = item->instances[index];
+        out[count].title = window != nullptr ? window->title : nullptr;
+        ++count;
     }
-    else if (!item->pinned)
-    {
-        const reach_window_snapshot *representative =
-            reach_window_tracking_window_by_id(dock->windows, item->window);
-        if (representative != nullptr)
-        {
-            reach_copy_utf16(window_app.path, 260, representative->path);
-            reach_copy_utf16(window_app.app_user_model_id, 260,
-                             representative->app_user_model_id);
-            app = &window_app;
-        }
-    }
-
-    if (app != nullptr && windows != nullptr)
-    {
-        size_t indices[16];
-        size_t index_cap = cap < 16 ? cap : 16;
-        size_t count = reach_dock_collect_matching_windows(
-            app, windows, window_count, reach_window_tracking_focus_history(dock->windows),
-            reach_window_tracking_focus_history_count(dock->windows),
-            reach_dock_window_matches_app_thunk, nullptr, indices, index_cap);
-        for (size_t at = 0; at < count; ++at)
-        {
-            out[at].window = windows[indices[at]].id;
-            out[at].title = windows[indices[at]].title;
-        }
-        if (count > 0)
-        {
-            return count;
-        }
-    }
-
-    if (item->window == 0)
-    {
-        return 0;
-    }
-    const reach_window_snapshot *window =
-        reach_window_tracking_window_by_id(dock->windows, item->window);
-    out[0].window = item->window;
-    out[0].title = window != nullptr ? window->title : nullptr;
-    return 1;
+    return count;
 }
 
 static void reach_dock_capsule_reset(void *capsule)
@@ -535,12 +354,13 @@ static void reach_dock_capsule_reset(void *capsule)
     reach_dock_reset_model(dock);
     if (dock != nullptr)
     {
-        reach_dock_now_playing_reset(dock->now_playing_subfeature);
         dock->pointer_layout_valid = 0;
-        dock->state.pressed_control = REACH_DOCK_HIT_NONE;
-        dock->state.power_hovered = 0;
-        dock->state.hovered_item = REACH_MAX_PINNED_APPS;
-        reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f);
+        dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
+        reach_draggable_init(&dock->state.drag.gesture);
+        dock->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
+        dock->state.drag.key = {};
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_reset(&dock->state.pressable, &feedback);
 
         dock->slots_synced = 0;
     }
@@ -563,38 +383,46 @@ static void reach_dock_capsule_on_game_mode(void *capsule, int32_t enabled)
     if (enabled)
     {
         reach_dock_reset_reveal_state(static_cast<reach_dock *>(capsule));
+        reach_dock_clear_item_x_animations(static_cast<reach_dock *>(capsule));
     }
 }
 
 static int32_t reach_dock_capsule_needs_frame(const void *capsule)
 {
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
-    return dock != nullptr &&
-           (reach_animation_manager_any_active(&dock->manager) || dock->state.drag.active);
+    return dock != nullptr && (reach_animation_manager_any_active(&dock->manager) ||
+                               reach_draggable_tracking(&dock->state.drag.gesture));
+}
+
+static int32_t reach_dock_capsule_pointer_sequence_active(const void *capsule)
+{
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    return dock != nullptr && reach_pressable_tracking(&dock->state.pressable);
 }
 
 static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
 {
-    return reach_dock_pointer_sequence_active(static_cast<const reach_dock *>(capsule));
+    return reach_dock_capsule_pointer_sequence_active(capsule);
 }
 
-static void reach_dock_capsule_begin_pointer_sequence(reach_dock *dock,
-                                                      reach_capsule_pointer_result *out)
+static int32_t reach_dock_capsule_pointer_capture_active(const void *capsule)
 {
-    if (reach_dock_begin_pointer_sequence(dock))
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    return dock != nullptr && reach_pressable_tracking(&dock->state.pressable);
+}
+
+static void reach_dock_capsule_surface_geometry(const void *capsule,
+                                                reach_feature_surface_geometry *out)
+{
+    if (out == nullptr)
     {
-        out->capture = 1;
-        out->sync_pointer_subscriptions = 1;
+        return;
     }
-}
-
-static void reach_dock_capsule_end_pointer_sequence(reach_dock *dock,
-                                                    reach_capsule_pointer_result *out)
-{
-    if (reach_dock_end_pointer_sequence(dock))
+    *out = {};
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    if (dock != nullptr && dock->pointer_layout_valid)
     {
-        out->capture = -1;
-        out->sync_pointer_subscriptions = 1;
+        out->visible_bounds = dock->pointer_layout.bounds;
     }
 }
 
@@ -605,8 +433,6 @@ static reach_dock_interaction_context reach_dock_capsule_interaction_context(rea
     {
         ctx.theme = dock->pointer_theme;
         ctx.layout = dock->pointer_layout_valid ? &dock->pointer_layout : nullptr;
-        ctx.pinned_apps = dock->pointer_pinned_apps;
-        ctx.pinned_app_count = dock->pointer_pinned_app_count;
     }
     return ctx;
 }
@@ -625,40 +451,99 @@ static int32_t reach_dock_capsule_screen_y(const reach_dock *dock, int32_t local
                : local_y;
 }
 
+/* Hovering an item offers the same complete request a right-click does; an item with no
+   running windows offers nothing at all. */
+static void reach_dock_notify_item_hovered(reach_dock *dock, size_t item_index)
+{
+    if (dock == nullptr || dock->routes.item_hovered == nullptr)
+    {
+        return;
+    }
+    if (!reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f, &dock->hover_request) ||
+        dock->hover_request.window_count == 0)
+    {
+        dock->routes.item_hovered(dock->routes.user, nullptr);
+        return;
+    }
+    dock->routes.item_hovered(dock->routes.user, &dock->hover_request);
+}
+
 static void
-reach_dock_capsule_apply_interaction_result(const reach_dock_interaction_result *interaction,
+reach_dock_capsule_apply_interaction_result(reach_dock *dock,
+                                            const reach_dock_interaction_result *interaction,
                                             reach_capsule_pointer_result *out)
 {
-    if (interaction == nullptr || out == nullptr)
+    if (dock == nullptr || interaction == nullptr || out == nullptr)
     {
         return;
     }
     out->redraw = out->redraw || interaction->redraw;
     if (interaction->rebuild_items)
     {
-        out->action.kind = REACH_DOCK_POINTER_ACTION_REBUILD_ITEMS;
+        reach_dock_mark_items_changed(dock);
+        out->relayout = 1;
     }
     if (interaction->move_pin)
     {
-        out->action.kind = REACH_DOCK_POINTER_ACTION_MOVE_PIN;
+        out->action.kind = REACH_FEATURE_ACTION_MOVE_PIN;
         out->action.id = interaction->move_pin_id;
         out->action.index = interaction->move_pin_target;
     }
 }
 
-static uint32_t reach_dock_capsule_media_action(reach_now_playing_action action)
+static const uint64_t REACH_DOCK_PRESSABLE_TRIGGER = UINT64_MAX - 1;
+
+static uint64_t reach_dock_pressable_target(const reach_dock *dock, reach_dock_hit_result hit,
+                                            reach_pointer_button button)
 {
-    switch (action)
+    if (dock != nullptr && hit.type == REACH_DOCK_HIT_ITEM &&
+        hit.index < dock->state.model.item_count)
     {
-    case REACH_NOW_PLAYING_ACTION_PREVIOUS:
-        return REACH_DOCK_POINTER_ACTION_MEDIA_PREVIOUS;
-    case REACH_NOW_PLAYING_ACTION_PLAY_PAUSE:
-        return REACH_DOCK_POINTER_ACTION_MEDIA_PLAY_PAUSE;
-    case REACH_NOW_PLAYING_ACTION_NEXT:
-        return REACH_DOCK_POINTER_ACTION_MEDIA_NEXT;
-    default:
-        return REACH_DOCK_POINTER_ACTION_NONE;
+        return (uint64_t)reach_dock_item_key_at(&dock->state.model, hit.index);
     }
+    if (button == REACH_POINTER_BUTTON_PRIMARY && hit.type == REACH_DOCK_HIT_TRIGGER)
+    {
+        return REACH_DOCK_PRESSABLE_TRIGGER;
+    }
+    return REACH_PRESSABLE_TARGET_NONE;
+}
+
+static void reach_dock_capsule_apply_pressable_result(const reach_pressable_result *pressable,
+                                                      reach_capsule_pointer_result *out)
+{
+    if (pressable == nullptr || out == nullptr)
+    {
+        return;
+    }
+    out->redraw = out->redraw || pressable->redraw;
+    if (pressable->capture != 0)
+    {
+        out->capture = pressable->capture;
+    }
+    out->sync_pointer_subscriptions =
+        out->sync_pointer_subscriptions || pressable->sync_pointer_subscriptions;
+}
+
+static int32_t reach_dock_capsule_publish_open_item(reach_dock *dock, size_t item_index,
+                                                    uint32_t flags,
+                                                    reach_capsule_pointer_result *out)
+{
+    if (dock == nullptr || out == nullptr ||
+        !reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f, &dock->action_request) ||
+        dock->action_request.path[0] == 0)
+    {
+        return 0;
+    }
+    out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
+    out->action.flags |= flags;
+    out->action.target.kind = REACH_FEATURE_TARGET_APP;
+    out->action.target.path = dock->action_request.path;
+    out->action.target.arguments =
+        dock->action_request.arguments[0] != 0 ? dock->action_request.arguments : nullptr;
+    out->action.target.app_user_model_id = dock->action_request.app_user_model_id[0] != 0
+                                               ? dock->action_request.app_user_model_id
+                                               : nullptr;
+    return 1;
 }
 
 static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
@@ -682,23 +567,11 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         local_event.y = local.y;
     }
     event = &local_event;
-    reach_dock_now_playing_update_result update = {};
-    reach_dock_now_playing_sync(dock->now_playing_subfeature, dock->now_playing, &update);
-    if (update.changed)
-    {
-        out->redraw = 1;
-    }
-    if (update.visibility_changed)
-    {
-        dock->state.items_changed = 1;
-        out->relayout = 1;
-    }
-
     reach_dock_state *state = &dock->state;
     reach_dock_interaction_context interaction_ctx = reach_dock_capsule_interaction_context(dock);
     reach_dock_hit_result hit = {};
     hit.type = REACH_DOCK_HIT_NONE;
-    hit.index = REACH_MAX_PINNED_APPS;
+    hit.index = REACH_MAX_DOCK_ITEMS;
     if (dock->pointer_layout_valid)
     {
         hit = reach_dock_hit_test(&dock->pointer_layout, event->x, event->y);
@@ -707,245 +580,276 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 
     if (event->kind == REACH_POINTER_EVENT_DOWN)
     {
-        reach_dock_capsule_begin_pointer_sequence(dock, out);
-        if (!reach_dock_slots_animating(dock) &&
-            reach_dock_now_playing_pointer_down(dock->now_playing_subfeature, event->x, event->y))
+        uint64_t target = reach_dock_pressable_target(dock, hit, event->button);
+        if (target == REACH_PRESSABLE_TARGET_NONE)
         {
-            out->handled = 1;
-            out->redraw = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_NOW_PLAYING;
             return;
         }
-
-        if (hit.type != REACH_DOCK_HIT_POWER_BUTTON)
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        size_t feedback_index =
+            hit.type == REACH_DOCK_HIT_TRIGGER ? REACH_DOCK_FEEDBACK_TRIGGER : hit.index;
+        reach_pressable_press(&state->pressable, event->button, target, feedback_index, &feedback,
+                              &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
+        if (hit.type == REACH_DOCK_HIT_TRIGGER)
         {
-            reach_dock_clear_power_release_suppressed(dock);
-        }
-        state->pressed_control = hit.type;
-        if (hit.type == REACH_DOCK_HIT_TRAY_BUTTON)
-        {
-            out->redraw =
-                out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_TRAY_BUTTON);
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_TRAY;
-            return;
-        }
-        if (hit.type == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON)
-        {
-            out->redraw = out->redraw || reach_dock_feedback_press(
-                                             dock, REACH_DOCK_FEEDBACK_QUICK_SETTINGS_BUTTON);
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_QUICK_SETTINGS;
-            return;
-        }
-        if (hit.type == REACH_DOCK_HIT_POWER_BUTTON)
-        {
-            out->redraw =
-                out->redraw || reach_dock_feedback_press(dock, REACH_DOCK_FEEDBACK_POWER_BUTTON);
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_POWER;
+            out->control = {REACH_DOCK_CONTROL_TRIGGER, REACH_DOCK_TRIGGER_PRIMARY, 1};
             return;
         }
         if (hit.type == REACH_DOCK_HIT_ITEM)
         {
-            reach_dock_interaction_result interaction = {};
-            reach_dock_item_press(dock, hit.index, reach_dock_capsule_screen_x(dock, event->x),
-                                  reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
-                                  &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_PRESS_ITEM;
-            out->action.index = hit.index;
+            out->control = {REACH_DOCK_CONTROL_ITEM, hit.index, 1,
+                            event->button == REACH_POINTER_BUTTON_SECONDARY};
+            if (event->button == REACH_POINTER_BUTTON_PRIMARY)
+            {
+                reach_dock_interaction_result interaction = {};
+                reach_dock_item_press(dock, hit.index,
+                                      reach_dock_capsule_screen_x(dock, event->x),
+                                      reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
+                                      &interaction);
+                reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
+            }
             return;
         }
-
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        reach_dock_clear_pressed(dock);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_UP)
     {
-        if (state->drag.active)
+        int32_t moved = event->button == REACH_POINTER_BUTTON_PRIMARY &&
+                        reach_draggable_tracking(&state->drag.gesture) &&
+                        reach_draggable_moved(&state->drag.gesture);
+        if (event->button == REACH_POINTER_BUTTON_PRIMARY &&
+            reach_draggable_tracking(&state->drag.gesture))
         {
-            int32_t moved = state->drag.moved;
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
-            if (moved)
-            {
-                state->pressed_control = REACH_DOCK_HIT_NONE;
-                out->handled = 1;
-                reach_dock_capsule_end_pointer_sequence(dock, out);
-                return;
-            }
-        }
-        else
-        {
-            out->redraw = out->redraw || reach_dock_feedback_release(dock);
+            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
         }
 
-        reach_now_playing_action action = REACH_NOW_PLAYING_ACTION_NONE;
-        if (reach_dock_now_playing_pointer_up(dock->now_playing_subfeature, event->x, event->y,
-                                              &action))
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        reach_pressable_release(&state->pressable, event->button,
+                                reach_dock_pressable_target(dock, hit, event->button), &feedback,
+                                &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
+        if (event->button == REACH_POINTER_BUTTON_SECONDARY)
         {
-            out->handled = 1;
-            out->redraw = 1;
-            out->action.kind = reach_dock_capsule_media_action(action);
-            state->pressed_control = REACH_DOCK_HIT_NONE;
-            reach_dock_capsule_end_pointer_sequence(dock, out);
+            if (pressable.activated && hit.type == REACH_DOCK_HIT_ITEM &&
+                hit.index < state->model.item_count)
+            {
+                out->handled = 1;
+                if (dock->routes.item_context_menu != nullptr)
+                {
+                    reach_menu_request request = {};
+                    if (reach_dock_build_menu_request(dock, hit.index, (float)event->x,
+                                                      (float)event->y, &request))
+                    {
+                        dock->routes.item_context_menu(dock->routes.user, &request);
+                    }
+                }
+            }
             return;
         }
-
-        reach_dock_hit_type pressed = static_cast<reach_dock_hit_type>(state->pressed_control);
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        if (pressed == REACH_DOCK_HIT_TRAY_BUTTON && hit.type == pressed)
+        if (moved)
         {
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_TRAY;
+            return;
         }
-        else if (pressed == REACH_DOCK_HIT_QUICK_SETTINGS_BUTTON && hit.type == pressed)
+        if (pressable.activated_target == REACH_DOCK_PRESSABLE_TRIGGER)
         {
             out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_QUICK_SETTINGS;
-        }
-        else if (pressed == REACH_DOCK_HIT_POWER_BUTTON && hit.type == pressed)
-        {
-            out->handled = 1;
-            if (!reach_dock_take_power_release_suppressed(dock))
+            if (dock->routes.trigger_activated != nullptr)
             {
-                out->action.kind = REACH_DOCK_POINTER_ACTION_TOGGLE_POWER;
+                dock->routes.trigger_activated(dock->routes.user, REACH_DOCK_TRIGGER_PRIMARY);
             }
         }
-        else if (pressed == REACH_DOCK_HIT_ITEM && hit.type == pressed)
+        else if (pressable.activated && hit.type == REACH_DOCK_HIT_ITEM &&
+                 hit.index < state->model.item_count)
         {
-            reach_dock_item_action item_action = {};
-            reach_dock_interaction_result interaction = {};
-            if (reach_dock_item_release(dock, hit.index, &item_action, &interaction))
+            size_t item_index = hit.index;
+            if (event->button == REACH_POINTER_BUTTON_MIDDLE)
             {
-                reach_dock_capsule_apply_interaction_result(&interaction, out);
                 out->handled = 1;
-                if (item_action.type == REACH_DOCK_ITEM_ACTION_LAUNCH_PINNED)
-                {
-                    out->action.kind = REACH_DOCK_POINTER_ACTION_LAUNCH_PINNED;
-                    out->action.index = item_action.pinned_index;
-                    out->action.id = item_action.pin_id;
-                }
-                else if (item_action.type == REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW)
-                {
-                    out->action.kind = REACH_DOCK_POINTER_ACTION_FOCUS_WINDOW;
-                    out->action.window = item_action.window;
-                }
+                (void)reach_dock_capsule_publish_open_item(
+                    dock, item_index, REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE, out);
+                return;
+            }
+            reach_dock_item_action item_action =
+                reach_dock_item_action_for_index(&state->model, item_index);
+            out->handled = 1;
+            if (item_action.type == REACH_DOCK_ITEM_ACTION_OPEN_APP)
+            {
+                (void)reach_dock_capsule_publish_open_item(dock, item_index, 0, out);
+            }
+            else if (item_action.type == REACH_DOCK_ITEM_ACTION_FOCUS_WINDOW)
+            {
+                out->action.kind = REACH_FEATURE_ACTION_TOGGLE_WINDOW_FOCUS;
+                out->action.window = item_action.window;
             }
         }
-        else
-        {
-            reach_dock_clear_pressed(dock);
-        }
-        reach_dock_capsule_end_pointer_sequence(dock, out);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_MOVE)
     {
-        if (!state->drag.active)
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        reach_pressable_update(
+            &state->pressable,
+            reach_dock_pressable_target(dock, hit, reach_pressable_button(&state->pressable)),
+            &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
+        if (!reach_draggable_tracking(&state->drag.gesture))
         {
-            int32_t hovered = hit.type == REACH_DOCK_HIT_POWER_BUTTON;
-            if (hovered != state->power_hovered)
-            {
-                state->power_hovered = hovered;
-                reach_animation_manager_animate_to(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER,
-                                                   hovered ? 1.0f : 0.0f, 0.18,
-                                                   REACH_EASING_EASE_IN_OUT);
-                out->handled = 1;
-                out->redraw = 1;
-            }
-
-            size_t hovered_item = hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
-                                      ? hit.index
-                                      : REACH_MAX_PINNED_APPS;
+            size_t hovered_item =
+                hit.type == REACH_DOCK_HIT_ITEM && hit.index < state->model.item_count
+                    ? hit.index
+                    : REACH_MAX_DOCK_ITEMS;
             if (hovered_item != state->hovered_item)
             {
                 state->hovered_item = hovered_item;
-                out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-                out->action.index = hovered_item;
+                reach_dock_notify_item_hovered(dock, hovered_item);
             }
         }
-        if (state->drag.active)
+        if (reach_draggable_tracking(&state->drag.gesture))
         {
+            int32_t was_moved = reach_draggable_moved(&state->drag.gesture);
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_update(dock, reach_dock_capsule_screen_x(dock, event->x),
                                    reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
                                    &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
+            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
+            if (!was_moved && reach_draggable_moved(&state->drag.gesture))
+            {
+                reach_pressable_disarm(&state->pressable, &feedback, &pressable);
+                reach_dock_capsule_apply_pressable_result(&pressable, out);
+            }
             out->handled = 1;
-        }
-        return;
-    }
-    if (event->kind == REACH_POINTER_EVENT_MIDDLE)
-    {
-        out->redraw = out->redraw || reach_dock_feedback_release(dock);
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        reach_dock_clear_pressed(dock);
-        if (hit.type == REACH_DOCK_HIT_ITEM)
-        {
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_LAUNCH_NEW_INSTANCE;
-            out->action.index = hit.index;
-        }
-        return;
-    }
-    if (event->kind == REACH_POINTER_EVENT_CONTEXT)
-    {
-        out->redraw = out->redraw || reach_dock_feedback_clear_sticky(dock);
-        if (hit.type == REACH_DOCK_HIT_ITEM)
-        {
-            out->redraw =
-                out->redraw || reach_dock_feedback_press_immediate(dock, hit.index, 0.50f);
-            out->handled = 1;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_SHOW_ITEM_CONTEXT;
-            out->action.index = hit.index;
         }
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_CANCEL)
     {
-        out->redraw =
-            out->redraw || reach_dock_now_playing_pointer_cancel(dock->now_playing_subfeature);
-        if (state->drag.active)
+        if (reach_draggable_tracking(&state->drag.gesture))
         {
             reach_dock_interaction_result interaction = {};
             reach_dock_drag_end(dock, &interaction_ctx, &interaction);
-            reach_dock_capsule_apply_interaction_result(&interaction, out);
+            reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
         }
-        out->redraw = out->redraw || reach_dock_feedback_release(dock);
-        state->pressed_control = REACH_DOCK_HIT_NONE;
-        reach_dock_clear_pressed(dock);
-        if (state->hovered_item != REACH_MAX_PINNED_APPS)
+        reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+        reach_pressable_result pressable = {};
+        reach_pressable_cancel(&state->pressable, &feedback, &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
+        if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
-            state->hovered_item = REACH_MAX_PINNED_APPS;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-            out->action.index = REACH_MAX_PINNED_APPS;
+            state->hovered_item = REACH_MAX_DOCK_ITEMS;
+            reach_dock_notify_item_hovered(dock, REACH_MAX_DOCK_ITEMS);
         }
-        reach_dock_capsule_end_pointer_sequence(dock, out);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_LEAVE)
     {
-        out->redraw =
-            out->redraw || reach_dock_now_playing_pointer_cancel(dock->now_playing_subfeature);
-        if (state->power_hovered)
+        reach_pressable_result pressable = {};
+        reach_pressable_update(&state->pressable, REACH_PRESSABLE_TARGET_NONE, &pressable);
+        reach_dock_capsule_apply_pressable_result(&pressable, out);
+        if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
         {
-            state->power_hovered = 0;
-            reach_animation_manager_animate_to(&dock->manager, REACH_DOCK_ANIM_POWER_HOVER, 0.0f,
-                                               0.18, REACH_EASING_EASE_IN_OUT);
-            out->redraw = 1;
-        }
-        if (state->hovered_item != REACH_MAX_PINNED_APPS)
-        {
-            state->hovered_item = REACH_MAX_PINNED_APPS;
-            out->action.kind = REACH_DOCK_POINTER_ACTION_HOVER_ITEM;
-            out->action.index = REACH_MAX_PINNED_APPS;
+            state->hovered_item = REACH_MAX_DOCK_ITEMS;
+            reach_dock_notify_item_hovered(dock, REACH_MAX_DOCK_ITEMS);
         }
     }
+}
+
+static int32_t reach_dock_capsule_control_at_point(const void *capsule, int32_t screen_x,
+                                                   int32_t screen_y, reach_feature_control *out)
+{
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    if (dock == nullptr || out == nullptr || !dock->pointer_layout_valid)
+    {
+        return 0;
+    }
+
+    reach_point_i32 local = reach_dock_local_point(&dock->pointer_layout, screen_x, screen_y);
+    reach_dock_hit_result hit = reach_dock_hit_test(&dock->pointer_layout, local.x, local.y);
+    *out = {};
+    switch (hit.type)
+    {
+    case REACH_DOCK_HIT_ITEM:
+        out->slot = REACH_DOCK_CONTROL_ITEM;
+        out->index = hit.index;
+        out->valid = 1;
+        return 1;
+    case REACH_DOCK_HIT_TRIGGER:
+        out->slot = REACH_DOCK_CONTROL_TRIGGER;
+        out->valid = 1;
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+void reach_dock_apply_config(reach_dock *dock, float height)
+{
+    if (dock != nullptr && height > 0.0f)
+    {
+        dock->metrics.height = height;
+    }
+}
+
+/* The dock resolves its own geometry: the metrics it owns, the pins it was handed and the
+   windows it tracks, against the monitor composition gives every surface. */
+const reach_dock_layout *reach_dock_arranged_layout(const reach_dock *dock)
+{
+    return dock != nullptr && dock->pointer_layout_valid ? &dock->pointer_layout : nullptr;
+}
+
+int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx)
+{
+    if (dock == nullptr || ctx == nullptr)
+    {
+        return 0;
+    }
+
+    const reach_theme *theme = ctx->theme != nullptr ? ctx->theme : reach_theme_default();
+    dock->metrics.icon_size = reach_theme_icon_box_size(theme, dock->metrics.height);
+
+    reach_ui_layout_input input = {};
+    input.monitor_bounds = ctx->monitor_bounds;
+    input.work_area = ctx->monitor_bounds;
+    input.dpi_scale = ctx->dpi_scale;
+    input.border_thickness = reach_theme_border_thickness(theme, ctx->dpi_scale);
+
+    reach_dock_layout layout = {};
+    if (reach_dock_layout_compute(&dock->metrics, &input, &layout) != REACH_OK)
+    {
+        return 0;
+    }
+
+    reach_dock_build_context build = {};
+    build.theme = theme;
+    build.dpi_scale = ctx->dpi_scale;
+    build.icon_size = dock->metrics.icon_size;
+    build.gap = dock->metrics.gap;
+    build.pinned_apps = dock->pinned_apps;
+    build.pinned_app_count = dock->pinned_app_count;
+
+    reach_rect_f32 before = dock->pointer_layout_valid ? dock->pointer_layout.bounds
+                                                       : reach_rect_f32{};
+    if (reach_dock_take_items_changed(dock))
+    {
+        reach_dock_rebuild_items(dock, &build,
+                                 dock->pointer_layout_valid ? &dock->pointer_layout : nullptr,
+                                 &layout);
+    }
+    else
+    {
+        reach_dock_build_layout(dock, &build, &layout);
+    }
+
+    return !reach_rect_equal(before, dock->pointer_layout.bounds) ||
+           reach_dock_slots_animating(dock);
 }
 
 const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
@@ -954,11 +858,16 @@ const reach_feature_capsule_ops *reach_dock_capsule_ops(void)
         reach_dock_capsule_reset,
         reach_dock_capsule_tick,
         reach_dock_capsule_is_open,
-        nullptr,
         reach_dock_capsule_on_game_mode,
         reach_dock_capsule_needs_frame,
         reach_dock_capsule_wants_pointer_move,
         reach_dock_capsule_handle_pointer,
+        reach_dock_capsule_pointer_sequence_active,
+        nullptr,
+        reach_dock_capsule_surface_geometry,
+        reach_dock_capsule_pointer_capture_active,
+        nullptr,
+        reach_dock_capsule_control_at_point,
     };
     return &ops;
 }
@@ -968,247 +877,116 @@ reach_animation_manager *reach_dock_manager(reach_dock *animations)
     return animations != nullptr ? &animations->manager : nullptr;
 }
 
-reach_rect_f32 reach_dock_reveal_edge_bounds(int32_t mode, reach_rect_f32 shown_dock_bounds,
-                                             reach_rect_f32 monitor_bounds)
-{
-    float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
-    reach_rect_f32 bounds = {};
-    bounds.x = shown_dock_bounds.x;
-    bounds.width = shown_dock_bounds.width;
-    if (mode == REACH_DOCK_REVEAL_EDGE_BRIDGE)
-    {
-        bounds.y = shown_dock_bounds.y;
-        bounds.height = monitor_bottom - shown_dock_bounds.y;
-    }
-    else
-    {
-        bounds.y = monitor_bottom - 2.0f;
-        bounds.height = 3.0f;
-    }
-    return bounds;
-}
-
-static int32_t reach_dock_point_in_rect(reach_point_i32 point, reach_rect_f32 rect)
-{
-    return (float)point.x >= rect.x && (float)point.x < rect.x + rect.width &&
-           (float)point.y >= rect.y && (float)point.y < rect.y + rect.height;
-}
-
-reach_dock_visibility_result
-reach_dock_update_visibility(reach_dock *animations, const reach_dock_visibility_request *request)
-{
-    reach_dock_visibility_result result = {};
-    if (animations == nullptr || request == nullptr)
-    {
-        return result;
-    }
-
-    reach_dock_state *state = &animations->state;
-    reach_animation_manager *manager = &animations->manager;
-
-    float hidden_y = request->monitor_bounds.y + request->monitor_bounds.height + 4.0f;
-    reach_rect_f32 current_dock_bounds = request->shown_bounds;
-    if (state->dock_animation_initialized)
-    {
-        current_dock_bounds.y = reach_animation_manager_value(manager, REACH_DOCK_ANIM_Y);
-    }
-    reach_rect_f32 bridge_bounds = reach_dock_reveal_edge_bounds(
-        REACH_DOCK_REVEAL_EDGE_BRIDGE, request->shown_bounds, request->monitor_bounds);
-    int32_t pointer_over_dock =
-        request->pointer_valid && reach_dock_point_in_rect(request->pointer, current_dock_bounds);
-    int32_t pointer_in_bridge =
-        request->pointer_valid && reach_dock_point_in_rect(request->pointer, bridge_bounds);
-
-    int32_t target_hidden = 0;
-    int32_t edge_mode = REACH_DOCK_REVEAL_EDGE_DISABLED;
-
-    if (request->game_mode)
-    {
-        state->reveal_session_active = 0;
-        target_hidden = 1;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_DISABLED;
-    }
-    else if (!request->can_hide)
-    {
-        state->reveal_session_active = 0;
-        target_hidden = 0;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_BRIDGE;
-    }
-    else if (state->pointer_sequence_active || request->transient_open)
-    {
-        target_hidden = 0;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_BRIDGE;
-    }
-    else if (state->reveal_session_active)
-    {
-        if (pointer_in_bridge || pointer_over_dock)
-        {
-            edge_mode = REACH_DOCK_REVEAL_EDGE_BRIDGE;
-        }
-        else
-        {
-            state->reveal_session_active = 0;
-            target_hidden = 1;
-            edge_mode = REACH_DOCK_REVEAL_EDGE_THIN;
-        }
-    }
-    else if (pointer_over_dock)
-    {
-        target_hidden = 0;
-    }
-    else
-    {
-        target_hidden = 1;
-        edge_mode = REACH_DOCK_REVEAL_EDGE_THIN;
-    }
-
-    float target_y = target_hidden ? hidden_y : request->shown_bounds.y;
-    if (target_hidden && request->dock_sticky_feedback)
-    {
-        result.clear_sticky_feedback = 1;
-    }
-
-    if (!state->dock_animation_initialized)
-    {
-        state->dock_animation_initialized = 1;
-        state->target_hidden = target_hidden;
-        reach_animation_manager_set(manager, REACH_DOCK_ANIM_Y, target_y);
-    }
-
-    if (state->target_hidden != target_hidden)
-    {
-        state->target_hidden = target_hidden;
-        reach_animation_manager_animate_to(manager, REACH_DOCK_ANIM_Y, target_y, 0.25,
-                                           REACH_EASING_EASE_IN_OUT);
-    }
-
-    reach_rect_f32 animated = request->shown_bounds;
-    animated.y = reach_animation_manager_value(manager, REACH_DOCK_ANIM_Y);
-    result.animated_bounds = animated;
-    result.edge_mode = edge_mode;
-    result.visible = target_hidden ? 0 : 1;
-    return result;
-}
-
-static void reach_dock_copy_ascii_to_utf16(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)(unsigned char)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
-static int32_t reach_dock_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    size_t index = 0;
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
-}
-
-int32_t reach_dock_update_clock(reach_dock *dock)
+int32_t reach_dock_retain_context_feedback(reach_dock *dock)
 {
     if (dock == nullptr)
     {
         return 0;
     }
-
-    reach_dock_state *state = &dock->state;
-
-    time_t now = time(nullptr);
-    int64_t current_minute = (int64_t)(now / 60);
-    if (state->clock_initialized && state->clock_last_minute == current_minute)
-    {
-        return 0;
-    }
-
-    struct tm local = {};
-    if (now == (time_t)-1 || localtime_s(&local, &now) != 0)
-    {
-        return 0;
-    }
-
-    static const char *months[] = {"January",   "February", "March",    "April",
-                                   "May",       "June",     "July",     "August",
-                                   "September", "October",  "November", "December"};
-    static const char *days[] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
-                                 "Thursday", "Friday", "Saturday"};
-
-    int hour = local.tm_hour % 12;
-    if (hour == 0)
-    {
-        hour = 12;
-    }
-    const char *suffix = local.tm_hour >= 12 ? "PM" : "AM";
-
-    char time_text[32] = {};
-    char date_text[64] = {};
-    snprintf(time_text, sizeof(time_text), "%d:%02d %s", hour, local.tm_min, suffix);
-    if (local.tm_mon < 0 || local.tm_mon > 11 || local.tm_wday < 0 || local.tm_wday > 6)
-    {
-        return 0;
-    }
-    snprintf(date_text, sizeof(date_text), "%.3s %d, %.3s", months[local.tm_mon], local.tm_mday,
-             days[local.tm_wday]);
-
-    uint16_t next_time[32] = {};
-    uint16_t next_date[64] = {};
-    reach_dock_copy_ascii_to_utf16(next_time, 32, time_text);
-    reach_dock_copy_ascii_to_utf16(next_date, 64, date_text);
-    int32_t redraw = 0;
-    if (!state->clock_initialized || !reach_dock_utf16_equal(state->clock_time_text, next_time) ||
-        !reach_dock_utf16_equal(state->clock_date_text, next_date))
-    {
-        reach_copy_utf16(state->clock_time_text, 32, next_time);
-        reach_copy_utf16(state->clock_date_text, 64, next_date);
-        state->clock_initialized = 1;
-        redraw = 1;
-    }
-    state->clock_last_minute = current_minute;
-    return redraw;
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+    return reach_pressable_latch_feedback(&dock->state.pressable, &feedback);
 }
 
-static reach_dock_order_key reach_dock_order_key_for_item(const reach_dock_item_model *item)
+int32_t reach_dock_clear_context_feedback(reach_dock *dock)
 {
-    reach_dock_order_key key = {};
-    if (item == nullptr)
+    if (dock == nullptr)
     {
-        return key;
+        return 0;
     }
-
-    key.pinned = item->pinned;
-    key.app_id = item->app_id;
-    return key;
+    reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
+    return reach_pressable_clear_latched_feedback(&dock->state.pressable, &feedback);
 }
 
-static void reach_dock_set_order_key(reach_dock_feature_model *model, size_t index,
-                                     const reach_dock_item_model *item)
+static reach_rect_f32 reach_dock_protected_band(reach_rect_f32 shown_bounds,
+                                                reach_rect_f32 monitor_bounds,
+                                                float shadow_clearance)
 {
-    if (model == nullptr || item == nullptr || index >= REACH_MAX_PINNED_APPS)
+    reach_rect_f32 band =
+        reach_bar_protected_band(REACH_DOCK_EDGE, shown_bounds, monitor_bounds, shadow_clearance);
+    band.x = shown_bounds.x;
+    band.width = shown_bounds.width;
+    return band;
+}
+
+static reach_bar_visibility_result
+reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_request *request)
+{
+    reach_dock *animations = static_cast<reach_dock *>(capsule);
+    if (animations == nullptr || request == nullptr)
     {
-        return;
+        return reach_bar_visibility_result{};
     }
-    model->order[index] = reach_dock_order_key_for_item(item);
+
+    reach_bar_visibility_request bar_request = *request;
+    bar_request.edge = REACH_DOCK_EDGE;
+    bar_request.pointer_sequence_active = reach_pressable_tracking(&animations->state.pressable);
+    int32_t bounds_changed =
+        fabsf(animations->coverage_shown_bounds.x - request->shown_bounds.x) >= 0.5f ||
+        fabsf(animations->coverage_shown_bounds.y - request->shown_bounds.y) >= 0.5f ||
+        fabsf(animations->coverage_shown_bounds.width - request->shown_bounds.width) >= 0.5f ||
+        fabsf(animations->coverage_shown_bounds.height - request->shown_bounds.height) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.x - request->monitor_bounds.x) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.y - request->monitor_bounds.y) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.width - request->monitor_bounds.width) >= 0.5f ||
+        fabsf(animations->coverage_monitor_bounds.height - request->monitor_bounds.height) >=
+            0.5f ||
+        fabsf(animations->coverage_shadow_clearance - request->shadow_clearance) >= 0.5f;
+    if (!animations->coverage_valid || bounds_changed)
+    {
+        reach_rect_f32 protected_band = reach_dock_protected_band(
+            request->shown_bounds, request->monitor_bounds, request->shadow_clearance);
+        animations->coverage_trespassed = reach_window_tracking_any_trespassing(
+            animations->windows, request->monitor_bounds, protected_band, request->excluded_window);
+        animations->coverage_shown_bounds = request->shown_bounds;
+        animations->coverage_monitor_bounds = request->monitor_bounds;
+        animations->coverage_shadow_clearance = request->shadow_clearance;
+        animations->coverage_valid = 1;
+    }
+    bar_request.can_hide = animations->coverage_trespassed;
+
+    reach_bar_visibility_result result = reach_bar_update_visibility(
+        &animations->state.visibility, &animations->manager, REACH_DOCK_ANIM_Y, &bar_request);
+    if (!result.visible && reach_dock_clear_context_feedback(animations))
+    {
+        result.redraw = 1;
+    }
+    return result;
+}
+
+static reach_bar_reveal_animation reach_dock_bar_animation(const void *capsule)
+{
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    reach_bar_reveal_animation animation = {};
+    if (dock == nullptr)
+    {
+        return animation;
+    }
+
+    animation.position_animating =
+        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
+    animation.animated_y = reach_animation_manager_value(&dock->manager, REACH_DOCK_ANIM_Y);
+    animation.content_animating =
+        reach_dock_slots_animating(dock) || reach_draggable_tracking(&dock->state.drag.gesture) ||
+        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP) ||
+        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
+    return animation;
+}
+
+static void reach_dock_invalidate_bar_coverage(void *capsule)
+{
+    reach_dock *dock = static_cast<reach_dock *>(capsule);
+    if (dock != nullptr)
+    {
+        dock->coverage_valid = 0;
+    }
+}
+
+const reach_bar_reveal_ops *reach_dock_reveal_ops(void)
+{
+    static const reach_bar_reveal_ops ops = {
+        reach_dock_bar_begin_session, reach_dock_bar_update_visibility, reach_dock_bar_animation,
+        nullptr, reach_dock_invalidate_bar_coverage};
+    return &ops;
 }
 
 size_t reach_dock_find_pinned_for_window(const reach_pinned_app_model *pinned_apps,
@@ -1219,7 +997,7 @@ size_t reach_dock_find_pinned_for_window(const reach_pinned_app_model *pinned_ap
 {
     if (pinned_apps == nullptr || window == nullptr || window_matches_pinned == nullptr)
     {
-        return REACH_MAX_PINNED_APPS;
+        return REACH_MAX_DOCK_ITEMS;
     }
 
     for (size_t index = 0; index < pinned_app_count; ++index)
@@ -1230,18 +1008,40 @@ size_t reach_dock_find_pinned_for_window(const reach_pinned_app_model *pinned_ap
         }
     }
 
-    return REACH_MAX_PINNED_APPS;
+    return REACH_MAX_DOCK_ITEMS;
 }
 
-struct reach_dock_app_group
+static void reach_dock_item_set_identity(reach_dock_item_model *item, const uint16_t *path,
+                                         const uint16_t *app_user_model_id,
+                                         const uint16_t *icon_ref)
 {
-    int32_t pinned;
-    uint32_t app_id;
-    size_t pinned_index;
-    uintptr_t representative;
-};
+    reach_copy_utf16(item->path, REACH_DOCK_TEXT_CAPACITY, path);
+    reach_copy_utf16(item->app_user_model_id, REACH_DOCK_TEXT_CAPACITY, app_user_model_id);
+    reach_copy_utf16(item->icon_ref, REACH_DOCK_TEXT_CAPACITY,
+                     icon_ref != nullptr && icon_ref[0] != 0 ? icon_ref : path);
+}
 
-static void reach_dock_build_candidate_items(
+static void reach_dock_item_add_instance(reach_dock_item_model *item, uintptr_t window)
+{
+    if (window == 0 || item->instance_count >= REACH_DOCK_MAX_INSTANCES)
+    {
+        return;
+    }
+    for (size_t index = 0; index < item->instance_count; ++index)
+    {
+        if (item->instances[index] == window)
+        {
+            return;
+        }
+    }
+    item->instances[item->instance_count++] = window;
+    if (item->window == 0)
+    {
+        item->window = window;
+    }
+}
+
+void reach_dock_feature_model_build_candidates(
     reach_dock_item_model *items, size_t *item_count, const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count, const reach_window_snapshot *open_windows,
     const uint32_t *window_group_ids, size_t open_window_count,
@@ -1256,153 +1056,156 @@ static void reach_dock_build_candidate_items(
         return;
     }
 
-    reach_dock_app_group groups[REACH_MAX_PINNED_APPS] = {};
-    size_t group_count = 0;
-    size_t pinned_group_count = 0;
+    uint32_t group_of[REACH_MAX_DOCK_ITEMS] = {};
+    size_t count = 0;
+    size_t running_count = 0;
 
     for (size_t index = 0;
-         pinned_apps != nullptr && index < pinned_app_count && group_count < REACH_MAX_PINNED_APPS;
+         pinned_apps != nullptr && index < pinned_app_count && count < REACH_MAX_DOCK_ITEMS;
          ++index)
     {
-        groups[group_count].pinned = 1;
-        groups[group_count].app_id = pinned_apps[index].id;
-        groups[group_count].pinned_index = index;
-        ++group_count;
+        reach_dock_item_model *item = &items[count];
+        *item = {};
+        item->pinned = 1;
+        item->pin_id = pinned_apps[index].id;
+        reach_dock_item_set_identity(item, pinned_apps[index].path,
+                                     pinned_apps[index].app_user_model_id,
+                                     pinned_apps[index].icon_ref);
+        ++count;
     }
-    pinned_group_count = group_count;
+    size_t pinned_count = count;
 
     for (size_t index = 0; open_windows != nullptr && index < open_window_count; ++index)
     {
+        const reach_window_snapshot *window = &open_windows[index];
         size_t pinned_index = reach_dock_find_pinned_for_window(
-            pinned_apps, pinned_app_count, &open_windows[index], window_matches_pinned, match_user);
-        if (pinned_index != REACH_MAX_PINNED_APPS)
+            pinned_apps, pinned_app_count, window, window_matches_pinned, match_user);
+        if (pinned_index != REACH_MAX_DOCK_ITEMS && pinned_index < pinned_count)
         {
-            if (pinned_index < pinned_group_count && groups[pinned_index].representative == 0)
-            {
-                groups[pinned_index].representative = open_windows[index].id;
-            }
+            reach_dock_item_add_instance(&items[pinned_index], window->id);
             continue;
         }
 
         uint32_t group_id = window_group_ids != nullptr ? window_group_ids[index] : 0;
-        int32_t grouped = 0;
-        for (size_t at = pinned_group_count; group_id != 0 && at < group_count; ++at)
+        size_t existing = REACH_MAX_DOCK_ITEMS;
+        for (size_t at = pinned_count; group_id != 0 && at < count; ++at)
         {
-            if (groups[at].app_id == group_id)
+            if (group_of[at] == group_id)
             {
-                grouped = 1;
+                existing = at;
                 break;
             }
         }
-        if (grouped || group_count >= REACH_MAX_PINNED_APPS)
+        if (existing != REACH_MAX_DOCK_ITEMS)
+        {
+            reach_dock_item_add_instance(&items[existing], window->id);
+            continue;
+        }
+        if (running_count >= REACH_MAX_DOCK_RUNNING_APPS || count >= REACH_MAX_DOCK_ITEMS)
         {
             continue;
         }
 
-        groups[group_count].pinned = 0;
-        groups[group_count].app_id = group_id;
-        groups[group_count].pinned_index = REACH_MAX_PINNED_APPS;
-        groups[group_count].representative = open_windows[index].id;
-        ++group_count;
+        reach_dock_item_model *item = &items[count];
+        *item = {};
+        item->pinned = 0;
+        reach_dock_item_set_identity(item, window->path, window->app_user_model_id,
+                                     window->icon_ref);
+        reach_dock_item_add_instance(item, window->id);
+        group_of[count] = group_id;
+        ++count;
+        ++running_count;
     }
 
-    for (size_t index = 0; index < group_count; ++index)
+    *item_count = count;
+}
+
+/* A candidate inherits the key of the app it matches by identity, so an app keeps its dock slot
+   through being pinned, unpinned, or handed a new pin id by the config store. */
+static void reach_dock_assign_keys(reach_dock_feature_model *model, reach_dock_item_model *candidates,
+                                   size_t candidate_count, uint32_t *next_key)
+{
+    for (size_t index = 0; index < candidate_count; ++index)
     {
-        reach_dock_item_model item = {};
-        item.pinned = groups[index].pinned;
-        item.app_id = groups[index].app_id;
-        item.window = groups[index].representative;
-        item.pinned_index = groups[index].pinned_index;
-        items[(*item_count)++] = item;
+        reach_dock_item_model *candidate = &candidates[index];
+        candidate->key = 0;
+        for (size_t at = 0; at < model->item_count; ++at)
+        {
+            if (reach_dock_item_identity_equal(&model->items[at], candidate->path,
+                                               candidate->app_user_model_id))
+            {
+                candidate->key = model->items[at].key;
+                break;
+            }
+        }
+        if (candidate->key == 0)
+        {
+            candidate->key = (*next_key)++;
+        }
     }
 }
 
-static void reach_dock_apply_existing_order(reach_dock_feature_model *model,
-                                            const reach_dock_item_model *candidates,
-                                            size_t candidate_count, int32_t *used)
+static void reach_dock_order_candidates(reach_dock_feature_model *model,
+                                        const reach_dock_item_model *candidates,
+                                        size_t candidate_count)
 {
-    if (model == nullptr || candidates == nullptr || used == nullptr)
-    {
-        return;
-    }
-
-    model->item_count = 0;
+    reach_dock_item_model ordered[REACH_MAX_DOCK_ITEMS] = {};
+    int32_t used[REACH_MAX_DOCK_ITEMS] = {};
+    size_t ordered_count = 0;
 
     for (size_t order_index = 0;
-         order_index < model->order_count && model->item_count < REACH_MAX_PINNED_APPS;
-         ++order_index)
+         order_index < model->order_count && ordered_count < REACH_MAX_DOCK_ITEMS; ++order_index)
     {
-        for (size_t candidate_index = 0; candidate_index < candidate_count; ++candidate_index)
+        for (size_t index = 0; index < candidate_count; ++index)
         {
-            reach_dock_order_key candidate_key =
-                reach_dock_order_key_for_item(&candidates[candidate_index]);
-            if (!used[candidate_index] &&
-                reach_dock_key_equal(&model->order[order_index], &candidate_key))
+            if (!used[index] && candidates[index].key == model->order[order_index])
             {
-                model->items[model->item_count++] = candidates[candidate_index];
-                used[candidate_index] = 1;
+                ordered[ordered_count++] = candidates[index];
+                used[index] = 1;
                 break;
             }
         }
     }
-}
 
-static void reach_dock_append_new_items(reach_dock_feature_model *model,
-                                        const reach_dock_item_model *candidates,
-                                        size_t candidate_count, const int32_t *used)
-{
-    if (model == nullptr || candidates == nullptr || used == nullptr)
+    for (size_t index = 0; index < candidate_count && ordered_count < REACH_MAX_DOCK_ITEMS; ++index)
     {
-        return;
-    }
-
-    for (size_t candidate_index = 0;
-         candidate_index < candidate_count && model->item_count < REACH_MAX_PINNED_APPS;
-         ++candidate_index)
-    {
-        if (!used[candidate_index])
+        if (!used[index])
         {
-            model->items[model->item_count++] = candidates[candidate_index];
+            ordered[ordered_count++] = candidates[index];
         }
     }
-}
 
-static void reach_dock_store_current_order(reach_dock_feature_model *model)
-{
-    if (model == nullptr)
+    model->item_count = ordered_count;
+    model->order_count = ordered_count;
+    for (size_t index = 0; index < ordered_count; ++index)
     {
-        return;
-    }
-
-    model->order_count = model->item_count;
-    for (size_t index = 0; index < model->item_count; ++index)
-    {
-        reach_dock_set_order_key(model, index, &model->items[index]);
+        model->items[index] = ordered[index];
+        model->order[index] = ordered[index].key;
     }
 }
 
 void reach_dock_feature_model_build_items(
-    reach_dock_feature_model *model, const reach_pinned_app_model *pinned_apps,
+    reach_dock_feature_model *model, uint32_t *next_key, const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count, const reach_window_snapshot *open_windows,
     const uint32_t *window_group_ids, size_t open_window_count,
     reach_dock_window_matches_pinned_fn window_matches_pinned, void *match_user)
 {
-    if (model == nullptr)
+    if (model == nullptr || next_key == nullptr)
     {
         return;
     }
+    if (*next_key == 0)
+    {
+        *next_key = 1;
+    }
 
-    reach_dock_item_model candidates[REACH_MAX_PINNED_APPS] = {};
-    int32_t used[REACH_MAX_PINNED_APPS] = {};
+    static reach_dock_item_model candidates[REACH_MAX_DOCK_ITEMS];
     size_t candidate_count = 0;
-
-    reach_dock_build_candidate_items(candidates, &candidate_count, pinned_apps, pinned_app_count,
-                                     open_windows, window_group_ids, open_window_count,
-                                     window_matches_pinned, match_user);
-
-    reach_dock_apply_existing_order(model, candidates, candidate_count, used);
-    reach_dock_append_new_items(model, candidates, candidate_count, used);
-    reach_dock_store_current_order(model);
+    reach_dock_feature_model_build_candidates(candidates, &candidate_count, pinned_apps,
+                                              pinned_app_count, open_windows, window_group_ids,
+                                              open_window_count, window_matches_pinned, match_user);
+    reach_dock_assign_keys(model, candidates, candidate_count, next_key);
+    reach_dock_order_candidates(model, candidates, candidate_count);
 }
 
 size_t reach_dock_item_count(reach_dock *dock)
@@ -1428,20 +1231,7 @@ size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_inde
     }
     const reach_dock_item_model *item = &dock->state.model.items[item_index];
 
-    const uint16_t *path = nullptr;
-    if (item->pinned)
-    {
-        path = item->pinned_index < dock->pointer_pinned_app_count
-                   ? dock->pointer_pinned_apps[item->pinned_index].path
-                   : nullptr;
-    }
-    else if (dock->windows != nullptr)
-    {
-        const reach_window_snapshot *window =
-            reach_window_tracking_window_by_id(dock->windows, item->window);
-        path = window != nullptr ? window->path : nullptr;
-    }
-    const int32_t has_path = path != nullptr;
+    const int32_t has_path = item->path[0] != 0;
     const int32_t has_window = item->window != 0;
 
     size_t count = 0;
@@ -1463,9 +1253,99 @@ size_t reach_dock_build_item_context_commands(reach_dock *dock, size_t item_inde
     }
     if (has_window && count < cap)
     {
-        out_commands[count++] = REACH_CONTEXT_MENU_COMMAND_CLOSE;
+        reach_dock_item_window item_windows[2] = {};
+        size_t item_window_count =
+            reach_dock_collect_item_windows(dock, item_index, item_windows, 2);
+        out_commands[count++] = item_window_count > 1 ? REACH_CONTEXT_MENU_COMMAND_CLOSE_ALL
+                                                      : REACH_CONTEXT_MENU_COMMAND_CLOSE;
     }
     return count;
+}
+
+/* Nothing to rebase. An entry is identified by its application, not by the pin id the config
+   store happened to hand it, so pinning, unpinning and reissued ids only change properties on an
+   entry that keeps its key and therefore its place. */
+void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model *apps,
+                                  size_t count)
+{
+    if (dock == nullptr)
+    {
+        return;
+    }
+    if (apps == nullptr)
+    {
+        count = 0;
+    }
+    if (count > REACH_MAX_PINNED_APPS)
+    {
+        count = REACH_MAX_PINNED_APPS;
+    }
+
+    dock->pinned_app_count = count;
+    for (size_t index = 0; index < count; ++index)
+    {
+        dock->pinned_apps[index] = apps[index];
+    }
+    reach_dock_mark_items_changed(dock);
+}
+
+int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float pointer_x,
+                                      float pointer_y, reach_menu_request *out_request)
+{
+    if (dock == nullptr || out_request == nullptr || item_index >= reach_dock_item_count(dock))
+    {
+        return 0;
+    }
+
+    *out_request = {};
+    out_request->target_index = item_index;
+    out_request->pointer_x = pointer_x;
+    out_request->pointer_y = pointer_y;
+    out_request->drop_direction = REACH_POPUP_DROP_UP;
+
+    const reach_dock_item_model *item = reach_dock_item_at(dock, item_index);
+    out_request->window = item->window;
+    out_request->pin_id = item->pin_id;
+    reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, item->path);
+    reach_copy_utf16(out_request->app_user_model_id, REACH_MENU_TEXT_CAPACITY,
+                     item->app_user_model_id);
+    reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY, item->icon_ref);
+    if (item->pinned)
+    {
+        for (size_t index = 0; index < dock->pinned_app_count; ++index)
+        {
+            if (dock->pinned_apps[index].id == item->pin_id)
+            {
+                reach_copy_utf16(out_request->arguments, REACH_MENU_TEXT_CAPACITY,
+                                 dock->pinned_apps[index].arguments);
+                break;
+            }
+        }
+    }
+
+    out_request->command_count = reach_dock_build_item_context_commands(
+        dock, item_index, out_request->commands, REACH_CONTEXT_MENU_MAX_ITEMS);
+
+    reach_dock_item_window item_windows[REACH_MENU_MAX_WINDOWS] = {};
+    size_t window_count =
+        reach_dock_collect_item_windows(dock, item_index, item_windows, REACH_MENU_MAX_WINDOWS);
+    out_request->window_count = window_count;
+    for (size_t index = 0; index < window_count; ++index)
+    {
+        out_request->windows[index].window = item_windows[index].window;
+        reach_copy_utf16(out_request->windows[index].title, REACH_MENU_TEXT_CAPACITY,
+                         item_windows[index].title);
+    }
+
+    reach_rect_f32 anchor = {};
+    float bar_edge_y = 0.0f;
+    if (reach_dock_item_anchor(dock, item_index, &anchor, &bar_edge_y))
+    {
+        out_request->anchored = 1;
+        out_request->anchor_button = anchor;
+        out_request->bar_edge_y = bar_edge_y;
+    }
+    return 1;
 }
 
 size_t reach_dock_order_count(reach_dock *dock)
@@ -1473,19 +1353,18 @@ size_t reach_dock_order_count(reach_dock *dock)
     return dock != nullptr ? reach_dock_state_mut(dock)->model.order_count : 0;
 }
 
-reach_dock_order_key reach_dock_order_key_at(reach_dock *dock, size_t index)
+uint32_t reach_dock_order_key_at(reach_dock *dock, size_t index)
 {
-    reach_dock_order_key key = {};
     if (dock == nullptr || index >= reach_dock_state_mut(dock)->model.order_count)
     {
-        return key;
+        return 0;
     }
     return reach_dock_state_mut(dock)->model.order[index];
 }
 
-void reach_dock_restore_order(reach_dock *dock, const reach_dock_order_key *keys, size_t count)
+void reach_dock_restore_order(reach_dock *dock, const uint32_t *keys, size_t count)
 {
-    if (dock == nullptr || keys == nullptr || count > REACH_MAX_PINNED_APPS)
+    if (dock == nullptr || keys == nullptr || count > REACH_MAX_DOCK_ITEMS)
     {
         return;
     }
@@ -1502,9 +1381,14 @@ static size_t reach_dock_slot_track(size_t pool_index)
     return REACH_DOCK_ANIM_SLOT_BASE + pool_index;
 }
 
-static float reach_dock_slot_width(const reach_dock *dock, size_t pool_index)
+static float reach_dock_slot_reveal(const reach_dock *dock, size_t pool_index)
 {
-    return reach_animation_manager_value(&dock->manager, reach_dock_slot_track(pool_index));
+    float reveal = reach_animation_manager_value(&dock->manager, reach_dock_slot_track(pool_index));
+    if (reveal < 0.0f)
+    {
+        return 0.0f;
+    }
+    return reveal > 1.0f ? 1.0f : reveal;
 }
 
 static void reach_dock_gate_animating_hit(reach_dock *dock, reach_dock_hit_result *hit)
@@ -1512,7 +1396,7 @@ static void reach_dock_gate_animating_hit(reach_dock *dock, reach_dock_hit_resul
     if (hit->type == REACH_DOCK_HIT_ITEM && reach_dock_slots_animating(dock))
     {
         hit->type = REACH_DOCK_HIT_NONE;
-        hit->index = REACH_MAX_PINNED_APPS;
+        hit->index = REACH_MAX_DOCK_ITEMS;
     }
 }
 
@@ -1558,7 +1442,7 @@ static void reach_dock_slot_free(reach_dock *dock, size_t pool_index)
 
 static size_t reach_dock_slot_alloc(reach_dock *dock)
 {
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_EMPTY)
         {
@@ -1568,7 +1452,7 @@ static size_t reach_dock_slot_alloc(reach_dock *dock)
     for (size_t at = 0; at < dock->slot_order_count; ++at)
     {
         size_t pool = dock->slot_order[at];
-        if (pool != 0 && dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING)
+        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING)
         {
             reach_dock_slot_free(dock, pool);
             return pool;
@@ -1578,12 +1462,12 @@ static size_t reach_dock_slot_alloc(reach_dock *dock)
     return REACH_DOCK_SLOT_CAPACITY;
 }
 
-static size_t reach_dock_slot_find(reach_dock *dock, reach_dock_order_key key)
+static size_t reach_dock_slot_find(reach_dock *dock, uint32_t key)
 {
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
-        if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_EMPTY &&
-            reach_dock_key_equal(&dock->slots[pool].key, &key))
+        if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_EMPTY && key != 0 &&
+            dock->slots[pool].key == key)
         {
             return pool;
         }
@@ -1605,20 +1489,20 @@ static void reach_dock_settle_slots(reach_dock *dock)
         {
             slot->lifecycle = REACH_DOCK_SLOT_STEADY;
         }
-        else if (slot->lifecycle == REACH_DOCK_SLOT_DYING && pool != 0)
+        else if (slot->lifecycle == REACH_DOCK_SLOT_DYING)
         {
             reach_dock_slot_free(dock, pool);
         }
     }
 }
 
-static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float np_slot_width)
+static void reach_dock_sync_slots(reach_dock *dock)
 {
     reach_dock_state *state = &dock->state;
     size_t item_count = state->model.item_count;
-    if (item_count > REACH_MAX_PINNED_APPS)
+    if (item_count > REACH_MAX_DOCK_ITEMS)
     {
-        item_count = REACH_MAX_PINNED_APPS;
+        item_count = REACH_MAX_DOCK_ITEMS;
     }
 
     if (!dock->slots_synced)
@@ -1629,41 +1513,19 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
             reach_animation_manager_reset(&dock->manager, reach_dock_slot_track(pool));
         }
         dock->slot_order_count = 0;
-        dock->slots[0].lifecycle = REACH_DOCK_SLOT_STEADY;
-        dock->slots[0].target_width = np_slot_width;
-        reach_animation_manager_set(&dock->manager, reach_dock_slot_track(0), np_slot_width);
-        reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
-                                    np_slot_width > 0.0f ? 1.0f : 0.0f);
-        dock->np_content_armed = 0;
-        dock->slot_order[dock->slot_order_count++] = 0;
         for (size_t index = 0; index < item_count; ++index)
         {
-            size_t pool = index + 1;
+            size_t pool = index;
             dock->slots[pool].lifecycle = REACH_DOCK_SLOT_STEADY;
             dock->slots[pool].key = reach_dock_item_key_at(&state->model, index);
-            dock->slots[pool].target_width = app_slot_width;
-            reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool),
-                                        app_slot_width);
-            dock->slot_order[dock->slot_order_count++] = (uint8_t)pool;
+            reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool), 1.0f);
+            dock->slot_order[dock->slot_order_count++] = (uint16_t)pool;
         }
         dock->slots_synced = 1;
         return;
     }
 
-    if (dock->slots[0].target_width != np_slot_width)
-    {
-        dock->slots[0].target_width = np_slot_width;
-        reach_animation_manager_animate_to(&dock->manager, reach_dock_slot_track(0), np_slot_width,
-                                           REACH_DOCK_SLOT_ANIMATION_SECONDS,
-                                           REACH_EASING_EASE_IN_OUT);
-        if (np_slot_width <= 0.0f)
-        {
-            reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT, 0.0f);
-        }
-        dock->np_content_armed = 0;
-    }
-
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         reach_dock_slot *slot = &dock->slots[pool];
         if (slot->lifecycle != REACH_DOCK_SLOT_APPEARING &&
@@ -1674,8 +1536,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
         int32_t found = 0;
         for (size_t index = 0; index < item_count; ++index)
         {
-            reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
-            if (reach_dock_key_equal(&slot->key, &item_key))
+            if (slot->key != 0 && slot->key == reach_dock_item_key_at(&state->model, index))
             {
                 found = 1;
                 break;
@@ -1690,14 +1551,14 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
         }
     }
 
-    uint8_t dying_anchor[REACH_DOCK_SLOT_CAPACITY] = {};
+    uint16_t dying_anchor[REACH_DOCK_SLOT_CAPACITY] = {};
     size_t last_live = 0;
     for (size_t at = 0; at < dock->slot_order_count; ++at)
     {
         size_t pool = dock->slot_order[at];
-        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING && pool != 0)
+        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING)
         {
-            dying_anchor[pool] = (uint8_t)last_live;
+            dying_anchor[pool] = (uint16_t)last_live;
         }
         else if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_EMPTY)
         {
@@ -1705,19 +1566,11 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
         }
     }
 
-    uint8_t new_order[REACH_DOCK_SLOT_CAPACITY] = {};
+    uint16_t new_order[REACH_DOCK_SLOT_CAPACITY] = {};
     size_t new_count = 0;
-    new_order[new_count++] = 0;
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
-    {
-        if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_DYING && dying_anchor[pool] == 0)
-        {
-            new_order[new_count++] = (uint8_t)pool;
-        }
-    }
     for (size_t index = 0; index < item_count; ++index)
     {
-        reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
+        uint32_t item_key = reach_dock_item_key_at(&state->model, index);
         size_t pool = reach_dock_slot_find(dock, item_key);
         if (pool < REACH_DOCK_SLOT_CAPACITY)
         {
@@ -1728,21 +1581,14 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
 
                 slot->lifecycle = REACH_DOCK_SLOT_APPEARING;
             }
-            if (slot->target_width != app_slot_width || slot->lifecycle != REACH_DOCK_SLOT_STEADY)
+            if (slot->lifecycle != REACH_DOCK_SLOT_STEADY)
             {
-                slot->target_width = app_slot_width;
-                if (slot->lifecycle == REACH_DOCK_SLOT_STEADY)
+                if (reach_animation_manager_target(&dock->manager, reach_dock_slot_track(pool)) !=
+                    1.0f)
                 {
-
-                    reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool),
-                                                app_slot_width);
-                }
-                else if (reach_animation_manager_target(
-                             &dock->manager, reach_dock_slot_track(pool)) != app_slot_width)
-                {
-                    reach_animation_manager_animate_to(
-                        &dock->manager, reach_dock_slot_track(pool), app_slot_width,
-                        REACH_DOCK_SLOT_ANIMATION_SECONDS, REACH_EASING_EASE_IN_OUT);
+                    reach_animation_manager_animate_to(&dock->manager, reach_dock_slot_track(pool),
+                                                       1.0f, REACH_DOCK_SLOT_ANIMATION_SECONDS,
+                                                       REACH_EASING_EASE_IN_OUT);
                 }
             }
         }
@@ -1755,23 +1601,22 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
             }
             dock->slots[pool].lifecycle = REACH_DOCK_SLOT_APPEARING;
             dock->slots[pool].key = item_key;
-            dock->slots[pool].target_width = app_slot_width;
-            reach_animation_manager_start(&dock->manager, reach_dock_slot_track(pool), 0.0f,
-                                          app_slot_width, REACH_DOCK_SLOT_ANIMATION_SECONDS,
+            reach_animation_manager_start(&dock->manager, reach_dock_slot_track(pool), 0.0f, 1.0f,
+                                          REACH_DOCK_SLOT_ANIMATION_SECONDS,
                                           REACH_EASING_EASE_IN_OUT);
         }
-        new_order[new_count++] = (uint8_t)pool;
-        for (size_t dying = 1; dying < REACH_DOCK_SLOT_CAPACITY; ++dying)
+        new_order[new_count++] = (uint16_t)pool;
+        for (size_t dying = 0; dying < REACH_DOCK_SLOT_CAPACITY; ++dying)
         {
             if (dock->slots[dying].lifecycle == REACH_DOCK_SLOT_DYING &&
                 dying_anchor[dying] == pool && dying != pool)
             {
-                new_order[new_count++] = (uint8_t)dying;
+                new_order[new_count++] = (uint16_t)dying;
             }
         }
     }
 
-    for (size_t pool = 1; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
+    for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         if (dock->slots[pool].lifecycle != REACH_DOCK_SLOT_DYING)
         {
@@ -1788,7 +1633,7 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
         }
         if (!present)
         {
-            new_order[new_count++] = (uint8_t)pool;
+            new_order[new_count++] = (uint16_t)pool;
         }
     }
     for (size_t at = 0; at < new_count; ++at)
@@ -1800,9 +1645,6 @@ static void reach_dock_sync_slots(reach_dock *dock, float app_slot_width, float 
 
 static void reach_dock_snap_slots(reach_dock *dock)
 {
-    reach_animation_manager_set(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT,
-                                dock->slots[0].target_width > 0.0f ? 1.0f : 0.0f);
-    dock->np_content_armed = 0;
     for (size_t pool = 0; pool < REACH_DOCK_SLOT_CAPACITY; ++pool)
     {
         reach_dock_slot *slot = &dock->slots[pool];
@@ -1810,14 +1652,13 @@ static void reach_dock_snap_slots(reach_dock *dock)
         {
             continue;
         }
-        if (slot->lifecycle == REACH_DOCK_SLOT_DYING && pool != 0)
+        if (slot->lifecycle == REACH_DOCK_SLOT_DYING)
         {
             reach_dock_slot_free(dock, pool);
             continue;
         }
         slot->lifecycle = REACH_DOCK_SLOT_STEADY;
-        reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool),
-                                    slot->target_width);
+        reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool), 1.0f);
     }
 }
 
@@ -1827,22 +1668,17 @@ float reach_dock_item_reveal(reach_dock *dock, size_t item_index)
     {
         return 0.0f;
     }
-    reach_dock_order_key key = reach_dock_item_key_at(&dock->state.model, item_index);
+    uint32_t key = reach_dock_item_key_at(&dock->state.model, item_index);
     size_t pool = reach_dock_slot_find(dock, key);
     if (pool >= REACH_DOCK_SLOT_CAPACITY)
     {
         return 1.0f;
     }
-    const reach_dock_slot *slot = &dock->slots[pool];
-    if (slot->lifecycle == REACH_DOCK_SLOT_STEADY)
+    if (dock->slots[pool].lifecycle == REACH_DOCK_SLOT_STEADY)
     {
         return 1.0f;
     }
-    if (slot->target_width <= 0.0f)
-    {
-        return 0.0f;
-    }
-    const float progress = reach_dock_slot_width(dock, pool) / slot->target_width;
+    const float progress = reach_dock_slot_reveal(dock, pool);
     if (progress <= REACH_DOCK_SLOT_REVEAL_THRESHOLD)
     {
         return 0.0f;
@@ -1852,14 +1688,57 @@ float reach_dock_item_reveal(reach_dock *dock, size_t item_index)
     return reveal > 1.0f ? 1.0f : reveal;
 }
 
-float reach_dock_now_playing_reveal_width(reach_dock *dock, float scaled_gap)
+reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_icon_size,
+                                             float native_gap, float native_border_thickness,
+                                             float available_width, float app_slot_units)
 {
-    if (dock == nullptr)
+    reach_dock_fit_result result = {};
+    if (native_height < 0.0f)
     {
-        return 0.0f;
+        native_height = 0.0f;
     }
-    const float width = reach_dock_slot_width(dock, 0) - scaled_gap;
-    return width > 0.0f ? width : 0.0f;
+    if (native_icon_size < 0.0f)
+    {
+        native_icon_size = 0.0f;
+    }
+    if (native_gap < 0.0f)
+    {
+        native_gap = 0.0f;
+    }
+    if (native_border_thickness < 0.0f)
+    {
+        native_border_thickness = 0.0f;
+    }
+    if (native_border_thickness > native_height * 0.5f)
+    {
+        native_border_thickness = native_height * 0.5f;
+    }
+    float available_icon_height = native_height - native_border_thickness * 2.0f;
+    if (native_icon_size > available_icon_height)
+    {
+        native_icon_size = available_icon_height;
+    }
+    if (app_slot_units < 0.0f)
+    {
+        app_slot_units = 0.0f;
+    }
+
+    const float native_outer_padding = native_gap * REACH_DOCK_OUTER_PADDING_SCALE;
+    const float native_width = native_border_thickness * 2.0f + native_outer_padding * 2.0f +
+                               native_icon_size + app_slot_units * (native_icon_size + native_gap);
+    result.scale = 1.0f;
+    if (available_width > 0.0f && native_width > available_width)
+    {
+        result.scale = available_width / native_width;
+    }
+    const float scaled_width = native_width * result.scale;
+    result.width = result.scale < 1.0f ? scaled_width : ceilf(scaled_width);
+    result.height = native_height * result.scale;
+    result.icon_size = native_icon_size * result.scale;
+    result.gap = native_gap * result.scale;
+    result.outer_padding = native_outer_padding * result.scale +
+                           (result.width - scaled_width) * 0.5f;
+    return result;
 }
 
 void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *ctx,
@@ -1871,68 +1750,52 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     }
 
     dock->pointer_theme = ctx->theme;
-    dock->pointer_pinned_apps = ctx->pinned_apps;
-    dock->pointer_pinned_app_count = ctx->pinned_app_count;
-
     reach_dock_build_items(dock, ctx->pinned_apps, ctx->pinned_app_count);
 
     layout->app_slot_count = dock->state.model.item_count;
-    const float scale = ctx->dpi_scale;
-    const float icon_size = ctx->icon_size * scale;
-    const float gap = ctx->gap * scale;
-    const size_t count = dock->state.model.item_count;
-    const reach_theme *theme = ctx->theme;
-    const float clock_width = theme->dock_clock_width * scale;
-    const float separator_width = theme->dock_system_separator_width * scale;
-    const float separator_height =
-        layout->bounds.height * theme->dock_system_separator_height_ratio;
-    const float now_playing_height = reach_theme_now_playing_height(theme, layout->bounds.height);
-    const float now_playing_render_width =
-        reach_dock_now_playing_desired_width(dock->now_playing_subfeature, theme, scale);
-    const float now_playing_reserved_width =
-        reach_dock_now_playing_visible(dock->now_playing_subfeature) ? now_playing_render_width
-                                                                     : 0.0f;
+    reach_dock_sync_slots(dock);
 
+    float app_slot_units = 0.0f;
+    for (size_t at = 0; at < dock->slot_order_count; ++at)
+    {
+        float reveal = reach_dock_slot_reveal(dock, dock->slot_order[at]);
+        app_slot_units += reveal;
+    }
+
+    const float dpi_scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    const float native_height =
+        layout->native_height > 0.0f ? layout->native_height : layout->bounds.height;
+    const float native_border_thickness = reach_theme_border_thickness(ctx->theme, dpi_scale);
+    const reach_dock_fit_result fit =
+        reach_dock_fit_metrics(native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale,
+                               native_border_thickness, layout->available_width, app_slot_units);
+    const float center_x = layout->bounds.x + layout->bounds.width * 0.5f;
+    const float bottom = layout->bounds.y + layout->bounds.height;
+    layout->bounds.x = center_x - fit.width * 0.5f;
+    layout->bounds.y = bottom - fit.height;
+    layout->bounds.width = fit.width;
+    layout->bounds.height = fit.height;
+    layout->native_height = native_height;
+    layout->content_scale = fit.scale;
+
+    const float icon_size = fit.icon_size;
+    const float gap = fit.gap;
+    const float border_thickness = native_border_thickness * fit.scale;
     const float app_slot_width = icon_size + gap;
-    const float np_slot_width =
-        now_playing_reserved_width > 0.0f ? ceilf(now_playing_reserved_width) + gap : 0.0f;
-    reach_dock_sync_slots(dock, app_slot_width, np_slot_width);
 
-    const float now_playing_left = theme->now_playing_left_margin * scale;
     const float top = (layout->bounds.height - icon_size) * 0.5f;
 
-    float x = gap;
-    layout->now_playing = {};
-    const float np_width_now = reach_dock_slot_width(dock, 0);
-    const float np_content =
-        reach_animation_manager_value(&dock->manager, REACH_DOCK_ANIM_NOW_PLAYING_CONTENT);
-    if (now_playing_render_width > 0.0f && np_width_now > 0.0f && np_content > 0.0f)
-    {
-        layout->now_playing.x = now_playing_left;
-        layout->now_playing.y = (layout->bounds.height - now_playing_height) * 0.5f;
-        layout->now_playing.width = now_playing_render_width;
-        layout->now_playing.height = now_playing_height;
-        if (np_content < 1.0f)
-        {
-
-            const float inset_x = layout->now_playing.width * (1.0f - np_content) * 0.5f;
-            const float inset_y = layout->now_playing.height * (1.0f - np_content) * 0.5f;
-            layout->now_playing.x += inset_x;
-            layout->now_playing.y += inset_y;
-            layout->now_playing.width -= inset_x * 2.0f;
-            layout->now_playing.height -= inset_y * 2.0f;
-        }
-    }
-    x += np_width_now;
+    float x = border_thickness + fit.outer_padding;
+    layout->trigger_button.width = icon_size;
+    layout->trigger_button.height = icon_size;
+    layout->trigger_button.x = x;
+    layout->trigger_button.y = top;
+    x += app_slot_width;
 
     size_t item_index = 0;
     for (size_t at = 0; at < dock->slot_order_count; ++at)
     {
         size_t pool = dock->slot_order[at];
-        if (pool == 0)
-        {
-            continue;
-        }
         const reach_dock_slot *slot = &dock->slots[pool];
         if (slot->lifecycle == REACH_DOCK_SLOT_APPEARING ||
             slot->lifecycle == REACH_DOCK_SLOT_STEADY)
@@ -1946,7 +1809,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
                 ++item_index;
             }
         }
-        x += reach_dock_slot_width(dock, pool);
+        x += reach_dock_slot_reveal(dock, pool) * app_slot_width;
     }
 
     for (; item_index < layout->app_slot_count; ++item_index)
@@ -1958,43 +1821,30 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
         x += app_slot_width;
     }
 
-    layout->tray_button.width = icon_size;
-    layout->tray_button.height = icon_size;
-    layout->tray_button.x = x;
-    layout->tray_button.y = top;
-
-    layout->quick_settings_button.width = icon_size;
-    layout->quick_settings_button.height = icon_size;
-    layout->quick_settings_button.x = layout->tray_button.x + icon_size;
-    layout->quick_settings_button.y = top;
-
-    layout->system_separator.width = separator_width;
-    layout->system_separator.height = separator_height;
-    layout->system_separator.x = layout->quick_settings_button.x + icon_size + gap;
-    layout->system_separator.y = (layout->bounds.height - separator_height) * 0.5f;
-
-    layout->clock.width = clock_width;
-    layout->clock.height = icon_size;
-    layout->clock.x = layout->system_separator.x + separator_width + gap;
-    layout->clock.y = top;
-
-    layout->power_button.width = icon_size;
-    layout->power_button.height = icon_size;
-    layout->power_button.x = layout->clock.x + clock_width + gap;
-    layout->power_button.y = top;
-
-    const float dock_width = ceilf(layout->power_button.x + icon_size + gap);
-    const float old_width = layout->bounds.width;
-    if (dock_width != old_width)
-    {
-        layout->bounds.x += (old_width - dock_width) * 0.5f;
-        layout->bounds.width = dock_width;
-    }
-
-    reach_dock_now_playing_relayout(dock->now_playing_subfeature, theme, layout->now_playing,
-                                    scale);
     dock->pointer_layout = *layout;
     dock->pointer_layout_valid = 1;
+}
+
+reach_result reach_dock_append_surface_render_commands(reach_dock *dock,
+                                                       const reach_dock_surface_render_context *ctx,
+                                                       reach_render_command_buffer *out_commands)
+{
+    if (dock == nullptr || ctx == nullptr || out_commands == nullptr || !dock->pointer_layout_valid)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_dock_layout layout = dock->pointer_layout;
+    layout.bounds = ctx->bounds;
+
+    reach_dock_render_context render = {};
+    render.theme = ctx->theme;
+    render.layout = &layout;
+    render.focused_window =
+        dock->windows != nullptr ? reach_window_tracking_foreground(dock->windows) : 0;
+    render.icon_size_px = ctx->icon_size_px;
+    render.dpi_scale = ctx->dpi_scale;
+    return reach_dock_append_render_commands(dock, &render, out_commands);
 }
 
 reach_point_i32 reach_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y)
@@ -2024,17 +1874,25 @@ reach_rect_f32 reach_dock_rect_to_screen(const reach_dock_layout *layout, reach_
 
 reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout)
 {
-    layout.now_playing = reach_dock_rect_to_screen(&layout, layout.now_playing);
     for (size_t index = 0; index < layout.app_slot_count; ++index)
     {
         layout.app_slots[index] = reach_dock_rect_to_screen(&layout, layout.app_slots[index]);
     }
-    layout.tray_button = reach_dock_rect_to_screen(&layout, layout.tray_button);
-    layout.quick_settings_button = reach_dock_rect_to_screen(&layout, layout.quick_settings_button);
-    layout.system_separator = reach_dock_rect_to_screen(&layout, layout.system_separator);
-    layout.clock = reach_dock_rect_to_screen(&layout, layout.clock);
-    layout.power_button = reach_dock_rect_to_screen(&layout, layout.power_button);
     return layout;
+}
+
+int32_t reach_dock_item_anchor(const reach_dock *dock, size_t index, reach_rect_f32 *out_button,
+                               float *out_bar_edge_y)
+{
+    if (dock == nullptr || !dock->pointer_layout_valid || out_button == nullptr ||
+        out_bar_edge_y == nullptr || index >= dock->pointer_layout.app_slot_count)
+    {
+        return 0;
+    }
+    *out_button =
+        reach_dock_rect_to_screen(&dock->pointer_layout, dock->pointer_layout.app_slots[index]);
+    *out_bar_edge_y = dock->pointer_layout.bounds.y;
+    return 1;
 }
 
 void reach_dock_rebuild_items(reach_dock *dock, const reach_dock_build_context *ctx,
@@ -2053,7 +1911,7 @@ void reach_dock_rebuild_items(reach_dock *dock, const reach_dock_build_context *
 
 static void reach_dock_start_item_x_animation(reach_dock *dock, size_t index, float from, float to)
 {
-    if (dock == nullptr || index >= REACH_MAX_PINNED_APPS)
+    if (dock == nullptr || index >= REACH_MAX_DOCK_ITEMS)
     {
         return;
     }
@@ -2076,7 +1934,7 @@ void reach_dock_clear_item_x_animations(reach_dock *dock)
         return;
     }
     reach_dock_snap_slots(dock);
-    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = 0; index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         reach_animation_manager_reset(&dock->manager, reach_dock_item_animation_id(index));
         dock->state.item_x_valid[index] = 0;
@@ -2098,9 +1956,9 @@ void reach_dock_item_x_snapshot_take(reach_dock *dock, const reach_theme *theme,
     }
     reach_dock_state *state = &dock->state;
     size_t count = state->model.item_count;
-    if (count > REACH_MAX_PINNED_APPS)
+    if (count > REACH_MAX_DOCK_ITEMS)
     {
-        count = REACH_MAX_PINNED_APPS;
+        count = REACH_MAX_DOCK_ITEMS;
     }
     out_snapshot->count = count;
     for (size_t index = 0; index < count; ++index)
@@ -2124,18 +1982,18 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
     {
         float target_x = reach_dock_slot_box_x(theme, layout, index);
         float from_x = target_x;
-        reach_dock_order_key item_key = reach_dock_item_key_at(&state->model, index);
+        uint32_t item_key = reach_dock_item_key_at(&state->model, index);
         for (size_t old_index = 0; old_index < snapshot->count; ++old_index)
         {
-            if (reach_dock_key_equal(&snapshot->keys[old_index], &item_key))
+            if (item_key != 0 && snapshot->keys[old_index] == item_key)
             {
                 from_x = snapshot->x[old_index];
                 break;
             }
         }
         state->item_x_keys[index] = item_key;
-        if (reach_dock_key_equal(&state->drag.key, &item_key) &&
-            (state->drag.active ||
+        if (item_key != 0 && state->drag.key == item_key &&
+            (reach_draggable_tracking(&state->drag.gesture) ||
              reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP)))
         {
             reach_dock_start_item_x_animation(dock, index, target_x, target_x);
@@ -2145,7 +2003,7 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
             reach_dock_start_item_x_animation(dock, index, from_x, target_x);
         }
     }
-    for (size_t index = state->model.item_count; index < REACH_MAX_PINNED_APPS; ++index)
+    for (size_t index = state->model.item_count; index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         state->item_x_valid[index] = 0;
         reach_animation_manager_reset(&dock->manager, reach_dock_item_animation_id(index));

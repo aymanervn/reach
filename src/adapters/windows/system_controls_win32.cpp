@@ -9,6 +9,7 @@
 
 #include <winsock2.h>
 #include <windows.h>
+#include <powrprof.h>
 #include <wlanapi.h>
 #include <iphlpapi.h>
 #include <wbemidl.h>
@@ -288,25 +289,6 @@ static void WINAPI reach_system_controls_wlan_notification(PWLAN_NOTIFICATION_DA
                                  REACH_SYSTEM_CONTROLS_CHANGE_NETWORK);
 }
 
-static void reach_system_controls_copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)(unsigned char)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
-}
-
 static DWORD WINAPI reach_system_controls_addr_change_thread(void *context)
 {
     reach_system_controls_adapter *adapter = static_cast<reach_system_controls_adapter *>(context);
@@ -417,7 +399,7 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
 
         reach_result result = REACH_ERROR;
         reach_bluetooth_state state = {};
-        int32_t notify_bluetooth = 0;
+        uint32_t notify_flags = 0;
 
         if (request_type == REACH_BLUETOOTH_REQUEST_GET_STATE)
         {
@@ -430,7 +412,8 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
         else if (request_type == REACH_BLUETOOTH_REQUEST_SET_ENABLED_ASYNC)
         {
             result = reach_bluetooth_worker_set_enabled(&radio, request_enabled);
-            notify_bluetooth = 1;
+            notify_flags = REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH |
+                           REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST;
         }
 
         if (adapter->bluetooth_lock_initialized)
@@ -446,9 +429,9 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
         {
             SetEvent(adapter->bluetooth_complete);
         }
-        if (notify_bluetooth)
+        if (notify_flags != 0)
         {
-            reach_system_controls_notify(adapter, REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
+            reach_system_controls_notify(adapter, notify_flags);
         }
     }
 
@@ -465,25 +448,6 @@ static DWORD WINAPI reach_bluetooth_worker_thread(void *context)
     radio = nullptr;
     winrt::uninit_apartment();
     return 0;
-}
-
-static void reach_system_controls_copy_utf16(uint16_t *dst, size_t dst_count, const wchar_t *src)
-{
-    if (dst == nullptr || dst_count == 0)
-    {
-        return;
-    }
-
-    size_t index = 0;
-    if (src != nullptr)
-    {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)src[index];
-            ++index;
-        }
-    }
-    dst[index] = 0;
 }
 
 static void reach_system_controls_copy_ssid(uint16_t *dst, size_t dst_count, const DOT11_SSID *ssid)
@@ -505,13 +469,16 @@ static void reach_system_controls_copy_ssid(uint16_t *dst, size_t dst_count, con
         source_count = sizeof(ssid->ucSSID);
     }
 
-    size_t index = 0;
-    while (index + 1 < dst_count && index < source_count)
+    int converted = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char *>(ssid->ucSSID),
+                                        (int)source_count, reinterpret_cast<wchar_t *>(dst),
+                                        (int)(dst_count - 1));
+    if (converted <= 0)
     {
-        dst[index] = (uint16_t)ssid->ucSSID[index];
-        ++index;
+        converted = MultiByteToWideChar(CP_ACP, 0, reinterpret_cast<const char *>(ssid->ucSSID),
+                                        (int)source_count, reinterpret_cast<wchar_t *>(dst),
+                                        (int)(dst_count - 1));
     }
-    dst[index] = 0;
+    dst[converted > 0 ? (size_t)converted : 0] = 0;
 }
 
 static void reach_system_controls_set_disconnected_network(reach_network_state *state)
@@ -523,8 +490,7 @@ static void reach_system_controls_set_disconnected_network(reach_network_state *
 
     *state = {};
     state->kind = REACH_NETWORK_KIND_NONE;
-    reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY,
-                                     "No internet");
+    reach_copy_ascii_to_utf16(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "No internet");
 }
 
 static void reach_system_controls_set_ethernet_network(reach_network_state *state)
@@ -538,7 +504,7 @@ static void reach_system_controls_set_ethernet_network(reach_network_state *stat
     state->kind = REACH_NETWORK_KIND_ETHERNET;
     state->connected = 1;
     state->signal_strength = 100;
-    reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "Ethernet");
+    reach_copy_ascii_to_utf16(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "Ethernet");
 }
 
 static void reach_system_controls_set_wifi_network(reach_network_state *state,
@@ -564,8 +530,7 @@ static void reach_system_controls_set_wifi_network(reach_network_state *state,
     reach_system_controls_copy_ssid(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, ssid);
     if (state->label[0] == 0)
     {
-        reach_system_controls_copy_ascii(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY,
-                                         "Wi-Fi");
+        reach_copy_ascii_to_utf16(state->label, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, "Wi-Fi");
     }
 }
 
@@ -831,6 +796,89 @@ static reach_result reach_system_controls_request_bluetooth_enabled(void *userda
     return REACH_OK;
 }
 
+static int32_t reach_system_controls_read_theme_value(HKEY key, const wchar_t *name,
+                                                      DWORD *out_value)
+{
+    DWORD value = 0;
+    DWORD type = 0;
+    DWORD size = sizeof(value);
+    LONG status =
+        RegQueryValueExW(key, name, nullptr, &type, reinterpret_cast<BYTE *>(&value), &size);
+    if (status != ERROR_SUCCESS || type != REG_DWORD || size != sizeof(value))
+    {
+        return 0;
+    }
+    *out_value = value;
+    return 1;
+}
+
+static reach_result reach_system_controls_set_theme_modes(void *userdata,
+                                                          reach_theme_mode system_mode,
+                                                          reach_theme_mode app_mode)
+{
+    (void)userdata;
+    if ((system_mode != REACH_THEME_MODE_DARK && system_mode != REACH_THEME_MODE_LIGHT) ||
+        (app_mode != REACH_THEME_MODE_DARK && app_mode != REACH_THEME_MODE_LIGHT))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER,
+                        L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0,
+                        nullptr, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, nullptr, &key,
+                        nullptr) != ERROR_SUCCESS)
+    {
+        return REACH_ERROR;
+    }
+
+    struct reach_theme_registry_value
+    {
+        const wchar_t *name;
+        DWORD target;
+    } values[] = {
+        {L"SystemUsesLightTheme", system_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u},
+        {L"AppsUseLightTheme", app_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u},
+    };
+
+    int32_t changed = 0;
+    reach_result result = REACH_OK;
+    for (const reach_theme_registry_value &value : values)
+    {
+        DWORD current = 0;
+        if (reach_system_controls_read_theme_value(key, value.name, &current) &&
+            current == value.target)
+        {
+            continue;
+        }
+        if (RegSetValueExW(key, value.name, 0, REG_DWORD,
+                           reinterpret_cast<const BYTE *>(&value.target),
+                           sizeof(value.target)) != ERROR_SUCCESS)
+        {
+            result = REACH_ERROR;
+            continue;
+        }
+        changed = 1;
+    }
+    RegCloseKey(key);
+
+    if (changed)
+    {
+        DWORD_PTR broadcast_result = 0;
+        (void)SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
+                                  reinterpret_cast<LPARAM>(L"ImmersiveColorSet"),
+                                  SMTO_ABORTIFHUNG | SMTO_NORMAL, 2000, &broadcast_result);
+        UINT taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
+        if (taskbar_created != 0)
+        {
+            broadcast_result = 0;
+            (void)SendMessageTimeoutW(HWND_BROADCAST, taskbar_created, 0, 0,
+                                      SMTO_ABORTIFHUNG | SMTO_NORMAL, 2000, &broadcast_result);
+        }
+    }
+    return result;
+}
+
 static reach_result reach_system_controls_get_power_state(void *userdata,
                                                           reach_power_state *out_state)
 {
@@ -853,7 +901,120 @@ static reach_result reach_system_controls_get_power_state(void *userdata,
     out_state->battery_percent =
         status.BatteryLifePercent == 255 ? -1 : (int32_t)status.BatteryLifePercent;
     out_state->battery_saver_on = status.SystemStatusFlag == 1 ? 1 : 0;
+    out_state->battery_charging = out_state->has_battery && status.ACLineStatus == 1 ? 1 : 0;
     return REACH_OK;
+}
+
+static const wchar_t REACH_POWER_BACKUP_KEY[] = L"Software\\Reach";
+static const wchar_t REACH_POWER_BACKUP_VALUE[] = L"BatterySaverThreshold";
+static const DWORD REACH_ENERGY_SAVER_ALWAYS = 100;
+static const DWORD REACH_ENERGY_SAVER_NEVER = 0;
+
+static int32_t reach_system_controls_read_saver_backup(DWORD *out_threshold)
+{
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, REACH_POWER_BACKUP_KEY, 0, KEY_QUERY_VALUE, &key) !=
+        ERROR_SUCCESS)
+    {
+        return 0;
+    }
+
+    DWORD value = 0;
+    DWORD size = sizeof(value);
+    DWORD type = 0;
+    LONG status = RegQueryValueExW(key, REACH_POWER_BACKUP_VALUE, nullptr, &type,
+                                   reinterpret_cast<BYTE *>(&value), &size);
+    RegCloseKey(key);
+
+    if (status != ERROR_SUCCESS || type != REG_DWORD || value > 100)
+    {
+        return 0;
+    }
+
+    *out_threshold = value;
+    return 1;
+}
+
+static void reach_system_controls_write_saver_backup(DWORD threshold)
+{
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, REACH_POWER_BACKUP_KEY, 0, nullptr, 0, KEY_SET_VALUE,
+                        nullptr, &key, nullptr) != ERROR_SUCCESS)
+    {
+        return;
+    }
+
+    (void)RegSetValueExW(key, REACH_POWER_BACKUP_VALUE, 0, REG_DWORD,
+                         reinterpret_cast<const BYTE *>(&threshold), sizeof(threshold));
+    RegCloseKey(key);
+}
+
+static void reach_system_controls_clear_saver_backup(void)
+{
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, REACH_POWER_BACKUP_KEY, 0, KEY_SET_VALUE, &key) !=
+        ERROR_SUCCESS)
+    {
+        return;
+    }
+
+    (void)RegDeleteValueW(key, REACH_POWER_BACKUP_VALUE);
+    RegCloseKey(key);
+}
+
+// Windows exposes no API that turns battery saver on or off — powrprof only exports the overlay
+// scheme setters and WinRT PowerManager is read-only. Driving the charge level at which Windows
+// engages it is the documented stand-in: 100 means "whenever on battery", 0 means never. The
+// previous threshold is kept in the registry so turning saver off restores the user's setting
+// even across a restart.
+static reach_result reach_system_controls_set_battery_saver_enabled(void *userdata, int32_t enabled)
+{
+    (void)userdata;
+
+    GUID *scheme = nullptr;
+    if (PowerGetActiveScheme(nullptr, &scheme) != ERROR_SUCCESS || scheme == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    DWORD current = 0;
+    int32_t current_valid =
+        PowerReadDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
+                              &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, &current) == ERROR_SUCCESS;
+
+    DWORD target = REACH_ENERGY_SAVER_NEVER;
+    if (enabled)
+    {
+        if (current_valid && current < REACH_ENERGY_SAVER_ALWAYS)
+        {
+            reach_system_controls_write_saver_backup(current);
+        }
+        target = REACH_ENERGY_SAVER_ALWAYS;
+    }
+    else
+    {
+        DWORD restored = 0;
+        if (reach_system_controls_read_saver_backup(&restored))
+        {
+            target = restored;
+        }
+    }
+
+    reach_result result = REACH_OK;
+    if (PowerWriteDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
+                               &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, target) != ERROR_SUCCESS ||
+        PowerSetActiveScheme(nullptr, scheme) != ERROR_SUCCESS)
+    {
+        result = REACH_ERROR;
+    }
+
+    if (result == REACH_OK && !enabled)
+    {
+        reach_system_controls_clear_saver_backup();
+    }
+
+    LocalFree(scheme);
+    return result;
 }
 
 static int32_t reach_system_controls_variant_bool(const VARIANT *variant)
@@ -1337,7 +1498,8 @@ reach_system_controls_start_watching(void *userdata, reach_system_controls_chang
             CreateThread(nullptr, 0, reach_system_controls_addr_change_thread, adapter, 0, nullptr);
     }
 
-    if (adapter->wlan == nullptr && adapter->addr_change_thread == nullptr)
+    if (adapter->wlan == nullptr && adapter->addr_change_thread == nullptr &&
+        adapter->bluetooth_thread == nullptr)
     {
         if (adapter->addr_change != nullptr)
         {
@@ -1437,6 +1599,7 @@ extern "C" reach_result reach_windows_create_system_controls(reach_system_contro
     out_port->set_brightness_level = reach_system_controls_set_brightness_level;
     out_port->open_project_menu = reach_system_controls_open_project_menu;
     out_port->open_system_quick_settings = reach_system_controls_open_system_quick_settings;
+    out_port->set_theme_modes = reach_system_controls_set_theme_modes;
     out_port->start_watching = reach_system_controls_start_watching;
     out_port->stop_watching = reach_system_controls_stop_watching;
     out_port->destroy = reach_system_controls_destroy;

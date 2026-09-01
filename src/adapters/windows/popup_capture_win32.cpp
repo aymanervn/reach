@@ -1,5 +1,7 @@
 #include "windows_adapters_internal.h"
 
+#include "mouse_hook_thread_win32.h"
+
 #include <windows.h>
 #include <windowsx.h>
 
@@ -9,7 +11,7 @@
 
 struct reach_popup_capture_adapter
 {
-    HHOOK mouse_hook;
+    reach_mouse_hook *mouse_hook;
     HWND message_window;
     reach_popup_capture_mouse_down_callback mouse_callback;
     void *mouse_callback_userdata;
@@ -110,17 +112,14 @@ reach_popup_capture_sync_mouse_hook(void *userdata, int32_t should_hook,
 
         if (adapter->mouse_hook != nullptr)
         {
-            UnhookWindowsHookEx(adapter->mouse_hook);
+            reach_windows_remove_mouse_hook(adapter->mouse_hook);
             adapter->mouse_hook = nullptr;
         }
-        adapter->mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, reach_popup_capture_mouse_hook_proc,
-                                                GetModuleHandleW(nullptr), 0);
-        if (adapter->mouse_hook != nullptr)
+        g_reach_popup_capture_instance = adapter;
+        if (reach_windows_install_mouse_hook(reach_popup_capture_mouse_hook_proc,
+                                             &adapter->mouse_hook) != REACH_OK)
         {
-            g_reach_popup_capture_instance = adapter;
-        }
-        else
-        {
+            g_reach_popup_capture_instance = nullptr;
             adapter->mouse_callback = nullptr;
             adapter->mouse_callback_userdata = nullptr;
             return REACH_ERROR;
@@ -128,7 +127,7 @@ reach_popup_capture_sync_mouse_hook(void *userdata, int32_t should_hook,
     }
     else if (!should_hook && adapter->mouse_hook != nullptr)
     {
-        UnhookWindowsHookEx(adapter->mouse_hook);
+        reach_windows_remove_mouse_hook(adapter->mouse_hook);
         adapter->mouse_hook = nullptr;
         adapter->mouse_callback = nullptr;
         adapter->mouse_callback_userdata = nullptr;
@@ -151,7 +150,7 @@ static void reach_popup_capture_destroy(void *userdata)
 
     if (adapter->mouse_hook != nullptr)
     {
-        UnhookWindowsHookEx(adapter->mouse_hook);
+        reach_windows_remove_mouse_hook(adapter->mouse_hook);
         adapter->mouse_hook = nullptr;
     }
 

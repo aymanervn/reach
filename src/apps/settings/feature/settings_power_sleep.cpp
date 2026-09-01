@@ -2,42 +2,34 @@
 
 const uint16_t *reach_settings_power_sleep_page_title(void)
 {
-    return (const uint16_t *)L"Power and Sleep";
+    return (const uint16_t *)L"Energy";
 }
 
 const uint16_t *reach_settings_power_sleep_page_placeholder(void)
 {
-    return (const uint16_t *)L"Power and Sleep settings page";
+    return (const uint16_t *)L"Energy settings page";
 }
 
-static const int32_t
-    reach_settings_power_presets[REACH_SETTINGS_POWER_TIMER_COUNT]
-                                [REACH_SETTINGS_POWER_PRESET_COUNT] = {
-                                    {0, 5, 15, 30, 60},
-                                    {0, 1, 5, 10, 15},
-                                    {0, 30, 60, 120, 180},
-                                    {0, 60, 120, 240, 360},
+static const int32_t reach_settings_power_presets[REACH_SETTINGS_POWER_TIMER_COUNT]
+                                                 [REACH_SETTINGS_POWER_PRESET_COUNT] = {
+                                                     {0, 5, 10, 15, 30},     {0, 5, 15, 30, 60},
+                                                     {0, 1, 5, 10, 15},      {0, 30, 60, 120, 180},
+                                                     {0, 60, 120, 240, 360},
 };
 
 const reach_settings_power_row_style *reach_settings_power_row_styles(void)
 {
     static const reach_settings_power_row_style styles[REACH_SETTINGS_POWER_TIMER_COUNT] = {
-        {REACH_VECTOR_ICON_SLEEP,
-         (const uint16_t *)L"Sleep",
-         (const uint16_t *)L"Put the device to sleep when idle for",
-         {0.70f, 0.55f, 0.95f, 1.0f}},
-        {REACH_VECTOR_ICON_LOCK,
-         (const uint16_t *)L"Auto lock",
-         (const uint16_t *)L"Lock Windows when idle for",
-         {0.31f, 0.78f, 0.86f, 1.0f}},
-        {REACH_VECTOR_ICON_SHUTDOWN,
-         (const uint16_t *)L"Shutdown",
-         (const uint16_t *)L"Shut down the device when idle for",
-         {0.96f, 0.45f, 0.35f, 1.0f}},
-        {REACH_VECTOR_ICON_RESTART,
-         (const uint16_t *)L"Restart",
-         (const uint16_t *)L"Restart the device when idle for",
-         {0.20f, 0.72f, 0.96f, 1.0f}},
+        {REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Screen off",
+         (const uint16_t *)L"Turn off the screen when idle for", REACH_THEME_ACCENT_BLUE},
+        {REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Sleep",
+         (const uint16_t *)L"Put the device to sleep when idle for", REACH_THEME_ACCENT_LAVENDER},
+        {REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Auto lock",
+         (const uint16_t *)L"Lock Windows when idle for", REACH_THEME_ACCENT_TEAL},
+        {REACH_VECTOR_ICON_SHUTDOWN, (const uint16_t *)L"Shutdown",
+         (const uint16_t *)L"Shut down the device when idle for", REACH_THEME_ACCENT_RED},
+        {REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Restart",
+         (const uint16_t *)L"Restart the device when idle for", REACH_THEME_ACCENT_CYAN},
     };
     return styles;
 }
@@ -58,12 +50,12 @@ const uint16_t *reach_settings_power_option_label(size_t timer, size_t option)
         int32_t minutes;
         const uint16_t *label;
     } labels[] = {
-        {0, (const uint16_t *)L"Never"},    {1, (const uint16_t *)L"1 min"},
-        {5, (const uint16_t *)L"5 min"},    {10, (const uint16_t *)L"10 min"},
-        {15, (const uint16_t *)L"15 min"},  {30, (const uint16_t *)L"30 min"},
-        {60, (const uint16_t *)L"1 hr"},    {120, (const uint16_t *)L"2 hrs"},
-        {180, (const uint16_t *)L"3 hrs"},  {240, (const uint16_t *)L"4 hrs"},
-        {360, (const uint16_t *)L"6 hrs"},  {720, (const uint16_t *)L"12 hrs"},
+        {0, (const uint16_t *)L"Never"},   {1, (const uint16_t *)L"1 min"},
+        {5, (const uint16_t *)L"5 min"},   {10, (const uint16_t *)L"10 min"},
+        {15, (const uint16_t *)L"15 min"}, {30, (const uint16_t *)L"30 min"},
+        {60, (const uint16_t *)L"1 hr"},   {120, (const uint16_t *)L"2 hrs"},
+        {180, (const uint16_t *)L"3 hrs"}, {240, (const uint16_t *)L"4 hrs"},
+        {360, (const uint16_t *)L"6 hrs"}, {720, (const uint16_t *)L"12 hrs"},
     };
 
     int32_t minutes = reach_settings_power_option_minutes(timer, option);
@@ -236,9 +228,8 @@ int32_t reach_settings_model_tick_power_animations(reach_settings_model *model,
 
 int32_t reach_settings_model_power_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr &&
-           (reach_animation_manager_any_active(&model->power_animations) ||
-            reach_animation_manager_any_active(&model->power_wait_animations));
+    return model != nullptr && (reach_animation_manager_any_active(&model->power_animations) ||
+                                reach_animation_manager_any_active(&model->power_wait_animations));
 }
 
 void reach_settings_model_power_focus_custom(reach_settings_model *model, size_t timer,
@@ -344,7 +335,8 @@ int32_t reach_settings_model_power_handle_edit_key(reach_settings_model *model,
 
 int32_t reach_settings_power_timer_supports_wait(size_t timer)
 {
-    return timer < REACH_SETTINGS_POWER_TIMER_COUNT && timer != REACH_SETTINGS_POWER_TIMER_LOCK;
+    return timer < REACH_SETTINGS_POWER_TIMER_COUNT && timer != REACH_SETTINGS_POWER_TIMER_LOCK &&
+           timer != REACH_SETTINGS_POWER_TIMER_SCREEN_OFF;
 }
 
 void reach_settings_model_set_power_wait_apps(reach_settings_model *model, size_t timer,

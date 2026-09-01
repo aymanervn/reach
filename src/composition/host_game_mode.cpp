@@ -20,28 +20,26 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
     cancel.type = REACH_UI_EVENT_POINTER_CANCEL;
     (void)reach_host_handle_event(host, &cancel);
     reach_host_close_transient_surfaces(host, 1);
-    reach_host_set_clipboard_open(host, 0);
+    reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
 
-    reach_switcher_force_close(host->switcher_capsule);
-    reach_animation_manager_init(&host->animations, host->animation_tracks,
-                                 REACH_HOST_ANIMATION_COUNT);
-    reach_host_surface_transitions_init(host);
-    reach_dock_clear_item_x_animations(host->dock_capsule);
-    host->dock_reveal.edge_visible = 0;
-    host->dock_reveal.edge_bounds_valid = 0;
-    if (host->dock_reveal_edge.ops.hide != nullptr)
-    {
-        (void)host->dock_reveal_edge.ops.hide(host->dock_reveal_edge.edge);
-    }
-
-    host->launcher.dirty_flags = 1;
-    host->tray.dirty_flags = 1;
-    host->switcher.dirty_flags = 1;
-    host->context_menu.dirty_flags = 1;
-    host->quick_settings.dirty_flags = 1;
-    host->clipboard_surface.dirty_flags = 1;
-    host->dock.dirty_flags = 1;
+    reach_host_mark_all_surfaces_dirty(host);
     host->dirty.render = 1;
+}
+
+static void reach_host_disable_bar_pointer_observations(reach_host *host)
+{
+    if (host == nullptr || host->input_source.ops.set_pointer_region == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        if (host->feature_runtimes[index].definition->surface.bar_reveal.ops != nullptr)
+        {
+            (void)host->input_source.ops.set_pointer_region(host->input_source.source,
+                                                            static_cast<uint32_t>(index), {}, 0);
+        }
+    }
 }
 
 int32_t reach_host_game_mode_enabled(const reach_host *host)
@@ -63,15 +61,22 @@ reach_result reach_host_update_game_mode(reach_host *host)
     {
         return REACH_OK;
     }
-
     reach_runtime_policy_set_game_mode(&host->runtime_policy, next_active);
+    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_GAME_MODE,
+                               next_active);
+    if (next_active)
+    {
+        host->top_bar_hidden = 1;
+    }
+    reach_system_stats_set_enabled(host->system_stats, !next_active);
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        reach_surface_desc *desc = &host->surface_descs[index];
-        if (desc->capsule_ops != nullptr && desc->capsule_ops->on_game_mode != nullptr)
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
+        if (desc->definition->capsule_ops != nullptr &&
+            desc->definition->capsule_ops->on_game_mode != nullptr)
         {
-            desc->capsule_ops->on_game_mode(desc->capsule, next_active);
+            desc->definition->capsule_ops->on_game_mode(desc->capsule, next_active);
         }
     }
 
@@ -83,15 +88,17 @@ reach_result reach_host_update_game_mode(reach_host *host)
     {
         host->dirty.layout = 1;
         host->dirty.render = 1;
-        host->dock.dirty_flags = 1;
-        host->launcher.dirty_flags = 1;
-        host->tray.dirty_flags = 1;
-        host->switcher.dirty_flags = 1;
-        host->context_menu.dirty_flags = 1;
-        host->quick_settings.dirty_flags = 1;
-        host->clipboard_surface.dirty_flags = 1;
+        reach_host_mark_all_surfaces_dirty(host);
     }
-    reach_host_sync_pointer_move_subscriptions(host);
+    if (next_active)
+    {
+        reach_host_disable_bar_pointer_observations(host);
+        reach_host_suspend_pointer_move_subscriptions(host);
+    }
+    else
+    {
+        reach_host_sync_pointer_move_subscriptions(host);
+    }
 
     return REACH_OK;
 }

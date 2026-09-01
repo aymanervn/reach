@@ -13,6 +13,7 @@
 #include "reach/core/ui_events.h"
 #include "reach/ports/window_manager.h"
 #include "reach/ports/icon_provider.h"
+#include "reach/ports/text_measure.h"
 #include "reach/support/animation.h"
 #include "reach/support/util.h"
 
@@ -44,6 +45,7 @@ extern "C"
         const reach_switcher_render_item *items;
         size_t item_count;
         float dpi_scale;
+        reach_text_measure_port text_measure;
         int32_t text_alignment_center;
         int32_t text_weight_demi_bold;
     } reach_switcher_render_input;
@@ -52,7 +54,8 @@ extern "C"
     reach_rect_f32 reach_switcher_bounds_for_count(reach_rect_f32 monitor_bounds,
                                                    size_t visible_count);
     reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bounds,
-                                                          size_t visible_count, float dpi_scale);
+                                                          size_t visible_count, float dpi_scale,
+                                                          float border_thickness);
     void reach_switcher_update_visible_start(reach_switcher_model *model);
     reach_result reach_switcher_build_render_commands(const reach_switcher_render_input *input,
                                                       reach_render_command_buffer *out_commands);
@@ -60,13 +63,24 @@ extern "C"
     typedef struct reach_switcher_state
     {
         int32_t open;
+        reach_rect_f32 bounds;
         size_t selected_index;
         size_t visible_start;
-        uintptr_t windows[REACH_MAX_PINNED_APPS];
+        uintptr_t windows[REACH_MAX_OPEN_WINDOWS];
         size_t window_count;
     } reach_switcher_state;
 
     typedef struct reach_switcher reach_switcher;
+
+    typedef struct reach_switcher_arrange_context
+    {
+        const reach_theme *theme;
+        reach_rect_f32 monitor_bounds;
+        reach_rect_f32 last_bounds;
+        float dpi_scale;
+        int32_t transition_visible;
+        int32_t bounds_valid;
+    } reach_switcher_arrange_context;
 
     reach_result reach_switcher_create(reach_switcher **out_switcher);
 
@@ -91,6 +105,8 @@ extern "C"
     reach_rect_f32 reach_switcher_apply_width_animation(
         reach_switcher *switcher, int32_t transition_visible, int32_t open, int32_t bounds_valid,
         float last_bounds_width, reach_rect_f32 target, int32_t *out_request_redraw);
+    int32_t reach_switcher_arrange(reach_switcher *switcher,
+                                   const reach_switcher_arrange_context *ctx);
 
     typedef enum reach_switcher_action_type
     {
@@ -113,9 +129,14 @@ extern "C"
         reach_rect_f32 bounds;
         float dpi_scale;
         int32_t icon_size_px;
+        reach_text_measure_port text_measure;
     } reach_switcher_render_context;
 
     void reach_switcher_force_close(reach_switcher *switcher);
+
+    int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open);
+    void reach_switcher_notify_windows_changed(reach_switcher *switcher,
+                                               reach_feature_tick_result *out);
 
     reach_switcher_action reach_switcher_handle_event(reach_switcher *switcher,
                                                       const reach_ui_event *event);

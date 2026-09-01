@@ -22,6 +22,13 @@ struct reach_audio_volume_adapter
     size_t session_icon_count;
     size_t output_device_icon_count;
     int32_t com_initialized;
+
+    reach_audio_volume_change_callback callback;
+    void *callback_user;
+    DWORD main_thread_id;
+    HANDLE watch_thread;
+    HANDLE watch_stop;
+    HANDLE watch_rebind;
 };
 
 struct IPolicyConfig : public IUnknown
@@ -61,42 +68,18 @@ static float reach_audio_volume_clamp01(float value)
     return value;
 }
 
-static void reach_audio_volume_copy_utf16(uint16_t *dst, size_t dst_count, const wchar_t *src)
+static void reach_audio_volume_copy_wide(uint16_t *dst, size_t dst_count, const wchar_t *src)
 {
     if (dst == nullptr || dst_count == 0)
     {
         return;
     }
-
-    size_t index = 0;
-    if (src != nullptr)
+    if (src == nullptr)
     {
-        while (index + 1 < dst_count && src[index] != 0)
-        {
-            dst[index] = (uint16_t)src[index];
-            ++index;
-        }
+        dst[0] = 0;
+        return;
     }
-    dst[index] = 0;
-}
-
-static int reach_audio_volume_utf16_equal(const uint16_t *a, const uint16_t *b)
-{
-    if (a == nullptr || b == nullptr)
-    {
-        return a == b;
-    }
-
-    size_t index = 0;
-    while (a[index] != 0 || b[index] != 0)
-    {
-        if (a[index] != b[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return 1;
+    (void)reach_copy_utf16(dst, dst_count, reinterpret_cast<const uint16_t *>(src));
 }
 
 static const wchar_t *reach_audio_volume_basename(const wchar_t *path)
@@ -291,8 +274,7 @@ static void reach_audio_volume_label_for_process(DWORD process_id, uint16_t *out
     wchar_t path[MAX_PATH] = {};
     if (reach_audio_volume_path_for_process(process_id, path, MAX_PATH))
     {
-        reach_audio_volume_copy_utf16(out_label, out_label_count,
-                                      reach_audio_volume_basename(path));
+        reach_audio_volume_copy_wide(out_label, out_label_count, reach_audio_volume_basename(path));
     }
 }
 
@@ -324,7 +306,7 @@ static HICON reach_audio_volume_icon_for_process(DWORD process_id)
 
 static void reach_audio_volume_copy_device_id(uint16_t *dst, size_t dst_count, const wchar_t *src)
 {
-    reach_audio_volume_copy_utf16(dst, dst_count, src);
+    reach_audio_volume_copy_wide(dst, dst_count, src);
 }
 
 static void reach_audio_volume_utf16_to_wchar(wchar_t *dst, size_t dst_count, const uint16_t *src)
@@ -353,8 +335,8 @@ static void reach_audio_volume_fill_fallback_device_label(reach_audio_output_dev
         return;
     }
 
-    reach_audio_volume_copy_utf16(device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
-                                  L"Output device");
+    reach_audio_volume_copy_wide(device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+                                 L"Output device");
 }
 
 static void reach_audio_volume_read_property_string(IPropertyStore *store, const PROPERTYKEY &key,
@@ -429,13 +411,12 @@ static void reach_audio_volume_fill_fallback_label(reach_audio_volume_session *s
 
     if (session->is_system_sounds)
     {
-        reach_audio_volume_copy_utf16(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
-                                      L"System Sounds");
+        reach_audio_volume_copy_wide(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
+                                     L"System Sounds");
         return;
     }
 
-    reach_audio_volume_copy_utf16(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY,
-                                  L"App");
+    reach_audio_volume_copy_wide(session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, L"App");
 }
 
 static reach_result reach_audio_volume_read_session(IAudioSessionControl *control,
@@ -472,8 +453,8 @@ static reach_result reach_audio_volume_read_session(IAudioSessionControl *contro
 
     if (SUCCEEDED(hr) && instance_id != nullptr && instance_id[0] != 0)
     {
-        reach_audio_volume_copy_utf16(out_session->session_instance_id,
-                                      REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY, instance_id);
+        reach_audio_volume_copy_wide(out_session->session_instance_id,
+                                     REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY, instance_id);
     }
     else if (SUCCEEDED(hr))
     {
@@ -504,14 +485,14 @@ static reach_result reach_audio_volume_read_session(IAudioSessionControl *contro
 
         if (out_session->is_system_sounds)
         {
-            reach_audio_volume_copy_utf16(
+            reach_audio_volume_copy_wide(
                 out_session->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, L"System Sounds");
         }
         else if (SUCCEEDED(control->GetDisplayName(&display_name)) && display_name != nullptr &&
                  display_name[0] != 0)
         {
-            reach_audio_volume_copy_utf16(out_session->label,
-                                          REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, display_name);
+            reach_audio_volume_copy_wide(out_session->label,
+                                         REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, display_name);
         }
         else
         {
@@ -746,8 +727,8 @@ static reach_result reach_audio_volume_read_output_device(reach_audio_volume_ada
         wchar_t label[REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY] = {};
         reach_audio_volume_read_property_string(store, PKEY_Device_FriendlyName, label,
                                                 REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY);
-        reach_audio_volume_copy_utf16(out_device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
-                                      label);
+        reach_audio_volume_copy_wide(out_device->label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+                                     label);
 
         wchar_t icon_path[512] = {};
         reach_audio_volume_read_property_string(store, PKEY_DeviceClass_IconPath, icon_path,
@@ -908,7 +889,7 @@ static reach_result reach_audio_volume_with_session_volume(const uint16_t *sessi
 
         reach_audio_volume_session session = {};
         if (reach_audio_volume_read_session(control, &session) == REACH_OK &&
-            reach_audio_volume_utf16_equal(session.session_instance_id, session_instance_id))
+            reach_utf16_equal(session.session_instance_id, session_instance_id))
         {
             ISimpleAudioVolume *volume = nullptr;
             hr = control->QueryInterface(IID_PPV_ARGS(&volume));
@@ -1010,6 +991,308 @@ static reach_result reach_audio_volume_set_default_output_device(void *userdata,
                : REACH_ERROR;
 }
 
+static void reach_audio_volume_notify(reach_audio_volume_adapter *adapter)
+{
+    if (adapter == nullptr || adapter->callback == nullptr)
+    {
+        return;
+    }
+
+    adapter->callback(adapter->callback_user);
+    if (adapter->main_thread_id != 0)
+    {
+        PostThreadMessageW(adapter->main_thread_id, WM_NULL, 0, 0);
+    }
+}
+
+class reach_audio_volume_endpoint_watcher : public IAudioEndpointVolumeCallback
+{
+  public:
+    explicit reach_audio_volume_endpoint_watcher(reach_audio_volume_adapter *adapter)
+        : references(1), adapter(adapter)
+    {
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override
+    {
+        return (ULONG)InterlockedIncrement(&references);
+    }
+
+    ULONG STDMETHODCALLTYPE Release() override
+    {
+        LONG remaining = InterlockedDecrement(&references);
+        if (remaining == 0)
+        {
+            delete this;
+        }
+        return (ULONG)remaining;
+    }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **out_interface) override
+    {
+        if (out_interface == nullptr)
+        {
+            return E_POINTER;
+        }
+        if (iid == __uuidof(IUnknown) || iid == __uuidof(IAudioEndpointVolumeCallback))
+        {
+            *out_interface = static_cast<IAudioEndpointVolumeCallback *>(this);
+            AddRef();
+            return S_OK;
+        }
+        *out_interface = nullptr;
+        return E_NOINTERFACE;
+    }
+
+    HRESULT STDMETHODCALLTYPE OnNotify(PAUDIO_VOLUME_NOTIFICATION_DATA data) override
+    {
+        (void)data;
+        reach_audio_volume_notify(adapter);
+        return S_OK;
+    }
+
+  private:
+    LONG references;
+    reach_audio_volume_adapter *adapter;
+};
+
+class reach_audio_volume_device_watcher : public IMMNotificationClient
+{
+  public:
+    explicit reach_audio_volume_device_watcher(HANDLE rebind) : references(1), rebind(rebind)
+    {
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override
+    {
+        return (ULONG)InterlockedIncrement(&references);
+    }
+
+    ULONG STDMETHODCALLTYPE Release() override
+    {
+        LONG remaining = InterlockedDecrement(&references);
+        if (remaining == 0)
+        {
+            delete this;
+        }
+        return (ULONG)remaining;
+    }
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **out_interface) override
+    {
+        if (out_interface == nullptr)
+        {
+            return E_POINTER;
+        }
+        if (iid == __uuidof(IUnknown) || iid == __uuidof(IMMNotificationClient))
+        {
+            *out_interface = static_cast<IMMNotificationClient *>(this);
+            AddRef();
+            return S_OK;
+        }
+        *out_interface = nullptr;
+        return E_NOINTERFACE;
+    }
+
+    HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged(EDataFlow flow, ERole role,
+                                                     LPCWSTR device_id) override
+    {
+        (void)role;
+        (void)device_id;
+        if (flow == eRender && rebind != nullptr)
+        {
+            SetEvent(rebind);
+        }
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE OnDeviceStateChanged(LPCWSTR, DWORD) override
+    {
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE OnDeviceAdded(LPCWSTR) override
+    {
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE OnDeviceRemoved(LPCWSTR) override
+    {
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(LPCWSTR, const PROPERTYKEY) override
+    {
+        return S_OK;
+    }
+
+  private:
+    LONG references;
+    HANDLE rebind;
+};
+
+static void reach_audio_volume_unbind_endpoint(IAudioEndpointVolume **endpoint,
+                                               reach_audio_volume_endpoint_watcher **watcher)
+{
+    if (*endpoint != nullptr && *watcher != nullptr)
+    {
+        (void)(*endpoint)->UnregisterControlChangeNotify(*watcher);
+    }
+    if (*watcher != nullptr)
+    {
+        (*watcher)->Release();
+        *watcher = nullptr;
+    }
+    if (*endpoint != nullptr)
+    {
+        (*endpoint)->Release();
+        *endpoint = nullptr;
+    }
+}
+
+static void reach_audio_volume_bind_endpoint(reach_audio_volume_adapter *adapter,
+                                             IAudioEndpointVolume **endpoint,
+                                             reach_audio_volume_endpoint_watcher **watcher)
+{
+    if (reach_audio_volume_create_default_endpoint_volume(endpoint) != REACH_OK)
+    {
+        return;
+    }
+
+    *watcher = new (std::nothrow) reach_audio_volume_endpoint_watcher(adapter);
+    if (*watcher == nullptr || FAILED((*endpoint)->RegisterControlChangeNotify(*watcher)))
+    {
+        reach_audio_volume_unbind_endpoint(endpoint, watcher);
+    }
+}
+
+static DWORD WINAPI reach_audio_volume_watch_thread(LPVOID parameter)
+{
+    reach_audio_volume_adapter *adapter = static_cast<reach_audio_volume_adapter *>(parameter);
+
+    HRESULT com_hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    int32_t uninitialize = com_hr == S_OK;
+    if (FAILED(com_hr) && com_hr != RPC_E_CHANGED_MODE)
+    {
+        return 0;
+    }
+
+    IMMDeviceEnumerator *enumerator = nullptr;
+    reach_audio_volume_device_watcher *device_watcher = nullptr;
+    if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                   IID_PPV_ARGS(&enumerator))))
+    {
+        device_watcher =
+            new (std::nothrow) reach_audio_volume_device_watcher(adapter->watch_rebind);
+        if (device_watcher != nullptr &&
+            FAILED(enumerator->RegisterEndpointNotificationCallback(device_watcher)))
+        {
+            device_watcher->Release();
+            device_watcher = nullptr;
+        }
+    }
+
+    IAudioEndpointVolume *endpoint = nullptr;
+    reach_audio_volume_endpoint_watcher *endpoint_watcher = nullptr;
+    reach_audio_volume_bind_endpoint(adapter, &endpoint, &endpoint_watcher);
+
+    HANDLE waits[2] = {adapter->watch_stop, adapter->watch_rebind};
+    for (;;)
+    {
+        DWORD signalled = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+        if (signalled != WAIT_OBJECT_0 + 1)
+        {
+            break;
+        }
+
+        reach_audio_volume_unbind_endpoint(&endpoint, &endpoint_watcher);
+        reach_audio_volume_bind_endpoint(adapter, &endpoint, &endpoint_watcher);
+        reach_audio_volume_notify(adapter);
+    }
+
+    reach_audio_volume_unbind_endpoint(&endpoint, &endpoint_watcher);
+    if (enumerator != nullptr)
+    {
+        if (device_watcher != nullptr)
+        {
+            (void)enumerator->UnregisterEndpointNotificationCallback(device_watcher);
+            device_watcher->Release();
+        }
+        enumerator->Release();
+    }
+
+    if (uninitialize)
+    {
+        CoUninitialize();
+    }
+    return 0;
+}
+
+static void reach_audio_volume_stop_watching(void *userdata)
+{
+    reach_audio_volume_adapter *adapter = static_cast<reach_audio_volume_adapter *>(userdata);
+    if (adapter == nullptr)
+    {
+        return;
+    }
+
+    if (adapter->watch_thread != nullptr)
+    {
+        SetEvent(adapter->watch_stop);
+        WaitForSingleObject(adapter->watch_thread, 2000);
+        CloseHandle(adapter->watch_thread);
+        adapter->watch_thread = nullptr;
+    }
+    if (adapter->watch_stop != nullptr)
+    {
+        CloseHandle(adapter->watch_stop);
+        adapter->watch_stop = nullptr;
+    }
+    if (adapter->watch_rebind != nullptr)
+    {
+        CloseHandle(adapter->watch_rebind);
+        adapter->watch_rebind = nullptr;
+    }
+
+    adapter->callback = nullptr;
+    adapter->callback_user = nullptr;
+    adapter->main_thread_id = 0;
+}
+
+static reach_result reach_audio_volume_start_watching(void *userdata,
+                                                      reach_audio_volume_change_callback callback,
+                                                      void *callback_user)
+{
+    reach_audio_volume_adapter *adapter = static_cast<reach_audio_volume_adapter *>(userdata);
+    if (adapter == nullptr || callback == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (adapter->watch_thread != nullptr)
+    {
+        return REACH_OK;
+    }
+
+    adapter->callback = callback;
+    adapter->callback_user = callback_user;
+    adapter->main_thread_id = GetCurrentThreadId();
+
+    adapter->watch_stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    adapter->watch_rebind = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (adapter->watch_stop != nullptr && adapter->watch_rebind != nullptr)
+    {
+        adapter->watch_thread =
+            CreateThread(nullptr, 0, reach_audio_volume_watch_thread, adapter, 0, nullptr);
+    }
+
+    if (adapter->watch_thread == nullptr)
+    {
+        reach_audio_volume_stop_watching(adapter);
+        return REACH_ERROR;
+    }
+    return REACH_OK;
+}
+
 static void reach_audio_volume_destroy(void *userdata)
 {
     reach_audio_volume_adapter *adapter = static_cast<reach_audio_volume_adapter *>(userdata);
@@ -1019,6 +1302,7 @@ static void reach_audio_volume_destroy(void *userdata)
         return;
     }
 
+    reach_audio_volume_stop_watching(adapter);
     reach_audio_volume_destroy_session_icons(adapter);
     reach_audio_volume_destroy_output_device_icons(adapter);
 
@@ -1077,6 +1361,8 @@ extern "C" reach_result reach_windows_create_audio_volume(reach_audio_volume_por
     out_port->set_session_level = reach_audio_volume_set_session_level;
     out_port->set_session_muted = reach_audio_volume_set_session_muted;
     out_port->set_default_output_device = reach_audio_volume_set_default_output_device;
+    out_port->start_watching = reach_audio_volume_start_watching;
+    out_port->stop_watching = reach_audio_volume_stop_watching;
     out_port->destroy = reach_audio_volume_destroy;
 
     return REACH_OK;

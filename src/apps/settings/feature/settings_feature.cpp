@@ -6,6 +6,26 @@
 
 #include "settings_pages_internal.h"
 
+static const double reach_settings_nav_selection_duration_seconds = 0.22;
+
+static int32_t reach_settings_nav_index_for_page(reach_settings_page page, float *out_index)
+{
+    size_t nav_count = 0;
+    const reach_settings_nav_item *items = reach_settings_nav_items(&nav_count);
+    for (size_t index = 0; index < nav_count; ++index)
+    {
+        if (items[index].page == page)
+        {
+            if (out_index != nullptr)
+            {
+                *out_index = (float)index;
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void reach_settings_model_init(reach_settings_model *model)
 {
     if (model == nullptr)
@@ -14,6 +34,8 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     memset(model, 0, sizeof(*model));
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
+    reach_animation_manager_init(&model->nav_selection_animation, &model->nav_selection_track, 1);
+    reach_animation_manager_set(&model->nav_selection_animation, 0, 0.0f);
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
     model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_IDLE;
     {
@@ -26,6 +48,26 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->startup_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_scrollbar_model_init(&model->wifi_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_scrollbar_model_init(&model->bluetooth_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_loader_model_init(&model->update_loader, 0.7f);
+    reach_loader_model_init(&model->wifi_loader, 0.7f);
+    reach_loader_model_init(&model->bluetooth_loader, 0.7f);
+    reach_animation_manager_init(&model->wifi_row_animations, model->wifi_row_tracks,
+                                 REACH_WIFI_MAX_NETWORKS + 1);
+    reach_animation_manager_init(&model->wifi_radio_animation, &model->wifi_radio_track, 1);
+    reach_animation_manager_init(&model->bluetooth_row_animations, model->bluetooth_row_tracks,
+                                 REACH_BLUETOOTH_MAX_DEVICES);
+    reach_animation_manager_init(&model->bluetooth_radio_animation, &model->bluetooth_radio_track,
+                                 1);
+    model->wifi_expanded_row = REACH_SETTINGS_WIFI_ROW_NONE;
+    model->wifi_focused_field = REACH_SETTINGS_WIFI_FIELD_NONE;
+    model->wifi_add_security = REACH_WIFI_SECURITY_WPA2_PERSONAL;
+    model->wifi_connect_automatically = 1;
+    model->bluetooth_expanded_row = REACH_SETTINGS_BLUETOOTH_ROW_NONE;
+    reach_text_edit_init(&model->wifi_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
+    reach_text_edit_init(&model->wifi_add_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
+    reach_text_edit_init(&model->wifi_add_name_edit, REACH_WIFI_SSID_CAPACITY - 1);
     reach_animation_manager_init(&model->startup_animations, model->startup_tracks,
                                  REACH_STARTUP_APP_MAX_ENTRIES);
     reach_animation_manager_init(&model->power_animations, model->power_tracks,
@@ -34,9 +76,12 @@ void reach_settings_model_init(reach_settings_model *model)
                                  REACH_SETTINGS_POWER_TIMER_COUNT);
     model->power_focused_timer = -1;
     model->account_focused_field = -1;
-    model->pressed_button = REACH_SETTINGS_HIT_NONE;
+    model->hovered_button = REACH_SETTINGS_HIT_NONE;
     reach_animation_manager_init(&model->display_fps_animation, &model->display_fps_track, 1);
+    reach_animation_manager_init(&model->display_font_animation, &model->display_font_track, 1);
+    reach_animation_manager_init(&model->display_theme_animation, &model->display_theme_track, 1);
     reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
+    reach_pressable_init(&model->button_pressable);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
     {
         reach_text_edit_init(&model->account_password_edits[field],
@@ -50,10 +95,13 @@ void reach_settings_model_init(reach_settings_model *model)
                                  REACH_SETTINGS_POWER_CUSTOM_DIGITS);
         }
     }
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF, 10);
     reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SLEEP, 30);
-    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_LOCK, 0);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_LOCK, 15);
     reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN, 0);
     reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_RESTART, 0);
+    reach_settings_model_set_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_SLEEP, 1);
+    reach_settings_model_set_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_RESTART, 1);
     reach_settings_model_power_mark_applied(model);
 }
 
@@ -63,37 +111,36 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
     {
         return;
     }
-    if (page < REACH_SETTINGS_PAGE_WIFI || page > REACH_SETTINGS_PAGE_UPDATE)
+    float target_index = 0.0f;
+    if (!reach_settings_nav_index_for_page(page, &target_index) || model->selected_page == page)
     {
         return;
     }
     model->selected_page = page;
+    reach_animation_manager_animate_to(&model->nav_selection_animation, 0, target_index,
+                                       reach_settings_nav_selection_duration_seconds,
+                                       REACH_EASING_EASE_IN_OUT);
 }
 
-void reach_settings_model_press_button(reach_settings_model *model, int32_t hit_type)
+int32_t reach_settings_model_tick_nav_selection(reach_settings_model *model, double delta_seconds)
 {
-    if (model == nullptr || hit_type == REACH_SETTINGS_HIT_NONE)
+    if (model == nullptr || !reach_animation_manager_any_active(&model->nav_selection_animation))
     {
-        return;
+        return 0;
     }
-    model->pressed_button = hit_type;
-    reach_animation_manager_set(&model->button_press_animation, 0, 1.0f);
+    reach_animation_manager_tick(&model->nav_selection_animation, delta_seconds);
+    return 1;
 }
 
-void reach_settings_model_release_button(reach_settings_model *model)
+int32_t reach_settings_model_nav_selection_active(const reach_settings_model *model)
 {
-    if (model == nullptr || model->pressed_button == REACH_SETTINGS_HIT_NONE)
-    {
-        return;
-    }
-    float current = reach_animation_manager_value(&model->button_press_animation, 0);
-    reach_animation_manager_start(&model->button_press_animation, 0, current, 0.0f, 0.18,
-                                  REACH_EASING_EASE_OUT);
+    return model != nullptr && reach_animation_manager_any_active(&model->nav_selection_animation);
 }
 
 float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)
 {
-    if (model == nullptr || model->pressed_button != hit_type)
+    if (model == nullptr ||
+        reach_pressable_feedback_index(&model->button_pressable) != (size_t)hit_type)
     {
         return 0.0f;
     }
@@ -107,11 +154,10 @@ int32_t reach_settings_model_tick_button_press(reach_settings_model *model, doub
         return 0;
     }
     reach_animation_manager_tick(&model->button_press_animation, delta_seconds);
-    if (!reach_animation_manager_any_active(&model->button_press_animation) &&
-        reach_animation_manager_value(&model->button_press_animation, 0) <= 0.0f)
-    {
-        model->pressed_button = REACH_SETTINGS_HIT_NONE;
-    }
+    reach_pressable_feedback_style feedback = {};
+    feedback.animations = &model->button_press_animation;
+    feedback.track = 0;
+    reach_pressable_settle_feedback(&model->button_pressable, &feedback);
     return 1;
 }
 
@@ -120,44 +166,33 @@ int32_t reach_settings_model_button_press_active(const reach_settings_model *mod
     return model != nullptr && reach_animation_manager_any_active(&model->button_press_animation);
 }
 
+int32_t reach_settings_model_set_hovered_button(reach_settings_model *model, int32_t hit_type)
+{
+    if (model == nullptr || model->hovered_button == hit_type)
+    {
+        return 0;
+    }
+    model->hovered_button = hit_type;
+    return 1;
+}
+
 const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
 {
     static const reach_settings_nav_item items[REACH_SETTINGS_NAV_ITEM_COUNT] = {
-        {REACH_SETTINGS_PAGE_WIFI,
-         REACH_VECTOR_ICON_WIFI_HIGH,
-         (const uint16_t *)L"Wi-Fi",
-         {0.22f, 0.82f, 0.43f, 1.0f},
-         {0.22f, 0.82f, 0.43f, 0.20f}},
-        {REACH_SETTINGS_PAGE_BLUETOOTH,
-         REACH_VECTOR_ICON_BLUETOOTH_ON,
-         (const uint16_t *)L"Bluetooth",
-         {0.24f, 0.58f, 1.0f, 1.0f},
-         {0.24f, 0.58f, 1.0f, 0.20f}},
-        {REACH_SETTINGS_PAGE_ACCOUNT,
-         REACH_VECTOR_ICON_LOCK,
-         (const uint16_t *)L"Account",
-         {0.31f, 0.78f, 0.86f, 1.0f},
-         {0.31f, 0.78f, 0.86f, 0.20f}},
-        {REACH_SETTINGS_PAGE_STARTUP_APPS,
-         REACH_VECTOR_ICON_QUICK_SETTINGS,
-         (const uint16_t *)L"Startup Apps",
-         {0.70f, 0.38f, 0.95f, 1.0f},
-         {0.70f, 0.38f, 0.95f, 0.20f}},
-        {REACH_SETTINGS_PAGE_POWER_SLEEP,
-         REACH_VECTOR_ICON_SLEEP,
-         (const uint16_t *)L"Power and Sleep",
-         {0.95f, 0.55f, 0.22f, 1.0f},
-         {0.95f, 0.55f, 0.22f, 0.20f}},
-        {REACH_SETTINGS_PAGE_DISPLAY,
-         REACH_VECTOR_ICON_RESIZE,
-         (const uint16_t *)L"Display",
-         {0.97f, 0.75f, 0.22f, 1.0f},
-         {0.97f, 0.75f, 0.22f, 0.20f}},
-        {REACH_SETTINGS_PAGE_UPDATE,
-         REACH_VECTOR_ICON_RESTART,
-         (const uint16_t *)L"Updates",
-         {0.20f, 0.72f, 0.96f, 1.0f},
-         {0.20f, 0.72f, 0.96f, 0.20f}},
+        {REACH_SETTINGS_PAGE_WIFI, REACH_VECTOR_ICON_WIFI_HIGH, (const uint16_t *)L"Wi-Fi",
+         REACH_THEME_ACCENT_GREEN},
+        {REACH_SETTINGS_PAGE_BLUETOOTH, REACH_VECTOR_ICON_BLUETOOTH_ON,
+         (const uint16_t *)L"Bluetooth", REACH_THEME_ACCENT_BLUE},
+        {REACH_SETTINGS_PAGE_ACCOUNT, REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Account",
+         REACH_THEME_ACCENT_TEAL},
+        {REACH_SETTINGS_PAGE_STARTUP_APPS, REACH_VECTOR_ICON_QUICK_SETTINGS,
+         (const uint16_t *)L"Startup Apps", REACH_THEME_ACCENT_PURPLE},
+        {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy",
+         REACH_THEME_ACCENT_ORANGE},
+        {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
+         REACH_THEME_ACCENT_YELLOW},
+        {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates",
+         REACH_THEME_ACCENT_CYAN},
     };
 
     if (out_count != nullptr)
@@ -223,13 +258,94 @@ static reach_rect_f32 reach_settings_rect(float x, float y, float width, float h
     return rect;
 }
 
+typedef struct reach_settings_toggle_card_rects
+{
+    reach_rect_f32 *card;
+    reach_rect_f32 *icon;
+    reach_rect_f32 *title;
+    reach_rect_f32 *subtitle;
+    reach_rect_f32 *toggle;
+} reach_settings_toggle_card_rects;
+
+static void reach_settings_layout_toggle_card(const reach_settings_toggle_card_rects *rects,
+                                              float x, float y, float width, float height,
+                                              float scale)
+{
+    float icon_box = 34.0f * scale;
+    float toggle_width = 40.0f * scale;
+    float toggle_height = 22.0f * scale;
+    float toggle_x = x + width - 18.0f * scale - toggle_width;
+    float text_x = x + 16.0f * scale + icon_box + 14.0f * scale;
+    float text_width = toggle_x - 14.0f * scale - text_x;
+
+    *rects->card = reach_settings_rect(x, y, width, height);
+    *rects->icon =
+        reach_settings_rect(x + 16.0f * scale, y + (height - icon_box) * 0.5f, icon_box, icon_box);
+    *rects->toggle = reach_settings_rect(toggle_x, y + (height - toggle_height) * 0.5f,
+                                         toggle_width, toggle_height);
+    *rects->title = reach_settings_rect(text_x, y + 15.0f * scale, text_width, 20.0f * scale);
+    *rects->subtitle = reach_settings_rect(text_x, y + 37.0f * scale, text_width, 16.0f * scale);
+}
+
+#define REACH_SETTINGS_THEME_CHOICE_OPTIONS_WIDTH 318.0f
+#define REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH 520.0f
+
+static void
+reach_settings_layout_theme_choice_card(reach_rect_f32 *card, reach_rect_f32 *title,
+                                        reach_rect_f32 *subtitle,
+                                        reach_rect_f32 options[REACH_SETTINGS_THEME_OPTION_COUNT],
+                                        float x, float y, float width, float height, float scale)
+{
+    *card = reach_settings_rect(x, y, width, height);
+    float option_gap = 6.0f * scale;
+    float option_height = 28.0f * scale;
+    if (width >= REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH * scale)
+    {
+        float options_width = REACH_SETTINGS_THEME_CHOICE_OPTIONS_WIDTH * scale;
+        float options_x = x + width - 16.0f * scale - options_width;
+        float text_x = x + 18.0f * scale;
+        *title = reach_settings_rect(text_x, y + 15.0f * scale, options_x - text_x - 16.0f * scale,
+                                     20.0f * scale);
+        *subtitle = reach_settings_rect(text_x, y + 37.0f * scale,
+                                        options_x - text_x - 16.0f * scale, 16.0f * scale);
+        float option_width =
+            (options_width - option_gap * (REACH_SETTINGS_THEME_OPTION_COUNT - 1)) /
+            REACH_SETTINGS_THEME_OPTION_COUNT;
+        float option_y = y + (height - option_height) * 0.5f;
+        for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
+        {
+            options[option] =
+                reach_settings_rect(options_x + (float)option * (option_width + option_gap),
+                                    option_y, option_width, option_height);
+        }
+        return;
+    }
+
+    float text_x = x + 16.0f * scale;
+    *title = reach_settings_rect(text_x, y + 11.0f * scale, width - 32.0f * scale, 20.0f * scale);
+    *subtitle =
+        reach_settings_rect(text_x, y + 31.0f * scale, width - 32.0f * scale, 16.0f * scale);
+    float options_x = text_x;
+    float options_width = width - 32.0f * scale;
+    float option_width = (options_width - option_gap * (REACH_SETTINGS_THEME_OPTION_COUNT - 1)) /
+                         REACH_SETTINGS_THEME_OPTION_COUNT;
+    float option_y = y + height - option_height - 10.0f * scale;
+    for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
+    {
+        options[option] =
+            reach_settings_rect(options_x + (float)option * (option_width + option_gap), option_y,
+                                option_width, option_height);
+    }
+}
+
 static int32_t reach_settings_update_in_select_section(reach_windows_update_state state)
 {
     return state == REACH_WINDOWS_UPDATE_DISCOVERED || state == REACH_WINDOWS_UPDATE_SELECTED ||
            state == REACH_WINDOWS_UPDATE_DOWNLOADING || state == REACH_WINDOWS_UPDATE_DOWNLOADED ||
            state == REACH_WINDOWS_UPDATE_INSTALLING ||
            state == REACH_WINDOWS_UPDATE_INSTALLED_NO_REBOOT_REQUIRED ||
-           state == REACH_WINDOWS_UPDATE_REBOOT_OBSERVED;
+           state == REACH_WINDOWS_UPDATE_REBOOT_OBSERVED ||
+           state == REACH_WINDOWS_UPDATE_VERIFIED_INSTALLED;
 }
 
 static int32_t reach_settings_update_in_restart_section(reach_windows_update_state state)
@@ -466,8 +582,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         float area_y = layout.content_title.y + layout.content_title.height + 12.0f * scale;
         float area_width = layout.content.width - 64.0f * scale - scrollbar_width;
 
-        layout.startup_summary =
-            reach_settings_rect(area_x, area_y, area_width, 16.0f * scale);
+        layout.startup_summary = reach_settings_rect(area_x, area_y, area_width, 16.0f * scale);
 
         float viewport_y = area_y + 16.0f * scale + 12.0f * scale;
         float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
@@ -522,23 +637,50 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         float area_width = layout.content.x + layout.content.width - 28.0f * scale - area_x;
 
         float card_height = 72.0f * scale;
-        layout.display_fps_card = reach_settings_rect(area_x, area_y, area_width, card_height);
-        float icon_box = 34.0f * scale;
-        layout.display_fps_icon = reach_settings_rect(
-            area_x + 16.0f * scale, area_y + (card_height - icon_box) * 0.5f, icon_box, icon_box);
+        float card_spacing = 12.0f * scale;
+        reach_settings_toggle_card_rects cards[] = {
+            {&layout.display_fps_card, &layout.display_fps_icon, &layout.display_fps_title,
+             &layout.display_fps_subtitle, &layout.display_fps_toggle},
+            {&layout.display_font_card, &layout.display_font_icon, &layout.display_font_title,
+             &layout.display_font_subtitle, &layout.display_font_toggle},
+            {&layout.display_theme_card, &layout.display_theme_icon, &layout.display_theme_title,
+             &layout.display_theme_subtitle, &layout.display_theme_toggle},
+        };
+        for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
+        {
+            reach_settings_layout_toggle_card(&cards[index], area_x,
+                                              area_y + (float)index * (card_height + card_spacing),
+                                              area_width, card_height, scale);
+        }
 
-        float toggle_width = 40.0f * scale;
-        float toggle_height = 22.0f * scale;
-        float toggle_x = area_x + area_width - 18.0f * scale - toggle_width;
-        layout.display_fps_toggle = reach_settings_rect(
-            toggle_x, area_y + (card_height - toggle_height) * 0.5f, toggle_width, toggle_height);
+        float section_y = area_y + 3.0f * card_height + 2.0f * card_spacing + 18.0f * scale;
+        layout.display_windows_section_title =
+            reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
+        float appearance_y = section_y + 26.0f * scale;
+        float appearance_card_height = area_width >= REACH_SETTINGS_THEME_CHOICE_WIDE_WIDTH * scale
+                                           ? 76.0f * scale
+                                           : 104.0f * scale;
+        reach_settings_layout_theme_choice_card(
+            &layout.display_windows_system_card, &layout.display_windows_system_title,
+            &layout.display_windows_system_subtitle, layout.display_windows_system_options, area_x,
+            appearance_y, area_width, appearance_card_height, scale);
+        reach_settings_layout_theme_choice_card(
+            &layout.display_windows_app_card, &layout.display_windows_app_title,
+            &layout.display_windows_app_subtitle, layout.display_windows_app_options, area_x,
+            appearance_y + appearance_card_height + card_spacing, area_width,
+            appearance_card_height, scale);
+    }
 
-        float text_x = layout.display_fps_icon.x + icon_box + 14.0f * scale;
-        float text_width = toggle_x - 14.0f * scale - text_x;
-        layout.display_fps_title =
-            reach_settings_rect(text_x, area_y + 15.0f * scale, text_width, 20.0f * scale);
-        layout.display_fps_subtitle =
-            reach_settings_rect(text_x, area_y + 37.0f * scale, text_width, 16.0f * scale);
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_WIFI)
+    {
+        reach_settings_layout_wifi(&layout, model, scale);
+        return layout;
+    }
+
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_BLUETOOTH)
+    {
+        reach_settings_layout_bluetooth(&layout, model, scale);
+        return layout;
     }
 
     if (model != nullptr && model->selected_page != REACH_SETTINGS_PAGE_UPDATE)
@@ -574,11 +716,11 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_rect(layout.content_title.x, reach_row_y, content_width, reach_row_height);
     float reach_button_width = 128.0f * scale;
     float reach_button_height = 32.0f * scale;
-    layout.reach_update_button = reach_settings_rect(
-        layout.reach_update_row.x + layout.reach_update_row.width - 14.0f * scale -
-            reach_button_width,
-        reach_row_y + (reach_row_height - reach_button_height) * 0.5f, reach_button_width,
-        reach_button_height);
+    layout.reach_update_button =
+        reach_settings_rect(layout.reach_update_row.x + layout.reach_update_row.width -
+                                14.0f * scale - reach_button_width,
+                            reach_row_y + (reach_row_height - reach_button_height) * 0.5f,
+                            reach_button_width, reach_button_height);
 
     float windows_title_y = reach_row_y + reach_row_height + 16.0f * scale;
     layout.windows_section_title = reach_settings_rect(layout.content_title.x, windows_title_y,
@@ -586,9 +728,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
 
     float viewport_y = windows_title_y + section_header_height + 6.0f * scale;
     float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
-    layout.update_viewport =
-        reach_settings_rect(layout.content_title.x, viewport_y, content_width,
-                            viewport_bottom - viewport_y);
+    layout.update_viewport = reach_settings_rect(layout.content_title.x, viewport_y, content_width,
+                                                 viewport_bottom - viewport_y);
     layout.update_scrollbar_track = reach_settings_rect(
         layout.update_viewport.x + layout.update_viewport.width + 11.0f * scale,
         layout.update_viewport.y, scrollbar_width, layout.update_viewport.height);
@@ -779,12 +920,45 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             }
         }
     }
-    if (layout->display_fps_toggle.width > 0.0f &&
-        (reach_settings_rect_contains(layout->display_fps_toggle, x, y) ||
-         reach_settings_rect_contains(layout->display_fps_card, x, y)))
+    const struct
     {
-        result.type = REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE;
-        return result;
+        reach_rect_f32 card;
+        reach_rect_f32 toggle;
+        reach_settings_hit_type type;
+    } display_cards[] = {
+        {layout->display_fps_card, layout->display_fps_toggle,
+         REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE},
+        {layout->display_font_card, layout->display_font_toggle,
+         REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE},
+        {layout->display_theme_card, layout->display_theme_toggle,
+         REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE},
+    };
+    for (size_t index = 0; index < sizeof(display_cards) / sizeof(display_cards[0]); ++index)
+    {
+        if (display_cards[index].toggle.width > 0.0f &&
+            (reach_settings_rect_contains(display_cards[index].toggle, x, y) ||
+             reach_settings_rect_contains(display_cards[index].card, x, y)))
+        {
+            result.type = display_cards[index].type;
+            return result;
+        }
+    }
+    for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
+    {
+        if (layout->display_windows_system_options[option].width > 0.0f &&
+            reach_settings_rect_contains(layout->display_windows_system_options[option], x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME;
+            result.display_theme_preference = (reach_config_theme_preference)option;
+            return result;
+        }
+        if (layout->display_windows_app_options[option].width > 0.0f &&
+            reach_settings_rect_contains(layout->display_windows_app_options[option], x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME;
+            result.display_theme_preference = (reach_config_theme_preference)option;
+            return result;
+        }
     }
     if (layout->account_password_button.width > 0.0f &&
         reach_settings_rect_contains(layout->account_password_button, x, y))
@@ -822,6 +996,148 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             {
                 result.type = REACH_SETTINGS_HIT_STARTUP_TOGGLE;
                 result.startup_index = index;
+                return result;
+            }
+        }
+    }
+
+    const struct
+    {
+        reach_rect_f32 rect;
+        reach_settings_hit_type type;
+    } wifi_controls[] = {
+        {layout->wifi_radio_toggle, REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE},
+        {layout->wifi_scan_button, REACH_SETTINGS_HIT_WIFI_SCAN},
+        {layout->wifi_add_button, REACH_SETTINGS_HIT_WIFI_ADD},
+        {layout->wifi_known_button, REACH_SETTINGS_HIT_WIFI_KNOWN},
+        {layout->wifi_back_button, REACH_SETTINGS_HIT_WIFI_BACK},
+        {layout->wifi_key_field, REACH_SETTINGS_HIT_WIFI_KEY_FIELD},
+        {layout->wifi_show_button, REACH_SETTINGS_HIT_WIFI_SHOW_KEY},
+        {layout->wifi_auto_toggle, REACH_SETTINGS_HIT_WIFI_AUTO_TOGGLE},
+        {layout->wifi_connect_button, REACH_SETTINGS_HIT_WIFI_CONNECT},
+        {layout->wifi_disconnect_button, REACH_SETTINGS_HIT_WIFI_DISCONNECT},
+        {layout->wifi_forget_button, REACH_SETTINGS_HIT_WIFI_FORGET},
+    };
+    for (size_t index = 0; index < sizeof(wifi_controls) / sizeof(wifi_controls[0]); ++index)
+    {
+        if (wifi_controls[index].rect.width > 0.0f &&
+            reach_settings_rect_contains(wifi_controls[index].rect, x, y))
+        {
+            result.type = wifi_controls[index].type;
+            return result;
+        }
+    }
+    int32_t wifi_add_form_visible =
+        layout->wifi_add_row.height > 0.0f &&
+        layout->wifi_add_clip.height >= layout->wifi_add_row.height * 0.99f;
+    if (wifi_add_form_visible)
+    {
+        const struct
+        {
+            reach_rect_f32 rect;
+            reach_settings_hit_type type;
+        } wifi_add_controls[] = {
+            {layout->wifi_add_name_field, REACH_SETTINGS_HIT_WIFI_ADD_NAME_FIELD},
+            {layout->wifi_add_key_field, REACH_SETTINGS_HIT_WIFI_ADD_KEY_FIELD},
+            {layout->wifi_add_show_button, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY},
+            {layout->wifi_add_auto_toggle, REACH_SETTINGS_HIT_WIFI_ADD_AUTO_TOGGLE},
+            {layout->wifi_add_submit_button, REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT},
+        };
+        for (size_t index = 0; index < sizeof(wifi_add_controls) / sizeof(wifi_add_controls[0]);
+             ++index)
+        {
+            if (wifi_add_controls[index].rect.width > 0.0f &&
+                reach_settings_rect_contains(wifi_add_controls[index].rect, x, y))
+            {
+                result.type = wifi_add_controls[index].type;
+                return result;
+            }
+        }
+        for (size_t option = 0; option < REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT; ++option)
+        {
+            if (layout->wifi_add_security_options[option].width > 0.0f &&
+                reach_settings_rect_contains(layout->wifi_add_security_options[option], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_WIFI_ADD_SECURITY;
+                result.wifi_security_option = option;
+                return result;
+            }
+        }
+    }
+    if (layout->wifi_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->wifi_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (layout->wifi_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->wifi_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_WIFI_SCROLLBAR_TRACK;
+        return result;
+    }
+    if (layout->wifi_viewport.width > 0.0f &&
+        reach_settings_rect_contains(layout->wifi_viewport, x, y))
+    {
+        if (layout->wifi_add_clip.width > 0.0f &&
+            reach_settings_rect_contains(layout->wifi_add_clip, x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_WIFI_ADD;
+            return result;
+        }
+        for (size_t index = 0; index < layout->wifi_row_count; ++index)
+        {
+            if (reach_settings_rect_contains(layout->wifi_rows[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_WIFI_ROW;
+                result.wifi_index = layout->wifi_row_indices[index];
+                return result;
+            }
+        }
+    }
+
+    const struct
+    {
+        reach_rect_f32 rect;
+        reach_settings_hit_type type;
+    } bluetooth_controls[] = {
+        {layout->bluetooth_radio_toggle, REACH_SETTINGS_HIT_BLUETOOTH_RADIO_TOGGLE},
+        {layout->bluetooth_scan_button, REACH_SETTINGS_HIT_BLUETOOTH_SCAN},
+        {layout->bluetooth_action_button, REACH_SETTINGS_HIT_BLUETOOTH_ACTION},
+        {layout->bluetooth_pin_accept_button, REACH_SETTINGS_HIT_BLUETOOTH_PIN_ACCEPT},
+        {layout->bluetooth_pin_reject_button, REACH_SETTINGS_HIT_BLUETOOTH_PIN_REJECT},
+    };
+    for (size_t index = 0; index < sizeof(bluetooth_controls) / sizeof(bluetooth_controls[0]);
+         ++index)
+    {
+        if (bluetooth_controls[index].rect.width > 0.0f &&
+            reach_settings_rect_contains(bluetooth_controls[index].rect, x, y))
+        {
+            result.type = bluetooth_controls[index].type;
+            return result;
+        }
+    }
+    if (layout->bluetooth_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->bluetooth_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (layout->bluetooth_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->bluetooth_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK;
+        return result;
+    }
+    if (layout->bluetooth_viewport.width > 0.0f &&
+        reach_settings_rect_contains(layout->bluetooth_viewport, x, y))
+    {
+        for (size_t index = 0; index < layout->bluetooth_row_count; ++index)
+        {
+            if (reach_settings_rect_contains(layout->bluetooth_rows[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_BLUETOOTH_ROW;
+                result.bluetooth_index = layout->bluetooth_row_indices[index];
                 return result;
             }
         }

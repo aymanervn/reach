@@ -1,5 +1,7 @@
 #include "windows_adapters_internal.h"
 
+#include "reach/core/typography.h"
+
 #include <dwmapi.h>
 #include <windows.h>
 #include <windowsx.h>
@@ -7,17 +9,9 @@
 #include <new>
 #include <wchar.h>
 
-#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
-#define DWMWA_WINDOW_CORNER_PREFERENCE 33
-#endif
-
 #define IDI_ICON1 101
 #define IDI_SETTINGS_ICON 102
 #define REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS 128
-
-#ifndef DWMWCP_ROUND
-#define DWMWCP_ROUND 2
-#endif
 
 struct reach_platform_window
 {
@@ -28,12 +22,13 @@ struct reach_platform_window
     reach_ui_event pending_events[REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS];
     size_t pending_event_count;
     reach_platform_window_caption caption;
-    float corner_radius;
     int tracking_mouse_leave;
     int pointer_move_enabled;
-    int topmost_enabled;
     int suppress_capture_changed;
     int shell_hook_registered;
+    reach_rect_f32 input_regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS];
+    size_t input_region_count;
+    int input_regions_active;
 };
 
 static int32_t reach_platform_window_rect_contains(reach_rect_f32 rect, float x, float y)
@@ -45,8 +40,7 @@ static int32_t reach_platform_window_rect_contains(reach_rect_f32 rect, float x,
 static int32_t reach_platform_window_point_in_caption(const reach_platform_window *window, float x,
                                                       float y)
 {
-    if (window == nullptr ||
-        !reach_platform_window_rect_contains(window->caption.bounds, x, y))
+    if (window == nullptr || !reach_platform_window_rect_contains(window->caption.bounds, x, y))
     {
         return 0;
     }
@@ -148,20 +142,15 @@ static HICON reach_load_window_icon(reach_surface_role role, int width, int heig
     return icon;
 }
 
-static HFONT reach_create_windows_menu_font()
+static HFONT reach_create_windows_menu_font(HWND hwnd)
 {
     NONCLIENTMETRICSW metrics = {};
     metrics.cbSize = sizeof(metrics);
     if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0))
     {
-        if (metrics.lfMenuFont.lfHeight < 0)
-        {
-            metrics.lfMenuFont.lfHeight += 2;
-        }
-        else if (metrics.lfMenuFont.lfHeight > 2)
-        {
-            metrics.lfMenuFont.lfHeight -= 2;
-        }
+        UINT dpi = GetDpiForWindow(hwnd);
+        dpi = dpi > 0 ? dpi : 96;
+        metrics.lfMenuFont.lfHeight = -MulDiv((int)REACH_TEXT_SIZE_MEDIUM, (int)dpi, 96);
         return CreateFontIndirectW(&metrics.lfMenuFont);
     }
     return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
@@ -182,6 +171,22 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
     switch (message)
     {
+    case WM_NCHITTEST:
+        if (window != nullptr && window->input_regions_active)
+        {
+            POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            ScreenToClient(hwnd, &point);
+            for (size_t index = 0; index < window->input_region_count; ++index)
+            {
+                if (reach_platform_window_rect_contains(window->input_regions[index],
+                                                        (float)point.x, (float)point.y))
+                {
+                    return HTCLIENT;
+                }
+            }
+            return HTTRANSPARENT;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR:
         SetCursor(LoadCursor(nullptr, IDC_ARROW));
         return TRUE;
@@ -210,11 +215,11 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
-    case REACH_WM_LAUNCHER_SEARCH_READY:
+    case REACH_WM_FEATURE_WORK_READY:
         if (window != nullptr)
         {
             reach_ui_event event = {};
-            event.type = REACH_UI_EVENT_LAUNCHER_SEARCH_READY;
+            event.type = REACH_UI_EVENT_FEATURE_WORK_READY;
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
@@ -231,6 +236,14 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_NOW_PLAYING_CHANGED;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return 0;
+    case REACH_WM_SYSTEM_STATS_CHANGED:
+        if (window != nullptr)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_SYSTEM_STATS_CHANGED;
             reach_platform_window_queue_event(window, &event);
         }
         return 0;
@@ -353,9 +366,12 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_LBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_RBUTTONDOWN:
         if (window != nullptr)
         {
-            if (reach_platform_window_point_in_caption(window, (float)GET_X_LPARAM(lparam),
+            if (message == WM_LBUTTONDOWN &&
+                reach_platform_window_point_in_caption(window, (float)GET_X_LPARAM(lparam),
                                                        (float)GET_Y_LPARAM(lparam)))
             {
                 ReleaseCapture();
@@ -369,12 +385,14 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_POINTER_DOWN;
+            event.button = message == WM_RBUTTONDOWN
+                               ? REACH_POINTER_BUTTON_SECONDARY
+                               : message == WM_MBUTTONDOWN ? REACH_POINTER_BUTTON_MIDDLE
+                                                          : REACH_POINTER_BUTTON_PRIMARY;
             event.x = point.x;
             event.y = point.y;
             reach_platform_window_queue_event(window, &event);
         }
-        return 0;
-    case WM_MBUTTONDOWN:
         return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
@@ -386,10 +404,11 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             point.y = GET_Y_LPARAM(lparam);
             ClientToScreen(hwnd, &point);
             reach_ui_event event = {};
-            event.type = message == WM_RBUTTONUP
-                             ? REACH_UI_EVENT_POINTER_CONTEXT
-                             : (message == WM_MBUTTONUP ? REACH_UI_EVENT_POINTER_MIDDLE
-                                                        : REACH_UI_EVENT_POINTER_UP);
+            event.type = REACH_UI_EVENT_POINTER_UP;
+            event.button = message == WM_RBUTTONUP
+                               ? REACH_POINTER_BUTTON_SECONDARY
+                               : message == WM_MBUTTONUP ? REACH_POINTER_BUTTON_MIDDLE
+                                                        : REACH_POINTER_BUTTON_PRIMARY;
             event.x = point.x;
             event.y = point.y;
             reach_platform_window_queue_event(window, &event);
@@ -485,7 +504,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             HDC dc = GetDC(hwnd);
             if (dc != nullptr && text != nullptr)
             {
-                HFONT font = reach_create_windows_menu_font();
+                HFONT font = reach_create_windows_menu_font(hwnd);
                 HGDIOBJ old_font = SelectObject(dc, font);
                 GetTextExtentPoint32W(dc, text, (int)wcslen(text), &size);
                 SelectObject(dc, old_font);
@@ -520,7 +539,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             SetBkMode(draw->hDC, TRANSPARENT);
             SetTextColor(draw->hDC, RGB(218, 216, 212));
 
-            HFONT font = reach_create_windows_menu_font();
+            HFONT font = reach_create_windows_menu_font(hwnd);
             HGDIOBJ old_font = SelectObject(draw->hDC, font);
 
             RECT text_rect = draw->rcItem;
@@ -581,36 +600,28 @@ static reach_result reach_register_platform_class()
 
 static int32_t reach_window_no_activate_surface(reach_surface_role role)
 {
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TRAY_MENU ||
-           role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-           role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_CLIPBOARD;
-}
-
-static int32_t reach_window_topmost_surface(reach_surface_role role)
-{
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
+    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
            role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
            role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-           role == REACH_SURFACE_CLIPBOARD;
+           role == REACH_SURFACE_BATTERY || role == REACH_SURFACE_CLIPBOARD ||
+           role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD;
 }
 
 static DWORD reach_window_ex_style(reach_surface_role role)
 {
     DWORD style = role == REACH_SURFACE_SETTINGS ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW;
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_LAUNCHER ||
-        role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-        role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS)
+    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
+        role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
+        role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
+        role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_BATTERY ||
+        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
+        role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
     else
     {
         style |= WS_EX_LAYERED;
-    }
-    if (reach_window_topmost_surface(role))
-    {
-        style |= WS_EX_TOPMOST;
     }
     if (reach_window_no_activate_surface(role))
     {
@@ -666,6 +677,20 @@ static void reach_platform_window_focus(HWND hwnd)
     }
 }
 
+static reach_result reach_platform_window_place_behind(reach_platform_window *window,
+                                                       reach_window_id target_window)
+{
+    if (window == nullptr || window->hwnd == nullptr || target_window == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND target = reinterpret_cast<HWND>(target_window);
+    BOOL ok = SetWindowPos(window->hwnd, target, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    return ok ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_platform_window_show(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -674,14 +699,19 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     }
 
     int32_t no_activate = reach_window_no_activate_surface(window->role);
+    if (no_activate && IsWindowVisible(window->hwnd))
+    {
+        return REACH_OK;
+    }
+
     int show_command =
         no_activate ? SW_SHOWNOACTIVATE : (IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW);
     ShowWindow(window->hwnd, show_command);
     if (no_activate)
     {
-        SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0,
-                     0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
+        SetWindowPos(window->hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER |
+                         SWP_SHOWWINDOW);
     }
     else
     {
@@ -713,8 +743,8 @@ static reach_result reach_platform_window_set_bounds(reach_platform_window *wind
     int width = (int)bounds.width;
     int height = (int)bounds.height;
 
-    BOOL ok = SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST,
-                           (int)bounds.x, (int)bounds.y, width, height, SWP_NOACTIVATE);
+    BOOL ok = SetWindowPos(window->hwnd, nullptr, (int)bounds.x, (int)bounds.y, width, height,
+                           SWP_NOACTIVATE | SWP_NOZORDER);
     return ok ? REACH_OK : REACH_ERROR;
 }
 
@@ -760,80 +790,6 @@ static reach_result reach_platform_window_get_bounds(const reach_platform_window
     out_bounds->width = (float)(rect.right - rect.left);
     out_bounds->height = (float)(rect.bottom - rect.top);
     return REACH_OK;
-}
-
-static reach_result reach_platform_window_apply_rounded_corners(reach_platform_window *window,
-                                                                float radius)
-{
-    if (window == nullptr || window->hwnd == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    window->corner_radius = radius;
-
-    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
-        window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
-        window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
-        window->role == REACH_SURFACE_SETTINGS)
-    {
-        return REACH_OK;
-    }
-
-    int preference = DWMWCP_ROUND;
-    (void)DwmSetWindowAttribute(window->hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference,
-                                sizeof(preference));
-
-    RECT client = {};
-    if (!GetClientRect(window->hwnd, &client) || client.right <= client.left ||
-        client.bottom <= client.top)
-    {
-        return REACH_OK;
-    }
-
-    int diameter = radius > 0.0f ? (int)(radius * 2.0f) : 18;
-    if (diameter < 18)
-    {
-        diameter = 18;
-    }
-
-    HRGN region = CreateRoundRectRgn(0, 0, client.right - client.left + 1,
-                                     client.bottom - client.top + 1, diameter, diameter);
-
-    if (region == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
-    return SetWindowRgn(window->hwnd, region, TRUE) ? REACH_OK : REACH_ERROR;
-}
-static reach_result reach_platform_window_set_opacity(reach_platform_window *window, float opacity)
-{
-    if (window == nullptr || window->hwnd == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_LAUNCHER ||
-        window->role == REACH_SURFACE_TRAY_MENU || window->role == REACH_SURFACE_SWITCHER ||
-        window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_CLIPBOARD ||
-        window->role == REACH_SURFACE_SETTINGS)
-    {
-        return REACH_OK;
-    }
-
-    if (opacity < 0.0f)
-    {
-        opacity = 0.0f;
-    }
-    if (opacity > 1.0f)
-    {
-        opacity = 1.0f;
-    }
-
-    BYTE alpha = (BYTE)(opacity * 255.0f);
-    return SetLayeredWindowAttributes(window->hwnd, 0, alpha, LWA_ALPHA) ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reach_platform_window_set_blur_enabled(reach_platform_window *window,
@@ -954,9 +910,8 @@ static reach_result reach_platform_window_set_topmost(reach_platform_window *win
         return REACH_INVALID_ARGUMENT;
     }
 
-    window->topmost_enabled = enabled ? 1 : 0;
-    BOOL ok = SetWindowPos(window->hwnd, window->topmost_enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0,
-                           0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    BOOL ok = SetWindowPos(window->hwnd, enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
+                           SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     return ok ? REACH_OK : REACH_ERROR;
 }
 
@@ -998,18 +953,14 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (!reach_window_topmost_surface(window->role))
+    if (reach_window_no_activate_surface(window->role))
     {
-        int show_command = IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW;
-        ShowWindow(window->hwnd, show_command);
-        BringWindowToTop(window->hwnd);
-        reach_platform_window_focus(window->hwnd);
+        ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
         return REACH_OK;
     }
 
-    ShowWindow(window->hwnd, SW_SHOW);
-    window->topmost_enabled = 1;
-    SetWindowPos(window->hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    int show_command = IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW;
+    ShowWindow(window->hwnd, show_command);
     BringWindowToTop(window->hwnd);
     reach_platform_window_focus(window->hwnd);
 
@@ -1042,6 +993,36 @@ static reach_window_id reach_platform_window_native_id(const reach_platform_wind
     return window == nullptr ? 0 : reinterpret_cast<reach_window_id>(window->hwnd);
 }
 
+static reach_result reach_platform_window_set_input_regions(reach_platform_window *window,
+                                                            const reach_rect_f32 *regions,
+                                                            size_t region_count)
+{
+    if (window == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    if (regions == nullptr || region_count == 0)
+    {
+        window->input_region_count = 0;
+        window->input_regions_active = 0;
+        return REACH_OK;
+    }
+
+    if (region_count > REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS)
+    {
+        region_count = REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS;
+    }
+
+    for (size_t index = 0; index < region_count; ++index)
+    {
+        window->input_regions[index] = regions[index];
+    }
+    window->input_region_count = region_count;
+    window->input_regions_active = 1;
+    return REACH_OK;
+}
+
 static reach_result reach_platform_window_post_event(reach_platform_window *window,
                                                      reach_ui_event_type type)
 {
@@ -1053,8 +1034,8 @@ static reach_result reach_platform_window_post_event(reach_platform_window *wind
     UINT message = 0;
     switch (type)
     {
-    case REACH_UI_EVENT_LAUNCHER_SEARCH_READY:
-        message = REACH_WM_LAUNCHER_SEARCH_READY;
+    case REACH_UI_EVENT_FEATURE_WORK_READY:
+        message = REACH_WM_FEATURE_WORK_READY;
         break;
     case REACH_UI_EVENT_CONFIG_CHANGED:
         message = REACH_WM_CONFIG_CHANGED;
@@ -1067,6 +1048,9 @@ static reach_result reach_platform_window_post_event(reach_platform_window *wind
         break;
     case REACH_UI_EVENT_NOW_PLAYING_CHANGED:
         message = REACH_WM_NOW_PLAYING_CHANGED;
+        break;
+    case REACH_UI_EVENT_SYSTEM_STATS_CHANGED:
+        message = REACH_WM_SYSTEM_STATS_CHANGED;
         break;
     default:
         return REACH_INVALID_ARGUMENT;
@@ -1114,7 +1098,6 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     }
     window->role = role;
     window->pointer_move_enabled = 1;
-    window->topmost_enabled = reach_window_topmost_surface(role);
     const wchar_t *title = role == REACH_SURFACE_SETTINGS ? L"Reach Settings" : L"Reach";
     window->hwnd =
         CreateWindowExW(reach_window_ex_style(role), reach_window_class_name(role), title, WS_POPUP,
@@ -1147,9 +1130,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.hide = reach_platform_window_hide;
     out_port->ops.set_bounds = reach_platform_window_set_bounds;
     out_port->ops.get_bounds = reach_platform_window_get_bounds;
-    out_port->ops.set_opacity = reach_platform_window_set_opacity;
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
-    out_port->ops.apply_rounded_corners = reach_platform_window_apply_rounded_corners;
     out_port->ops.set_caption = reach_platform_window_set_caption;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;
     out_port->ops.has_pending_events = reach_platform_window_has_pending_events;
@@ -1162,7 +1143,9 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.is_minimized = reach_platform_window_is_minimized;
     out_port->ops.is_active = reach_platform_window_is_active;
     out_port->ops.native_id = reach_platform_window_native_id;
+    out_port->ops.place_behind = reach_platform_window_place_behind;
     out_port->ops.post_event = reach_platform_window_post_event;
+    out_port->ops.set_input_regions = reach_platform_window_set_input_regions;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
 }

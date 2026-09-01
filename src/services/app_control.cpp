@@ -20,13 +20,17 @@ static const int64_t REACH_APP_CONTROL_LAUNCH_IDLE_EXIT_MILLISECONDS = 10000;
 enum reach_app_control_launch_item_kind
 {
     REACH_APP_CONTROL_ITEM_LAUNCH = 0,
-    REACH_APP_CONTROL_ITEM_REVEAL = 1
+    REACH_APP_CONTROL_ITEM_REVEAL = 1,
+    REACH_APP_CONTROL_ITEM_TERMINAL = 2,
+    REACH_APP_CONTROL_ITEM_OPEN_LOCATION = 3
 };
 
 struct reach_app_control_launch_item
 {
     int32_t kind;
     reach_app_launch_request launch;
+    reach_terminal_launch_request terminal;
+    reach_app_control_location_kind location;
 };
 
 struct reach_app_control_launch_state
@@ -34,6 +38,7 @@ struct reach_app_control_launch_state
     std::mutex mutex;
     std::condition_variable cv;
     reach_app_launcher_port launcher = {};
+    reach_terminal_launcher_port terminal_launcher = {};
     reach_explorer_service_port explorer = {};
     reach_app_control_launch_item queue[REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = {};
     size_t queue_head = 0;
@@ -55,6 +60,47 @@ static void reach_app_control_launch_state_release(reach_app_control_launch_stat
     if (last)
     {
         delete state;
+    }
+}
+
+static void reach_app_control_open_default(const reach_app_control_launch_state *state)
+{
+    if (state->explorer.ops.open_default != nullptr)
+    {
+        (void)state->explorer.ops.open_default(state->explorer.service);
+    }
+}
+
+static void reach_app_control_open_location(const reach_app_control_launch_state *state,
+                                            reach_app_control_location_kind kind,
+                                            const uint16_t *path)
+{
+    switch (kind)
+    {
+    case REACH_APP_CONTROL_LOCATION_PATH:
+        if (state->explorer.ops.path_exists != nullptr &&
+            state->explorer.ops.path_exists(state->explorer.service, path) &&
+            state->explorer.ops.open_path != nullptr)
+        {
+            (void)state->explorer.ops.open_path(state->explorer.service, path);
+            return;
+        }
+        reach_app_control_open_default(state);
+        return;
+
+    case REACH_APP_CONTROL_LOCATION_SHELL:
+        if (state->explorer.ops.open_shell_location != nullptr)
+        {
+            (void)state->explorer.ops.open_shell_location(state->explorer.service, path);
+            return;
+        }
+        reach_app_control_open_default(state);
+        return;
+
+    case REACH_APP_CONTROL_LOCATION_DEFAULT:
+    default:
+        reach_app_control_open_default(state);
+        return;
     }
 }
 
@@ -94,11 +140,23 @@ static void reach_app_control_launch_worker_main(reach_app_control_launch_state 
             --state->queue_count;
         }
 
-        if (item.kind == REACH_APP_CONTROL_ITEM_REVEAL)
+        if (item.kind == REACH_APP_CONTROL_ITEM_OPEN_LOCATION)
+        {
+            reach_app_control_open_location(state, item.location, item.launch.path);
+        }
+        else if (item.kind == REACH_APP_CONTROL_ITEM_REVEAL)
         {
             if (state->explorer.ops.reveal_path != nullptr)
             {
                 (void)state->explorer.ops.reveal_path(state->explorer.service, item.launch.path);
+            }
+        }
+        else if (item.kind == REACH_APP_CONTROL_ITEM_TERMINAL)
+        {
+            if (state->terminal_launcher.ops.launch != nullptr)
+            {
+                (void)state->terminal_launcher.ops.launch(state->terminal_launcher.launcher,
+                                                          &item.terminal);
             }
         }
         else if (state->launcher.ops.launch != nullptr)
@@ -311,6 +369,7 @@ static reach_result reach_app_control_start_window_worker(reach_app_control *ser
 }
 
 reach_result reach_app_control_create(reach_app_launcher_port launcher,
+                                      reach_terminal_launcher_port terminal_launcher,
                                       reach_explorer_service_port explorer,
                                       reach_window_manager_port window_manager,
                                       void (*notify)(void *user), void *notify_user,
@@ -329,6 +388,7 @@ reach_result reach_app_control_create(reach_app_launcher_port launcher,
         return REACH_ERROR;
     }
     launch->launcher = launcher;
+    launch->terminal_launcher = terminal_launcher;
     launch->explorer = explorer;
     service->launch = launch;
     service->window_manager = window_manager;
@@ -468,6 +528,25 @@ reach_result reach_app_control_schedule_launch(reach_app_control *service,
     return reach_app_control_enqueue(service->launch, &item);
 }
 
+reach_result
+reach_app_control_schedule_terminal_launch(reach_app_control *service,
+                                           const reach_terminal_launch_request *request)
+{
+    if (service == nullptr || service->launch == nullptr || request == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->launch->terminal_launcher.ops.launch == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_app_control_launch_item item = {};
+    item.kind = REACH_APP_CONTROL_ITEM_TERMINAL;
+    item.terminal = *request;
+    return reach_app_control_enqueue(service->launch, &item);
+}
+
 int32_t reach_app_control_reveal_available(const reach_app_control *service)
 {
     return service != nullptr && service->launch != nullptr &&
@@ -488,6 +567,29 @@ reach_result reach_app_control_schedule_reveal(reach_app_control *service, const
     reach_app_control_launch_item item = {};
     item.kind = REACH_APP_CONTROL_ITEM_REVEAL;
     reach_copy_utf16(item.launch.path, 260, path);
+    return reach_app_control_enqueue(service->launch, &item);
+}
+
+reach_result reach_app_control_schedule_open_location(reach_app_control *service,
+                                                      reach_app_control_location_kind kind,
+                                                      const uint16_t *path)
+{
+    if (service == nullptr || service->launch == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->launch->explorer.service == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    reach_app_control_launch_item item = {};
+    item.kind = REACH_APP_CONTROL_ITEM_OPEN_LOCATION;
+    item.location = kind;
+    if (path != nullptr)
+    {
+        reach_copy_utf16(item.launch.path, 260, path);
+    }
     return reach_app_control_enqueue(service->launch, &item);
 }
 
@@ -546,8 +648,9 @@ reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr
     return REACH_OK;
 }
 
-reach_result reach_app_control_schedule_minimize(reach_app_control *service,
-                                                 const uintptr_t *window_ids, size_t window_count)
+reach_result reach_app_control_schedule_windows(reach_app_control *service,
+                                                reach_window_control_action action,
+                                                const uintptr_t *window_ids, size_t window_count)
 {
     if (service == nullptr || window_ids == nullptr || window_count == 0)
     {
@@ -567,7 +670,7 @@ reach_result reach_app_control_schedule_minimize(reach_app_control *service,
 
     {
         std::lock_guard<std::mutex> lock(service->window_mutex);
-        service->window_pending_action = REACH_WINDOW_CONTROL_MINIMIZE;
+        service->window_pending_action = action;
         service->window_pending_is_snap = 0;
         service->window_pending_window_count = window_count;
         for (size_t index = 0; index < window_count; ++index)
@@ -583,6 +686,51 @@ reach_result reach_app_control_schedule_minimize(reach_app_control *service,
 
     service->window_cv.notify_one();
     return REACH_OK;
+}
+
+reach_result reach_app_control_window_bounds(const reach_app_control *service, uintptr_t window_id,
+                                             reach_rect_f32 *out_bounds)
+{
+    if (service == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->window_manager.ops.outer_bounds == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->window_manager.ops.outer_bounds(service->window_manager.manager, window_id,
+                                                    out_bounds);
+}
+
+reach_result reach_app_control_window_frame_bounds(const reach_app_control *service,
+                                                   uintptr_t window_id, reach_rect_f32 *out_bounds)
+{
+    if (service == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->window_manager.ops.frame_bounds == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->window_manager.ops.frame_bounds(service->window_manager.manager, window_id,
+                                                    out_bounds);
+}
+
+reach_result reach_app_control_move_windows(reach_app_control *service,
+                                            const reach_window_move *windows, size_t count)
+{
+    if (service == nullptr || windows == nullptr || count == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->window_manager.ops.move_windows == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->window_manager.ops.move_windows(service->window_manager.manager, windows,
+                                                    count);
 }
 
 int32_t reach_app_control_take_window_completed(reach_app_control *service,

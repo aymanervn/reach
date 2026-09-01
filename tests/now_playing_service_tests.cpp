@@ -1,3 +1,5 @@
+#include "reach/support/util.h"
+#include "test_utf16.h"
 #include "reach/services/now_playing.h"
 
 #include <chrono>
@@ -16,31 +18,6 @@ static void expect_true(int condition, const char *message)
         ++failures;
         fprintf(stderr, "FAILED: %s\n", message);
     }
-}
-
-static void copy_ascii(uint16_t *dst, size_t dst_count, const char *src)
-{
-    size_t index = 0;
-    while (src != nullptr && src[index] != 0 && index + 1 < dst_count)
-    {
-        dst[index] = (uint16_t)(unsigned char)src[index];
-        ++index;
-    }
-    dst[index] = 0;
-}
-
-static int text_equals_ascii(const uint16_t *text, const char *expected)
-{
-    size_t index = 0;
-    while (expected[index] != 0)
-    {
-        if (text[index] != (uint16_t)(unsigned char)expected[index])
-        {
-            return 0;
-        }
-        ++index;
-    }
-    return text[index] == 0;
 }
 
 struct fake_media_controls
@@ -164,8 +141,8 @@ static void fake_set_state(fake_media_controls *fake, uint64_t media_generation,
         fake->state.media_generation = media_generation;
         if (has_media)
         {
-            copy_ascii(fake->state.title, 260, title);
-            copy_ascii(fake->state.artist, 260, "Artist");
+            reach_copy_ascii_to_utf16(fake->state.title, 260, title);
+            reach_copy_ascii_to_utf16(fake->state.artist, 260, "Artist");
             fake->state.playback = REACH_MEDIA_PLAYBACK_PLAYING;
             fake->state.previous_enabled = 1;
             fake->state.play_pause_enabled = 1;
@@ -257,11 +234,12 @@ static void test_progressive_latest_only_publication()
     expect_true(reach_now_playing_service_start(service) == REACH_OK, "service start succeeds");
 
     reach_now_playing_snapshot snapshot = {};
-    expect_true(wait_for_snapshot(
-                    service, [](const reach_now_playing_snapshot &value)
-                    { return value.has_session && text_equals_ascii(value.title, "First"); },
-                    &snapshot),
-                "core state publishes while first cover is blocked");
+    expect_true(
+        wait_for_snapshot(
+            service, [](const reach_now_playing_snapshot &value)
+            { return value.has_session && reach_test_utf16_equals_ascii(value.title, "First"); },
+            &snapshot),
+        "core state publishes while first cover is blocked");
     expect_true(snapshot.cover_image_id == 0, "first core generation does not wait for cover");
     expect_true(snapshot.next_enabled, "core controls publish before cover");
     expect_true(wait_for_cover_request(&fake, 1), "first cover read starts");
@@ -287,19 +265,21 @@ static void test_progressive_latest_only_publication()
     }
     fake_set_state(&fake, 2, "Second", 1);
     expect_true(wait_for_cover_request(&fake, 2), "second cover read starts");
-    expect_true(
-        wait_for_snapshot(
-            service, [](const reach_now_playing_snapshot &value)
-            { return text_equals_ascii(value.title, "Second") && value.cover_image_id == 1001; }),
-        "new core generation temporarily retains the previous cover");
+    expect_true(wait_for_snapshot(service,
+                                  [](const reach_now_playing_snapshot &value)
+                                  {
+                                      return reach_test_utf16_equals_ascii(value.title, "Second") &&
+                                             value.cover_image_id == 1001;
+                                  }),
+                "new core generation temporarily retains the previous cover");
 
     fake_set_state(&fake, 3, "Third", 1);
     expect_true(wait_for_snapshot(service, [](const reach_now_playing_snapshot &value)
-                                  { return text_equals_ascii(value.title, "Third"); }),
+                                  { return reach_test_utf16_equals_ascii(value.title, "Third"); }),
                 "intermediate core generation publishes");
     fake_set_state(&fake, 4, "Fourth", 1);
     expect_true(wait_for_snapshot(service, [](const reach_now_playing_snapshot &value)
-                                  { return text_equals_ascii(value.title, "Fourth"); }),
+                                  { return reach_test_utf16_equals_ascii(value.title, "Fourth"); }),
                 "latest core generation publishes");
 
     {
@@ -320,31 +300,36 @@ static void test_progressive_latest_only_publication()
     }
     fake_set_state(&fake, 5, "Fifth", 1);
     expect_true(wait_for_cover_request(&fake, 5), "failed current cover read starts");
-    expect_true(
-        wait_for_snapshot(
-            service, [](const reach_now_playing_snapshot &value)
-            { return text_equals_ascii(value.title, "Fifth") && value.cover_image_id == 1004; }),
-        "old cover remains while the current cover is loading");
+    expect_true(wait_for_snapshot(service,
+                                  [](const reach_now_playing_snapshot &value)
+                                  {
+                                      return reach_test_utf16_equals_ascii(value.title, "Fifth") &&
+                                             value.cover_image_id == 1004;
+                                  }),
+                "old cover remains while the current cover is loading");
     {
         std::lock_guard<std::mutex> lock(fake.mutex);
         fake.allow_blocked_cover = 1;
     }
     fake.cv.notify_all();
-    expect_true(
-        wait_for_snapshot(
-            service, [](const reach_now_playing_snapshot &value)
-            { return text_equals_ascii(value.title, "Fifth") && value.cover_image_id == 0; }),
-        "current cover failure clears to the placeholder");
+    expect_true(wait_for_snapshot(service,
+                                  [](const reach_now_playing_snapshot &value)
+                                  {
+                                      return reach_test_utf16_equals_ascii(value.title, "Fifth") &&
+                                             value.cover_image_id == 0;
+                                  }),
+                "current cover failure clears to the placeholder");
 
     fake_set_state(&fake, 6, nullptr, 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     reach_now_playing_service_snapshot(service, &snapshot);
-    expect_true(snapshot.has_session && text_equals_ascii(snapshot.title, "Fifth"),
+    expect_true(snapshot.has_session && reach_test_utf16_equals_ascii(snapshot.title, "Fifth"),
                 "transient session absence retains the last snapshot");
     fake_set_state(&fake, 7, "Recovered", 1);
-    expect_true(wait_for_snapshot(service, [](const reach_now_playing_snapshot &value)
-                                  { return text_equals_ascii(value.title, "Recovered"); }),
-                "media recovery cancels pending disappearance");
+    expect_true(
+        wait_for_snapshot(service, [](const reach_now_playing_snapshot &value)
+                          { return reach_test_utf16_equals_ascii(value.title, "Recovered"); }),
+        "media recovery cancels pending disappearance");
 
     auto disappearance_started = std::chrono::steady_clock::now();
     fake_set_state(&fake, 8, nullptr, 0);
@@ -368,7 +353,7 @@ static void test_progressive_latest_only_publication()
     fake_set_state(&fake, 9, "Ninth", 1);
     expect_true(wait_for_cover_request(&fake, 9), "ninth cover read is blocked");
     expect_true(wait_for_snapshot(service, [](const reach_now_playing_snapshot &value)
-                                  { return text_equals_ascii(value.title, "Ninth"); }),
+                                  { return reach_test_utf16_equals_ascii(value.title, "Ninth"); }),
                 "ninth core generation publishes before its cover");
 
     expect_true(reach_now_playing_service_try_action(service, REACH_NOW_PLAYING_ACTION_NEXT),
@@ -381,12 +366,15 @@ static void test_progressive_latest_only_publication()
     expect_true(snapshot.has_session && snapshot.transport_pending,
                 "transient empty state neither hides nor unlocks transport");
     fake_set_state(&fake, 11, "Eleventh", 1);
-    expect_true(
-        wait_for_snapshot(
-            service, [](const reach_now_playing_snapshot &value)
-            { return text_equals_ascii(value.title, "Eleventh") && value.transport_pending == 0; },
-            &snapshot, 1000),
-        "new core state cancels disappearance and unlocks transport");
+    expect_true(wait_for_snapshot(
+                    service,
+                    [](const reach_now_playing_snapshot &value)
+                    {
+                        return reach_test_utf16_equals_ascii(value.title, "Eleventh") &&
+                               value.transport_pending == 0;
+                    },
+                    &snapshot, 1000),
+                "new core state cancels disappearance and unlocks transport");
     expect_true(snapshot.next_enabled, "transport controls restore from core state");
 
     {

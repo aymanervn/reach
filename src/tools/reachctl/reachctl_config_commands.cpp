@@ -2,8 +2,7 @@
 
 #include "reachctl_common.h"
 
-#include "reach/services/pin_config.h"
-#include "reach/ports/config_store.h"
+#include "reach/services/config.h"
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -36,11 +35,10 @@ static int32_t reachctl_is_supported_wallpaper_path(const uint16_t *path)
            lstrcmpiW(extension, L".webp") == 0;
 }
 
-static reach_result reachctl_path_is_already_pinned(reach_config_store_port *store,
+static reach_result reachctl_path_is_already_pinned(reach_config_service *service,
                                                     const uint16_t *path, int32_t *out_pinned)
 {
-    if (store == nullptr || store->ops.load == nullptr || path == nullptr || path[0] == 0 ||
-        out_pinned == nullptr)
+    if (service == nullptr || path == nullptr || path[0] == 0 || out_pinned == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -48,7 +46,7 @@ static reach_result reachctl_path_is_already_pinned(reach_config_store_port *sto
     *out_pinned = 0;
 
     reach_config_snapshot snapshot = {};
-    reach_result result = store->ops.load(store->store, &snapshot);
+    reach_result result = reach_config_service_snapshot(service, &snapshot);
     if (result != REACH_OK)
     {
         return result;
@@ -56,7 +54,7 @@ static reach_result reachctl_path_is_already_pinned(reach_config_store_port *sto
 
     for (size_t index = 0; index < snapshot.pinned_app_count; ++index)
     {
-        if (reachctl_path_equals_ci(snapshot.pinned_apps[index].path, path))
+        if (reach_path_equals(snapshot.pinned_apps[index].path, path))
         {
             *out_pinned = 1;
             return REACH_OK;
@@ -97,12 +95,23 @@ int reachctl_pin_command(const wchar_t *path)
         reachctl_print(L"Could not open Reach config.");
         return 1;
     }
+    reach_config_service *service = nullptr;
+    if (reach_config_service_create(store, nullptr, nullptr, &service) != REACH_OK)
+    {
+        if (store.ops.destroy != nullptr)
+        {
+            store.ops.destroy(store.store);
+        }
+        reachctl_print(L"Could not read Reach config.");
+        return 1;
+    }
     int32_t already_pinned = 0;
     reach_result already_result =
-        reachctl_path_is_already_pinned(&store, absolute_path, &already_pinned);
+        reachctl_path_is_already_pinned(service, absolute_path, &already_pinned);
 
     if (already_result != REACH_OK)
     {
+        reach_config_service_destroy(service);
         if (store.ops.destroy != nullptr)
         {
             store.ops.destroy(store.store);
@@ -112,13 +121,19 @@ int reachctl_pin_command(const wchar_t *path)
 
     if (already_pinned)
     {
+        reach_config_service_destroy(service);
         if (store.ops.destroy != nullptr)
         {
             store.ops.destroy(store.store);
         }
         return 0;
     }
-    reach_result pin_result = reach_pin_config_pin_path(&store, absolute_path);
+    reach_result pin_result = reach_config_service_pin_path(service, absolute_path);
+    if (pin_result == REACH_OK)
+    {
+        pin_result = reach_config_service_flush(service);
+    }
+    reach_config_service_destroy(service);
 
     if (store.ops.destroy != nullptr)
     {
@@ -171,15 +186,14 @@ int reachctl_wallpaper_monitor_command(const wchar_t *index_text, const wchar_t 
 
     reach_config_store_port store = {};
     reach_result store_result = reachctl_open_config_store(&store);
-    if (store_result != REACH_OK || store.ops.load == nullptr || store.ops.save == nullptr)
+    if (store_result != REACH_OK)
     {
         reachctl_print(L"Could not open Reach config.");
         return 1;
     }
 
-    reach_config_snapshot snapshot = {};
-    reach_result load_result = store.ops.load(store.store, &snapshot);
-    if (load_result != REACH_OK)
+    reach_config_service *service = nullptr;
+    if (reach_config_service_create(store, nullptr, nullptr, &service) != REACH_OK)
     {
         if (store.ops.destroy != nullptr)
         {
@@ -190,10 +204,24 @@ int reachctl_wallpaper_monitor_command(const wchar_t *index_text, const wchar_t 
         return 1;
     }
 
+    reach_config_snapshot snapshot = {};
+    reach_result load_result = reach_config_service_snapshot(service, &snapshot);
+    if (load_result != REACH_OK)
+    {
+        reach_config_service_destroy(service);
+        if (store.ops.destroy != nullptr)
+        {
+            store.ops.destroy(store.store);
+        }
+        reachctl_print(L"Could not read Reach config.");
+        return 1;
+    }
+
     uint16_t *target_path = snapshot.monitor_wallpaper_paths[monitor_index];
 
-    if (reachctl_path_equals_ci(target_path, absolute_path))
+    if (reach_path_equals(target_path, absolute_path))
     {
+        reach_config_service_destroy(service);
         if (store.ops.destroy != nullptr)
         {
             store.ops.destroy(store.store);
@@ -203,19 +231,13 @@ int reachctl_wallpaper_monitor_command(const wchar_t *index_text, const wchar_t 
         return 0;
     }
 
-    reach_result copy_result = reach_copy_utf16(target_path, 260, absolute_path);
-    if (copy_result != REACH_OK)
+    reach_result save_result =
+        reach_config_service_set_monitor_wallpaper(service, monitor_index, absolute_path);
+    if (save_result == REACH_OK)
     {
-        if (store.ops.destroy != nullptr)
-        {
-            store.ops.destroy(store.store);
-        }
-
-        reachctl_print(L"Could not copy wallpaper path.");
-        return 1;
+        save_result = reach_config_service_flush(service);
     }
-
-    reach_result save_result = store.ops.save(store.store, &snapshot);
+    reach_config_service_destroy(service);
 
     if (store.ops.destroy != nullptr)
     {

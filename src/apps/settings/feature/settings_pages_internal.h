@@ -23,8 +23,11 @@ typedef struct reach_settings_power_row_style
     uint32_t icon_id;
     const uint16_t *title;
     const uint16_t *subtitle;
-    reach_color accent;
+    reach_theme_accent accent;
 } reach_settings_power_row_style;
 
 const reach_settings_power_row_style *reach_settings_power_row_styles(void);
+
+int32_t reach_settings_wifi_row_needs_key_form(const reach_settings_model *model, size_t index);
+int32_t reach_settings_bluetooth_row_is_pairing(const reach_settings_model *model, size_t index);
 #endif

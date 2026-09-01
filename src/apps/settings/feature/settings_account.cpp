@@ -11,8 +11,7 @@ const uint16_t *reach_settings_account_page_placeholder(void)
 }
 
 void reach_settings_model_set_account(reach_settings_model *model, const uint16_t *display_name,
-                                      const uint16_t *user_name, int32_t is_admin,
-                                      uint64_t picture)
+                                      const uint16_t *user_name, int32_t is_admin, uint64_t picture)
 {
     REACH_ASSERT(model != nullptr);
     if (model == nullptr)

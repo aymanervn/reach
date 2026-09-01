@@ -23,10 +23,15 @@ extern "C"
         REACH_SURFACE_CONTEXT_MENU = 4,
         REACH_SURFACE_QUICK_SETTINGS = 5,
         REACH_SURFACE_SETTINGS = 6,
-        REACH_SURFACE_CLIPBOARD = 7
+        REACH_SURFACE_CLIPBOARD = 7,
+        REACH_SURFACE_STAGE = 8,
+        REACH_SURFACE_TOP_BAR = 9,
+        REACH_SURFACE_BATTERY = 10,
+        REACH_SURFACE_SYSTEM_HUD = 11
     } reach_surface_role;
 
 #define REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS 4
+#define REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS 16
 
     typedef struct reach_platform_window reach_platform_window;
     typedef void (*reach_platform_window_event_callback)(void *user, const reach_ui_event *event);
@@ -44,9 +49,7 @@ extern "C"
         reach_result (*hide)(reach_platform_window *window);
         reach_result (*set_bounds)(reach_platform_window *window, reach_rect_f32 bounds);
         reach_result (*get_bounds)(const reach_platform_window *window, reach_rect_f32 *out_bounds);
-        reach_result (*set_opacity)(reach_platform_window *window, float opacity);
         reach_result (*set_blur_enabled)(reach_platform_window *window, int32_t enabled);
-        reach_result (*apply_rounded_corners)(reach_platform_window *window, float radius);
         reach_result (*set_caption)(reach_platform_window *window,
                                     const reach_platform_window_caption *caption);
         reach_result (*set_event_callback)(reach_platform_window *window,
@@ -62,7 +65,10 @@ extern "C"
         int32_t (*is_minimized)(const reach_platform_window *window);
         int32_t (*is_active)(const reach_platform_window *window);
         reach_window_id (*native_id)(const reach_platform_window *window);
+        reach_result (*place_behind)(reach_platform_window *window, reach_window_id target);
         reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);
+        reach_result (*set_input_regions)(reach_platform_window *window,
+                                          const reach_rect_f32 *regions, size_t region_count);
         void (*destroy)(reach_platform_window *window);
     } reach_platform_window_ops;
 

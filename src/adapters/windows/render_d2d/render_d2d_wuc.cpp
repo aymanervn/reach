@@ -50,6 +50,56 @@ HRESULT reach_visual_set_size(IInspectable *inspectable, float width, float heig
     return hr;
 }
 
+reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
+                                          reach_rect_f32 content_rect)
+{
+    if (backend == nullptr || backend->backdrop_visual == nullptr)
+    {
+        return REACH_OK;
+    }
+
+    if (backend->backdrop_content_rect.x == content_rect.x &&
+        backend->backdrop_content_rect.y == content_rect.y &&
+        backend->backdrop_content_rect.width == content_rect.width &&
+        backend->backdrop_content_rect.height == content_rect.height)
+    {
+        return REACH_OK;
+    }
+
+    float right = (float)backend->target_width - (content_rect.x + content_rect.width);
+    float bottom = (float)backend->target_height - (content_rect.y + content_rect.height);
+
+    ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset;
+    HRESULT hr = backend->compositor->CreateInsetClipWithInsets(
+        content_rect.x, content_rect.y, right > 0.0f ? right : 0.0f, bottom > 0.0f ? bottom : 0.0f,
+        &inset);
+
+    ComPtr<ABI::Windows::UI::Composition::IVisual> backdrop;
+    if (SUCCEEDED(hr))
+    {
+        hr = backend->backdrop_visual.As(&backdrop);
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::ICompositionClip> clip;
+    if (SUCCEEDED(hr))
+    {
+        hr = inset.As(&clip);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = backdrop->put_Clip(clip.Get());
+    }
+
+    if (FAILED(hr))
+    {
+        reach_d2d_log_hresult(L"backdrop content clip", hr);
+        return REACH_ERROR;
+    }
+
+    backend->backdrop_content_rect = content_rect;
+    return REACH_OK;
+}
+
 reach_result reach_wuc_create_target(reach_render_backend *backend)
 {
     if (backend == nullptr || backend->hwnd == nullptr || backend->factory == nullptr)

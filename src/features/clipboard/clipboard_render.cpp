@@ -26,19 +26,10 @@ static float reach_clipboard_clamp01(float value)
     return value;
 }
 
-static size_t reach_clipboard_count_clamped(const reach_clipboard_model *model)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    return model->count <= REACH_CLIPBOARD_MAX_ITEMS ? model->count : REACH_CLIPBOARD_MAX_ITEMS;
-}
-
 static constexpr size_t REACH_CLIPBOARD_RENDER_ITEM_LIMIT = 5;
 static constexpr size_t REACH_CLIPBOARD_PREVIEW_LINE_LIMIT = 4;
 static constexpr float REACH_CLIPBOARD_PREVIEW_LINE_HEIGHT_RATIO = 1.25f;
-static constexpr float REACH_CLIPBOARD_PREVIEW_AVERAGE_GLYPH_WIDTH_RATIO = 0.58f;
+static constexpr float REACH_CLIPBOARD_PREVIEW_GLYPH_ADVANCE_RATIO = 0.60f;
 
 struct reach_clipboard_preview_slice
 {
@@ -205,8 +196,8 @@ static int32_t reach_clipboard_preview_has_visible_text(const reach_clipboard_it
 
 static size_t reach_clipboard_preview_line_capacity(float text_width, float text_size)
 {
-    const float glyph_width = reach_clipboard_max_float(
-        1.0f, text_size * REACH_CLIPBOARD_PREVIEW_AVERAGE_GLYPH_WIDTH_RATIO);
+    const float glyph_width =
+        reach_clipboard_max_float(1.0f, text_size * REACH_CLIPBOARD_PREVIEW_GLYPH_ADVANCE_RATIO);
     size_t capacity = (size_t)(text_width / glyph_width);
     if (capacity < 1)
     {
@@ -457,23 +448,20 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     const reach_theme *theme = input->theme;
     const reach_clipboard_model *model = input->model;
     const reach_clipboard_layout *layout = input->layout;
+    const float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
     reach_render_command_buffer_clear(commands);
 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect = {0.0f, 0.0f, layout->bounds.width, layout->bounds.height};
-    command.color = theme->clipboard_background;
-    command.radius = reach_clipboard_scale_value(theme->clipboard_panel_radius, input->dpi_scale);
-    reach_render_command_buffer_push(commands, &command);
-
-    command = {};
-    command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-    command.rect = {0.5f, 0.5f, reach_clipboard_max_float(0.0f, layout->bounds.width - 1.0f),
-                    reach_clipboard_max_float(0.0f, layout->bounds.height - 1.0f)};
-    command.color = theme->clipboard_border;
-    command.radius = reach_clipboard_scale_value(theme->clipboard_panel_radius, input->dpi_scale);
-    command.stroke_width = theme->border_thickness;
-    reach_render_command_buffer_push(commands, &command);
+    command.radius = reach_clipboard_scale_value(theme->radius_large, input->dpi_scale);
+    reach_result result = reach_render_push_bordered_background(
+        commands, &command, theme->clipboard_background, theme->clipboard_border, border_thickness,
+        &theme->popup_shadow, input->dpi_scale);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
 
     command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
@@ -584,48 +572,44 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         }
 
         const reach_rect_f32 local_item = reach_clipboard_local(item, layout->bounds);
+        const reach_rect_f32 local_item_content =
+            reach_theme_border_content_rect(theme, input->dpi_scale, local_item);
         const reach_rect_f32 local_visible_item =
             reach_clipboard_local(visible_item, layout->bounds);
         const reach_clipboard_item *item_data = &model->items[index];
         const float hover = reach_clipboard_clamp01(
             input->hover_values != nullptr ? input->hover_values[index] : 0.0f);
 
-        command = {};
-        command.type = REACH_RENDER_COMMAND_RECT;
-        command.rect = local_visible_item;
-        command.color = theme->clipboard_item_background;
-        command.color.r += (theme->clipboard_item_hover_background.r - command.color.r) * hover;
-        command.color.g += (theme->clipboard_item_hover_background.g - command.color.g) * hover;
-        command.color.b += (theme->clipboard_item_hover_background.b - command.color.b) * hover;
-        command.color.a += (theme->clipboard_item_hover_background.a - command.color.a) * hover;
-        command.radius =
-            reach_clipboard_scale_value(theme->clipboard_item_radius, input->dpi_scale);
-        reach_render_command_buffer_push(commands, &command);
-
-        command = {};
-        command.type = REACH_RENDER_COMMAND_ROUNDED_RECT_STROKE;
-        command.rect = {local_visible_item.x + 0.5f, local_visible_item.y + 0.5f,
-                        reach_clipboard_max_float(0.0f, local_visible_item.width - 1.0f),
-                        reach_clipboard_max_float(0.0f, local_visible_item.height - 1.0f)};
-        command.color = theme->clipboard_item_hover_border;
-        command.color.a *= hover;
-        command.radius =
-            reach_clipboard_scale_value(theme->clipboard_item_radius, input->dpi_scale);
-        command.stroke_width = theme->border_thickness;
-        reach_render_command_buffer_push(commands, &command);
+        reach_color item_background = reach_theme_color_mix(
+            theme->clipboard_item_background, theme->clipboard_item_hover_background, hover);
+        reach_color border_source = theme->clipboard_item_hover_border;
+        float border_alpha = border_source.a * hover;
+        border_source.a = 1.0f;
+        reach_color item_border =
+            reach_theme_color_mix(item_background, border_source, border_alpha);
+        reach_render_command item_shape = {};
+        item_shape.type = REACH_RENDER_COMMAND_RECT;
+        item_shape.rect = local_visible_item;
+        item_shape.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
+        result = reach_render_push_bordered_background(commands, &item_shape, item_background,
+                                                       item_border, border_thickness, nullptr,
+                                                       input->dpi_scale);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
 
         const float close_size = metrics.close_button_size;
         const float close_margin = metrics.close_button_margin;
-        const reach_rect_f32 close_rect = {local_item.x + local_item.width - close_size -
-                                               close_margin,
-                                           local_item.y + close_margin, close_size, close_size};
+        const reach_rect_f32 close_rect =
+            reach_clipboard_local(layout->close_buttons[index], layout->bounds);
 
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = close_rect;
         command.color = theme->clipboard_secondary_text;
         command.color.a = metrics.close_button_hover_alpha * hover;
-        command.radius = reach_clipboard_scale_value(4.0f, input->dpi_scale);
+        command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
         if (reach_clipboard_clip_rect(&command.rect, local_visible_item))
         {
             reach_render_command_buffer_push(commands, &command);
@@ -647,20 +631,21 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
 
         const float padding = metrics.thumbnail_padding;
         const float reserved_right = close_size + close_margin * 2.0f;
-        const float text_right = local_item.x + local_item.width - reserved_right;
+        const float text_right = local_item_content.x + local_item_content.width - reserved_right;
         if (item_data->kind == REACH_CLIPBOARD_ITEM_IMAGE && item_data->thumbnail_id != 0)
         {
             const float thumbnail_height =
-                reach_clipboard_min_float(metrics.thumbnail_height, local_item.height);
+                reach_clipboard_min_float(metrics.thumbnail_height, local_item_content.height);
             const float thumbnail_max_width = reach_clipboard_max_float(
-                0.0f, local_item.width * metrics.thumbnail_max_width_ratio);
+                0.0f, local_item_content.width * metrics.thumbnail_max_width_ratio);
             const float thumbnail_width = reach_clipboard_thumbnail_width_for_item(
                 item_data, thumbnail_height, thumbnail_max_width);
 
-            const float thumbnail_x = local_item.x + padding;
+            const float thumbnail_x = local_item_content.x + padding;
             const float thumbnail_y =
-                local_item.y +
-                reach_clipboard_max_float(0.0f, local_item.height - thumbnail_height) * 0.5f;
+                local_item_content.y +
+                reach_clipboard_max_float(0.0f, local_item_content.height - thumbnail_height) *
+                    0.5f;
 
             command = {};
             command.type = REACH_RENDER_COMMAND_ICON;
@@ -668,7 +653,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             command.icon_id = item_data->thumbnail_id;
             command.icon_crop_to_fill = 1;
             command.color.a = 1.0f;
-            command.radius = metrics.item_radius;
+            command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
             if (reach_clipboard_clip_rect(&command.rect, local_visible_item))
             {
                 reach_render_command_buffer_push(commands, &command);
@@ -677,20 +662,20 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             const float text_x = thumbnail_x + thumbnail_width + metrics.thumbnail_text_gap;
             reach_clipboard_push_preview_text_lines(
                 commands, item_data,
-                {text_x, local_item.y + padding,
+                {text_x, local_item_content.y + padding,
                  reach_clipboard_max_float(0.0f, text_right - text_x),
-                 reach_clipboard_max_float(0.0f, local_item.height - padding * 2.0f)},
+                 reach_clipboard_max_float(0.0f, local_item_content.height - padding * 2.0f)},
                 local_visible_item, theme->clipboard_secondary_text, metrics.items_font_size,
                 input->text_alignment_leading);
         }
         else
         {
-            const float text_x = local_item.x + padding;
+            const float text_x = local_item_content.x + padding;
             reach_clipboard_push_preview_text_lines(
                 commands, item_data,
-                {text_x, local_item.y + padding,
+                {text_x, local_item_content.y + padding,
                  reach_clipboard_max_float(0.0f, text_right - text_x),
-                 reach_clipboard_max_float(0.0f, local_item.height - padding * 2.0f)},
+                 reach_clipboard_max_float(0.0f, local_item_content.height - padding * 2.0f)},
                 local_visible_item, theme->clipboard_primary_text, metrics.items_font_size,
                 input->text_alignment_leading);
         }

@@ -5,6 +5,7 @@
 
 #include "reach/ports/app_launcher.h"
 #include "reach/ports/explorer_service.h"
+#include "reach/ports/terminal_launcher.h"
 #include "reach/ports/window_manager.h"
 #include "reach/support/layout.h"
 
@@ -23,6 +24,7 @@ extern "C"
     } reach_window_control_action;
 
     reach_result reach_app_control_create(reach_app_launcher_port launcher,
+                                          reach_terminal_launcher_port terminal_launcher,
                                           reach_explorer_service_port explorer,
                                           reach_window_manager_port window_manager,
                                           void (*notify)(void *user), void *notify_user,
@@ -35,6 +37,23 @@ extern "C"
     reach_result reach_app_control_schedule_launch(reach_app_control *service,
                                                    const reach_app_launch_request *request);
 
+    reach_result
+    reach_app_control_schedule_terminal_launch(reach_app_control *service,
+                                               const reach_terminal_launch_request *request);
+
+    typedef enum reach_app_control_location_kind
+    {
+        REACH_APP_CONTROL_LOCATION_DEFAULT = 0,
+        REACH_APP_CONTROL_LOCATION_PATH = 1,
+        REACH_APP_CONTROL_LOCATION_SHELL = 2
+    } reach_app_control_location_kind;
+
+    /* Opening a shell location is a blocking ShellExecute, and deciding whether a path exists can
+       block for seconds on a disconnected share, so both happen on the worker. */
+    reach_result reach_app_control_schedule_open_location(reach_app_control *service,
+                                                          reach_app_control_location_kind kind,
+                                                          const uint16_t *path);
+
     int32_t reach_app_control_reveal_available(const reach_app_control *service);
     reach_result reach_app_control_schedule_reveal(reach_app_control *service,
                                                    const uint16_t *path);
@@ -42,11 +61,20 @@ extern "C"
     reach_result reach_app_control_schedule_window(reach_app_control *service,
                                                    reach_window_control_action action,
                                                    uintptr_t window_id);
-    reach_result reach_app_control_schedule_minimize(reach_app_control *service,
-                                                     const uintptr_t *window_ids,
-                                                     size_t window_count);
+    reach_result reach_app_control_schedule_windows(reach_app_control *service,
+                                                    reach_window_control_action action,
+                                                    const uintptr_t *window_ids,
+                                                    size_t window_count);
     reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
                                                  reach_split_mode mode);
+
+    reach_result reach_app_control_window_bounds(const reach_app_control *service,
+                                                 uintptr_t window_id, reach_rect_f32 *out_bounds);
+    reach_result reach_app_control_window_frame_bounds(const reach_app_control *service,
+                                                       uintptr_t window_id,
+                                                       reach_rect_f32 *out_bounds);
+    reach_result reach_app_control_move_windows(reach_app_control *service,
+                                                const reach_window_move *windows, size_t count);
     int32_t reach_app_control_take_window_completed(reach_app_control *service,
                                                     reach_result *out_result);
 

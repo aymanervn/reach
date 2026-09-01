@@ -1,19 +1,11 @@
 #include "reach/features/quick_settings.h"
-#include "reach/features/popup.h"
+#include "reach/features/common/progress_bar_render.h"
+#include "reach/features/common/section_reveal.h"
 
 #include "quick_settings_common.h"
+
+#include "reach/features/common/level_presentation.h"
 #include "quick_settings_metrics.h"
-
-static float reach_quick_settings_min_f32(float a, float b)
-{
-    return a < b ? a : b;
-}
-
-static reach_color reach_quick_settings_color_alpha(reach_color color, float alpha)
-{
-    color.a = alpha;
-    return color;
-}
 
 static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *commands,
                                                    reach_rect_f32 rect, float radius,
@@ -26,6 +18,35 @@ static void reach_quick_settings_push_ellipsized_text(reach_render_command_buffe
                                                       reach_rect_f32 rect, const uint16_t *text,
                                                       float size, int32_t weight, int32_t alignment,
                                                       reach_color color);
+
+static reach_color reach_quick_settings_color_opacity(reach_color color, float opacity)
+{
+    color.a *= reach_quick_settings_clamp01(opacity);
+    return color;
+}
+
+static void reach_quick_settings_push_chevron_crossfade(reach_render_command_buffer *commands,
+                                                        reach_rect_f32 rect, float progress,
+                                                        reach_color color)
+{
+    progress = reach_quick_settings_clamp01(progress);
+    reach_render_command icon = {};
+    icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    icon.rect = rect;
+    icon.icon_id = REACH_VECTOR_ICON_ARROW_DOWN;
+    icon.color = reach_quick_settings_color_opacity(color, 1.0f - progress);
+    (void)reach_render_command_buffer_push(commands, &icon);
+    icon.icon_id = REACH_VECTOR_ICON_ARROW_UP;
+    icon.color = reach_quick_settings_color_opacity(color, progress);
+    (void)reach_render_command_buffer_push(commands, &icon);
+}
+
+static float reach_quick_settings_pill_radius(reach_rect_f32 rect, const reach_theme *theme)
+{
+    const float half_height = rect.height * 0.5f;
+    const float radius_large = theme != nullptr ? theme->radius_large : 0.0f;
+    return half_height < radius_large ? half_height : radius_large;
+}
 
 static size_t reach_quick_settings_utf16_length(const uint16_t *text)
 {
@@ -203,15 +224,7 @@ static uint32_t reach_quick_settings_network_icon_id(const reach_network_state *
     {
         return REACH_VECTOR_ICON_ETHERNET;
     }
-    if (state->signal_strength < 34)
-    {
-        return REACH_VECTOR_ICON_WIFI_LOW;
-    }
-    if (state->signal_strength < 67)
-    {
-        return REACH_VECTOR_ICON_WIFI_MEDIUM;
-    }
-    return REACH_VECTOR_ICON_WIFI_HIGH;
+    return reach_wifi_signal_icon(state->signal_strength);
 }
 
 static void reach_quick_settings_network_label(const reach_network_state *state,
@@ -224,43 +237,47 @@ static void reach_quick_settings_network_label(const reach_network_state *state,
 
     if (state == nullptr || !state->connected)
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, no_internet);
+        reach_copy_utf16(out_label, out_label_count, no_internet);
         return;
     }
     if (state->kind == REACH_NETWORK_KIND_ETHERNET)
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, ethernet);
+        reach_copy_utf16(out_label, out_label_count, ethernet);
         return;
     }
     if (state->label[0] != 0)
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, state->label);
+        reach_copy_utf16(out_label, out_label_count, state->label);
     }
     else
     {
-        reach_quick_settings_copy_utf16(out_label, out_label_count, wifi);
+        reach_copy_utf16(out_label, out_label_count, wifi);
     }
 }
 
 static void reach_quick_settings_push_system_tile_commands(
     reach_render_command_buffer *commands, const reach_quick_settings_tile_layout *layout,
-    uint32_t icon_id, const uint16_t *label, int32_t active, const reach_theme *theme,
-    const reach_quick_settings_metrics *metrics, float dpi_scale)
+    uint32_t icon_id, const uint16_t *label, int32_t active, reach_theme_accent accent_id,
+    const reach_theme *theme, const reach_quick_settings_metrics *metrics, float dpi_scale)
 {
     if (commands == nullptr || layout == nullptr || theme == nullptr)
     {
         return;
     }
 
-    reach_color active_background = {1.0f, 1.0f, 1.0f, 1.0f};
-    reach_color active_foreground = {0.0f, 0.0f, 0.0f, 1.0f};
-    reach_color foreground = active ? active_foreground : theme->light_text;
-
     const reach_quick_settings_metrics *values =
         metrics != nullptr ? metrics : &reach_quick_settings_metrics_values;
-    reach_quick_settings_push_rounded_rect(
-        commands, layout->bounds, reach_popup_radius_scaled(dpi_scale),
-        active ? active_background : theme->quick_settings_button_color);
+    const reach_color foreground =
+        active ? reach_theme_accent_color(theme, accent_id) : theme->quick_settings_secondary_text;
+    const reach_color icon_background =
+        reach_theme_color_alpha(foreground, theme->accent_tint_alpha);
+    const reach_color tile_background =
+        active ? icon_background : theme->quick_settings_button_background;
+    float radius = theme->radius_small * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+
+    reach_quick_settings_push_rounded_rect(commands, layout->bounds, radius, tile_background);
+    reach_quick_settings_push_rounded_rect(commands, layout->icon_background, radius,
+                                           icon_background);
 
     reach_render_command icon = {};
     icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
@@ -285,21 +302,6 @@ static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static void reach_quick_settings_push_clipped_rounded_rect(reach_render_command_buffer *commands,
-                                                           reach_rect_f32 rect, float radius,
-                                                           reach_rect_f32 clip_rect,
-                                                           float clip_radius, reach_color color)
-{
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT;
-    command.rect = rect;
-    command.clip_rect = clip_rect;
-    command.radius = radius;
-    command.clip_radius = clip_radius;
-    command.color = color;
-    (void)reach_render_command_buffer_push(commands, &command);
-}
-
 static void reach_quick_settings_push_text(reach_render_command_buffer *commands,
                                            reach_rect_f32 rect, const uint16_t *text, float size,
                                            int32_t weight, int32_t alignment, reach_color color)
@@ -311,7 +313,7 @@ static void reach_quick_settings_push_text(reach_render_command_buffer *commands
     command.text_weight = weight;
     command.text_alignment = alignment;
     command.color = color;
-    reach_quick_settings_copy_utf16(command.text, 260, text);
+    reach_copy_utf16(command.text, 260, text);
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
@@ -328,7 +330,7 @@ static void reach_quick_settings_push_ellipsized_text(reach_render_command_buffe
     command.text_alignment = alignment;
     command.text_ellipsis = 1;
     command.color = color;
-    reach_quick_settings_copy_utf16(command.text, 260, text);
+    reach_copy_utf16(command.text, 260, text);
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
@@ -386,13 +388,7 @@ static reach_result reach_quick_settings_push_volume_pill_commands_with_label(
         metrics != nullptr ? metrics : &reach_quick_settings_metrics_values;
     float volume = reach_quick_settings_clamp01(model->volume_level);
     reach_quick_settings_volume_pill_layout pill = *layout;
-    pill.slider_fill.y = pill.slider_track.y;
-    pill.slider_fill.width = pill.slider_track.width * volume;
-    pill.slider_fill.height = pill.slider_track.height;
-    if (pill.slider_fill.width < 0.0f)
-    {
-        pill.slider_fill.width = 0.0f;
-    }
+    pill.slider_fill = reach_progress_bar_fill_rect(pill.slider_track, volume);
 
     reach_render_command icon = {};
     icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
@@ -409,25 +405,15 @@ static reach_result reach_quick_settings_push_volume_pill_commands_with_label(
     }
 
     reach_quick_settings_push_text(commands, label_rect, model->label, label_text_size,
-                                   values->pill_label_text_weight, 0, theme->light_text);
+                                   values->pill_label_text_weight, 0, theme->primary_text);
 
-    float track_radius = reach_popup_radius_scaled(dpi_scale);
-    float fill_radius = reach_quick_settings_min_f32(track_radius, pill.slider_fill.width * 0.5f);
+    reach_color slider_fill_color =
+        model->muted ? theme->quick_settings_slider_muted_fill : theme->quick_settings_slider_fill;
+    reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
 
-    reach_color slider_fill_color = model->muted ? theme->quick_settings_slider_muted_fill_color
-                                                 : theme->quick_settings_slider_fill_color;
-
-    reach_quick_settings_push_rounded_rect(commands, pill.slider_track, track_radius,
-                                           theme->quick_settings_slider_track_color);
-
-    if (pill.slider_fill.width > 0.0f)
-    {
-        reach_quick_settings_push_clipped_rounded_rect(commands, pill.slider_fill, fill_radius,
-                                                       pill.slider_track, track_radius,
-                                                       slider_fill_color);
-    }
-
-    return REACH_OK;
+    return reach_progress_bar_build_render_commands(pill.slider_track, pill.slider_fill, origin,
+                                                    theme->quick_settings_slider_track,
+                                                    slider_fill_color, commands);
 }
 
 static reach_result reach_quick_settings_push_output_device_row_commands(
@@ -460,7 +446,7 @@ static reach_result reach_quick_settings_push_output_device_row_commands(
 
     reach_quick_settings_push_text(commands, primary_rect, primary_label,
                                    values->output_row_primary_text_size, REACH_TEXT_WEIGHT_NORMAL,
-                                   0, theme->light_text);
+                                   0, theme->primary_text);
 
     if (secondary_label[0] != 0)
     {
@@ -468,10 +454,9 @@ static reach_result reach_quick_settings_push_output_device_row_commands(
         secondary_rect.y += values->output_row_secondary_top;
         secondary_rect.height = values->output_row_secondary_height;
 
-        reach_quick_settings_push_text(commands, secondary_rect, secondary_label,
-                                       values->output_row_secondary_text_size,
-                                       REACH_TEXT_WEIGHT_NORMAL, 0,
-                                       reach_quick_settings_color_alpha(theme->light_text, 0.56f));
+        reach_quick_settings_push_text(
+            commands, secondary_rect, secondary_label, values->output_row_secondary_text_size,
+            REACH_TEXT_WEIGHT_NORMAL, 0, theme->quick_settings_secondary_text);
     }
 
     if (device->is_default)
@@ -486,9 +471,8 @@ static reach_result reach_quick_settings_push_output_device_row_commands(
 
     if (row_index + 1 < row_count)
     {
-        reach_quick_settings_push_rounded_rect(
-            commands, layout->separator, 0.0f,
-            reach_quick_settings_color_alpha(theme->light_text, 0.16f));
+        reach_quick_settings_push_rounded_rect(commands, layout->separator, 0.0f,
+                                               theme->quick_settings_separator);
     }
 
     return REACH_OK;
@@ -531,11 +515,11 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
 
     reach_quick_settings_push_ellipsized_text(commands, layout->app_label, display_label,
                                               values->app_row_text_size, REACH_TEXT_WEIGHT_NORMAL,
-                                              0, theme->light_text);
+                                              0, theme->primary_text);
 
-    reach_color line_color = reach_quick_settings_color_alpha(theme->light_text, 0.32f);
-    reach_color level_color =
-        reach_quick_settings_color_alpha(theme->light_text, session->muted ? 0.42f : 0.92f);
+    reach_color line_color = theme->quick_settings_app_volume_track;
+    reach_color level_color = session->muted ? theme->quick_settings_app_volume_muted_fill
+                                             : theme->quick_settings_app_volume_fill;
 
     reach_quick_settings_push_rounded_rect(commands, layout->slider_full_range_line,
                                            layout->slider_full_range_line.height * 0.5f,
@@ -559,16 +543,76 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
                                         sizeof(percent_text) / sizeof(percent_text[0]), volume);
     reach_quick_settings_push_text(commands, layout->app_volume_percent, percent_text,
                                    values->app_row_percent_text_size, REACH_TEXT_WEIGHT_SEMIBOLD, 2,
-                                   theme->light_text);
+                                   theme->primary_text);
 
     if (row_index + 1 < row_count)
     {
-        reach_quick_settings_push_rounded_rect(
-            commands, layout->separator, 0.0f,
-            reach_quick_settings_color_alpha(theme->light_text, 0.16f));
+        reach_quick_settings_push_rounded_rect(commands, layout->separator, 0.0f,
+                                               theme->quick_settings_separator);
     }
 
     return REACH_OK;
+}
+
+static reach_rect_f32
+reach_quick_settings_press_feedback_bounds(const reach_quick_settings_render_input *input)
+{
+    reach_rect_f32 bounds = {};
+    if (input == nullptr)
+    {
+        return bounds;
+    }
+    switch (reach_quick_settings_pressable_target_kind(input->press_feedback_target))
+    {
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_NETWORK_TILE:
+        return input->layout.network_tile.bounds;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_TILE:
+        return input->layout.bluetooth_tile.bounds;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_PROJECT_TILE:
+        return input->layout.project_tile.bounds;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON:
+        return input->layout.output_device_button;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW:
+    {
+        size_t index = reach_quick_settings_pressable_target_index(input->press_feedback_target);
+        return index < input->layout.output_device_row_count
+                   ? input->layout.output_device_rows[index].bounds
+                   : bounds;
+    }
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON:
+        return input->layout.expand_button;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_NONE:
+    default:
+        return bounds;
+    }
+}
+
+static void reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input *input,
+                                                     reach_render_command_buffer *commands)
+{
+    if (input == nullptr || commands == nullptr || input->press_feedback_opacity <= 0.001f)
+    {
+        return;
+    }
+    reach_rect_f32 bounds = reach_quick_settings_press_feedback_bounds(input);
+    if (bounds.width <= 0.0f || bounds.height <= 0.0f)
+    {
+        return;
+    }
+    reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f * input->press_feedback_opacity};
+    float radius = input->theme.radius_small * (input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f);
+    int32_t clip_output_row =
+        reach_quick_settings_pressable_target_kind(input->press_feedback_target) ==
+        REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW;
+    if (clip_output_row)
+    {
+        reach_render_command_buffer_set_scissor(commands, input->layout.output_devices_clip);
+    }
+    reach_quick_settings_push_rounded_rect(commands, bounds, radius, overlay);
+    if (clip_output_row)
+    {
+        reach_render_command_buffer_clear_scissor(commands);
+    }
 }
 
 reach_result
@@ -582,7 +626,6 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
 
     reach_render_command_buffer_clear(commands);
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(input->dpi_scale);
-    float popup_radius = reach_popup_radius_scaled(input->dpi_scale);
 
     uint16_t network_label[REACH_SYSTEM_NETWORK_LABEL_CAPACITY] = {};
     reach_quick_settings_network_label(&input->model.network, network_label,
@@ -590,7 +633,8 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     reach_quick_settings_push_system_tile_commands(
         commands, &input->layout.network_tile,
         reach_quick_settings_network_icon_id(&input->model.network), network_label,
-        input->model.network.connected, &input->theme, &metrics, input->dpi_scale);
+        input->model.network.connected, REACH_THEME_ACCENT_GREEN, &input->theme, &metrics,
+        input->dpi_scale);
 
     static const uint16_t bluetooth_label[] = {'B', 'l', 'u', 'e', 't', 'o', 'o', 't', 'h', 0};
     int32_t bluetooth_enabled = input->model.bluetooth_pending
@@ -599,22 +643,13 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     reach_quick_settings_push_system_tile_commands(
         commands, &input->layout.bluetooth_tile,
         bluetooth_enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF,
-        bluetooth_label, bluetooth_enabled, &input->theme, &metrics, input->dpi_scale);
-
-    if (input->model.power.has_battery)
-    {
-        static const uint16_t battery_saver_label[] = {'B', 'a', 't', 't', 'e', 'r', 'y',
-                                                       ' ', 's', 'a', 'v', 'e', 'r', 0};
-        reach_quick_settings_push_system_tile_commands(
-            commands, &input->layout.battery_saver_tile, REACH_VECTOR_ICON_BATTERY_SAVER,
-            battery_saver_label, input->model.power.battery_saver_on, &input->theme, &metrics,
-            input->dpi_scale);
-    }
+        bluetooth_label, bluetooth_enabled, REACH_THEME_ACCENT_BLUE, &input->theme, &metrics,
+        input->dpi_scale);
 
     static const uint16_t project_label[] = {'P', 'r', 'o', 'j', 'e', 'c', 't', 0};
-    reach_quick_settings_push_system_tile_commands(commands, &input->layout.project_tile,
-                                                   REACH_VECTOR_ICON_PROJECT, project_label, 0,
-                                                   &input->theme, &metrics, input->dpi_scale);
+    reach_quick_settings_push_system_tile_commands(
+        commands, &input->layout.project_tile, REACH_VECTOR_ICON_PROJECT, project_label, 0,
+        REACH_THEME_ACCENT_YELLOW, &input->theme, &metrics, input->dpi_scale);
 
     if (input->model.brightness.available)
     {
@@ -654,66 +689,51 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     static const uint16_t output_device_fallback_label[] = {'O', 'u', 't', 'p', 'u', 't', ' ',
                                                             'd', 'e', 'v', 'i', 'c', 'e', 0};
 
-    if (!input->model.output_devices_expanded)
+    reach_quick_settings_push_rounded_rect(
+        commands, input->layout.output_device_button,
+        reach_quick_settings_pill_radius(input->layout.output_device_button, &input->theme),
+        input->theme.quick_settings_button_background);
+
+    reach_quick_settings_push_output_icon(commands, input->layout.output_device_button_icon,
+                                          current_device != nullptr ? current_device->icon_id : 0,
+                                          &input->theme);
+
+    static const uint16_t output_title_label[] = {'O', 'u', 't', 'p', 'u', 't', 0};
+
+    uint16_t output_device_label[REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY] = {};
+    reach_quick_settings_copy_device_primary_label(
+        output_device_label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
+        current_device != nullptr ? current_device->label : output_device_fallback_label);
+
+    reach_rect_f32 output_title_rect = input->layout.output_device_button_label;
+    output_title_rect.y += metrics.output_button_title_top;
+    output_title_rect.height = metrics.output_button_title_height;
+
+    reach_quick_settings_push_text(commands, output_title_rect, output_title_label,
+                                   metrics.output_button_title_text_size, REACH_TEXT_WEIGHT_NORMAL,
+                                   0, input->theme.quick_settings_section_label);
+
+    reach_rect_f32 output_device_rect = input->layout.output_device_button_label;
+    output_device_rect.y += metrics.output_button_device_top;
+    output_device_rect.height = metrics.output_button_device_height;
+
+    reach_quick_settings_push_text(commands, output_device_rect, output_device_label,
+                                   metrics.output_button_device_text_size,
+                                   REACH_TEXT_WEIGHT_SEMIBOLD, 0, input->theme.primary_text);
+
+    reach_quick_settings_push_chevron_crossfade(
+        commands, input->layout.output_device_button_chevron, input->output_devices_expansion,
+        input->theme.system_glyph);
+
+    float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
+    if (input->output_devices_expansion > 0.001f && input->layout.output_devices_clip.height > 0.0f)
     {
-        reach_quick_settings_push_rounded_rect(commands, input->layout.output_device_button,
-                                               popup_radius,
-                                               input->theme.quick_settings_button_color);
-
-        reach_quick_settings_push_output_icon(
-            commands, input->layout.output_device_button_icon,
-            current_device != nullptr ? current_device->icon_id : 0, &input->theme);
-
-        static const uint16_t output_title_label[] = {'O', 'u', 't', 'p', 'u', 't', 0};
-
-        uint16_t output_device_label[REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY] = {};
-        reach_quick_settings_copy_device_primary_label(
-            output_device_label, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY,
-            current_device != nullptr ? current_device->label : output_device_fallback_label);
-
-        reach_rect_f32 output_title_rect = input->layout.output_device_button_label;
-        output_title_rect.y += metrics.output_button_title_top;
-        output_title_rect.height = metrics.output_button_title_height;
-
-        reach_quick_settings_push_text(
-            commands, output_title_rect, output_title_label, metrics.output_button_title_text_size,
-            REACH_TEXT_WEIGHT_NORMAL, 0,
-            reach_quick_settings_color_alpha(input->theme.light_text, 0.60f));
-
-        reach_rect_f32 output_device_rect = input->layout.output_device_button_label;
-        output_device_rect.y += metrics.output_button_device_top;
-        output_device_rect.height = metrics.output_button_device_height;
-
-        reach_quick_settings_push_text(commands, output_device_rect, output_device_label,
-                                       metrics.output_button_device_text_size,
-                                       REACH_TEXT_WEIGHT_SEMIBOLD, 0, input->theme.light_text);
-
-        reach_render_command output_chevron = {};
-        output_chevron.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-        output_chevron.rect = input->layout.output_device_button_chevron;
-        output_chevron.icon_id = REACH_VECTOR_ICON_ARROW_DOWN;
-        output_chevron.color = input->theme.system_glyph;
-        (void)reach_render_command_buffer_push(commands, &output_chevron);
-    }
-    else
-    {
-        static const uint16_t output_devices_title[] = {'O', 'u', 't', 'p', 'u', 't', ' ', 'd',
-                                                        'e', 'v', 'i', 'c', 'e', 's', 0};
-
-        reach_quick_settings_push_text(commands, input->layout.output_devices_title,
-                                       output_devices_title, metrics.section_title_text_size,
-                                       REACH_TEXT_WEIGHT_SEMIBOLD, 0, input->theme.light_text);
-
-        reach_render_command output_chevron = {};
-        output_chevron.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-        output_chevron.rect = input->layout.output_devices_title_chevron;
-        output_chevron.icon_id = REACH_VECTOR_ICON_ARROW_UP;
-        output_chevron.color = input->theme.system_glyph;
-        (void)reach_render_command_buffer_push(commands, &output_chevron);
-
-        reach_quick_settings_push_rounded_rect(commands, input->layout.output_devices_panel,
-                                               popup_radius,
-                                               input->theme.quick_settings_button_color);
+        reach_render_command_buffer_set_scissor(commands, input->layout.output_devices_clip);
+        size_t first_command = commands->count;
+        reach_quick_settings_push_rounded_rect(
+            commands, input->layout.output_devices_panel,
+            reach_quick_settings_pill_radius(input->layout.output_devices_panel, &input->theme),
+            input->theme.quick_settings_button_background);
 
         for (size_t index = 0; index < input->layout.output_device_row_count &&
                                index < input->model.output_devices.count;
@@ -728,19 +748,43 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
                 return result;
             }
         }
+        reach_section_reveal_apply(commands, first_command, input->output_devices_expansion,
+                                   4.0f * scale);
+        reach_render_command_buffer_clear_scissor(commands);
     }
 
-    if (input->model.expanded)
-    {
-        static const uint16_t app_volumes_title[] = {'A', 'p', 'p', ' ', 'v', 'o',
-                                                     'l', 'u', 'm', 'e', 's', 0};
-        reach_quick_settings_push_text(commands, input->layout.app_volumes_title, app_volumes_title,
-                                       metrics.section_title_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-                                       0, input->theme.light_text);
+    reach_quick_settings_push_rounded_rect(
+        commands, input->layout.expand_button,
+        reach_quick_settings_pill_radius(input->layout.expand_button, &input->theme),
+        input->theme.quick_settings_button_background);
 
-        reach_quick_settings_push_rounded_rect(commands, input->layout.app_volumes_panel,
-                                               popup_radius,
-                                               input->theme.quick_settings_button_color);
+    static const uint16_t expand_label[] = {'A', 'l', 'l', ' ', 'v', 'o', 'l', 'u', 'm', 'e',
+                                            ' ', 's', 'l', 'i', 'd', 'e', 'r', 's', 0};
+    static const uint16_t collapse_label[] = {'H', 'i', 'd', 'e', ' ', 'a', 'p', 'p', ' ',
+                                              'v', 'o', 'l', 'u', 'm', 'e', 's', 0};
+
+    reach_quick_settings_push_text(
+        commands, input->layout.expand_button_label, expand_label, metrics.expand_button_text_size,
+        REACH_TEXT_WEIGHT_NORMAL, 0,
+        reach_quick_settings_color_opacity(input->theme.primary_text,
+                                           1.0f - input->app_volumes_expansion));
+    reach_quick_settings_push_text(commands, input->layout.expand_button_label, collapse_label,
+                                   metrics.expand_button_text_size, REACH_TEXT_WEIGHT_NORMAL, 0,
+                                   reach_quick_settings_color_opacity(
+                                       input->theme.primary_text, input->app_volumes_expansion));
+
+    reach_quick_settings_push_chevron_crossfade(commands, input->layout.expand_button_icon,
+                                                input->app_volumes_expansion,
+                                                input->theme.system_glyph);
+
+    if (input->app_volumes_expansion > 0.001f && input->layout.app_volumes_clip.height > 0.0f)
+    {
+        reach_render_command_buffer_set_scissor(commands, input->layout.app_volumes_clip);
+        size_t first_command = commands->count;
+        reach_quick_settings_push_rounded_rect(
+            commands, input->layout.app_volumes_panel,
+            reach_quick_settings_pill_radius(input->layout.app_volumes_panel, &input->theme),
+            input->theme.quick_settings_button_background);
 
         for (size_t index = 0;
              index < input->layout.app_volume_row_count && index < input->model.sessions.count;
@@ -748,37 +792,18 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         {
             result = reach_quick_settings_push_app_volume_row_commands(
                 &input->model.sessions.sessions[index], &input->layout.app_volume_rows[index],
-                index, input->layout.app_volume_row_count + 1, &input->theme, commands, &metrics);
+                index, input->layout.app_volume_row_count, &input->theme, commands, &metrics);
             if (result != REACH_OK)
             {
                 return result;
             }
         }
+        reach_section_reveal_apply(commands, first_command, input->app_volumes_expansion,
+                                   4.0f * scale);
+        reach_render_command_buffer_clear_scissor(commands);
     }
 
-    if (!input->model.expanded)
-    {
-        reach_quick_settings_push_rounded_rect(commands, input->layout.expand_button, popup_radius,
-                                               input->theme.quick_settings_button_color);
-    }
-
-    static const uint16_t expand_label[] = {'A', 'l', 'l', ' ', 'v', 'o', 'l', 'u', 'm', 'e',
-                                            ' ', 's', 'l', 'i', 'd', 'e', 'r', 's', 0};
-    static const uint16_t collapse_label[] = {'H', 'i', 'd', 'e', ' ', 'a', 'p', 'p', ' ',
-                                              'v', 'o', 'l', 'u', 'm', 'e', 's', 0};
-
-    reach_quick_settings_push_text(commands, input->layout.expand_button_label,
-                                   input->model.expanded ? collapse_label : expand_label,
-                                   metrics.expand_button_text_size, REACH_TEXT_WEIGHT_NORMAL, 0,
-                                   input->theme.light_text);
-
-    reach_render_command icon = {};
-    icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-    icon.rect = input->layout.expand_button_icon;
-    icon.icon_id =
-        input->model.expanded ? REACH_VECTOR_ICON_ARROW_UP : REACH_VECTOR_ICON_ARROW_DOWN;
-    icon.color = input->theme.system_glyph;
-    (void)reach_render_command_buffer_push(commands, &icon);
+    reach_quick_settings_push_press_feedback(input, commands);
 
     return REACH_OK;
 }
@@ -799,6 +824,10 @@ reach_result reach_quick_settings_append_render_commands(reach_quick_settings *q
     input.model = state->model;
     input.layout = state->layout;
     input.dpi_scale = dpi_scale;
+    input.output_devices_expansion = state->output_devices_expansion;
+    input.app_volumes_expansion = state->app_volumes_expansion;
+    input.press_feedback_target = reach_quick_settings_press_feedback_target(quick_settings);
+    input.press_feedback_opacity = reach_quick_settings_press_feedback_value(quick_settings);
 
     return reach_quick_settings_build_render_commands(&input, out_commands);
 }

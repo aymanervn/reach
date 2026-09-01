@@ -8,19 +8,23 @@ extern "C"
 {
 #endif
 
+    typedef enum reach_pointer_button
+    {
+        REACH_POINTER_BUTTON_PRIMARY = 0,
+        REACH_POINTER_BUTTON_SECONDARY = 1,
+        REACH_POINTER_BUTTON_MIDDLE = 2
+    } reach_pointer_button;
+
     typedef enum reach_ui_event_type
     {
         REACH_UI_EVENT_NONE = 0,
         REACH_UI_EVENT_WINDOWS_KEY = 1,
         REACH_UI_EVENT_ESCAPE = 2,
-        REACH_UI_EVENT_DOCK_APP_CLICK = 5,
         REACH_UI_EVENT_TRAY_BUTTON_CLICK = 6,
         REACH_UI_EVENT_POINTER_UP = 7,
-        REACH_UI_EVENT_POINTER_CONTEXT = 8,
         REACH_UI_EVENT_WALLPAPER_CHANGED = 9,
         REACH_UI_EVENT_POINTER_MOVE = 10,
         REACH_UI_EVENT_POINTER_LEAVE = 11,
-        REACH_UI_EVENT_POINTER_MIDDLE = 12,
         REACH_UI_EVENT_POINTER_DOWN = 13,
         REACH_UI_EVENT_APP_SWITCH_BEGIN = 14,
         REACH_UI_EVENT_APP_SWITCH_NEXT = 15,
@@ -30,7 +34,7 @@ extern "C"
         REACH_UI_EVENT_ENTER = 19,
         REACH_UI_EVENT_ARROW_UP = 20,
         REACH_UI_EVENT_ARROW_DOWN = 21,
-        REACH_UI_EVENT_LAUNCHER_SEARCH_READY = 27,
+        REACH_UI_EVENT_FEATURE_WORK_READY = 27,
         REACH_UI_EVENT_CONFIG_CHANGED = 28,
         REACH_UI_EVENT_DISPLAY_CHANGED = 29,
         REACH_UI_EVENT_WINDOW_STATE_CHANGED = 30,
@@ -57,7 +61,11 @@ extern "C"
         REACH_UI_EVENT_SNAP_TOP = 50,
         REACH_UI_EVENT_SNAP_BOTTOM = 51,
         REACH_UI_EVENT_WINDOW_FOCUS_LOST = 52,
-        REACH_UI_EVENT_FOREGROUND_CHANGED = 53
+        REACH_UI_EVENT_FOREGROUND_CHANGED = 53,
+        REACH_UI_EVENT_CLIPBOARD_TOGGLE = 55,
+        REACH_UI_EVENT_SYSTEM_STATS_CHANGED = 56,
+        REACH_UI_EVENT_POINTER_REGION_CHANGED = 57,
+        REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED = 58
     } reach_ui_event_type;
 
     typedef enum reach_ui_edit_key
@@ -83,23 +91,10 @@ extern "C"
         int32_t x;
         int32_t y;
         int32_t wheel_delta;
+        reach_pointer_button button;
         uint16_t text[REACH_MAX_SEARCH_CHARS + 1];
     } reach_ui_event;
 
-    typedef enum reach_ui_intent_type
-    {
-        REACH_UI_INTENT_NONE = 0,
-        REACH_UI_INTENT_LAUNCH_APP = 1,
-        REACH_UI_INTENT_RESERVED_2 = 2,
-        REACH_UI_INTENT_RESERVED_3 = 3,
-        REACH_UI_INTENT_OPEN_LAUNCHER_RESULT = 4
-    } reach_ui_intent_type;
-
-    typedef struct reach_ui_intent
-    {
-        reach_ui_intent_type type;
-        uint32_t id;
-    } reach_ui_intent;
 
 #ifdef __cplusplus
 }

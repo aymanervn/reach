@@ -29,7 +29,6 @@ extern "C"
         reach_bluetooth_state bluetooth;
         int32_t bluetooth_pending;
         int32_t bluetooth_pending_enabled;
-        reach_power_state power;
         reach_brightness_state brightness;
     } reach_quick_settings_model;
 
@@ -75,6 +74,7 @@ extern "C"
     typedef struct reach_quick_settings_tile_layout
     {
         reach_rect_f32 bounds;
+        reach_rect_f32 icon_background;
         reach_rect_f32 icon;
         reach_rect_f32 label;
     } reach_quick_settings_tile_layout;
@@ -86,7 +86,6 @@ extern "C"
         reach_rect_f32 system_grid_bounds;
         reach_quick_settings_tile_layout network_tile;
         reach_quick_settings_tile_layout bluetooth_tile;
-        reach_quick_settings_tile_layout battery_saver_tile;
         reach_quick_settings_tile_layout project_tile;
         size_t system_tile_count;
 
@@ -102,15 +101,14 @@ extern "C"
         reach_rect_f32 output_device_button_icon;
         reach_rect_f32 output_device_button_label;
         reach_rect_f32 output_device_button_chevron;
-        reach_rect_f32 output_devices_title;
-        reach_rect_f32 output_devices_title_chevron;
         reach_rect_f32 output_devices_panel;
+        reach_rect_f32 output_devices_clip;
         reach_quick_settings_output_device_row_layout
             output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
         size_t output_device_row_count;
 
-        reach_rect_f32 app_volumes_title;
         reach_rect_f32 app_volumes_panel;
+        reach_rect_f32 app_volumes_clip;
         reach_quick_settings_app_volume_row_layout app_volume_rows[REACH_AUDIO_VOLUME_MAX_SESSIONS];
         size_t app_volume_row_count;
 
@@ -119,27 +117,16 @@ extern "C"
         reach_rect_f32 expand_button_icon;
     } reach_quick_settings_layout;
 
-    typedef enum reach_quick_settings_pointer_action_kind
-    {
-        REACH_QUICK_SETTINGS_POINTER_ACTION_NONE = 0,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_MAIN_VOLUME,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_SESSION_VOLUME,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_BRIGHTNESS,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_NETWORK_TILE,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BLUETOOTH,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_BATTERY_SAVER,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_OPEN_PROJECT,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_TOGGLE_OUTPUT_DEVICES,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_SET_OUTPUT_DEVICE,
-        REACH_QUICK_SETTINGS_POINTER_ACTION_EXPAND
-    } reach_quick_settings_pointer_action_kind;
-
     typedef struct reach_quick_settings_render_input
     {
         reach_quick_settings_model model;
         reach_quick_settings_layout layout;
         reach_theme theme;
         float dpi_scale;
+        float output_devices_expansion;
+        float app_volumes_expansion;
+        uint64_t press_feedback_target;
+        float press_feedback_opacity;
     } reach_quick_settings_render_input;
 
     void reach_quick_settings_model_init(reach_quick_settings_model *model);
@@ -157,7 +144,6 @@ extern "C"
     void reach_quick_settings_model_set_system_states(reach_quick_settings_model *model,
                                                       const reach_network_state *network,
                                                       const reach_bluetooth_state *bluetooth,
-                                                      const reach_power_state *power,
                                                       const reach_brightness_state *brightness);
 
     uint32_t reach_quick_settings_volume_icon_id(float volume_level, int32_t muted);
@@ -217,7 +203,10 @@ extern "C"
         reach_rect_f32 bounds;
         reach_rect_f32 target_bounds;
         reach_rect_f32 content_bounds;
+        float output_devices_expansion;
+        float app_volumes_expansion;
         float notch_anchor_x;
+        int32_t drop_direction;
         reach_quick_settings_drag_state drag;
     } reach_quick_settings_state;
 
@@ -246,8 +235,10 @@ extern "C"
     {
         const reach_theme *theme;
         float dpi_scale;
-        float anchor_x;
-        float dock_top;
+        reach_rect_f32 anchor_button;
+        reach_rect_f32 monitor;
+        float bar_edge_y;
+        int32_t drop_direction;
     } reach_quick_settings_layout_context;
 
     void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
@@ -261,7 +252,6 @@ extern "C"
     reach_quick_settings_update_open_animation(reach_quick_settings *quick_settings,
                                                const reach_quick_settings_layout_context *ctx);
 
-    int32_t reach_quick_settings_bluetooth_pending(reach_quick_settings *quick_settings);
     int32_t reach_quick_settings_bluetooth_available(reach_quick_settings *quick_settings);
     int32_t reach_quick_settings_bluetooth_enabled(reach_quick_settings *quick_settings);
     void reach_quick_settings_set_bluetooth_pending(reach_quick_settings *quick_settings,
@@ -279,16 +269,14 @@ extern "C"
 
     typedef struct reach_quick_settings_system_apply_result
     {
-        int32_t bluetooth_pending_cleared;
         int32_t relayout;
     } reach_quick_settings_system_apply_result;
 
     void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settings,
                                                   const reach_network_state *network,
                                                   const reach_bluetooth_state *bluetooth,
-                                                  const reach_power_state *power,
                                                   const reach_brightness_state *brightness,
-                                                  int32_t bluetooth_valid,
+                                                  int32_t bluetooth_valid, uint32_t change_flags,
                                                   reach_quick_settings_system_apply_result *out);
 
     void reach_quick_settings_attach_status(reach_quick_settings *quick_settings,
@@ -299,7 +287,6 @@ extern "C"
                                              uint32_t change_flags);
 
     void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
-                                              uint32_t change_flags, double delta_seconds,
                                               reach_feature_tick_result *out);
     size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quick_settings,
                                                           uint64_t *out_ids, size_t cap);

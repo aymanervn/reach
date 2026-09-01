@@ -13,7 +13,7 @@ static float reach_animation_clamp01(float value)
     return value;
 }
 
-static float reach_animation_ease(float value, reach_easing easing)
+float reach_easing_apply(float value, reach_easing easing)
 {
     float t = reach_animation_clamp01(value);
     switch (easing)
@@ -101,7 +101,7 @@ void reach_animation_manager_tick(reach_animation_manager *manager, double delta
             continue;
         }
 
-        float eased = reach_animation_ease(progress, track->easing);
+        float eased = reach_easing_apply(progress, track->easing);
         track->value = track->from + (track->to - track->from) * eased;
     }
 }
@@ -131,14 +131,14 @@ double reach_animation_track_time_to_value(const reach_animation_track *track, f
 
     float lo = (float)(track->elapsed_seconds / track->duration_seconds);
     float hi = 1.0f;
-    if (reach_animation_ease(lo, track->easing) >= needed)
+    if (reach_easing_apply(lo, track->easing) >= needed)
     {
         return 0.0;
     }
     for (int step = 0; step < 32; ++step)
     {
         float mid = (lo + hi) * 0.5f;
-        if (reach_animation_ease(mid, track->easing) < needed)
+        if (reach_easing_apply(mid, track->easing) < needed)
         {
             lo = mid;
         }

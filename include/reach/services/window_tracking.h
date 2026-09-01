@@ -18,9 +18,6 @@ extern "C"
         int32_t changed;
         int32_t items_changed;
         int32_t icon_identity_changed;
-        size_t old_count;
-        uintptr_t old_windows[REACH_MAX_PINNED_APPS];
-        uint16_t old_icon_refs[REACH_MAX_PINNED_APPS][260];
     } reach_window_tracking_refresh_report;
 
     reach_result reach_window_tracking_create(reach_window_manager_port window_manager,
@@ -39,6 +36,8 @@ extern "C"
 
     int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
                                                      const reach_window_snapshot *window);
+    void reach_window_tracking_app_display_name(const reach_window_snapshot *window,
+                                                uint16_t *out_name, size_t out_name_count);
     int32_t reach_window_tracking_identity_equal(const uint16_t *path_a, const uint16_t *aumid_a,
                                                  const uint16_t *path_b, const uint16_t *aumid_b);
     int32_t reach_window_tracking_windows_same_app(const reach_window_snapshot *a,
@@ -51,6 +50,10 @@ extern "C"
     size_t reach_window_tracking_collect_unminimized(const reach_window_tracking *service,
                                                      uintptr_t *out_windows,
                                                      size_t out_window_count);
+    int32_t reach_window_tracking_any_trespassing(const reach_window_tracking *service,
+                                                  reach_rect_f32 monitor_bounds,
+                                                  reach_rect_f32 protected_band,
+                                                  uintptr_t excluded_window);
 
     void reach_window_tracking_note_foreground(reach_window_tracking *service,
                                                uintptr_t foreground_window);
