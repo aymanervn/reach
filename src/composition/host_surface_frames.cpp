@@ -251,14 +251,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
 
     int32_t needs_frame = reach_host_surface_needs_frame(desc);
     int32_t active = reach_host_surface_presented(desc);
-    if (desc->transition != nullptr && !active)
-    {
-        reach_host_surface_transition_set(host, desc->transition, 0);
-    }
-    int32_t visible = desc->transition != nullptr
-                          ? reach_host_surface_transition_visible(desc->transition)
-                          : active;
-    int32_t frame_active = active || visible;
+    int32_t visible = active;
+    int32_t frame_active = active;
     if (!active && desc->definition->surface_ops->native_overlay != nullptr)
     {
         reach_host_release_native_overlay(host, desc);
@@ -327,7 +321,6 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                                                      geometry.visible_bounds, ctx->monitor_bounds);
     }
     reach_shadow_pad shadow_pad = reach_host_surface_shadow_pad(host, desc->definition->id);
-    float opacity = 1.0f;
     float applied_scale = 1.0f;
     int32_t scale_changed = 0;
     int32_t transition_frame_active = 0;
@@ -338,7 +331,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         shadow_pad.top *= shadow_scale;
         shadow_pad.right *= shadow_scale;
         shadow_pad.bottom *= shadow_scale;
-        reach_host_surface_transition_frame frame =
+        reach_host_surface_presentation_frame frame =
             reach_host_surface_presentation_frame_compute(
                 geometry.visible_bounds, geometry.envelope_bounds, shadow_pad,
                 geometry.presentation.y_offset, geometry.presentation.scale,
@@ -375,21 +368,14 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     else if (geometry.presentation.managed)
     {
         bounds.y += geometry.presentation.y_offset;
-        opacity = geometry.presentation.opacity;
         transition_frame_active = needs_frame;
-    }
-    else if (desc->transition != nullptr)
-    {
-        bounds = reach_host_surface_transition_bounds(host, desc->transition, bounds);
-        opacity = reach_host_surface_transition_opacity(host, desc->transition);
     }
     surface_ctx.render_bounds = bounds;
 
     int32_t window_changed = 0;
     reach_result result = reach_host_apply_window_state(
-        &desc->surface->window, bounds, shadow_pad, opacity, &desc->surface->last_bounds,
-        &desc->surface->last_opacity, &desc->surface->bounds_valid, &desc->surface->opacity_valid,
-        &window_changed);
+        &desc->surface->window, bounds, shadow_pad, &desc->surface->last_bounds,
+        &desc->surface->bounds_valid, &window_changed);
     int32_t position_only = reach_host_bar_position_only(desc);
     int32_t render_needed = host->dirty.render || desc->surface->dirty_flags || layout_changed ||
                             geometry_changed || scale_changed || transition_frame_active ||

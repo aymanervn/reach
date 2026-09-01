@@ -63,7 +63,7 @@ static void reach_host_process_system_status_requests(reach_host *host)
     }
 }
 
-void reach_host_finish_surface_transitions(reach_host *host)
+void reach_host_finish_surface_presentations(reach_host *host)
 {
     if (host == nullptr)
     {
@@ -74,18 +74,12 @@ void reach_host_finish_surface_transitions(reach_host *host)
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
-        was_visible[index] =
-            runtime->presentation_visible ||
-            reach_host_surface_transition_visible(runtime->transition);
-    }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
-    {
-        reach_host_surface_transition_finish(host, host->feature_runtimes[index].transition);
+        was_visible[index] = runtime->presentation_visible;
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
-        int32_t visible = reach_host_surface_transition_visible(runtime->transition);
+        int32_t visible = 0;
         if (runtime->definition != nullptr)
         {
             visible = visible || reach_host_surface_presented(runtime);
@@ -108,10 +102,8 @@ void reach_host_finish_surface_transitions(reach_host *host)
     }
 }
 
-static void reach_host_tick_animations(reach_host *host, double delta_seconds)
+static void reach_host_tick_features(reach_host *host, double delta_seconds)
 {
-    reach_animation_manager_tick(&host->animations, delta_seconds);
-
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
@@ -124,7 +116,7 @@ static void reach_host_tick_animations(reach_host *host, double delta_seconds)
         desc->definition->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
         reach_host_apply_feature_tick_result(host, desc, &tick);
     }
-    reach_host_finish_surface_transitions(host);
+    reach_host_finish_surface_presentations(host);
 }
 
 static reach_result reach_host_finish_update(reach_host *host)
@@ -245,7 +237,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     }
 
     reach_host_process_system_status_requests(host);
-    reach_host_tick_animations(host, delta_seconds);
+    reach_host_tick_features(host, delta_seconds);
     reach_host_drain_registered_render_resources(host);
     reach_host_drain_now_playing_retired_covers(host);
     reach_host_process_deferred_launch(host);
@@ -431,7 +423,6 @@ int32_t reach_host_needs_frame(const reach_host *host)
 
     if (host->dirty.render || reach_host_any_surface_dirty(host) ||
         reach_icon_service_work_pending(host->icon_service) ||
-        reach_animation_manager_any_active(&host->animations) ||
         reach_clock_minute_elapsed(host->clock) ||
         reach_input_language_service_settling(host->input_language))
     {

@@ -18,7 +18,7 @@ struct reach_top_bar_tray_popup
 {
     reach_animation_manager animations;
     reach_animation_track tracks[REACH_TOP_BAR_TRAY_ANIM_COUNT];
-    reach_popup_transition popup_transition;
+    reach_feature_transition popup_transition;
     reach_pressable pressable;
     reach_rect_f32 item_slots[REACH_MAX_TRAY_ITEMS];
     size_t overflow_start;
@@ -248,7 +248,8 @@ reach_result reach_top_bar_tray_popup_create(reach_top_bar_tray_popup **out_popu
     }
     reach_animation_manager_init(&(*out_popup)->animations, (*out_popup)->tracks,
                                  REACH_TOP_BAR_TRAY_ANIM_COUNT);
-    reach_popup_transition_init(&(*out_popup)->popup_transition, REACH_POPUP_DROP_DOWN);
+    reach_feature_transition_init(&(*out_popup)->popup_transition,
+                                  REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&(*out_popup)->pressable);
     return REACH_OK;
 }
@@ -276,7 +277,7 @@ int32_t reach_top_bar_set_tray_popup_open(reach_top_bar *top_bar, int32_t open)
     }
     top_bar->tray_popup->open = next;
     top_bar->state.tray_popup_open = next;
-    (void)reach_popup_transition_set_open(&top_bar->tray_popup->popup_transition, next);
+    (void)reach_feature_transition_set_open(&top_bar->tray_popup->popup_transition, next);
     if (!next)
     {
         reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);
@@ -352,7 +353,7 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
 
     reach_top_bar_tray_popup *popup = top_bar->tray_popup;
     popup->anchor = *anchor;
-    reach_popup_transition_configure(&popup->popup_transition, theme, dpi_scale,
+    reach_feature_transition_configure(&popup->popup_transition, theme, dpi_scale,
                                      anchor->direction);
     float slot_size = reach_theme_tray_slot_size(theme, anchor->bar_height);
     float gap = slot_size * 0.22f;
@@ -415,7 +416,7 @@ static void reach_top_bar_tray_reset(void *capsule)
     reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);
     reach_pressable_reset(&top_bar->tray_popup->pressable, &feedback);
     top_bar->tray_popup->open = 0;
-    reach_popup_transition_reset(&top_bar->tray_popup->popup_transition);
+    reach_feature_transition_reset(&top_bar->tray_popup->popup_transition);
     top_bar->tray_popup->pointer_bounds_valid = 0;
     top_bar->state.tray_popup_open = 0;
 }
@@ -439,11 +440,11 @@ static void reach_top_bar_tray_tick(void *capsule, double delta_seconds,
     int32_t active =
         reach_animation_manager_active(&popup->animations, REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
     int32_t popup_changed =
-        reach_popup_transition_tick(&popup->popup_transition, delta_seconds);
+        reach_feature_transition_tick(&popup->popup_transition, delta_seconds);
     if ((was_active || active || popup_changed) && out != nullptr)
     {
         out->redraw = 1;
-        out->request_update = reach_popup_transition_active(&popup->popup_transition);
+        out->request_update = reach_feature_transition_active(&popup->popup_transition);
     }
     reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);
     reach_pressable_settle_feedback(&popup->pressable, &feedback);
@@ -458,14 +459,14 @@ static int32_t reach_top_bar_tray_presentation_visible(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     return top_bar != nullptr && top_bar->tray_popup != nullptr &&
-           reach_popup_transition_visible(&top_bar->tray_popup->popup_transition);
+           reach_feature_transition_visible(&top_bar->tray_popup->popup_transition);
 }
 
 static int32_t reach_top_bar_tray_needs_frame(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     return top_bar != nullptr && top_bar->tray_popup != nullptr &&
-           (reach_popup_transition_active(&top_bar->tray_popup->popup_transition) ||
+           (reach_feature_transition_active(&top_bar->tray_popup->popup_transition) ||
             reach_animation_manager_any_active(&top_bar->tray_popup->animations));
 }
 
@@ -489,7 +490,7 @@ static void reach_top_bar_tray_surface_geometry(const void *capsule,
     out->envelope_bounds = top_bar->tray_popup->placement.bounds;
     out->notch_anchor_x = top_bar->tray_popup->placement.notch_anchor_x;
     out->notch_side = top_bar->tray_popup->placement.notch_side;
-    reach_popup_transition_presentation(&top_bar->tray_popup->popup_transition, out);
+    reach_feature_transition_presentation(&top_bar->tray_popup->popup_transition, out);
 }
 
 static void reach_top_bar_tray_apply_pressable(const reach_pressable_result *result,

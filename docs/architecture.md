@@ -252,7 +252,7 @@ A capsule that consumes non-pointer UI events declares them as
 `handle_event` hook, which returns the same `reach_capsule_event_result`
 vocabulary as pointer input: handled/redraw/relayout/request_update plus one
 shared action. Composition broadcasts each routed event to every declaring
-capsule and observes the capsule's own `is_open` to drive transitions, so
+capsule and observes the capsule's own `is_open` to drive presentation, so
 keyboard behaviour needs no feature branch. A capsule that acts on a target
 outside Reach publishes a complete `reach_feature_target`
 (`include/reach/features/common/feature_target.h`) — app, path, terminal command,
@@ -445,15 +445,15 @@ and surface lifecycle. Concrete feature knowledge has two controlled seams:
 slots that let one feature's action affect another. Those are the only two files in the layer that
 include a concrete feature header or call a concrete feature API, and
 `tools/check_architecture.py` rejects either anywhere else outright — there is no baseline and no
-exception list. `reach_host` holds no feature-named state: surface runtimes, transitions and
-animation tracks are arrays indexed by `reach_surface_id`, so adding a surface adds no field. `feature_registry.cpp` is the seam for
+exception list. `reach_host` holds no feature-named state: surface runtimes are arrays indexed by
+`reach_surface_id`, so adding a surface adds no field. `feature_registry.cpp` is the seam for
 feature definitions: each registered surface has exactly one immutable
 `reach_feature_definition` and one `reach_feature_runtime`. The definition owns its opaque
 create/destroy factory, capsule operations, surface operations, layout, and policy. The runtime
-contains only the bound surface, transition, capsule, resolved geometry, native-overlay state,
+contains only the bound surface, capsule, resolved geometry, native-overlay state,
 and a pointer to that definition. A registered surface joins every loop by being in that table:
 lifecycle in `reach_host_create_with_dependencies`, layout in `reach_host_init_layout`,
-transition completion in `reach_host_finish_surface_transitions`, input ordering in
+presentation completion in `reach_host_finish_surface_presentations`, input ordering in
 `reach_host_pointer_order`, and the frame pass in `reach_host_update` each iterate it whole, and
 `tools/check_architecture.py` rejects any of them being narrowed to a hand-maintained feature
 list. `reach_host_feature_capsule<T>` derives any concrete view from that
@@ -463,7 +463,7 @@ binds to its owning top-bar capsule. Definitions also declare opaque lifecycle o
 dependency attachment, start, and stop. Composition supplies one service dependency bundle and
 iterates every runtime; concrete attachment and start/stop calls remain inside the registry seam.
 Definitions may also declare opaque control operations. The shared open/close path applies opening
-policy, transitions, pointer subscriptions, popup capture, dirtying, and update scheduling around
+policy, pointer subscriptions, popup capture, dirtying, and update scheduling around
 the capsule's semantic `set_open`; registry adapters are the only code that translates that call to
 a concrete capsule. Typed host notifications are broadcast through the same contract for external
 state that more than one capsule may present, including system statistics, Now Playing, media
@@ -472,12 +472,12 @@ Settings, Battery, System HUD, Launcher, and Switcher use these operations rathe
 orchestration files. Closing carries an intent: `REACH_SURFACE_CLOSE_DISMISS` for a dismissal the
 user drove, `REACH_SURFACE_CLOSE_SUPERSEDED` when something else took over. A surface that declares
 `restores_focus_on_close` has composition remember the foreground window when it opens and
-reactivate it once the close transition has finished; a superseded close drops that window instead,
+reactivate it once the close presentation has finished; a superseded close drops that window instead,
 so a launch or a click on another surface keeps the focus it just took. `close_on_persistent_press`
 declares the other half of that rule — a primary press a persistent bar handled supersedes the
 surfaces that declare it. Both are surface-spec data, so neither the focus controller
 (`host_focus_restore.cpp`) nor the pointer path names a feature. Control operations also declare
-`surface_hidden`, called by the generic transition tail once a surface has finished animating out,
+`surface_hidden`, called by the generic presentation tail once a surface has finished animating out,
 which is where a capsule drops the state that must not survive a close.
 Render-resource operations on the control contract expose retired and active opaque
 renderer/source identities, so the host drains and releases icons in one runtime loop while each
@@ -536,33 +536,33 @@ dismissal dwell and pointer leave releases it. It is centered above the Dock's
 shown-position geometry even when the Dock itself is hidden, and its whole render
 command buffer is faded by the shared animation manager.
 A deferred launch is keyed on the surface that requested it, so composition waits for that
-surface's own close transition before running the launch rather than testing one named feature.
+surface's own close presentation before running the launch rather than testing one named feature.
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
 own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
 pass. Capsules also own feature-specific presentation animation. Launcher keeps its offset,
 opacity, and proportional scale tracks beside its results-expansion track in the Launcher animation
-manager. Popup capsules embed the shared `features/common/popup` transition, which owns direction,
-timing, reversal, and close visibility. Their geometry publishes only generic presentation values;
+manager. Popup capsules, Clipboard, and Switcher embed the shared
+`features/common/presentation` transition, which owns direction, timing, reversal, and close
+visibility. Their geometry publishes only generic presentation values;
 composition applies managed opacity to the complete rendered command buffer and, for scaled
 presentation, maintains a stable maximum envelope plus matching render and pointer transforms.
 Capsules whose close presentation outlives `is_open` expose that lifetime through
-`presentation_visible`; `needs_frame` remains scheduler-only. Registry entries and popup
-call sites do not carry animation direction or scale policy. Surfaces that still use the generic
-host transition receive distinct indexed offset and opacity tracks. The per-surface frame steps
-(`host_surface_frames.cpp`, layout refresh → transition → window state →
+`presentation_visible`; `needs_frame` remains scheduler-only. Registry entries do not carry
+animation direction or scale policy, and composition owns no surface animation tracks. The
+per-surface frame steps
+(`host_surface_frames.cpp`, layout refresh → presentation → window state →
 corners → show/render) run as one loop over the table in definition `layout.priority`
-order against a shared `reach_host_frame_context`. Transition completion is runtime-driven:
-composition observes both capsule-owned presentation and non-null runtime transitions before
-delivering `surface_hidden` and restoring focus. Every definition
+order against a shared `reach_host_frame_context`. Presentation completion is runtime-driven:
+composition observes capsule-owned presentation before delivering `surface_hidden` and restoring
+focus. Every definition
 exposes uniform `surface_ops` for
 arrangement and render-command production. `reach_host_frame_registered_surface`
 then resolves the declared layout anchor, applies window geometry and visibility,
 and executes rendering without naming the feature. System HUD uses this path and
 declares Dock as its anchor; the Dock's shown-position bounds are stored on its
 feature runtime rather than in a HUD-specific host cache. Switcher also uses the
-path: its capsule owns width animation, arranged bounds, and geometry publication,
-while its registry adapter supplies the transition-adjusted render bounds. Clipboard
-declares Launcher as its anchor and likewise owns relayout, animation state, geometry,
+path: its capsule owns width animation, presentation, arranged bounds, and geometry publication.
+Clipboard declares Launcher as its anchor and likewise owns relayout, presentation, geometry,
 and command production. There is no named frame fallback: every registered surface runs the
 same frame function, and the architecture checker requires one runtime binding and one
 `surface_ops` contract for every registered id.
@@ -703,7 +703,7 @@ entry in `docs/repo-analysis.md`.
    translate; composition keeps only the effects it owns, such as surface open/close,
    app-launch scheduling, window control, and pin mutation.
 3. **Registry definition** (`src/composition/feature_registry.cpp`): id, opaque factory,
-   class, surface runtime binding, transition, opaque lifecycle attachment/start/stop operations,
+   class, surface runtime binding, opaque lifecycle attachment/start/stop operations,
    host-level `force_close`, optional opaque control operations for semantic open/close,
    notifications, fast-frame blockers, and render-resource ownership, capsule ops,
    pointer flags, `role`, `pointer_priority`, `dismiss` if outside-press close differs

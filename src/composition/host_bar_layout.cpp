@@ -302,11 +302,6 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
-        if (desc->transition != nullptr &&
-            reach_host_surface_transition_active(host, desc->transition))
-        {
-            return 0;
-        }
         if (desc->definition->surface.bar_reveal.ops == nullptr ||
             desc->definition->surface.bar_reveal.ops->animation == nullptr)
         {
@@ -364,9 +359,8 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
         int32_t window_changed = 0;
         reach_result result = reach_host_apply_window_state(
             &desc->surface->window, bounds,
-            reach_host_surface_shadow_pad(host, desc->definition->id), 1.0f,
-            &desc->surface->last_bounds, &desc->surface->last_opacity, &desc->surface->bounds_valid,
-            &desc->surface->opacity_valid, &window_changed);
+            reach_host_surface_shadow_pad(host, desc->definition->id),
+            &desc->surface->last_bounds, &desc->surface->bounds_valid, &window_changed);
         if (result != REACH_OK)
         {
             return result;

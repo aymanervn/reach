@@ -40,20 +40,7 @@
 #define REACH_HOST_MAX_ITEM_WINDOWS 16
 #define REACH_SURFACE_NATIVE_OVERLAY_CAPACITY (REACH_MAX_OPEN_WINDOWS + 1)
 
-static const float REACH_HOST_TRANSITION_SETTLE_FROM_BELOW = 8.0f;
-
-typedef struct reach_host_surface_transition
-{
-    int32_t visible;
-    int32_t target_open;
-    size_t y_track;
-    size_t opacity_track;
-    float settle_offset;
-    double open_seconds;
-    double close_seconds;
-} reach_host_surface_transition;
-
-typedef struct reach_host_surface_transition_frame
+typedef struct reach_host_surface_presentation_frame
 {
     reach_rect_f32 window_bounds;
     reach_rect_f32 content_rect;
@@ -61,7 +48,7 @@ typedef struct reach_host_surface_transition_frame
     reach_transform_f32 pointer_transform;
     float scale;
     int32_t scale_envelope_active;
-} reach_host_surface_transition_frame;
+} reach_host_surface_presentation_frame;
 
 typedef enum reach_surface_class
 {
@@ -86,16 +73,6 @@ typedef enum reach_surface_id
     REACH_SURFACE_ID_SYSTEM_HUD,
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
-
-#define REACH_HOST_ANIMATION_TRACKS_PER_SURFACE 2
-#define REACH_HOST_ANIMATION_COUNT                                                                 \
-    ((size_t)REACH_HOST_SURFACE_COUNT * REACH_HOST_ANIMATION_TRACKS_PER_SURFACE)
-
-static inline size_t reach_host_surface_track(reach_surface_id id, size_t offset)
-{
-    return (size_t)id * REACH_HOST_ANIMATION_TRACKS_PER_SURFACE + offset;
-}
-
 
 typedef enum reach_surface_shadow
 {
@@ -196,7 +173,6 @@ typedef struct reach_feature_lifecycle_ops
     void (*attach)(void *capsule, const reach_feature_dependencies *dependencies);
     reach_result (*start)(void *capsule);
     void (*stop)(void *capsule);
-    int32_t close_transition_on_stop;
 } reach_feature_lifecycle_ops;
 
 typedef enum reach_feature_notification_kind
@@ -332,7 +308,6 @@ typedef struct reach_surface_spec
     int32_t layer;
     reach_surface_role role;
     int32_t pointer_priority;
-    int32_t has_transition;
     int32_t popup_chrome;
     int32_t bar_shown_while_open;
     int32_t restores_focus_on_close;
@@ -387,7 +362,6 @@ typedef struct reach_feature_definition
 typedef struct reach_feature_runtime
 {
     reach_surface_runtime *surface;
-    reach_host_surface_transition *transition;
     void *capsule;
     reach_rect_f32 resolved_bounds;
     int32_t resolved_bounds_valid;
@@ -568,7 +542,6 @@ struct reach_host
 
 
     reach_surface_runtime surfaces[REACH_HOST_SURFACE_COUNT];
-    reach_host_surface_transition transitions[REACH_HOST_SURFACE_COUNT];
 
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
@@ -611,8 +584,6 @@ struct reach_host
     void (*pointer_moved_route)(void *user, reach_point_i32 point);
     void (*pointer_region_route)(void *user, uint32_t region_id);
     float layout_dpi_scale;
-    reach_animation_manager animations;
-    reach_animation_track animation_tracks[REACH_HOST_ANIMATION_COUNT];
     int32_t has_layout;
     reach_host_dirty_state dirty;
     reach_config_service *config_service;
@@ -721,28 +692,12 @@ void reach_host_stamp_surface_content(const reach_host *host, reach_surface_id i
                                       reach_render_command_buffer *commands);
 reach_result reach_host_apply_window_state(reach_platform_window_port *window,
                                            reach_rect_f32 bounds, reach_shadow_pad pad,
-                                           float opacity, reach_rect_f32 *last_bounds,
-                                           float *last_opacity, int32_t *bounds_valid,
-                                           int32_t *opacity_valid, int32_t *out_changed);
-void reach_host_surface_transition_init(reach_host *host, reach_host_surface_transition *transition,
-                                        size_t y_track, size_t opacity_track, float settle_offset);
-void reach_host_surface_transitions_init(reach_host *host);
-void reach_host_surface_transition_set(reach_host *host, reach_host_surface_transition *transition,
-                                       int32_t open);
-reach_rect_f32 reach_host_surface_transition_bounds(const reach_host *host,
-                                                    const reach_host_surface_transition *transition,
-                                                    reach_rect_f32 target_bounds);
-float reach_host_surface_transition_opacity(const reach_host *host,
-                                            const reach_host_surface_transition *transition);
-reach_host_surface_transition_frame reach_host_surface_presentation_frame_compute(
+                                           reach_rect_f32 *last_bounds, int32_t *bounds_valid,
+                                           int32_t *out_changed);
+reach_host_surface_presentation_frame reach_host_surface_presentation_frame_compute(
     reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
     float y_offset, float scale, float max_scale);
-int32_t reach_host_surface_transition_visible(const reach_host_surface_transition *transition);
-int32_t reach_host_surface_transition_active(const reach_host *host,
-                                             const reach_host_surface_transition *transition);
-void reach_host_surface_transition_finish(reach_host *host,
-                                          reach_host_surface_transition *transition);
-void reach_host_finish_surface_transitions(reach_host *host);
+void reach_host_finish_surface_presentations(reach_host *host);
 
 reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
                                                      const reach_ui_event *event,

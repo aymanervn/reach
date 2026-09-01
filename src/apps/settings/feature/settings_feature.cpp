@@ -55,7 +55,6 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_loader_model_init(&model->bluetooth_loader, 0.7f);
     reach_animation_manager_init(&model->wifi_row_animations, model->wifi_row_tracks,
                                  REACH_WIFI_MAX_NETWORKS + 1);
-    reach_animation_manager_init(&model->wifi_view_animation, &model->wifi_view_track, 1);
     reach_animation_manager_init(&model->wifi_radio_animation, &model->wifi_radio_track, 1);
     reach_animation_manager_init(&model->bluetooth_row_animations, model->bluetooth_row_tracks,
                                  REACH_BLUETOOTH_MAX_DEVICES);

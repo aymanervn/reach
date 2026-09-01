@@ -17,9 +17,7 @@ extern "C"
         reach_platform_window_port window;
         reach_render_backend_port renderer;
         reach_rect_f32 last_bounds;
-        float last_opacity;
         int32_t bounds_valid;
-        int32_t opacity_valid;
         int32_t activated;
         int32_t transition_input_region_active;
         float last_transition_scale;

@@ -3,8 +3,7 @@
 
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
-#include "reach/features/feature_capsule.h"
-#include "reach/support/animation.h"
+#include "reach/features/common/presentation.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -32,30 +31,6 @@ extern "C"
         float notch_anchor_x;
         int32_t notch_side;
     } reach_popup_placement;
-
-    typedef struct reach_popup_transition
-    {
-        reach_animation_manager animations;
-        reach_animation_track tracks[2];
-        double open_seconds;
-        double close_seconds;
-        float dpi_scale;
-        int32_t direction;
-        int32_t visible;
-        int32_t target_open;
-    } reach_popup_transition;
-
-    void reach_popup_transition_init(reach_popup_transition *transition, int32_t direction);
-    void reach_popup_transition_reset(reach_popup_transition *transition);
-    void reach_popup_transition_configure(reach_popup_transition *transition,
-                                          const reach_theme *theme, float dpi_scale,
-                                          int32_t direction);
-    int32_t reach_popup_transition_set_open(reach_popup_transition *transition, int32_t open);
-    int32_t reach_popup_transition_tick(reach_popup_transition *transition, double delta_seconds);
-    int32_t reach_popup_transition_active(const reach_popup_transition *transition);
-    int32_t reach_popup_transition_visible(const reach_popup_transition *transition);
-    void reach_popup_transition_presentation(const reach_popup_transition *transition,
-                                             reach_feature_surface_geometry *geometry);
 
     int32_t reach_popup_notch_side(int32_t direction);
 

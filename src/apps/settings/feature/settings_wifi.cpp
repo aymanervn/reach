@@ -151,8 +151,6 @@ void reach_settings_model_set_wifi_view(reach_settings_model *model, reach_setti
     model->wifi_view = view;
     reach_settings_model_wifi_expand_row(model, REACH_SETTINGS_WIFI_ROW_NONE);
     reach_scrollbar_model_init(&model->wifi_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
-    reach_animation_manager_start(&model->wifi_view_animation, 0, 0.0f, 1.0f, 0.16,
-                                  REACH_EASING_EASE_OUT);
 }
 
 void reach_settings_model_set_wifi_status(reach_settings_model *model, int32_t status,
@@ -463,11 +461,6 @@ int32_t reach_settings_model_tick_wifi_animations(reach_settings_model *model, d
         reach_animation_manager_tick(&model->wifi_row_animations, delta_seconds);
         changed = 1;
     }
-    if (reach_animation_manager_any_active(&model->wifi_view_animation))
-    {
-        reach_animation_manager_tick(&model->wifi_view_animation, delta_seconds);
-        changed = 1;
-    }
     if (reach_animation_manager_any_active(&model->wifi_radio_animation))
     {
         reach_animation_manager_tick(&model->wifi_radio_animation, delta_seconds);
@@ -479,7 +472,6 @@ int32_t reach_settings_model_tick_wifi_animations(reach_settings_model *model, d
 int32_t reach_settings_model_wifi_animations_active(const reach_settings_model *model)
 {
     return model != nullptr && (reach_animation_manager_any_active(&model->wifi_row_animations) ||
-                                reach_animation_manager_any_active(&model->wifi_view_animation) ||
                                 reach_animation_manager_any_active(&model->wifi_radio_animation));
 }
 

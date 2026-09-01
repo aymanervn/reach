@@ -792,35 +792,6 @@ static reach_result reach_platform_window_get_bounds(const reach_platform_window
     return REACH_OK;
 }
 
-static reach_result reach_platform_window_set_opacity(reach_platform_window *window, float opacity)
-{
-    if (window == nullptr || window->hwnd == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    if (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_TOP_BAR ||
-        window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_TRAY_MENU ||
-        window->role == REACH_SURFACE_SWITCHER || window->role == REACH_SURFACE_CONTEXT_MENU ||
-        window->role == REACH_SURFACE_QUICK_SETTINGS || window->role == REACH_SURFACE_BATTERY ||
-        window->role == REACH_SURFACE_CLIPBOARD || window->role == REACH_SURFACE_SETTINGS ||
-        window->role == REACH_SURFACE_STAGE || window->role == REACH_SURFACE_SYSTEM_HUD)
-    {
-        return REACH_OK;
-    }
-
-    if (opacity < 0.0f)
-    {
-        opacity = 0.0f;
-    }
-    if (opacity > 1.0f)
-    {
-        opacity = 1.0f;
-    }
-
-    BYTE alpha = (BYTE)(opacity * 255.0f);
-    return SetLayeredWindowAttributes(window->hwnd, 0, alpha, LWA_ALPHA) ? REACH_OK : REACH_ERROR;
-}
-
 static reach_result reach_platform_window_set_blur_enabled(reach_platform_window *window,
                                                            int32_t enabled)
 {
@@ -1159,7 +1130,6 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.hide = reach_platform_window_hide;
     out_port->ops.set_bounds = reach_platform_window_set_bounds;
     out_port->ops.get_bounds = reach_platform_window_get_bounds;
-    out_port->ops.set_opacity = reach_platform_window_set_opacity;
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
     out_port->ops.set_caption = reach_platform_window_set_caption;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;

@@ -142,7 +142,7 @@ add_library(reach_features STATIC
     src/features/launcher/launcher_interaction.cpp
     src/features/launcher/launcher_render.cpp
     src/features/launcher/launcher_state.cpp
-    src/features/common/popup/popup_animation.cpp
+    src/features/common/presentation/presentation_animation.cpp
     src/features/common/popup/popup_render.cpp
     src/features/quick_settings/quick_settings_feature.cpp
     src/features/quick_settings/quick_settings_interaction.cpp

@@ -670,20 +670,17 @@ static const reach_feature_control_ops reach_system_hud_control_ops = {
 #define REACH_HOST_LAYER_STAGE_EDGE_REVEAL 150
 
 static void reach_host_define_feature(reach_host *host, reach_surface_id id,
-                                      reach_surface_class cls, int32_t has_transition,
-                                      void (*force_close)(reach_host *),
+                                      reach_surface_class cls, void (*force_close)(reach_host *),
                                       const reach_feature_capsule_ops *capsule_ops,
                                       uint32_t pointer_flags)
 {
     reach_surface_runtime *surface = &host->surfaces[id];
-    reach_host_surface_transition *transition = has_transition ? &host->transitions[id] : nullptr;
     reach_feature_definition *definition = &host->feature_definitions[id];
     *definition = {};
     definition->id = id;
     definition->capsule_ops = capsule_ops;
     definition->surface.cls = cls;
     definition->surface.pointer_flags = pointer_flags;
-    definition->surface.has_transition = has_transition != 0;
     definition->surface.opening_origin = REACH_HOST_SURFACE_COUNT;
     definition->layout.anchor = REACH_HOST_SURFACE_COUNT;
     definition->surface.dismiss_guard_surface = REACH_HOST_SURFACE_COUNT;
@@ -692,7 +689,6 @@ static void reach_host_define_feature(reach_host *host, reach_surface_id id,
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
     *runtime = {};
     runtime->surface = surface;
-    runtime->transition = transition;
     runtime->definition = definition;
 }
 
@@ -704,43 +700,41 @@ static void reach_host_init_feature_definitions(reach_host *host)
     }
 
     reach_host_define_feature(host, REACH_SURFACE_ID_DOCK, REACH_SURFACE_CLASS_PERSISTENT,
-                              0, nullptr, reach_dock_capsule_ops(),
+                              nullptr, reach_dock_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED |
                                   REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE);
     reach_host_define_feature(host, REACH_SURFACE_ID_TOP_BAR, REACH_SURFACE_CLASS_PERSISTENT,
-                              0, nullptr, reach_top_bar_capsule_ops(),
+                              nullptr, reach_top_bar_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, 0, nullptr,
+        host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, nullptr,
         reach_launcher_capsule_ops(),
         REACH_SURFACE_POINTER_RELAYOUT_REDRAWS | REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT, 1,
+        host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT,
         reach_host_surface_clipboard_close, reach_clipboard_feature_capsule_ops(),
         REACH_SURFACE_POINTER_SOURCE_GATED);
-    reach_host_define_feature(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP, 0,
+    reach_host_define_feature(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP,
                               reach_host_surface_tray_close, reach_top_bar_tray_capsule_ops(),
                               REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_CLASS_POPUP, 0,
+        host, REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_CLASS_POPUP,
         reach_host_surface_quick_settings_close, reach_quick_settings_capsule_ops(),
         REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE | REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE);
-    reach_host_define_feature(host, REACH_SURFACE_ID_BATTERY, REACH_SURFACE_CLASS_POPUP, 0,
+    reach_host_define_feature(host, REACH_SURFACE_ID_BATTERY, REACH_SURFACE_CLASS_POPUP,
                               reach_host_surface_battery_close, reach_battery_capsule_ops(),
                               REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_SYSTEM_HUD, REACH_SURFACE_CLASS_PERSISTENT,
-                              0, nullptr, reach_system_hud_capsule_ops(),
+                              nullptr, reach_system_hud_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(
-        host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, 0, nullptr,
+        host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, nullptr,
         reach_context_menu_capsule_ops(),
         REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
     reach_host_define_feature(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY,
-                              1, nullptr,
-                              reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
+                              nullptr, reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_CLASS_TRANSIENT,
-                              0, nullptr,
-                              reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
+                              nullptr, reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
 
     reach_feature_definition *definitions = host->feature_definitions;
 
@@ -1176,10 +1170,9 @@ static const reach_feature_surface_ops reach_switcher_surface_ops = {
 static int32_t reach_clipboard_surface_arrange(void *capsule,
                                                const reach_feature_surface_context *ctx)
 {
-    float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
     return reach_clipboard_feature_relayout(static_cast<reach_clipboard_feature *>(capsule),
-                                            ctx->monitor_bounds, ctx->anchor_bounds, ctx->dpi_scale,
-                                            border, nullptr);
+                                            ctx->theme, ctx->monitor_bounds, ctx->anchor_bounds,
+                                            ctx->dpi_scale, nullptr);
 }
 
 static reach_result reach_clipboard_surface_render(void *capsule,
@@ -1551,10 +1544,6 @@ void reach_host_stop_registered_features(reach_host *host)
             continue;
         }
         lifecycle->stop(runtime->capsule);
-        if (lifecycle->close_transition_on_stop && runtime->transition != nullptr)
-        {
-            reach_host_surface_transition_set(host, runtime->transition, 0);
-        }
         if (runtime->surface != nullptr)
         {
             runtime->surface->dirty_flags = 1;

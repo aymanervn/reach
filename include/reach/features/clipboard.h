@@ -95,9 +95,10 @@ extern "C"
     const reach_feature_capsule_ops *reach_clipboard_feature_capsule_ops(void);
 
     int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
+                                             const reach_theme *theme,
                                              reach_rect_f32 monitor_bounds,
                                              reach_rect_f32 launcher_bounds, float dpi_scale,
-                                             float border_thickness, int32_t *out_animating);
+                                             int32_t *out_animating);
 
     int32_t reach_clipboard_is_open(reach_clipboard_feature *clipboard);
     size_t reach_clipboard_item_count(reach_clipboard_feature *clipboard);
