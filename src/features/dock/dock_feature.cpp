@@ -897,6 +897,17 @@ int32_t reach_dock_clear_context_feedback(reach_dock *dock)
     return reach_pressable_clear_latched_feedback(&dock->state.pressable, &feedback);
 }
 
+static reach_rect_f32 reach_dock_protected_band(reach_rect_f32 shown_bounds,
+                                                reach_rect_f32 monitor_bounds,
+                                                float shadow_clearance)
+{
+    reach_rect_f32 band =
+        reach_bar_protected_band(REACH_DOCK_EDGE, shown_bounds, monitor_bounds, shadow_clearance);
+    band.x = shown_bounds.x;
+    band.width = shown_bounds.width;
+    return band;
+}
+
 static reach_bar_visibility_result
 reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_request *request)
 {
@@ -922,9 +933,8 @@ reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_reque
         fabsf(animations->coverage_shadow_clearance - request->shadow_clearance) >= 0.5f;
     if (!animations->coverage_valid || bounds_changed)
     {
-        reach_rect_f32 protected_band =
-            reach_bar_protected_band(REACH_DOCK_EDGE, request->shown_bounds,
-                                     request->monitor_bounds, request->shadow_clearance);
+        reach_rect_f32 protected_band = reach_dock_protected_band(
+            request->shown_bounds, request->monitor_bounds, request->shadow_clearance);
         animations->coverage_trespassed = reach_window_tracking_any_trespassing(
             animations->windows, request->monitor_bounds, protected_band, request->excluded_window);
         animations->coverage_shown_bounds = request->shown_bounds;
