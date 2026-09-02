@@ -78,6 +78,72 @@ reach_result reachctl_open_config_store(reach_config_store_port *out_store)
     return reach_windows_create_config_store(config_path, out_store);
 }
 
+static int32_t reachctl_config_path_state(const uint16_t *path)
+{
+    DWORD attributes = GetFileAttributesW(reinterpret_cast<const wchar_t *>(path));
+    if (attributes != INVALID_FILE_ATTRIBUTES)
+    {
+        return (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 ? 1 : -1;
+    }
+    DWORD error = GetLastError();
+    return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND ? 0 : -1;
+}
+
+reach_result reachctl_initialize_config(void)
+{
+    uint16_t config_path[260] = {};
+    reach_result result = reach_windows_default_config_path(config_path, 260);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    int32_t state = reachctl_config_path_state(config_path);
+    if (state != 0)
+    {
+        return state > 0 ? REACH_OK : REACH_ERROR;
+    }
+
+    reach_config_store_port store = {};
+    result = reach_windows_create_config_store(config_path, &store);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    result = store.ops.begin_transaction(store.store);
+    if (result == REACH_OK)
+    {
+        state = reachctl_config_path_state(config_path);
+        if (state > 0)
+        {
+            result = REACH_OK;
+        }
+        else if (state < 0)
+        {
+            result = REACH_ERROR;
+        }
+        else
+        {
+            reach_config_snapshot snapshot = {};
+            result = store.ops.load(store.store, &snapshot);
+            if (result == REACH_OK)
+            {
+                result = reach_windows_collect_taskbar_pins(
+                    snapshot.pinned_apps, REACH_MAX_PINNED_APPS, &snapshot.pinned_app_count);
+            }
+            if (result == REACH_OK)
+            {
+                result = store.ops.save(store.store, &snapshot);
+            }
+        }
+        store.ops.end_transaction(store.store);
+    }
+
+    store.ops.destroy(store.store);
+    return result;
+}
+
 reach_result reachctl_absolute_path(const uint16_t *path, uint16_t *out_path, DWORD out_path_count)
 {
     if (path == nullptr || path[0] == 0 || out_path == nullptr || out_path_count == 0)
