@@ -513,7 +513,7 @@ reach_result reach_app_control_schedule_launch(reach_app_control *service,
                                                const reach_app_launch_request *request)
 {
     if (service == nullptr || service->launch == nullptr || request == nullptr ||
-        request->path[0] == 0)
+        (request->path[0] == 0 && request->app_user_model_id[0] == 0))
     {
         return REACH_INVALID_ARGUMENT;
     }

@@ -100,9 +100,15 @@ int main()
 
     reach_config_snapshot defaults = {};
     failed += expect(reach_pin_config_ensure_defaults(&defaults, &changed) == REACH_OK);
+    failed += expect(changed == 0);
+    failed += expect(defaults.pinned_app_count == 0);
+
+    uint16_t first_path[260] = {};
+    reach_copy_ascii_to_utf16(first_path, 260, "first.exe");
+    failed += expect(reach_pin_config_pin_path(&defaults, first_path, &changed) == REACH_OK);
     failed += expect(changed == 1);
     failed += expect(defaults.pinned_app_count == 1);
-    failed += expect(defaults.pinned_apps[0].id == 1);
+    failed += expect(reach_path_equals(defaults.pinned_apps[0].path, first_path));
 
     return failed == 0 ? 0 : 1;
 }

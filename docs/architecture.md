@@ -76,7 +76,11 @@ config-store port directly. Window tracking owns the naming policy for a running
 the top bar's current-app pill reads it from there. Window-oriented surfaces that already
 show the app icon, including Switcher and Stage, label each window from its snapshot title
 without prepending the app identity. Pinned apps do not persist a title; the Dock derives
-its icon fallback from the executable path and never treats config as a live label. Now Playing
+its icon fallback from the executable path and never treats config as a live label. When
+`reachctl` creates `reach.ini`, it imports the current Windows taskbar order once, including
+shortcut arguments and application identities. Existing configuration is never overwritten,
+and an empty pin list remains empty. Packaged pins launch through their application identity;
+Reach never needs access to their protected installation directory. Now Playing
 publishes atomic core media generations immediately, enriches them with the latest
 generation's cover asynchronously, owns transport serialization and cover lifetime,
 and masks every transport control while a command is settling. A new core generation

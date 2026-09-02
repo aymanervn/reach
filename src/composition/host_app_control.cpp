@@ -118,7 +118,8 @@ void reach_host_apply_window_control_result(reach_host *host)
 reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
                                                           const reach_app_launch_request *request)
 {
-    if (host == nullptr || request == nullptr || request->path[0] == 0 ||
+    if (host == nullptr || request == nullptr ||
+        (request->path[0] == 0 && request->app_user_model_id[0] == 0) ||
         source >= REACH_HOST_SURFACE_COUNT)
     {
         return REACH_INVALID_ARGUMENT;
@@ -199,15 +200,16 @@ reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id s
     switch (target->kind)
     {
     case REACH_FEATURE_TARGET_APP:
-        return target->path != nullptr && target->path[0] != 0
+        return (target->path != nullptr && target->path[0] != 0) ||
+                       (target->app_user_model_id != nullptr && target->app_user_model_id[0] != 0)
                    ? reach_host_open_app(host, target->path, target->arguments,
                                          target->app_user_model_id, new_instance, source, defer)
                    : REACH_OK;
 
     case REACH_FEATURE_TARGET_PATH:
         return target->path != nullptr && target->path[0] != 0
-                   ? reach_host_launch_app(host, target->path, target->arguments, new_instance,
-                                           run_as_admin, source, defer)
+                   ? reach_host_launch_app(host, target->path, target->arguments, nullptr,
+                                           new_instance, run_as_admin, source, defer)
                    : REACH_OK;
 
     case REACH_FEATURE_TARGET_TERMINAL_COMMAND:
@@ -313,21 +315,31 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
 }
 
 reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
-                                   const uint16_t *arguments, int32_t force_new_instance,
-                                   int32_t run_as_admin, reach_surface_id source,
-                                   int32_t defer_until_closed)
+                                   const uint16_t *arguments, const uint16_t *app_user_model_id,
+                                   int32_t force_new_instance, int32_t run_as_admin,
+                                   reach_surface_id source, int32_t defer_until_closed)
 {
-    if (host == nullptr || path == nullptr || path[0] == 0)
+    if (host == nullptr ||
+        ((path == nullptr || path[0] == 0) &&
+         (app_user_model_id == nullptr || app_user_model_id[0] == 0)))
     {
         return REACH_INVALID_ARGUMENT;
     }
 
     reach_app_launch_request request = {};
-    reach_copy_utf16(request.path, 260, path);
+    if (path != nullptr)
+    {
+        reach_copy_utf16(request.path, 260, path);
+    }
 
     if (arguments != nullptr)
     {
         reach_copy_utf16(request.arguments, 260, arguments);
+    }
+
+    if (app_user_model_id != nullptr)
+    {
+        reach_copy_utf16(request.app_user_model_id, 260, app_user_model_id);
     }
 
     request.force_new_instance = force_new_instance ? 1 : 0;
@@ -341,7 +353,9 @@ reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const u
                                  const uint16_t *app_user_model_id, int32_t force_new_instance,
                                  reach_surface_id source, int32_t defer_until_closed)
 {
-    if (host == nullptr || path == nullptr || path[0] == 0)
+    if (host == nullptr ||
+        ((path == nullptr || path[0] == 0) &&
+         (app_user_model_id == nullptr || app_user_model_id[0] == 0)))
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -355,8 +369,8 @@ reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const u
         }
     }
 
-    return reach_host_launch_app(host, path, arguments, force_new_instance, 0, source,
-                                 defer_until_closed);
+    return reach_host_launch_app(host, path, arguments, app_user_model_id, force_new_instance, 0,
+                                 source, defer_until_closed);
 }
 
 reach_result reach_host_schedule_open_terminal(reach_host *host)

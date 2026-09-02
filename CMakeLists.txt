@@ -192,6 +192,8 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/search_retriever_win32.cpp
     src/adapters/windows/search_catalog_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp
+    src/adapters/windows/taskbar_pin_blob.cpp
+    src/adapters/windows/taskbar_pins_win32.cpp
     src/adapters/windows/settings_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
@@ -448,6 +450,8 @@ add_executable(reachctl
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
     src/adapters/windows/wallpaper_win32.cpp
+    src/adapters/windows/taskbar_pin_blob.cpp
+    src/adapters/windows/taskbar_pins_win32.cpp
     src/support/util.cpp
 )
 
@@ -471,6 +475,7 @@ target_link_libraries(reachctl PRIVATE
 add_executable(reachWatchdog WIN32
     src/tools/reach_watchdog/reach_watchdog.cpp
 )
+
 set_target_properties(reachWatchdog PROPERTIES OUTPUT_NAME "reachWatchdog")
 
 reach_configure_common(reachWatchdog)
@@ -673,6 +678,17 @@ target_link_libraries(reach_util_tests PRIVATE
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
 )
+
+add_executable(reach_taskbar_pin_blob_tests
+    tests/taskbar_pin_blob_tests.cpp
+    src/adapters/windows/taskbar_pin_blob.cpp
+)
+reach_configure_common(reach_taskbar_pin_blob_tests)
+target_include_directories(reach_taskbar_pin_blob_tests PRIVATE
+    src/adapters/windows
+)
+target_compile_features(reach_taskbar_pin_blob_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_taskbar_pin_blob_tests PRIVATE reach_support)
 
 reach_configure_common(reach_pin_config_tests)
 target_compile_features(reach_pin_config_tests PRIVATE
@@ -997,6 +1013,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
     add_test(NAME reach_bluetooth_tests COMMAND reach_bluetooth_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
+    add_test(NAME reach_taskbar_pin_blob_tests COMMAND reach_taskbar_pin_blob_tests)
     add_test(NAME reach_config_service_tests COMMAND reach_config_service_tests)
     add_test(NAME reach_config_ini_tests COMMAND reach_config_ini_tests)
     add_test(NAME reach_layout_tests COMMAND reach_layout_tests)

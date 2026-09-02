@@ -737,9 +737,9 @@ reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature
 reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
                                      int32_t minimize_if_foreground);
 reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
-                                   const uint16_t *arguments, int32_t force_new_instance,
-                                   int32_t run_as_admin, reach_surface_id source,
-                                   int32_t defer_until_closed);
+                                   const uint16_t *arguments, const uint16_t *app_user_model_id,
+                                   int32_t force_new_instance, int32_t run_as_admin,
+                                   reach_surface_id source, int32_t defer_until_closed);
 reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const uint16_t *arguments,
                                  const uint16_t *app_user_model_id, int32_t force_new_instance,
                                  reach_surface_id source, int32_t defer_until_closed);

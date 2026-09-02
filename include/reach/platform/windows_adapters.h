@@ -35,6 +35,7 @@
 #include "reach/ports/window_thumbnail.h"
 #include "reach/ports/windows_update.h"
 #include "reach/ports/clipboard.h"
+#include "reach/core/pinned_app.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -91,6 +92,8 @@ extern "C"
     reach_result reach_windows_create_startup_apps(reach_startup_apps_port *out_port);
     size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
                                               size_t capacity);
+    reach_result reach_windows_collect_taskbar_pins(reach_pinned_app_model *out_pins,
+                                                    size_t capacity, size_t *out_count);
     uintptr_t reach_windows_get_current_foreground(void);
 
 #ifdef __cplusplus

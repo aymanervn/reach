@@ -63,23 +63,6 @@ static int32_t reach_pin_ensure_ids(reach_config_snapshot *snapshot)
     return changed;
 }
 
-static reach_result reach_pin_add_default_explorer(reach_config_snapshot *snapshot)
-{
-    if (snapshot == nullptr || snapshot->pinned_app_count >= REACH_MAX_PINNED_APPS)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    reach_pinned_app_model *app = &snapshot->pinned_apps[snapshot->pinned_app_count];
-    *app = {};
-    app->id = reach_pin_next_available_id(snapshot);
-    const uint16_t explorer_path[] = {'C', ':', '\\', 'W', 'i', 'n', 'd', 'o', 'w', 's', '\\', 'e',
-                                      'x', 'p', 'l',  'o', 'r', 'e', 'r', '.', 'e', 'x', 'e',  0};
-    (void)reach_copy_utf16(app->path, 260, explorer_path);
-    (void)reach_copy_utf16(app->icon_ref, 260, explorer_path);
-    snapshot->pinned_app_count += 1;
-    return REACH_OK;
-}
-
 static void reach_pin_set_changed(int32_t *out_changed, int32_t changed)
 {
     if (out_changed != nullptr)
@@ -96,15 +79,6 @@ reach_result reach_pin_config_ensure_defaults(reach_config_snapshot *snapshot, i
         return REACH_INVALID_ARGUMENT;
     }
     int32_t changed = reach_pin_ensure_ids(snapshot);
-    if (snapshot->pinned_app_count == 0)
-    {
-        reach_result result = reach_pin_add_default_explorer(snapshot);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-        changed = 1;
-    }
     reach_pin_set_changed(out_changed, changed);
     return REACH_OK;
 }
@@ -117,21 +91,11 @@ reach_result reach_pin_config_pin_path(reach_config_snapshot *snapshot, const ui
     {
         return REACH_INVALID_ARGUMENT;
     }
-    int32_t changed = 0;
-    if (snapshot->pinned_app_count == 0)
-    {
-        reach_result result = reach_pin_add_default_explorer(snapshot);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-        changed = 1;
-    }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
         if (reach_path_equals(snapshot->pinned_apps[index].path, path))
         {
-            reach_pin_set_changed(out_changed, changed);
+            reach_pin_set_changed(out_changed, 0);
             return REACH_OK;
         }
     }
@@ -157,23 +121,13 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
     {
         return REACH_INVALID_ARGUMENT;
     }
-    int32_t default_added = 0;
-    if (snapshot->pinned_app_count == 0)
-    {
-        reach_result result = reach_pin_add_default_explorer(snapshot);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-        default_added = 1;
-    }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
         if (!reach_path_equals(snapshot->pinned_apps[index].path, app->path))
         {
             continue;
         }
-        int32_t changed = default_added;
+        int32_t changed = 0;
         if (snapshot->pinned_apps[index].arguments[0] == 0 && app->arguments[0] != 0)
         {
             (void)reach_copy_utf16(snapshot->pinned_apps[index].arguments, 260, app->arguments);

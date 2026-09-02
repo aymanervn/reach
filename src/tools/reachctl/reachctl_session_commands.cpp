@@ -539,6 +539,12 @@ reach_result reachctl_install_reach_shell_and_watchdog(const uint16_t *reach_exe
         return REACH_ERROR;
     }
 
+    reach_result config_result = reachctl_initialize_config();
+    if (config_result != REACH_OK)
+    {
+        return config_result;
+    }
+
     reach_result task_result = reachctl_register_watchdog_task();
     if (task_result != REACH_OK)
     {

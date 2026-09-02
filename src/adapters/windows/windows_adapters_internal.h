@@ -34,6 +34,7 @@
 #include "reach/ports/window_manager.h"
 #include "reach/ports/window_thumbnail.h"
 #include "reach/ports/windows_update.h"
+#include "reach/core/pinned_app.h"
 #include "reach/support/util.h"
 
 #define REACH_WM_WALLPAPER_CHANGED 0x8014
@@ -127,6 +128,8 @@ extern "C"
     reach_result reach_windows_create_startup_apps(reach_startup_apps_port *out_port);
     size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
                                               size_t capacity);
+    reach_result reach_windows_collect_taskbar_pins(reach_pinned_app_model *out_pins,
+                                                    size_t capacity, size_t *out_count);
     extern "C" uintptr_t reach_windows_get_current_foreground(void);
     reach_result reach_windows_shell_install_current_user(const uint16_t *exe_path);
     reach_result reach_windows_shell_install_command_current_user(const uint16_t *identity_exe_path,

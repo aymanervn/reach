@@ -8,6 +8,7 @@
 #include <objbase.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <shobjidl_core.h>
 #include <shlwapi.h>
 
 #include <cstring>
@@ -24,6 +25,37 @@ struct reach_terminal_launcher
     wchar_t executable[MAX_PATH];
     int32_t windows_terminal;
 };
+
+static reach_result reach_windows_activate_application(const reach_app_launch_request *request)
+{
+    if (request == nullptr || request->app_user_model_id[0] == 0 || request->run_as_admin)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    IApplicationActivationManager *manager = nullptr;
+    HRESULT hr = CoCreateInstance(CLSID_ApplicationActivationManager, nullptr, CLSCTX_LOCAL_SERVER,
+                                  IID_PPV_ARGS(&manager));
+    DWORD process_id = 0;
+    if (SUCCEEDED(hr))
+    {
+        hr = manager->ActivateApplication(
+            reinterpret_cast<const wchar_t *>(request->app_user_model_id),
+            request->arguments[0] != 0 ? reinterpret_cast<const wchar_t *>(request->arguments)
+                                       : nullptr,
+            AO_NONE, &process_id);
+    }
+    if (manager != nullptr)
+    {
+        manager->Release();
+    }
+    if (SUCCEEDED(com_result))
+    {
+        CoUninitialize();
+    }
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
 
 static reach_result reach_windows_shell_launch(const wchar_t *verb, const wchar_t *path,
                                                const wchar_t *arguments,
@@ -54,9 +86,15 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
                                               const reach_app_launch_request *request)
 {
     (void)launcher;
-    if (request == nullptr || request->path[0] == 0)
+    if (request == nullptr ||
+        (request->path[0] == 0 && request->app_user_model_id[0] == 0))
     {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if (request->app_user_model_id[0] != 0)
+    {
+        return reach_windows_activate_application(request);
     }
 
     wchar_t working_directory[MAX_PATH] = {};
