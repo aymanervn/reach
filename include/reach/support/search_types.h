@@ -68,6 +68,7 @@ extern "C"
         uint16_t name[REACH_SEARCH_RESULT_NAME_CAPACITY];
         uint16_t path[REACH_SEARCH_RESULT_PATH_CAPACITY];
         uint16_t arguments[REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY];
+        uint16_t app_user_model_id[REACH_SEARCH_RESULT_PATH_CAPACITY];
         reach_search_result_kind kind;
         int32_t source;
         int32_t match_tier;

@@ -94,7 +94,11 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
 
     if (request->app_user_model_id[0] != 0)
     {
-        return reach_windows_activate_application(request);
+        reach_result activation = reach_windows_activate_application(request);
+        if (activation == REACH_OK || request->path[0] == 0)
+        {
+            return activation;
+        }
     }
 
     wchar_t working_directory[MAX_PATH] = {};

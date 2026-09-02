@@ -6,6 +6,7 @@
 #include <windows.h>
 
 #include <new>
+#include <memory>
 #include <vector>
 
 static const size_t REACH_CATALOG_ENTRY_CAP = 4096;
@@ -15,6 +16,7 @@ struct reach_catalog_entry
     uint16_t name[REACH_SEARCH_RESULT_NAME_CAPACITY];
     uint16_t path[REACH_SEARCH_RESULT_PATH_CAPACITY];
     uint16_t arguments[REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY];
+    uint16_t app_user_model_id[REACH_SEARCH_RESULT_PATH_CAPACITY];
     size_t alias_index;
     int32_t has_alias;
 };
@@ -88,7 +90,8 @@ static int32_t reach_catalog_is_packaged_path(const uint16_t *path)
 
 static void reach_catalog_append(reach_windows_search_catalog *catalog, const uint16_t *name,
                                  const uint16_t *path, const uint16_t *arguments,
-                                 size_t alias_index, int32_t has_alias)
+                                 const uint16_t *app_user_model_id, size_t alias_index,
+                                 int32_t has_alias)
 {
     if (catalog->entries.size() >= REACH_CATALOG_ENTRY_CAP)
     {
@@ -108,6 +111,8 @@ static void reach_catalog_append(reach_windows_search_catalog *catalog, const ui
     reach_copy_utf16(entry.name, REACH_SEARCH_RESULT_NAME_CAPACITY, name);
     reach_copy_utf16(entry.path, REACH_SEARCH_RESULT_PATH_CAPACITY, path);
     reach_copy_utf16(entry.arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY, arguments);
+    reach_copy_utf16(entry.app_user_model_id, REACH_SEARCH_RESULT_PATH_CAPACITY,
+                     app_user_model_id);
     entry.alias_index = alias_index;
     entry.has_alias = has_alias;
     catalog->entries.push_back(entry);
@@ -159,7 +164,7 @@ static void reach_catalog_build_aliases(reach_windows_search_catalog *catalog,
         reach_copy_ascii_to_utf16(name, REACH_SEARCH_RESULT_NAME_CAPACITY, alias->display);
         reach_copy_ascii_to_utf16(arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
                                   alias->arguments);
-        reach_catalog_append(catalog, name, path, arguments, index, 1);
+        reach_catalog_append(catalog, name, path, arguments, nullptr, index, 1);
     }
 }
 
@@ -195,7 +200,7 @@ static void reach_catalog_build_system_pattern(reach_windows_search_catalog *cat
             continue;
         }
         reach_catalog_append(catalog, reinterpret_cast<const uint16_t *>(found.cFileName),
-                             reinterpret_cast<const uint16_t *>(combined), nullptr, 0, 0);
+                             reinterpret_cast<const uint16_t *>(combined), nullptr, nullptr, 0, 0);
     } while (FindNextFileW(handle, &found));
 
     FindClose(handle);
@@ -272,7 +277,7 @@ static void reach_catalog_build_app_paths(reach_windows_search_catalog *catalog,
             continue;
         }
 
-        reach_catalog_append(catalog, reach_catalog_file_name(path), path, nullptr, 0, 0);
+        reach_catalog_append(catalog, reach_catalog_file_name(path), path, nullptr, nullptr, 0, 0);
     }
 
     RegCloseKey(key);
@@ -297,6 +302,17 @@ static void reach_catalog_build(reach_windows_search_catalog *catalog)
     reach_catalog_build_system_pattern(catalog, system_directory, L"*.cpl");
     reach_catalog_build_app_paths(catalog, HKEY_LOCAL_MACHINE);
     reach_catalog_build_app_paths(catalog, HKEY_CURRENT_USER);
+
+    std::unique_ptr<reach_installed_app_list> apps(new (std::nothrow) reach_installed_app_list());
+    if (apps != nullptr && reach_windows_collect_installed_apps(apps.get()) == REACH_OK)
+    {
+        for (size_t index = 0; index < apps->count; ++index)
+        {
+            const reach_installed_app *app = &apps->entries[index];
+            reach_catalog_append(catalog, app->display_name, app->launch_path, nullptr,
+                                 app->app_user_model_id, 0, 0);
+        }
+    }
 }
 
 reach_result reach_windows_search_catalog_create(reach_windows_search_catalog **out_catalog)
@@ -368,7 +384,11 @@ size_t reach_windows_search_catalog_collect(reach_windows_search_catalog *catalo
         reach_copy_utf16(candidate->path, REACH_SEARCH_RESULT_PATH_CAPACITY, entry.path);
         reach_copy_utf16(candidate->arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
                          entry.arguments);
-        candidate->kind = reach_search_classify_result(entry.path, 0);
+        reach_copy_utf16(candidate->app_user_model_id, REACH_SEARCH_RESULT_PATH_CAPACITY,
+                         entry.app_user_model_id);
+        candidate->kind = entry.app_user_model_id[0] != 0
+                              ? REACH_SEARCH_RESULT_APP
+                              : reach_search_classify_result(entry.path, 0);
         candidate->source = REACH_SEARCH_SOURCE_CATALOG;
         candidate->match_tier = (int32_t)tier;
         candidate->pinned = tier == REACH_SEARCH_MATCH_EXACT ? 1 : 0;

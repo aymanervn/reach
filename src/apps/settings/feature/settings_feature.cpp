@@ -48,6 +48,7 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->startup_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_scrollbar_model_init(&model->installed_apps_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->wifi_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->bluetooth_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_loader_model_init(&model->update_loader, 0.7f);
@@ -187,6 +188,8 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
          REACH_THEME_ACCENT_TEAL},
         {REACH_SETTINGS_PAGE_STARTUP_APPS, REACH_VECTOR_ICON_QUICK_SETTINGS,
          (const uint16_t *)L"Startup Apps", REACH_THEME_ACCENT_PURPLE},
+        {REACH_SETTINGS_PAGE_APPLICATIONS, REACH_VECTOR_ICON_EXECUTABLE,
+         (const uint16_t *)L"Applications", REACH_THEME_ACCENT_BLUE},
         {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy",
          REACH_THEME_ACCENT_ORANGE},
         {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
@@ -214,6 +217,8 @@ const uint16_t *reach_settings_page_title(reach_settings_page page)
         return reach_settings_account_page_title();
     case REACH_SETTINGS_PAGE_STARTUP_APPS:
         return reach_settings_startup_apps_page_title();
+    case REACH_SETTINGS_PAGE_APPLICATIONS:
+        return reach_settings_installed_apps_page_title();
     case REACH_SETTINGS_PAGE_POWER_SLEEP:
         return reach_settings_power_sleep_page_title();
     case REACH_SETTINGS_PAGE_DISPLAY:
@@ -237,6 +242,8 @@ const uint16_t *reach_settings_page_placeholder(reach_settings_page page)
         return reach_settings_account_page_placeholder();
     case REACH_SETTINGS_PAGE_STARTUP_APPS:
         return reach_settings_startup_apps_page_placeholder();
+    case REACH_SETTINGS_PAGE_APPLICATIONS:
+        return reach_settings_installed_apps_page_placeholder();
     case REACH_SETTINGS_PAGE_POWER_SLEEP:
         return reach_settings_power_sleep_page_placeholder();
     case REACH_SETTINGS_PAGE_DISPLAY:
@@ -630,6 +637,78 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         }
     }
 
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_APPLICATIONS)
+    {
+        float scrollbar_width = 5.0f * scale;
+        float area_x = layout.content_title.x;
+        float area_y = layout.content_title.y + layout.content_title.height + 12.0f * scale;
+        float area_width = layout.content.width - 64.0f * scale - scrollbar_width;
+        layout.installed_apps_summary =
+            reach_settings_rect(area_x, area_y, area_width, 16.0f * scale);
+        float viewport_y = area_y + 28.0f * scale;
+        float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
+        layout.installed_apps_viewport =
+            reach_settings_rect(area_x, viewport_y, area_width, viewport_bottom - viewport_y);
+        layout.installed_apps_scrollbar_track = reach_settings_rect(
+            layout.installed_apps_viewport.x + layout.installed_apps_viewport.width + 11.0f * scale,
+            layout.installed_apps_viewport.y, scrollbar_width,
+            layout.installed_apps_viewport.height);
+
+        float row_height = 70.0f * scale;
+        float row_gap = 8.0f * scale;
+        float button_height = 26.0f * scale;
+        float button_gap = 7.0f * scale;
+        float uninstall_width = 72.0f * scale;
+        float manage_width = 64.0f * scale;
+        float open_width = 50.0f * scale;
+        float content_y = 0.0f;
+        layout.installed_app_row_count =
+            model->installed_apps.count < REACH_INSTALLED_APP_MAX_ENTRIES
+                ? model->installed_apps.count
+                : REACH_INSTALLED_APP_MAX_ENTRIES;
+        for (size_t index = 0; index < layout.installed_app_row_count; ++index)
+        {
+            layout.installed_app_rows[index] = reach_settings_rect(
+                layout.installed_apps_viewport.x,
+                layout.installed_apps_viewport.y + content_y -
+                    model->installed_apps_scrollbar.offset,
+                layout.installed_apps_viewport.width, row_height);
+            float right = layout.installed_app_rows[index].x +
+                          layout.installed_app_rows[index].width - 14.0f * scale;
+            layout.installed_app_uninstall_buttons[index] = reach_settings_rect(
+                right - uninstall_width,
+                layout.installed_app_rows[index].y + (row_height - button_height) * 0.5f,
+                uninstall_width, button_height);
+            right -= uninstall_width + button_gap;
+            layout.installed_app_manage_buttons[index] = reach_settings_rect(
+                right - manage_width,
+                layout.installed_app_rows[index].y + (row_height - button_height) * 0.5f,
+                manage_width, button_height);
+            right -= manage_width + button_gap;
+            layout.installed_app_open_buttons[index] = reach_settings_rect(
+                right - open_width,
+                layout.installed_app_rows[index].y + (row_height - button_height) * 0.5f,
+                open_width, button_height);
+            content_y += row_height + row_gap;
+        }
+        float base_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
+        layout.installed_apps_content_height =
+            base_height > layout.installed_apps_viewport.height ? base_height + 20.0f * scale
+                                                                 : base_height;
+        reach_scrollbar_set_extents(&model->installed_apps_scrollbar,
+                                    layout.installed_apps_content_height,
+                                    layout.installed_apps_viewport.height);
+        if (layout.installed_apps_content_height > layout.installed_apps_viewport.height)
+        {
+            reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
+                &model->installed_apps_scrollbar, layout.installed_apps_scrollbar_track,
+                layout.installed_apps_viewport.height, layout.installed_apps_content_height,
+                34.0f * scale);
+            layout.installed_apps_scrollbar_track = scrollbar.track;
+            layout.installed_apps_scrollbar_thumb = scrollbar.thumb;
+        }
+    }
+
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_DISPLAY)
     {
         float area_x = layout.content_title.x;
@@ -996,6 +1075,31 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             {
                 result.type = REACH_SETTINGS_HIT_STARTUP_TOGGLE;
                 result.startup_index = index;
+                return result;
+            }
+        }
+    }
+
+    if (reach_settings_rect_contains(layout->installed_apps_viewport, x, y))
+    {
+        for (size_t index = 0; index < layout->installed_app_row_count; ++index)
+        {
+            if (reach_settings_rect_contains(layout->installed_app_open_buttons[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_APPLICATION_OPEN;
+                result.installed_app_index = index;
+                return result;
+            }
+            if (reach_settings_rect_contains(layout->installed_app_manage_buttons[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_APPLICATION_MANAGE;
+                result.installed_app_index = index;
+                return result;
+            }
+            if (reach_settings_rect_contains(layout->installed_app_uninstall_buttons[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_APPLICATION_UNINSTALL;
+                result.installed_app_index = index;
                 return result;
             }
         }

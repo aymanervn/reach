@@ -428,6 +428,8 @@ static reach_result reach_search_retriever_result_at(const reach_search_provider
     reach_copy_utf16(out_result->path, REACH_SEARCH_RESULT_PATH_CAPACITY, candidate->path);
     reach_copy_utf16(out_result->arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY,
                      candidate->arguments);
+    reach_copy_utf16(out_result->app_user_model_id, REACH_SEARCH_RESULT_PATH_CAPACITY,
+                     candidate->app_user_model_id);
     out_result->kind = candidate->kind;
     out_result->is_directory = candidate->is_directory;
     out_result->score = candidate->score;

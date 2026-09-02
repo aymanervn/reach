@@ -656,6 +656,150 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
     }
 }
 
+static void render_installed_app_button(const reach_settings_render_input *input,
+                                        reach_render_command_buffer *commands,
+                                        reach_rect_f32 bounds, const uint16_t *label,
+                                        reach_color color)
+{
+    reach_settings_push_rect(commands, bounds,
+                             reach_settings_scale(input, input->theme->radius_small), color);
+    reach_settings_push_text(commands, bounds, label,
+                             reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                             REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
+                             input->theme->settings_text, 1);
+}
+
+static void render_installed_apps_page(const reach_settings_render_input *input,
+                                       reach_render_command_buffer *commands)
+{
+    const reach_settings_model *model = input->model;
+    const reach_settings_layout *layout = input->layout;
+    uint16_t summary[160] = {};
+    append_number(summary, 160, model->installed_apps.count);
+    append_text(summary, 160,
+                model->installed_apps.count == 1
+                    ? (const uint16_t *)u" application registered with Windows"
+                    : (const uint16_t *)u" applications registered with Windows");
+    reach_settings_push_text(commands, layout->installed_apps_summary, summary,
+                             reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
+                             REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+                             input->theme->settings_secondary_text, 1);
+
+    if (model->installed_apps_status != REACH_SETTINGS_APPLICATIONS_STATUS_NONE)
+    {
+        reach_color color = model->installed_apps_status >= REACH_SETTINGS_APPLICATIONS_STATUS_FAILED
+                                ? input->theme->settings_status_error
+                                : input->theme->settings_secondary_text;
+        reach_settings_push_text(
+            commands, layout->installed_apps_summary,
+            reach_settings_installed_apps_status_message(model->installed_apps_status),
+            reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+            REACH_TEXT_ALIGNMENT_TRAILING, color, 1);
+    }
+
+    if (layout->installed_app_row_count == 0)
+    {
+        reach_settings_push_text(
+            commands, layout->installed_apps_viewport,
+            model->installed_apps_loaded ? (const uint16_t *)u"No launchable applications found"
+                                         : (const uint16_t *)u"Reading applications...",
+            reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
+            REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
+        return;
+    }
+
+    reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_BLUE);
+    reach_color action = reach_settings_color_with_alpha(accent, 0.30f);
+    reach_color destructive = reach_settings_color_with_alpha(
+        input->theme->settings_status_error, 0.30f);
+    reach_render_command_buffer_set_scissor(commands, layout->installed_apps_viewport);
+    for (size_t index = 0; index < layout->installed_app_row_count; ++index)
+    {
+        const reach_installed_app *entry = &model->installed_apps.entries[index];
+        reach_rect_f32 row = layout->installed_app_rows[index];
+        reach_settings_push_rect(commands, row,
+                                 reach_settings_scale(input, input->theme->radius_small),
+                                 input->theme->settings_card_background);
+
+        float icon_size = reach_settings_scale(input, 36.0f);
+        reach_rect_f32 icon_box = {row.x + reach_settings_scale(input, 14.0f),
+                                   row.y + (row.height - icon_size) * 0.5f, icon_size, icon_size};
+        reach_settings_push_rect(commands, icon_box,
+                                 reach_settings_scale(input, input->theme->radius_small),
+                                 input->theme->settings_icon_box_background);
+        if (model->installed_app_icons[index] != 0)
+        {
+            float inset = reach_settings_scale(input, 6.0f);
+            reach_settings_push_app_icon(commands,
+                                         {icon_box.x + inset, icon_box.y + inset,
+                                          icon_box.width - inset * 2.0f,
+                                          icon_box.height - inset * 2.0f},
+                                         model->installed_app_icons[index], 1.0f);
+        }
+        else
+        {
+            reach_settings_push_icon(commands, icon_box, input->theme->settings_secondary_text,
+                                     REACH_VECTOR_ICON_EXECUTABLE, 0.26f);
+        }
+
+        float text_x = icon_box.x + icon_box.width + reach_settings_scale(input, 14.0f);
+        float text_right = layout->installed_app_open_buttons[index].x -
+                           reach_settings_scale(input, 14.0f);
+        float text_width = text_right > text_x ? text_right - text_x : 0.0f;
+        reach_settings_push_text(commands,
+                                 {text_x, row.y + reach_settings_scale(input, 13.0f), text_width,
+                                  reach_settings_scale(input, 19.0f)},
+                                 entry->display_name,
+                                 reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
+                                 REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+                                 input->theme->settings_text, 1);
+        uint16_t detail[260] = {};
+        append_text(detail, 260, entry->publisher);
+        if (entry->publisher[0] != 0 && entry->version[0] != 0)
+        {
+            append_text(detail, 260, (const uint16_t *)u"  ·  ");
+        }
+        append_text(detail, 260, entry->version);
+        if (detail[0] == 0)
+        {
+            append_text(detail, 260,
+                        entry->kind == REACH_INSTALLED_APP_PACKAGED
+                            ? (const uint16_t *)u"Windows application"
+                            : (const uint16_t *)u"Desktop application");
+        }
+        reach_settings_push_text(commands,
+                                 {text_x, row.y + reach_settings_scale(input, 38.0f), text_width,
+                                  reach_settings_scale(input, 15.0f)},
+                                 detail, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                                 REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+                                 input->theme->settings_secondary_text, 1);
+
+        render_installed_app_button(input, commands, layout->installed_app_open_buttons[index],
+                                    (const uint16_t *)u"Open", action);
+        if (entry->can_manage)
+        {
+            render_installed_app_button(input, commands,
+                                        layout->installed_app_manage_buttons[index],
+                                        (const uint16_t *)u"Options", action);
+        }
+        if (entry->can_uninstall)
+        {
+            render_installed_app_button(input, commands,
+                                        layout->installed_app_uninstall_buttons[index],
+                                        (const uint16_t *)u"Uninstall", destructive);
+        }
+    }
+    reach_render_command_buffer_clear_scissor(commands);
+
+    if (layout->installed_apps_scrollbar_thumb.height > 0.0f)
+    {
+        reach_scrollbar_build_render_commands(
+            layout->installed_apps_scrollbar_track, layout->installed_apps_scrollbar_thumb,
+            {0.0f, 0.0f, 0.0f, 0.0f}, input->theme->settings_scrollbar_track,
+            input->theme->settings_scrollbar_thumb, commands);
+    }
+}
+
 static void build_reach_version_line(const reach_settings_model *model, uint16_t *text,
                                      size_t capacity)
 {
@@ -1019,6 +1163,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         render_display_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS)
         render_startup_apps_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_APPLICATIONS)
+        render_installed_apps_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_WIFI)
         reach_settings_render_wifi_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_BLUETOOTH)

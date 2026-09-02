@@ -13,6 +13,7 @@
 #include "reach/ports/explorer_service.h"
 #include "reach/ports/icon_provider.h"
 #include "reach/ports/input_language.h"
+#include "reach/ports/installed_apps.h"
 #include "reach/ports/input_source.h"
 #include "reach/ports/media_controls.h"
 #include "reach/ports/monitor.h"
@@ -126,6 +127,8 @@ extern "C"
     reach_result reach_windows_create_user_account(reach_user_account_port *out_port);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
     reach_result reach_windows_create_startup_apps(reach_startup_apps_port *out_port);
+    reach_result reach_windows_create_installed_apps(reach_installed_apps_port *out_port);
+    reach_result reach_windows_collect_installed_apps(reach_installed_app_list *out_list);
     size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
                                               size_t capacity);
     reach_result reach_windows_collect_taskbar_pins(reach_pinned_app_model *out_pins,
