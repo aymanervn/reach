@@ -155,6 +155,8 @@ int main()
     results[0].name[0] = 'a';
     results[0].kind = REACH_SEARCH_RESULT_APP;
     fill_ascii(results[0].path, REACH_SEARCH_RESULT_PATH_CAPACITY, "C:/apps/a.exe");
+    fill_ascii(results[0].app_user_model_id, REACH_SEARCH_RESULT_PATH_CAPACITY,
+               "Example.Package_test!App");
     results[1].name[0] = 'b';
     results[1].kind = REACH_SEARCH_RESULT_FILE;
     fill_ascii(results[1].path, REACH_SEARCH_RESULT_PATH_CAPACITY, "C:/docs/b.txt");
@@ -251,6 +253,8 @@ int main()
     failed += expect(entered.action.target.kind == REACH_FEATURE_TARGET_APP);
     failed +=
         expect(reach_test_utf16_equals_ascii(entered.action.target.path, "C:/apps/a.exe"));
+    failed += expect(reach_test_utf16_equals_ascii(entered.action.target.app_user_model_id,
+                                                   "Example.Package_test!App"));
     failed +=
         expect((entered.action.flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0);
 

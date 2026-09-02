@@ -15,6 +15,8 @@ const uint16_t *reach_settings_wifi_page_placeholder(void);
 const uint16_t *reach_settings_bluetooth_page_placeholder(void);
 const uint16_t *reach_settings_account_page_placeholder(void);
 const uint16_t *reach_settings_startup_apps_page_placeholder(void);
+const uint16_t *reach_settings_installed_apps_page_title(void);
+const uint16_t *reach_settings_installed_apps_page_placeholder(void);
 const uint16_t *reach_settings_power_sleep_page_placeholder(void);
 const uint16_t *reach_settings_display_page_placeholder(void);
 

@@ -9,6 +9,7 @@
 #include "reach/ports/image_loader.h"
 #include "reach/ports/clock.h"
 #include "reach/ports/input_language.h"
+#include "reach/ports/installed_apps.h"
 #include "reach/ports/screen_hotspot.h"
 #include "reach/ports/foreground_watcher.h"
 #include "reach/ports/explorer_service.h"
@@ -90,6 +91,8 @@ extern "C"
     reach_result reach_windows_notify_config_changed(void);
 
     reach_result reach_windows_create_startup_apps(reach_startup_apps_port *out_port);
+    reach_result reach_windows_create_installed_apps(reach_installed_apps_port *out_port);
+    reach_result reach_windows_collect_installed_apps(reach_installed_app_list *out_list);
     size_t reach_windows_collect_startup_apps(reach_app_launch_request *out_requests,
                                               size_t capacity);
     reach_result reach_windows_collect_taskbar_pins(reach_pinned_app_model *out_pins,

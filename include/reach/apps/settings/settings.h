@@ -8,6 +8,7 @@
 #include "reach/core/bluetooth.h"
 #include "reach/core/config.h"
 #include "reach/core/loader.h"
+#include "reach/core/installed_apps.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/scrollbar.h"
 #include "reach/features/common/pressable.h"
@@ -24,7 +25,7 @@ extern "C"
 {
 #endif
 
-#define REACH_SETTINGS_NAV_ITEM_COUNT 7
+#define REACH_SETTINGS_NAV_ITEM_COUNT 8
 #define REACH_SETTINGS_POWER_TIMER_COUNT 5
 #define REACH_SETTINGS_POWER_OPTION_COUNT 6
 #define REACH_SETTINGS_POWER_PRESET_COUNT (REACH_SETTINGS_POWER_OPTION_COUNT - 1)
@@ -57,7 +58,8 @@ extern "C"
         REACH_SETTINGS_PAGE_STARTUP_APPS = 3,
         REACH_SETTINGS_PAGE_POWER_SLEEP = 4,
         REACH_SETTINGS_PAGE_DISPLAY = 5,
-        REACH_SETTINGS_PAGE_UPDATE = 6
+        REACH_SETTINGS_PAGE_UPDATE = 6,
+        REACH_SETTINGS_PAGE_APPLICATIONS = 7
     } reach_settings_page;
 
     typedef enum reach_settings_hit_type
@@ -86,6 +88,9 @@ extern "C"
         REACH_SETTINGS_HIT_STARTUP_TOGGLE,
         REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK,
         REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB,
+        REACH_SETTINGS_HIT_APPLICATION_OPEN,
+        REACH_SETTINGS_HIT_APPLICATION_MANAGE,
+        REACH_SETTINGS_HIT_APPLICATION_UNINSTALL,
         REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE,
         REACH_SETTINGS_HIT_WIFI_SCAN,
         REACH_SETTINGS_HIT_WIFI_ADD,
@@ -122,6 +127,14 @@ extern "C"
         REACH_SETTINGS_STARTUP_STATUS_LOADING,
         REACH_SETTINGS_STARTUP_STATUS_FAILED
     } reach_settings_startup_status;
+
+    typedef enum reach_settings_applications_status
+    {
+        REACH_SETTINGS_APPLICATIONS_STATUS_NONE = 0,
+        REACH_SETTINGS_APPLICATIONS_STATUS_LOADING,
+        REACH_SETTINGS_APPLICATIONS_STATUS_FAILED,
+        REACH_SETTINGS_APPLICATIONS_STATUS_ACTION_FAILED
+    } reach_settings_applications_status;
 
     typedef enum reach_settings_account_status
     {
@@ -244,6 +257,12 @@ extern "C"
         int32_t startup_loaded;
         int32_t startup_busy;
         int32_t startup_status;
+        reach_installed_app_list installed_apps;
+        uint64_t installed_app_icons[REACH_INSTALLED_APP_MAX_ENTRIES];
+        reach_scrollbar_model installed_apps_scrollbar;
+        int32_t installed_apps_loaded;
+        int32_t installed_apps_busy;
+        int32_t installed_apps_status;
         int32_t display_high_refresh_rate;
         reach_animation_track display_fps_track;
         reach_animation_manager display_fps_animation;
@@ -360,6 +379,16 @@ extern "C"
         reach_rect_f32 startup_toggles[REACH_STARTUP_APP_MAX_ENTRIES];
         size_t startup_row_count;
         float startup_content_height;
+        reach_rect_f32 installed_apps_summary;
+        reach_rect_f32 installed_apps_viewport;
+        reach_rect_f32 installed_apps_scrollbar_track;
+        reach_rect_f32 installed_apps_scrollbar_thumb;
+        reach_rect_f32 installed_app_rows[REACH_INSTALLED_APP_MAX_ENTRIES];
+        reach_rect_f32 installed_app_open_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
+        reach_rect_f32 installed_app_manage_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
+        reach_rect_f32 installed_app_uninstall_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
+        size_t installed_app_row_count;
+        float installed_apps_content_height;
         reach_rect_f32 display_fps_card;
         reach_rect_f32 display_fps_icon;
         reach_rect_f32 display_fps_title;
@@ -462,6 +491,7 @@ extern "C"
         size_t power_custom_field;
         size_t account_field;
         size_t startup_index;
+        size_t installed_app_index;
         reach_config_theme_preference display_theme_preference;
         size_t wifi_index;
         size_t wifi_security_option;
@@ -548,6 +578,16 @@ extern "C"
     int32_t reach_settings_model_tick_startup_animations(reach_settings_model *model,
                                                          double delta_seconds);
     int32_t reach_settings_model_startup_animations_active(const reach_settings_model *model);
+
+    void reach_settings_model_apply_installed_apps(reach_settings_model *model,
+                                                    const reach_installed_app_list *list);
+    void reach_settings_model_set_installed_apps_busy(reach_settings_model *model, int32_t busy);
+    void reach_settings_model_set_installed_apps_status(reach_settings_model *model,
+                                                        int32_t status);
+    const uint16_t *reach_settings_installed_apps_status_message(int32_t status);
+    void reach_settings_model_scroll_installed_apps(reach_settings_model *model, float delta);
+    int32_t reach_settings_model_installed_apps_scroll(reach_settings_model *model,
+                                                       double delta_seconds);
 
     void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int32_t enabled);
     int32_t reach_settings_model_high_refresh_rate(const reach_settings_model *model);

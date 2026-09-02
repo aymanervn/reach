@@ -68,6 +68,8 @@ static void reach_search_service_query(reach_search_service *service, const uint
                              result.path);
             reach_copy_utf16(out_results[write_index].arguments,
                              REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY, result.arguments);
+            reach_copy_utf16(out_results[write_index].app_user_model_id,
+                             REACH_SEARCH_RESULT_PATH_CAPACITY, result.app_user_model_id);
             out_results[write_index].kind = result.kind;
             out_results[write_index].is_directory = result.is_directory;
             out_results[write_index].score = result.score;

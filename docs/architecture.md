@@ -772,6 +772,23 @@ Both pages render as an accordion: one row expands in place, driven by one anima
 row, and every action lives inside the expanded row, so neither page opens a popup. The Wi-Fi
 "Known networks" view is a sub-view of the same page, not an eighth nav row.
 
+### Installed applications (Settings and Launcher)
+
+Launchable applications registered with Windows come from one Windows adapter over the
+`shell:AppsFolder` namespace. The adapter preserves each entry's AppUserModelID and maps packaged
+entries to the current user's PackageManager records, including package family, full package name,
+publisher, and version. Reach never reads or executes files from the protected `WindowsApps`
+directory; packaged launches use `IApplicationActivationManager`, with the AppsFolder parsing path
+retained as a shell fallback for desktop entries that publish an AppUserModelID but are not MSIX.
+
+The Launcher search catalog consumes the same adapter projection and carries the AppUserModelID
+through search results and feature targets. The standalone Settings app consumes it through
+`reach_installed_apps_service`, whose worker serializes refresh, open, uninstall, and management
+commands and publishes snapshots to the UI tick. Current-user packaged uninstall uses the OS
+PackageManager API. Repair and reset are not reimplemented: the Applications page opens the
+package's Windows Advanced options page, because Settings-equivalent direct repair belongs to the
+Windows App SDK PackageDeploymentManager and Reach does not deploy that runtime.
+
 ## tools
 
 The executables — reach shell, Reach Service, watchdog, reachctl, update helper,

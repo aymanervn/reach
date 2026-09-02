@@ -5,6 +5,7 @@
 #include "reach/platform/windows_adapters.h"
 #include "reach/services/bluetooth.h"
 #include "reach/services/config.h"
+#include "reach/services/installed_apps.h"
 #include "reach/services/system_status.h"
 #include "reach/services/wifi.h"
 
@@ -120,6 +121,7 @@ struct reach_settings_app
     reach_system_status *system_status;
     reach_wifi_service *wifi_service;
     reach_bluetooth_service *bluetooth_service;
+    reach_installed_apps_service *installed_apps_service;
     std::atomic<int32_t> radio_notify;
     std::atomic<uint32_t> system_controls_change_flags;
     reach_settings_model model;
@@ -132,6 +134,8 @@ struct reach_settings_app
     reach_settings_startup_worker startup_worker;
     reach_icon_handle startup_icon_handles[REACH_STARTUP_APP_MAX_ENTRIES];
     size_t startup_icon_count;
+    reach_icon_handle installed_app_icon_handles[REACH_INSTALLED_APP_MAX_ENTRIES];
+    size_t installed_app_icon_count;
     reach_icon_handle bluetooth_icon_handles[REACH_BLUETOOTH_MAX_DEVICES];
     size_t bluetooth_icon_count;
     uint16_t app_update_zip[260];
@@ -1234,6 +1238,67 @@ static void reach_settings_load_startup_icons(reach_settings_app *app)
     }
 }
 
+static void reach_settings_release_installed_app_icons(reach_settings_app *app)
+{
+    if (app->icon_provider.ops.release != nullptr)
+    {
+        for (size_t index = 0; index < app->installed_app_icon_count; ++index)
+        {
+            if (app->installed_app_icon_handles[index].id != 0)
+            {
+                (void)app->icon_provider.ops.release(app->icon_provider.provider,
+                                                     app->installed_app_icon_handles[index]);
+            }
+        }
+    }
+    memset(app->installed_app_icon_handles, 0, sizeof(app->installed_app_icon_handles));
+    app->installed_app_icon_count = 0;
+}
+
+static void reach_settings_load_installed_app_icons(reach_settings_app *app)
+{
+    reach_settings_release_installed_app_icons(app);
+    if (app->icon_provider.ops.load == nullptr)
+    {
+        return;
+    }
+    app->installed_app_icon_count = app->model.installed_apps.count;
+    for (size_t index = 0; index < app->installed_app_icon_count; ++index)
+    {
+        const reach_installed_app *entry = &app->model.installed_apps.entries[index];
+        reach_icon_request request = {};
+        request.size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
+        reach_copy_utf16(request.path, 260, entry->icon_ref);
+        reach_icon_handle handle = {};
+        if (entry->icon_ref[0] != 0 &&
+            app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) == REACH_OK)
+        {
+            app->installed_app_icon_handles[index] = handle;
+            app->model.installed_app_icons[index] = handle.id;
+        }
+    }
+}
+
+static void reach_settings_apply_installed_apps_snapshot(reach_settings_app *app)
+{
+    std::unique_ptr<reach_installed_apps_snapshot> snapshot(
+        new (std::nothrow) reach_installed_apps_snapshot());
+    if (snapshot == nullptr || app->installed_apps_service == nullptr ||
+        !reach_installed_apps_service_take(app->installed_apps_service, snapshot.get()))
+    {
+        return;
+    }
+    reach_settings_model_apply_installed_apps(&app->model, &snapshot->apps);
+    reach_settings_load_installed_app_icons(app);
+    if (snapshot->completed_command != REACH_INSTALLED_APPS_COMMAND_REFRESH &&
+        !snapshot->command_succeeded)
+    {
+        reach_settings_model_set_installed_apps_status(
+            &app->model, REACH_SETTINGS_APPLICATIONS_STATUS_ACTION_FAILED);
+    }
+    app->dirty = 1;
+}
+
 static void reach_settings_apply_startup_result(reach_settings_app *app)
 {
     reach_settings_startup_worker *worker = &app->startup_worker;
@@ -1341,6 +1406,54 @@ static void reach_settings_enter_bluetooth_page(reach_settings_app *app)
     }
     reach_settings_request_bluetooth_radio(app);
     reach_bluetooth_service_refresh(app->bluetooth_service);
+    app->dirty = 1;
+}
+
+static void reach_settings_enter_applications_page(reach_settings_app *app)
+{
+    if (app->installed_apps_service == nullptr)
+    {
+        reach_settings_model_set_installed_apps_status(
+            &app->model, REACH_SETTINGS_APPLICATIONS_STATUS_FAILED);
+        return;
+    }
+    reach_settings_model_set_installed_apps_busy(&app->model, 1);
+    reach_settings_model_set_installed_apps_status(
+        &app->model, REACH_SETTINGS_APPLICATIONS_STATUS_LOADING);
+    reach_installed_apps_service_refresh(app->installed_apps_service);
+    app->dirty = 1;
+}
+
+static void reach_settings_handle_applications_action(reach_settings_app *app,
+                                                       reach_settings_hit_result hit)
+{
+    if (app->installed_apps_service == nullptr || app->model.installed_apps_busy ||
+        hit.installed_app_index >= app->model.installed_apps.count)
+    {
+        return;
+    }
+    const reach_installed_app *entry =
+        &app->model.installed_apps.entries[hit.installed_app_index];
+    if (hit.type == REACH_SETTINGS_HIT_APPLICATION_OPEN && entry->can_open)
+    {
+        reach_installed_apps_service_open(app->installed_apps_service, hit.installed_app_index);
+    }
+    else if (hit.type == REACH_SETTINGS_HIT_APPLICATION_MANAGE && entry->can_manage)
+    {
+        reach_installed_apps_service_manage(app->installed_apps_service, hit.installed_app_index);
+    }
+    else if (hit.type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL && entry->can_uninstall)
+    {
+        reach_installed_apps_service_uninstall(app->installed_apps_service,
+                                               hit.installed_app_index);
+    }
+    else
+    {
+        return;
+    }
+    reach_settings_model_set_installed_apps_busy(&app->model, 1);
+    reach_settings_model_set_installed_apps_status(&app->model,
+                                                   REACH_SETTINGS_APPLICATIONS_STATUS_LOADING);
     app->dirty = 1;
 }
 
@@ -1559,6 +1672,9 @@ static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
     return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
            type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_REACH_UPDATE ||
            type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD ||
+           type == REACH_SETTINGS_HIT_APPLICATION_OPEN ||
+           type == REACH_SETTINGS_HIT_APPLICATION_MANAGE ||
+           type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL ||
            type == REACH_SETTINGS_HIT_WIFI_SCAN || type == REACH_SETTINGS_HIT_WIFI_ADD ||
            type == REACH_SETTINGS_HIT_WIFI_KNOWN || type == REACH_SETTINGS_HIT_WIFI_BACK ||
            type == REACH_SETTINGS_HIT_WIFI_SHOW_KEY || type == REACH_SETTINGS_HIT_WIFI_CONNECT ||
@@ -1599,6 +1715,11 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
         break;
     case REACH_SETTINGS_HIT_STARTUP_TOGGLE:
         detail = (uint32_t)hit.startup_index;
+        break;
+    case REACH_SETTINGS_HIT_APPLICATION_OPEN:
+    case REACH_SETTINGS_HIT_APPLICATION_MANAGE:
+    case REACH_SETTINGS_HIT_APPLICATION_UNINSTALL:
+        detail = (uint32_t)hit.installed_app_index;
         break;
     case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME:
     case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME:
@@ -1897,6 +2018,10 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         {
             reach_settings_enter_bluetooth_page(app);
         }
+        else if (hit.page == REACH_SETTINGS_PAGE_APPLICATIONS)
+        {
+            reach_settings_enter_applications_page(app);
+        }
         app->dirty = 1;
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_WIFI)
@@ -1906,6 +2031,10 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_BLUETOOTH)
     {
         reach_settings_handle_bluetooth_action(app, hit);
+    }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_APPLICATIONS)
+    {
+        reach_settings_handle_applications_action(app, hit);
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_UPDATE)
     {
@@ -2366,6 +2495,15 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         app->dirty = 1;
     }
     else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
+             app->model.selected_page == REACH_SETTINGS_PAGE_APPLICATIONS &&
+             event->wheel_delta != 0)
+    {
+        reach_settings_model_scroll_installed_apps(
+            &app->model, event->wheel_delta > 0 ? -86.0f * reach_settings_app_scale(app)
+                                                : 86.0f * reach_settings_app_scale(app));
+        app->dirty = 1;
+    }
+    else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
              app->model.selected_page == REACH_SETTINGS_PAGE_WIFI && event->wheel_delta != 0)
     {
         reach_settings_model_scroll_wifi(&app->model, event->wheel_delta > 0
@@ -2441,6 +2579,31 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     (void)reach_windows_create_app_update(&app->app_update);
     (void)reach_windows_create_startup_apps(&app->startup_apps);
     (void)reach_windows_create_icon_provider(&app->icon_provider);
+    reach_installed_apps_port installed_apps_port = {};
+    reach_app_launcher_port installed_apps_launcher = {};
+    reach_result installed_apps_result =
+        reach_windows_create_installed_apps(&installed_apps_port);
+    if (installed_apps_result == REACH_OK)
+    {
+        installed_apps_result = reach_windows_create_app_launcher(&installed_apps_launcher);
+    }
+    if (installed_apps_result == REACH_OK)
+    {
+        installed_apps_result = reach_installed_apps_service_create(
+            installed_apps_port, installed_apps_launcher, reach_settings_radio_notify, app,
+            &app->installed_apps_service);
+    }
+    if (installed_apps_result != REACH_OK)
+    {
+        if (installed_apps_port.ops.destroy != nullptr)
+        {
+            installed_apps_port.ops.destroy(installed_apps_port.apps);
+        }
+        if (installed_apps_launcher.ops.destroy != nullptr)
+        {
+            installed_apps_launcher.ops.destroy(installed_apps_launcher.launcher);
+        }
+    }
     (void)reach_windows_create_system_controls(&app->system_controls);
     reach_audio_volume_port settings_audio_volume = {};
     (void)reach_system_status_create(settings_audio_volume, app->system_controls,
@@ -2538,6 +2701,7 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     reach_settings_apply_reach_progress(app);
     reach_settings_apply_reach_result(app);
     reach_settings_apply_startup_result(app);
+    reach_settings_apply_installed_apps_snapshot(app);
     uint32_t system_changes = app->system_controls_change_flags.exchange(0);
     if ((system_changes & REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH) != 0)
     {
@@ -2562,6 +2726,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
         app->dirty = 1;
     }
     if (reach_settings_model_bluetooth_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_installed_apps_scroll(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -2682,6 +2850,8 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            worker->completed || app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
            app->model.startup_scrollbar.offset != app->model.startup_scrollbar.target ||
+           app->model.installed_apps_scrollbar.offset !=
+               app->model.installed_apps_scrollbar.target ||
            app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
            reach_settings_model_startup_animations_active(&app->model) ||
            reach_settings_model_power_animations_active(&app->model) ||
@@ -2694,6 +2864,7 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_system_status_system_pending(app->system_status) ||
            reach_wifi_service_pending(app->wifi_service) ||
            reach_bluetooth_service_pending(app->bluetooth_service) ||
+           reach_installed_apps_service_pending(app->installed_apps_service) ||
            app->model.wifi_scrollbar.offset != app->model.wifi_scrollbar.target ||
            app->model.bluetooth_scrollbar.offset != app->model.bluetooth_scrollbar.target ||
            app->wifi_scrollbar_drag.active || app->bluetooth_scrollbar_drag.active ||
@@ -2794,6 +2965,9 @@ void reach_settings_app_destroy(reach_settings_app *app)
         app->system_controls.destroy(app->system_controls.userdata);
     }
     reach_settings_release_startup_icons(app);
+    reach_settings_release_installed_app_icons(app);
+    reach_installed_apps_service_destroy(app->installed_apps_service);
+    app->installed_apps_service = nullptr;
     if (app->startup_apps.ops.destroy != nullptr)
     {
         app->startup_apps.ops.destroy(app->startup_apps.apps);

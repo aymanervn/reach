@@ -73,6 +73,7 @@ add_library(reach_services STATIC
     src/services/search.cpp
     src/services/clock.cpp
     src/services/input_language.cpp
+    src/services/installed_apps.cpp
     src/services/system_stats.cpp
     src/services/system_status.cpp
     src/services/tray.cpp
@@ -199,6 +200,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/icon_shell.cpp
     src/adapters/windows/windows_icon_handle.cpp
     src/adapters/windows/input_language_win32.cpp
+    src/adapters/windows/installed_apps_win32.cpp
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/media_controls_win32.cpp
     src/adapters/windows/config_ini.cpp
@@ -370,6 +372,7 @@ add_library(reach_settings_feature STATIC
     src/apps/settings/feature/settings_bluetooth_layout.cpp
     src/apps/settings/feature/settings_bluetooth_render.cpp
     src/apps/settings/feature/settings_feature.cpp
+    src/apps/settings/feature/settings_installed_apps.cpp
     src/apps/settings/feature/settings_monitors_scaling.cpp
     src/apps/settings/feature/settings_power_sleep.cpp
     src/apps/settings/feature/settings_render.cpp
@@ -989,6 +992,16 @@ add_executable(reach_system_status_tests
     tests/system_status_tests.cpp
 )
 
+add_executable(reach_installed_apps_service_tests
+    tests/installed_apps_service_tests.cpp
+)
+reach_configure_common(reach_installed_apps_service_tests)
+target_compile_features(reach_installed_apps_service_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_installed_apps_service_tests PRIVATE
+    reach_services
+    reach_support
+)
+
 reach_configure_common(reach_system_status_tests)
 target_compile_features(reach_system_status_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_system_status_tests PRIVATE
@@ -1021,6 +1034,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_quick_settings_feature_tests COMMAND reach_quick_settings_feature_tests)
     add_test(NAME reach_battery_feature_tests COMMAND reach_battery_feature_tests)
     add_test(NAME reach_system_status_tests COMMAND reach_system_status_tests)
+    add_test(NAME reach_installed_apps_service_tests COMMAND reach_installed_apps_service_tests)
     add_test(NAME reach_system_hud_feature_tests COMMAND reach_system_hud_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)

@@ -1132,7 +1132,7 @@ reach_feature_target reach_launcher_open_target(const reach_launcher *launcher)
         }
 
         const reach_search_candidate *search = &result->payload.search;
-        if (search->path[0] == 0)
+        if (search->path[0] == 0 && search->app_user_model_id[0] == 0)
         {
             return target;
         }
@@ -1140,6 +1140,8 @@ reach_feature_target reach_launcher_open_target(const reach_launcher *launcher)
                                                               : REACH_FEATURE_TARGET_PATH;
         target.path = search->path;
         target.arguments = search->arguments[0] != 0 ? search->arguments : nullptr;
+        target.app_user_model_id =
+            search->app_user_model_id[0] != 0 ? search->app_user_model_id : nullptr;
         return target;
     }
 
