@@ -231,7 +231,7 @@ static void test_order_preserved_and_new_groups_append(void)
                 "new group appends at the end");
 }
 
-static void test_same_path_different_aumid_stays_split(void)
+static void test_same_path_different_aumid_groups(void)
 {
     reach_dock_feature_model model = {};
     reach_dock_feature_model_init(&model);
@@ -241,11 +241,11 @@ static void test_same_path_different_aumid_stays_split(void)
         make_window(301, "C:\\apps\\brave.exe", "Brave._crx_abc"),
         make_window(302, "C:\\apps\\brave.exe", "Brave._crx_xyz"),
     };
-    uint32_t group_ids[2] = {7, 8};
+    uint32_t group_ids[2] = {7, 7};
     reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, windows, group_ids, 2, matches_thunk,
                                          nullptr);
 
-    expect_true(model.item_count == 2, "distinct group ids produce distinct items");
+    expect_true(model.item_count == 1, "shared executable produces one item");
 }
 
 /* The property the whole dock rests on: an entry describes an application, and being pinned is
@@ -670,7 +670,7 @@ int main(void)
     test_shortcut_pin_matches_executable();
     test_key_stable_when_representative_closes();
     test_order_preserved_and_new_groups_append();
-    test_same_path_different_aumid_stays_split();
+    test_same_path_different_aumid_groups();
     test_pinned_and_unpinned_entries_are_the_same_kind_of_thing();
     test_identity_survives_pinning_and_unpinning();
     test_capacity_keeps_all_pinned_and_running_groups();

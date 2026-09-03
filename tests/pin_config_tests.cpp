@@ -105,6 +105,21 @@ int main()
     failed += expect(changed == 0);
     failed += expect(defaults.pinned_app_count == 0);
 
+    static reach_config_snapshot duplicates = {};
+    duplicates.pinned_app_count = 2;
+    duplicates.pinned_apps[0].id = 1;
+    duplicates.pinned_apps[1].id = 2;
+    reach_copy_ascii_to_utf16(duplicates.pinned_apps[0].path, 260, "C:\\Apps\\browser.exe");
+    reach_copy_ascii_to_utf16(duplicates.pinned_apps[0].app_user_model_id, 260, "Browser.Main");
+    reach_copy_ascii_to_utf16(duplicates.pinned_apps[1].path, 260, "c:\\apps\\BROWSER.EXE");
+    reach_copy_ascii_to_utf16(duplicates.pinned_apps[1].app_user_model_id, 260, "Browser.Profile");
+    reach_copy_ascii_to_utf16(duplicates.pinned_apps[1].arguments, 260, "--profile");
+    failed += expect(reach_pin_config_ensure_defaults(&duplicates, &changed) == REACH_OK);
+    failed += expect(changed == 1);
+    failed += expect(duplicates.pinned_app_count == 1);
+    failed += expect(duplicates.pinned_apps[0].id == 1);
+    failed += expect(duplicates.pinned_apps[0].arguments[0] == '-');
+
     uint16_t first_path[260] = {};
     reach_copy_ascii_to_utf16(first_path, 260, "first.exe");
     failed += expect(reach_pin_config_pin_path(&defaults, first_path, &changed) == REACH_OK);

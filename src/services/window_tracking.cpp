@@ -1,5 +1,6 @@
 #include "reach/services/window_tracking.h"
 
+#include "reach/support/application_identity.h"
 #include "reach/support/util.h"
 
 #include <condition_variable>
@@ -173,23 +174,6 @@ reach_window_tracking_window_by_id(const reach_window_tracking *service, uintptr
     return nullptr;
 }
 
-static int32_t reach_window_tracking_nonempty_path_equals(const uint16_t *a, const uint16_t *b)
-{
-    return a != nullptr && b != nullptr && a[0] != 0 && b[0] != 0 && reach_path_equals(a, b);
-}
-
-int32_t reach_window_tracking_identity_equal(const uint16_t *path_a, const uint16_t *aumid_a,
-                                             const uint16_t *path_b, const uint16_t *aumid_b)
-{
-    int32_t aumid_a_set = aumid_a != nullptr && aumid_a[0] != 0;
-    int32_t aumid_b_set = aumid_b != nullptr && aumid_b[0] != 0;
-    if (aumid_a_set && aumid_b_set)
-    {
-        return reach_utf16_equal_ascii_case_insensitive(aumid_a, aumid_b);
-    }
-    return reach_window_tracking_nonempty_path_equals(path_a, path_b);
-}
-
 int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
                                                  const reach_window_snapshot *window)
 {
@@ -197,19 +181,8 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
     {
         return 0;
     }
-    if (app->app_user_model_id[0] != 0 && window->app_user_model_id[0] != 0 &&
-        reach_utf16_equal_ascii_case_insensitive(app->app_user_model_id,
-                                                 window->app_user_model_id))
-    {
-        return 1;
-    }
-    if (app->shortcut_path[0] != 0 &&
-        reach_window_tracking_nonempty_path_equals(app->path, window->path))
-    {
-        return 1;
-    }
-    return reach_window_tracking_identity_equal(app->path, app->app_user_model_id, window->path,
-                                                 window->app_user_model_id);
+    return reach_application_identity_equal(app->path, app->app_user_model_id, window->path,
+                                             window->app_user_model_id);
 }
 
 void reach_window_tracking_app_display_name(const reach_window_snapshot *window, uint16_t *out_name,
@@ -240,8 +213,36 @@ int32_t reach_window_tracking_windows_same_app(const reach_window_snapshot *a,
     {
         return 0;
     }
-    return reach_window_tracking_identity_equal(a->path, a->app_user_model_id, b->path,
-                                                b->app_user_model_id);
+    return reach_application_identity_equal(a->path, a->app_user_model_id, b->path,
+                                            b->app_user_model_id);
+}
+
+static size_t reach_window_tracking_group_root(size_t *parents, size_t index)
+{
+    while (parents[index] != index)
+    {
+        parents[index] = parents[parents[index]];
+        index = parents[index];
+    }
+    return index;
+}
+
+static void reach_window_tracking_group_union(size_t *parents, size_t a, size_t b)
+{
+    size_t root_a = reach_window_tracking_group_root(parents, a);
+    size_t root_b = reach_window_tracking_group_root(parents, b);
+    if (root_a == root_b)
+    {
+        return;
+    }
+    if (root_a < root_b)
+    {
+        parents[root_b] = root_a;
+    }
+    else
+    {
+        parents[root_a] = root_b;
+    }
 }
 
 const uint32_t *reach_window_tracking_window_group_ids(const reach_window_tracking *service)
@@ -464,38 +465,84 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         service->open_windows[out_index] = snapshot;
     }
 
+    size_t parents[REACH_MAX_OPEN_WINDOWS] = {};
+    uint32_t component_group_ids[REACH_MAX_OPEN_WINDOWS] = {};
     for (size_t index = 0; index < service->open_window_count; ++index)
     {
-        const reach_window_snapshot *window = &service->open_windows[index];
-        uint32_t group_id = 0;
-        for (size_t old_index = 0; old_index < old_count && group_id == 0; ++old_index)
+        parents[index] = index;
+    }
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        for (size_t prior = 0; prior < index; ++prior)
         {
-            if (old_windows[old_index].id == window->id)
+            if (reach_window_tracking_windows_same_app(&service->open_windows[index],
+                                                       &service->open_windows[prior]))
             {
-                group_id = old_group_ids[old_index];
+                reach_window_tracking_group_union(parents, index, prior);
             }
         }
-        for (size_t prior = 0; prior < index && group_id == 0; ++prior)
+    }
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        size_t root = reach_window_tracking_group_root(parents, index);
+        for (size_t old_index = 0; old_index < old_count; ++old_index)
         {
-            if (reach_window_tracking_windows_same_app(window, &service->open_windows[prior]))
+            if (old_windows[old_index].id != service->open_windows[index].id)
             {
-                group_id = service->group_ids[prior];
+                continue;
+            }
+            uint32_t old_group_id = old_group_ids[old_index];
+            if (component_group_ids[root] == 0 || old_group_id < component_group_ids[root])
+            {
+                component_group_ids[root] = old_group_id;
+            }
+            break;
+        }
+    }
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        size_t root = reach_window_tracking_group_root(parents, index);
+        for (size_t old_index = 0; old_index < old_count; ++old_index)
+        {
+            if (!reach_application_identity_equal(
+                    service->open_windows[index].path,
+                    service->open_windows[index].app_user_model_id, old_windows[old_index].path,
+                    old_windows[old_index].app_user_model_id))
+            {
+                continue;
+            }
+            uint32_t old_group_id = old_group_ids[old_index];
+            if (component_group_ids[root] == 0 || old_group_id < component_group_ids[root])
+            {
+                component_group_ids[root] = old_group_id;
             }
         }
-        for (size_t old_index = 0; old_index < old_count && group_id == 0; ++old_index)
+    }
+    for (size_t root = 0; root < service->open_window_count; ++root)
+    {
+        if (reach_window_tracking_group_root(parents, root) != root ||
+            component_group_ids[root] == 0)
         {
-            if (reach_window_tracking_identity_equal(window->path, window->app_user_model_id,
-                                                     old_windows[old_index].path,
-                                                     old_windows[old_index].app_user_model_id))
+            continue;
+        }
+        for (size_t prior = 0; prior < root; ++prior)
+        {
+            if (reach_window_tracking_group_root(parents, prior) == prior &&
+                component_group_ids[prior] == component_group_ids[root])
             {
-                group_id = old_group_ids[old_index];
+                component_group_ids[root] = 0;
+                break;
             }
         }
-        if (group_id == 0)
+    }
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        size_t root = reach_window_tracking_group_root(parents, index);
+        if (component_group_ids[root] == 0)
         {
-            group_id = service->next_group_id++;
+            component_group_ids[root] = service->next_group_id++;
         }
-        service->group_ids[index] = group_id;
+        service->group_ids[index] = component_group_ids[root];
     }
 
     int32_t changed = old_count != service->open_window_count;
