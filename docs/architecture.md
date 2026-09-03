@@ -80,10 +80,12 @@ its icon fallback from the executable path and never treats config as a live lab
 `reachctl` creates `reach.ini`, it imports the current Windows taskbar order once, including
 shortcut arguments, original shortcut paths, resolved executable paths, and application
 identities. Existing configuration is never overwritten, and an empty pin list remains empty.
-Dock matching prefers application identity and uses the resolved executable only as a fallback
-for shortcut-backed pins. The original shortcut remains the launch and icon source. Packaged
-pins launch through their application identity; Reach never needs access to their protected
-installation directory. Now Playing
+Application identity is shared across pin import, pin mutation, window tracking, and Dock
+reconciliation: two records match when either their nonempty normalized executable paths or their
+nonempty AppUserModelIDs match. Window tracking closes transitive matches into deterministic
+application groups. The original shortcut remains the launch and icon source. Packaged pins launch
+through their application identity; Reach never needs access to their protected installation
+directory. Now Playing
 publishes atomic core media generations immediately, enriches them with the latest
 generation's cover asynchronously, owns transport serialization and cover lifetime,
 and masks every transport control while a command is settling. A new core generation

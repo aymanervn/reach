@@ -34,9 +34,7 @@ extern "C"
 #define REACH_DOCK_MAX_INSTANCES 16
 
     /* One entry per application on the dock. Pinned and running are properties of an entry, not
-       different kinds of entry, so every icon carries the same information and behaves the same.
-       Identity is the (path, app_user_model_id) pair window tracking already uses, which is why a
-       key survives an app being pinned, unpinned, or reissued a pin id by the config store. */
+       different kinds of entry, so every icon carries the same information and behaves the same. */
     typedef struct reach_dock_item_model
     {
         uint32_t key;

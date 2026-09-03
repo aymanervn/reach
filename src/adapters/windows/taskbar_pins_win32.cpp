@@ -2,6 +2,8 @@
 #include "shortcut_win32.h"
 #include "taskbar_pin_blob.h"
 
+#include "reach/support/application_identity.h"
+
 #include <windows.h>
 #include <propsys.h>
 #include <propkey.h>
@@ -15,12 +17,8 @@
 static int32_t reach_taskbar_pin_same(const reach_pinned_app_model *a,
                                       const reach_pinned_app_model *b)
 {
-    if (a->app_user_model_id[0] != 0 && b->app_user_model_id[0] != 0)
-    {
-        return lstrcmpiW(reinterpret_cast<const wchar_t *>(a->app_user_model_id),
-                         reinterpret_cast<const wchar_t *>(b->app_user_model_id)) == 0;
-    }
-    return a->path[0] != 0 && b->path[0] != 0 && reach_path_equals(a->path, b->path);
+    return reach_application_identity_equal(a->path, a->app_user_model_id, b->path,
+                                            b->app_user_model_id);
 }
 
 static void reach_taskbar_copy_shell_string(IShellItem2 *item, REFPROPERTYKEY key,

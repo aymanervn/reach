@@ -1,5 +1,7 @@
 #include "reach/features/dock.h"
 
+#include "reach/support/application_identity.h"
+
 void reach_dock_feature_model_init(reach_dock_feature_model *model)
 {
     if (model == nullptr)
@@ -13,9 +15,8 @@ void reach_dock_feature_model_init(reach_dock_feature_model *model)
 int32_t reach_dock_item_identity_equal(const reach_dock_item_model *item, const uint16_t *path,
                                        const uint16_t *app_user_model_id)
 {
-    return item != nullptr && reach_window_tracking_identity_equal(item->path,
-                                                                   item->app_user_model_id, path,
-                                                                   app_user_model_id);
+    return item != nullptr && reach_application_identity_equal(
+                                  item->path, item->app_user_model_id, path, app_user_model_id);
 }
 
 uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *model, size_t index)

@@ -153,8 +153,8 @@ static void test_identity_rule(void)
                 "distinct aumids never match");
     expect_true(reach_window_tracking_windows_same_app(&pwa, &pwa_upper),
                 "matching aumids compare case-insensitively regardless of path");
-    expect_true(!reach_window_tracking_windows_same_app(&uwp_a, &uwp_b),
-                "shared host path with differing aumids stays separate");
+    expect_true(reach_window_tracking_windows_same_app(&uwp_a, &uwp_b),
+                "shared executable matches even when aumids differ");
     expect_true(!reach_window_tracking_windows_same_app(&bare_a, &bare_b),
                 "empty identities never match each other");
 
@@ -225,7 +225,7 @@ static void test_group_id_assignment_and_stability(void)
     reach_window_tracking_destroy(service);
 }
 
-static void test_empty_identity_and_aumid_split(void)
+static void test_empty_identity_and_shared_executable(void)
 {
     reach_window_tracking *service = make_service();
     if (service == nullptr)
@@ -249,8 +249,8 @@ static void test_empty_identity_and_aumid_split(void)
     uint32_t bare_two = group_of(service, 32);
     expect_true(bare_one != 0 && bare_two != 0 && bare_one != bare_two,
                 "empty-identity windows get distinct group ids");
-    expect_true(group_of(service, 33) != group_of(service, 34),
-                "same path with differing aumids splits into two groups");
+    expect_true(group_of(service, 33) == group_of(service, 34),
+                "same path with differing aumids shares one group");
 
     (void)reach_window_tracking_refresh(service, nullptr);
     expect_true(group_of(service, 31) == bare_one && group_of(service, 32) == bare_two,
@@ -259,11 +259,64 @@ static void test_empty_identity_and_aumid_split(void)
     reach_window_tracking_destroy(service);
 }
 
+static void test_identity_groups_are_transitive(void)
+{
+    reach_window_tracking *service = make_service();
+    if (service == nullptr)
+    {
+        ++failures;
+        return;
+    }
+
+    reach_window_snapshot windows[3] = {
+        make_window(51, "C:\\apps\\launcher.exe", "App.One"),
+        make_window(52, "C:\\apps\\launcher.exe", "App.Two"),
+        make_window(53, "C:\\apps\\runtime.exe", "App.Two"),
+    };
+    set_windows(windows, 3);
+    (void)reach_window_tracking_refresh(service, nullptr);
+
+    uint32_t group = group_of(service, 51);
+    expect_true(group != 0 && group_of(service, 52) == group && group_of(service, 53) == group,
+                "path and aumid bridges produce one deterministic group");
+
+    reach_window_tracking_destroy(service);
+}
+
+static void test_identity_groups_split_without_a_bridge(void)
+{
+    reach_window_tracking *service = make_service();
+    if (service == nullptr)
+    {
+        ++failures;
+        return;
+    }
+
+    reach_window_snapshot bridged[3] = {
+        make_window(61, "C:\\apps\\launcher.exe", "App.One"),
+        make_window(62, "C:\\apps\\launcher.exe", "App.Two"),
+        make_window(63, "C:\\apps\\runtime.exe", "App.Two"),
+    };
+    set_windows(bridged, 3);
+    (void)reach_window_tracking_refresh(service, nullptr);
+
+    reach_window_snapshot split[2] = {bridged[0], bridged[2]};
+    set_windows(split, 2);
+    (void)reach_window_tracking_refresh(service, nullptr);
+
+    expect_true(group_of(service, 61) != group_of(service, 63),
+                "components split deterministically when their bridge closes");
+
+    reach_window_tracking_destroy(service);
+}
+
 int main(void)
 {
     test_identity_rule();
     test_group_id_assignment_and_stability();
-    test_empty_identity_and_aumid_split();
+    test_empty_identity_and_shared_executable();
+    test_identity_groups_are_transitive();
+    test_identity_groups_split_without_a_bridge();
     test_trespass_uses_protected_band_and_monitor();
     return failures == 0 ? 0 : 1;
 }
