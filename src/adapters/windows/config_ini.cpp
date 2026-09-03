@@ -1,4 +1,5 @@
 #include "windows_adapters_internal.h"
+#include "shortcut_win32.h"
 
 #include "reach/ports/config_store.h"
 #include "reach/protocol/version.h"
@@ -125,6 +126,36 @@ static void reach_config_resolve_wallpaper_paths(reach_config_store *store,
     }
 }
 
+static void reach_config_resolve_pinned_shortcut(reach_pinned_app_model *app)
+{
+    wchar_t *app_path = reinterpret_cast<wchar_t *>(app->path);
+    if (app->shortcut_path[0] == 0 && lstrcmpiW(PathFindExtensionW(app_path), L".lnk") == 0)
+    {
+        (void)reach_copy_utf16(app->shortcut_path, 260, app->path);
+    }
+    if (app->shortcut_path[0] == 0)
+    {
+        return;
+    }
+
+    reach_windows_shortcut_info shortcut = {};
+    const wchar_t *shortcut_path = reinterpret_cast<const wchar_t *>(app->shortcut_path);
+    if (reach_windows_read_shortcut(shortcut_path, &shortcut) && shortcut.target_path[0] != 0)
+    {
+        (void)reach_copy_utf16(app->path, 260,
+                               reinterpret_cast<const uint16_t *>(shortcut.target_path));
+        if (app->arguments[0] == 0)
+        {
+            (void)reach_copy_utf16(app->arguments, 260,
+                                   reinterpret_cast<const uint16_t *>(shortcut.arguments));
+        }
+    }
+    if (app->icon_ref[0] == 0)
+    {
+        (void)reach_copy_utf16(app->icon_ref, 260, app->shortcut_path);
+    }
+}
+
 static reach_result reach_config_store_load(reach_config_store *store,
                                             reach_config_snapshot *out_snapshot)
 {
@@ -203,12 +234,15 @@ static reach_result reach_config_store_load(reach_config_store *store,
         app->id = (uint32_t)GetPrivateProfileIntW(section, L"id",
                                                   (int)(out_snapshot->pinned_app_count + 1), path);
         reach_copy_utf16(app->path, 260, reinterpret_cast<const uint16_t *>(app_path));
+        GetPrivateProfileStringW(section, L"lnk", L"",
+                                 reinterpret_cast<wchar_t *>(app->shortcut_path), 260, path);
         GetPrivateProfileStringW(section, L"arguments", L"",
                                  reinterpret_cast<wchar_t *>(app->arguments), 260, path);
         GetPrivateProfileStringW(section, L"icon", L"", reinterpret_cast<wchar_t *>(app->icon_ref),
                                  260, path);
         GetPrivateProfileStringW(section, L"app_user_model_id", L"",
                                  reinterpret_cast<wchar_t *>(app->app_user_model_id), 260, path);
+        reach_config_resolve_pinned_shortcut(app);
         out_snapshot->pinned_app_count += 1;
     }
 
@@ -286,6 +320,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
         text.append(std::to_wstring(app->id));
         text.append(L"\r\npath=");
         text.append(reinterpret_cast<const wchar_t *>(app->path));
+        text.append(L"\r\nlnk=");
+        text.append(reinterpret_cast<const wchar_t *>(app->shortcut_path));
         text.append(L"\r\narguments=");
         text.append(reinterpret_cast<const wchar_t *>(app->arguments));
         text.append(L"\r\nicon=");

@@ -78,9 +78,12 @@ show the app icon, including Switcher and Stage, label each window from its snap
 without prepending the app identity. Pinned apps do not persist a title; the Dock derives
 its icon fallback from the executable path and never treats config as a live label. When
 `reachctl` creates `reach.ini`, it imports the current Windows taskbar order once, including
-shortcut arguments and application identities. Existing configuration is never overwritten,
-and an empty pin list remains empty. Packaged pins launch through their application identity;
-Reach never needs access to their protected installation directory. Now Playing
+shortcut arguments, original shortcut paths, resolved executable paths, and application
+identities. Existing configuration is never overwritten, and an empty pin list remains empty.
+Dock matching prefers application identity and uses the resolved executable only as a fallback
+for shortcut-backed pins. The original shortcut remains the launch and icon source. Packaged
+pins launch through their application identity; Reach never needs access to their protected
+installation directory. Now Playing
 publishes atomic core media generations immediately, enriches them with the latest
 generation's cover asynchronously, owns transport serialization and cover lifetime,
 and masks every transport control while a command is settling. A new core generation

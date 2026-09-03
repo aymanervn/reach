@@ -14,6 +14,7 @@ extern "C"
     {
         uint32_t id;
         uint16_t path[260];
+        uint16_t shortcut_path[260];
         uint16_t arguments[260];
         uint16_t icon_ref[260];
         uint16_t app_user_model_id[260];

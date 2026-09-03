@@ -1,4 +1,5 @@
 #include "windows_adapters_internal.h"
+#include "shortcut_win32.h"
 #include "taskbar_pin_blob.h"
 
 #include <windows.h>
@@ -14,11 +15,10 @@
 static int32_t reach_taskbar_pin_same(const reach_pinned_app_model *a,
                                       const reach_pinned_app_model *b)
 {
-    if (a->app_user_model_id[0] != 0 && b->app_user_model_id[0] != 0 &&
-        lstrcmpiW(reinterpret_cast<const wchar_t *>(a->app_user_model_id),
-                  reinterpret_cast<const wchar_t *>(b->app_user_model_id)) == 0)
+    if (a->app_user_model_id[0] != 0 && b->app_user_model_id[0] != 0)
     {
-        return 1;
+        return lstrcmpiW(reinterpret_cast<const wchar_t *>(a->app_user_model_id),
+                         reinterpret_cast<const wchar_t *>(b->app_user_model_id)) == 0;
     }
     return a->path[0] != 0 && b->path[0] != 0 && reach_path_equals(a->path, b->path);
 }
@@ -62,10 +62,36 @@ static reach_result reach_taskbar_pin_from_item(IShellItem2 *item, reach_pinned_
     PWSTR file_path = nullptr;
     if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &file_path)) && file_path != nullptr)
     {
-        (void)reach_copy_utf16(out_pin->path, 260,
-                               reinterpret_cast<const uint16_t *>(file_path));
         (void)reach_copy_utf16(out_pin->icon_ref, 260,
                                reinterpret_cast<const uint16_t *>(file_path));
+        if (lstrcmpiW(PathFindExtensionW(file_path), L".lnk") == 0)
+        {
+            (void)reach_copy_utf16(out_pin->shortcut_path, 260,
+                                   reinterpret_cast<const uint16_t *>(file_path));
+            reach_windows_shortcut_info shortcut = {};
+            if (reach_windows_read_shortcut(file_path, &shortcut) &&
+                shortcut.target_path[0] != 0)
+            {
+                (void)reach_copy_utf16(out_pin->path, 260,
+                                       reinterpret_cast<const uint16_t *>(shortcut.target_path));
+                if (out_pin->arguments[0] == 0)
+                {
+                    (void)reach_copy_utf16(
+                        out_pin->arguments, 260,
+                        reinterpret_cast<const uint16_t *>(shortcut.arguments));
+                }
+            }
+            else
+            {
+                (void)reach_copy_utf16(out_pin->path, 260,
+                                       reinterpret_cast<const uint16_t *>(file_path));
+            }
+        }
+        else
+        {
+            (void)reach_copy_utf16(out_pin->path, 260,
+                                   reinterpret_cast<const uint16_t *>(file_path));
+        }
     }
     CoTaskMemFree(file_path);
 

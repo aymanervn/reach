@@ -195,6 +195,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/app_launcher_win32.cpp
     src/adapters/windows/taskbar_pin_blob.cpp
     src/adapters/windows/taskbar_pins_win32.cpp
+    src/adapters/windows/shortcut_win32.cpp
     src/adapters/windows/settings_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
@@ -455,6 +456,7 @@ add_executable(reachctl
     src/adapters/windows/wallpaper_win32.cpp
     src/adapters/windows/taskbar_pin_blob.cpp
     src/adapters/windows/taskbar_pins_win32.cpp
+    src/adapters/windows/shortcut_win32.cpp
     src/support/util.cpp
 )
 

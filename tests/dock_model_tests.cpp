@@ -157,6 +157,22 @@ static void test_pinned_app_claims_matching_windows(void)
                 "leftover window forms an unpinned entry");
 }
 
+static void test_shortcut_pin_matches_executable(void)
+{
+    reach_dock_feature_model model = {};
+    reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
+    reach_pinned_app_model pin = make_pin(6, "C:\\apps\\zed.exe");
+    reach_copy_ascii_to_utf16(pin.shortcut_path, 260, "C:\\Pins\\Zed.lnk");
+    reach_copy_ascii_to_utf16(pin.app_user_model_id, 260, "ZedIndustries.Zed");
+    reach_window_snapshot window = make_window(104, "C:\\apps\\zed.exe", "");
+    uint32_t group_id = 9;
+    reach_dock_feature_model_build_items(&model, &next_key, &pin, 1, &window, &group_id, 1,
+                                         matches_thunk, nullptr);
+    expect_true(model.item_count == 1 && model.items[0].window == 104,
+                "resolved shortcut executable claims the running window");
+}
+
 static void test_key_stable_when_representative_closes(void)
 {
     reach_dock_feature_model model = {};
@@ -487,6 +503,7 @@ static void test_pinned_item_pressable_release_opens_its_target(void)
     reach_pinned_app_model pin = make_pin(7, "C:\\apps\\brave.exe");
     reach_copy_ascii_to_utf16(pin.arguments, 260, "--profile-directory=Default");
     reach_copy_ascii_to_utf16(pin.app_user_model_id, 260, "Brave.App");
+    reach_copy_ascii_to_utf16(pin.shortcut_path, 260, "C:\\Pins\\Brave.lnk");
     reach_dock_apply_pinned_apps(dock, &pin, 1);
 
     reach_dock_arrange_context arrange = {};
@@ -527,8 +544,8 @@ static void test_pinned_item_pressable_release_opens_its_target(void)
                     result.action.target.kind == REACH_FEATURE_TARGET_APP,
                 "primary release publishes the generic app target action");
     expect_true(reach_test_utf16_equals_ascii(result.action.target.path,
-                                              "C:\\apps\\brave.exe"),
-                "the target carries the activated Dock item's path");
+                                              "C:\\Pins\\Brave.lnk"),
+                "the target launches the pin's original shortcut");
     expect_true(reach_test_utf16_equals_ascii(result.action.target.arguments,
                                               "--profile-directory=Default"),
                 "the target carries the pinned app arguments");
@@ -650,6 +667,7 @@ int main(void)
     test_pinned_reorder_survives_the_config_round_trip();
     test_unpinned_windows_group_into_one_item();
     test_pinned_app_claims_matching_windows();
+    test_shortcut_pin_matches_executable();
     test_key_stable_when_representative_closes();
     test_order_preserved_and_new_groups_append();
     test_same_path_different_aumid_stays_split();

@@ -13,7 +13,7 @@ int main()
     int failed = 0;
     int32_t changed = 0;
 
-    reach_config_snapshot snapshot = {};
+    static reach_config_snapshot snapshot = {};
     snapshot.pinned_app_count = 4;
     for (size_t index = 0; index < snapshot.pinned_app_count; ++index)
     {
@@ -43,6 +43,7 @@ int main()
     reach_copy_ascii_to_utf16(helper_app.path, 260, "steam.exe");
     reach_copy_ascii_to_utf16(helper_app.arguments, 260, "-silent");
     reach_copy_ascii_to_utf16(helper_app.app_user_model_id, 260, "Valve.Steam.Client");
+    reach_copy_ascii_to_utf16(helper_app.shortcut_path, 260, "C:\\Pins\\steam.lnk");
 
     failed += expect(reach_pin_config_pin_app(&snapshot, &helper_app, &changed) == REACH_OK);
     failed += expect(changed == 1);
@@ -50,8 +51,9 @@ int main()
     failed += expect(snapshot.pinned_apps[4].path[0] == 's');
     failed += expect(snapshot.pinned_apps[4].arguments[0] == '-');
     failed += expect(snapshot.pinned_apps[4].app_user_model_id[0] == 'V');
+    failed += expect(snapshot.pinned_apps[4].shortcut_path[0] == 'C');
 
-    reach_config_snapshot update_snapshot = {};
+    static reach_config_snapshot update_snapshot = {};
     update_snapshot.pinned_app_count = 1;
     update_snapshot.pinned_apps[0].id = 1;
     reach_copy_ascii_to_utf16(update_snapshot.pinned_apps[0].path, 260, "C:\\Apps\\helper.exe");
@@ -75,7 +77,7 @@ int main()
                                                             update_aumid, &changed) == REACH_OK);
     failed += expect(changed == 0);
 
-    reach_config_snapshot capacity_snapshot = {};
+    static reach_config_snapshot capacity_snapshot = {};
     capacity_snapshot.pinned_app_count = REACH_MAX_PINNED_APPS - 1;
     for (size_t index = 0; index < capacity_snapshot.pinned_app_count; ++index)
     {
@@ -98,7 +100,7 @@ int main()
     failed += expect(changed == 0);
     failed += expect(capacity_snapshot.pinned_app_count == REACH_MAX_PINNED_APPS);
 
-    reach_config_snapshot defaults = {};
+    static reach_config_snapshot defaults = {};
     failed += expect(reach_pin_config_ensure_defaults(&defaults, &changed) == REACH_OK);
     failed += expect(changed == 0);
     failed += expect(defaults.pinned_app_count == 0);
