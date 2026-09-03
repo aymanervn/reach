@@ -96,7 +96,7 @@ static void test_navigation_pages(void)
     expect_true(nav_count == REACH_SETTINGS_NAV_ITEM_COUNT, "settings exposes all nav items");
     expect_true(nav[0].page == REACH_SETTINGS_PAGE_WIFI && equals_ascii(nav[0].label, "Wi-Fi"),
                 "first nav item is Wi-Fi");
-    expect_true(nav[6].page == REACH_SETTINGS_PAGE_UPDATE && equals_ascii(nav[6].label, "Updates"),
+    expect_true(nav[7].page == REACH_SETTINGS_PAGE_UPDATE && equals_ascii(nav[7].label, "Updates"),
                 "last nav item is Updates");
     expect_true(reach_animation_manager_value(&model->nav_selection_animation, 0) == 0.0f &&
                     !reach_settings_model_nav_selection_active(model.get()),
@@ -105,13 +105,13 @@ static void test_navigation_pages(void)
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_UPDATE);
     expect_true(model->selected_page == REACH_SETTINGS_PAGE_UPDATE,
                 "valid page selection updates model");
-    expect_true(reach_animation_manager_target(&model->nav_selection_animation, 0) == 6.0f &&
+    expect_true(reach_animation_manager_target(&model->nav_selection_animation, 0) == 7.0f &&
                     reach_settings_model_nav_selection_active(model.get()),
                 "page selection starts the navigation indicator animation");
     expect_true(reach_settings_model_tick_nav_selection(model.get(), 0.11),
                 "navigation indicator tick reports activity");
     float interrupted_position = reach_animation_manager_value(&model->nav_selection_animation, 0);
-    expect_true(interrupted_position > 0.0f && interrupted_position < 6.0f,
+    expect_true(interrupted_position > 0.0f && interrupted_position < 7.0f,
                 "navigation indicator travels between rows");
 
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_ACCOUNT);

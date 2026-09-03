@@ -140,6 +140,17 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
                                    app->app_user_model_id);
             changed = 1;
         }
+        if (snapshot->pinned_apps[index].shortcut_path[0] == 0 && app->shortcut_path[0] != 0)
+        {
+            (void)reach_copy_utf16(snapshot->pinned_apps[index].shortcut_path, 260,
+                                   app->shortcut_path);
+            changed = 1;
+        }
+        if (snapshot->pinned_apps[index].icon_ref[0] == 0 && app->icon_ref[0] != 0)
+        {
+            (void)reach_copy_utf16(snapshot->pinned_apps[index].icon_ref, 260, app->icon_ref);
+            changed = 1;
+        }
         reach_pin_set_changed(out_changed, changed);
         return REACH_OK;
     }
@@ -151,6 +162,7 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
     *pinned = {};
     pinned->id = reach_pin_next_available_id(snapshot);
     (void)reach_copy_utf16(pinned->path, 260, app->path);
+    (void)reach_copy_utf16(pinned->shortcut_path, 260, app->shortcut_path);
     (void)reach_copy_utf16(pinned->arguments, 260, app->arguments);
     (void)reach_copy_utf16(pinned->icon_ref, 260,
                            app->icon_ref[0] != 0 ? app->icon_ref : app->path);

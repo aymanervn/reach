@@ -1,4 +1,5 @@
 #include "windows_adapters_internal.h"
+#include "shortcut_win32.h"
 
 #include "reach/ports/icon_provider.h"
 #include "windows_icon_handle_internal.h"
@@ -94,46 +95,6 @@ static int32_t reach_icon_split_resource_ref(const wchar_t *path, wchar_t *out_p
     out_path[path_count] = 0;
     *out_icon_index = (int)icon_index;
     return 1;
-}
-
-static int32_t reach_icon_resolve_shortcut(const wchar_t *path, wchar_t *resolved,
-                                           DWORD resolved_count)
-{
-    if (path == nullptr || resolved == nullptr || resolved_count == 0 ||
-        lstrcmpiW(PathFindExtensionW(path), L".lnk") != 0)
-    {
-        return 0;
-    }
-
-    IShellLinkW *link = nullptr;
-    HRESULT hr =
-        CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&link));
-    if (FAILED(hr))
-    {
-        return 0;
-    }
-
-    IPersistFile *persist = nullptr;
-    hr = link->QueryInterface(IID_PPV_ARGS(&persist));
-    if (SUCCEEDED(hr))
-    {
-        hr = persist->Load(path, STGM_READ);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = link->Resolve(nullptr, SLR_NO_UI | SLR_NOSEARCH | SLR_NOTRACK);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = link->GetPath(resolved, resolved_count, nullptr, SLGP_UNCPRIORITY);
-    }
-
-    if (persist != nullptr)
-    {
-        persist->Release();
-    }
-    link->Release();
-    return SUCCEEDED(hr) && resolved[0] != 0;
 }
 
 static HBITMAP reach_icon_bitmap_from_shell_item_image_factory(const wchar_t *path, int32_t size_px)
@@ -267,27 +228,38 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
     const wchar_t *requested_path = reinterpret_cast<const wchar_t *>(request->path);
     wchar_t resource_ref_path[260] = {};
     wchar_t resolved[260] = {};
-    wchar_t shortcut_target[260] = {};
+    reach_windows_shortcut_info shortcut_info = {};
     const wchar_t *icon_path = requested_path;
     int icon_index = 0;
     int32_t resource_ref =
         reach_icon_split_resource_ref(requested_path, resource_ref_path, 260, &icon_index);
+    int32_t shortcut = 0;
     if (resource_ref)
     {
         icon_path = resource_ref_path;
     }
-    else if (reach_icon_resolve_shortcut(requested_path, shortcut_target, 260))
-    {
-        icon_path = shortcut_target;
-    }
-    else if (reach_icon_resolve_search_path(requested_path, resolved, 260))
-    {
-        icon_path = resolved;
-    }
     else
     {
-        (void)reach_icon_copy_path(resolved, 260, requested_path);
-        icon_path = resolved;
+        shortcut = lstrcmpiW(PathFindExtensionW(requested_path), L".lnk") == 0 &&
+                   reach_windows_read_shortcut(requested_path, &shortcut_info);
+        if (shortcut && shortcut_info.icon_path[0] != 0)
+        {
+            icon_path = shortcut_info.icon_path;
+            icon_index = shortcut_info.icon_index;
+        }
+        else if (shortcut && shortcut_info.target_path[0] != 0)
+        {
+            icon_path = shortcut_info.target_path;
+        }
+        else if (reach_icon_resolve_search_path(requested_path, resolved, 260))
+        {
+            icon_path = resolved;
+        }
+        else
+        {
+            (void)reach_icon_copy_path(resolved, 260, requested_path);
+            icon_path = resolved;
+        }
     }
 
     uint64_t icon_id = 0;
@@ -297,7 +269,7 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
     // A "file,index" reference names one icon resource inside a container such as a DLL. The
     // shell item, system image list and file info paths all ignore the index and would return
     // the container file's own icon instead, so an indexed reference must be extracted first.
-    int32_t indexed = resource_ref || is_exe;
+    int32_t indexed = resource_ref || (shortcut && shortcut_info.icon_path[0] != 0) || is_exe;
     if (indexed)
     {
         hicon = reach_icon_from_extract_icon(icon_path, request->size_px, icon_index);

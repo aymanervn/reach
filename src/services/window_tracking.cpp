@@ -197,8 +197,19 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
     {
         return 0;
     }
+    if (app->app_user_model_id[0] != 0 && window->app_user_model_id[0] != 0 &&
+        reach_utf16_equal_ascii_case_insensitive(app->app_user_model_id,
+                                                 window->app_user_model_id))
+    {
+        return 1;
+    }
+    if (app->shortcut_path[0] != 0 &&
+        reach_window_tracking_nonempty_path_equals(app->path, window->path))
+    {
+        return 1;
+    }
     return reach_window_tracking_identity_equal(app->path, app->app_user_model_id, window->path,
-                                                window->app_user_model_id);
+                                                 window->app_user_model_id);
 }
 
 void reach_window_tracking_app_display_name(const reach_window_snapshot *window, uint16_t *out_name,

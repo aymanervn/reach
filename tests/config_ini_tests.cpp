@@ -2,7 +2,9 @@
 #include "reach/platform/windows_adapters.h"
 
 #include <windows.h>
+#include <shobjidl.h>
 
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -33,7 +35,7 @@ int main()
     failed += expect(snapshot->windows_system_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
     failed += expect(snapshot->windows_app_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
 
-    *snapshot = {};
+    std::memset(snapshot.get(), 0, sizeof(*snapshot));
     snapshot->dock_height = 58.0f;
     snapshot->power_screen_off_minutes = 9;
     snapshot->power_sleep_minutes = 21;
@@ -48,6 +50,8 @@ int main()
     snapshot->pinned_app_count = 2;
     snapshot->pinned_apps[0].id = 4;
     reach_copy_ascii_to_utf16(snapshot->pinned_apps[0].path, 260, "C:\\Apps\\one.exe");
+    reach_copy_ascii_to_utf16(snapshot->pinned_apps[0].shortcut_path, 260,
+                              "C:\\Pins\\one.lnk");
     snapshot->pinned_apps[0].arguments[0] = 0x03A9;
     snapshot->pinned_apps[0].arguments[1] = 0;
     snapshot->pinned_apps[1].id = 9;
@@ -63,12 +67,73 @@ int main()
     failed += expect(loaded->pinned_app_count == 2);
     failed += expect(loaded->pinned_apps[0].id == 4);
     failed += expect(loaded->pinned_apps[0].arguments[0] == 0x03A9);
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].shortcut_path,
+                                      snapshot->pinned_apps[0].shortcut_path));
 
     snapshot->pinned_app_count = 1;
     failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
-    *loaded = {};
+    std::memset(loaded.get(), 0, sizeof(*loaded));
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
     failed += expect(loaded->pinned_app_count == 1);
+
+    wchar_t shortcut_path[260] = {};
+    wchar_t shortcut_target[260] = {};
+    wcscpy_s(shortcut_path, path);
+    wcscat_s(shortcut_path, L".lnk");
+    failed += expect(GetSystemDirectoryW(shortcut_target, 260) != 0);
+    wcscat_s(shortcut_target, L"\\notepad.exe");
+
+    HRESULT initialize = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    IShellLinkW *link = nullptr;
+    HRESULT link_result =
+        CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&link));
+    if (SUCCEEDED(link_result) && link != nullptr)
+    {
+        link_result = link->SetPath(shortcut_target);
+        if (SUCCEEDED(link_result))
+        {
+            link_result = link->SetArguments(L"--reach-shortcut-test");
+        }
+        if (SUCCEEDED(link_result))
+        {
+            link_result = link->SetIconLocation(shortcut_target, 0);
+        }
+        IPersistFile *persist = nullptr;
+        if (SUCCEEDED(link_result))
+        {
+            link_result = link->QueryInterface(IID_PPV_ARGS(&persist));
+        }
+        if (SUCCEEDED(link_result) && persist != nullptr)
+        {
+            link_result = persist->Save(shortcut_path, TRUE);
+        }
+        if (persist != nullptr)
+        {
+            persist->Release();
+        }
+        link->Release();
+    }
+    failed += expect(SUCCEEDED(link_result));
+
+    std::memset(snapshot.get(), 0, sizeof(*snapshot));
+    failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
+    failed += expect(WritePrivateProfileStringW(L"pinned.0", L"path", shortcut_path, path) != 0);
+    std::memset(loaded.get(), 0, sizeof(*loaded));
+    failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
+    failed += expect(loaded->pinned_app_count == 1);
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].shortcut_path,
+                                      reinterpret_cast<const uint16_t *>(shortcut_path)));
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].path,
+                                      reinterpret_cast<const uint16_t *>(shortcut_target)));
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].icon_ref,
+                                      reinterpret_cast<const uint16_t *>(shortcut_path)));
+    failed += expect(lstrcmpW(reinterpret_cast<const wchar_t *>(loaded->pinned_apps[0].arguments),
+                             L"--reach-shortcut-test") == 0);
+    DeleteFileW(shortcut_path);
+    if (SUCCEEDED(initialize))
+    {
+        CoUninitialize();
+    }
 
     HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                               FILE_ATTRIBUTE_NORMAL, nullptr);

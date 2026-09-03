@@ -1318,6 +1318,11 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
             {
                 reach_copy_utf16(out_request->arguments, REACH_MENU_TEXT_CAPACITY,
                                  dock->pinned_apps[index].arguments);
+                if (dock->pinned_apps[index].shortcut_path[0] != 0)
+                {
+                    reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY,
+                                     dock->pinned_apps[index].shortcut_path);
+                }
                 break;
             }
         }
