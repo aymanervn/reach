@@ -5,6 +5,8 @@
 
 #include <shlwapi.h>
 #include <cwchar>
+#include <memory>
+#include <new>
 
 void reachctl_print(const wchar_t *message)
 {
@@ -125,16 +127,19 @@ reach_result reachctl_initialize_config(void)
         }
         else
         {
-            reach_config_snapshot snapshot = {};
-            result = store.ops.load(store.store, &snapshot);
-            if (result == REACH_OK)
+            std::unique_ptr<reach_config_snapshot> snapshot(
+                new (std::nothrow) reach_config_snapshot{});
+            result = snapshot != nullptr ? store.ops.load(store.store, snapshot.get())
+                                         : REACH_ERROR;
+            if (result == REACH_OK && snapshot != nullptr)
             {
                 result = reach_windows_collect_taskbar_pins(
-                    snapshot.pinned_apps, REACH_MAX_PINNED_APPS, &snapshot.pinned_app_count);
+                    snapshot->pinned_apps, REACH_MAX_PINNED_APPS,
+                    &snapshot->pinned_app_count);
             }
-            if (result == REACH_OK)
+            if (result == REACH_OK && snapshot != nullptr)
             {
-                result = store.ops.save(store.store, &snapshot);
+                result = store.ops.save(store.store, snapshot.get());
             }
         }
         store.ops.end_transaction(store.store);

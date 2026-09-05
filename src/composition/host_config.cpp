@@ -62,12 +62,14 @@ int32_t reach_host_apply_config_update(reach_host *host)
         return 0;
     }
 
-    reach_config_snapshot snapshot = {};
-    if (!reach_config_service_take_snapshot_update(host->config_service, &snapshot))
+    std::unique_ptr<reach_config_snapshot> snapshot(
+        new (std::nothrow) reach_config_snapshot{});
+    if (snapshot == nullptr ||
+        !reach_config_service_take_snapshot_update(host->config_service, snapshot.get()))
     {
         return 0;
     }
-    (void)reach_host_apply_config_snapshot(host, &snapshot, 1, 1);
+    (void)reach_host_apply_config_snapshot(host, snapshot.get(), 1, 1);
     return 1;
 }
 
@@ -295,9 +297,11 @@ void reach_host_reload_wallpaper(reach_host *host, int32_t force)
     {
         return;
     }
-    reach_config_snapshot snapshot = {};
-    if (reach_config_service_snapshot(host->config_service, &snapshot) == REACH_OK)
+    std::unique_ptr<reach_config_snapshot> snapshot(
+        new (std::nothrow) reach_config_snapshot{});
+    if (snapshot != nullptr &&
+        reach_config_service_snapshot(host->config_service, snapshot.get()) == REACH_OK)
     {
-        reach_wallpaper_reload(host->wallpaper, &snapshot, force);
+        reach_wallpaper_reload(host->wallpaper, snapshot.get(), force);
     }
 }

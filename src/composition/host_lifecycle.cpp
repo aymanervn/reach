@@ -1,5 +1,6 @@
 #include "host_internal.h"
 
+#include <memory>
 #include <new>
 
 static void reach_host_on_config_service_ready(void *user, reach_config_service_event event)
@@ -457,30 +458,37 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     if (result == REACH_OK)
     {
-        reach_config_snapshot snapshot = {};
-        if (reach_config_service_snapshot(host->config_service, &snapshot) == REACH_OK)
+        std::unique_ptr<reach_config_snapshot> snapshot(
+            new (std::nothrow) reach_config_snapshot{});
+        if (snapshot == nullptr)
         {
-            reach_host_notify_config_changed(host, &snapshot);
-            (void)reach_host_set_pinned_apps(host, snapshot.pinned_apps, snapshot.pinned_app_count);
+            result = REACH_ERROR;
+        }
+        else if (reach_config_service_snapshot(host->config_service, snapshot.get()) == REACH_OK)
+        {
+            reach_host_notify_config_changed(host, snapshot.get());
+            (void)reach_host_set_pinned_apps(host, snapshot->pinned_apps,
+                                             snapshot->pinned_app_count);
             reach_host_notify_pinned_apps_changed(host);
-            reach_host_seed_or_apply_wallpaper(host, &snapshot);
-            if (snapshot.power_shutdown_minutes != 0 || snapshot.power_restart_minutes != 0)
+            reach_host_seed_or_apply_wallpaper(host, snapshot.get());
+            if (snapshot->power_shutdown_minutes != 0 ||
+                snapshot->power_restart_minutes != 0)
             {
-                snapshot.power_shutdown_minutes = 0;
-                snapshot.power_restart_minutes = 0;
+                snapshot->power_shutdown_minutes = 0;
+                snapshot->power_restart_minutes = 0;
                 reach_config_power_settings power = {};
-                power.screen_off_minutes = snapshot.power_screen_off_minutes;
-                power.sleep_minutes = snapshot.power_sleep_minutes;
-                power.lock_minutes = snapshot.power_lock_minutes;
-                power.shutdown_minutes = snapshot.power_shutdown_minutes;
-                power.restart_minutes = snapshot.power_restart_minutes;
-                power.sleep_wait_apps = snapshot.power_sleep_wait_apps;
-                power.shutdown_wait_apps = snapshot.power_shutdown_wait_apps;
-                power.restart_wait_apps = snapshot.power_restart_wait_apps;
+                power.screen_off_minutes = snapshot->power_screen_off_minutes;
+                power.sleep_minutes = snapshot->power_sleep_minutes;
+                power.lock_minutes = snapshot->power_lock_minutes;
+                power.shutdown_minutes = snapshot->power_shutdown_minutes;
+                power.restart_minutes = snapshot->power_restart_minutes;
+                power.sleep_wait_apps = snapshot->power_sleep_wait_apps;
+                power.shutdown_wait_apps = snapshot->power_shutdown_wait_apps;
+                power.restart_wait_apps = snapshot->power_restart_wait_apps;
                 (void)reach_config_service_set_power(host->config_service, &power);
             }
-            reach_host_apply_power_config(host, &snapshot);
-            reach_host_apply_display_config(host, &snapshot);
+            reach_host_apply_power_config(host, snapshot.get());
+            reach_host_apply_display_config(host, snapshot.get());
         }
     }
     if (result != REACH_OK)
