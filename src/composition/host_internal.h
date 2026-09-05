@@ -571,6 +571,7 @@ struct reach_host
     reach_tray_service *tray_service;
     reach_search_provider_port search_provider;
     reach_app_launcher_port app_launcher;
+    reach_application_resolver_port application_resolver;
     reach_terminal_launcher_port terminal_launcher;
     reach_settings_launcher_port settings_launcher;
     reach_icon_service *icon_service;

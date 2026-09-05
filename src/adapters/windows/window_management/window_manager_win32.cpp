@@ -615,6 +615,7 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
     const reach_service_window_snapshot &helper = manager->helper_windows[index];
     reach_window_snapshot snapshot = {};
     snapshot.id = static_cast<uintptr_t>(helper.window);
+    snapshot.process_id = static_cast<reach_process_id>(helper.process_id);
     (void)reach_copy_utf16(snapshot.title, 260, reinterpret_cast<const uint16_t *>(helper.title));
     (void)reach_copy_utf16(snapshot.path, 260,
                            reinterpret_cast<const uint16_t *>(helper.process_path));

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "reach/ports/app_launcher.h"
+#include "reach/ports/application_resolver.h"
 #include "reach/core/ui_events.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/explorer_service.h"
@@ -84,6 +85,7 @@ extern "C"
         reach_tray_provider_port tray_provider;
         reach_search_provider_port search_provider;
         reach_app_launcher_port app_launcher;
+        reach_application_resolver_port application_resolver;
         reach_terminal_launcher_port terminal_launcher;
         reach_settings_launcher_port settings_launcher;
         reach_icon_provider_port icon_provider;

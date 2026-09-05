@@ -5,6 +5,7 @@
 
 #include "reach/core/geometry.h"
 #include "reach/core/pinned_app.h"
+#include "reach/core/process_id.h"
 #include "reach/core/window_id.h"
 #include "reach/support/layout.h"
 #include "reach/support/util.h"
@@ -19,6 +20,7 @@ extern "C"
     typedef struct reach_window_snapshot
     {
         reach_window_id id;
+        reach_process_id process_id;
         uint16_t title[260];
         uint16_t path[260];
         uint16_t icon_ref[260];

@@ -110,6 +110,7 @@ static reach_result reach_taskbar_pin_from_item(IShellItem2 *item, reach_pinned_
         (void)reach_copy_utf16(application->icon_ref, 260, application->launch.path);
     }
 
+    (void)reach_windows_enrich_application(application);
     if (application->launch.path[0] == 0)
     {
         return REACH_ERROR;
@@ -213,6 +214,7 @@ static int32_t reach_taskbar_add_embedded_aumid(const BYTE *data, size_t size,
         return 0;
     }
     (void)reach_copy_utf16(pin.application.icon_ref, 260, pin.application.launch.path);
+    (void)reach_windows_enrich_application(&pin.application);
     for (size_t index = 0; index < *count; ++index)
     {
         if (reach_taskbar_pin_same(&pins[index], &pin))

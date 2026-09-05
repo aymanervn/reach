@@ -162,6 +162,24 @@ reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature
     const reach_window_snapshot *window =
         window_id != 0 ? reach_window_tracking_window_by_id(host->window_tracking, window_id)
                        : nullptr;
+    if (window != nullptr && host->application_resolver.ops.resolve != nullptr)
+    {
+        reach_application_observation observation = {};
+        observation.process_id = window->process_id;
+        (void)reach_copy_utf16(observation.runtime_path, REACH_APPLICATION_TEXT_CAPACITY,
+                               window->path);
+        (void)reach_copy_utf16(observation.app_user_model_id,
+                               REACH_APPLICATION_TEXT_CAPACITY,
+                               window->app_user_model_id);
+        (void)reach_copy_utf16(observation.icon_ref, REACH_APPLICATION_TEXT_CAPACITY,
+                               window->icon_ref);
+        if (host->application_resolver.ops.resolve(
+                host->application_resolver.resolver, &observation,
+                &app.application) == REACH_OK)
+        {
+            return reach_host_pin_app(host, &app);
+        }
+    }
     if (window != nullptr && host->window_manager.ops.pin_app_for_window != nullptr &&
         host->window_manager.ops.pin_app_for_window(host->window_manager.manager, window->id,
                                                     window, &app) == REACH_OK)
