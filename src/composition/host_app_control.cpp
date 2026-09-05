@@ -166,23 +166,29 @@ reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature
         host->window_manager.ops.pin_app_for_window(host->window_manager.manager, window->id,
                                                     window, &app) == REACH_OK)
     {
-        return app.path[0] != 0 ? reach_host_pin_app(host, &app) : REACH_ERROR;
+        return app.application.launch.path[0] != 0 ? reach_host_pin_app(host, &app)
+                                                   : REACH_ERROR;
     }
 
     app = {};
     if (target->path != nullptr)
     {
-        (void)reach_copy_utf16(app.path, 260, target->path);
+        app.application.launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
+        (void)reach_copy_utf16(app.application.launch.path, 260, target->path);
+        (void)reach_application_identity_add_runtime_path(&app.application.identity,
+                                                          target->path);
     }
     if (target->icon_ref != nullptr)
     {
-        (void)reach_copy_utf16(app.icon_ref, 260, target->icon_ref);
+        (void)reach_copy_utf16(app.application.icon_ref, 260, target->icon_ref);
     }
     if (target->app_user_model_id != nullptr)
     {
-        (void)reach_copy_utf16(app.app_user_model_id, 260, target->app_user_model_id);
+        (void)reach_copy_utf16(app.application.identity.app_user_model_id, 260,
+                               target->app_user_model_id);
     }
-    return app.path[0] != 0 ? reach_host_pin_app(host, &app) : REACH_ERROR;
+    return app.application.launch.path[0] != 0 ? reach_host_pin_app(host, &app)
+                                               : REACH_ERROR;
 }
 
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
@@ -241,11 +247,12 @@ static int32_t reach_host_app_launch_window_matches_app(const reach_window_snaps
     reach_pinned_app_model app = {};
     if (path != nullptr)
     {
-        (void)reach_copy_utf16(app.path, 260, path);
+        (void)reach_application_identity_add_runtime_path(&app.application.identity, path);
     }
     if (app_user_model_id != nullptr)
     {
-        (void)reach_copy_utf16(app.app_user_model_id, 260, app_user_model_id);
+        (void)reach_copy_utf16(app.application.identity.app_user_model_id, 260,
+                               app_user_model_id);
     }
     return reach_window_tracking_window_matches_app(&app, window);
 }

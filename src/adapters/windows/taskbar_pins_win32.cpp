@@ -2,8 +2,6 @@
 #include "shortcut_win32.h"
 #include "taskbar_pin_blob.h"
 
-#include "reach/support/application_identity.h"
-
 #include <windows.h>
 #include <propsys.h>
 #include <propkey.h>
@@ -17,8 +15,8 @@
 static int32_t reach_taskbar_pin_same(const reach_pinned_app_model *a,
                                       const reach_pinned_app_model *b)
 {
-    return reach_application_identity_equal(a->path, a->app_user_model_id, b->path,
-                                            b->app_user_model_id);
+    return reach_application_identity_matches(&a->application.identity,
+                                              &b->application.identity);
 }
 
 static void reach_taskbar_copy_shell_string(IShellItem2 *item, REFPROPERTYKEY key,
@@ -40,18 +38,21 @@ static reach_result reach_taskbar_pin_from_item(IShellItem2 *item, reach_pinned_
     }
 
     *out_pin = {};
-    reach_taskbar_copy_shell_string(item, PKEY_AppUserModel_ID, out_pin->app_user_model_id, 260);
-    reach_taskbar_copy_shell_string(item, PKEY_Link_Arguments, out_pin->arguments, 260);
+    reach_application *application = &out_pin->application;
+    reach_taskbar_copy_shell_string(item, PKEY_AppUserModel_ID,
+                                    application->identity.app_user_model_id, 260);
+    reach_taskbar_copy_shell_string(item, PKEY_Link_Arguments,
+                                    application->launch.arguments, 260);
 
     PWSTR parsing_path = nullptr;
     if (SUCCEEDED(item->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &parsing_path)) &&
-        parsing_path != nullptr && out_pin->app_user_model_id[0] == 0)
+        parsing_path != nullptr && application->identity.app_user_model_id[0] == 0)
     {
         const wchar_t *candidate = wcsrchr(parsing_path, L'\\');
         candidate = candidate != nullptr ? candidate + 1 : parsing_path;
         if (wcschr(candidate, L'!') != nullptr)
         {
-            (void)reach_copy_utf16(out_pin->app_user_model_id, 260,
+            (void)reach_copy_utf16(application->identity.app_user_model_id, 260,
                                    reinterpret_cast<const uint16_t *>(candidate));
         }
     }
@@ -60,53 +61,56 @@ static reach_result reach_taskbar_pin_from_item(IShellItem2 *item, reach_pinned_
     PWSTR file_path = nullptr;
     if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &file_path)) && file_path != nullptr)
     {
-        (void)reach_copy_utf16(out_pin->icon_ref, 260,
+        (void)reach_copy_utf16(application->icon_ref, 260,
                                reinterpret_cast<const uint16_t *>(file_path));
         if (lstrcmpiW(PathFindExtensionW(file_path), L".lnk") == 0)
         {
-            (void)reach_copy_utf16(out_pin->shortcut_path, 260,
+            application->launch.kind = REACH_APPLICATION_LAUNCH_SHORTCUT;
+            (void)reach_copy_utf16(application->launch.path, 260,
                                    reinterpret_cast<const uint16_t *>(file_path));
             reach_windows_shortcut_info shortcut = {};
             if (reach_windows_read_shortcut(file_path, &shortcut) &&
                 shortcut.target_path[0] != 0)
             {
-                (void)reach_copy_utf16(out_pin->path, 260,
-                                       reinterpret_cast<const uint16_t *>(shortcut.target_path));
-                if (out_pin->arguments[0] == 0)
+                (void)reach_application_identity_add_runtime_path(
+                    &application->identity,
+                    reinterpret_cast<const uint16_t *>(shortcut.target_path));
+                if (application->launch.arguments[0] == 0)
                 {
                     (void)reach_copy_utf16(
-                        out_pin->arguments, 260,
+                        application->launch.arguments, 260,
                         reinterpret_cast<const uint16_t *>(shortcut.arguments));
                 }
-            }
-            else
-            {
-                (void)reach_copy_utf16(out_pin->path, 260,
-                                       reinterpret_cast<const uint16_t *>(file_path));
             }
         }
         else
         {
-            (void)reach_copy_utf16(out_pin->path, 260,
+            application->launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
+            (void)reach_copy_utf16(application->launch.path, 260,
                                    reinterpret_cast<const uint16_t *>(file_path));
+            (void)reach_application_identity_add_runtime_path(
+                &application->identity, reinterpret_cast<const uint16_t *>(file_path));
         }
     }
     CoTaskMemFree(file_path);
 
-    if (out_pin->path[0] == 0 && out_pin->app_user_model_id[0] != 0)
+    if (application->launch.path[0] == 0 &&
+        application->identity.app_user_model_id[0] != 0)
     {
-        int written = swprintf_s(reinterpret_cast<wchar_t *>(out_pin->path), 260,
+        application->launch.kind = REACH_APPLICATION_LAUNCH_SHELL;
+        int written = swprintf_s(reinterpret_cast<wchar_t *>(application->launch.path), 260,
                                  L"shell:AppsFolder\\%ls",
-                                 reinterpret_cast<const wchar_t *>(out_pin->app_user_model_id));
+                                 reinterpret_cast<const wchar_t *>(
+                                     application->identity.app_user_model_id));
         if (written <= 0)
         {
             *out_pin = {};
             return REACH_ERROR;
         }
-        (void)reach_copy_utf16(out_pin->icon_ref, 260, out_pin->path);
+        (void)reach_copy_utf16(application->icon_ref, 260, application->launch.path);
     }
 
-    if (out_pin->path[0] == 0)
+    if (application->launch.path[0] == 0)
     {
         return REACH_ERROR;
     }
@@ -195,16 +199,20 @@ static int32_t reach_taskbar_add_embedded_aumid(const BYTE *data, size_t size,
                                                 size_t *count)
 {
     reach_pinned_app_model pin = {};
-    if (!reach_taskbar_find_embedded_aumid(data, size, pin.app_user_model_id, 260))
+    if (!reach_taskbar_find_embedded_aumid(
+            data, size, pin.application.identity.app_user_model_id, 260))
     {
         return 0;
     }
-    if (swprintf_s(reinterpret_cast<wchar_t *>(pin.path), 260, L"shell:AppsFolder\\%ls",
-                   reinterpret_cast<const wchar_t *>(pin.app_user_model_id)) <= 0)
+    pin.application.launch.kind = REACH_APPLICATION_LAUNCH_PACKAGED;
+    if (swprintf_s(reinterpret_cast<wchar_t *>(pin.application.launch.path), 260,
+                   L"shell:AppsFolder\\%ls",
+                   reinterpret_cast<const wchar_t *>(
+                       pin.application.identity.app_user_model_id)) <= 0)
     {
         return 0;
     }
-    (void)reach_copy_utf16(pin.icon_ref, 260, pin.path);
+    (void)reach_copy_utf16(pin.application.icon_ref, 260, pin.application.launch.path);
     for (size_t index = 0; index < *count; ++index)
     {
         if (reach_taskbar_pin_same(&pins[index], &pin))

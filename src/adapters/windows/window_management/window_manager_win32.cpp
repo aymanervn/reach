@@ -748,10 +748,14 @@ static reach_result reach_window_manager_pin_app_for_window(reach_window_manager
     }
 
     *out_app = {};
-    (void)reach_copy_utf16(out_app->path, 260,
+    out_app->application.launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
+    (void)reach_copy_utf16(out_app->application.launch.path, 260,
                            reinterpret_cast<const uint16_t *>(helper->process_path));
-    reach_window_manager_icon_ref_for_helper(*helper, out_app->icon_ref, 260);
-    (void)reach_copy_utf16(out_app->app_user_model_id, 260,
+    (void)reach_application_identity_add_runtime_path(
+        &out_app->application.identity,
+        reinterpret_cast<const uint16_t *>(helper->process_path));
+    reach_window_manager_icon_ref_for_helper(*helper, out_app->application.icon_ref, 260);
+    (void)reach_copy_utf16(out_app->application.identity.app_user_model_id, 260,
                            reinterpret_cast<const uint16_t *>(helper->app_user_model_id));
     reach_window_manager_unlock(manager);
     return REACH_OK;

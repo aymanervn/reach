@@ -181,8 +181,11 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
     {
         return 0;
     }
-    return reach_application_identity_equal(app->path, app->app_user_model_id, window->path,
-                                             window->app_user_model_id);
+    reach_application_identity identity = {};
+    (void)reach_copy_utf16(identity.app_user_model_id, 260,
+                           window->app_user_model_id);
+    (void)reach_application_identity_add_runtime_path(&identity, window->path);
+    return reach_application_identity_matches(&app->application.identity, &identity);
 }
 
 void reach_window_tracking_app_display_name(const reach_window_snapshot *window, uint16_t *out_name,

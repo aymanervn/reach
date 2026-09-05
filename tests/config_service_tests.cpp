@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstring>
 #include <mutex>
 
 struct test_config_store
@@ -124,8 +125,8 @@ static reach_config_store_port test_port(test_config_store *store)
 static void seed_pin(reach_config_snapshot *snapshot, size_t index, uint32_t id, const char *path)
 {
     snapshot->pinned_apps[index].id = id;
-    reach_copy_ascii_to_utf16(snapshot->pinned_apps[index].path, 260, path);
-    reach_copy_ascii_to_utf16(snapshot->pinned_apps[index].icon_ref, 260, path);
+    reach_copy_ascii_to_utf16(snapshot->pinned_apps[index].application.launch.path, 260, path);
+    reach_copy_ascii_to_utf16(snapshot->pinned_apps[index].application.icon_ref, 260, path);
 }
 
 int main()
@@ -190,7 +191,7 @@ int main()
     failed += expect(reach_config_service_flush(service) == REACH_OK);
     failed += expect(rebased_store.snapshot.light_theme == 1);
     failed += expect(rebased_store.snapshot.pinned_app_count == 1);
-    live = {};
+    std::memset(&live, 0, sizeof(live));
     failed += expect(reach_config_service_snapshot(service, &live) == REACH_OK);
     failed += expect(live.light_theme == 1);
     failed += expect(live.pinned_app_count == 1);
@@ -203,7 +204,7 @@ int main()
     display.windows_app_theme = REACH_CONFIG_THEME_DARK;
     failed += expect(reach_config_service_set_display(service, &display) == REACH_OK);
     failed += expect(reach_config_service_flush(service) == REACH_OK);
-    live = {};
+    std::memset(&live, 0, sizeof(live));
     failed += expect(reach_config_service_snapshot(service, &live) == REACH_OK);
     failed += expect(live.windows_system_theme == REACH_CONFIG_THEME_LIGHT);
     failed += expect(live.windows_app_theme == REACH_CONFIG_THEME_DARK);

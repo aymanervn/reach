@@ -126,33 +126,43 @@ static void reach_config_resolve_wallpaper_paths(reach_config_store *store,
     }
 }
 
-static void reach_config_resolve_pinned_shortcut(reach_pinned_app_model *app)
+static int32_t reach_config_path_has_extension(const uint16_t *path, const wchar_t *extension)
 {
-    wchar_t *app_path = reinterpret_cast<wchar_t *>(app->path);
-    if (app->shortcut_path[0] == 0 && lstrcmpiW(PathFindExtensionW(app_path), L".lnk") == 0)
-    {
-        (void)reach_copy_utf16(app->shortcut_path, 260, app->path);
-    }
-    if (app->shortcut_path[0] == 0)
+    return path != nullptr && path[0] != 0 &&
+           lstrcmpiW(PathFindExtensionW(reinterpret_cast<const wchar_t *>(path)), extension) == 0;
+}
+
+static int32_t reach_config_path_is_shell(const uint16_t *path)
+{
+    return path != nullptr &&
+           StrCmpNIW(reinterpret_cast<const wchar_t *>(path), L"shell:", 6) == 0;
+}
+
+static void reach_config_resolve_pinned_shortcut(reach_application *application)
+{
+    if (application->launch.kind != REACH_APPLICATION_LAUNCH_SHORTCUT ||
+        application->launch.path[0] == 0)
     {
         return;
     }
 
     reach_windows_shortcut_info shortcut = {};
-    const wchar_t *shortcut_path = reinterpret_cast<const wchar_t *>(app->shortcut_path);
+    const wchar_t *shortcut_path =
+        reinterpret_cast<const wchar_t *>(application->launch.path);
     if (reach_windows_read_shortcut(shortcut_path, &shortcut) && shortcut.target_path[0] != 0)
     {
-        (void)reach_copy_utf16(app->path, 260,
-                               reinterpret_cast<const uint16_t *>(shortcut.target_path));
-        if (app->arguments[0] == 0)
+        (void)reach_application_identity_add_runtime_path(
+            &application->identity,
+            reinterpret_cast<const uint16_t *>(shortcut.target_path));
+        if (application->launch.arguments[0] == 0)
         {
-            (void)reach_copy_utf16(app->arguments, 260,
+            (void)reach_copy_utf16(application->launch.arguments, 260,
                                    reinterpret_cast<const uint16_t *>(shortcut.arguments));
         }
     }
-    if (app->icon_ref[0] == 0)
+    if (application->icon_ref[0] == 0)
     {
-        (void)reach_copy_utf16(app->icon_ref, 260, app->shortcut_path);
+        (void)reach_copy_utf16(application->icon_ref, 260, application->launch.path);
     }
 }
 
@@ -223,26 +233,77 @@ static reach_result reach_config_store_load(reach_config_store *store,
     {
         wchar_t section[32] = {};
         swprintf_s(section, L"pinned.%u", (unsigned)index);
-        wchar_t app_path[260] = {};
-        GetPrivateProfileStringW(section, L"path", L"", app_path, 260, path);
-        if (app_path[0] == 0)
+        wchar_t launch_path[260] = {};
+        GetPrivateProfileStringW(section, L"launch_path", L"", launch_path, 260, path);
+        wchar_t legacy_path[260] = {};
+        GetPrivateProfileStringW(section, L"path", L"", legacy_path, 260, path);
+        wchar_t legacy_shortcut[260] = {};
+        GetPrivateProfileStringW(section, L"lnk", L"", legacy_shortcut, 260, path);
+        if (launch_path[0] == 0)
+        {
+            reach_copy_utf16(reinterpret_cast<uint16_t *>(launch_path), 260,
+                             reinterpret_cast<const uint16_t *>(
+                                 legacy_shortcut[0] != 0 ? legacy_shortcut : legacy_path));
+        }
+        if (launch_path[0] == 0)
         {
             continue;
         }
 
         reach_pinned_app_model *app = &out_snapshot->pinned_apps[out_snapshot->pinned_app_count];
+        reach_application *application = &app->application;
         app->id = (uint32_t)GetPrivateProfileIntW(section, L"id",
                                                   (int)(out_snapshot->pinned_app_count + 1), path);
-        reach_copy_utf16(app->path, 260, reinterpret_cast<const uint16_t *>(app_path));
-        GetPrivateProfileStringW(section, L"lnk", L"",
-                                 reinterpret_cast<wchar_t *>(app->shortcut_path), 260, path);
+        application->launch.kind = (reach_application_launch_kind)GetPrivateProfileIntW(
+            section, L"launch_kind", REACH_APPLICATION_LAUNCH_NONE, path);
+        reach_copy_utf16(application->launch.path, 260,
+                         reinterpret_cast<const uint16_t *>(launch_path));
+        if (application->launch.kind == REACH_APPLICATION_LAUNCH_NONE)
+        {
+            application->launch.kind =
+                reach_config_path_has_extension(application->launch.path, L".lnk")
+                    ? REACH_APPLICATION_LAUNCH_SHORTCUT
+                : reach_config_path_is_shell(application->launch.path)
+                    ? REACH_APPLICATION_LAUNCH_SHELL
+                    : REACH_APPLICATION_LAUNCH_EXECUTABLE;
+        }
         GetPrivateProfileStringW(section, L"arguments", L"",
-                                 reinterpret_cast<wchar_t *>(app->arguments), 260, path);
-        GetPrivateProfileStringW(section, L"icon", L"", reinterpret_cast<wchar_t *>(app->icon_ref),
-                                 260, path);
+                                 reinterpret_cast<wchar_t *>(application->launch.arguments), 260,
+                                 path);
+        GetPrivateProfileStringW(section, L"icon", L"",
+                                 reinterpret_cast<wchar_t *>(application->icon_ref), 260, path);
         GetPrivateProfileStringW(section, L"app_user_model_id", L"",
-                                 reinterpret_cast<wchar_t *>(app->app_user_model_id), 260, path);
-        reach_config_resolve_pinned_shortcut(app);
+                                 reinterpret_cast<wchar_t *>(
+                                     application->identity.app_user_model_id),
+                                 260, path);
+        for (size_t runtime_index = 0;
+             runtime_index < REACH_APPLICATION_RUNTIME_PATH_CAPACITY; ++runtime_index)
+        {
+            wchar_t key[32] = {};
+            swprintf_s(key, L"runtime_path.%u", (unsigned)runtime_index);
+            wchar_t runtime_path[260] = {};
+            GetPrivateProfileStringW(section, key, L"", runtime_path, 260, path);
+            if (runtime_path[0] != 0)
+            {
+                (void)reach_application_identity_add_runtime_path(
+                    &application->identity,
+                    reinterpret_cast<const uint16_t *>(runtime_path));
+            }
+        }
+        if (application->identity.runtime_path_count == 0 && legacy_path[0] != 0 &&
+            !reach_config_path_has_extension(
+                reinterpret_cast<const uint16_t *>(legacy_path), L".lnk") &&
+            !reach_config_path_is_shell(reinterpret_cast<const uint16_t *>(legacy_path)))
+        {
+            (void)reach_application_identity_add_runtime_path(
+                &application->identity,
+                reinterpret_cast<const uint16_t *>(legacy_path));
+        }
+        reach_config_resolve_pinned_shortcut(application);
+        if (application->icon_ref[0] == 0)
+        {
+            (void)reach_copy_utf16(application->icon_ref, 260, application->launch.path);
+        }
         out_snapshot->pinned_app_count += 1;
     }
 
@@ -318,16 +379,26 @@ static reach_result reach_config_store_save(reach_config_store *store,
         text.append(std::to_wstring(index));
         text.append(L"]\r\nid=");
         text.append(std::to_wstring(app->id));
-        text.append(L"\r\npath=");
-        text.append(reinterpret_cast<const wchar_t *>(app->path));
-        text.append(L"\r\nlnk=");
-        text.append(reinterpret_cast<const wchar_t *>(app->shortcut_path));
+        text.append(L"\r\nlaunch_kind=");
+        text.append(std::to_wstring((int32_t)app->application.launch.kind));
+        text.append(L"\r\nlaunch_path=");
+        text.append(reinterpret_cast<const wchar_t *>(app->application.launch.path));
         text.append(L"\r\narguments=");
-        text.append(reinterpret_cast<const wchar_t *>(app->arguments));
+        text.append(reinterpret_cast<const wchar_t *>(app->application.launch.arguments));
         text.append(L"\r\nicon=");
-        text.append(reinterpret_cast<const wchar_t *>(app->icon_ref));
+        text.append(reinterpret_cast<const wchar_t *>(app->application.icon_ref));
         text.append(L"\r\napp_user_model_id=");
-        text.append(reinterpret_cast<const wchar_t *>(app->app_user_model_id));
+        text.append(reinterpret_cast<const wchar_t *>(
+            app->application.identity.app_user_model_id));
+        for (size_t runtime_index = 0;
+             runtime_index < app->application.identity.runtime_path_count; ++runtime_index)
+        {
+            text.append(L"\r\nruntime_path.");
+            text.append(std::to_wstring(runtime_index));
+            text.append(L"=");
+            text.append(reinterpret_cast<const wchar_t *>(
+                app->application.identity.runtime_paths[runtime_index]));
+        }
         text.append(L"\r\n");
     }
 

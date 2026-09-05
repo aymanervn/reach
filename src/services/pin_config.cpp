@@ -1,7 +1,5 @@
 #include "reach/services/pin_config.h"
 
-#include "reach/support/application_identity.h"
-
 static int32_t reach_pin_id_used_before(const reach_config_snapshot *snapshot, size_t before_index,
                                         uint32_t id)
 {
@@ -77,26 +75,42 @@ static int32_t reach_pin_merge_missing(reach_pinned_app_model *target,
                                        const reach_pinned_app_model *source)
 {
     int32_t changed = 0;
-    if (target->arguments[0] == 0 && source->arguments[0] != 0)
+    reach_application *target_application = &target->application;
+    const reach_application *source_application = &source->application;
+    size_t runtime_count = target_application->identity.runtime_path_count;
+    int32_t had_app_user_model_id =
+        target_application->identity.app_user_model_id[0] != 0;
+    if (target_application->launch.kind == REACH_APPLICATION_LAUNCH_NONE &&
+        source_application->launch.kind != REACH_APPLICATION_LAUNCH_NONE)
     {
-        (void)reach_copy_utf16(target->arguments, 260, source->arguments);
+        target_application->launch.kind = source_application->launch.kind;
         changed = 1;
     }
-    if (target->app_user_model_id[0] == 0 && source->app_user_model_id[0] != 0)
+    if (target_application->launch.path[0] == 0 &&
+        source_application->launch.path[0] != 0)
     {
-        (void)reach_copy_utf16(target->app_user_model_id, 260, source->app_user_model_id);
+        (void)reach_copy_utf16(target_application->launch.path, 260,
+                               source_application->launch.path);
         changed = 1;
     }
-    if (target->shortcut_path[0] == 0 && source->shortcut_path[0] != 0)
+    if (target_application->launch.arguments[0] == 0 &&
+        source_application->launch.arguments[0] != 0)
     {
-        (void)reach_copy_utf16(target->shortcut_path, 260, source->shortcut_path);
+        (void)reach_copy_utf16(target_application->launch.arguments, 260,
+                               source_application->launch.arguments);
         changed = 1;
     }
-    if (target->icon_ref[0] == 0 && source->icon_ref[0] != 0)
+    if (target_application->icon_ref[0] == 0 && source_application->icon_ref[0] != 0)
     {
-        (void)reach_copy_utf16(target->icon_ref, 260, source->icon_ref);
+        (void)reach_copy_utf16(target_application->icon_ref, 260,
+                               source_application->icon_ref);
         changed = 1;
     }
+    reach_application_identity_merge(&target_application->identity,
+                                     &source_application->identity);
+    changed |= target_application->identity.runtime_path_count != runtime_count;
+    changed |= !had_app_user_model_id &&
+               target_application->identity.app_user_model_id[0] != 0;
     return changed;
 }
 
@@ -109,11 +123,9 @@ static int32_t reach_pin_merge_duplicates(reach_config_snapshot *snapshot)
         size_t match = write;
         for (size_t index = 0; index < write; ++index)
         {
-            if (reach_application_identity_equal(
-                    snapshot->pinned_apps[index].path,
-                    snapshot->pinned_apps[index].app_user_model_id,
-                    snapshot->pinned_apps[read].path,
-                    snapshot->pinned_apps[read].app_user_model_id))
+            if (reach_application_identity_matches(
+                    &snapshot->pinned_apps[index].application.identity,
+                    &snapshot->pinned_apps[read].application.identity))
             {
                 match = index;
                 break;
@@ -164,7 +176,7 @@ reach_result reach_pin_config_pin_path(reach_config_snapshot *snapshot, const ui
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        if (reach_path_equals(snapshot->pinned_apps[index].path, path))
+        if (reach_path_equals(snapshot->pinned_apps[index].application.launch.path, path))
         {
             reach_pin_set_changed(out_changed, 0);
             return REACH_OK;
@@ -177,8 +189,10 @@ reach_result reach_pin_config_pin_path(reach_config_snapshot *snapshot, const ui
     reach_pinned_app_model *app = &snapshot->pinned_apps[snapshot->pinned_app_count];
     *app = {};
     app->id = reach_pin_next_available_id(snapshot);
-    (void)reach_copy_utf16(app->path, 260, path);
-    (void)reach_copy_utf16(app->icon_ref, 260, path);
+    app->application.launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
+    (void)reach_copy_utf16(app->application.launch.path, 260, path);
+    (void)reach_copy_utf16(app->application.icon_ref, 260, path);
+    (void)reach_application_identity_add_runtime_path(&app->application.identity, path);
     snapshot->pinned_app_count += 1;
     reach_pin_set_changed(out_changed, 1);
     return REACH_OK;
@@ -188,16 +202,16 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
                                       const reach_pinned_app_model *app, int32_t *out_changed)
 {
     reach_pin_set_changed(out_changed, 0);
-    if (snapshot == nullptr || app == nullptr || app->path[0] == 0)
+    if (snapshot == nullptr || app == nullptr ||
+        app->application.launch.path[0] == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        if (!reach_application_identity_equal(
-                snapshot->pinned_apps[index].path,
-                snapshot->pinned_apps[index].app_user_model_id, app->path,
-                app->app_user_model_id))
+        if (!reach_application_identity_matches(
+                &snapshot->pinned_apps[index].application.identity,
+                &app->application.identity))
         {
             continue;
         }
@@ -210,14 +224,13 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
         return REACH_ERROR;
     }
     reach_pinned_app_model *pinned = &snapshot->pinned_apps[snapshot->pinned_app_count];
-    *pinned = {};
+    *pinned = *app;
     pinned->id = reach_pin_next_available_id(snapshot);
-    (void)reach_copy_utf16(pinned->path, 260, app->path);
-    (void)reach_copy_utf16(pinned->shortcut_path, 260, app->shortcut_path);
-    (void)reach_copy_utf16(pinned->arguments, 260, app->arguments);
-    (void)reach_copy_utf16(pinned->icon_ref, 260,
-                           app->icon_ref[0] != 0 ? app->icon_ref : app->path);
-    (void)reach_copy_utf16(pinned->app_user_model_id, 260, app->app_user_model_id);
+    if (pinned->application.icon_ref[0] == 0)
+    {
+        (void)reach_copy_utf16(pinned->application.icon_ref, 260,
+                               pinned->application.launch.path);
+    }
     snapshot->pinned_app_count += 1;
     reach_pin_set_changed(out_changed, 1);
     return REACH_OK;
@@ -285,13 +298,19 @@ reach_result reach_pin_config_set_app_user_model_id(reach_config_snapshot *snaps
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        if (reach_path_equals(snapshot->pinned_apps[index].path, path))
+        reach_application_identity *identity =
+            &snapshot->pinned_apps[index].application.identity;
+        for (size_t runtime_index = 0; runtime_index < identity->runtime_path_count;
+             ++runtime_index)
         {
-            if (!reach_utf16_equal_ascii_case_insensitive(
-                    snapshot->pinned_apps[index].app_user_model_id, app_user_model_id))
+            if (!reach_path_equals(identity->runtime_paths[runtime_index], path))
             {
-                (void)reach_copy_utf16(snapshot->pinned_apps[index].app_user_model_id, 260,
-                                       app_user_model_id);
+                continue;
+            }
+            if (!reach_utf16_equal_ascii_case_insensitive(identity->app_user_model_id,
+                                                          app_user_model_id))
+            {
+                (void)reach_copy_utf16(identity->app_user_model_id, 260, app_user_model_id);
                 reach_pin_set_changed(out_changed, 1);
             }
             return REACH_OK;
@@ -339,7 +358,16 @@ reach_result reach_pin_config_unpin_path(reach_config_snapshot *snapshot, const 
     size_t write_index = 0;
     for (size_t read_index = 0; read_index < snapshot->pinned_app_count; ++read_index)
     {
-        if (!reach_path_equals(snapshot->pinned_apps[read_index].path, path))
+        const reach_pinned_app_model *app = &snapshot->pinned_apps[read_index];
+        int32_t matches = reach_path_equals(app->application.launch.path, path);
+        for (size_t runtime_index = 0;
+             !matches && runtime_index < app->application.identity.runtime_path_count;
+             ++runtime_index)
+        {
+            matches = reach_path_equals(
+                app->application.identity.runtime_paths[runtime_index], path);
+        }
+        if (!matches)
         {
             if (write_index != read_index)
             {
