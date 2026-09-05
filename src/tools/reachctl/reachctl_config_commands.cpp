@@ -7,6 +7,8 @@
 #include <windows.h>
 #include <shlwapi.h>
 #include <cwchar>
+#include <memory>
+#include <new>
 
 static int32_t reachctl_is_supported_pin_path(const uint16_t *path)
 {
@@ -45,17 +47,21 @@ static reach_result reachctl_path_is_already_pinned(reach_config_service *servic
 
     *out_pinned = 0;
 
-    reach_config_snapshot snapshot = {};
-    reach_result result = reach_config_service_snapshot(service, &snapshot);
+    std::unique_ptr<reach_config_snapshot> snapshot(
+        new (std::nothrow) reach_config_snapshot{});
+    reach_result result =
+        snapshot != nullptr
+            ? reach_config_service_snapshot(service, snapshot.get())
+            : REACH_ERROR;
     if (result != REACH_OK)
     {
         return result;
     }
 
-    for (size_t index = 0; index < snapshot.pinned_app_count; ++index)
+    for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
         const reach_application *application =
-            &snapshot.pinned_apps[index].application;
+            &snapshot->pinned_apps[index].application;
         int32_t matches = reach_path_equals(application->launch.path, path);
         for (size_t runtime_index = 0;
              !matches && runtime_index < application->identity.runtime_path_count;
@@ -214,8 +220,12 @@ int reachctl_wallpaper_monitor_command(const wchar_t *index_text, const wchar_t 
         return 1;
     }
 
-    reach_config_snapshot snapshot = {};
-    reach_result load_result = reach_config_service_snapshot(service, &snapshot);
+    std::unique_ptr<reach_config_snapshot> snapshot(
+        new (std::nothrow) reach_config_snapshot{});
+    reach_result load_result =
+        snapshot != nullptr
+            ? reach_config_service_snapshot(service, snapshot.get())
+            : REACH_ERROR;
     if (load_result != REACH_OK)
     {
         reach_config_service_destroy(service);
@@ -227,7 +237,7 @@ int reachctl_wallpaper_monitor_command(const wchar_t *index_text, const wchar_t 
         return 1;
     }
 
-    uint16_t *target_path = snapshot.monitor_wallpaper_paths[monitor_index];
+    uint16_t *target_path = snapshot->monitor_wallpaper_paths[monitor_index];
 
     if (reach_path_equals(target_path, absolute_path))
     {
