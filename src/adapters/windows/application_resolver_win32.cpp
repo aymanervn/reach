@@ -265,8 +265,8 @@ static void reach_windows_collect_aumid_key(HKEY classes, const wchar_t *subkey)
 static void reach_windows_collect_aumid_root(HKEY root)
 {
     HKEY classes = nullptr;
-    if (RegOpenKeyExW(root, L"Software\\Classes", 0, KEY_ENUMERATE_SUB_KEYS, &classes) !=
-        ERROR_SUCCESS)
+    if (RegOpenKeyExW(root, L"Software\\Classes", 0,
+                      KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS, &classes) != ERROR_SUCCESS)
     {
         return;
     }
