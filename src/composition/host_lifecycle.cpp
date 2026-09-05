@@ -158,6 +158,10 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->window_manager.ops.destroy(host->window_manager.manager);
     }
+    if (host->application_resolver.ops.destroy != nullptr)
+    {
+        host->application_resolver.ops.destroy(host->application_resolver.resolver);
+    }
     reach_config_service_destroy(host->config_service);
     host->config_service = nullptr;
     if (host->config_store.ops.destroy != nullptr)
@@ -244,6 +248,7 @@ static void reach_host_cleanup(reach_host *host)
     host->pointer_move = {};
     host->input_source = {};
     host->window_manager = {};
+    host->application_resolver = {};
     host->foreground_watcher = {};
     host->config_store = {};
     host->tray_service = nullptr;
@@ -320,6 +325,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->input_source = dependencies->input_source;
     host->monitors = dependencies->monitors;
     host->window_manager = dependencies->window_manager;
+    host->application_resolver = dependencies->application_resolver;
     host->foreground_watcher = dependencies->foreground_watcher;
     host->window_tracking = nullptr;
     if (reach_window_tracking_create(host->window_manager, &host->window_tracking) != REACH_OK)

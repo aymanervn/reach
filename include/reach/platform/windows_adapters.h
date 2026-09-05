@@ -2,6 +2,7 @@
 #define REACH_PLATFORM_WINDOWS_ADAPTERS_H
 
 #include "reach/ports/app_launcher.h"
+#include "reach/ports/application_resolver.h"
 #include "reach/ports/app_update.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/bluetooth.h"
@@ -52,6 +53,8 @@ extern "C"
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
     reach_result reach_windows_create_settings_launcher(reach_settings_launcher_port *out_port);
     reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port);
+    reach_result reach_windows_create_application_resolver(
+        reach_application_resolver_port *out_port);
     reach_result reach_windows_create_terminal_launcher(reach_terminal_launcher_port *out_port);
     reach_result reach_windows_create_tray_provider(reach_tray_provider_port *out_port);
     reach_result reach_windows_create_icon_provider(reach_icon_provider_port *out_port);
