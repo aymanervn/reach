@@ -1056,7 +1056,7 @@ static void reach_dock_item_add_instance(reach_dock_item_model *item, uintptr_t 
     }
 }
 
-void reach_dock_feature_model_build_candidates(
+static void reach_dock_feature_model_build_candidates(
     reach_dock_item_model *items, size_t *item_count, const reach_pinned_app_model *pinned_apps,
     size_t pinned_app_count, const reach_window_snapshot *open_windows,
     const uint32_t *window_group_ids, size_t open_window_count,
