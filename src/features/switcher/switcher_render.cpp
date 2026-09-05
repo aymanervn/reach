@@ -60,8 +60,11 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
         {
             continue;
         }
-        const uint16_t *icon_path = window->icon_ref[0] != 0 ? window->icon_ref : window->path;
-        if (icon_path[0] != 0)
+        const uint16_t *runtime_path =
+            reach_application_identity_primary_runtime_path(&window->identity);
+        const uint16_t *icon_path =
+            window->icon_ref[0] != 0 ? window->icon_ref : runtime_path;
+        if (icon_path != nullptr && icon_path[0] != 0)
         {
             items[index].icon_id = reach_icon_service_get(reach_switcher_icons(switcher), icon_path,
                                                           ctx->icon_size_px);

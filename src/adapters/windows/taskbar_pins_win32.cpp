@@ -310,9 +310,17 @@ static reach_result reach_taskbar_collect_favorites(reach_pinned_app_model *pins
         return REACH_ERROR;
     }
 
-    reach_pinned_app_model decoded[REACH_MAX_PINNED_APPS] = {};
+    std::vector<reach_pinned_app_model> decoded;
+    try
+    {
+        decoded.resize(REACH_MAX_PINNED_APPS);
+    }
+    catch (const std::bad_alloc &)
+    {
+        return REACH_ERROR;
+    }
     reach_taskbar_favorites_decode decode = {};
-    decode.pins = decoded;
+    decode.pins = decoded.data();
     decode.capacity = REACH_MAX_PINNED_APPS;
     reach_result result =
         reach_taskbar_pin_blob_visit(data.data(), data.size(), reach_taskbar_decode_favorite,

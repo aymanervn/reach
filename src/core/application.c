@@ -72,6 +72,25 @@ int32_t reach_application_identity_matches(const reach_application_identity *a,
     return 0;
 }
 
+int32_t reach_application_identity_same(const reach_application_identity *a,
+                                        const reach_application_identity *b)
+{
+    if (a == NULL || b == NULL ||
+        !reach_application_text_equal(a->app_user_model_id, b->app_user_model_id, 0) ||
+        a->runtime_path_count != b->runtime_path_count)
+    {
+        return 0;
+    }
+    for (size_t index = 0; index < a->runtime_path_count; ++index)
+    {
+        if (!reach_application_text_equal(a->runtime_paths[index], b->runtime_paths[index], 1))
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 int32_t reach_application_identity_add_runtime_path(reach_application_identity *identity,
                                                     const uint16_t *path)
 {

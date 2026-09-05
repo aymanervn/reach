@@ -451,9 +451,15 @@ void reach_context_menu_command_action(const reach_menu_request *request,
             return;
         }
         out->kind = REACH_FEATURE_ACTION_OPEN_TARGET;
-        out->target.kind = REACH_FEATURE_TARGET_PATH;
+        out->target.kind =
+            request->launch_kind != REACH_APPLICATION_LAUNCH_NONE ||
+                    request->app_user_model_id[0] != 0
+                ? REACH_FEATURE_TARGET_APP
+                : REACH_FEATURE_TARGET_PATH;
         out->target.path = request->path;
         out->target.arguments = request->arguments[0] != 0 ? request->arguments : nullptr;
+        out->target.app_user_model_id = request->app_user_model_id;
+        out->target.launch_kind = request->launch_kind;
         out->flags |= REACH_FEATURE_ACTION_FLAG_NEW_INSTANCE;
         if (command == REACH_CONTEXT_MENU_COMMAND_OPEN_AS_ADMIN)
         {
@@ -473,6 +479,7 @@ void reach_context_menu_command_action(const reach_menu_request *request,
         out->target.path = request->path;
         out->target.app_user_model_id = request->app_user_model_id;
         out->target.icon_ref = request->icon_ref;
+        out->target.launch_kind = request->launch_kind;
         return;
 
     case REACH_CONTEXT_MENU_COMMAND_CLOSE:

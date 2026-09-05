@@ -38,7 +38,6 @@ function(reach_configure_windows target)
 endfunction()
 
 add_library(reach_support STATIC
-    src/support/application_identity.cpp
     src/support/util.cpp
     src/support/animation.cpp
     src/support/layout.cpp

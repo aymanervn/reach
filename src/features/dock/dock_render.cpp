@@ -9,19 +9,30 @@
 
 static uint16_t reach_dock_item_fallback_initial(const reach_dock_item_model *item)
 {
-    if (item == nullptr || item->path[0] == 0)
+    if (item == nullptr)
+    {
+        return '?';
+    }
+    const uint16_t *path =
+        reach_application_identity_primary_runtime_path(
+            &item->application.identity);
+    if (path == nullptr)
+    {
+        path = item->application.launch.path;
+    }
+    if (path[0] == 0)
     {
         return '?';
     }
     size_t stem = 0;
-    for (size_t index = 0; item->path[index] != 0; ++index)
+    for (size_t index = 0; path[index] != 0; ++index)
     {
-        if (item->path[index] == '\\' || item->path[index] == '/')
+        if (path[index] == '\\' || path[index] == '/')
         {
             stem = index + 1;
         }
     }
-    return item->path[stem] != 0 ? item->path[stem] : '?';
+    return path[stem] != 0 ? path[stem] : '?';
 }
 
 static void reach_dock_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
@@ -320,7 +331,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         const reach_dock_item_model *item = &state->model.items[index];
-        const uint16_t *icon_path = item->icon_ref;
+        const uint16_t *icon_path = item->application.icon_ref;
         uint16_t initial = reach_dock_item_fallback_initial(item);
         const reach_window_snapshot *window =
             item->window != 0

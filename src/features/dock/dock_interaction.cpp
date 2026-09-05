@@ -64,7 +64,7 @@ reach_dock_item_action reach_dock_item_action_for_index(const reach_dock_feature
         return action;
     }
 
-    if (item->path[0] != 0)
+    if (item->application.launch.path[0] != 0)
     {
         action.type = REACH_DOCK_ITEM_ACTION_OPEN_APP;
     }

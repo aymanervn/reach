@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/application.h"
 #include "reach/core/geometry.h"
 
 #ifdef __cplusplus
@@ -48,6 +49,7 @@ extern "C"
         uint16_t arguments[REACH_MENU_TEXT_CAPACITY];
         uint16_t app_user_model_id[REACH_MENU_TEXT_CAPACITY];
         uint16_t icon_ref[REACH_MENU_TEXT_CAPACITY];
+        reach_application_launch_kind launch_kind;
 
         uint32_t commands[REACH_CONTEXT_MENU_MAX_ITEMS];
         size_t command_count;

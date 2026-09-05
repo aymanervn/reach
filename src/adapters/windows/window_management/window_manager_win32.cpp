@@ -617,13 +617,13 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
     snapshot.id = static_cast<uintptr_t>(helper.window);
     snapshot.process_id = static_cast<reach_process_id>(helper.process_id);
     (void)reach_copy_utf16(snapshot.title, 260, reinterpret_cast<const uint16_t *>(helper.title));
-    (void)reach_copy_utf16(snapshot.path, 260,
-                           reinterpret_cast<const uint16_t *>(helper.process_path));
+    (void)reach_application_identity_add_runtime_path(
+        &snapshot.identity, reinterpret_cast<const uint16_t *>(helper.process_path));
     reach_window_manager_icon_ref_for_helper(helper, snapshot.icon_ref, 260);
     snapshot.visible = helper.visible;
     snapshot.maximized = helper.maximized;
     snapshot.minimized = helper.iconic;
-    (void)reach_copy_utf16(snapshot.app_user_model_id, 260,
+    (void)reach_copy_utf16(snapshot.identity.app_user_model_id, 260,
                            reinterpret_cast<const uint16_t *>(helper.app_user_model_id));
     *out_window = snapshot;
     reach_window_manager_unlock(manager);
@@ -728,40 +728,6 @@ static reach_result reach_window_manager_move_windows(reach_window_manager *mana
     return result;
 }
 
-static reach_result reach_window_manager_pin_app_for_window(reach_window_manager *manager,
-                                                            uintptr_t window_id,
-                                                            const reach_window_snapshot *snapshot,
-                                                            reach_pinned_app_model *out_app)
-{
-    (void)snapshot;
-    if (manager == nullptr || window_id == 0 || out_app == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    reach_window_manager_lock(manager);
-    const reach_service_window_snapshot *helper =
-        reach_window_manager_find_helper_window(manager, window_id);
-    if (helper == nullptr || helper->process_path[0] == 0)
-    {
-        reach_window_manager_unlock(manager);
-        return REACH_ERROR;
-    }
-
-    *out_app = {};
-    out_app->application.launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
-    (void)reach_copy_utf16(out_app->application.launch.path, 260,
-                           reinterpret_cast<const uint16_t *>(helper->process_path));
-    (void)reach_application_identity_add_runtime_path(
-        &out_app->application.identity,
-        reinterpret_cast<const uint16_t *>(helper->process_path));
-    reach_window_manager_icon_ref_for_helper(*helper, out_app->application.icon_ref, 260);
-    (void)reach_copy_utf16(out_app->application.identity.app_user_model_id, 260,
-                           reinterpret_cast<const uint16_t *>(helper->app_user_model_id));
-    reach_window_manager_unlock(manager);
-    return REACH_OK;
-}
-
 static reach_result reach_window_manager_activate(reach_window_manager *manager,
                                                   uintptr_t window_id)
 {
@@ -828,7 +794,6 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.frame_bounds = reach_window_manager_frame_bounds;
     out_port->ops.outer_bounds = reach_window_manager_outer_bounds;
     out_port->ops.move_windows = reach_window_manager_move_windows;
-    out_port->ops.pin_app_for_window = reach_window_manager_pin_app_for_window;
     out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;
     out_port->ops.activate = reach_window_manager_activate;

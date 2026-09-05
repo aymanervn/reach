@@ -1,22 +1,48 @@
 #include "reach/features/dock.h"
 
-#include "reach/support/application_identity.h"
+#include <new>
 
-void reach_dock_feature_model_init(reach_dock_feature_model *model)
+reach_result reach_dock_feature_model_init(reach_dock_feature_model *model)
+{
+    if (model == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    *model = {};
+    model->items =
+        new (std::nothrow) reach_dock_item_model[REACH_MAX_DOCK_ITEMS * 2]{};
+    return model->items != nullptr ? REACH_OK : REACH_ERROR;
+}
+
+void reach_dock_feature_model_reset(reach_dock_feature_model *model)
 {
     if (model == nullptr)
     {
         return;
     }
 
+    model->item_count = 0;
+    model->order_count = 0;
+}
+
+void reach_dock_feature_model_destroy(reach_dock_feature_model *model)
+{
+    if (model == nullptr)
+    {
+        return;
+    }
+
+    delete[] model->items;
     *model = {};
 }
 
-int32_t reach_dock_item_identity_equal(const reach_dock_item_model *item, const uint16_t *path,
-                                       const uint16_t *app_user_model_id)
+int32_t reach_dock_item_identity_matches(
+    const reach_dock_item_model *item,
+    const reach_application_identity *identity)
 {
-    return item != nullptr && reach_application_identity_equal(
-                                  item->path, item->app_user_model_id, path, app_user_model_id);
+    return item != nullptr &&
+           reach_application_identity_matches(&item->application.identity, identity);
 }
 
 uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *model, size_t index)

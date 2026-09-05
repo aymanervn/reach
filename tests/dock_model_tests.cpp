@@ -31,8 +31,10 @@ static reach_window_snapshot make_window(uintptr_t id, const char *path, const c
     window.id = id;
     window.visible = 1;
     reach_copy_ascii_to_utf16(window.title, 260, "window");
-    reach_copy_ascii_to_utf16(window.path, 260, path);
-    reach_copy_ascii_to_utf16(window.app_user_model_id, 260, aumid);
+    uint16_t runtime_path[260] = {};
+    reach_copy_ascii_to_utf16(runtime_path, 260, path);
+    reach_application_identity_add_runtime_path(&window.identity, runtime_path);
+    reach_copy_ascii_to_utf16(window.identity.app_user_model_id, 260, aumid);
     return window;
 }
 
@@ -134,6 +136,7 @@ static void test_unpinned_windows_group_into_one_item(void)
     expect_true(reach_dock_feature_model_find_order_key(
                     &model, reach_dock_item_key_at(&model, 0)) == 0,
                 "the item holds the first slot in the order");
+    reach_dock_feature_model_destroy(&model);
 }
 
 static void test_pinned_app_claims_matching_windows(void)
@@ -159,6 +162,7 @@ static void test_pinned_app_claims_matching_windows(void)
     expect_true(model.items[0].window == 101, "pinned item takes first matching window");
     expect_true(model.items[1].pinned == 0 && model.items[1].pin_id == 0,
                 "leftover window forms an unpinned entry");
+    reach_dock_feature_model_destroy(&model);
 }
 
 static void test_shortcut_pin_matches_executable(void)
@@ -177,6 +181,7 @@ static void test_shortcut_pin_matches_executable(void)
                                          matches_thunk, nullptr);
     expect_true(model.item_count == 1 && model.items[0].window == 104,
                 "resolved shortcut executable claims the running window");
+    reach_dock_feature_model_destroy(&model);
 }
 
 static void test_key_stable_when_representative_closes(void)
@@ -206,6 +211,7 @@ static void test_key_stable_when_representative_closes(void)
                 "group keeps its dock position when representative closes");
     expect_true(model.items[0].window == 102,
                 "surviving window becomes the representative");
+    reach_dock_feature_model_destroy(&model);
 }
 
 static void test_order_preserved_and_new_groups_append(void)
@@ -231,10 +237,13 @@ static void test_order_preserved_and_new_groups_append(void)
     reach_dock_feature_model_build_items(&model, &next_key, pins, 1, with_new, new_group_ids, 3, matches_thunk,
                                          nullptr);
 
-    expect_true(reach_test_utf16_equals_ascii(model.items[0].path, "C:\\apps\\code.exe"),
+    expect_true(reach_test_utf16_equals_ascii(
+                    model.items[0].application.launch.path, "C:\\apps\\code.exe"),
                 "moved group keeps its position across rebuild");
-    expect_true(reach_test_utf16_equals_ascii(model.items[3].path, "C:\\apps\\mail.exe"),
+    expect_true(reach_test_utf16_equals_ascii(
+                    model.items[3].application.launch.path, "C:\\apps\\mail.exe"),
                 "new group appends at the end");
+    reach_dock_feature_model_destroy(&model);
 }
 
 static void test_same_path_different_aumid_groups(void)
@@ -252,6 +261,7 @@ static void test_same_path_different_aumid_groups(void)
                                          nullptr);
 
     expect_true(model.item_count == 1, "shared executable produces one item");
+    reach_dock_feature_model_destroy(&model);
 }
 
 /* The property the whole dock rests on: an entry describes an application, and being pinned is
@@ -284,19 +294,22 @@ static void test_pinned_and_unpinned_entries_are_the_same_kind_of_thing(void)
     const reach_dock_item_model *b = &pinned.items[0];
 
     expect_true(a->key != 0 && b->key != 0, "every entry has a usable identity");
-    expect_true(reach_dock_item_identity_equal(a, b->path, b->app_user_model_id),
+    expect_true(reach_dock_item_identity_matches(a, &b->application.identity),
                 "both entries describe the same application");
     expect_true(a->instance_count == b->instance_count && a->instance_count == 1,
                 "both entries own the running window");
     expect_true(a->window == b->window && a->window == 501,
                 "both entries report the same representative");
-    expect_true(a->icon_ref[0] != 0 && b->icon_ref[0] != 0,
+    expect_true(a->application.icon_ref[0] != 0 && b->application.icon_ref[0] != 0,
                 "both entries can draw themselves without an external lookup");
-    expect_true(a->path[0] != 0 && b->path[0] != 0,
+    expect_true(a->application.launch.path[0] != 0 &&
+                    b->application.launch.path[0] != 0,
                 "both entries can be launched without an external lookup");
 
     expect_true(!a->pinned && a->pin_id == 0, "the unpinned entry differs only in its properties");
     expect_true(b->pinned && b->pin_id == 5, "the pinned entry differs only in its properties");
+    reach_dock_feature_model_destroy(&unpinned);
+    reach_dock_feature_model_destroy(&pinned);
 }
 
 static void test_identity_survives_pinning_and_unpinning(void)
@@ -328,6 +341,7 @@ static void test_identity_survives_pinning_and_unpinning(void)
                 "and keeps it again when it is unpinned");
     expect_true(!model.items[0].pinned && model.items[0].pin_id == 0,
                 "unpinning clears the properties without changing the entry");
+    reach_dock_feature_model_destroy(&model);
 }
 
 static void test_capacity_keeps_all_pinned_and_running_groups(void)
@@ -364,6 +378,7 @@ static void test_capacity_keeps_all_pinned_and_running_groups(void)
     expect_true(model.items[REACH_MAX_PINNED_APPS - 1].pinned == 1, "last pinned item is retained");
     expect_true(model.items[REACH_MAX_PINNED_APPS].pinned == 0,
                 "first running item follows the pins");
+    reach_dock_feature_model_destroy(&model);
 }
 
 static void test_fit_metrics_keep_native_size_until_overflow(void)
@@ -600,8 +615,9 @@ static void test_pinned_reorder_survives_the_config_round_trip(void)
     reach_dock_restore_order(dock, swapped, 2);
     reach_dock_mark_items_changed(dock);
     (void)reach_dock_arrange(dock, &arrange);
-    expect_true(reach_test_utf16_equals_ascii(reach_dock_item_at(dock, 0)->path,
-                                              "C:\\apps\\b.exe"),
+    expect_true(reach_test_utf16_equals_ascii(
+                    reach_dock_item_at(dock, 0)->application.launch.path,
+                    "C:\\apps\\b.exe"),
                 "the dragged pin takes the first slot straight away");
 
     /* config persists that move and reissues pin ids on the way back */
@@ -609,8 +625,9 @@ static void test_pinned_reorder_survives_the_config_round_trip(void)
                                            make_pin(8, "C:\\apps\\a.exe")};
     reach_dock_apply_pinned_apps(dock, reordered, 2);
     (void)reach_dock_arrange(dock, &arrange);
-    expect_true(reach_test_utf16_equals_ascii(reach_dock_item_at(dock, 0)->path,
-                                              "C:\\apps\\b.exe"),
+    expect_true(reach_test_utf16_equals_ascii(
+                    reach_dock_item_at(dock, 0)->application.launch.path,
+                    "C:\\apps\\b.exe"),
                 "the dragged order survives the config round trip that reissues pin ids");
     expect_true(reach_dock_item_at(dock, 0)->pin_id == 7,
                 "and the entry picks up the pin id the config store reissued");
