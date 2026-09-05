@@ -22,9 +22,8 @@ extern "C"
         reach_window_id id;
         reach_process_id process_id;
         uint16_t title[260];
-        uint16_t path[260];
+        reach_application_identity identity;
         uint16_t icon_ref[260];
-        uint16_t app_user_model_id[260];
         int32_t visible;
         int32_t maximized;
         int32_t minimized;
@@ -55,9 +54,6 @@ extern "C"
                                      reach_rect_f32 *out_bounds);
         reach_result (*move_windows)(reach_window_manager *manager,
                                      const reach_window_move *windows, size_t count);
-        reach_result (*pin_app_for_window)(reach_window_manager *manager, reach_window_id window_id,
-                                           const reach_window_snapshot *snapshot,
-                                           reach_pinned_app_model *out_app);
         int32_t (*privileged_control_available)(const reach_window_manager *manager);
         reach_result (*start_privileged_control)(reach_window_manager *manager);
         reach_result (*activate)(reach_window_manager *manager, reach_window_id window_id);

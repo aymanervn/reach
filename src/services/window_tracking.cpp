@@ -1,6 +1,5 @@
 #include "reach/services/window_tracking.h"
 
-#include "reach/support/application_identity.h"
 #include "reach/support/util.h"
 
 #include <condition_variable>
@@ -32,7 +31,10 @@ struct reach_window_tracking
 
 static const uint16_t *reach_window_tracking_icon_ref(const reach_window_snapshot *window)
 {
-    return window->icon_ref[0] != 0 ? window->icon_ref : window->path;
+    const uint16_t *runtime_path =
+        reach_application_identity_primary_runtime_path(&window->identity);
+    return window->icon_ref[0] != 0 || runtime_path == nullptr ? window->icon_ref
+                                                               : runtime_path;
 }
 
 reach_result reach_window_tracking_create(reach_window_manager_port window_manager,
@@ -181,11 +183,8 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
     {
         return 0;
     }
-    reach_application_identity identity = {};
-    (void)reach_copy_utf16(identity.app_user_model_id, 260,
-                           window->app_user_model_id);
-    (void)reach_application_identity_add_runtime_path(&identity, window->path);
-    return reach_application_identity_matches(&app->application.identity, &identity);
+    return reach_application_identity_matches(&app->application.identity,
+                                              &window->identity);
 }
 
 void reach_window_tracking_app_display_name(const reach_window_snapshot *window, uint16_t *out_name,
@@ -202,7 +201,9 @@ void reach_window_tracking_app_display_name(const reach_window_snapshot *window,
         return;
     }
 
-    reach_copy_path_stem_utf16(out_name, out_name_count, window->path);
+    const uint16_t *runtime_path =
+        reach_application_identity_primary_runtime_path(&window->identity);
+    reach_copy_path_stem_utf16(out_name, out_name_count, runtime_path);
     if (out_name[0] == 0)
     {
         (void)reach_copy_utf16(out_name, out_name_count, window->title);
@@ -216,8 +217,7 @@ int32_t reach_window_tracking_windows_same_app(const reach_window_snapshot *a,
     {
         return 0;
     }
-    return reach_application_identity_equal(a->path, a->app_user_model_id, b->path,
-                                            b->app_user_model_id);
+    return reach_application_identity_matches(&a->identity, &b->identity);
 }
 
 static size_t reach_window_tracking_group_root(size_t *parents, size_t index)
@@ -459,7 +459,8 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         if (service->window_manager.ops.window_at(service->window_manager.manager, index,
                                                   &snapshot) != REACH_OK ||
             snapshot.id == 0 ||
-            (snapshot.path[0] == 0 && snapshot.app_user_model_id[0] == 0 && snapshot.title[0] == 0))
+            (snapshot.identity.runtime_path_count == 0 &&
+             snapshot.identity.app_user_model_id[0] == 0 && snapshot.title[0] == 0))
         {
             continue;
         }
@@ -507,10 +508,9 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         size_t root = reach_window_tracking_group_root(parents, index);
         for (size_t old_index = 0; old_index < old_count; ++old_index)
         {
-            if (!reach_application_identity_equal(
-                    service->open_windows[index].path,
-                    service->open_windows[index].app_user_model_id, old_windows[old_index].path,
-                    old_windows[old_index].app_user_model_id))
+            if (!reach_application_identity_matches(
+                    &service->open_windows[index].identity,
+                    &old_windows[old_index].identity))
             {
                 continue;
             }
@@ -558,9 +558,9 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         {
             int32_t item_changed =
                 old_windows[index].id != service->open_windows[index].id ||
-                !reach_utf16_equal(old_windows[index].path, service->open_windows[index].path) ||
-                !reach_utf16_equal(old_windows[index].app_user_model_id,
-                                   service->open_windows[index].app_user_model_id);
+                !reach_application_identity_same(
+                    &old_windows[index].identity,
+                    &service->open_windows[index].identity);
             int32_t icon_ref_changed =
                 !reach_utf16_equal(reach_window_tracking_icon_ref(&old_windows[index]),
                                    reach_window_tracking_icon_ref(&service->open_windows[index]));

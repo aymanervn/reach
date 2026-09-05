@@ -376,8 +376,15 @@ static void reach_top_bar_update_current_app(reach_top_bar *top_bar)
         return;
     }
 
-    reach_copy_utf16(state->current_app_icon_ref, 260,
-                     window->icon_ref[0] != 0 ? window->icon_ref : window->path);
+    const uint16_t *runtime_path =
+        reach_application_identity_primary_runtime_path(&window->identity);
+    state->current_app_icon_ref[0] = 0;
+    const uint16_t *icon_ref =
+        window->icon_ref[0] != 0 ? window->icon_ref : runtime_path;
+    if (icon_ref != nullptr)
+    {
+        reach_copy_utf16(state->current_app_icon_ref, 260, icon_ref);
+    }
     reach_window_tracking_app_display_name(window, state->current_app_name, 260);
 }
 

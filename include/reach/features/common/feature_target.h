@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "reach/core/application.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -28,6 +30,7 @@ extern "C"
         const uint16_t *arguments;
         const uint16_t *app_user_model_id;
         const uint16_t *icon_ref;
+        reach_application_launch_kind launch_kind;
     } reach_feature_target;
 
 #ifdef __cplusplus

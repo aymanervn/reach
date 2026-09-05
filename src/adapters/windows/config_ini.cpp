@@ -300,6 +300,7 @@ static reach_result reach_config_store_load(reach_config_store *store,
                 reinterpret_cast<const uint16_t *>(legacy_path));
         }
         reach_config_resolve_pinned_shortcut(application);
+        (void)reach_windows_enrich_application(application);
         if (application->icon_ref[0] == 0)
         {
             (void)reach_copy_utf16(application->icon_ref, 260, application->launch.path);

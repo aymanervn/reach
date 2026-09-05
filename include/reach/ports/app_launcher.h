@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "reach/core/application.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -17,6 +18,7 @@ extern "C"
         uint16_t path[260];
         uint16_t arguments[260];
         uint16_t app_user_model_id[260];
+        reach_application_launch_kind launch_kind;
         int32_t force_new_instance;
         int32_t run_as_admin;
     } reach_app_launch_request;

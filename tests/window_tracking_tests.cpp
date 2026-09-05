@@ -20,8 +20,10 @@ static reach_window_snapshot make_window(uintptr_t id, const char *path, const c
     window.id = id;
     window.visible = 1;
     reach_copy_ascii_to_utf16(window.title, 260, "window");
-    reach_copy_ascii_to_utf16(window.path, 260, path);
-    reach_copy_ascii_to_utf16(window.app_user_model_id, 260, aumid);
+    uint16_t runtime_path[260] = {};
+    reach_copy_ascii_to_utf16(runtime_path, 260, path);
+    reach_application_identity_add_runtime_path(&window.identity, runtime_path);
+    reach_copy_ascii_to_utf16(window.identity.app_user_model_id, 260, aumid);
     return window;
 }
 

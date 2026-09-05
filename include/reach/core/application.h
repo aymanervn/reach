@@ -45,6 +45,8 @@ extern "C"
 
     int32_t reach_application_identity_matches(const reach_application_identity *a,
                                                const reach_application_identity *b);
+    int32_t reach_application_identity_same(const reach_application_identity *a,
+                                            const reach_application_identity *b);
     int32_t reach_application_identity_add_runtime_path(reach_application_identity *identity,
                                                         const uint16_t *path);
     int32_t reach_application_identity_merge(reach_application_identity *target,

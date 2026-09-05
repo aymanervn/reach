@@ -92,7 +92,10 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (request->app_user_model_id[0] != 0)
+    if (request->app_user_model_id[0] != 0 &&
+        (request->launch_kind == REACH_APPLICATION_LAUNCH_PACKAGED ||
+         (request->launch_kind == REACH_APPLICATION_LAUNCH_NONE &&
+          request->path[0] == 0)))
     {
         reach_result activation = reach_windows_activate_application(request);
         if (activation == REACH_OK || request->path[0] == 0)

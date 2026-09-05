@@ -41,9 +41,7 @@ extern "C"
         int32_t pinned;
         uint32_t pin_id;
 
-        uint16_t path[REACH_DOCK_TEXT_CAPACITY];
-        uint16_t app_user_model_id[REACH_DOCK_TEXT_CAPACITY];
-        uint16_t icon_ref[REACH_DOCK_TEXT_CAPACITY];
+        reach_application application;
 
         uintptr_t instances[REACH_DOCK_MAX_INSTANCES];
         size_t instance_count;
@@ -52,13 +50,15 @@ extern "C"
 
     typedef struct reach_dock_feature_model
     {
-        reach_dock_item_model items[REACH_MAX_DOCK_ITEMS];
+        reach_dock_item_model *items;
         size_t item_count;
         uint32_t order[REACH_MAX_DOCK_ITEMS];
         size_t order_count;
     } reach_dock_feature_model;
 
-    void reach_dock_feature_model_init(reach_dock_feature_model *model);
+    reach_result reach_dock_feature_model_init(reach_dock_feature_model *model);
+    void reach_dock_feature_model_reset(reach_dock_feature_model *model);
+    void reach_dock_feature_model_destroy(reach_dock_feature_model *model);
     uint32_t reach_dock_feature_model_item_pin_id(const reach_dock_feature_model *model,
                                                   size_t index);
     size_t reach_dock_feature_model_find_item_key(const reach_dock_feature_model *model,
@@ -68,9 +68,9 @@ extern "C"
     void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t source,
                                              size_t target);
     uint32_t reach_dock_item_key_at(const reach_dock_feature_model *model, size_t index);
-    int32_t reach_dock_item_identity_equal(const reach_dock_item_model *item,
-                                           const uint16_t *path,
-                                           const uint16_t *app_user_model_id);
+    int32_t reach_dock_item_identity_matches(
+        const reach_dock_item_model *item,
+        const reach_application_identity *identity);
     size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_model *model,
                                                        uint32_t pin_id);
     size_t
