@@ -137,12 +137,27 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
 
     for (size_t index = 0; index < a_count; ++index)
     {
-        if (a[index].id != b[index].id || !reach_utf16_equal(a[index].path, b[index].path) ||
-            !reach_utf16_equal(a[index].arguments, b[index].arguments) ||
-            !reach_utf16_equal(a[index].icon_ref, b[index].icon_ref) ||
-            !reach_utf16_equal(a[index].app_user_model_id, b[index].app_user_model_id))
+        const reach_application *left = &a[index].application;
+        const reach_application *right = &b[index].application;
+        if (a[index].id != b[index].id ||
+            left->launch.kind != right->launch.kind ||
+            !reach_utf16_equal(left->launch.path, right->launch.path) ||
+            !reach_utf16_equal(left->launch.arguments, right->launch.arguments) ||
+            !reach_utf16_equal(left->icon_ref, right->icon_ref) ||
+            !reach_utf16_equal(left->identity.app_user_model_id,
+                               right->identity.app_user_model_id) ||
+            left->identity.runtime_path_count != right->identity.runtime_path_count)
         {
             return 0;
+        }
+        for (size_t runtime_index = 0;
+             runtime_index < left->identity.runtime_path_count; ++runtime_index)
+        {
+            if (!reach_utf16_equal(left->identity.runtime_paths[runtime_index],
+                                   right->identity.runtime_paths[runtime_index]))
+            {
+                return 0;
+            }
         }
     }
 

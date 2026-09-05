@@ -54,7 +54,17 @@ static reach_result reachctl_path_is_already_pinned(reach_config_service *servic
 
     for (size_t index = 0; index < snapshot.pinned_app_count; ++index)
     {
-        if (reach_path_equals(snapshot.pinned_apps[index].path, path))
+        const reach_application *application =
+            &snapshot.pinned_apps[index].application;
+        int32_t matches = reach_path_equals(application->launch.path, path);
+        for (size_t runtime_index = 0;
+             !matches && runtime_index < application->identity.runtime_path_count;
+             ++runtime_index)
+        {
+            matches = reach_path_equals(
+                application->identity.runtime_paths[runtime_index], path);
+        }
+        if (matches)
         {
             *out_pinned = 1;
             return REACH_OK;

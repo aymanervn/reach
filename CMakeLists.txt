@@ -92,6 +92,7 @@ target_link_libraries(reach_services PUBLIC
 )
 
 add_library(reach_core STATIC
+    src/core/application.c
     src/core/app_update.c
     src/core/bluetooth.c
     src/core/clipboard.c
@@ -110,6 +111,9 @@ reach_configure_common(reach_core)
 target_compile_features(reach_core PUBLIC
     c_std_11
     cxx_std_17
+)
+target_link_libraries(reach_services PUBLIC
+    reach_core
 )
 
 add_library(reach_features STATIC

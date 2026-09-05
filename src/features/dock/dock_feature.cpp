@@ -1068,9 +1068,12 @@ void reach_dock_feature_model_build_candidates(
         *item = {};
         item->pinned = 1;
         item->pin_id = pinned_apps[index].id;
-        reach_dock_item_set_identity(item, pinned_apps[index].path,
-                                     pinned_apps[index].app_user_model_id,
-                                     pinned_apps[index].icon_ref);
+        const reach_application *application = &pinned_apps[index].application;
+        const uint16_t *runtime_path =
+            reach_application_identity_primary_runtime_path(&application->identity);
+        reach_dock_item_set_identity(
+            item, runtime_path != nullptr ? runtime_path : application->launch.path,
+            application->identity.app_user_model_id, application->icon_ref);
         ++count;
     }
     size_t pinned_count = count;
@@ -1316,13 +1319,12 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
         {
             if (dock->pinned_apps[index].id == item->pin_id)
             {
+                const reach_application_launch_target *launch =
+                    &dock->pinned_apps[index].application.launch;
+                reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY,
+                                 launch->path);
                 reach_copy_utf16(out_request->arguments, REACH_MENU_TEXT_CAPACITY,
-                                 dock->pinned_apps[index].arguments);
-                if (dock->pinned_apps[index].shortcut_path[0] != 0)
-                {
-                    reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY,
-                                     dock->pinned_apps[index].shortcut_path);
-                }
+                                 launch->arguments);
                 break;
             }
         }

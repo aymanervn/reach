@@ -96,7 +96,11 @@ static reach_pinned_app_model make_pin(uint32_t id, const char *path)
 {
     reach_pinned_app_model app = {};
     app.id = id;
-    reach_copy_ascii_to_utf16(app.path, 260, path);
+    app.application.launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
+    reach_copy_ascii_to_utf16(app.application.launch.path, 260, path);
+    uint16_t runtime_path[260] = {};
+    reach_copy_ascii_to_utf16(runtime_path, 260, path);
+    reach_application_identity_add_runtime_path(&app.application.identity, runtime_path);
     return app;
 }
 
@@ -163,8 +167,10 @@ static void test_shortcut_pin_matches_executable(void)
     reach_dock_feature_model_init(&model);
     uint32_t next_key = 1;
     reach_pinned_app_model pin = make_pin(6, "C:\\apps\\zed.exe");
-    reach_copy_ascii_to_utf16(pin.shortcut_path, 260, "C:\\Pins\\Zed.lnk");
-    reach_copy_ascii_to_utf16(pin.app_user_model_id, 260, "ZedIndustries.Zed");
+    pin.application.launch.kind = REACH_APPLICATION_LAUNCH_SHORTCUT;
+    reach_copy_ascii_to_utf16(pin.application.launch.path, 260, "C:\\Pins\\Zed.lnk");
+    reach_copy_ascii_to_utf16(pin.application.identity.app_user_model_id, 260,
+                              "ZedIndustries.Zed");
     reach_window_snapshot window = make_window(104, "C:\\apps\\zed.exe", "");
     uint32_t group_id = 9;
     reach_dock_feature_model_build_items(&model, &next_key, &pin, 1, &window, &group_id, 1,
@@ -263,7 +269,8 @@ static void test_pinned_and_unpinned_entries_are_the_same_kind_of_thing(void)
                                          1, matches_thunk, nullptr);
 
     reach_pinned_app_model pins[1] = {make_pin(5, "C:\\apps\\brave.exe")};
-    reach_copy_ascii_to_utf16(pins[0].app_user_model_id, 260, "Brave.App");
+    reach_copy_ascii_to_utf16(pins[0].application.identity.app_user_model_id, 260,
+                              "Brave.App");
     reach_dock_feature_model pinned = {};
     reach_dock_feature_model_init(&pinned);
     uint32_t pinned_key = 1;
@@ -501,9 +508,11 @@ static void test_pinned_item_pressable_release_opens_its_target(void)
     }
 
     reach_pinned_app_model pin = make_pin(7, "C:\\apps\\brave.exe");
-    reach_copy_ascii_to_utf16(pin.arguments, 260, "--profile-directory=Default");
-    reach_copy_ascii_to_utf16(pin.app_user_model_id, 260, "Brave.App");
-    reach_copy_ascii_to_utf16(pin.shortcut_path, 260, "C:\\Pins\\Brave.lnk");
+    reach_copy_ascii_to_utf16(pin.application.launch.arguments, 260,
+                              "--profile-directory=Default");
+    reach_copy_ascii_to_utf16(pin.application.identity.app_user_model_id, 260, "Brave.App");
+    pin.application.launch.kind = REACH_APPLICATION_LAUNCH_SHORTCUT;
+    reach_copy_ascii_to_utf16(pin.application.launch.path, 260, "C:\\Pins\\Brave.lnk");
     reach_dock_apply_pinned_apps(dock, &pin, 1);
 
     reach_dock_arrange_context arrange = {};
