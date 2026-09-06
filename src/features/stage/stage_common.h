@@ -25,7 +25,6 @@ static inline double reach_stage_reflow_seconds(void)
 enum
 {
     REACH_STAGE_ANIMATION_PROGRESS = 0,
-    REACH_STAGE_ANIMATION_BACKDROP_OPACITY,
     REACH_STAGE_ANIMATION_REFLOW,
     REACH_STAGE_ANIMATION_CLOSE_HOVER,
     REACH_STAGE_ANIMATION_COUNT
@@ -35,7 +34,6 @@ struct reach_stage
 {
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_STAGE_ANIMATION_COUNT];
-    int32_t backdrop_open_pending;
     reach_stage_state state;
     reach_pressable pressable;
     size_t pressable_generation;

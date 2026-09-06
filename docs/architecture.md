@@ -217,23 +217,34 @@ its private overflow-popup capsule: popup layout, item hit resolution, press/rel
 left/right semantic actions, and cancellation. Composition retains topmost-window handling,
 surface lifecycle, semantic-action translation, and renderer-cache eviction before retired native
 icons are released.
-Stage is the window overview: a fullscreen overlay capsule that shrinks every open
-window into a centered grid. It owns tile layout, the open/close animation, hover
-state, and hit resolution, and reports only activate/dismiss actions. It uses no
+Stage is the window overview: a fullscreen overlay capsule that shrinks open app
+windows into a centered grid over a fixed Desktop preview. The Desktop keeps the
+same centered, solo-size geometry whether or not apps are present. Its outer edge fits between
+the top bar and Dock with 10dp clearance from each; it has no
+artificial header or title, and contributes only a phantom layout slot so the app
+grid retains overview-scale thumbnails without reserving a visible Desktop cell.
+Stage owns tile layout, the open/close animation, hover state, and hit resolution,
+gives overlapping app tiles pointer priority over Desktop, and reports only
+activate/dismiss actions. It uses no
 generic host transition: its fullscreen surface remains fixed to the monitor while
-the capsule's theme-timed progress animates the tiles. Backdrop opacity is another capsule-owned
-track: opening presents one transparent backdrop frame so the host's pre-render tick cannot consume
-the short fade, then fades over the first 35% of the configured Stage duration; closing holds
-its current opacity until the final 35%, then fades
-out at the same speed. It never calls the thumbnail port — it publishes a read-only placement list
+the capsule's theme-timed progress animates the tiles. It never calls the thumbnail port — it
+publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
 into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in
-screen space; the render pass converts to surface-local. Because DWM composites
-thumbnails _on top of_ the host surface, stage chrome (labels, selection) must stay
-outside the tile rects — drawing over a tile is not possible from the same surface.
-Minimized windows have no DWM content and fall back to an icon tile.
-The Desktop tile uses the Reach-owned top-level Progman compatibility host as its
-DWM source and crops the virtual-screen thumbnail to the primary monitor.
+screen space; the render pass converts to surface-local. Native-overlay placements
+select either the target surface or a plane behind it. App thumbnails remain DWM
+relationships on the Stage target. The Desktop relationship instead targets a
+non-activating top-level helper HWND that the Windows adapter keeps fullscreen and
+directly behind Stage. That lower HWND paints one fully opaque, theme-colored Stage
+background and positions the animated Desktop thumbnail within it. The upper Stage
+DirectComposition surface stays transparent except for app plates, headers, titles,
+close buttons, and the Desktop's transparent-center hover outline made from ordinary fills, so no
+moving cutout or split backdrop is required. Because each app DWM
+thumbnail still composites on top of its own destination surface, app chrome stays
+outside the app thumbnail rect. Minimized windows have no DWM content and fall back
+to an icon tile. The Desktop source is the Reach-owned top-level Progman
+compatibility host, cropped from the virtual-screen thumbnail to the primary
+monitor.
 Activating a tile suppresses every other tile's thumbnail for the close animation, so
 the chosen window animates alone instead of being covered by a maximized neighbour.
 A tile's `source_rect` is the screen rect the close animation lands on, and windows
@@ -573,6 +584,9 @@ and executes rendering without naming the feature. System HUD uses this path and
 declares Dock as its anchor; the Dock's shown-position bounds are stored on its
 feature runtime rather than in a HUD-specific host cache. Switcher also uses the
 path: its capsule owns width animation, presentation, arranged bounds, and geometry publication.
+Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved
+bounds receives the remaining rectangle through the generic surface context; Stage uses this
+contract after Dock and top bar arrangement rather than reading either feature directly.
 Clipboard declares Launcher as its anchor and likewise owns relayout, presentation, geometry,
 and command production. There is no named frame fallback: every registered surface runs the
 same frame function, and the architecture checker requires one runtime binding and one

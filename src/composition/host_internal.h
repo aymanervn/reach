@@ -236,6 +236,7 @@ typedef struct reach_feature_surface_context
 {
     const reach_theme *theme;
     reach_rect_f32 monitor_bounds;
+    reach_rect_f32 available_bounds;
     reach_rect_f32 anchor_bounds;
     reach_rect_f32 last_bounds;
     reach_rect_f32 visible_bounds;
@@ -254,6 +255,13 @@ typedef struct reach_feature_surface_context
     int32_t anchor_valid;
     int32_t content_transform_active;
 } reach_feature_surface_context;
+
+typedef enum reach_layout_reservation_edge
+{
+    REACH_LAYOUT_RESERVATION_NONE = 0,
+    REACH_LAYOUT_RESERVATION_TOP = 1,
+    REACH_LAYOUT_RESERVATION_BOTTOM = 2
+} reach_layout_reservation_edge;
 
 typedef struct reach_feature_layout_anchor
 {
@@ -279,6 +287,7 @@ typedef enum reach_popup_activation_decision
 typedef struct reach_feature_native_overlay_item
 {
     reach_window_id source;
+    reach_window_thumbnail_plane plane;
     reach_window_thumbnail_placement placement;
 } reach_feature_native_overlay_item;
 
@@ -286,7 +295,8 @@ typedef struct reach_feature_native_overlay_ops
 {
     size_t (*generation)(const void *capsule);
     size_t (*count)(const void *capsule);
-    reach_result (*item)(const void *capsule, size_t index, reach_feature_native_overlay_item *out);
+    reach_result (*item)(const void *capsule, size_t index, const reach_theme *theme,
+                         reach_feature_native_overlay_item *out);
 } reach_feature_native_overlay_ops;
 
 typedef struct reach_feature_surface_ops
@@ -329,6 +339,8 @@ typedef struct reach_layout_spec
     reach_surface_id anchor;
     uint32_t anchor_slot;
     int32_t priority;
+    reach_layout_reservation_edge reservation_edge;
+    int32_t uses_reserved_bounds;
 } reach_layout_spec;
 
 typedef struct reach_feature_anchor

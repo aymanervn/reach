@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/core/theme.h"
 #include "reach/core/window_id.h"
 #include "reach/support/util.h"
 
@@ -18,6 +19,12 @@ extern "C"
 
 #define REACH_WINDOW_THUMBNAIL_NONE ((reach_window_thumbnail_id)0)
 
+    typedef enum reach_window_thumbnail_plane
+    {
+        REACH_WINDOW_THUMBNAIL_PLANE_TARGET = 0,
+        REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET = 1
+    } reach_window_thumbnail_plane;
+
     typedef struct reach_window_thumbnail_placement
     {
         reach_rect_f32 destination;
@@ -25,6 +32,8 @@ extern "C"
         float opacity;
         int32_t visible;
         int32_t source_screen_valid;
+        reach_color background;
+        int32_t background_visible;
     } reach_window_thumbnail_placement;
 
     typedef struct reach_window_thumbnail_ops
@@ -32,6 +41,7 @@ extern "C"
         reach_result (*set_target)(reach_window_thumbnails *thumbnails, reach_window_id target);
 
         reach_result (*create)(reach_window_thumbnails *thumbnails, reach_window_id source,
+                               reach_window_thumbnail_plane plane,
                                reach_window_thumbnail_id *out_id);
 
         reach_result (*set_placement)(reach_window_thumbnails *thumbnails,

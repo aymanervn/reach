@@ -868,6 +868,10 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_BATTERY].layout.priority = 55;
     definitions[REACH_SURFACE_ID_SWITCHER].layout.priority = 60;
     definitions[REACH_SURFACE_ID_STAGE].layout.priority = 65;
+    definitions[REACH_SURFACE_ID_DOCK].layout.reservation_edge =
+        REACH_LAYOUT_RESERVATION_BOTTOM;
+    definitions[REACH_SURFACE_ID_TOP_BAR].layout.reservation_edge = REACH_LAYOUT_RESERVATION_TOP;
+    definitions[REACH_SURFACE_ID_STAGE].layout.uses_reserved_bounds = 1;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].layout.priority = 70;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].layout.priority = 80;
 
@@ -1075,26 +1079,39 @@ static size_t reach_stage_native_overlay_count(const void *capsule)
 }
 
 static reach_result reach_stage_native_overlay_item(const void *capsule, size_t index,
+                                                    const reach_theme *theme,
                                                     reach_feature_native_overlay_item *out)
 {
-    if (out == nullptr)
+    if (theme == nullptr || out == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
+    const reach_stage *stage = static_cast<const reach_stage *>(capsule);
     reach_stage_thumbnail_placement placement = {};
-    reach_result result =
-        reach_stage_thumbnail_at(static_cast<const reach_stage *>(capsule), index, &placement);
+    reach_result result = reach_stage_thumbnail_at(stage, index, &placement);
     if (result != REACH_OK)
     {
         return result;
     }
     out->source = placement.window;
+    out->plane = placement.behind_surface ? REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET
+                                          : REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
     out->placement.destination = placement.destination;
     out->placement.source_screen = placement.source_screen;
     out->placement.opacity = placement.opacity;
     out->placement.visible = placement.visible;
     out->placement.source_screen_valid = placement.source_screen_valid;
+    out->placement.background = theme->stage_backdrop;
+    out->placement.background.a = 1.0f;
+    out->placement.background_visible = placement.desktop && reach_stage_is_open(stage);
     return REACH_OK;
+}
+
+static int32_t reach_stage_surface_arrange(void *capsule,
+                                           const reach_feature_surface_context *ctx)
+{
+    return reach_stage_set_desktop_bounds(static_cast<reach_stage *>(capsule),
+                                          ctx->available_bounds);
 }
 
 static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {
@@ -1104,7 +1121,7 @@ static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {
 };
 
 static const reach_feature_surface_ops reach_stage_surface_ops = {
-    reach_prearranged_surface_arrange, reach_stage_surface_render, nullptr, nullptr,
+    reach_stage_surface_arrange, reach_stage_surface_render, nullptr, nullptr,
     &reach_stage_native_overlay_ops,
 };
 

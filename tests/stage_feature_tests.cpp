@@ -39,6 +39,25 @@ static reach_stage_open_window make_window(uintptr_t id, reach_rect_f32 frame)
     return window;
 }
 
+static reach_stage_open_window make_desktop(uintptr_t id, reach_rect_f32 frame)
+{
+    reach_stage_open_window window = make_window(id, frame);
+    window.desktop = 1;
+    return window;
+}
+
+static size_t find_desktop_tile(const reach_stage_state *state)
+{
+    for (size_t index = 0; index < state->tile_count; ++index)
+    {
+        if (state->tiles[index].desktop)
+        {
+            return index;
+        }
+    }
+    return state->tile_count;
+}
+
 static void advance_stage(reach_stage *stage, int steps, double delta_seconds)
 {
     const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
@@ -47,79 +66,6 @@ static void advance_stage(reach_stage *stage, int steps, double delta_seconds)
     {
         ops->tick(stage, delta_seconds, &tick);
     }
-}
-
-static void test_backdrop_uses_short_managed_fades(void)
-{
-    reach_stage *stage = nullptr;
-    expect_true(reach_stage_create(&stage) == REACH_OK && stage != nullptr,
-                "stage is created for backdrop timing");
-    if (stage == nullptr)
-    {
-        return;
-    }
-
-    reach_stage_set_animation_seconds(stage, 1.0f);
-    reach_stage_open_window window = make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f));
-    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, &window, 1);
-
-    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 0.0f,
-                "backdrop starts transparent");
-    advance_stage(stage, 1, 0.025);
-    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 0.0f,
-                "backdrop keeps the first presented frame transparent");
-    advance_stage(stage, 1, 0.35);
-    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 1.0f,
-                "backdrop reaches full opacity early");
-    expect_true(reach_stage_state_ptr(stage)->progress > 0.0f &&
-                    reach_stage_state_ptr(stage)->progress < 1.0f,
-                "tiles continue opening after the backdrop settles");
-
-    advance_stage(stage, 1, 0.65);
-    reach_stage_begin_close(stage);
-    advance_stage(stage, 60, 0.01);
-    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 1.0f,
-                "backdrop holds full opacity through most of close");
-
-    advance_stage(stage, 25, 0.01);
-    float fading = reach_stage_state_ptr(stage)->backdrop_opacity;
-    expect_true(fading > 0.0f && fading < 1.0f,
-                "backdrop fades during the final close segment");
-
-    advance_stage(stage, 15, 0.01);
-    expect_true(!reach_stage_is_open(stage), "backdrop fade ends with the stage close");
-    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, 0.0f,
-                "closed stage clears backdrop opacity");
-
-    reach_stage_destroy(stage);
-}
-
-static void test_backdrop_close_preserves_interrupted_open_opacity(void)
-{
-    reach_stage *stage = nullptr;
-    expect_true(reach_stage_create(&stage) == REACH_OK && stage != nullptr,
-                "stage is created for interrupted backdrop timing");
-    if (stage == nullptr)
-    {
-        return;
-    }
-
-    reach_stage_set_animation_seconds(stage, 1.0f);
-    reach_stage_open_window window = make_window(1, make_rect(0.0f, 0.0f, 400.0f, 300.0f));
-    (void)reach_stage_open(stage, make_rect(0.0f, 0.0f, 1000.0f, 1000.0f), 1.0f, &window, 1);
-    advance_stage(stage, 1, 0.025);
-    advance_stage(stage, 1, 0.05);
-
-    float interrupted = reach_stage_state_ptr(stage)->backdrop_opacity;
-    expect_true(interrupted > 0.0f && interrupted < 1.0f,
-                "interrupted opening has partial backdrop opacity");
-    reach_stage_begin_close(stage);
-    advance_stage(stage, 50, 0.01);
-    expect_near(reach_stage_state_ptr(stage)->backdrop_opacity, interrupted,
-                "closing holds the interrupted backdrop opacity without a jump");
-
-    reach_stage_force_close(stage);
-    reach_stage_destroy(stage);
 }
 
 static void test_open_and_close_state_machine(void)
@@ -341,14 +287,121 @@ static void test_closing_lands_on_the_current_window_frame(void)
     reach_stage_destroy(stage);
 }
 
+static void test_desktop_keeps_solo_geometry_behind_apps(void)
+{
+    reach_stage *stage = nullptr;
+    if (reach_stage_create(&stage) != REACH_OK || stage == nullptr)
+    {
+        expect_true(0, "stage is created for desktop placement");
+        return;
+    }
+
+    reach_rect_f32 bounds = make_rect(0.0f, 0.0f, 1920.0f, 1080.0f);
+    reach_stage_open_window desktop = make_desktop(100, bounds);
+    expect_true(reach_stage_open(stage, bounds, 1.0f, &desktop, 1) == REACH_OK,
+                "desktop-only stage opens");
+    reach_rect_f32 available = make_rect(0.0f, 40.0f, 1920.0f, 960.0f);
+    expect_true(reach_stage_set_desktop_bounds(stage, available),
+                "desktop accepts the space reserved between the bars");
+    advance_stage(stage, 40, 0.016);
+
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    size_t desktop_index = find_desktop_tile(state);
+    expect_true(desktop_index < state->tile_count, "desktop tile is present");
+    reach_rect_f32 solo = state->tiles[desktop_index].target_rect;
+    float border = reach_theme_border_thickness(reach_theme_default(), 1.0f);
+    expect_near(solo.y - border, 50.0f,
+                "desktop outer border leaves 10 dp below the top bar");
+    expect_near(solo.y + solo.height + border, 990.0f,
+                "desktop outer border leaves 10 dp above the Dock");
+    expect_true(solo.width > 1600.0f, "desktop thumbnail is noticeably larger");
+    expect_near(state->tiles[desktop_index].bar_height, 0.0f,
+                "desktop tile has no artificial top bar");
+
+    reach_stage_thumbnail_placement placement = {};
+    expect_true(reach_stage_thumbnail_at(stage, desktop_index, &placement) == REACH_OK,
+                "desktop thumbnail placement is readable");
+    expect_true(placement.behind_surface,
+                "desktop thumbnail uses the plane behind the Stage surface");
+
+    reach_stage_force_close(stage);
+    reach_stage_open_window windows[3] = {
+        make_window(1, make_rect(100.0f, 80.0f, 1200.0f, 800.0f)),
+        make_window(2, make_rect(300.0f, 160.0f, 900.0f, 700.0f)), desktop};
+    expect_true(reach_stage_open(stage, bounds, 1.0f, windows, 3) == REACH_OK,
+                "stage opens with apps and desktop");
+    expect_true(reach_stage_set_desktop_bounds(stage, available),
+                "reopened desktop accepts the space reserved between the bars");
+    advance_stage(stage, 40, 0.016);
+
+    state = reach_stage_state_ptr(stage);
+    desktop_index = find_desktop_tile(state);
+    expect_true(desktop_index < state->tile_count, "desktop remains present with apps");
+    const reach_stage_tile *desktop_tile = &state->tiles[desktop_index];
+    expect_near(desktop_tile->target_rect.x, solo.x,
+                "desktop keeps its solo horizontal position");
+    expect_near(desktop_tile->target_rect.y, solo.y, "desktop keeps its solo vertical position");
+    expect_near(desktop_tile->target_rect.width, solo.width, "desktop keeps its solo width");
+    expect_near(desktop_tile->target_rect.height, solo.height, "desktop keeps its solo height");
+    expect_true(state->tiles[0].target_rect.width < desktop_tile->target_rect.width,
+                "app thumbnails remain smaller than the desktop thumbnail");
+
+    expect_true(reach_stage_thumbnail_at(stage, 0, &placement) == REACH_OK,
+                "app thumbnail placement is readable");
+    expect_true(!placement.behind_surface, "app thumbnail stays on the Stage surface plane");
+
+    reach_stage_destroy(stage);
+}
+
+static void test_apps_take_pointer_priority_over_desktop(void)
+{
+    reach_stage *stage = nullptr;
+    if (reach_stage_create(&stage) != REACH_OK || stage == nullptr)
+    {
+        expect_true(0, "stage is created for overlapping desktop interaction");
+        return;
+    }
+
+    reach_rect_f32 bounds = make_rect(0.0f, 0.0f, 1920.0f, 1080.0f);
+    reach_stage_open_window desktop = make_desktop(100, bounds);
+    (void)reach_stage_open(stage, bounds, 1.0f, &desktop, 1);
+    advance_stage(stage, 40, 0.016);
+
+    reach_stage_open_window windows[2] = {
+        desktop, make_window(1, make_rect(100.0f, 80.0f, 1200.0f, 800.0f))};
+    expect_true(reach_stage_update_windows(stage, windows, 2),
+                "an app can join a desktop-only Stage");
+    advance_stage(stage, 40, 0.016);
+
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    size_t app_index = state->tiles[0].desktop ? 1 : 0;
+    size_t desktop_index = find_desktop_tile(state);
+    reach_point_f32 point = {state->tiles[app_index].current_rect.x +
+                                 state->tiles[app_index].current_rect.width * 0.5f,
+                             state->tiles[app_index].current_rect.y +
+                                 state->tiles[app_index].current_rect.height * 0.5f};
+    const reach_rect_f32 desktop_rect = state->tiles[desktop_index].current_rect;
+    expect_true(point.x >= desktop_rect.x && point.x <= desktop_rect.x + desktop_rect.width &&
+                    point.y >= desktop_rect.y && point.y <= desktop_rect.y + desktop_rect.height,
+                "app center overlaps the fixed desktop thumbnail");
+
+    size_t hit_index = state->tile_count;
+    expect_true(reach_stage_tile_at_point(stage, point, &hit_index),
+                "overlapping app thumbnail is interactive");
+    expect_true(hit_index == app_index && !state->tiles[hit_index].desktop,
+                "app thumbnail wins hit testing over desktop");
+
+    reach_stage_destroy(stage);
+}
+
 int main(void)
 {
-    test_backdrop_uses_short_managed_fades();
-    test_backdrop_close_preserves_interrupted_open_opacity();
     test_open_and_close_state_machine();
     test_force_close_keeps_configured_animation();
     test_closing_stage_finishes_without_external_wake_ups();
     test_close_before_the_first_tick_completes();
     test_closing_lands_on_the_current_window_frame();
+    test_desktop_keeps_solo_geometry_behind_apps();
+    test_apps_take_pointer_priority_over_desktop();
     return failures == 0 ? 0 : 1;
 }
