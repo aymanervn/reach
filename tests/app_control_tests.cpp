@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <stdio.h>
 #include <functional>
 #include <thread>
@@ -288,8 +290,63 @@ static void test_terminal_command_is_queued_unchanged(void)
     reach_app_control_destroy(service);
 }
 
+struct preparation_probe
+{
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool notified = false;
+    reach_window_id window = 0;
+    reach_window_id cover = 0;
+};
+
+static void test_preparation_has_a_separate_correlated_completion(void)
+{
+    preparation_probe probe;
+    reach_window_manager_port manager = {};
+    manager.manager = reinterpret_cast<reach_window_manager *>(&probe);
+    manager.ops.privileged_control_available = fake_privileged_available;
+    manager.ops.prepare = [](reach_window_manager *manager, reach_window_id window,
+                              reach_window_id cover)
+    {
+        auto *probe = reinterpret_cast<preparation_probe *>(manager);
+        probe->window = window;
+        probe->cover = cover;
+        return REACH_OK;
+    };
+    reach_app_control *service = nullptr;
+    auto notify = [](void *user)
+    {
+        auto *probe = static_cast<preparation_probe *>(user);
+        std::lock_guard<std::mutex> lock(probe->mutex);
+        probe->notified = true;
+        probe->changed.notify_one();
+    };
+    expect_true(reach_app_control_create({}, {}, {}, manager, notify, &probe, &service) == REACH_OK,
+                "preparation service is created");
+    expect_true(reach_app_control_schedule_preparation(service, 42, 84, 123) == REACH_OK,
+                "covered preparation is scheduled");
+    {
+        std::unique_lock<std::mutex> lock(probe.mutex);
+        expect_true(probe.changed.wait_for(lock, std::chrono::seconds(2),
+                                           [&probe] { return probe.notified; }),
+                    "preparation wakes its consumer through the completion event");
+    }
+    reach_result ordinary_result = REACH_OK;
+    expect_true(!reach_app_control_take_window_completed(service, &ordinary_result),
+                "ordinary window completion cannot consume preparation readiness");
+    reach_window_preparation_result result = {};
+    expect_true(reach_app_control_take_preparation(service, &result) &&
+                    result.request == 123 && result.window == 42 && result.result == REACH_OK,
+                "preparation retains its request identity and selected window");
+    expect_true(probe.window == 42 && probe.cover == 84, "the adapter receives the covering window");
+    expect_true(!reach_app_control_take_preparation(service, &result),
+                "preparation completion is consumed once");
+    reach_app_control_destroy(service);
+}
+
 int main(void)
 {
+    test_preparation_has_a_separate_correlated_completion();
     test_open_location_never_touches_the_port_on_the_caller();
     test_schedule_windows_closes_every_window();
     test_terminal_command_is_queued_unchanged();

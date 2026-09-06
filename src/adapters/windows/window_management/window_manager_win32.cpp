@@ -110,7 +110,8 @@ static void reach_window_manager_fill_request_identity(const reach_window_manage
 
 static reach_result reach_window_manager_send_helper(reach_window_manager *manager,
                                                      reach_service_command command,
-                                                     uintptr_t window_id, reach_split_mode mode)
+                                                     uintptr_t window_id, reach_split_mode mode,
+                                                     reach_window_id cover = 0)
 {
     if (!reach_service_shared_reader_connected())
     {
@@ -121,6 +122,7 @@ static reach_result reach_window_manager_send_helper(reach_window_manager *manag
     request.version = reach_service_protocol_version();
     request.command = command;
     request.split_mode = static_cast<int32_t>(mode);
+    request.cover = cover;
     reach_window_manager_fill_request_identity(manager, window_id, &request);
 
     return reach_service_send_request(&request, nullptr);
@@ -736,6 +738,13 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     return result;
 }
 
+static reach_result reach_window_manager_prepare(reach_window_manager *manager,
+                                                 reach_window_id window, reach_window_id cover)
+{
+    return reach_window_manager_send_helper(manager, REACH_SERVICE_COMMAND_PREPARE,
+                                             window, REACH_SPLIT_LEFT, cover);
+}
+
 static reach_result reach_window_manager_minimize(reach_window_manager *manager,
                                                   uintptr_t window_id)
 {
@@ -797,6 +806,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;
     out_port->ops.activate = reach_window_manager_activate;
+    out_port->ops.prepare = reach_window_manager_prepare;
     out_port->ops.minimize = reach_window_manager_minimize;
     out_port->ops.close = reach_window_manager_close;
     out_port->ops.destroy = reach_window_manager_destroy;

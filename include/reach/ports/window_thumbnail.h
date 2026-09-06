@@ -51,6 +51,7 @@ extern "C"
         reach_result (*destroy_all)(reach_window_thumbnails *thumbnails);
 
         void (*destroy)(reach_window_thumbnails *thumbnails);
+        reach_window_id (*cover_window)(const reach_window_thumbnails *thumbnails);
     } reach_window_thumbnail_ops;
 
     typedef struct reach_window_thumbnail_port

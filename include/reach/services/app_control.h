@@ -20,7 +20,8 @@ extern "C"
     {
         REACH_WINDOW_CONTROL_ACTIVATE = 0,
         REACH_WINDOW_CONTROL_MINIMIZE = 1,
-        REACH_WINDOW_CONTROL_CLOSE = 2
+        REACH_WINDOW_CONTROL_CLOSE = 2,
+        REACH_WINDOW_CONTROL_PREPARE = 3
     } reach_window_control_action;
 
     reach_result reach_app_control_create(reach_app_launcher_port launcher,
@@ -65,6 +66,21 @@ extern "C"
                                                     reach_window_control_action action,
                                                     const uintptr_t *window_ids,
                                                     size_t window_count);
+    typedef struct reach_window_preparation_result
+    {
+        uint64_t request;
+        reach_window_id window;
+        reach_result result;
+    } reach_window_preparation_result;
+
+    reach_result reach_app_control_schedule_preparation(reach_app_control *service,
+                                                        reach_window_id window,
+                                                        reach_window_id cover, uint64_t request);
+    reach_result reach_app_control_schedule_desktop_preparation(reach_app_control *service,
+        const uintptr_t *windows, size_t count, reach_window_id cover, uint64_t request);
+    int32_t reach_app_control_take_preparation(reach_app_control *service,
+                                               reach_window_preparation_result *out);
+
     reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
                                                  reach_split_mode mode);
 

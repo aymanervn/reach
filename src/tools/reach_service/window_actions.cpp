@@ -1,5 +1,7 @@
 #include "window_actions.h"
 
+#include <dwmapi.h>
+
 struct reach_window_action_state
 {
     int32_t is_window;
@@ -258,6 +260,60 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
     reach_window_action_state state = reach_window_management_capture_state(target);
     reach_window_management_log_failure("activate.foreground", target, &state, &state);
     return REACH_ERROR;
+}
+
+reach_result reach_window_management_prepare(HWND hwnd, HWND cover)
+{
+    if (!IsWindow(hwnd) || !IsWindow(cover) || !IsWindowVisible(cover) || hwnd == cover ||
+        (GetWindowLongPtrW(cover, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    HWND target = reach_window_management_activation_target(hwnd);
+    if (target == nullptr || target != hwnd)
+    {
+        return REACH_ERROR;
+    }
+    if (!SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER))
+    {
+        return REACH_ERROR;
+    }
+    BOOL transitions_disabled = FALSE;
+    bool restore_transitions = SUCCEEDED(DwmGetWindowAttribute(
+        target, DWMWA_TRANSITIONS_FORCEDISABLED, &transitions_disabled, sizeof(transitions_disabled)));
+    BOOL disabled = TRUE;
+    if (restore_transitions)
+    {
+        (void)DwmSetWindowAttribute(target, DWMWA_TRANSITIONS_FORCEDISABLED, &disabled, sizeof(disabled));
+    }
+    DWORD_PTR response = 0;
+    bool restored = !IsIconic(target) || SendMessageTimeoutW(
+        target, WM_SYSCOMMAND, SC_RESTORE, 0, SMTO_ABORTIFHUNG | SMTO_BLOCK, 750, &response) != 0;
+    if (restored && !IsWindowVisible(target))
+    {
+        restored = ShowWindowAsync(target, SW_SHOWNOACTIVATE) != 0;
+    }
+    bool ready = restored && IsWindow(cover) && IsWindowVisible(cover) &&
+                 !IsIconic(target) && IsWindowVisible(target) &&
+                 reach_window_management_focus_target(target);
+    if (ready)
+    {
+        ready = SetWindowPos(target, cover, 0, 0, 0, 0,
+                              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER) != 0;
+    }
+    if (ready)
+    {
+        ready = SendMessageTimeoutW(target, WM_NULL, 0, 0,
+                                     SMTO_ABORTIFHUNG | SMTO_BLOCK, 750, &response) != 0;
+        ready = SUCCEEDED(DwmFlush()) && ready;
+    }
+    if (restore_transitions && IsWindow(target))
+    {
+        (void)DwmSetWindowAttribute(target, DWMWA_TRANSITIONS_FORCEDISABLED,
+                                    &transitions_disabled, sizeof(transitions_disabled));
+    }
+    return ready ? REACH_OK : REACH_ERROR;
 }
 
 reach_result reach_window_management_activate(HWND hwnd)

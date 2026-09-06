@@ -2,7 +2,7 @@
 
 uint32_t reach_service_protocol_version(void)
 {
-    return 9;
+    return 10;
 }
 
 int32_t reach_service_command_valid(uint32_t command)
@@ -15,6 +15,7 @@ int32_t reach_service_command_valid(uint32_t command)
     case REACH_SERVICE_COMMAND_SNAP:
     case REACH_SERVICE_COMMAND_CLOSE:
     case REACH_SERVICE_COMMAND_RESTORE:
+    case REACH_SERVICE_COMMAND_PREPARE:
         return 1;
     default:
         return 0;
@@ -37,6 +38,11 @@ int32_t reach_service_request_valid(const reach_service_request *request)
     if (request->window == 0)
     {
         return 0;
+    }
+
+    if (request->command == REACH_SERVICE_COMMAND_PREPARE)
+    {
+        return request->cover != 0 && request->cover != request->window;
     }
 
     if (request->command == REACH_SERVICE_COMMAND_SNAP)

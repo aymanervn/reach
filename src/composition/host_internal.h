@@ -608,6 +608,14 @@ struct reach_host
     reach_search_service *search_service;
     reach_app_control *app_control;
     reach_host_deferred_launch deferred_launch;
+    struct
+    {
+        reach_surface_id surface;
+        reach_window_id window;
+        uint64_t request;
+        int32_t pending;
+    } window_preparation;
+    uint64_t next_window_preparation;
     int32_t running;
     reach_runtime_policy_state runtime_policy;
     reach_audio_volume_port audio_volume;
@@ -740,6 +748,8 @@ reach_result reach_host_schedule_reveal_path(reach_host *host, const uint16_t *p
 reach_result reach_host_launch_settings_app(reach_host *host);
 void reach_host_stop_app_control(reach_host *host);
 void reach_host_process_deferred_launch(reach_host *host);
+void reach_host_start_window_preparation(reach_host *host, const reach_feature_runtime *source,
+                                          reach_result presentation_result);
 reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
                                                           const reach_app_launch_request *request);
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,

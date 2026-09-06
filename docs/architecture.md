@@ -220,7 +220,7 @@ icons are released.
 Stage is the window overview: a fullscreen overlay capsule that shrinks open app
 windows into a centered grid over a fixed Desktop preview. The Desktop keeps the
 same centered, solo-size geometry whether or not apps are present. Its outer edge fits between
-the top bar and Dock with 10dp clearance from each; it has no
+the top bar and Dock with 20dp clearance from each; it has no
 artificial header or title, and contributes only a phantom layout slot so the app
 grid retains overview-scale thumbnails without reserving a visible Desktop cell.
 Stage owns tile layout, the open/close animation, hover state, and hit resolution,
@@ -247,6 +247,23 @@ compatibility host, cropped from the virtual-screen thumbnail to the primary
 monitor.
 Activating a tile suppresses every other tile's thumbnail for the close animation, so
 the chosen window animates alone instead of being covered by a maximized neighbour.
+Selection requests covered window preparation through the generic feature-action contract.
+After the opaque cover is presented, `app_control` restores and activates the selected window
+beneath it, or minimizes the app batch for Desktop selection. Preparation runs on the existing
+worker and publishes a separate request-correlated completion. The Windows service uses a
+versioned preparation command that avoids the ordinary activation path's topmost promotion;
+restoration temporarily disables the selected window's native transition and restores that setting.
+Stage holds its preview during preparation, then animates toward the restored live frame bounds.
+The close lifecycle retains the aligned thumbnail until renderer synchronization acknowledges
+that frame. Only then does the backdrop fade using the shared surface-close duration, while
+the selected app thumbnail stays opaque and stationary. A transparent-frame acknowledgement
+precedes native thumbnail and helper disposal; there is no second activation at disposal.
+Escape follows movement and reveal without preparing another app. Failed preparation or a
+vanished selected window drops the preview and fades out safely. The lower helper carries its
+own layered opacity and changes bounds, order, visibility, and paint only when needed.
+The renderer's synchronization operation waits for DirectComposition commit completion and
+then flushes the calling process's queued DWM work; it does not establish that an external
+application has finished producing its own content.
 A tile's `source_rect` is the screen rect the close animation lands on, and windows
 move while the overview is up — opening Stage forces the top bar shown, and the bar
 pushes every trespassing window down with its reveal progress. Composition therefore

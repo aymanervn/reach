@@ -256,7 +256,7 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
     reach_render_command_buffer_clear(out_commands);
 
     const reach_stage_state *state = &stage->state;
-    if (!state->open || state->tile_count == 0)
+    if (!state->open || state->close_failed || state->tile_count == 0)
     {
         return REACH_OK;
     }

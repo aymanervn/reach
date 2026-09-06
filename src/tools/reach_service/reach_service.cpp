@@ -1212,6 +1212,10 @@ static reach_result reach_helper_execute(const reach_service_request *request,
     reach_result result = REACH_INVALID_ARGUMENT;
     switch (request->command)
     {
+    case REACH_SERVICE_COMMAND_PREPARE:
+        result = reach_window_management_prepare(
+            hwnd, reinterpret_cast<HWND>(static_cast<uintptr_t>(request->cover)));
+        break;
     case REACH_SERVICE_COMMAND_ACTIVATE:
         result = reach_window_management_activate(hwnd);
         break;

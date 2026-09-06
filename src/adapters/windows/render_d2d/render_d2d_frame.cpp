@@ -1,5 +1,7 @@
 #include "render_d2d_internal.h"
 
+#include <dwmapi.h>
+
 reach_result reach_d2d_begin_frame(reach_render_backend *backend)
 {
     REACH_ASSERT(backend != nullptr);
@@ -128,4 +130,17 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
     }
 
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
+
+reach_result reach_d2d_synchronize(reach_render_backend *backend)
+{
+    if (backend == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (backend->dcomp_device != nullptr && FAILED(backend->dcomp_device->WaitForCommitCompletion()))
+    {
+        return REACH_ERROR;
+    }
+    return SUCCEEDED(DwmFlush()) ? REACH_OK : REACH_ERROR;
 }

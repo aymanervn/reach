@@ -8,7 +8,7 @@
 #define REACH_STAGE_BAR_HEIGHT 32.0f
 #define REACH_STAGE_BAR_MAX_BOX_RATIO 0.20f
 #define REACH_STAGE_PRESENCE_MIN_SCALE 0.88f
-#define REACH_STAGE_DESKTOP_EDGE_GAP 10.0f
+#define REACH_STAGE_DESKTOP_EDGE_GAP 20.0f
 
 typedef struct reach_stage_section
 {
