@@ -29,6 +29,42 @@ static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id
     reach_layout_set_visible(&host->layout_manager, host->surface_participants[id], visible);
 }
 
+static reach_rect_f32 reach_host_available_bounds(const reach_host *host,
+                                                  reach_rect_f32 monitor_bounds)
+{
+    reach_rect_f32 available = monitor_bounds;
+    float bottom = monitor_bounds.y + monitor_bounds.height;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (!runtime->resolved_bounds_valid || runtime->definition == nullptr)
+        {
+            continue;
+        }
+
+        reach_rect_f32 reserved = runtime->resolved_bounds;
+        if (runtime->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_TOP)
+        {
+            float edge = reserved.y + reserved.height;
+            if (edge > available.y)
+            {
+                available.y = edge;
+            }
+        }
+        else if (runtime->definition->layout.reservation_edge ==
+                 REACH_LAYOUT_RESERVATION_BOTTOM)
+        {
+            if (reserved.y < bottom)
+            {
+                bottom = reserved.y;
+            }
+        }
+    }
+
+    available.height = bottom > available.y ? bottom - available.y : 0.0f;
+    return available;
+}
+
 static void reach_host_fill_surface_context(reach_host *host, const reach_feature_runtime *desc,
                                             const reach_host_frame_context *ctx,
                                             reach_feature_surface_context *out)
@@ -36,6 +72,12 @@ static void reach_host_fill_surface_context(reach_host *host, const reach_featur
     *out = {};
     out->theme = host->theme != nullptr ? host->theme : reach_theme_default();
     out->monitor_bounds = ctx != nullptr ? ctx->monitor_bounds : reach_rect_f32{};
+    out->available_bounds = out->monitor_bounds;
+    if (ctx != nullptr && desc->definition != nullptr &&
+        desc->definition->layout.uses_reserved_bounds)
+    {
+        out->available_bounds = reach_host_available_bounds(host, out->monitor_bounds);
+    }
     out->last_bounds = desc->surface->last_bounds;
     out->text_measure.context = desc->surface->renderer.backend;
     out->text_measure.measure = desc->surface->renderer.ops.measure_text;
@@ -151,13 +193,14 @@ static void reach_host_register_native_overlay(reach_host *host, reach_feature_r
     {
         size_t item_index = index - 1;
         reach_feature_native_overlay_item item = {};
-        if (ops->item(desc->capsule, item_index, &item) != REACH_OK)
+        const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
+        if (ops->item(desc->capsule, item_index, theme, &item) != REACH_OK)
         {
             continue;
         }
         reach_window_thumbnail_id id = REACH_WINDOW_THUMBNAIL_NONE;
         if (host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails, item.source,
-                                               &id) == REACH_OK)
+                                               item.plane, &id) == REACH_OK)
         {
             desc->native_overlay_ids[item_index] = id;
             desc->native_overlay_registered = 1;
@@ -193,7 +236,8 @@ static void reach_host_sync_native_overlay(reach_host *host, reach_feature_runti
             continue;
         }
         reach_feature_native_overlay_item item = {};
-        if (ops->item(desc->capsule, index, &item) != REACH_OK)
+        const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
+        if (ops->item(desc->capsule, index, theme, &item) != REACH_OK)
         {
             continue;
         }

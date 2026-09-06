@@ -50,11 +50,11 @@ extern "C"
         int32_t open;
         int32_t closing;
         float progress;
-        float backdrop_opacity;
         float reflow;
         float close_hover;
         float animation_seconds;
         reach_rect_f32 bounds;
+        reach_rect_f32 desktop_bounds;
         float dpi_scale;
         size_t tile_count;
         size_t tile_generation;
@@ -88,6 +88,7 @@ extern "C"
         int32_t source_screen_valid;
         int32_t minimized;
         int32_t desktop;
+        int32_t behind_surface;
     } reach_stage_thumbnail_placement;
 
     reach_result reach_stage_create(reach_stage **out_stage);
@@ -100,6 +101,7 @@ extern "C"
     void reach_stage_attach_services(reach_stage *stage, reach_window_tracking *windows,
                                      reach_icon_service *icons, reach_app_control *apps);
     void reach_stage_set_display(reach_stage *stage, const reach_display_environment *display);
+    int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds);
     int32_t reach_stage_set_open(reach_stage *stage, int32_t open);
     int32_t reach_stage_sync_windows(reach_stage *stage);
     int32_t reach_stage_animation_active(const reach_stage *stage);

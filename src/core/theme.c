@@ -2,7 +2,7 @@
 
 #define REACH_RGB8(r, g, b, a) {(r) / 255.0f, (g) / 255.0f, (b) / 255.0f, (a)}
 
-#define REACH_THEME_STAGE_BACKDROP_ALPHA 0.99f
+#define REACH_THEME_STAGE_BACKDROP_ALPHA 1.0f
 
 #define REACH_PURE_WHITE(a) REACH_RGB8(255, 255, 255, a)
 #define REACH_CRITICAL_RED(a) REACH_RGB8(217, 61, 61, a)

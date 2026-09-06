@@ -56,7 +56,11 @@ static reach_rect_f32 observed_bounds;
 static size_t render_count;
 static float observed_last_command_alpha;
 static size_t thumbnail_create_count;
+static size_t thumbnail_target_plane_create_count;
+static size_t thumbnail_behind_plane_create_count;
 static size_t thumbnail_place_count;
+static size_t thumbnail_background_place_count;
+static float thumbnail_background_alpha;
 static size_t thumbnail_destroy_count;
 static int32_t captured_release_active;
 static int32_t exclusive_release_open;
@@ -197,10 +201,24 @@ static reach_result fake_thumbnail_set_target(reach_window_thumbnails *thumbnail
 }
 
 static reach_result fake_thumbnail_create(reach_window_thumbnails *thumbnails,
-                                          reach_window_id source, reach_window_thumbnail_id *out_id)
+                                          reach_window_id source,
+                                          reach_window_thumbnail_plane plane,
+                                          reach_window_thumbnail_id *out_id)
 {
     (void)thumbnails;
     if (source == 0 || out_id == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (plane == REACH_WINDOW_THUMBNAIL_PLANE_TARGET)
+    {
+        thumbnail_target_plane_create_count++;
+    }
+    else if (plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET)
+    {
+        thumbnail_behind_plane_create_count++;
+    }
+    else
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -218,6 +236,11 @@ static reach_result fake_thumbnail_set_placement(reach_window_thumbnails *thumbn
         return REACH_INVALID_ARGUMENT;
     }
     thumbnail_place_count++;
+    if (placement->background_visible)
+    {
+        thumbnail_background_place_count++;
+        thumbnail_background_alpha = placement->background.a;
+    }
     return REACH_OK;
 }
 
@@ -832,6 +855,13 @@ static void test_registered_feature_lifecycle(void)
         host->feature_runtimes[REACH_SURFACE_ID_DOCK].definition->resolve_anchor != nullptr &&
             host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].definition->resolve_anchor != nullptr,
         "dynamic anchor owners publish generic anchor resolvers");
+    expect_true(host->feature_runtimes[REACH_SURFACE_ID_DOCK]
+                        .definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_BOTTOM &&
+                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
+                            .definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_TOP &&
+                    host->feature_runtimes[REACH_SURFACE_ID_STAGE]
+                        .definition->layout.uses_reserved_bounds,
+                "Stage consumes the generic bounds reserved by the bars");
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
@@ -967,14 +997,17 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     host->layout_dpi_scale = 1.0f;
 
     static const uint16_t label[] = {'W', 'i', 'n', 'd', 'o', 'w', 0};
-    reach_stage_open_window window = {};
-    window.window = 42;
-    window.label = label;
-    window.frame = {100.0f, 100.0f, 800.0f, 600.0f};
+    reach_stage_open_window windows[2] = {};
+    windows[0].window = 42;
+    windows[0].label = label;
+    windows[0].frame = {100.0f, 100.0f, 800.0f, 600.0f};
+    windows[1].window = 84;
+    windows[1].desktop = 1;
+    windows[1].frame = {0.0f, 0.0f, 1920.0f, 1080.0f};
     reach_rect_f32 monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
     expect_true(
         reach_stage_open(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE),
-                         monitor, 1.0f, &window, 1) == REACH_OK,
+                         monitor, 1.0f, windows, 2) == REACH_OK,
         "Stage opens for native-overlay frame testing");
 
     reach_feature_runtime *stage = &host->feature_runtimes[REACH_SURFACE_ID_STAGE];
@@ -993,7 +1026,11 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     host->window_thumbnails.ops.destroy_all = fake_thumbnail_destroy_all;
 
     thumbnail_create_count = 0;
+    thumbnail_target_plane_create_count = 0;
+    thumbnail_behind_plane_create_count = 0;
     thumbnail_place_count = 0;
+    thumbnail_background_place_count = 0;
+    thumbnail_background_alpha = 0.0f;
     thumbnail_destroy_count = 0;
     observed_bounds = {};
     reach_host_frame_context frame = {};
@@ -1002,8 +1039,14 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
                 "generic frame renders a native-overlay surface");
     expect_true(reach_rect_equal(observed_bounds, monitor),
                 "Stage animation keeps the fullscreen surface on the monitor bounds");
-    expect_true(thumbnail_create_count == 1 && thumbnail_place_count == 1,
+    expect_true(thumbnail_create_count == 2 && thumbnail_place_count == 2,
                 "generic frame registers and places the Stage thumbnail");
+    expect_true(thumbnail_target_plane_create_count == 1 &&
+                    thumbnail_behind_plane_create_count == 1,
+                "generic frame separates app and Desktop thumbnail planes");
+    expect_true(thumbnail_background_place_count == 1 &&
+                    thumbnail_background_alpha == 1.0f,
+                "Desktop lower plane carries one fully opaque Stage background");
 
     reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,

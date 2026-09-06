@@ -81,22 +81,25 @@ int32_t reach_stage_tile_at_point(const reach_stage *stage, reach_point_f32 poin
         return 0;
     }
 
-    for (size_t index = 0; index < stage->state.tile_count; ++index)
+    for (size_t pass = 0; pass < 2; ++pass)
     {
-        const reach_stage_tile *tile = &stage->state.tiles[index];
-        if (!reach_stage_tile_takes_pointer(tile))
+        for (size_t index = 0; index < stage->state.tile_count; ++index)
         {
-            continue;
-        }
-        if (reach_stage_rect_contains(tile->current_rect, point) ||
-            reach_stage_rect_contains(tile->current_bar, point) ||
-            reach_stage_rect_contains(reach_stage_tile_close_button_rect(stage, index), point))
-        {
-            if (out_index != nullptr)
+            const reach_stage_tile *tile = &stage->state.tiles[index];
+            if (!reach_stage_tile_takes_pointer(tile) || (tile->desktop ? 1u : 0u) != pass)
             {
-                *out_index = index;
+                continue;
             }
-            return 1;
+            if (reach_stage_rect_contains(tile->current_rect, point) ||
+                reach_stage_rect_contains(tile->current_bar, point) ||
+                reach_stage_rect_contains(reach_stage_tile_close_button_rect(stage, index), point))
+            {
+                if (out_index != nullptr)
+                {
+                    *out_index = index;
+                }
+                return 1;
+            }
         }
     }
     return 0;
