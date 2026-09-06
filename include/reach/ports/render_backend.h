@@ -21,6 +21,7 @@ extern "C"
         void (*set_ui_font)(reach_render_backend *backend, int32_t use_bundled_font);
         reach_text_measure_fn measure_text;
         void (*destroy)(reach_render_backend *backend);
+        reach_result (*synchronize)(reach_render_backend *backend);
     } reach_render_backend_ops;
 
     typedef struct reach_render_backend_port

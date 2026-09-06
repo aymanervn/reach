@@ -123,6 +123,7 @@ reach_result reach_wuc_create_target(reach_render_backend *backend);
 
 reach_result reach_d2d_begin_frame(reach_render_backend *backend);
 reach_result reach_d2d_end_frame(reach_render_backend *backend);
+reach_result reach_d2d_synchronize(reach_render_backend *backend);
 
 void reach_d2d_clear_icon_cache(reach_render_backend *backend);
 reach_result reach_d2d_draw_icon(reach_render_backend *backend,

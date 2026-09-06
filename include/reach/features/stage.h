@@ -45,10 +45,24 @@ extern "C"
         reach_rect_f32 current_bar;
     } reach_stage_tile;
 
+    typedef enum reach_stage_close_phase
+    {
+        REACH_STAGE_CLOSE_NONE = 0,
+        REACH_STAGE_CLOSE_PREPARING,
+        REACH_STAGE_CLOSE_MOVING,
+        REACH_STAGE_CLOSE_ALIGNED,
+        REACH_STAGE_CLOSE_REVEALING,
+        REACH_STAGE_CLOSE_TRANSPARENT,
+        REACH_STAGE_CLOSE_FINISHED
+    } reach_stage_close_phase;
+
     typedef struct reach_stage_state
     {
         int32_t open;
         int32_t closing;
+        reach_stage_close_phase close_phase;
+        int32_t close_failed;
+        float backdrop_opacity;
         float progress;
         float reflow;
         float close_hover;
@@ -89,6 +103,7 @@ extern "C"
         int32_t minimized;
         int32_t desktop;
         int32_t behind_surface;
+        float backdrop_opacity;
     } reach_stage_thumbnail_placement;
 
     reach_result reach_stage_create(reach_stage **out_stage);

@@ -60,6 +60,8 @@ extern "C"
         reach_result (*minimize)(reach_window_manager *manager, reach_window_id window_id);
         reach_result (*close)(reach_window_manager *manager, reach_window_id window_id);
         void (*destroy)(reach_window_manager *manager);
+        reach_result (*prepare)(reach_window_manager *manager, reach_window_id window,
+                                reach_window_id cover);
     } reach_window_manager_ops;
 
     typedef struct reach_window_manager_port

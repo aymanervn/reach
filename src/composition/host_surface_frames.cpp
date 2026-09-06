@@ -208,14 +208,14 @@ static void reach_host_register_native_overlay(reach_host *host, reach_feature_r
     }
 }
 
-static void reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
+static reach_result reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
                                            reach_rect_f32 visible_bounds)
 {
     const reach_feature_native_overlay_ops *ops = desc->definition->surface_ops->native_overlay;
     if (ops == nullptr || ops->generation == nullptr || ops->count == nullptr ||
         ops->item == nullptr || host->window_thumbnails.ops.set_placement == nullptr)
     {
-        return;
+        return REACH_ERROR;
     }
     if (!desc->native_overlay_registered ||
         desc->native_overlay_generation != ops->generation(desc->capsule))
@@ -228,24 +228,34 @@ static void reach_host_sync_native_overlay(reach_host *host, reach_feature_runti
     {
         count = REACH_SURFACE_NATIVE_OVERLAY_CAPACITY;
     }
+    reach_result placement_result = REACH_OK;
     for (size_t index = 0; index < count; ++index)
     {
         reach_window_thumbnail_id id = desc->native_overlay_ids[index];
-        if (id == REACH_WINDOW_THUMBNAIL_NONE)
-        {
-            continue;
-        }
         reach_feature_native_overlay_item item = {};
         const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
         if (ops->item(desc->capsule, index, theme, &item) != REACH_OK)
         {
             continue;
         }
+        if (id == REACH_WINDOW_THUMBNAIL_NONE)
+        {
+            if (item.placement.visible || item.placement.background_visible)
+            {
+                placement_result = REACH_ERROR;
+            }
+            continue;
+        }
         item.placement.destination.x -= visible_bounds.x;
         item.placement.destination.y -= visible_bounds.y;
-        (void)host->window_thumbnails.ops.set_placement(host->window_thumbnails.thumbnails, id,
-                                                        &item.placement);
+        reach_result result = host->window_thumbnails.ops.set_placement(
+            host->window_thumbnails.thumbnails, id, &item.placement);
+        if (result != REACH_OK)
+        {
+            placement_result = result;
+        }
     }
+    return placement_result;
 }
 
 reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id)
@@ -304,6 +314,11 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     reach_host_set_surface_visible(host, desc->definition->id, visible);
     if (!visible)
     {
+        if (host->window_preparation.request != 0 &&
+            host->window_preparation.surface == desc->definition->id)
+        {
+            host->window_preparation = {};
+        }
         reach_host_release_native_overlay(host, desc);
         return REACH_OK;
     }
@@ -426,13 +441,42 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                             (window_changed && !position_only);
     if (result == REACH_OK && active && desc->definition->surface_ops->native_overlay != nullptr)
     {
-        reach_host_sync_native_overlay(host, desc, geometry.visible_bounds);
+        result = reach_host_sync_native_overlay(host, desc, geometry.visible_bounds);
     }
-    if (result != REACH_OK || !frame_active || !render_needed)
+    if (result != REACH_OK)
+    {
+        reach_host_start_window_preparation(host, desc, result);
+        if (desc->definition->capsule_ops->presentation_committed != nullptr)
+        {
+            reach_feature_tick_result tick = {};
+            desc->definition->capsule_ops->presentation_committed(desc->capsule, result, &tick);
+            reach_host_apply_feature_tick_result(host, desc, &tick);
+        }
+        return result;
+    }
+    if (!frame_active || !render_needed)
     {
         return result;
     }
     result = reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
+    bool preparing = host->window_preparation.pending &&
+                     host->window_preparation.surface == desc->definition->id;
+    if (preparing || geometry.synchronize_presentation)
+    {
+        if (result == REACH_OK)
+        {
+            result = desc->surface->renderer.ops.synchronize != nullptr
+                ? desc->surface->renderer.ops.synchronize(desc->surface->renderer.backend)
+                : REACH_ERROR;
+        }
+        reach_host_start_window_preparation(host, desc, result);
+        if (desc->definition->capsule_ops->presentation_committed != nullptr)
+        {
+            reach_feature_tick_result tick = {};
+            desc->definition->capsule_ops->presentation_committed(desc->capsule, result, &tick);
+            reach_host_apply_feature_tick_result(host, desc, &tick);
+        }
+    }
     if (result == REACH_OK && geometry.presentation.managed &&
         geometry.presentation.max_scale > 1.0f)
     {

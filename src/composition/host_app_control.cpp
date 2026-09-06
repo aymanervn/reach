@@ -37,6 +37,7 @@ void reach_host_stop_app_control(reach_host *host)
     }
     reach_app_control_stop(host->app_control);
     host->deferred_launch = {};
+    host->window_preparation = {};
 }
 
 reach_result reach_host_schedule_window_control(reach_host *host,
@@ -93,11 +94,68 @@ reach_result reach_host_schedule_minimize_open_windows(reach_host *host)
                             : REACH_OK;
 }
 
+static void reach_host_complete_window_preparation(reach_host *host, reach_result result)
+{
+    auto preparation = host->window_preparation;
+    host->window_preparation = {};
+    reach_feature_runtime *source = &host->feature_runtimes[preparation.surface];
+    if (reach_host_surface_presented(source) &&
+        source->definition->capsule_ops->window_prepared != nullptr)
+    {
+        reach_feature_tick_result tick = {};
+        source->definition->capsule_ops->window_prepared(source->capsule, preparation.window,
+                                                        result, &tick);
+        reach_host_apply_feature_tick_result(host, source, &tick);
+    }
+}
+
+void reach_host_start_window_preparation(reach_host *host, const reach_feature_runtime *source,
+                                          reach_result presentation_result)
+{
+    if (!host->window_preparation.pending ||
+        host->window_preparation.surface != source->definition->id)
+    {
+        return;
+    }
+    host->window_preparation.pending = 0;
+    reach_window_id cover = host->window_thumbnails.ops.cover_window != nullptr
+        ? host->window_thumbnails.ops.cover_window(host->window_thumbnails.thumbnails) : 0;
+    reach_result result = presentation_result;
+    if (result == REACH_OK)
+    {
+        if (host->window_preparation.window != 0)
+        {
+            result = reach_app_control_schedule_preparation(host->app_control,
+                host->window_preparation.window, cover, host->window_preparation.request);
+        }
+        else
+        {
+            uintptr_t windows[REACH_MAX_OPEN_WINDOWS] = {};
+            size_t count = reach_window_tracking_collect_unminimized(host->window_tracking,
+                windows, REACH_MAX_OPEN_WINDOWS);
+            result = reach_app_control_schedule_desktop_preparation(host->app_control,
+                windows, count, cover, host->window_preparation.request);
+        }
+    }
+    if (result != REACH_OK)
+    {
+        reach_host_complete_window_preparation(host, result);
+    }
+}
+
 void reach_host_apply_window_control_result(reach_host *host)
 {
     if (host == nullptr)
     {
         return;
+    }
+
+    reach_window_preparation_result preparation = {};
+    if (reach_app_control_take_preparation(host->app_control, &preparation) &&
+        preparation.request == host->window_preparation.request)
+    {
+        reach_host_refresh_window_world(host);
+        reach_host_complete_window_preparation(host, preparation.result);
     }
 
     reach_result result = REACH_OK;

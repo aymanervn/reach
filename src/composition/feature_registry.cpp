@@ -1102,7 +1102,7 @@ static reach_result reach_stage_native_overlay_item(const void *capsule, size_t 
     out->placement.visible = placement.visible;
     out->placement.source_screen_valid = placement.source_screen_valid;
     out->placement.background = theme->stage_backdrop;
-    out->placement.background.a = 1.0f;
+    out->placement.background.a = placement.backdrop_opacity;
     out->placement.background_visible = placement.desktop && reach_stage_is_open(stage);
     return REACH_OK;
 }

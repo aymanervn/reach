@@ -19,6 +19,7 @@ enum reach_service_command : uint32_t
     REACH_SERVICE_COMMAND_SNAP = 3,
     REACH_SERVICE_COMMAND_CLOSE = 4,
     REACH_SERVICE_COMMAND_RESTORE = 8,
+    REACH_SERVICE_COMMAND_PREPARE = 9,
 };
 
 enum reach_service_window_kind : uint32_t
@@ -55,6 +56,7 @@ struct reach_service_request
     uint32_t thread_id;
     int32_t split_mode;
     wchar_t class_name[128];
+    uint64_t cover;
 };
 
 struct reach_service_window_snapshot

@@ -19,6 +19,8 @@ typedef struct reach_window_thumbnail_entry
     reach_window_thumbnail_plane plane;
     COLORREF background;
     int32_t background_set;
+    BYTE background_opacity;
+    int32_t opacity_set;
 } reach_window_thumbnail_entry;
 
 struct reach_window_thumbnails
@@ -86,9 +88,11 @@ static reach_result reach_window_thumbnail_register_host_class(void)
     return atom != 0 || GetLastError() == ERROR_CLASS_ALREADY_EXISTS ? REACH_OK : REACH_ERROR;
 }
 
-static HWND reach_window_thumbnail_create_host(void)
+static HWND reach_window_thumbnail_create_host(HWND target)
 {
-    return CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+    DWORD topmost = (GetWindowLongPtrW(target, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0
+                        ? WS_EX_TOPMOST : 0;
+    return CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | topmost,
                            reach_window_thumbnail_host_class(), L"", WS_POPUP, 0, 0, 1, 1, nullptr,
                            nullptr, GetModuleHandleW(nullptr), nullptr);
 }
@@ -201,7 +205,7 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
     HWND destination = thumbnails->target;
     if (plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET)
     {
-        destination = reach_window_thumbnail_create_host();
+        destination = reach_window_thumbnail_create_host(thumbnails->target);
         if (destination == nullptr)
         {
             return REACH_ERROR;
@@ -293,21 +297,51 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
             entry->background_set = 1;
         }
 
-        if (host_visible)
+        BYTE opacity = reach_window_thumbnail_color_channel(placement->background.a);
+        if (!entry->opacity_set || entry->background_opacity != opacity)
         {
-            if (!SetWindowPos(entry->destination, thumbnails->target, target_rect.left,
-                              target_rect.top, target_width, target_height,
-                              SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW))
+            if (!SetLayeredWindowAttributes(entry->destination, 0, opacity, LWA_ALPHA))
             {
                 return REACH_ERROR;
             }
-            if (background_changed)
+            entry->background_opacity = opacity;
+            entry->opacity_set = 1;
+        }
+        bool was_visible = IsWindowVisible(entry->destination) != 0;
+        if (host_visible)
+        {
+            RECT current = {};
+            bool bounds_changed = !GetWindowRect(entry->destination, &current) ||
+                                  !EqualRect(&current, &target_rect);
+            bool order_changed = GetWindow(entry->destination, GW_HWNDPREV) != thumbnails->target;
+            if (bounds_changed || order_changed || !was_visible)
+            {
+                UINT flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+                if (!bounds_changed)
+                {
+                    flags |= SWP_NOMOVE | SWP_NOSIZE;
+                }
+                if (!order_changed)
+                {
+                    flags |= SWP_NOZORDER;
+                }
+                if (!was_visible)
+                {
+                    flags |= SWP_SHOWWINDOW;
+                }
+                if (!SetWindowPos(entry->destination, thumbnails->target, target_rect.left,
+                                  target_rect.top, target_width, target_height, flags))
+                {
+                    return REACH_ERROR;
+                }
+            }
+            if (background_changed || bounds_changed || !was_visible)
             {
                 InvalidateRect(entry->destination, nullptr, FALSE);
+                UpdateWindow(entry->destination);
             }
-            UpdateWindow(entry->destination);
         }
-        else
+        else if (was_visible)
         {
             ShowWindow(entry->destination, SW_HIDE);
         }
@@ -386,6 +420,24 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
     return SUCCEEDED(DwmUpdateThumbnailProperties(entry->handle, &props)) ? REACH_OK : REACH_ERROR;
 }
 
+static reach_window_id reach_window_thumbnail_cover_window(const reach_window_thumbnails *thumbnails)
+{
+    if (thumbnails != nullptr)
+    {
+        for (size_t index = 0; index < thumbnails->entry_count; ++index)
+        {
+            const reach_window_thumbnail_entry *entry = &thumbnails->entries[index];
+            if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET &&
+                entry->opacity_set && entry->background_opacity == 255 &&
+                IsWindowVisible(entry->destination))
+            {
+                return reinterpret_cast<reach_window_id>(entry->destination);
+            }
+        }
+    }
+    return 0;
+}
+
 static reach_result reach_window_thumbnail_destroy_all(reach_window_thumbnails *thumbnails)
 {
     if (thumbnails == nullptr)
@@ -443,5 +495,6 @@ reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port 
     out_port->ops.set_placement = reach_window_thumbnail_set_placement;
     out_port->ops.destroy_all = reach_window_thumbnail_destroy_all;
     out_port->ops.destroy = reach_window_thumbnail_destroy;
+    out_port->ops.cover_window = reach_window_thumbnail_cover_window;
     return REACH_OK;
 }

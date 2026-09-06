@@ -527,6 +527,7 @@ target_compile_features(reach_service PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_service PRIVATE
+    dwmapi
     user32
     shell32
     advapi32
