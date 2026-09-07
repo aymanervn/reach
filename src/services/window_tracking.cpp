@@ -25,6 +25,7 @@ struct reach_window_tracking
 
     uint32_t next_group_id;
     uintptr_t foreground_window;
+    uintptr_t current_foreground_window;
     uintptr_t focus_history[REACH_MAX_OPEN_WINDOWS];
     size_t focus_history_count;
 };
@@ -408,6 +409,31 @@ void reach_window_tracking_note_foreground(reach_window_tracking *service,
     service->foreground_window = foreground_window;
     reach_window_tracking_remove_focus_history_window(service, foreground_window);
     reach_window_tracking_prune_focus_history(service);
+}
+
+void reach_window_tracking_note_current_foreground(reach_window_tracking *service, uintptr_t window)
+{
+    if (service != nullptr)
+    {
+        service->current_foreground_window = window;
+    }
+}
+
+uintptr_t reach_window_tracking_current_foreground(const reach_window_tracking *service)
+{
+    return service != nullptr ? service->current_foreground_window : 0;
+}
+
+int32_t reach_window_tracking_window_is_foreground(const reach_window_tracking *service,
+                                                   uintptr_t window)
+{
+    if (service == nullptr || window == 0)
+    {
+        return 0;
+    }
+    return service->window_manager.ops.is_foreground != nullptr
+        ? service->window_manager.ops.is_foreground(service->window_manager.manager, window)
+        : service->current_foreground_window == window;
 }
 
 uintptr_t reach_window_tracking_foreground(const reach_window_tracking *service)

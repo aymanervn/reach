@@ -251,8 +251,17 @@ Selection requests covered window preparation through the generic feature-action
 After the opaque cover is presented, `app_control` restores and activates the selected window
 beneath it, or minimizes the app batch for Desktop selection. Preparation runs on the existing
 worker and publishes a separate request-correlated completion. The Windows service uses a
-versioned preparation command that avoids the ordinary activation path's topmost promotion;
-restoration temporarily disables the selected window's native transition and restores that setting.
+versioned preparation command sharing ordinary activation's restore, owner/dialog resolution,
+and foreground transfer. Covered placement keeps the app in the ordinary window band and never
+uses the topmost cover as its insert-after window. Restoration temporarily disables the selected
+window's native transition and restores that setting. Ordinary activation retains its existing
+topmost promotion/demotion sequence and native foreground-transfer compatibility path.
+The worker serializes window requests, coalesces pending activation selections, and preserves
+close, minimize, and snap requests. Preparation retains a queue hold until the surface releases
+its cover. Teardown cancels queued preparation and waits for running preparation before releasing
+the native overlay; overlay refresh also preserves the helper until preparation completes.
+Game mode immediately releases suppressed overlays and abandons their pending preparation;
+a running native operation settles asynchronously and its completion cannot resume the surface.
 Stage holds its preview during preparation, then animates toward the restored live frame bounds.
 The close lifecycle retains the aligned thumbnail until renderer synchronization acknowledges
 that frame. Only then does the backdrop fade using the shared surface-close duration, while
@@ -630,7 +639,8 @@ window to the top of the app band, so a redundant demote would pop a resting bar
 above whatever covers it. The pass is the sole owner of `show()` / `hide()` for
 these windows; frame steps compute intent and render, and never touch visibility or
 z. It emits nothing when the resolved plan equals the last applied one unless native
-pointer interaction invalidated the topmost chain. A pointer-down on a visible banded
+pointer interaction, a foreground change, or a completed window-control operation invalidated
+the topmost chain. A pointer-down on a visible banded
 surface schedules an order-only reconciliation because Windows may reorder clicked
 HWNDs inside the topmost band; visibility remains cached and is not replayed. Each
 semantic plan change emits ops only for the participants whose layer or visibility
@@ -719,8 +729,11 @@ is ever open, and a fourth needs only the flag. Popups and transients are siblin
 classes, not subtypes — every rule but popup-mutual-exclusion treats them together,
 so a rule keyed on one silently misses the other. The global outside-press rule is likewise one loop
 over the transient and popup rows, closing any surface the press missed. Foreground identity
-has a single producer — the in-process foreground watcher port feeds
-`window_tracking`, and nothing reads focus state out of the Reach Service snapshot.
+comes from the in-process foreground watcher port, including Reach-owned and untracked windows.
+`window_tracking` keeps current native foreground separate from the remembered tracked app used
+for focus history. Dock's minimize toggle checks current foreground through the window-manager
+port, including owned dialogs, rather than treating the remembered app as currently focused.
+Nothing reads focus state out of the Reach Service snapshot.
 Genuinely per-feature policies stay as named exceptions (e.g. dock-cluster pairwise
 button rules); a growing exception list signals a missing class rule. May include
 everything.

@@ -745,6 +745,21 @@ static reach_result reach_window_manager_prepare(reach_window_manager *manager,
                                              window, REACH_SPLIT_LEFT, cover);
 }
 
+static int32_t reach_window_manager_is_foreground(const reach_window_manager *manager,
+                                                   reach_window_id window)
+{
+    if (manager == nullptr || window == 0)
+    {
+        return 0;
+    }
+    HWND target = reinterpret_cast<HWND>(window);
+    HWND foreground = GetForegroundWindow();
+    return IsWindow(target) && foreground != nullptr &&
+           (foreground == target || GetAncestor(foreground, GA_ROOTOWNER) == target ||
+            (GetAncestor(target, GA_ROOTOWNER) != nullptr &&
+             GetAncestor(foreground, GA_ROOTOWNER) == GetAncestor(target, GA_ROOTOWNER)));
+}
+
 static reach_result reach_window_manager_minimize(reach_window_manager *manager,
                                                   uintptr_t window_id)
 {
@@ -807,6 +822,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;
     out_port->ops.activate = reach_window_manager_activate;
     out_port->ops.prepare = reach_window_manager_prepare;
+    out_port->ops.is_foreground = reach_window_manager_is_foreground;
     out_port->ops.minimize = reach_window_manager_minimize;
     out_port->ops.close = reach_window_manager_close;
     out_port->ops.destroy = reach_window_manager_destroy;
