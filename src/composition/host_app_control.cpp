@@ -96,8 +96,14 @@ reach_result reach_host_schedule_minimize_open_windows(reach_host *host)
 
 static void reach_host_complete_window_preparation(reach_host *host, reach_result result)
 {
+    host->window_preparation.completed = 1;
     auto preparation = host->window_preparation;
-    host->window_preparation = {};
+    if (preparation.cancelled)
+    {
+        reach_app_control_release_preparation(host->app_control, preparation.request);
+        host->window_preparation = {};
+        return;
+    }
     reach_feature_runtime *source = &host->feature_runtimes[preparation.surface];
     if (reach_host_surface_presented(source) &&
         source->definition->capsule_ops->window_prepared != nullptr)
@@ -154,6 +160,7 @@ void reach_host_apply_window_control_result(reach_host *host)
     if (reach_app_control_take_preparation(host->app_control, &preparation) &&
         preparation.request == host->window_preparation.request)
     {
+        host->dirty.z_order = 1;
         reach_host_refresh_window_world(host);
         reach_host_complete_window_preparation(host, preparation.result);
     }
@@ -164,6 +171,7 @@ void reach_host_apply_window_control_result(reach_host *host)
         return;
     }
 
+    host->dirty.z_order = 1;
     reach_host_end_programmatic_window_manipulation(host);
     reach_host_refresh_window_world(host);
 
@@ -379,10 +387,9 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
         (void)reach_host_refresh_open_windows(host, nullptr);
     }
 
-    uintptr_t foreground = reach_host_foreground_window(host);
-
     reach_result result = REACH_OK;
-    if (minimize_if_foreground && foreground == window_id &&
+    if (minimize_if_foreground &&
+        reach_window_tracking_window_is_foreground(host->window_tracking, window_id) &&
         !reach_host_window_is_minimized(host, window_id))
     {
         result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_MINIMIZE, window_id);

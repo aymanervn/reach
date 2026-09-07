@@ -9,7 +9,6 @@ struct reach_foreground_watcher
     HWINEVENTHOOK hook;
     reach_foreground_watcher_callback callback;
     void *user;
-    HWND foreground;
 };
 
 static reach_foreground_watcher *g_foreground_watcher = nullptr;
@@ -30,7 +29,6 @@ static void CALLBACK reach_foreground_watcher_proc(HWINEVENTHOOK hook, DWORD eve
         return;
     }
 
-    watcher->foreground = hwnd;
     if (watcher->callback != nullptr)
     {
         watcher->callback(watcher->user);
@@ -48,13 +46,12 @@ static reach_result reach_foreground_watcher_start(reach_foreground_watcher *wat
 
     watcher->callback = callback;
     watcher->user = user;
-    watcher->foreground = GetForegroundWindow();
 
     if (watcher->hook == nullptr)
     {
         watcher->hook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
                                         reach_foreground_watcher_proc, 0, 0,
-                                        WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+                                        WINEVENT_OUTOFCONTEXT);
     }
 
     return watcher->hook != nullptr ? REACH_OK : REACH_ERROR;
@@ -79,7 +76,7 @@ static reach_result reach_foreground_watcher_stop(reach_foreground_watcher *watc
 
 static reach_window_id reach_foreground_watcher_foreground(const reach_foreground_watcher *watcher)
 {
-    return watcher == nullptr ? 0 : reinterpret_cast<reach_window_id>(watcher->foreground);
+    return watcher == nullptr ? 0 : reinterpret_cast<reach_window_id>(GetForegroundWindow());
 }
 
 static void reach_foreground_watcher_destroy(reach_foreground_watcher *watcher)
@@ -113,7 +110,6 @@ reach_result reach_windows_create_foreground_watcher(reach_foreground_watcher_po
     watcher->hook = nullptr;
     watcher->callback = nullptr;
     watcher->user = nullptr;
-    watcher->foreground = nullptr;
     g_foreground_watcher = watcher;
 
     *out_port = {};

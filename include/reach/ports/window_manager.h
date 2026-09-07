@@ -62,6 +62,7 @@ extern "C"
         void (*destroy)(reach_window_manager *manager);
         reach_result (*prepare)(reach_window_manager *manager, reach_window_id window,
                                 reach_window_id cover);
+        int32_t (*is_foreground)(const reach_window_manager *manager, reach_window_id window);
     } reach_window_manager_ops;
 
     typedef struct reach_window_manager_port

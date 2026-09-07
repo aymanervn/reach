@@ -78,6 +78,8 @@ extern "C"
                                                         reach_window_id cover, uint64_t request);
     reach_result reach_app_control_schedule_desktop_preparation(reach_app_control *service,
         const uintptr_t *windows, size_t count, reach_window_id cover, uint64_t request);
+    int32_t reach_app_control_cancel_preparation(reach_app_control *service, uint64_t request);
+    void reach_app_control_release_preparation(reach_app_control *service, uint64_t request);
     int32_t reach_app_control_take_preparation(reach_app_control *service,
                                                reach_window_preparation_result *out);
 

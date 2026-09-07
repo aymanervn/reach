@@ -148,7 +148,7 @@ static int32_t reach_host_bar_position_only(const reach_feature_runtime *desc)
     return animation.position_animating && !animation.content_animating;
 }
 
-static void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *desc)
+void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *desc)
 {
     if (!desc->native_overlay_registered)
     {
@@ -211,6 +211,12 @@ static void reach_host_register_native_overlay(reach_host *host, reach_feature_r
 static reach_result reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
                                            reach_rect_f32 visible_bounds)
 {
+    if (host->window_preparation.request != 0 &&
+        host->window_preparation.surface == desc->definition->id &&
+        !host->window_preparation.pending && !host->window_preparation.completed)
+    {
+        return REACH_OK;
+    }
     const reach_feature_native_overlay_ops *ops = desc->definition->surface_ops->native_overlay;
     if (ops == nullptr || ops->generation == nullptr || ops->count == nullptr ||
         ops->item == nullptr || host->window_thumbnails.ops.set_placement == nullptr)
@@ -307,21 +313,29 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     int32_t active = reach_host_surface_presented(desc);
     int32_t visible = active;
     int32_t frame_active = active;
-    if (!active && desc->definition->surface_ops->native_overlay != nullptr)
-    {
-        reach_host_release_native_overlay(host, desc);
-    }
-    reach_host_set_surface_visible(host, desc->definition->id, visible);
     if (!visible)
     {
-        if (host->window_preparation.request != 0 &&
-            host->window_preparation.surface == desc->definition->id)
+        uint64_t preparation = host->window_preparation.surface == desc->definition->id
+            ? host->window_preparation.request : 0;
+        if (preparation != 0)
         {
+            host->window_preparation.pending = 0;
+            if (!reach_app_control_cancel_preparation(host->app_control, preparation))
+            {
+                reach_host_set_surface_visible(host, desc->definition->id, 1);
+                return REACH_OK;
+            }
+        }
+        reach_host_set_surface_visible(host, desc->definition->id, 0);
+        reach_host_release_native_overlay(host, desc);
+        if (preparation != 0)
+        {
+            reach_app_control_release_preparation(host->app_control, preparation);
             host->window_preparation = {};
         }
-        reach_host_release_native_overlay(host, desc);
         return REACH_OK;
     }
+    reach_host_set_surface_visible(host, desc->definition->id, visible);
 
     reach_feature_surface_context surface_ctx = {};
     reach_host_fill_surface_context(host, desc, ctx, &surface_ctx);

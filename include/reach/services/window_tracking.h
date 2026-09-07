@@ -55,6 +55,11 @@ extern "C"
 
     void reach_window_tracking_note_foreground(reach_window_tracking *service,
                                                uintptr_t foreground_window);
+    void reach_window_tracking_note_current_foreground(reach_window_tracking *service,
+                                                       uintptr_t window);
+    uintptr_t reach_window_tracking_current_foreground(const reach_window_tracking *service);
+    int32_t reach_window_tracking_window_is_foreground(const reach_window_tracking *service,
+                                                       uintptr_t window);
     uintptr_t reach_window_tracking_foreground(const reach_window_tracking *service);
     const uintptr_t *reach_window_tracking_focus_history(const reach_window_tracking *service);
     size_t reach_window_tracking_focus_history_count(const reach_window_tracking *service);

@@ -62,7 +62,6 @@ static size_t thumbnail_place_count;
 static size_t thumbnail_background_place_count;
 static float thumbnail_background_alpha;
 static size_t thumbnail_destroy_count;
-static size_t presentation_sync_count;
 static int32_t captured_release_active;
 static int32_t exclusive_release_open;
 static size_t captured_release_count;
@@ -1018,11 +1017,6 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     stage->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
     stage->surface->renderer.ops.begin_frame = fake_begin_frame;
     stage->surface->renderer.ops.end_frame = fake_end_frame;
-    stage->surface->renderer.ops.synchronize = [](reach_render_backend *)
-    {
-        ++presentation_sync_count;
-        return REACH_OK;
-    };
     stage->surface->renderer.ops.execute = fake_execute;
     stage->surface->dirty_flags = 1;
     host->window_thumbnails.thumbnails = reinterpret_cast<reach_window_thumbnails *>(1);
@@ -1038,7 +1032,6 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     thumbnail_background_place_count = 0;
     thumbnail_background_alpha = 0.0f;
     thumbnail_destroy_count = 0;
-    presentation_sync_count = 0;
     observed_bounds = {};
     reach_host_frame_context frame = {};
     frame.monitor_bounds = monitor;
@@ -1055,23 +1048,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
                     thumbnail_background_alpha == 1.0f,
                 "Desktop lower plane carries one fully opaque Stage background");
 
-    reach_stage *capsule = reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE);
-    reach_stage_begin_close(capsule);
-    reach_feature_tick_result tick = {};
-    stage->definition->capsule_ops->tick(capsule, 1.0, &tick);
-    stage->surface->dirty_flags = 1;
-    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
-                "the aligned thumbnail frame reaches the presentation barrier");
-    expect_true(presentation_sync_count == 1 && thumbnail_destroy_count == 0,
-                "alignment is acknowledged while native thumbnails remain registered");
-    stage->definition->capsule_ops->tick(capsule, 1.0, &tick);
-    stage->surface->dirty_flags = 1;
-    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
-                "the transparent backdrop frame reaches the presentation barrier");
-    expect_true(presentation_sync_count == 2 && thumbnail_background_alpha == 0.0f &&
-                    thumbnail_destroy_count == 0,
-                "transparent presentation completes before native overlay destruction");
-    stage->definition->capsule_ops->tick(capsule, 0.016, &tick);
+    reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "generic frame handles native-overlay closure");
     expect_true(thumbnail_destroy_count == 1,

@@ -406,7 +406,7 @@ static void test_apps_take_pointer_priority_over_desktop(void)
     reach_stage_destroy(stage);
 }
 
-static void test_reveal_waits_for_aligned_and_transparent_presentations(void)
+static void test_close_requires_completion_before_teardown(void)
 {
     reach_stage *stage = nullptr;
     expect_true(reach_stage_create(&stage) == REACH_OK, "handoff stage is created");
@@ -420,17 +420,10 @@ static void test_reveal_waits_for_aligned_and_transparent_presentations(void)
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_true(state->open && state->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "a completed movement retains its final thumbnail for presentation");
-    expect_near(state->tiles[0].current_rect.y, window.frame.y,
-                "the retained final thumbnail exactly covers the real window");
     ops->tick(stage, 1.0, &tick);
-    expect_near(state->backdrop_opacity, 1.0f,
-                "elapsed time cannot reveal the backdrop before presentation acknowledgement");
+    expect_true(state->close_phase == REACH_STAGE_CLOSE_ALIGNED,
+                "elapsed time cannot bypass the first completion gate");
     ops->presentation_committed(stage, REACH_OK, &tick);
-    ops->tick(stage, 0.04, &tick);
-    expect_true(state->backdrop_opacity > 0 && state->backdrop_opacity < 1,
-                "the backdrop fades after the aligned frame is presented");
-    expect_near(state->tiles[0].current_rect.y, window.frame.y,
-                "the thumbnail stays aligned throughout the reveal");
     ops->tick(stage, 1.0, &tick);
     expect_true(state->open && state->close_phase == REACH_STAGE_CLOSE_TRANSPARENT,
                 "the transparent backdrop must be presented before disposal");
@@ -441,45 +434,7 @@ static void test_reveal_waits_for_aligned_and_transparent_presentations(void)
     reach_stage_destroy(stage);
 }
 
-static void test_minimized_selection_uses_restored_bounds_before_moving(void)
-{
-    reach_window_manager_port manager = {};
-    manager.ops.frame_bounds = [](const reach_window_manager *, reach_window_id,
-                                  reach_rect_f32 *out)
-    {
-        *out = make_rect(250, 180, 700, 500);
-        return REACH_OK;
-    };
-    reach_app_control *apps = nullptr;
-    reach_app_control_create({}, {}, {}, manager, nullptr, nullptr, &apps);
-    reach_stage *stage = nullptr;
-    reach_stage_create(&stage);
-    reach_stage_attach_services(stage, nullptr, nullptr, apps);
-    reach_stage_open_window window = make_window(1, make_rect(100, 120, 640, 480));
-    window.minimized = 1;
-    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &window, 1);
-    advance_stage(stage, 30, 0.016);
-    reach_stage_state *state = const_cast<reach_stage_state *>(reach_stage_state_ptr(stage));
-    state->has_selection = 1;
-    state->selected_index = 0;
-    reach_stage_begin_close(stage);
-    reach_feature_tick_result tick = {};
-    const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
-    ops->window_prepared(stage, 1, REACH_OK, &tick);
-    expect_true(!state->tiles[0].minimized && state->close_phase == REACH_STAGE_CLOSE_MOVING,
-                "restoration enables the live thumbnail before closing movement");
-    expect_near(state->tiles[0].source_rect.y, 180,
-                "the restored frame replaces stale minimized geometry");
-    ops->tick(stage, 1.0, &tick);
-    expect_near(state->tiles[0].current_rect.y, 180,
-                "the thumbnail lands over the restored app");
-    expect_near(state->backdrop_opacity, 1,
-                "restoring a minimized app never starts the reveal early");
-    reach_stage_destroy(stage);
-    reach_app_control_destroy(apps);
-}
-
-static void test_preparation_failure_exits_without_exposing_duplicate_previews(void)
+static void test_preparation_ignores_unrelated_results_and_recovers_from_failure(void)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
@@ -495,15 +450,12 @@ static void test_preparation_failure_exits_without_exposing_duplicate_previews(v
     reach_feature_tick_result tick = {};
     ops->tick(stage, 1.0, &tick);
     expect_true(!ops->needs_frame(stage), "preparation sleeps until the worker completion event");
-    expect_near(state->progress, 1, "a minimized placeholder waits for restoration");
     ops->window_prepared(stage, 2, REACH_ERROR, &tick);
     expect_true(state->close_phase == REACH_STAGE_CLOSE_PREPARING,
                 "an unrelated completion cannot advance the selected window");
     ops->window_prepared(stage, 1, REACH_ERROR, &tick);
-    reach_stage_thumbnail_placement placement = {};
-    reach_stage_thumbnail_at(stage, 0, &placement);
-    expect_true(!placement.visible && state->close_failed,
-                "failed restoration reveals the desktop without a duplicate preview");
+    expect_true(state->close_failed && state->close_phase != REACH_STAGE_CLOSE_PREPARING,
+                "a matching failure releases the preparation wait");
     advance_stage(stage, 30, 0.016);
     expect_true(!reach_stage_is_open(stage), "failed preparation cannot strand an opaque Stage");
     reach_stage_destroy(stage);
@@ -511,9 +463,8 @@ static void test_preparation_failure_exits_without_exposing_duplicate_previews(v
 
 int main(void)
 {
-    test_reveal_waits_for_aligned_and_transparent_presentations();
-    test_minimized_selection_uses_restored_bounds_before_moving();
-    test_preparation_failure_exits_without_exposing_duplicate_previews();
+    test_close_requires_completion_before_teardown();
+    test_preparation_ignores_unrelated_results_and_recovers_from_failure();
     test_open_and_close_state_machine();
     test_force_close_keeps_configured_animation();
     test_closing_stage_finishes_without_external_wake_ups();

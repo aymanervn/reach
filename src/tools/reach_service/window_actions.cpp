@@ -213,11 +213,23 @@ static int32_t reach_window_management_focus_target(HWND target)
     return foreground_ok || reach_window_management_foreground_matches(target);
 }
 
-static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact)
+static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact, HWND cover = nullptr)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
     {
         return REACH_INVALID_ARGUMENT;
+    }
+
+    if (cover != nullptr)
+    {
+        HWND target = reach_window_management_activation_target(hwnd);
+        if (!IsWindow(cover) || !IsWindowVisible(cover) || target == nullptr ||
+            (GetWindowLongPtrW(cover, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0 ||
+            !SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0,
+                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER))
+        {
+            return REACH_ERROR;
+        }
     }
 
     if (IsIconic(hwnd))
@@ -229,8 +241,23 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
                                           (placement.showCmd == SW_SHOWMAXIMIZED ||
                                            (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
 
-        ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
-        if (!reach_window_management_wait_for(hwnd, reach_window_management_restored, nullptr, 750))
+        if (cover != nullptr)
+        {
+            DWORD_PTR response = 0;
+            if (!SendMessageTimeoutW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0,
+                                     SMTO_ABORTIFHUNG | SMTO_BLOCK, 750, &response))
+            {
+                return REACH_ERROR;
+            }
+        }
+        else
+        {
+            ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
+        }
+        int32_t restored = cover != nullptr
+            ? reach_window_management_restored(hwnd, nullptr)
+            : reach_window_management_wait_for(hwnd, reach_window_management_restored, nullptr, 750);
+        if (!restored)
         {
             reach_window_action_state after = reach_window_management_capture_state(hwnd);
             reach_window_management_log_failure("activate.restore", hwnd, &before, &after);
@@ -239,7 +266,7 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
     }
     else if (!IsWindowVisible(hwnd))
     {
-        ShowWindow(hwnd, SW_SHOW);
+        ShowWindow(hwnd, cover != nullptr ? SW_SHOWNOACTIVATE : SW_SHOW);
     }
 
     HWND target = exact ? hwnd : reach_window_management_activation_target(hwnd);
@@ -248,9 +275,26 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
         return REACH_ERROR;
     }
 
-    SetWindowPos(target, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-    SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-    BringWindowToTop(target);
+    if (cover != nullptr)
+    {
+        if (!IsWindow(cover) || !IsWindowVisible(cover) ||
+            (GetWindowLongPtrW(cover, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)
+        {
+            return REACH_ERROR;
+        }
+        UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+        if (!SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0, flags) ||
+            !SetWindowPos(target, HWND_TOP, 0, 0, 0, 0, flags))
+        {
+            return REACH_ERROR;
+        }
+    }
+    else
+    {
+        SetWindowPos(target, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        BringWindowToTop(target);
+    }
 
     if (reach_window_management_focus_target(target))
     {
@@ -269,48 +313,26 @@ reach_result reach_window_management_prepare(HWND hwnd, HWND cover)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    HWND target = reach_window_management_activation_target(hwnd);
-    if (target == nullptr || target != hwnd)
-    {
-        return REACH_ERROR;
-    }
-    if (!SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0,
-                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER))
-    {
-        return REACH_ERROR;
-    }
     BOOL transitions_disabled = FALSE;
     bool restore_transitions = SUCCEEDED(DwmGetWindowAttribute(
-        target, DWMWA_TRANSITIONS_FORCEDISABLED, &transitions_disabled, sizeof(transitions_disabled)));
+        hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &transitions_disabled, sizeof(transitions_disabled)));
     BOOL disabled = TRUE;
     if (restore_transitions)
     {
-        (void)DwmSetWindowAttribute(target, DWMWA_TRANSITIONS_FORCEDISABLED, &disabled, sizeof(disabled));
+        (void)DwmSetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &disabled, sizeof(disabled));
     }
-    DWORD_PTR response = 0;
-    bool restored = !IsIconic(target) || SendMessageTimeoutW(
-        target, WM_SYSCOMMAND, SC_RESTORE, 0, SMTO_ABORTIFHUNG | SMTO_BLOCK, 750, &response) != 0;
-    if (restored && !IsWindowVisible(target))
-    {
-        restored = ShowWindowAsync(target, SW_SHOWNOACTIVATE) != 0;
-    }
-    bool ready = restored && IsWindow(cover) && IsWindowVisible(cover) &&
-                 !IsIconic(target) && IsWindowVisible(target) &&
-                 reach_window_management_focus_target(target);
+    bool ready = reach_window_management_activate_impl(hwnd, 0, cover) == REACH_OK;
     if (ready)
     {
-        ready = SetWindowPos(target, cover, 0, 0, 0, 0,
-                              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER) != 0;
-    }
-    if (ready)
-    {
+        HWND target = reach_window_management_activation_target(hwnd);
+        DWORD_PTR response = 0;
         ready = SendMessageTimeoutW(target, WM_NULL, 0, 0,
                                      SMTO_ABORTIFHUNG | SMTO_BLOCK, 750, &response) != 0;
         ready = SUCCEEDED(DwmFlush()) && ready;
     }
-    if (restore_transitions && IsWindow(target))
+    if (restore_transitions && IsWindow(hwnd))
     {
-        (void)DwmSetWindowAttribute(target, DWMWA_TRANSITIONS_FORCEDISABLED,
+        (void)DwmSetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED,
                                     &transitions_disabled, sizeof(transitions_disabled));
     }
     return ready ? REACH_OK : REACH_ERROR;
