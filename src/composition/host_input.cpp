@@ -917,6 +917,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     if (event->type == REACH_UI_EVENT_APP_SWITCH_BEGIN)
     {
+        reach_host_close_transient_surfaces(host, 0);
         reach_host_refresh_window_world(host);
         reach_host_apply_foreground_change(host);
     }

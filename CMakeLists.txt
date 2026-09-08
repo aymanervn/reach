@@ -819,6 +819,18 @@ target_link_libraries(reach_app_control_tests PRIVATE
     reach_services
 )
 
+add_executable(reach_switcher_feature_tests
+    tests/switcher_feature_tests.cpp
+)
+
+reach_configure_common(reach_switcher_feature_tests)
+target_compile_features(reach_switcher_feature_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_switcher_feature_tests PRIVATE
+    reach_features
+)
+
 add_executable(reach_wallpaper_service_tests
     tests/wallpaper_service_tests.cpp
 )
@@ -1047,6 +1059,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_system_hud_feature_tests COMMAND reach_system_hud_feature_tests)
     add_test(NAME reach_context_menu_feature_tests COMMAND reach_context_menu_feature_tests)
     add_test(NAME reach_app_control_tests COMMAND reach_app_control_tests)
+    add_test(NAME reach_switcher_feature_tests COMMAND reach_switcher_feature_tests)
     add_test(NAME reach_wallpaper_service_tests COMMAND reach_wallpaper_service_tests)
     add_test(NAME reach_now_playing_service_tests COMMAND reach_now_playing_service_tests)
     add_test(NAME reach_idle_watch_tests COMMAND reach_idle_watch_tests)
