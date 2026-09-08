@@ -42,6 +42,7 @@ static reach_host generic_frame_host;
 static reach_host native_overlay_host;
 static reach_host closing_stage_host;
 static reach_host focus_restore_host;
+static reach_host foreground_reconciliation_host;
 static reach_host closable_host;
 static reach_host dismiss_guard_host;
 static reach_host bar_conditions_host;
@@ -68,6 +69,8 @@ static size_t captured_release_count;
 static size_t exclusive_release_count;
 static int32_t fake_source_popup_trigger;
 static size_t unrelated_popup_down_count;
+static reach_window_id observed_foreground_window;
+static int32_t foreground_window_available;
 
 typedef struct fake_presentation_capsule
 {
@@ -173,6 +176,33 @@ static reach_result fake_get_pointer_position(reach_input_source *source,
         return REACH_INVALID_ARGUMENT;
     }
     *out_position = observed_pointer;
+    return REACH_OK;
+}
+
+static reach_window_id fake_current_foreground(const reach_foreground_watcher *watcher)
+{
+    (void)watcher;
+    return observed_foreground_window;
+}
+
+static size_t fake_foreground_window_count(const reach_window_manager *manager)
+{
+    (void)manager;
+    return foreground_window_available ? 1 : 0;
+}
+
+static reach_result fake_foreground_window_at(const reach_window_manager *manager, size_t index,
+                                              reach_window_snapshot *out_window)
+{
+    (void)manager;
+    if (!foreground_window_available || index != 0 || out_window == nullptr)
+    {
+        return REACH_ERROR;
+    }
+    *out_window = {};
+    out_window->id = observed_foreground_window;
+    out_window->visible = 1;
+    out_window->title[0] = 'A';
     return REACH_OK;
 }
 
@@ -696,6 +726,13 @@ static void test_focus_restore_follows_the_close_intent(void)
     expect_true(host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER]
                     .definition->surface.restores_focus_on_close,
                 "the Launcher declares that closing restores the previous foreground window");
+    expect_true(!host->feature_runtimes[REACH_SURFACE_ID_SWITCHER]
+                     .definition->surface.restores_focus_on_close,
+                "the Switcher never needs focus restoration because it does not activate");
+    expect_true((host->feature_runtimes[REACH_SURFACE_ID_SWITCHER]
+                     .definition->surface.behavior_flags &
+                 REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0,
+                "the Switcher remains non-activating while an app-switch gesture is active");
 
     host->focus_restore_window[REACH_SURFACE_ID_LAUNCHER] = 4242;
     reach_host_arm_focus_restore(host, REACH_SURFACE_ID_LAUNCHER);
@@ -718,6 +755,41 @@ static void test_focus_restore_follows_the_close_intent(void)
     reach_host_arm_focus_restore(host, REACH_SURFACE_ID_DOCK);
     expect_true(!host->focus_restore_pending[REACH_SURFACE_ID_DOCK],
                 "a surface that does not declare focus restore never arms one");
+}
+
+static void test_foreground_reconciles_after_window_discovery(void)
+{
+    reach_host *host = &foreground_reconciliation_host;
+    reach_host_init_feature_registry(host);
+
+    reach_window_manager_port window_manager = {};
+    window_manager.ops.window_count = fake_foreground_window_count;
+    window_manager.ops.window_at = fake_foreground_window_at;
+    expect_true(reach_window_tracking_create(window_manager, &host->window_tracking) == REACH_OK,
+                "foreground reconciliation creates window tracking");
+
+    observed_foreground_window = 4242;
+    foreground_window_available = 0;
+    host->foreground_watcher.ops.foreground = fake_current_foreground;
+    reach_host_apply_foreground_change(host);
+
+    expect_true(reach_window_tracking_current_foreground(host->window_tracking) == 4242,
+                "untracked native foreground is remembered");
+    expect_true(reach_window_tracking_foreground(host->window_tracking) == 0,
+                "untracked native foreground does not enter app history");
+
+    foreground_window_available = 1;
+    expect_true(reach_host_refresh_open_windows(host, nullptr) == REACH_OK,
+                "newly discovered foreground window refreshes");
+    reach_host_apply_foreground_change(host);
+
+    expect_true(reach_window_tracking_current_foreground(host->window_tracking) == 4242,
+                "native foreground remains unchanged after discovery");
+    expect_true(reach_window_tracking_foreground(host->window_tracking) == 4242,
+                "newly discovered foreground reconciles into app history");
+
+    reach_window_tracking_destroy(host->window_tracking);
+    host->window_tracking = nullptr;
 }
 
 static void test_every_dismissable_surface_reaches_the_shared_close_path(void)
@@ -1189,6 +1261,7 @@ int main(void)
     test_power_popup_resolves_its_exact_top_bar_owner();
     test_captured_release_precedes_exclusive_popup();
     test_popup_trigger_press_bypasses_unrelated_open_popup();
+    test_foreground_reconciles_after_window_discovery();
     test_focus_restore_follows_the_close_intent();
     test_every_dismissable_surface_reaches_the_shared_close_path();
     test_every_popup_names_the_control_that_holds_it_open();

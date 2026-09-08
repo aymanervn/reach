@@ -320,14 +320,18 @@ void reach_host_apply_foreground_change(reach_host *host)
     uintptr_t foreground =
         host->foreground_watcher.ops.foreground(host->foreground_watcher.watcher);
 
-    if (foreground == reach_window_tracking_current_foreground(host->window_tracking))
+    if (foreground == 0)
     {
         return;
     }
-    reach_window_tracking_note_current_foreground(host->window_tracking, foreground);
-    host->dirty.z_order = 1;
-    reach_host_request_update(host);
-    if (reach_window_tracking_window_by_id(host->window_tracking, foreground) == nullptr)
+    if (foreground != reach_window_tracking_current_foreground(host->window_tracking))
+    {
+        reach_window_tracking_note_current_foreground(host->window_tracking, foreground);
+        host->dirty.z_order = 1;
+        reach_host_request_update(host);
+    }
+    if (foreground == reach_host_foreground_window(host) ||
+        reach_window_tracking_window_by_id(host->window_tracking, foreground) == nullptr)
     {
         return;
     }

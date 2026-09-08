@@ -174,7 +174,7 @@ static int32_t reach_window_management_foreground_matches(HWND target)
             GetAncestor(foreground, GA_ROOTOWNER) == target);
 }
 
-static int32_t reach_window_management_focus_target(HWND target)
+static int32_t reach_window_management_focus_target(HWND target, int32_t bring_to_top)
 {
     if (target == nullptr || !IsWindow(target))
     {
@@ -200,6 +200,10 @@ static int32_t reach_window_management_focus_target(HWND target)
     (void)SetActiveWindow(target);
     (void)SetFocus(target);
     BOOL foreground_ok = SetForegroundWindow(target);
+    if (bring_to_top)
+    {
+        BringWindowToTop(target);
+    }
 
     if (attached_foreground)
     {
@@ -213,7 +217,8 @@ static int32_t reach_window_management_focus_target(HWND target)
     return foreground_ok || reach_window_management_foreground_matches(target);
 }
 
-static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact, HWND cover = nullptr)
+static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact,
+                                                          HWND cover = nullptr)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
     {
@@ -296,7 +301,7 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
         BringWindowToTop(target);
     }
 
-    if (reach_window_management_focus_target(target))
+    if (reach_window_management_focus_target(target, cover == nullptr))
     {
         return REACH_OK;
     }
@@ -385,7 +390,7 @@ reach_result reach_window_management_leave_game_to_desktop(HWND game)
         return REACH_ERROR;
     }
 
-    if (!reach_window_management_focus_target(desktop))
+    if (!reach_window_management_focus_target(desktop, 0))
     {
         reach_window_action_state state = reach_window_management_capture_state(game);
         reach_window_management_log_failure("leave_game.foreground", game, &state, &state);

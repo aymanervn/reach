@@ -255,7 +255,11 @@ versioned preparation command sharing ordinary activation's restore, owner/dialo
 and foreground transfer. Covered placement keeps the app in the ordinary window band and never
 uses the topmost cover as its insert-after window. Restoration temporarily disables the selected
 window's native transition and restores that setting. Ordinary activation retains its existing
-topmost promotion/demotion sequence and native foreground-transfer compatibility path.
+topmost promotion/demotion sequence and native foreground-transfer compatibility path, including
+the final attached-input raise. Switcher uses that ordinary activation path. Its non-activating
+overlay presents immediately and starts the shared close transition before publishing the selected
+window for activation. Switcher Begin runs the generic transient close sweep before refreshing the
+window world and dispatching the event to the capsule.
 The worker serializes window requests, coalesces pending activation selections, and preserves
 close, minimize, and snap requests. Preparation retains a queue hold until the surface releases
 its cover. Teardown cancels queued preparation and waits for running preparation before releasing
