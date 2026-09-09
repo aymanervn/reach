@@ -93,9 +93,10 @@ static reach_rect_f32 reach_top_bar_rect_union(reach_rect_f32 left, reach_rect_f
 
 static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
                                                        reach_render_command_buffer *commands,
-                                                       reach_rect_f32 pill, float dpi_scale)
+                                                       reach_rect_f32 pill, float dpi_scale,
+                                                       int32_t border, int32_t rounded)
 {
-    float radius = pill.height * 0.5f;
+    float radius = rounded ? pill.height * 0.5f : 0.0f;
 
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
@@ -103,7 +104,8 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
     shape.radius = radius;
     return reach_render_push_bordered_background(
         commands, &shape, theme->top_bar_background, theme->bar_border,
-        reach_theme_border_thickness(theme, dpi_scale), &theme->bar_shadow, dpi_scale);
+        border ? reach_theme_border_thickness(theme, dpi_scale) : 0.0f, &theme->bar_shadow,
+        dpi_scale);
 }
 
 static reach_rect_f32 reach_top_bar_render_pill(const reach_top_bar_layout *layout, size_t index)
@@ -502,11 +504,13 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
 
     const reach_top_bar_state *state = &top_bar->state;
     const reach_top_bar_layout *layout = &state->layout;
+    reach_top_bar_style_profile profile = reach_top_bar_style_profile_for(state->style);
 
-    if (state->style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED)
+    if (profile.background != REACH_TOP_BAR_BACKGROUND_SPLIT)
     {
         result = reach_top_bar_push_pill_background(
-            ctx->theme, out_commands, reach_top_bar_background_bounds(top_bar), ctx->dpi_scale);
+            ctx->theme, out_commands, reach_top_bar_background_bounds(top_bar), ctx->dpi_scale,
+            profile.border, profile.background != REACH_TOP_BAR_BACKGROUND_SIMPLE);
         if (result != REACH_OK)
         {
             return result;
@@ -520,8 +524,9 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
             {
                 continue;
             }
-            result = reach_top_bar_push_pill_background(
-                ctx->theme, out_commands, reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
+            result = reach_top_bar_push_pill_background(ctx->theme, out_commands,
+                                                        reach_top_bar_render_pill(layout, index),
+                                                        ctx->dpi_scale, profile.border, 1);
             if (result != REACH_OK)
             {
                 return result;

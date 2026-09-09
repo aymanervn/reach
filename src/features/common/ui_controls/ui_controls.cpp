@@ -2,6 +2,8 @@
 
 #include "reach/support/util.h"
 
+#include <math.h>
+
 static void reach_ui_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                float radius, reach_color color)
 {
@@ -97,6 +99,75 @@ void reach_ui_selection_item_render(reach_render_command_buffer *commands, reach
     reach_ui_push_text(commands, bounds, label, style->text_size, style->text_weight,
                        REACH_TEXT_ALIGNMENT_CENTER,
                        reach_theme_color_mix(style->text, style->accent, selection));
+}
+
+reach_rect_f32 reach_ui_segmented_selector_item_bounds(reach_rect_f32 bounds, size_t item_count,
+                                                       size_t index)
+{
+    if (item_count == 0 || index >= item_count || bounds.width <= 0.0f || bounds.height <= 0.0f)
+    {
+        return {};
+    }
+    float item_width = bounds.width / (float)item_count;
+    return {bounds.x + item_width * (float)index, bounds.y, item_width, bounds.height};
+}
+
+int32_t reach_ui_segmented_selector_index_at(reach_rect_f32 bounds, size_t item_count, float x,
+                                             float y)
+{
+    if (item_count == 0 || bounds.width <= 0.0f || bounds.height <= 0.0f || x < bounds.x ||
+        x >= bounds.x + bounds.width || y < bounds.y || y >= bounds.y + bounds.height)
+    {
+        return -1;
+    }
+    size_t index = (size_t)((x - bounds.x) * (float)item_count / bounds.width);
+    return index < item_count ? (int32_t)index : -1;
+}
+
+void reach_ui_segmented_selector_render(reach_render_command_buffer *commands,
+                                        reach_rect_f32 bounds, const uint16_t *const *labels,
+                                        size_t item_count,
+                                        const reach_ui_selection_item_style *style,
+                                        float selection_position)
+{
+    if (commands == nullptr || labels == nullptr || item_count == 0 || style == nullptr ||
+        bounds.width <= 0.0f || bounds.height <= 0.0f)
+    {
+        return;
+    }
+    float maximum = (float)(item_count - 1);
+    if (selection_position < 0.0f)
+    {
+        selection_position = 0.0f;
+    }
+    if (selection_position > maximum)
+    {
+        selection_position = maximum;
+    }
+
+    float radius = bounds.height * 0.5f;
+    reach_ui_push_rect(commands, bounds, radius, style->background);
+    reach_rect_f32 selected = reach_ui_segmented_selector_item_bounds(bounds, item_count, 0);
+    selected.x += selected.width * selection_position;
+    reach_color selected_background =
+        reach_theme_color_mix(style->background, style->accent, 0.22f);
+    reach_color selected_border = reach_theme_color_mix(selected_background, style->accent, 0.85f);
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = selected;
+    shape.radius = radius;
+    (void)reach_render_push_bordered_background(
+        commands, &shape, selected_background, selected_border, style->border_width, nullptr, 1.0f);
+
+    for (size_t index = 0; index < item_count; ++index)
+    {
+        float distance = fabsf(selection_position - (float)index);
+        float selection = distance < 1.0f ? 1.0f - distance : 0.0f;
+        reach_rect_f32 item = reach_ui_segmented_selector_item_bounds(bounds, item_count, index);
+        reach_ui_push_text(commands, item, labels[index], style->text_size, style->text_weight,
+                           REACH_TEXT_ALIGNMENT_CENTER,
+                           reach_theme_color_mix(style->text, style->accent, selection));
+    }
 }
 
 void reach_ui_toggle_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,

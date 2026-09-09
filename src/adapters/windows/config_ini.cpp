@@ -178,12 +178,12 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
-    int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(
-        L"top_bar", L"style", REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED, path);
-    out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED &&
-                                          top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_UNIFIED
+    int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(L"top_bar", L"style",
+                                                           REACH_CONFIG_TOP_BAR_STYLE_SPLIT, path);
+    out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SPLIT &&
+                                          top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_SIMPLE
                                       ? (reach_config_top_bar_style)top_bar_style
-                                      : REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED;
+                                      : REACH_CONFIG_TOP_BAR_STYLE_SPLIT;
     int32_t top_bar_mode = (int32_t)GetPrivateProfileIntW(L"top_bar", L"mode",
                                                           REACH_CONFIG_TOP_BAR_MODE_DYNAMIC, path);
     out_snapshot->top_bar_mode = top_bar_mode >= REACH_CONFIG_TOP_BAR_MODE_DYNAMIC &&

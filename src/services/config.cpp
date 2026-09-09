@@ -642,8 +642,8 @@ reach_result reach_config_service_set_display(reach_config_service *service,
 reach_result reach_config_service_set_top_bar(reach_config_service *service,
                                               const reach_config_top_bar_settings *settings)
 {
-    if (settings == nullptr || settings->style < REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED ||
-        settings->style > REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ||
+    if (settings == nullptr || settings->style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
+        settings->style > REACH_CONFIG_TOP_BAR_STYLE_SIMPLE ||
         settings->mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
         settings->mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
     {

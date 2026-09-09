@@ -22,8 +22,9 @@ extern "C"
 
     typedef enum reach_config_top_bar_style
     {
-        REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED = 0,
-        REACH_CONFIG_TOP_BAR_STYLE_UNIFIED = 1
+        REACH_CONFIG_TOP_BAR_STYLE_SPLIT = 0,
+        REACH_CONFIG_TOP_BAR_STYLE_UNIFIED = 1,
+        REACH_CONFIG_TOP_BAR_STYLE_SIMPLE = 2
     } reach_config_top_bar_style;
 
     typedef enum reach_config_top_bar_mode

@@ -1,4 +1,5 @@
 #include "reach/features/common/bar_visibility.h"
+#include "reach/features/top_bar.h"
 
 #include <stdio.h>
 
@@ -45,6 +46,54 @@ static void test_protected_bands_are_symmetric(void)
         reach_bar_protected_band(REACH_BAR_EDGE_TOP, scaled_top, scaled_monitor, 15.0f);
     expect_true(scaled_band.height == top_band.height * 2.0f,
                 "protected-band clearance follows DPI-scaled geometry");
+    expect_true(reach_bar_reserved_edge(REACH_BAR_EDGE_TOP, top, 8.0f) == 56.0f,
+                "top reservation uses the explicit far-edge clearance");
+    expect_true(reach_bar_reserved_edge(REACH_BAR_EDGE_BOTTOM, bottom, 8.0f) == 744.0f,
+                "bottom reservation uses the explicit far-edge clearance");
+}
+
+static void test_top_bar_styles_publish_their_clearance(void)
+{
+    reach_top_bar *top_bar = nullptr;
+    expect_true(reach_top_bar_create(&top_bar) == REACH_OK, "top bar is created");
+    if (top_bar == nullptr)
+    {
+        return;
+    }
+
+    reach_top_bar_build_context context = {};
+    context.theme = reach_theme_default();
+    context.monitor_bounds = {100.0f, 50.0f, 1200.0f, 800.0f};
+    context.dpi_scale = 1.0f;
+
+    (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_SPLIT,
+                                     REACH_CONFIG_TOP_BAR_MODE_STATIC);
+    reach_top_bar_build_layout(top_bar, &context);
+    const reach_top_bar_state *split = reach_top_bar_state_ptr(top_bar);
+    reach_feature_surface_geometry split_geometry = {};
+    reach_top_bar_capsule_ops()->surface_geometry(top_bar, &split_geometry);
+    expect_true(split->layout.bounds.y == 56.0f && split->layout.app_clearance == 6.0f,
+                "split top bar keeps symmetric visual clearance");
+    expect_true(split_geometry.reserve_monitor_work_area &&
+                    split_geometry.work_area_clearance == 6.0f,
+                "split top bar publishes its static work-area clearance");
+
+    (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
+                                     REACH_CONFIG_TOP_BAR_MODE_STATIC);
+    reach_top_bar_build_layout(top_bar, &context);
+    const reach_top_bar_state *simple = reach_top_bar_state_ptr(top_bar);
+    reach_feature_surface_geometry simple_geometry = {};
+    reach_top_bar_capsule_ops()->surface_geometry(top_bar, &simple_geometry);
+    reach_rect_f32 background = reach_top_bar_background_bounds(top_bar);
+    expect_true(simple->layout.bounds.y == 50.0f && simple->layout.app_clearance == 0.0f,
+                "simple top bar reaches the screen edge without app clearance");
+    expect_true(background.x == 0.0f && background.width == context.monitor_bounds.width,
+                "simple top bar background spans the monitor width");
+    expect_true(simple_geometry.reserve_monitor_work_area &&
+                    simple_geometry.work_area_clearance == 0.0f,
+                "simple top bar publishes zero extra work-area clearance");
+
+    reach_top_bar_destroy(top_bar);
 }
 
 static void test_forced_hide_animates_and_suppresses_reveal(void)
@@ -155,6 +204,7 @@ static void test_resized_shown_bounds_override_an_old_position_animation(void)
 int main(void)
 {
     test_protected_bands_are_symmetric();
+    test_top_bar_styles_publish_their_clearance();
     test_forced_hide_animates_and_suppresses_reveal();
     test_stage_force_show_precedes_manipulation();
     test_pointer_observation_wakes_hover_exit();

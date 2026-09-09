@@ -1,5 +1,6 @@
 #include "reach/support/util.h"
 #include "reach/apps/settings/settings.h"
+#include "reach/features/common/ui_controls.h"
 
 #include <memory>
 #include <stdio.h>
@@ -466,6 +467,16 @@ static void test_display_theme_preferences(void)
     expect_true(reach_settings_model_select_windows_system_theme(model.get(),
                                                                  REACH_CONFIG_THEME_FOLLOW_REACH),
                 "Windows mode can return to Reach synchronization");
+
+    reach_rect_f32 selector = {100.0f, 40.0f, 300.0f, 30.0f};
+    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 149.0f, 55.0f) == 0,
+                "segmented selector maps its first segment");
+    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 250.0f, 55.0f) == 1,
+                "segmented selector maps its middle segment");
+    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 399.0f, 55.0f) == 2,
+                "segmented selector maps its final segment");
+    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 400.0f, 55.0f) < 0,
+                "segmented selector excludes its far edge");
 }
 
 static void test_account_password_form(void)
@@ -557,18 +568,30 @@ static void test_top_bar_preferences(void)
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
 
-    expect_true(reach_settings_model_top_bar_style(model.get()) ==
-                    REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED,
-                "top bar defaults to segmented style");
+    expect_true(reach_settings_model_top_bar_style(model.get()) == REACH_CONFIG_TOP_BAR_STYLE_SPLIT,
+                "top bar defaults to split style");
     expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC,
                 "top bar defaults to dynamic mode");
     expect_true(reach_animation_manager_value(&model->top_bar_mode_animation, 0) == 1.0f,
                 "dynamic mode presents auto hide as enabled");
 
-    expect_true(reach_settings_model_toggle_top_bar_style(model.get()), "top bar style can toggle");
+    expect_true(
+        reach_settings_model_select_top_bar_style(model.get(), REACH_CONFIG_TOP_BAR_STYLE_UNIFIED),
+        "top bar style can select unified");
     expect_true(reach_settings_model_top_bar_style(model.get()) ==
                     REACH_CONFIG_TOP_BAR_STYLE_UNIFIED,
-                "top bar style toggles to unified");
+                "top bar style stores unified");
+    expect_true(
+        reach_settings_model_select_top_bar_style(model.get(), REACH_CONFIG_TOP_BAR_STYLE_SIMPLE),
+        "top bar style can select simple");
+    expect_true(reach_settings_model_top_bar_style(model.get()) ==
+                    REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
+                "top bar style stores simple");
+    expect_true(reach_animation_manager_target(&model->top_bar_style_animation, 0) == 2.0f,
+                "top bar style selector targets simple");
+    expect_true(
+        !reach_settings_model_select_top_bar_style(model.get(), (reach_config_top_bar_style)99),
+        "top bar style rejects invalid selections");
     expect_true(reach_settings_model_toggle_top_bar_mode(model.get()), "top bar mode can toggle");
     expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_STATIC,
                 "top bar mode toggles to static");

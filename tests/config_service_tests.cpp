@@ -212,15 +212,18 @@ int main()
     failed += expect(reach_config_service_set_display(service, &display) == REACH_INVALID_ARGUMENT);
 
     reach_config_top_bar_settings top_bar = {};
-    top_bar.style = REACH_CONFIG_TOP_BAR_STYLE_UNIFIED;
+    top_bar.style = REACH_CONFIG_TOP_BAR_STYLE_SIMPLE;
     top_bar.mode = REACH_CONFIG_TOP_BAR_MODE_STATIC;
     failed += expect(reach_config_service_set_top_bar(service, &top_bar) == REACH_OK);
     failed += expect(reach_config_service_flush(service) == REACH_OK);
     std::memset(&live, 0, sizeof(live));
     failed += expect(reach_config_service_snapshot(service, &live) == REACH_OK);
-    failed += expect(live.top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED);
+    failed += expect(live.top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_SIMPLE);
     failed += expect(live.top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
     top_bar.mode = (reach_config_top_bar_mode)99;
+    failed += expect(reach_config_service_set_top_bar(service, &top_bar) == REACH_INVALID_ARGUMENT);
+    top_bar.mode = REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
+    top_bar.style = (reach_config_top_bar_style)99;
     failed += expect(reach_config_service_set_top_bar(service, &top_bar) == REACH_INVALID_ARGUMENT);
     reach_config_service_destroy(service);
 

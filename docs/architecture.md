@@ -316,9 +316,10 @@ is a `shell:` location or a filesystem path.
 **Accepted coupling (by design — do not “fix”):** the top bar cluster. The top
 bar hosts the tray / quick-settings / power buttons, so its private tray overflow UI and the
 other popup features may take the top bar layout directly; no anchor indirection is wanted
-between them. Segmented and unified top-bar styles are two chrome treatments over that same
-capsule, layout, control set, and action routing: the style changes background and input-region
-composition without duplicating controls. Now Playing is not a
+between them. Split, unified, and simple top-bar styles are chrome and edge-geometry treatments
+over that same capsule, layout, control set, and action routing: the style profile changes the
+background, border, screen inset, app clearance, and input-region composition without duplicating
+controls. Now Playing is not a
 separate feature: its private UI subfeature lives inside the top bar and consumes
 the shared Now Playing service, leaving room for a future standalone music feature
 to consume the same stable service independently. It renders one bold line and
@@ -363,8 +364,8 @@ edge lands — a maximized window's rect overhangs the monitor by its invisible
 resize border and the app paints that overhang, so aligning anything else puts
 that painted border against the bar and eats the gap. The depth of that band
 comes from the top bar's own layout — the screen gap above the bar, the bar
-height, and the same gap again below it — not from the bar rect alone, so a
-revealed bar floats between the screen edge and the window it pushed. Only
+height, and the style's app-side clearance below it — not from the bar rect alone. Split and
+unified float between the screen edge and the window they push; simple meets both. Only
 windows centred on the bar's monitor are pushed; a window on a neighbouring
 monitor that merely clips into this one is left alone. It stores each window's
 original position at capture and animates back onto it — Windows never moves a
@@ -392,8 +393,8 @@ the shell measures with; mixing the two drifts by the invisible resize border.
 Dynamic mode deliberately leaves the work area alone: changing it costs ~37 ms per call,
 which no animation-frame path can afford. Static mode disables reveal and window push, keeps the
 bar shown, and publishes work-area reservation intent with its surface geometry. The generic frame
-path derives the reservation from the resolved bar bounds and current layout monitor, mirroring the
-bar's inset from its reserved screen edge after the bar's far edge. The monitor adapter caches the
+path derives the reservation from the resolved bar bounds, explicit app-side clearance, and current
+layout monitor. The monitor adapter caches the
 applied geometry, changes the OS work area only when that state changes, and reconciles visible
 maximized windows on the affected monitor while preserving their normal restore bounds.
 
@@ -629,8 +630,8 @@ bounds receives the remaining rectangle through the generic surface context; Sta
 contract after Dock and top bar arrangement rather than reading either feature directly.
 Separately, a surface can publish `manage_monitor_work_area` and
 `reserve_monitor_work_area` in its resolved geometry. Composition maps the definition's
-reservation edge and resolved bounds to the monitor port's generic
-`set_work_area` operation. The reserved edge gap mirrors the surface's own screen-edge inset. The
+reservation edge, resolved bounds, and published `work_area_clearance` to the monitor port's generic
+`set_work_area` operation. The
 Windows monitor adapter uses `SPI_SETWORKAREA` with change broadcasting, caches identical writes,
 reconciles visible maximized windows on the affected monitor without changing their normal restore
 bounds, and restores full monitor bounds when the surface is hidden, enters game-mode suppression,

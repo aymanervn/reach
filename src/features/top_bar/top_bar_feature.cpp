@@ -28,18 +28,17 @@ reach_animation_manager *reach_top_bar_manager(reach_top_bar *top_bar)
 int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_style style,
                                    reach_config_top_bar_mode mode)
 {
-    if (top_bar == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED ||
-        style > REACH_CONFIG_TOP_BAR_STYLE_UNIFIED || mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
+    if (top_bar == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
+        style > REACH_CONFIG_TOP_BAR_STYLE_SIMPLE || mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
         mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
     {
         return 0;
     }
 
     int32_t changed = top_bar->state.style != style || top_bar->state.mode != mode;
-    int32_t mode_changed = top_bar->state.mode != mode;
     top_bar->state.style = style;
     top_bar->state.mode = mode;
-    if (mode_changed)
+    if (changed)
     {
         reach_bar_visibility_reset(&top_bar->state.visibility);
         if (mode == REACH_CONFIG_TOP_BAR_MODE_STATIC)
@@ -428,9 +427,10 @@ static int32_t reach_top_bar_has_current_app_icon(const reach_top_bar *top_bar)
 // Rounded to whole pixels because the renderer snaps pill rects the same way. Left unrounded, the
 // pill's bottom edge lands up to half a pixel away from the full-height elements sitting flush
 // inside it, and the pill's own background shows through the difference.
-static float reach_top_bar_height(float dpi_scale)
+static float reach_top_bar_height(reach_config_top_bar_style style, float dpi_scale)
 {
-    return roundf(reach_top_bar_metrics_values.height * (dpi_scale > 0.0f ? dpi_scale : 1.0f));
+    return roundf(reach_top_bar_style_profile_for(style).height *
+                  (dpi_scale > 0.0f ? dpi_scale : 1.0f));
 }
 
 static float reach_top_bar_stats_slot_advance(const reach_text_measure_port *measure,
@@ -470,22 +470,25 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     }
 
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    const reach_top_bar_style_profile profile =
+        reach_top_bar_style_profile_for(top_bar->state.style);
     const float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
-    const float height = reach_top_bar_height(scale);
+    const float height = reach_top_bar_height(top_bar->state.style, scale);
     reach_top_bar_layout *layout = &top_bar->state.layout;
 
     *layout = {};
     layout->bounds.x = ctx->monitor_bounds.x;
     layout->bounds.width = ctx->monitor_bounds.width;
-    layout->bounds.y = ctx->monitor_bounds.y + metrics.screen_gap * scale;
+    layout->bounds.y = ctx->monitor_bounds.y + profile.screen_gap * scale;
     layout->bounds.height = height;
+    layout->app_clearance = profile.app_clearance * scale;
 
     if (height <= 0.0f || layout->bounds.width <= 0.0f)
     {
         return;
     }
 
-    const float edge_inset = metrics.edge_inset * scale;
+    const float edge_inset = profile.edge_inset * scale;
     const float pill_gap = metrics.pill_gap * scale;
     const float padding = metrics.pill_padding * scale;
     const float power_button_size = height * metrics.bar_button_scale;
@@ -503,7 +506,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     const float dot_size = ctx->theme->bar_separator_dot_size * scale;
     const float dot_gap = ctx->theme->bar_separator_dot_gap * scale;
-    const float border_thickness = reach_theme_border_thickness(ctx->theme, scale);
+    const float border_thickness =
+        profile.border ? reach_theme_border_thickness(ctx->theme, scale) : 0.0f;
 
     float now_playing_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH, &top_bar->now_playing_target_width,
@@ -798,6 +802,11 @@ reach_rect_f32 reach_top_bar_background_bounds(const reach_top_bar *top_bar)
     }
 
     const reach_top_bar_layout *layout = &top_bar->state.layout;
+    if (reach_top_bar_style_profile_for(top_bar->state.style).background ==
+        REACH_TOP_BAR_BACKGROUND_SIMPLE)
+    {
+        return {0.0f, 0.0f, layout->bounds.width, layout->bounds.height};
+    }
     float left = layout->bounds.width;
     float right = 0.0f;
     for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
@@ -917,14 +926,12 @@ static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float reveal
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
 
-static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
+static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds,
+                                      float app_clearance)
 {
-    float screen_gap = shown_bounds.y - monitor_bounds.y;
-    if (screen_gap < 0.0f)
-    {
-        screen_gap = 0.0f;
-    }
-    return screen_gap + shown_bounds.height + screen_gap;
+    float depth =
+        reach_bar_reserved_edge(REACH_TOP_BAR_EDGE, shown_bounds, app_clearance) - monitor_bounds.y;
+    return depth > 0.0f ? depth : 0.0f;
 }
 
 static int32_t reach_top_bar_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
@@ -977,7 +984,8 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
         return reach_bar_visibility_result{};
     }
 
-    float push_depth = reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds);
+    float push_depth = reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds,
+                                                top_bar->state.layout.app_clearance);
 
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_TOP_BAR_EDGE;
@@ -1291,6 +1299,7 @@ static void reach_top_bar_capsule_surface_geometry(const void *capsule,
         out->visible_bounds = top_bar->state.layout.bounds;
         out->manage_monitor_work_area = 1;
         out->reserve_monitor_work_area = static_mode;
+        out->work_area_clearance = top_bar->state.layout.app_clearance;
         out->disable_bar_reveal = static_mode;
         out->force_topmost = static_mode;
     }
@@ -1305,7 +1314,9 @@ static size_t reach_top_bar_capsule_input_regions(const void *capsule, reach_rec
         return 0;
     }
 
-    if (top_bar->state.style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED)
+    reach_top_bar_background_style background =
+        reach_top_bar_style_profile_for(top_bar->state.style).background;
+    if (background != REACH_TOP_BAR_BACKGROUND_SPLIT)
     {
         if (max_regions == 0)
         {

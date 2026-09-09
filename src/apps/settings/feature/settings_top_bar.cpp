@@ -3,35 +3,32 @@
 void reach_settings_model_set_top_bar_style(reach_settings_model *model,
                                             reach_config_top_bar_style style)
 {
-    if (model == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED ||
-        style > REACH_CONFIG_TOP_BAR_STYLE_UNIFIED)
+    if (model == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
+        style > REACH_CONFIG_TOP_BAR_STYLE_SIMPLE)
     {
         return;
     }
     model->top_bar_style = style;
-    reach_animation_manager_set(&model->top_bar_style_animation, 0,
-                                style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ? 1.0f : 0.0f);
+    reach_animation_manager_set(&model->top_bar_style_animation, 0, (float)style);
 }
 
 reach_config_top_bar_style reach_settings_model_top_bar_style(const reach_settings_model *model)
 {
-    return model != nullptr ? model->top_bar_style : REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED;
+    return model != nullptr ? model->top_bar_style : REACH_CONFIG_TOP_BAR_STYLE_SPLIT;
 }
 
-int32_t reach_settings_model_toggle_top_bar_style(reach_settings_model *model)
+int32_t reach_settings_model_select_top_bar_style(reach_settings_model *model,
+                                                  reach_config_top_bar_style style)
 {
-    if (model == nullptr)
+    if (model == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
+        style > REACH_CONFIG_TOP_BAR_STYLE_SIMPLE || model->top_bar_style == style)
     {
         return 0;
     }
-    model->top_bar_style = model->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED
-                               ? REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED
-                               : REACH_CONFIG_TOP_BAR_STYLE_UNIFIED;
+    model->top_bar_style = style;
     float current = reach_animation_manager_value(&model->top_bar_style_animation, 0);
-    reach_animation_manager_start(&model->top_bar_style_animation, 0, current,
-                                  model->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ? 1.0f
-                                                                                             : 0.0f,
-                                  0.18, REACH_EASING_EASE_OUT);
+    reach_animation_manager_start(&model->top_bar_style_animation, 0, current, (float)style, 0.18,
+                                  REACH_EASING_EASE_OUT);
     return 1;
 }
 

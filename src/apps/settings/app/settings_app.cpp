@@ -1753,6 +1753,9 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME:
         detail = (uint32_t)hit.display_theme_preference;
         break;
+    case REACH_SETTINGS_HIT_TOP_BAR_STYLE:
+        detail = (uint32_t)hit.top_bar_style;
+        break;
     case REACH_SETTINGS_HIT_WIFI_ROW:
         detail = (uint32_t)hit.wifi_index;
         break;
@@ -2178,13 +2181,15 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_DISPLAY)
     {
-        if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_UNIFIED_TOGGLE)
+        if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_STYLE)
         {
-            (void)reach_settings_model_toggle_top_bar_style(&app->model);
-            reach_settings_save_top_bar_config(app);
-            app->dirty = 1;
+            if (reach_settings_model_select_top_bar_style(&app->model, hit.top_bar_style))
+            {
+                reach_settings_save_top_bar_config(app);
+                app->dirty = 1;
+            }
         }
-        else if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_STATIC_TOGGLE)
+        else if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE)
         {
             (void)reach_settings_model_toggle_top_bar_mode(&app->model);
             reach_settings_save_top_bar_config(app);

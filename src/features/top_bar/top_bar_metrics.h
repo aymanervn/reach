@@ -1,14 +1,44 @@
 #ifndef REACH_FEATURES_TOP_BAR_METRICS_H
 #define REACH_FEATURES_TOP_BAR_METRICS_H
 
+#include "reach/core/config.h"
 #include "reach/core/render_commands.h"
 #include "reach/core/typography.h"
 
-struct reach_top_bar_metrics
+typedef enum reach_top_bar_background_style
+{
+    REACH_TOP_BAR_BACKGROUND_SPLIT = 0,
+    REACH_TOP_BAR_BACKGROUND_UNIFIED = 1,
+    REACH_TOP_BAR_BACKGROUND_SIMPLE = 2
+} reach_top_bar_background_style;
+
+struct reach_top_bar_style_profile
 {
     float height;
     float screen_gap;
+    float app_clearance;
     float edge_inset;
+    reach_top_bar_background_style background;
+    int32_t border;
+};
+
+static constexpr reach_top_bar_style_profile
+reach_top_bar_style_profile_for(reach_config_top_bar_style style)
+{
+    switch (style)
+    {
+    case REACH_CONFIG_TOP_BAR_STYLE_UNIFIED:
+        return {34.5f, 6.0f, 6.0f, 8.0f, REACH_TOP_BAR_BACKGROUND_UNIFIED, 1};
+    case REACH_CONFIG_TOP_BAR_STYLE_SIMPLE:
+        return {34.5f, 0.0f, 0.0f, 0.0f, REACH_TOP_BAR_BACKGROUND_SIMPLE, 0};
+    case REACH_CONFIG_TOP_BAR_STYLE_SPLIT:
+    default:
+        return {34.5f, 6.0f, 6.0f, 8.0f, REACH_TOP_BAR_BACKGROUND_SPLIT, 1};
+    }
+}
+
+struct reach_top_bar_metrics
+{
     float pill_gap;
     float pill_padding;
 
@@ -67,9 +97,6 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 {
     reach_top_bar_metrics metrics = {};
 
-    metrics.height = 34.5f;
-    metrics.screen_gap = 6.0f;
-    metrics.edge_inset = 8.0f;
     metrics.pill_gap = 6.0f;
     metrics.pill_padding = 10.0f;
 
