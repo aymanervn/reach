@@ -42,7 +42,7 @@ static void fill_ascii(uint16_t *out, size_t capacity, const char *text)
 }
 
 static reach_capsule_event_result route(reach_launcher *launcher, reach_ui_event_type type,
-                                       uint32_t id)
+                                        uint32_t id)
 {
     reach_ui_event event = {};
     event.type = type;
@@ -174,12 +174,10 @@ int main()
     layout_input.monitor_bounds = arrange.monitor_bounds;
     layout_input.work_area = arrange.monitor_bounds;
     layout_input.dpi_scale = arrange.dpi_scale;
-    layout_input.border_thickness =
-        reach_theme_border_thickness(arrange.theme, arrange.dpi_scale);
+    layout_input.border_thickness = reach_theme_border_thickness(arrange.theme, arrange.dpi_scale);
     reach_launcher_layout expansion_layout = {};
-    failed +=
-        expect(reach_launcher_layout_compute(&state->model, &layout_input, &expansion_layout) ==
-               REACH_OK);
+    failed += expect(
+        reach_launcher_layout_compute(&state->model, &layout_input, &expansion_layout) == REACH_OK);
 
     const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
     reach_feature_surface_geometry geometry = {};
@@ -200,12 +198,10 @@ int main()
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect(geometry.visible_bounds.height > expansion_layout.search_box.height &&
                      geometry.visible_bounds.height < expansion_layout.bounds.height);
-    failed += expect(geometry.presentation.opacity > 0.0f &&
-                     geometry.presentation.opacity < 1.0f);
-    failed += expect(geometry.presentation.y_offset > 0.0f &&
-                     geometry.presentation.y_offset < 8.0f);
-    failed += expect(geometry.presentation.scale > 1.0f &&
-                     geometry.presentation.scale < 1.08f);
+    failed += expect(geometry.presentation.opacity > 0.0f && geometry.presentation.opacity < 1.0f);
+    failed +=
+        expect(geometry.presentation.y_offset > 0.0f && geometry.presentation.y_offset < 8.0f);
+    failed += expect(geometry.presentation.scale > 1.0f && geometry.presentation.scale < 1.08f);
     failed += expect(tick.redraw == 1);
     tick = {};
     capsule_ops->tick(capsule, 0.16, &tick);
@@ -251,24 +247,20 @@ int main()
     reach_capsule_event_result entered = route(capsule, REACH_UI_EVENT_ENTER, 0);
     failed += expect(entered.action.kind == REACH_FEATURE_ACTION_OPEN_TARGET);
     failed += expect(entered.action.target.kind == REACH_FEATURE_TARGET_APP);
-    failed +=
-        expect(reach_test_utf16_equals_ascii(entered.action.target.path, "C:/apps/a.exe"));
+    failed += expect(reach_test_utf16_equals_ascii(entered.action.target.path, "C:/apps/a.exe"));
     failed += expect(reach_test_utf16_equals_ascii(entered.action.target.app_user_model_id,
                                                    "Example.Package_test!App"));
-    failed +=
-        expect((entered.action.flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0);
+    failed += expect((entered.action.flags & REACH_FEATURE_ACTION_FLAG_DEFER_UNTIL_CLOSED) != 0);
 
     (void)route(capsule, REACH_UI_EVENT_ESCAPE, 0);
     failed += expect(state->model.open == 0);
     tick = {};
     capsule_ops->tick(capsule, 0.06, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed += expect(geometry.presentation.opacity > 0.0f &&
-                     geometry.presentation.opacity < 1.0f);
-    failed += expect(geometry.presentation.y_offset > 0.0f &&
-                     geometry.presentation.y_offset < 8.0f);
-    failed += expect(geometry.presentation.scale > 1.0f &&
-                     geometry.presentation.scale < 1.08f);
+    failed += expect(geometry.presentation.opacity > 0.0f && geometry.presentation.opacity < 1.0f);
+    failed +=
+        expect(geometry.presentation.y_offset > 0.0f && geometry.presentation.y_offset < 8.0f);
+    failed += expect(geometry.presentation.scale > 1.0f && geometry.presentation.scale < 1.08f);
     tick = {};
     capsule_ops->tick(capsule, 0.12, &tick);
     failed += expect(capsule_ops->needs_frame(capsule) == 0);

@@ -242,8 +242,7 @@ static void reach_config_service_thread_main(reach_config_service *service)
 
         reach_result result = REACH_INVALID_ARGUMENT;
         int32_t publish_snapshot = 0;
-        std::unique_ptr<reach_config_snapshot> snapshot(
-            new (std::nothrow) reach_config_snapshot{});
+        std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot{});
         if (snapshot == nullptr)
         {
             result = REACH_ERROR;
@@ -251,8 +250,7 @@ static void reach_config_service_thread_main(reach_config_service *service)
         if (work == REACH_CONFIG_WORK_SAVE)
         {
             int32_t transaction_locked = 0;
-            result = snapshot == nullptr
-                         ? REACH_ERROR
+            result = snapshot == nullptr ? REACH_ERROR
                      : service->store.ops.begin_transaction != nullptr
                          ? service->store.ops.begin_transaction(service->store.store)
                          : REACH_OK;
@@ -285,11 +283,9 @@ static void reach_config_service_thread_main(reach_config_service *service)
                     std::unique_ptr<reach_config_snapshot> current(
                         new (std::nothrow) reach_config_snapshot(*snapshot));
                     if (current != nullptr &&
-                        reach_config_apply_operations(current.get(),
-                                                      service->pending_operations) ==
+                        reach_config_apply_operations(current.get(), service->pending_operations) ==
                             REACH_OK &&
-                        std::memcmp(current.get(), &service->snapshot,
-                                    sizeof(*current)) != 0)
+                        std::memcmp(current.get(), &service->snapshot, sizeof(*current)) != 0)
                     {
                         service->snapshot = *current;
                         ++service->generation;
@@ -313,14 +309,12 @@ static void reach_config_service_thread_main(reach_config_service *service)
         }
         else if (work == REACH_CONFIG_WORK_RELOAD)
         {
-            result = snapshot != nullptr
-                         ? reach_config_service_load_store(service, snapshot.get())
-                         : REACH_ERROR;
+            result = snapshot != nullptr ? reach_config_service_load_store(service, snapshot.get())
+                                         : REACH_ERROR;
             if (result == REACH_OK)
             {
                 std::lock_guard<std::mutex> lock(service->mutex);
-                result =
-                    reach_config_apply_operations(snapshot.get(), service->pending_operations);
+                result = reach_config_apply_operations(snapshot.get(), service->pending_operations);
                 if (result == REACH_OK)
                 {
                     service->snapshot = *snapshot;

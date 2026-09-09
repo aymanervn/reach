@@ -519,19 +519,29 @@ static void render_display_page(const reach_settings_render_input *input,
         reach_settings_model_windows_app_theme(model), accent);
 
     reach_settings_push_text(
-        commands, layout->display_desktop_section_title,
-        (const uint16_t *)u"Desktop appearance",
+        commands, layout->display_desktop_section_title, (const uint16_t *)u"Desktop appearance",
         reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
         input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     const display_toggle_card desktop_cards[] = {
-        {layout->top_bar_unified_card, {}, layout->top_bar_unified_title,
-         layout->top_bar_unified_subtitle, layout->top_bar_unified_toggle,
-         REACH_VECTOR_ICON_NONE, nullptr, L"Unified top bar",
+        {layout->top_bar_unified_card,
+         {},
+         layout->top_bar_unified_title,
+         layout->top_bar_unified_subtitle,
+         layout->top_bar_unified_toggle,
+         REACH_VECTOR_ICON_NONE,
+         nullptr,
+         L"Unified top bar",
          L"Draw every top bar item inside one pill",
          reach_animation_manager_value(&model->top_bar_style_animation, 0)},
-        {layout->top_bar_static_card, {}, layout->top_bar_static_title,
-         layout->top_bar_static_subtitle, layout->top_bar_static_toggle, REACH_VECTOR_ICON_NONE,
-         nullptr, L"Static top bar", L"Keep it visible and reserve its screen region",
+        {layout->top_bar_static_card,
+         {},
+         layout->top_bar_static_title,
+         layout->top_bar_static_subtitle,
+         layout->top_bar_static_toggle,
+         REACH_VECTOR_ICON_NONE,
+         nullptr,
+         L"Static top bar",
+         L"Keep it visible and reserve its screen region",
          reach_animation_manager_value(&model->top_bar_mode_animation, 0)},
     };
     for (size_t index = 0; index < sizeof(desktop_cards) / sizeof(desktop_cards[0]); ++index)
@@ -680,19 +690,6 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
     }
 }
 
-static void render_installed_app_button(const reach_settings_render_input *input,
-                                        reach_render_command_buffer *commands,
-                                        reach_rect_f32 bounds, const uint16_t *label,
-                                        reach_color color)
-{
-    reach_settings_push_rect(commands, bounds,
-                             reach_settings_scale(input, input->theme->radius_small), color);
-    reach_settings_push_text(commands, bounds, label,
-                             reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
-                             REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
-                             input->theme->settings_text, 1);
-}
-
 static void render_installed_apps_page(const reach_settings_render_input *input,
                                        reach_render_command_buffer *commands)
 {
@@ -701,9 +698,8 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
     uint16_t summary[160] = {};
     append_number(summary, 160, model->installed_apps.count);
     append_text(summary, 160,
-                model->installed_apps.count == 1
-                    ? (const uint16_t *)u" application registered with Windows"
-                    : (const uint16_t *)u" applications registered with Windows");
+                model->installed_apps.count == 1 ? (const uint16_t *)u" packaged application"
+                                                 : (const uint16_t *)u" packaged applications");
     reach_settings_push_text(commands, layout->installed_apps_summary, summary,
                              reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                              REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
@@ -711,9 +707,10 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
 
     if (model->installed_apps_status != REACH_SETTINGS_APPLICATIONS_STATUS_NONE)
     {
-        reach_color color = model->installed_apps_status >= REACH_SETTINGS_APPLICATIONS_STATUS_FAILED
-                                ? input->theme->settings_status_error
-                                : input->theme->settings_secondary_text;
+        reach_color color =
+            model->installed_apps_status >= REACH_SETTINGS_APPLICATIONS_STATUS_FAILED
+                ? input->theme->settings_status_error
+                : input->theme->settings_secondary_text;
         reach_settings_push_text(
             commands, layout->installed_apps_summary,
             reach_settings_installed_apps_status_message(model->installed_apps_status),
@@ -725,17 +722,19 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
     {
         reach_settings_push_text(
             commands, layout->installed_apps_viewport,
-            model->installed_apps_loaded ? (const uint16_t *)u"No launchable applications found"
-                                         : (const uint16_t *)u"Reading applications...",
+            model->installed_apps_loaded
+                ? (const uint16_t *)u"No manageable packaged applications found"
+                : (const uint16_t *)u"Reading applications...",
             reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_NORMAL,
             REACH_TEXT_ALIGNMENT_CENTER, input->theme->settings_secondary_text, 1);
         return;
     }
 
-    reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_BLUE);
-    reach_color action = reach_settings_color_with_alpha(accent, 0.30f);
-    reach_color destructive = reach_settings_color_with_alpha(
-        input->theme->settings_status_error, 0.30f);
+    reach_ui_button_style open_style =
+        reach_settings_button_style(input, input->theme->settings_button_primary);
+    reach_ui_button_style manage_style = reach_settings_muted_button_style(input);
+    reach_ui_button_style uninstall_style =
+        reach_settings_button_style(input, input->theme->settings_button_danger);
     reach_render_command_buffer_set_scissor(commands, layout->installed_apps_viewport);
     for (size_t index = 0; index < layout->installed_app_row_count; ++index)
     {
@@ -767,8 +766,8 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
         }
 
         float text_x = icon_box.x + icon_box.width + reach_settings_scale(input, 14.0f);
-        float text_right = layout->installed_app_open_buttons[index].x -
-                           reach_settings_scale(input, 14.0f);
+        float text_right =
+            layout->installed_app_open_buttons[index].x - reach_settings_scale(input, 14.0f);
         float text_width = text_right > text_x ? text_right - text_x : 0.0f;
         reach_settings_push_text(commands,
                                  {text_x, row.y + reach_settings_scale(input, 13.0f), text_width,
@@ -798,19 +797,24 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
                                  REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
                                  input->theme->settings_secondary_text, 1);
 
-        render_installed_app_button(input, commands, layout->installed_app_open_buttons[index],
-                                    (const uint16_t *)u"Open", action);
+        int32_t enabled = !model->installed_apps_busy;
+        reach_ui_button_render(commands, layout->installed_app_open_buttons[index],
+                               (const uint16_t *)u"Open", &open_style, enabled && entry->can_open,
+                               reach_settings_model_installed_app_button_press_value(
+                                   model, REACH_SETTINGS_HIT_APPLICATION_OPEN, index));
         if (entry->can_manage)
         {
-            render_installed_app_button(input, commands,
-                                        layout->installed_app_manage_buttons[index],
-                                        (const uint16_t *)u"Options", action);
+            reach_ui_button_render(commands, layout->installed_app_manage_buttons[index],
+                                   (const uint16_t *)u"Options", &manage_style, enabled,
+                                   reach_settings_model_installed_app_button_press_value(
+                                       model, REACH_SETTINGS_HIT_APPLICATION_MANAGE, index));
         }
         if (entry->can_uninstall)
         {
-            render_installed_app_button(input, commands,
-                                        layout->installed_app_uninstall_buttons[index],
-                                        (const uint16_t *)u"Uninstall", destructive);
+            reach_ui_button_render(commands, layout->installed_app_uninstall_buttons[index],
+                                   (const uint16_t *)u"Uninstall", &uninstall_style, enabled,
+                                   reach_settings_model_installed_app_button_press_value(
+                                       model, REACH_SETTINGS_HIT_APPLICATION_UNINSTALL, index));
         }
     }
     reach_render_command_buffer_clear_scissor(commands);

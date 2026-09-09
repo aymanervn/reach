@@ -9,11 +9,11 @@ const uint16_t *reach_settings_installed_apps_page_title(void)
 
 const uint16_t *reach_settings_installed_apps_page_placeholder(void)
 {
-    return (const uint16_t *)L"Open and manage applications registered with Windows";
+    return (const uint16_t *)L"Open and manage packaged applications installed for your account";
 }
 
 void reach_settings_model_apply_installed_apps(reach_settings_model *model,
-                                                const reach_installed_app_list *list)
+                                               const reach_installed_app_list *list)
 {
     if (model == nullptr)
     {

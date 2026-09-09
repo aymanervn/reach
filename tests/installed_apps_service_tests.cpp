@@ -25,11 +25,35 @@ static void expect_true(int value, const char *message)
     }
 }
 
+static int equals_ascii(const uint16_t *value, const char *expected)
+{
+    size_t index = 0;
+    while (expected[index] != 0 && value[index] == (uint16_t)(unsigned char)expected[index])
+    {
+        ++index;
+    }
+    return expected[index] == 0 && value[index] == 0;
+}
+
 static reach_result enumerate_apps(reach_installed_apps *, reach_installed_app_list *out_list)
 {
     memset(out_list, 0, sizeof(*out_list));
-    out_list->count = 1;
+    out_list->count = 3;
     reach_installed_app *entry = &out_list->entries[0];
+    reach_copy_ascii_to_utf16(entry->display_name, REACH_INSTALLED_APP_NAME_CAPACITY, "Notepad");
+    entry->kind = REACH_INSTALLED_APP_DESKTOP;
+    entry->can_open = 1;
+
+    entry = &out_list->entries[1];
+    reach_copy_ascii_to_utf16(entry->display_name, REACH_INSTALLED_APP_NAME_CAPACITY,
+                              "Windows Security");
+    reach_copy_ascii_to_utf16(entry->package_full_name, REACH_INSTALLED_APP_TEXT_CAPACITY,
+                              "Microsoft.SecHealthUI_test");
+    entry->kind = REACH_INSTALLED_APP_PACKAGED;
+    entry->can_open = 1;
+    entry->can_manage = 1;
+
+    entry = &out_list->entries[2];
     reach_copy_ascii_to_utf16(entry->display_name, REACH_INSTALLED_APP_NAME_CAPACITY, "ChatGPT");
     reach_copy_ascii_to_utf16(entry->launch_path, REACH_INSTALLED_APP_TEXT_CAPACITY,
                               "shell:AppsFolder\\OpenAI.Codex_test!App");
@@ -37,8 +61,10 @@ static reach_result enumerate_apps(reach_installed_apps *, reach_installed_app_l
                               "OpenAI.Codex_test!App");
     reach_copy_ascii_to_utf16(entry->package_full_name, REACH_INSTALLED_APP_TEXT_CAPACITY,
                               "OpenAI.Codex_1.0.0.0_x64__test");
+    entry->kind = REACH_INSTALLED_APP_PACKAGED;
     entry->can_open = 1;
     entry->can_uninstall = 1;
+    entry->can_manage = 1;
     return REACH_OK;
 }
 
@@ -91,12 +117,15 @@ int main(void)
     wait_for_notify(1);
     std::unique_ptr<reach_installed_apps_snapshot> snapshot(new reach_installed_apps_snapshot());
     expect_true(reach_installed_apps_service_take(service, snapshot.get()), "refresh completes");
-    expect_true(snapshot->apps.count == 1, "refresh publishes the catalog");
+    expect_true(snapshot->apps.count == 1, "refresh keeps only manageable packaged apps");
+    expect_true(equals_ascii(snapshot->apps.entries[0].display_name, "ChatGPT"),
+                "refresh removes desktop and internal Windows apps");
 
     reach_installed_apps_service_open(service, 0);
     wait_for_notify(2);
     expect_true(reach_installed_apps_service_take(service, snapshot.get()), "open completes");
-    expect_true(open_count == 1 && opened_aumid[0] != 0, "open preserves the AppUserModelID");
+    expect_true(open_count == 1 && equals_ascii(opened_aumid, "OpenAI.Codex_test!App"),
+                "open preserves the filtered app's AppUserModelID");
 
     reach_installed_apps_service_uninstall(service, 0);
     wait_for_notify(3);

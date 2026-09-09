@@ -260,8 +260,9 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
             ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
         }
         int32_t restored = cover != nullptr
-            ? reach_window_management_restored(hwnd, nullptr)
-            : reach_window_management_wait_for(hwnd, reach_window_management_restored, nullptr, 750);
+                               ? reach_window_management_restored(hwnd, nullptr)
+                               : reach_window_management_wait_for(
+                                     hwnd, reach_window_management_restored, nullptr, 750);
         if (!restored)
         {
             reach_window_action_state after = reach_window_management_capture_state(hwnd);
@@ -319,26 +320,28 @@ reach_result reach_window_management_prepare(HWND hwnd, HWND cover)
         return REACH_INVALID_ARGUMENT;
     }
     BOOL transitions_disabled = FALSE;
-    bool restore_transitions = SUCCEEDED(DwmGetWindowAttribute(
-        hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &transitions_disabled, sizeof(transitions_disabled)));
+    bool restore_transitions =
+        SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED,
+                                        &transitions_disabled, sizeof(transitions_disabled)));
     BOOL disabled = TRUE;
     if (restore_transitions)
     {
-        (void)DwmSetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &disabled, sizeof(disabled));
+        (void)DwmSetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &disabled,
+                                    sizeof(disabled));
     }
     bool ready = reach_window_management_activate_impl(hwnd, 0, cover) == REACH_OK;
     if (ready)
     {
         HWND target = reach_window_management_activation_target(hwnd);
         DWORD_PTR response = 0;
-        ready = SendMessageTimeoutW(target, WM_NULL, 0, 0,
-                                     SMTO_ABORTIFHUNG | SMTO_BLOCK, 750, &response) != 0;
+        ready = SendMessageTimeoutW(target, WM_NULL, 0, 0, SMTO_ABORTIFHUNG | SMTO_BLOCK, 750,
+                                    &response) != 0;
         ready = SUCCEEDED(DwmFlush()) && ready;
     }
     if (restore_transitions && IsWindow(hwnd))
     {
-        (void)DwmSetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED,
-                                    &transitions_disabled, sizeof(transitions_disabled));
+        (void)DwmSetWindowAttribute(hwnd, DWMWA_TRANSITIONS_FORCEDISABLED, &transitions_disabled,
+                                    sizeof(transitions_disabled));
     }
     return ready ? REACH_OK : REACH_ERROR;
 }

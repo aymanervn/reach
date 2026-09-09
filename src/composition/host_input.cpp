@@ -957,7 +957,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     {
         reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
         reach_host_close_registered_surface(host, REACH_SURFACE_ID_STAGE,
-                                           REACH_SURFACE_CLOSE_DISMISS);
+                                            REACH_SURFACE_CLOSE_DISMISS);
     }
 
     return REACH_OK;

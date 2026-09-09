@@ -187,8 +187,7 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result =
-            reach_windows_create_application_resolver(&dependencies.application_resolver);
+        result = reach_windows_create_application_resolver(&dependencies.application_resolver);
     }
     if (result == REACH_OK)
     {

@@ -354,7 +354,7 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     reach_top_bar_tray_popup *popup = top_bar->tray_popup;
     popup->anchor = *anchor;
     reach_feature_transition_configure(&popup->popup_transition, theme, dpi_scale,
-                                     anchor->direction);
+                                       anchor->direction);
     float slot_size = reach_theme_tray_slot_size(theme, anchor->bar_height);
     float gap = slot_size * 0.22f;
     float padding = slot_size * 0.3f;
@@ -439,8 +439,7 @@ static void reach_top_bar_tray_tick(void *capsule, double delta_seconds,
     reach_animation_manager_tick(&popup->animations, delta_seconds);
     int32_t active =
         reach_animation_manager_active(&popup->animations, REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
-    int32_t popup_changed =
-        reach_feature_transition_tick(&popup->popup_transition, delta_seconds);
+    int32_t popup_changed = reach_feature_transition_tick(&popup->popup_transition, delta_seconds);
     if ((was_active || active || popup_changed) && out != nullptr)
     {
         out->redraw = 1;

@@ -47,8 +47,8 @@ static LRESULT CALLBACK reach_window_thumbnail_host_proc(HWND hwnd, UINT message
     {
         reach_window_thumbnail_entry *entry = reinterpret_cast<reach_window_thumbnail_entry *>(
             GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-        COLORREF color = entry != nullptr && entry->background_set ? entry->background
-                                                                   : RGB(0, 0, 0);
+        COLORREF color =
+            entry != nullptr && entry->background_set ? entry->background : RGB(0, 0, 0);
         PAINTSTRUCT paint = {};
         HDC dc = BeginPaint(hwnd, &paint);
         if (dc != nullptr)
@@ -90,8 +90,8 @@ static reach_result reach_window_thumbnail_register_host_class(void)
 
 static HWND reach_window_thumbnail_create_host(HWND target)
 {
-    DWORD topmost = (GetWindowLongPtrW(target, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0
-                        ? WS_EX_TOPMOST : 0;
+    DWORD topmost =
+        (GetWindowLongPtrW(target, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0 ? WS_EX_TOPMOST : 0;
     return CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | topmost,
                            reach_window_thumbnail_host_class(), L"", WS_POPUP, 0, 0, 1, 1, nullptr,
                            nullptr, GetModuleHandleW(nullptr), nullptr);
@@ -127,8 +127,7 @@ static void reach_window_thumbnail_release_entry(reach_window_thumbnail_entry *e
     {
         DwmUnregisterThumbnail(entry->handle);
     }
-    if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET &&
-        entry->destination != nullptr)
+    if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET && entry->destination != nullptr)
     {
         SetWindowLongPtrW(entry->destination, GWLP_USERDATA, 0);
         DestroyWindow(entry->destination);
@@ -265,8 +264,7 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
 
     LONG destination_left = (LONG)(placement->destination.x + 0.5f);
     LONG destination_top = (LONG)(placement->destination.y + 0.5f);
-    LONG destination_right =
-        (LONG)(placement->destination.x + placement->destination.width + 0.5f);
+    LONG destination_right = (LONG)(placement->destination.x + placement->destination.width + 0.5f);
     LONG destination_bottom =
         (LONG)(placement->destination.y + placement->destination.height + 0.5f);
 
@@ -285,9 +283,8 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
         LONG thumbnail_height = destination_bottom - destination_top;
         int32_t thumbnail_visible =
             placement->visible && thumbnail_width > 0 && thumbnail_height > 0;
-        int32_t host_visible =
-            (placement->background_visible || thumbnail_visible) && target_width > 0 &&
-            target_height > 0;
+        int32_t host_visible = (placement->background_visible || thumbnail_visible) &&
+                               target_width > 0 && target_height > 0;
 
         COLORREF background = reach_window_thumbnail_color(placement->background);
         int32_t background_changed = !entry->background_set || entry->background != background;
@@ -311,8 +308,8 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
         if (host_visible)
         {
             RECT current = {};
-            bool bounds_changed = !GetWindowRect(entry->destination, &current) ||
-                                  !EqualRect(&current, &target_rect);
+            bool bounds_changed =
+                !GetWindowRect(entry->destination, &current) || !EqualRect(&current, &target_rect);
             bool order_changed = GetWindow(entry->destination, GW_HWNDPREV) != thumbnails->target;
             if (bounds_changed || order_changed || !was_visible)
             {
@@ -420,16 +417,16 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
     return SUCCEEDED(DwmUpdateThumbnailProperties(entry->handle, &props)) ? REACH_OK : REACH_ERROR;
 }
 
-static reach_window_id reach_window_thumbnail_cover_window(const reach_window_thumbnails *thumbnails)
+static reach_window_id
+reach_window_thumbnail_cover_window(const reach_window_thumbnails *thumbnails)
 {
     if (thumbnails != nullptr)
     {
         for (size_t index = 0; index < thumbnails->entry_count; ++index)
         {
             const reach_window_thumbnail_entry *entry = &thumbnails->entries[index];
-            if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET &&
-                entry->opacity_set && entry->background_opacity == 255 &&
-                IsWindowVisible(entry->destination))
+            if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET && entry->opacity_set &&
+                entry->background_opacity == 255 && IsWindowVisible(entry->destination))
             {
                 return reinterpret_cast<reach_window_id>(entry->destination);
             }

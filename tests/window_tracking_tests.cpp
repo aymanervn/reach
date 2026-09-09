@@ -161,15 +161,15 @@ static void test_identity_rule(void)
                 "empty identities never match each other");
 
     reach_pinned_app_model app = {};
-    reach_application_identity_add_runtime_path(
-        &app.application.identity, (const uint16_t *)L"C:\\apps\\brave.exe");
+    reach_application_identity_add_runtime_path(&app.application.identity,
+                                                (const uint16_t *)L"C:\\apps\\brave.exe");
     expect_true(reach_window_tracking_window_matches_app(&app, &browser_a),
                 "pinned path matches browser window");
     expect_true(reach_window_tracking_window_matches_app(&app, &pwa),
                 "pinned app without aumid falls back to path");
     reach_pinned_app_model pwa_pin = {};
-    reach_application_identity_add_runtime_path(
-        &pwa_pin.application.identity, (const uint16_t *)L"C:\\apps\\brave.exe");
+    reach_application_identity_add_runtime_path(&pwa_pin.application.identity,
+                                                (const uint16_t *)L"C:\\apps\\brave.exe");
     reach_copy_ascii_to_utf16(pwa_pin.application.identity.app_user_model_id, 260,
                               "Brave._crx_abc");
     expect_true(reach_window_tracking_window_matches_app(&pwa_pin, &browser_a),
@@ -177,11 +177,10 @@ static void test_identity_rule(void)
     expect_true(!reach_window_tracking_window_matches_app(&pwa_pin, &uwp_a),
                 "pinned pwa does not match different aumid");
     reach_pinned_app_model shortcut_pin = {};
-    reach_application_identity_add_runtime_path(
-        &shortcut_pin.application.identity, (const uint16_t *)L"C:\\apps\\zed.exe");
+    reach_application_identity_add_runtime_path(&shortcut_pin.application.identity,
+                                                (const uint16_t *)L"C:\\apps\\zed.exe");
     shortcut_pin.application.launch.kind = REACH_APPLICATION_LAUNCH_SHORTCUT;
-    reach_copy_ascii_to_utf16(shortcut_pin.application.launch.path, 260,
-                              "C:\\Pins\\Zed.lnk");
+    reach_copy_ascii_to_utf16(shortcut_pin.application.launch.path, 260, "C:\\Pins\\Zed.lnk");
     reach_copy_ascii_to_utf16(shortcut_pin.application.identity.app_user_model_id, 260,
                               "ZedIndustries.Zed");
     reach_window_snapshot zed = make_window(9, "c:\\APPS\\ZED.EXE", "Zed.Editor");

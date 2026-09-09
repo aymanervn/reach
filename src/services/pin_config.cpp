@@ -78,16 +78,14 @@ static int32_t reach_pin_merge_missing(reach_pinned_app_model *target,
     reach_application *target_application = &target->application;
     const reach_application *source_application = &source->application;
     size_t runtime_count = target_application->identity.runtime_path_count;
-    int32_t had_app_user_model_id =
-        target_application->identity.app_user_model_id[0] != 0;
+    int32_t had_app_user_model_id = target_application->identity.app_user_model_id[0] != 0;
     if (target_application->launch.kind == REACH_APPLICATION_LAUNCH_NONE &&
         source_application->launch.kind != REACH_APPLICATION_LAUNCH_NONE)
     {
         target_application->launch.kind = source_application->launch.kind;
         changed = 1;
     }
-    if (target_application->launch.path[0] == 0 &&
-        source_application->launch.path[0] != 0)
+    if (target_application->launch.path[0] == 0 && source_application->launch.path[0] != 0)
     {
         (void)reach_copy_utf16(target_application->launch.path, 260,
                                source_application->launch.path);
@@ -102,15 +100,12 @@ static int32_t reach_pin_merge_missing(reach_pinned_app_model *target,
     }
     if (target_application->icon_ref[0] == 0 && source_application->icon_ref[0] != 0)
     {
-        (void)reach_copy_utf16(target_application->icon_ref, 260,
-                               source_application->icon_ref);
+        (void)reach_copy_utf16(target_application->icon_ref, 260, source_application->icon_ref);
         changed = 1;
     }
-    reach_application_identity_merge(&target_application->identity,
-                                     &source_application->identity);
+    reach_application_identity_merge(&target_application->identity, &source_application->identity);
     changed |= target_application->identity.runtime_path_count != runtime_count;
-    changed |= !had_app_user_model_id &&
-               target_application->identity.app_user_model_id[0] != 0;
+    changed |= !had_app_user_model_id && target_application->identity.app_user_model_id[0] != 0;
     return changed;
 }
 
@@ -133,9 +128,8 @@ static int32_t reach_pin_merge_duplicates(reach_config_snapshot *snapshot)
         }
         if (match < write)
         {
-            changed |=
-                reach_pin_merge_missing(&snapshot->pinned_apps[match],
-                                        &snapshot->pinned_apps[read]);
+            changed |= reach_pin_merge_missing(&snapshot->pinned_apps[match],
+                                               &snapshot->pinned_apps[read]);
             changed = 1;
             continue;
         }
@@ -202,16 +196,14 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
                                       const reach_pinned_app_model *app, int32_t *out_changed)
 {
     reach_pin_set_changed(out_changed, 0);
-    if (snapshot == nullptr || app == nullptr ||
-        app->application.launch.path[0] == 0)
+    if (snapshot == nullptr || app == nullptr || app->application.launch.path[0] == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        if (!reach_application_identity_matches(
-                &snapshot->pinned_apps[index].application.identity,
-                &app->application.identity))
+        if (!reach_application_identity_matches(&snapshot->pinned_apps[index].application.identity,
+                                                &app->application.identity))
         {
             continue;
         }
@@ -228,8 +220,7 @@ reach_result reach_pin_config_pin_app(reach_config_snapshot *snapshot,
     pinned->id = reach_pin_next_available_id(snapshot);
     if (pinned->application.icon_ref[0] == 0)
     {
-        (void)reach_copy_utf16(pinned->application.icon_ref, 260,
-                               pinned->application.launch.path);
+        (void)reach_copy_utf16(pinned->application.icon_ref, 260, pinned->application.launch.path);
     }
     snapshot->pinned_app_count += 1;
     reach_pin_set_changed(out_changed, 1);
@@ -298,8 +289,7 @@ reach_result reach_pin_config_set_app_user_model_id(reach_config_snapshot *snaps
     }
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        reach_application_identity *identity =
-            &snapshot->pinned_apps[index].application.identity;
+        reach_application_identity *identity = &snapshot->pinned_apps[index].application.identity;
         for (size_t runtime_index = 0; runtime_index < identity->runtime_path_count;
              ++runtime_index)
         {
@@ -364,8 +354,8 @@ reach_result reach_pin_config_unpin_path(reach_config_snapshot *snapshot, const 
              !matches && runtime_index < app->application.identity.runtime_path_count;
              ++runtime_index)
         {
-            matches = reach_path_equals(
-                app->application.identity.runtime_paths[runtime_index], path);
+            matches =
+                reach_path_equals(app->application.identity.runtime_paths[runtime_index], path);
         }
         if (!matches)
         {

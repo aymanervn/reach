@@ -29,8 +29,8 @@ int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_
                                    reach_config_top_bar_mode mode)
 {
     if (top_bar == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED ||
-        style > REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ||
-        mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC || mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
+        style > REACH_CONFIG_TOP_BAR_STYLE_UNIFIED || mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
+        mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
     {
         return 0;
     }
@@ -407,8 +407,7 @@ static void reach_top_bar_update_current_app(reach_top_bar *top_bar)
     const uint16_t *runtime_path =
         reach_application_identity_primary_runtime_path(&window->identity);
     state->current_app_icon_ref[0] = 0;
-    const uint16_t *icon_ref =
-        window->icon_ref[0] != 0 ? window->icon_ref : runtime_path;
+    const uint16_t *icon_ref = window->icon_ref[0] != 0 ? window->icon_ref : runtime_path;
     if (icon_ref != nullptr)
     {
         reach_copy_utf16(state->current_app_icon_ref, 260, icon_ref);
@@ -984,10 +983,9 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     bar_request.pointer_sequence_active = reach_pressable_tracking(&top_bar->state.pressable);
     int32_t dynamic = top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
     bar_request.force_shown = dynamic ? bar_request.force_shown : 1;
-    bar_request.can_hide =
-        dynamic && reach_top_bar_windows_trespassing(
-                       top_bar, request->shown_bounds, request->monitor_bounds,
-                       request->shadow_clearance, request->excluded_window);
+    bar_request.can_hide = dynamic && reach_top_bar_windows_trespassing(
+                                          top_bar, request->shown_bounds, request->monitor_bounds,
+                                          request->shadow_clearance, request->excluded_window);
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);
@@ -1268,9 +1266,8 @@ static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule
 static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
-    return top_bar != nullptr &&
-           (top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_STATIC ||
-            reach_top_bar_capsule_pointer_sequence_active(capsule));
+    return top_bar != nullptr && (top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_STATIC ||
+                                  reach_top_bar_capsule_pointer_sequence_active(capsule));
 }
 
 static int32_t reach_top_bar_capsule_pointer_capture_active(const void *capsule)
@@ -1382,8 +1379,7 @@ static void reach_top_bar_capsule_handle_pointer(void *capsule, const reach_poin
 }
 
 static int32_t reach_top_bar_capsule_control_at_point(const void *capsule, int32_t screen_x,
-                                                      int32_t screen_y,
-                                                      reach_feature_control *out)
+                                                      int32_t screen_y, reach_feature_control *out)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     if (top_bar == nullptr || out == nullptr)
@@ -1420,11 +1416,16 @@ static int32_t reach_top_bar_capsule_control_at_point(const void *capsule, int32
 const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_top_bar_capsule_reset,          reach_top_bar_capsule_tick,
-        reach_top_bar_capsule_is_open,        reach_top_bar_capsule_on_game_mode,
-        reach_top_bar_capsule_needs_frame,    reach_top_bar_capsule_wants_pointer_move,
-        reach_top_bar_capsule_handle_pointer, reach_top_bar_capsule_pointer_sequence_active,
-        reach_top_bar_capsule_input_regions,  reach_top_bar_capsule_surface_geometry,
+        reach_top_bar_capsule_reset,
+        reach_top_bar_capsule_tick,
+        reach_top_bar_capsule_is_open,
+        reach_top_bar_capsule_on_game_mode,
+        reach_top_bar_capsule_needs_frame,
+        reach_top_bar_capsule_wants_pointer_move,
+        reach_top_bar_capsule_handle_pointer,
+        reach_top_bar_capsule_pointer_sequence_active,
+        reach_top_bar_capsule_input_regions,
+        reach_top_bar_capsule_surface_geometry,
         reach_top_bar_capsule_pointer_capture_active,
         nullptr,
         reach_top_bar_capsule_control_at_point,

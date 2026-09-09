@@ -37,8 +37,7 @@ struct reach_windows_package_info
 struct reach_windows_installed_apps_com_scope
 {
     HRESULT result;
-    reach_windows_installed_apps_com_scope()
-        : result(CoInitializeEx(nullptr, COINIT_MULTITHREADED))
+    reach_windows_installed_apps_com_scope() : result(CoInitializeEx(nullptr, COINIT_MULTITHREADED))
     {
     }
     ~reach_windows_installed_apps_com_scope()
@@ -57,12 +56,12 @@ static std::wstring reach_windows_lower(std::wstring value)
     return value;
 }
 
-static std::wstring reach_windows_package_version(
-    const winrt::Windows::ApplicationModel::PackageVersion &version)
+static std::wstring
+reach_windows_package_version(const winrt::Windows::ApplicationModel::PackageVersion &version)
 {
     wchar_t text[64] = {};
-    _snwprintf_s(text, 64, _TRUNCATE, L"%u.%u.%u.%u", version.Major, version.Minor,
-                 version.Build, version.Revision);
+    _snwprintf_s(text, 64, _TRUNCATE, L"%u.%u.%u.%u", version.Major, version.Minor, version.Build,
+                 version.Revision);
     return text;
 }
 
@@ -91,7 +90,7 @@ reach_windows_read_packages(void)
 }
 
 static int32_t reach_windows_shell_item_string(IShellItem2 *item, REFPROPERTYKEY key,
-                                                uint16_t *out_value, size_t capacity)
+                                               uint16_t *out_value, size_t capacity)
 {
     PWSTR value = nullptr;
     HRESULT hr = item->GetString(key, &value);
@@ -106,7 +105,7 @@ static int32_t reach_windows_shell_item_string(IShellItem2 *item, REFPROPERTYKEY
 }
 
 static int32_t reach_windows_shell_item_display_name(IShellItem *item, SIGDN format,
-                                                      uint16_t *out_value, size_t capacity)
+                                                     uint16_t *out_value, size_t capacity)
 {
     PWSTR value = nullptr;
     HRESULT hr = item->GetDisplayName(format, &value);
@@ -118,6 +117,77 @@ static int32_t reach_windows_shell_item_display_name(IShellItem *item, SIGDN for
     reach_copy_utf16(out_value, capacity, reinterpret_cast<const uint16_t *>(value));
     CoTaskMemFree(value);
     return 1;
+}
+
+static int32_t reach_windows_shell_item_has_verb(IShellItem *item, const wchar_t *expected)
+{
+    if (item == nullptr || expected == nullptr)
+    {
+        return 0;
+    }
+
+    PIDLIST_ABSOLUTE item_id_list = nullptr;
+    if (FAILED(SHGetIDListFromObject(item, &item_id_list)) || item_id_list == nullptr)
+    {
+        return 0;
+    }
+
+    IShellFolder *parent = nullptr;
+    PCUITEMID_CHILD child = nullptr;
+    HRESULT hr = SHBindToParent(item_id_list, IID_PPV_ARGS(&parent), &child);
+    IContextMenu *context_menu = nullptr;
+    if (SUCCEEDED(hr) && parent != nullptr && child != nullptr)
+    {
+        hr = parent->GetUIObjectOf(nullptr, 1, &child, IID_IContextMenu, nullptr,
+                                   reinterpret_cast<void **>(&context_menu));
+    }
+    if (parent != nullptr)
+    {
+        parent->Release();
+    }
+    CoTaskMemFree(item_id_list);
+    if (FAILED(hr) || context_menu == nullptr)
+    {
+        return 0;
+    }
+
+    HMENU menu = CreatePopupMenu();
+    if (menu == nullptr)
+    {
+        context_menu->Release();
+        return 0;
+    }
+
+    int32_t found = 0;
+    hr = context_menu->QueryContextMenu(menu, 0, 1, 0x7fff, CMF_NORMAL);
+    if (SUCCEEDED(hr))
+    {
+        int item_count = GetMenuItemCount(menu);
+        for (int position = 0; position < item_count; ++position)
+        {
+            MENUITEMINFOW item = {};
+            item.cbSize = sizeof(item);
+            item.fMask = MIIM_FTYPE | MIIM_ID | MIIM_STATE;
+            if (!GetMenuItemInfoW(menu, static_cast<UINT>(position), TRUE, &item) ||
+                (item.fType & MFT_SEPARATOR) != 0 || (item.fState & MFS_DISABLED) != 0 ||
+                item.wID < 1)
+            {
+                continue;
+            }
+            wchar_t verb[128] = {};
+            if (SUCCEEDED(context_menu->GetCommandString(item.wID - 1, GCS_VERBW, nullptr,
+                                                         reinterpret_cast<char *>(verb),
+                                                         static_cast<UINT>(_countof(verb)))) &&
+                _wcsicmp(verb, expected) == 0)
+            {
+                found = 1;
+                break;
+            }
+        }
+    }
+    DestroyMenu(menu);
+    context_menu->Release();
+    return found;
 }
 
 static void reach_windows_fill_package_fields(
@@ -146,7 +216,6 @@ static void reach_windows_fill_package_fields(
     reach_copy_utf16(entry->version, 64,
                      reinterpret_cast<const uint16_t *>(package.version.c_str()));
     entry->kind = REACH_INSTALLED_APP_PACKAGED;
-    entry->can_uninstall = 1;
     entry->can_manage = 1;
 }
 
@@ -188,21 +257,23 @@ reach_result reach_windows_collect_installed_apps(reach_installed_app_list *out_
         {
             reach_installed_app entry = {};
             entry.kind = REACH_INSTALLED_APP_DESKTOP;
-            if (reach_windows_shell_item_display_name(item, SIGDN_NORMALDISPLAY,
-                                                       entry.display_name,
-                                                       REACH_INSTALLED_APP_NAME_CAPACITY) &&
+            if (reach_windows_shell_item_display_name(item, SIGDN_NORMALDISPLAY, entry.display_name,
+                                                      REACH_INSTALLED_APP_NAME_CAPACITY) &&
                 reach_windows_shell_item_string(item2, PKEY_AppUserModel_ID,
                                                 entry.app_user_model_id,
                                                 REACH_INSTALLED_APP_TEXT_CAPACITY))
             {
                 _snwprintf_s(reinterpret_cast<wchar_t *>(entry.launch_path),
-                             REACH_INSTALLED_APP_TEXT_CAPACITY, _TRUNCATE,
-                             L"shell:AppsFolder\\%s",
+                             REACH_INSTALLED_APP_TEXT_CAPACITY, _TRUNCATE, L"shell:AppsFolder\\%s",
                              reinterpret_cast<const wchar_t *>(entry.app_user_model_id));
                 reach_copy_utf16(entry.icon_ref, REACH_INSTALLED_APP_TEXT_CAPACITY,
                                  entry.launch_path);
                 entry.can_open = 1;
                 reach_windows_fill_package_fields(&entry, packages);
+                if (entry.kind == REACH_INSTALLED_APP_PACKAGED)
+                {
+                    entry.can_uninstall = reach_windows_shell_item_has_verb(item, L"uninstall");
+                }
                 found.push_back(entry);
             }
             item2->Release();
@@ -212,8 +283,8 @@ reach_result reach_windows_collect_installed_apps(reach_installed_app_list *out_
     }
     items->Release();
 
-    std::sort(found.begin(), found.end(), [](const reach_installed_app &a,
-                                             const reach_installed_app &b)
+    std::sort(found.begin(), found.end(),
+              [](const reach_installed_app &a, const reach_installed_app &b)
               {
                   return _wcsicmp(reinterpret_cast<const wchar_t *>(a.display_name),
                                   reinterpret_cast<const wchar_t *>(b.display_name)) < 0;
@@ -229,13 +300,13 @@ reach_result reach_windows_collect_installed_apps(reach_installed_app_list *out_
 }
 
 static reach_result reach_windows_installed_apps_enumerate(reach_installed_apps *,
-                                                            reach_installed_app_list *out_list)
+                                                           reach_installed_app_list *out_list)
 {
     return reach_windows_collect_installed_apps(out_list);
 }
 
 static reach_result reach_windows_installed_apps_uninstall(reach_installed_apps *,
-                                                            const reach_installed_app *entry)
+                                                           const reach_installed_app *entry)
 {
     if (entry == nullptr || entry->package_full_name[0] == 0)
     {
@@ -244,10 +315,9 @@ static reach_result reach_windows_installed_apps_uninstall(reach_installed_apps 
     try
     {
         winrt::Windows::Management::Deployment::PackageManager manager;
-        auto result = manager
-                          .RemovePackageAsync(reinterpret_cast<const wchar_t *>(
-                              entry->package_full_name))
-                          .get();
+        auto result =
+            manager.RemovePackageAsync(reinterpret_cast<const wchar_t *>(entry->package_full_name))
+                .get();
         return result.ExtendedErrorCode().value < 0 ? REACH_ERROR : REACH_OK;
     }
     catch (...)
@@ -257,7 +327,7 @@ static reach_result reach_windows_installed_apps_uninstall(reach_installed_apps 
 }
 
 static reach_result reach_windows_installed_apps_manage(reach_installed_apps *,
-                                                         const reach_installed_app *entry)
+                                                        const reach_installed_app *entry)
 {
     if (entry == nullptr || entry->package_family_name[0] == 0)
     {

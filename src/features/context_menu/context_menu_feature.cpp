@@ -155,8 +155,7 @@ int32_t reach_context_menu_window_list_hover_bounds(const reach_context_menu *me
                                                     reach_rect_f32 *out_bounds)
 {
     if (menu == nullptr || out_bounds == nullptr || !menu->state.open ||
-        !menu->state.window_list_open ||
-        !menu->request.anchored)
+        !menu->state.window_list_open || !menu->request.anchored)
     {
         return 0;
     }
@@ -165,11 +164,11 @@ int32_t reach_context_menu_window_list_hover_bounds(const reach_context_menu *me
     const reach_rect_f32 slot = menu->request.anchor_button;
     const float margin = menu->hover_margin;
     float left = popup.x < slot.x ? popup.x : slot.x;
-    float right = popup.x + popup.width > slot.x + slot.width ? popup.x + popup.width
-                                                              : slot.x + slot.width;
+    float right =
+        popup.x + popup.width > slot.x + slot.width ? popup.x + popup.width : slot.x + slot.width;
     float top = popup.y < slot.y ? popup.y : slot.y;
-    float bottom =
-        popup.y + popup.height > slot.y + slot.height ? popup.y + popup.height : slot.y + slot.height;
+    float bottom = popup.y + popup.height > slot.y + slot.height ? popup.y + popup.height
+                                                                 : slot.y + slot.height;
     if (menu->request.bar_edge_y < top)
     {
         top = menu->request.bar_edge_y;
@@ -236,7 +235,7 @@ static void reach_context_menu_present(reach_context_menu *menu,
                                        const reach_context_menu_open_context *ctx)
 {
     reach_feature_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
-                                     ctx->drop_direction);
+                                       ctx->drop_direction);
     menu->state.open = 1;
     (void)reach_feature_transition_set_open(&menu->popup_transition, 1);
 }
@@ -434,7 +433,6 @@ void reach_context_menu_command_action(const reach_menu_request *request,
         return;
     }
 
-
     if (!reach_menu_request_allows(request, command))
     {
         out->kind = REACH_FEATURE_ACTION_NONE;
@@ -451,11 +449,10 @@ void reach_context_menu_command_action(const reach_menu_request *request,
             return;
         }
         out->kind = REACH_FEATURE_ACTION_OPEN_TARGET;
-        out->target.kind =
-            request->launch_kind != REACH_APPLICATION_LAUNCH_NONE ||
-                    request->app_user_model_id[0] != 0
-                ? REACH_FEATURE_TARGET_APP
-                : REACH_FEATURE_TARGET_PATH;
+        out->target.kind = request->launch_kind != REACH_APPLICATION_LAUNCH_NONE ||
+                                   request->app_user_model_id[0] != 0
+                               ? REACH_FEATURE_TARGET_APP
+                               : REACH_FEATURE_TARGET_PATH;
         out->target.path = request->path;
         out->target.arguments = request->arguments[0] != 0 ? request->arguments : nullptr;
         out->target.app_user_model_id = request->app_user_model_id;
@@ -662,7 +659,7 @@ void reach_context_menu_reanchor(reach_context_menu *menu,
                             : menu->state.anchor_popup_width;
     reach_context_menu_place(&menu->state, ctx, popup_width, menu->state.anchor_ratio);
     reach_feature_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
-                                     ctx->drop_direction);
+                                       ctx->drop_direction);
 }
 
 static void reach_context_menu_capsule_reset(void *capsule)
@@ -945,8 +942,7 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
     if (reach_feature_transition_tick(&menu->popup_transition, delta_seconds))
     {
         out->redraw = 1;
-        out->request_update =
-            reach_feature_transition_active(&menu->popup_transition);
+        out->request_update = reach_feature_transition_active(&menu->popup_transition);
     }
     if (popup_was_visible && !reach_feature_transition_visible(&menu->popup_transition) &&
         !menu->state.open)
@@ -1028,8 +1024,7 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
     }
     reach_animation_manager_init(&menu->animations, menu->animation_tracks,
                                  REACH_CONTEXT_MENU_ANIM_COUNT);
-    reach_feature_transition_init(&menu->popup_transition,
-                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
+    reach_feature_transition_init(&menu->popup_transition, REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&menu->pressable);
     reach_context_menu_reset(menu);
     *out_menu = menu;

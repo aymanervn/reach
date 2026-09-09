@@ -56,9 +56,8 @@ int main()
     snapshot->pinned_apps[0].application.launch.kind = REACH_APPLICATION_LAUNCH_SHORTCUT;
     reach_copy_ascii_to_utf16(snapshot->pinned_apps[0].application.launch.path, 260,
                               "C:\\Pins\\one.lnk");
-    reach_application_identity_add_runtime_path(
-        &snapshot->pinned_apps[0].application.identity,
-        (const uint16_t *)L"C:\\Apps\\one.exe");
+    reach_application_identity_add_runtime_path(&snapshot->pinned_apps[0].application.identity,
+                                                (const uint16_t *)L"C:\\Apps\\one.exe");
     snapshot->pinned_apps[0].application.launch.arguments[0] = 0x03A9;
     snapshot->pinned_apps[0].application.launch.arguments[1] = 0;
     snapshot->pinned_apps[1].id = 9;
@@ -78,9 +77,8 @@ int main()
     failed += expect(loaded->pinned_app_count == 2);
     failed += expect(loaded->pinned_apps[0].id == 4);
     failed += expect(loaded->pinned_apps[0].application.launch.arguments[0] == 0x03A9);
-    failed += expect(
-        reach_path_equals(loaded->pinned_apps[0].application.launch.path,
-                          snapshot->pinned_apps[0].application.launch.path));
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].application.launch.path,
+                                       snapshot->pinned_apps[0].application.launch.path));
 
     snapshot->pinned_app_count = 1;
     failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
@@ -133,19 +131,15 @@ int main()
     std::memset(loaded.get(), 0, sizeof(*loaded));
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
     failed += expect(loaded->pinned_app_count == 1);
-    failed += expect(reach_path_equals(
-        loaded->pinned_apps[0].application.launch.path,
-        reinterpret_cast<const uint16_t *>(shortcut_path)));
-    failed += expect(reach_path_equals(
-        loaded->pinned_apps[0].application.identity.runtime_paths[0],
-        reinterpret_cast<const uint16_t *>(shortcut_target)));
-    failed += expect(reach_path_equals(
-        loaded->pinned_apps[0].application.icon_ref,
-        reinterpret_cast<const uint16_t *>(shortcut_path)));
-    failed += expect(
-        lstrcmpW(reinterpret_cast<const wchar_t *>(
-                     loaded->pinned_apps[0].application.launch.arguments),
-                 L"--reach-shortcut-test") == 0);
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].application.launch.path,
+                                       reinterpret_cast<const uint16_t *>(shortcut_path)));
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].application.identity.runtime_paths[0],
+                                       reinterpret_cast<const uint16_t *>(shortcut_target)));
+    failed += expect(reach_path_equals(loaded->pinned_apps[0].application.icon_ref,
+                                       reinterpret_cast<const uint16_t *>(shortcut_path)));
+    failed += expect(lstrcmpW(reinterpret_cast<const wchar_t *>(
+                                  loaded->pinned_apps[0].application.launch.arguments),
+                              L"--reach-shortcut-test") == 0);
     DeleteFileW(shortcut_path);
     if (SUCCEEDED(initialize))
     {

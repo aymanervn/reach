@@ -10,8 +10,7 @@ static const float REACH_FEATURE_TRANSITION_OFFSET = 8.0f;
 
 static float reach_feature_transition_origin(const reach_feature_transition *transition)
 {
-    return transition != nullptr &&
-                   transition->direction == REACH_FEATURE_TRANSITION_FROM_ABOVE
+    return transition != nullptr && transition->direction == REACH_FEATURE_TRANSITION_FROM_ABOVE
                ? -REACH_FEATURE_TRANSITION_OFFSET
                : REACH_FEATURE_TRANSITION_OFFSET;
 }
@@ -86,12 +85,11 @@ int32_t reach_feature_transition_set_open(reach_feature_transition *transition, 
             transition->visible = 1;
             reach_animation_manager_set(&transition->animations, REACH_FEATURE_TRANSITION_Y,
                                         reach_feature_transition_origin(transition));
-            reach_animation_manager_set(&transition->animations,
-                                        REACH_FEATURE_TRANSITION_OPACITY, 0.0f);
+            reach_animation_manager_set(&transition->animations, REACH_FEATURE_TRANSITION_OPACITY,
+                                        0.0f);
         }
         reach_animation_manager_animate_to(&transition->animations, REACH_FEATURE_TRANSITION_Y,
-                                           0.0f, transition->open_seconds,
-                                           REACH_EASING_EASE_OUT);
+                                           0.0f, transition->open_seconds, REACH_EASING_EASE_OUT);
         reach_animation_manager_animate_to(&transition->animations,
                                            REACH_FEATURE_TRANSITION_OPACITY, 1.0f,
                                            transition->open_seconds, REACH_EASING_EASE_OUT);
@@ -119,8 +117,8 @@ int32_t reach_feature_transition_tick(reach_feature_transition *transition, doub
     reach_animation_manager_tick(&transition->animations, delta_seconds);
     int32_t active = reach_animation_manager_any_active(&transition->animations);
     if (!transition->target_open && transition->visible && !active &&
-        reach_animation_manager_value(&transition->animations,
-                                      REACH_FEATURE_TRANSITION_OPACITY) <= 0.001f)
+        reach_animation_manager_value(&transition->animations, REACH_FEATURE_TRANSITION_OPACITY) <=
+            0.001f)
     {
         transition->visible = 0;
     }
@@ -134,8 +132,7 @@ int32_t reach_feature_transition_visible(const reach_feature_transition *transit
 
 int32_t reach_feature_transition_active(const reach_feature_transition *transition)
 {
-    return transition != nullptr &&
-           reach_animation_manager_any_active(&transition->animations);
+    return transition != nullptr && reach_animation_manager_any_active(&transition->animations);
 }
 
 void reach_feature_transition_presentation(const reach_feature_transition *transition,
@@ -146,8 +143,8 @@ void reach_feature_transition_presentation(const reach_feature_transition *trans
         return;
     }
     geometry->presentation.managed = 1;
-    geometry->presentation.opacity = reach_animation_manager_value(
-        &transition->animations, REACH_FEATURE_TRANSITION_OPACITY);
+    geometry->presentation.opacity =
+        reach_animation_manager_value(&transition->animations, REACH_FEATURE_TRANSITION_OPACITY);
     geometry->presentation.y_offset =
         reach_animation_manager_value(&transition->animations, REACH_FEATURE_TRANSITION_Y) *
         transition->dpi_scale;

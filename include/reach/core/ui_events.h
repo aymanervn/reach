@@ -95,7 +95,6 @@ extern "C"
         uint16_t text[REACH_MAX_SEARCH_CHARS + 1];
     } reach_ui_event;
 
-
 #ifdef __cplusplus
 }
 #endif

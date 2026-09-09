@@ -93,6 +93,8 @@ extern "C"
         REACH_SETTINGS_HIT_APPLICATION_OPEN,
         REACH_SETTINGS_HIT_APPLICATION_MANAGE,
         REACH_SETTINGS_HIT_APPLICATION_UNINSTALL,
+        REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_TRACK,
+        REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_THUMB,
         REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE,
         REACH_SETTINGS_HIT_WIFI_SCAN,
         REACH_SETTINGS_HIT_WIFI_ADD,
@@ -597,7 +599,7 @@ extern "C"
     int32_t reach_settings_model_startup_animations_active(const reach_settings_model *model);
 
     void reach_settings_model_apply_installed_apps(reach_settings_model *model,
-                                                    const reach_installed_app_list *list);
+                                                   const reach_installed_app_list *list);
     void reach_settings_model_set_installed_apps_busy(reach_settings_model *model, int32_t busy);
     void reach_settings_model_set_installed_apps_status(reach_settings_model *model,
                                                         int32_t status);
@@ -638,8 +640,7 @@ extern "C"
     int32_t reach_settings_model_toggle_top_bar_style(reach_settings_model *model);
     void reach_settings_model_set_top_bar_mode(reach_settings_model *model,
                                                reach_config_top_bar_mode mode);
-    reach_config_top_bar_mode
-    reach_settings_model_top_bar_mode(const reach_settings_model *model);
+    reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model);
     int32_t reach_settings_model_tick_top_bar_animations(reach_settings_model *model,
                                                          double delta_seconds);
@@ -668,6 +669,9 @@ extern "C"
 
     float reach_settings_model_button_press_value(const reach_settings_model *model,
                                                   int32_t hit_type);
+    float reach_settings_model_installed_app_button_press_value(const reach_settings_model *model,
+                                                                int32_t hit_type,
+                                                                size_t installed_app_index);
     int32_t reach_settings_model_tick_button_press(reach_settings_model *model,
                                                    double delta_seconds);
     int32_t reach_settings_model_button_press_active(const reach_settings_model *model);

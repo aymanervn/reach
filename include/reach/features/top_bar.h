@@ -96,8 +96,8 @@ extern "C"
         REACH_TOP_BAR_ANIM_TRAY_WIDTH,
         REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
         REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE,
-        REACH_TOP_BAR_ANIM_COUNT =
-            REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE + REACH_TOP_BAR_MAX_TRAY_ICONS
+        REACH_TOP_BAR_ANIM_COUNT = REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE +
+            REACH_TOP_BAR_MAX_TRAY_ICONS
     };
 
     static inline size_t reach_top_bar_tray_item_x_animation_id(size_t index)
@@ -109,8 +109,8 @@ extern "C"
     {
         REACH_TOP_BAR_FEEDBACK_POWER_BUTTON = 0,
         REACH_TOP_BAR_FEEDBACK_TRAY_BASE,
-        REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW =
-            REACH_TOP_BAR_FEEDBACK_TRAY_BASE + REACH_TOP_BAR_MAX_TRAY_ICONS,
+        REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW = REACH_TOP_BAR_FEEDBACK_TRAY_BASE +
+            REACH_TOP_BAR_MAX_TRAY_ICONS,
         REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON,
@@ -200,8 +200,7 @@ extern "C"
     void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control *apps);
 
     void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar);
-    int32_t reach_top_bar_apply_config(reach_top_bar *top_bar,
-                                       reach_config_top_bar_style style,
+    int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_style style,
                                        reach_config_top_bar_mode mode);
     reach_rect_f32 reach_top_bar_background_bounds(const reach_top_bar *top_bar);
 

@@ -182,8 +182,8 @@ static void test_open_location_never_touches_the_port_on_the_caller(void)
     fake_explorer_thread.store(caller);
 
     const uint16_t shell_location[] = {'s', 'h', 'e', 'l', 'l', 0};
-    expect_true(reach_app_control_schedule_open_location(
-                    service, REACH_APP_CONTROL_LOCATION_SHELL, shell_location) == REACH_OK,
+    expect_true(reach_app_control_schedule_open_location(service, REACH_APP_CONTROL_LOCATION_SHELL,
+                                                         shell_location) == REACH_OK,
                 "a shell location is accepted for scheduling");
     expect_true(fake_shell_calls.load() == 0,
                 "scheduling a shell location does not open it on the caller");
@@ -192,8 +192,8 @@ static void test_open_location_never_touches_the_port_on_the_caller(void)
                 "the shell location is opened off the calling thread");
 
     const uint16_t missing[] = {'n', 'o', 'p', 'e', 0};
-    expect_true(reach_app_control_schedule_open_location(
-                    service, REACH_APP_CONTROL_LOCATION_PATH, missing) == REACH_OK,
+    expect_true(reach_app_control_schedule_open_location(service, REACH_APP_CONTROL_LOCATION_PATH,
+                                                         missing) == REACH_OK,
                 "a path is accepted for scheduling");
     expect_true(fake_path_exists_calls.load() == 0,
                 "the existence probe does not run on the caller");
@@ -305,8 +305,8 @@ static void test_preparation_has_a_separate_correlated_completion(void)
     reach_window_manager_port manager = {};
     manager.manager = reinterpret_cast<reach_window_manager *>(&probe);
     manager.ops.privileged_control_available = fake_privileged_available;
-    manager.ops.prepare = [](reach_window_manager *manager, reach_window_id window,
-                              reach_window_id cover)
+    manager.ops.prepare =
+        [](reach_window_manager *manager, reach_window_id window, reach_window_id cover)
     {
         auto *probe = reinterpret_cast<preparation_probe *>(manager);
         probe->window = window;
@@ -335,10 +335,11 @@ static void test_preparation_has_a_separate_correlated_completion(void)
     expect_true(!reach_app_control_take_window_completed(service, &ordinary_result),
                 "ordinary window completion cannot consume preparation readiness");
     reach_window_preparation_result result = {};
-    expect_true(reach_app_control_take_preparation(service, &result) &&
-                    result.request == 123 && result.window == 42 && result.result == REACH_OK,
+    expect_true(reach_app_control_take_preparation(service, &result) && result.request == 123 &&
+                    result.window == 42 && result.result == REACH_OK,
                 "preparation retains its request identity and selected window");
-    expect_true(probe.window == 42 && probe.cover == 84, "the adapter receives the covering window");
+    expect_true(probe.window == 42 && probe.cover == 84,
+                "the adapter receives the covering window");
     expect_true(!reach_app_control_take_preparation(service, &result),
                 "preparation completion is consumed once");
     reach_app_control_destroy(service);

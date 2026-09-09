@@ -47,12 +47,9 @@ static reach_result reachctl_path_is_already_pinned(reach_config_service *servic
 
     *out_pinned = 0;
 
-    std::unique_ptr<reach_config_snapshot> snapshot(
-        new (std::nothrow) reach_config_snapshot{});
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot{});
     reach_result result =
-        snapshot != nullptr
-            ? reach_config_service_snapshot(service, snapshot.get())
-            : REACH_ERROR;
+        snapshot != nullptr ? reach_config_service_snapshot(service, snapshot.get()) : REACH_ERROR;
     if (result != REACH_OK)
     {
         return result;
@@ -60,15 +57,12 @@ static reach_result reachctl_path_is_already_pinned(reach_config_service *servic
 
     for (size_t index = 0; index < snapshot->pinned_app_count; ++index)
     {
-        const reach_application *application =
-            &snapshot->pinned_apps[index].application;
+        const reach_application *application = &snapshot->pinned_apps[index].application;
         int32_t matches = reach_path_equals(application->launch.path, path);
         for (size_t runtime_index = 0;
-             !matches && runtime_index < application->identity.runtime_path_count;
-             ++runtime_index)
+             !matches && runtime_index < application->identity.runtime_path_count; ++runtime_index)
         {
-            matches = reach_path_equals(
-                application->identity.runtime_paths[runtime_index], path);
+            matches = reach_path_equals(application->identity.runtime_paths[runtime_index], path);
         }
         if (matches)
         {
@@ -220,12 +214,9 @@ int reachctl_wallpaper_monitor_command(const wchar_t *index_text, const wchar_t 
         return 1;
     }
 
-    std::unique_ptr<reach_config_snapshot> snapshot(
-        new (std::nothrow) reach_config_snapshot{});
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot{});
     reach_result load_result =
-        snapshot != nullptr
-            ? reach_config_service_snapshot(service, snapshot.get())
-            : REACH_ERROR;
+        snapshot != nullptr ? reach_config_service_snapshot(service, snapshot.get()) : REACH_ERROR;
     if (load_result != REACH_OK)
     {
         reach_config_service_destroy(service);

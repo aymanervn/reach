@@ -51,8 +51,8 @@ extern "C"
                                                         const uint16_t *path);
     int32_t reach_application_identity_merge(reach_application_identity *target,
                                              const reach_application_identity *source);
-    const uint16_t *reach_application_identity_primary_runtime_path(
-        const reach_application_identity *identity);
+    const uint16_t *
+    reach_application_identity_primary_runtime_path(const reach_application_identity *identity);
 
 #ifdef __cplusplus
 }

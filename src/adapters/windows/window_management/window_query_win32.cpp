@@ -30,14 +30,14 @@ int32_t reach_window_identity_is_explorer_dialog(const uint16_t *process_path,
     }
 
     const uint16_t *filename = reach_window_path_filename(process_path);
-    int32_t explorer = filename != nullptr &&
-                       reach_utf16_equal_ascii_case_insensitive(
-                           filename, reinterpret_cast<const uint16_t *>(u"explorer.exe"));
+    int32_t explorer =
+        filename != nullptr && reach_utf16_equal_ascii_case_insensitive(
+                                   filename, reinterpret_cast<const uint16_t *>(u"explorer.exe"));
     int32_t dialog_class =
         reach_utf16_equal_ascii_case_insensitive(
             class_name, reinterpret_cast<const uint16_t *>(u"OperationStatusWindow")) ||
-        reach_utf16_equal_ascii_case_insensitive(
-            class_name, reinterpret_cast<const uint16_t *>(u"#32770"));
+        reach_utf16_equal_ascii_case_insensitive(class_name,
+                                                 reinterpret_cast<const uint16_t *>(u"#32770"));
     return explorer && dialog_class;
 }
 
@@ -57,8 +57,8 @@ int32_t reach_window_is_explorer_dialog(HWND hwnd)
         return 0;
     }
 
-    return reach_window_identity_is_explorer_dialog(
-        process_path, reinterpret_cast<const uint16_t *>(class_name));
+    return reach_window_identity_is_explorer_dialog(process_path,
+                                                    reinterpret_cast<const uint16_t *>(class_name));
 }
 
 int32_t reach_window_property_string(IPropertyStore *store, const PROPERTYKEY &key,

@@ -5,8 +5,7 @@ static int32_t reach_taskbar_pin_blob_pidl_valid(const uint8_t *data, size_t siz
     size_t cursor = 0;
     while (cursor + sizeof(uint16_t) <= size)
     {
-        uint16_t item_size =
-            (uint16_t)(data[cursor] | ((uint16_t)data[cursor + 1] << 8));
+        uint16_t item_size = (uint16_t)(data[cursor] | ((uint16_t)data[cursor + 1] << 8));
         if (item_size == 0)
         {
             return cursor + sizeof(uint16_t) == size;

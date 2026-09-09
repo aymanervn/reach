@@ -134,8 +134,7 @@ static int32_t reach_config_path_has_extension(const uint16_t *path, const wchar
 
 static int32_t reach_config_path_is_shell(const uint16_t *path)
 {
-    return path != nullptr &&
-           StrCmpNIW(reinterpret_cast<const wchar_t *>(path), L"shell:", 6) == 0;
+    return path != nullptr && StrCmpNIW(reinterpret_cast<const wchar_t *>(path), L"shell:", 6) == 0;
 }
 
 static void reach_config_resolve_pinned_shortcut(reach_application *application)
@@ -147,13 +146,11 @@ static void reach_config_resolve_pinned_shortcut(reach_application *application)
     }
 
     reach_windows_shortcut_info shortcut = {};
-    const wchar_t *shortcut_path =
-        reinterpret_cast<const wchar_t *>(application->launch.path);
+    const wchar_t *shortcut_path = reinterpret_cast<const wchar_t *>(application->launch.path);
     if (reach_windows_read_shortcut(shortcut_path, &shortcut) && shortcut.target_path[0] != 0)
     {
         (void)reach_application_identity_add_runtime_path(
-            &application->identity,
-            reinterpret_cast<const uint16_t *>(shortcut.target_path));
+            &application->identity, reinterpret_cast<const uint16_t *>(shortcut.target_path));
         if (application->launch.arguments[0] == 0)
         {
             (void)reach_copy_utf16(application->launch.arguments, 260,
@@ -181,22 +178,18 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
-    int32_t top_bar_style =
-        (int32_t)GetPrivateProfileIntW(L"top_bar", L"style", REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED,
-                                       path);
-    out_snapshot->top_bar_style =
-        top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED &&
-                top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_UNIFIED
-            ? (reach_config_top_bar_style)top_bar_style
-            : REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED;
-    int32_t top_bar_mode =
-        (int32_t)GetPrivateProfileIntW(L"top_bar", L"mode", REACH_CONFIG_TOP_BAR_MODE_DYNAMIC,
-                                       path);
-    out_snapshot->top_bar_mode =
-        top_bar_mode >= REACH_CONFIG_TOP_BAR_MODE_DYNAMIC &&
-                top_bar_mode <= REACH_CONFIG_TOP_BAR_MODE_STATIC
-            ? (reach_config_top_bar_mode)top_bar_mode
-            : REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
+    int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(
+        L"top_bar", L"style", REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED, path);
+    out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED &&
+                                          top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_UNIFIED
+                                      ? (reach_config_top_bar_style)top_bar_style
+                                      : REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED;
+    int32_t top_bar_mode = (int32_t)GetPrivateProfileIntW(L"top_bar", L"mode",
+                                                          REACH_CONFIG_TOP_BAR_MODE_DYNAMIC, path);
+    out_snapshot->top_bar_mode = top_bar_mode >= REACH_CONFIG_TOP_BAR_MODE_DYNAMIC &&
+                                         top_bar_mode <= REACH_CONFIG_TOP_BAR_MODE_STATIC
+                                     ? (reach_config_top_bar_mode)top_bar_mode
+                                     : REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
     out_snapshot->power_screen_off_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"screen_off_minutes", 10, path);
     out_snapshot->power_sleep_minutes =
@@ -288,12 +281,11 @@ static reach_result reach_config_store_load(reach_config_store *store,
                                  path);
         GetPrivateProfileStringW(section, L"icon", L"",
                                  reinterpret_cast<wchar_t *>(application->icon_ref), 260, path);
-        GetPrivateProfileStringW(section, L"app_user_model_id", L"",
-                                 reinterpret_cast<wchar_t *>(
-                                     application->identity.app_user_model_id),
-                                 260, path);
-        for (size_t runtime_index = 0;
-             runtime_index < REACH_APPLICATION_RUNTIME_PATH_CAPACITY; ++runtime_index)
+        GetPrivateProfileStringW(
+            section, L"app_user_model_id", L"",
+            reinterpret_cast<wchar_t *>(application->identity.app_user_model_id), 260, path);
+        for (size_t runtime_index = 0; runtime_index < REACH_APPLICATION_RUNTIME_PATH_CAPACITY;
+             ++runtime_index)
         {
             wchar_t key[32] = {};
             swprintf_s(key, L"runtime_path.%u", (unsigned)runtime_index);
@@ -302,18 +294,16 @@ static reach_result reach_config_store_load(reach_config_store *store,
             if (runtime_path[0] != 0)
             {
                 (void)reach_application_identity_add_runtime_path(
-                    &application->identity,
-                    reinterpret_cast<const uint16_t *>(runtime_path));
+                    &application->identity, reinterpret_cast<const uint16_t *>(runtime_path));
             }
         }
         if (application->identity.runtime_path_count == 0 && legacy_path[0] != 0 &&
-            !reach_config_path_has_extension(
-                reinterpret_cast<const uint16_t *>(legacy_path), L".lnk") &&
+            !reach_config_path_has_extension(reinterpret_cast<const uint16_t *>(legacy_path),
+                                             L".lnk") &&
             !reach_config_path_is_shell(reinterpret_cast<const uint16_t *>(legacy_path)))
         {
             (void)reach_application_identity_add_runtime_path(
-                &application->identity,
-                reinterpret_cast<const uint16_t *>(legacy_path));
+                &application->identity, reinterpret_cast<const uint16_t *>(legacy_path));
         }
         reach_config_resolve_pinned_shortcut(application);
         (void)reach_windows_enrich_application(application);
@@ -409,10 +399,9 @@ static reach_result reach_config_store_save(reach_config_store *store,
         text.append(L"\r\nicon=");
         text.append(reinterpret_cast<const wchar_t *>(app->application.icon_ref));
         text.append(L"\r\napp_user_model_id=");
-        text.append(reinterpret_cast<const wchar_t *>(
-            app->application.identity.app_user_model_id));
-        for (size_t runtime_index = 0;
-             runtime_index < app->application.identity.runtime_path_count; ++runtime_index)
+        text.append(reinterpret_cast<const wchar_t *>(app->application.identity.app_user_model_id));
+        for (size_t runtime_index = 0; runtime_index < app->application.identity.runtime_path_count;
+             ++runtime_index)
         {
             text.append(L"\r\nruntime_path.");
             text.append(std::to_wstring(runtime_index));

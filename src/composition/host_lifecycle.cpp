@@ -21,8 +21,8 @@ static void reach_host_on_config_service_ready(void *user, reach_config_service_
     }
     if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.post_event != nullptr)
     {
-        (void)host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.window,
-                                                   REACH_UI_EVENT_CONFIG_CHANGED);
+        (void)host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.post_event(
+            host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.window, REACH_UI_EVENT_CONFIG_CHANGED);
     }
     else
     {
@@ -39,8 +39,8 @@ static void reach_host_on_foreground_changed(void *user)
     }
     if (host->surfaces[REACH_SURFACE_ID_DOCK].window.ops.post_event != nullptr)
     {
-        (void)host->surfaces[REACH_SURFACE_ID_DOCK].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_DOCK].window.window,
-                                               REACH_UI_EVENT_FOREGROUND_CHANGED);
+        (void)host->surfaces[REACH_SURFACE_ID_DOCK].window.ops.post_event(
+            host->surfaces[REACH_SURFACE_ID_DOCK].window.window, REACH_UI_EVENT_FOREGROUND_CHANGED);
     }
     else
     {
@@ -56,12 +56,14 @@ static void reach_host_on_system_status_ready(void *user)
 static void reach_host_on_system_stats_ready(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host == nullptr || host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event == nullptr)
+    if (host == nullptr ||
+        host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event == nullptr)
     {
         return;
     }
-    (void)host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.window,
-                                              REACH_UI_EVENT_SYSTEM_STATS_CHANGED);
+    (void)host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event(
+        host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.window,
+        REACH_UI_EVENT_SYSTEM_STATS_CHANGED);
 }
 
 static void reach_host_on_search_service_ready(void *user)
@@ -87,12 +89,13 @@ static void reach_host_on_feature_update_requested(void *user)
 static void reach_host_on_now_playing_ready(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host == nullptr || host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event == nullptr)
+    if (host == nullptr ||
+        host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event == nullptr)
     {
         return;
     }
-    (void)host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event(host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.window,
-                                              REACH_UI_EVENT_NOW_PLAYING_CHANGED);
+    (void)host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.ops.post_event(
+        host->surfaces[REACH_SURFACE_ID_TOP_BAR].window.window, REACH_UI_EVENT_NOW_PLAYING_CHANGED);
 }
 
 void reach_host_stop_search_service(reach_host *host)
@@ -458,8 +461,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
 
     if (result == REACH_OK)
     {
-        std::unique_ptr<reach_config_snapshot> snapshot(
-            new (std::nothrow) reach_config_snapshot{});
+        std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot{});
         if (snapshot == nullptr)
         {
             result = REACH_ERROR;
@@ -471,8 +473,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                              snapshot->pinned_app_count);
             reach_host_notify_pinned_apps_changed(host);
             reach_host_seed_or_apply_wallpaper(host, snapshot.get());
-            if (snapshot->power_shutdown_minutes != 0 ||
-                snapshot->power_restart_minutes != 0)
+            if (snapshot->power_shutdown_minutes != 0 || snapshot->power_restart_minutes != 0)
             {
                 snapshot->power_shutdown_minutes = 0;
                 snapshot->power_restart_minutes = 0;

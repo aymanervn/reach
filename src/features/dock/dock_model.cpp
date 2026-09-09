@@ -10,8 +10,7 @@ reach_result reach_dock_feature_model_init(reach_dock_feature_model *model)
     }
 
     *model = {};
-    model->items =
-        new (std::nothrow) reach_dock_item_model[REACH_MAX_DOCK_ITEMS * 2]{};
+    model->items = new (std::nothrow) reach_dock_item_model[REACH_MAX_DOCK_ITEMS * 2]{};
     return model->items != nullptr ? REACH_OK : REACH_ERROR;
 }
 
@@ -37,9 +36,8 @@ void reach_dock_feature_model_destroy(reach_dock_feature_model *model)
     *model = {};
 }
 
-int32_t reach_dock_item_identity_matches(
-    const reach_dock_item_model *item,
-    const reach_application_identity *identity)
+int32_t reach_dock_item_identity_matches(const reach_dock_item_model *item,
+                                         const reach_application_identity *identity)
 {
     return item != nullptr &&
            reach_application_identity_matches(&item->application.identity, identity);

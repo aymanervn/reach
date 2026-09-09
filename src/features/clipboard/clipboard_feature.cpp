@@ -260,8 +260,8 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
 enum
 {
     REACH_CLIPBOARD_ANIMATION_HOVER_BASE = 0,
-    REACH_CLIPBOARD_ANIMATION_HEIGHT =
-        REACH_CLIPBOARD_ANIMATION_HOVER_BASE + REACH_CLIPBOARD_MAX_ITEMS,
+    REACH_CLIPBOARD_ANIMATION_HEIGHT = REACH_CLIPBOARD_ANIMATION_HOVER_BASE +
+        REACH_CLIPBOARD_MAX_ITEMS,
     REACH_CLIPBOARD_ANIMATION_ITEM_WIDTH,
     REACH_CLIPBOARD_ANIMATION_COUNT
 };
@@ -347,8 +347,7 @@ static int32_t reach_clipboard_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 }
 
 int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
-                                         const reach_theme *theme,
-                                         reach_rect_f32 monitor_bounds,
+                                         const reach_theme *theme, reach_rect_f32 monitor_bounds,
                                          reach_rect_f32 launcher_bounds, float dpi_scale,
                                          int32_t *out_animating)
 {
@@ -459,8 +458,7 @@ static int32_t reach_clipboard_capsule_presentation_visible(const void *capsule)
 {
     const reach_clipboard_feature *clipboard =
         static_cast<const reach_clipboard_feature *>(capsule);
-    return clipboard != nullptr &&
-           reach_feature_transition_visible(&clipboard->surface_transition);
+    return clipboard != nullptr && reach_feature_transition_visible(&clipboard->surface_transition);
 }
 
 static int32_t reach_clipboard_capsule_wants_pointer_move(const void *capsule)

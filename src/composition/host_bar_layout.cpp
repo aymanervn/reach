@@ -88,9 +88,8 @@ float reach_host_bar_protected_clearance(const reach_host *host,
     {
         return configured * reach_host_layout_dpi_scale(host);
     }
-    return reach_theme_shadow_extent(
-        reach_host_surface_shadow(host, runtime->definition->id),
-        reach_host_layout_dpi_scale(host));
+    return reach_theme_shadow_extent(reach_host_surface_shadow(host, runtime->definition->id),
+                                     reach_host_layout_dpi_scale(host));
 }
 
 static void reach_host_sync_pointer_move_enabled(reach_platform_window_port *window,
@@ -196,9 +195,10 @@ static void reach_host_apply_bar_pointer_observation(reach_host *host, reach_sur
                                        result->pointer_observation_active);
 }
 
-reach_rect_f32 reach_host_reconcile_bar_visibility(
-    reach_host *host, reach_surface_id id, reach_rect_f32 shown_bounds,
-    reach_rect_f32 monitor_bounds, const reach_feature_surface_geometry *geometry)
+reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
+                                                   reach_rect_f32 shown_bounds,
+                                                   reach_rect_f32 monitor_bounds,
+                                                   const reach_feature_surface_geometry *geometry)
 {
     REACH_ASSERT(host != nullptr);
 
@@ -225,9 +225,9 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(
         reach_host_set_pointer_observation(host, id, {}, 0);
         if (desc->definition->surface.bar_reveal.active_layer > 0)
         {
-            reach_layout_set_layer_intent(
-                &host->layout_manager, host->surface_participants[id],
-                geometry->force_topmost, desc->definition->surface.bar_reveal.active_layer);
+            reach_layout_set_layer_intent(&host->layout_manager, host->surface_participants[id],
+                                          geometry->force_topmost,
+                                          desc->definition->surface.bar_reveal.active_layer);
         }
         reach_host_apply_edge_reveal(host, reach_host_edge_reveal_for_surface(host, id), 0, {});
         return shown_bounds;
@@ -267,10 +267,10 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(
 
     if (desc->definition->surface.bar_reveal.active_layer > 0)
     {
-        reach_layout_set_layer_intent(
-            &host->layout_manager, host->surface_participants[id],
-            result.reveal_transition_active || (geometry != nullptr && geometry->force_topmost),
-            desc->definition->surface.bar_reveal.active_layer);
+        reach_layout_set_layer_intent(&host->layout_manager, host->surface_participants[id],
+                                      result.reveal_transition_active ||
+                                          (geometry != nullptr && geometry->force_topmost),
+                                      desc->definition->surface.bar_reveal.active_layer);
     }
 
     if (result.redraw && desc->surface != nullptr)
@@ -418,8 +418,8 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
         int32_t window_changed = 0;
         reach_result result = reach_host_apply_window_state(
             &desc->surface->window, bounds,
-            reach_host_surface_shadow_pad(host, desc->definition->id),
-            &desc->surface->last_bounds, &desc->surface->bounds_valid, &window_changed);
+            reach_host_surface_shadow_pad(host, desc->definition->id), &desc->surface->last_bounds,
+            &desc->surface->bounds_valid, &window_changed);
         if (result != REACH_OK)
         {
             return result;

@@ -5,8 +5,7 @@ static uint16_t reach_application_ascii_lower(uint16_t value)
     return value >= 'A' && value <= 'Z' ? (uint16_t)(value + ('a' - 'A')) : value;
 }
 
-static int32_t reach_application_text_equal(const uint16_t *a, const uint16_t *b,
-                                            int32_t path)
+static int32_t reach_application_text_equal(const uint16_t *a, const uint16_t *b, int32_t path)
 {
     if (a == NULL || b == NULL)
     {
@@ -129,14 +128,14 @@ int32_t reach_application_identity_merge(reach_application_identity *target,
     }
     for (size_t index = 0; index < source->runtime_path_count; ++index)
     {
-        changed |= reach_application_identity_add_runtime_path(target,
-                                                               source->runtime_paths[index]);
+        changed |=
+            reach_application_identity_add_runtime_path(target, source->runtime_paths[index]);
     }
     return changed;
 }
 
-const uint16_t *reach_application_identity_primary_runtime_path(
-    const reach_application_identity *identity)
+const uint16_t *
+reach_application_identity_primary_runtime_path(const reach_application_identity *identity)
 {
     return identity != NULL && identity->runtime_path_count > 0 ? identity->runtime_paths[0] : NULL;
 }

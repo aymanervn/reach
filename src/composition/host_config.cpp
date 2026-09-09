@@ -62,8 +62,7 @@ int32_t reach_host_apply_config_update(reach_host *host)
         return 0;
     }
 
-    std::unique_ptr<reach_config_snapshot> snapshot(
-        new (std::nothrow) reach_config_snapshot{});
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot{});
     if (snapshot == nullptr ||
         !reach_config_service_take_snapshot_update(host->config_service, snapshot.get()))
     {
@@ -141,8 +140,7 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
     {
         const reach_application *left = &a[index].application;
         const reach_application *right = &b[index].application;
-        if (a[index].id != b[index].id ||
-            left->launch.kind != right->launch.kind ||
+        if (a[index].id != b[index].id || left->launch.kind != right->launch.kind ||
             !reach_utf16_equal(left->launch.path, right->launch.path) ||
             !reach_utf16_equal(left->launch.arguments, right->launch.arguments) ||
             !reach_utf16_equal(left->icon_ref, right->icon_ref) ||
@@ -152,8 +150,8 @@ static int32_t reach_host_pinned_apps_equal(const reach_pinned_app_model *a, siz
         {
             return 0;
         }
-        for (size_t runtime_index = 0;
-             runtime_index < left->identity.runtime_path_count; ++runtime_index)
+        for (size_t runtime_index = 0; runtime_index < left->identity.runtime_path_count;
+             ++runtime_index)
         {
             if (!reach_utf16_equal(left->identity.runtime_paths[runtime_index],
                                    right->identity.runtime_paths[runtime_index]))
@@ -297,8 +295,7 @@ void reach_host_reload_wallpaper(reach_host *host, int32_t force)
     {
         return;
     }
-    std::unique_ptr<reach_config_snapshot> snapshot(
-        new (std::nothrow) reach_config_snapshot{});
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot{});
     if (snapshot != nullptr &&
         reach_config_service_snapshot(host->config_service, snapshot.get()) == REACH_OK)
     {

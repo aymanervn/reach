@@ -208,8 +208,8 @@ static void reach_feature_notify_stage(void *capsule,
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
              notification->config != nullptr && notification->config->stage_animation_ms > 0)
     {
-        reach_stage_set_animation_seconds(stage,
-                                          (float)notification->config->stage_animation_ms / 1000.0f);
+        reach_stage_set_animation_seconds(stage, (float)notification->config->stage_animation_ms /
+                                                     1000.0f);
     }
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED &&
              reach_stage_sync_windows(stage))
@@ -232,9 +232,8 @@ static int32_t reach_feature_control_context_menu_open(void *capsule, int32_t op
     return changed;
 }
 
-static void reach_feature_notify_dock(void *capsule,
-                                     const reach_feature_notification *notification,
-                                     reach_feature_tick_result *out)
+static void reach_feature_notify_dock(void *capsule, const reach_feature_notification *notification,
+                                      reach_feature_tick_result *out)
 {
     reach_dock *dock = static_cast<reach_dock *>(capsule);
     if (dock == nullptr || notification == nullptr || out == nullptr)
@@ -335,8 +334,7 @@ static void reach_feature_notify_switcher(void *capsule,
                                           const reach_feature_notification *notification,
                                           reach_feature_tick_result *out)
 {
-    if (notification == nullptr ||
-        notification->kind != REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED)
+    if (notification == nullptr || notification->kind != REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED)
     {
         return;
     }
@@ -674,8 +672,7 @@ static const reach_feature_control_ops reach_launcher_control_ops = {
 static const reach_feature_control_ops reach_switcher_control_ops = {
     reach_feature_control_switcher_open, nullptr, reach_feature_notify_switcher, nullptr, nullptr};
 static const reach_feature_control_ops reach_clipboard_control_ops = {
-    reach_feature_control_clipboard_open, nullptr, nullptr, nullptr,
-    &reach_clipboard_resource_ops};
+    reach_feature_control_clipboard_open, nullptr, nullptr, nullptr, &reach_clipboard_resource_ops};
 static const reach_feature_control_ops reach_tray_control_ops = {
     reach_feature_control_tray_open, nullptr, nullptr, reach_feature_tray_blocks_position_frame,
     &reach_tray_resource_ops};
@@ -722,21 +719,21 @@ static void reach_host_init_feature_definitions(reach_host *host)
         return;
     }
 
-    reach_host_define_feature(host, REACH_SURFACE_ID_DOCK, REACH_SURFACE_CLASS_PERSISTENT,
-                              nullptr, reach_dock_capsule_ops(),
+    reach_host_define_feature(host, REACH_SURFACE_ID_DOCK, REACH_SURFACE_CLASS_PERSISTENT, nullptr,
+                              reach_dock_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED |
                                   REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE);
     reach_host_define_feature(host, REACH_SURFACE_ID_TOP_BAR, REACH_SURFACE_CLASS_PERSISTENT,
                               nullptr, reach_top_bar_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
-    reach_host_define_feature(
-        host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT, nullptr,
-        reach_launcher_capsule_ops(),
-        REACH_SURFACE_POINTER_RELAYOUT_REDRAWS | REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED);
-    reach_host_define_feature(
-        host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT,
-        reach_host_surface_clipboard_close, reach_clipboard_feature_capsule_ops(),
-        REACH_SURFACE_POINTER_SOURCE_GATED);
+    reach_host_define_feature(host, REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_CLASS_TRANSIENT,
+                              nullptr, reach_launcher_capsule_ops(),
+                              REACH_SURFACE_POINTER_RELAYOUT_REDRAWS |
+                                  REACH_SURFACE_POINTER_DOWN_CLOSES_ON_UNHANDLED);
+    reach_host_define_feature(host, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_CLASS_TRANSIENT,
+                              reach_host_surface_clipboard_close,
+                              reach_clipboard_feature_capsule_ops(),
+                              REACH_SURFACE_POINTER_SOURCE_GATED);
     reach_host_define_feature(host, REACH_SURFACE_ID_TRAY, REACH_SURFACE_CLASS_POPUP,
                               reach_host_surface_tray_close, reach_top_bar_tray_capsule_ops(),
                               REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED);
@@ -750,14 +747,13 @@ static void reach_host_init_feature_definitions(reach_host *host)
     reach_host_define_feature(host, REACH_SURFACE_ID_SYSTEM_HUD, REACH_SURFACE_CLASS_PERSISTENT,
                               nullptr, reach_system_hud_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED);
-    reach_host_define_feature(
-        host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP, nullptr,
-        reach_context_menu_capsule_ops(),
-        REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
-    reach_host_define_feature(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY,
-                              nullptr, reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
-    reach_host_define_feature(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_CLASS_TRANSIENT,
-                              nullptr, reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
+    reach_host_define_feature(host, REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_CLASS_POPUP,
+                              nullptr, reach_context_menu_capsule_ops(),
+                              REACH_SURFACE_POINTER_EXCLUSIVE_WHILE_OPEN);
+    reach_host_define_feature(host, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_CLASS_OVERLAY, nullptr,
+                              reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
+    reach_host_define_feature(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_CLASS_TRANSIENT, nullptr,
+                              reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
 
     reach_feature_definition *definitions = host->feature_definitions;
 
@@ -831,7 +827,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.pointer_priority = 30;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.dismiss_guard_surface = REACH_SURFACE_ID_DOCK;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.dismiss_guard_any_control = 1;
-    
+
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.restores_focus_on_close = 1;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.close_on_persistent_press = 1;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.behavior_flags =
@@ -892,8 +888,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_BATTERY].layout.priority = 55;
     definitions[REACH_SURFACE_ID_SWITCHER].layout.priority = 60;
     definitions[REACH_SURFACE_ID_STAGE].layout.priority = 65;
-    definitions[REACH_SURFACE_ID_DOCK].layout.reservation_edge =
-        REACH_LAYOUT_RESERVATION_BOTTOM;
+    definitions[REACH_SURFACE_ID_DOCK].layout.reservation_edge = REACH_LAYOUT_RESERVATION_BOTTOM;
     definitions[REACH_SURFACE_ID_TOP_BAR].layout.reservation_edge = REACH_LAYOUT_RESERVATION_TOP;
     definitions[REACH_SURFACE_ID_STAGE].layout.uses_reserved_bounds = 1;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].layout.priority = 70;
@@ -901,8 +896,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
 
     definitions[REACH_SURFACE_ID_LAUNCHER].toggle_events = reach_launcher_activation_events(
         &definitions[REACH_SURFACE_ID_LAUNCHER].toggle_event_count);
-    definitions[REACH_SURFACE_ID_LAUNCHER].routed_events = reach_launcher_routed_events(
-        &definitions[REACH_SURFACE_ID_LAUNCHER].routed_event_count);
+    definitions[REACH_SURFACE_ID_LAUNCHER].routed_events =
+        reach_launcher_routed_events(&definitions[REACH_SURFACE_ID_LAUNCHER].routed_event_count);
     definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_events = reach_clipboard_activation_events(
         &definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_event_count);
     definitions[REACH_SURFACE_ID_SWITCHER].routed_events =
@@ -1131,8 +1126,7 @@ static reach_result reach_stage_native_overlay_item(const void *capsule, size_t 
     return REACH_OK;
 }
 
-static int32_t reach_stage_surface_arrange(void *capsule,
-                                           const reach_feature_surface_context *ctx)
+static int32_t reach_stage_surface_arrange(void *capsule, const reach_feature_surface_context *ctx)
 {
     return reach_stage_set_desktop_bounds(static_cast<reach_stage *>(capsule),
                                           ctx->available_bounds);
@@ -1145,7 +1139,7 @@ static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {
 };
 
 static const reach_feature_surface_ops reach_stage_surface_ops = {
-    reach_stage_surface_arrange, reach_stage_surface_render, nullptr, nullptr,
+    reach_stage_surface_arrange,     reach_stage_surface_render, nullptr, nullptr,
     &reach_stage_native_overlay_ops,
 };
 
@@ -1481,7 +1475,8 @@ void reach_host_bind_registered_surface_ports(reach_host *host,
     host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].window = dependencies->context_menu_window;
     host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer = dependencies->context_menu_renderer;
     host->surfaces[REACH_SURFACE_ID_QUICK_SETTINGS].window = dependencies->quick_settings_window;
-    host->surfaces[REACH_SURFACE_ID_QUICK_SETTINGS].renderer = dependencies->quick_settings_renderer;
+    host->surfaces[REACH_SURFACE_ID_QUICK_SETTINGS].renderer =
+        dependencies->quick_settings_renderer;
     host->surfaces[REACH_SURFACE_ID_BATTERY].window = dependencies->battery_window;
     host->surfaces[REACH_SURFACE_ID_BATTERY].renderer = dependencies->battery_renderer;
     host->surfaces[REACH_SURFACE_ID_SYSTEM_HUD].window = dependencies->system_hud_window;

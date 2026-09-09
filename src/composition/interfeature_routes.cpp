@@ -19,7 +19,8 @@ reach_host_menu_open_context(reach_host *host, const reach_menu_request *request
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.monitor = reach_host_menu_monitor(host, request->anchor_button);
     ctx.text_measure.context = host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.backend;
-    ctx.text_measure.measure = host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.ops.measure_text;
+    ctx.text_measure.measure =
+        host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.ops.measure_text;
     ctx.anchor_button = request->anchor_button;
     ctx.bar_edge_y = request->bar_edge_y;
     ctx.drop_direction = request->drop_direction;
@@ -33,7 +34,7 @@ reach_host_menu_open_context(reach_host *host, const reach_menu_request *request
 }
 
 static reach_feature_layout_anchor reach_host_menu_owner(reach_surface_id surface, uint32_t slot,
-                                                          size_t index)
+                                                         size_t index)
 {
     reach_feature_layout_anchor owner = {};
     owner.surface = surface;
@@ -143,10 +144,9 @@ static void reach_host_route_dock_item_hovered(void *user, const reach_menu_requ
         return;
     }
     if (open_target == REACH_CONTEXT_MENU_NO_TARGET &&
-        reach_host_any_surface_open(host,
-                                    reach_surface_class_bit(REACH_SURFACE_CLASS_TRANSIENT) |
-                                        reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP) |
-                                        reach_surface_class_bit(REACH_SURFACE_CLASS_OVERLAY)))
+        reach_host_any_surface_open(host, reach_surface_class_bit(REACH_SURFACE_CLASS_TRANSIENT) |
+                                              reach_surface_class_bit(REACH_SURFACE_CLASS_POPUP) |
+                                              reach_surface_class_bit(REACH_SURFACE_CLASS_OVERLAY)))
     {
         return;
     }

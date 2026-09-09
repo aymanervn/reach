@@ -50,8 +50,7 @@ static reach_result reach_foreground_watcher_start(reach_foreground_watcher *wat
     if (watcher->hook == nullptr)
     {
         watcher->hook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
-                                        reach_foreground_watcher_proc, 0, 0,
-                                        WINEVENT_OUTOFCONTEXT);
+                                        reach_foreground_watcher_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
     }
 
     return watcher->hook != nullptr ? REACH_OK : REACH_ERROR;

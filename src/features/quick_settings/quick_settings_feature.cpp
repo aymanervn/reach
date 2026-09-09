@@ -907,10 +907,9 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
                       (quick_settings != nullptr &&
                        reach_animation_manager_any_active(&quick_settings->animations));
         out->relayout = changes.relayout;
-        out->request_update =
-            changes.request_update ||
-            (quick_settings != nullptr &&
-             reach_feature_transition_active(&quick_settings->popup_transition));
+        out->request_update = changes.request_update ||
+                              (quick_settings != nullptr &&
+                               reach_feature_transition_active(&quick_settings->popup_transition));
     }
 }
 
@@ -1615,8 +1614,8 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     }
 
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-    reach_feature_transition_configure(&quick_settings->popup_transition, ctx->theme, ctx->dpi_scale,
-                                     ctx->drop_direction);
+    reach_feature_transition_configure(&quick_settings->popup_transition, ctx->theme,
+                                       ctx->dpi_scale, ctx->drop_direction);
 
     reach_rect_f32 previous_target = state->target_bounds;
     float current_height = state->bounds.height;
