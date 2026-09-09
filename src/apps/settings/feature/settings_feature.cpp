@@ -83,6 +83,7 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_animation_manager_init(&model->display_theme_animation, &model->display_theme_track, 1);
     reach_animation_manager_init(&model->top_bar_style_animation, &model->top_bar_style_track, 1);
     reach_animation_manager_init(&model->top_bar_mode_animation, &model->top_bar_mode_track, 1);
+    reach_animation_manager_set(&model->top_bar_mode_animation, 0, 1.0f);
     reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
     reach_pressable_init(&model->button_pressable);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)

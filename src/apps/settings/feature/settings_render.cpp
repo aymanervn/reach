@@ -540,8 +540,8 @@ static void render_display_page(const reach_settings_render_input *input,
          layout->top_bar_static_toggle,
          REACH_VECTOR_ICON_NONE,
          nullptr,
-         L"Static top bar",
-         L"Keep it visible and reserve its screen region",
+         L"Auto hide top bar",
+         L"Hide it when a window enters its screen region",
          reach_animation_manager_value(&model->top_bar_mode_animation, 0)},
     };
     for (size_t index = 0; index < sizeof(desktop_cards) / sizeof(desktop_cards[0]); ++index)

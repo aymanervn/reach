@@ -917,12 +917,14 @@ static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float reveal
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
 
-static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds,
-                                      float shadow_clearance)
+static float reach_top_bar_push_depth(reach_rect_f32 shown_bounds, reach_rect_f32 monitor_bounds)
 {
-    return reach_bar_protected_band(REACH_TOP_BAR_EDGE, shown_bounds, monitor_bounds,
-                                    shadow_clearance)
-        .height;
+    float screen_gap = shown_bounds.y - monitor_bounds.y;
+    if (screen_gap < 0.0f)
+    {
+        screen_gap = 0.0f;
+    }
+    return screen_gap + shown_bounds.height + screen_gap;
 }
 
 static int32_t reach_top_bar_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
@@ -975,8 +977,7 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
         return reach_bar_visibility_result{};
     }
 
-    float push_depth = reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds,
-                                                request->shadow_clearance);
+    float push_depth = reach_top_bar_push_depth(request->shown_bounds, request->monitor_bounds);
 
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_TOP_BAR_EDGE;
