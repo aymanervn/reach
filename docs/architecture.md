@@ -285,9 +285,11 @@ The DWM adapter also caches the last submitted thumbnail properties and skips id
 `DwmUpdateThumbnailProperties` calls; DWM owns live thumbnail resolution and Reach does not request
 a capture resolution or refresh rate. Native thumbnail registration and placement are best-effort
 while Stage is open or reflowing because a source can disappear between the window snapshot and
-the DWM call. Missing relationships are retried without aborting the host frame. Placement remains
-strict at Stage's synchronized close boundaries so a failed final handoff follows the capsule's
-existing recovery path.
+the DWM call. Generation changes reconcile relationships by source and plane: unchanged app
+relationships and the Desktop helper HWND remain alive, new relationships are added, and departed
+relationships are released only after the capsule removes their tiles. Missing relationships are
+retried without aborting the host frame. Placement remains strict at Stage's synchronized close
+boundaries so a failed final handoff follows the capsule's existing recovery path.
 The renderer's synchronization operation waits for DirectComposition commit completion and
 then flushes the calling process's queued DWM work; it does not establish that an external
 application has finished producing its own content.
