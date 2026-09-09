@@ -446,6 +446,20 @@ static void test_display_theme_preferences(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
+    reach_settings_model_set_light_theme(model.get(), 0);
+    expect_true(reach_settings_model_select_light_theme(model.get(), 1),
+                "Reach theme accepts an explicit light selection");
+    expect_true(reach_settings_model_light_theme(model.get()),
+                "Reach theme stores the selected light mode");
+    expect_true(reach_animation_manager_target(&model->display_theme_animation, 0) == 1.0f,
+                "Reach theme selector animates toward light");
+    expect_true(!reach_settings_model_select_light_theme(model.get(), 1),
+                "reselecting the active Reach theme is unchanged");
+    expect_true(reach_settings_model_select_light_theme(model.get(), 0),
+                "Reach theme accepts an explicit dark selection");
+    expect_true(reach_animation_manager_target(&model->display_theme_animation, 0) == 0.0f,
+                "Reach theme selector animates toward dark");
+
     expect_true(reach_settings_model_windows_system_theme(model.get()) ==
                     REACH_CONFIG_THEME_FOLLOW_REACH,
                 "Windows mode follows Reach by default");
@@ -468,15 +482,31 @@ static void test_display_theme_preferences(void)
                                                                  REACH_CONFIG_THEME_FOLLOW_REACH),
                 "Windows mode can return to Reach synchronization");
 
-    reach_rect_f32 selector = {100.0f, 40.0f, 300.0f, 30.0f};
-    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 149.0f, 55.0f) == 0,
-                "segmented selector maps its first segment");
-    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 250.0f, 55.0f) == 1,
-                "segmented selector maps its middle segment");
-    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 399.0f, 55.0f) == 2,
-                "segmented selector maps its final segment");
-    expect_true(reach_ui_segmented_selector_index_at(selector, 3, 400.0f, 55.0f) < 0,
-                "segmented selector excludes its far edge");
+}
+
+static void test_segmented_control_choice_counts(void)
+{
+    reach_rect_f32 control = {100.0f, 40.0f, 300.0f, 30.0f};
+    expect_true(reach_ui_segmented_control_index_at(control, 2, 249.0f, 55.0f) == 0,
+                "two-way segmented control maps its first choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 2, 250.0f, 55.0f) == 1,
+                "two-way segmented control maps its second choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 3, 149.0f, 55.0f) == 0,
+                "three-way segmented control maps its first choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 3, 250.0f, 55.0f) == 1,
+                "three-way segmented control maps its middle choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 3, 399.0f, 55.0f) == 2,
+                "three-way segmented control maps its final choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 4, 174.0f, 55.0f) == 0,
+                "four-way segmented control maps its first choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 4, 175.0f, 55.0f) == 1,
+                "four-way segmented control maps its second choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 4, 399.0f, 55.0f) == 3,
+                "four-way segmented control maps its final choice");
+    expect_true(reach_ui_segmented_control_index_at(control, 4, 400.0f, 55.0f) < 0,
+                "segmented control excludes its far edge");
+    expect_true(reach_ui_segmented_control_index_at(control, 0, 200.0f, 55.0f) < 0,
+                "segmented control rejects an empty choice list");
 }
 
 static void test_account_password_form(void)
@@ -654,6 +684,7 @@ int main(void)
     test_power_wait_apps_toggle();
     test_account_model_and_layout();
     test_display_theme_preferences();
+    test_segmented_control_choice_counts();
     test_account_password_form();
     test_button_press_feedback();
     test_top_bar_preferences();

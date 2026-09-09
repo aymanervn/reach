@@ -83,17 +83,17 @@ int32_t reach_settings_model_light_theme(const reach_settings_model *model)
     return model != nullptr && model->display_light_theme;
 }
 
-int32_t reach_settings_model_toggle_light_theme(reach_settings_model *model)
+int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int32_t enabled)
 {
-    if (model == nullptr)
+    int32_t light_theme = enabled ? 1 : 0;
+    if (model == nullptr || model->display_light_theme == light_theme)
     {
         return 0;
     }
-    model->display_light_theme = model->display_light_theme ? 0 : 1;
+    model->display_light_theme = light_theme;
     float current = reach_animation_manager_value(&model->display_theme_animation, 0);
     reach_animation_manager_start(&model->display_theme_animation, 0, current,
-                                  model->display_light_theme ? 1.0f : 0.0f, 0.18,
-                                  REACH_EASING_EASE_OUT);
+                                  light_theme ? 1.0f : 0.0f, 0.18, REACH_EASING_EASE_OUT);
     return 1;
 }
 

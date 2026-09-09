@@ -1462,15 +1462,7 @@ static void reach_settings_handle_applications_action(reach_settings_app *app,
         return;
     }
     const reach_installed_app *entry = &app->model.installed_apps.entries[hit.installed_app_index];
-    if (hit.type == REACH_SETTINGS_HIT_APPLICATION_OPEN && entry->can_open)
-    {
-        reach_installed_apps_service_open(app->installed_apps_service, hit.installed_app_index);
-    }
-    else if (hit.type == REACH_SETTINGS_HIT_APPLICATION_MANAGE && entry->can_manage)
-    {
-        reach_installed_apps_service_manage(app->installed_apps_service, hit.installed_app_index);
-    }
-    else if (hit.type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL && entry->can_uninstall)
+    if (hit.type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL && entry->can_uninstall)
     {
         reach_installed_apps_service_uninstall(app->installed_apps_service,
                                                hit.installed_app_index);
@@ -1700,8 +1692,6 @@ static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
     return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
            type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_REACH_UPDATE ||
            type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD ||
-           type == REACH_SETTINGS_HIT_APPLICATION_OPEN ||
-           type == REACH_SETTINGS_HIT_APPLICATION_MANAGE ||
            type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL ||
            type == REACH_SETTINGS_HIT_WIFI_SCAN || type == REACH_SETTINGS_HIT_WIFI_ADD ||
            type == REACH_SETTINGS_HIT_WIFI_KNOWN || type == REACH_SETTINGS_HIT_WIFI_BACK ||
@@ -1744,14 +1734,15 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_STARTUP_TOGGLE:
         detail = (uint32_t)hit.startup_index;
         break;
-    case REACH_SETTINGS_HIT_APPLICATION_OPEN:
-    case REACH_SETTINGS_HIT_APPLICATION_MANAGE:
     case REACH_SETTINGS_HIT_APPLICATION_UNINSTALL:
         detail = (uint32_t)hit.installed_app_index;
         break;
     case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME:
     case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME:
         detail = (uint32_t)hit.display_theme_preference;
+        break;
+    case REACH_SETTINGS_HIT_DISPLAY_THEME:
+        detail = (uint32_t)hit.display_light_theme;
         break;
     case REACH_SETTINGS_HIT_TOP_BAR_STYLE:
         detail = (uint32_t)hit.top_bar_style;
@@ -1790,9 +1781,7 @@ static size_t reach_settings_pressable_feedback_index(reach_settings_hit_result 
     {
         return REACH_PRESSABLE_FEEDBACK_NONE;
     }
-    return hit.type == REACH_SETTINGS_HIT_APPLICATION_OPEN ||
-                   hit.type == REACH_SETTINGS_HIT_APPLICATION_MANAGE ||
-                   hit.type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL
+    return hit.type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL
                ? static_cast<size_t>(target)
                : static_cast<size_t>(hit.type);
 }
@@ -2207,11 +2196,13 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             reach_settings_save_display_config(app);
             reach_settings_apply_ui_font(app);
         }
-        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE)
+        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_THEME)
         {
-            (void)reach_settings_model_toggle_light_theme(&app->model);
-            reach_settings_save_display_config(app);
-            reach_settings_apply_theme(app);
+            if (reach_settings_model_select_light_theme(&app->model, hit.display_light_theme))
+            {
+                reach_settings_save_display_config(app);
+                reach_settings_apply_theme(app);
+            }
         }
         else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME)
         {

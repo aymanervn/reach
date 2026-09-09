@@ -171,6 +171,7 @@ extern "C"
         reach_color settings_card_background;
         reach_color settings_pill_background;
         reach_color settings_icon_box_background;
+        reach_color settings_segmented_control_background;
         reach_color settings_input_background;
         reach_color settings_divider;
         reach_color settings_toggle_track_off;
