@@ -112,6 +112,7 @@ extern "C"
         float work_area_clearance;
         int32_t disable_bar_reveal;
         int32_t force_topmost;
+        int32_t yield_topmost_to_foreground_fullscreen;
         float notch_anchor_x;
         int32_t notch_side;
         struct

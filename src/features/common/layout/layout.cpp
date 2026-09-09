@@ -57,6 +57,31 @@ reach_result reach_layout_register_override(reach_layout *layout,
     return REACH_OK;
 }
 
+reach_result reach_layout_set_layer_ceiling(reach_layout *layout,
+                                            reach_layout_participant participant,
+                                            reach_layout_condition condition, int32_t enabled,
+                                            int32_t layer)
+{
+    reach_layout_participant_state *state = reach_layout_participant_at(layout, participant);
+    if (state == nullptr || !reach_layout_condition_valid(condition))
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    uint32_t bit = reach_layout_condition_bit(condition);
+    if (enabled)
+    {
+        state->layer_ceiling_conditions |= bit;
+        state->layer_ceilings[condition] = layer;
+    }
+    else
+    {
+        state->layer_ceiling_conditions &= ~bit;
+        state->layer_ceilings[condition] = 0;
+    }
+    return REACH_OK;
+}
+
 reach_result reach_layout_register_visibility(reach_layout *layout,
                                               reach_layout_participant participant,
                                               reach_layout_condition condition, int32_t visible)
@@ -155,6 +180,27 @@ static reach_layout_entry reach_layout_resolve_participant(const reach_layout *l
     if (state->layer_intent_active && (!layer_overridden || state->layer_intent > entry.layer))
     {
         entry.layer = state->layer_intent;
+    }
+
+    for (uint32_t condition = 0; condition < (uint32_t)REACH_LAYOUT_CONDITION_COUNT; ++condition)
+    {
+        uint32_t bit = (uint32_t)1u << condition;
+        if ((layout->active_conditions & bit) != 0 &&
+            (state->layer_ceiling_conditions & bit) != 0 &&
+            state->layer_ceilings[condition] < entry.layer)
+        {
+            entry.layer = state->layer_ceilings[condition];
+        }
+    }
+
+    for (uint32_t condition = 0; condition < (uint32_t)REACH_LAYOUT_CONDITION_COUNT; ++condition)
+    {
+        uint32_t bit = (uint32_t)1u << condition;
+        if ((layout->active_conditions & bit) != 0 && (state->layer_conditions & bit) != 0 &&
+            state->layer_overrides[condition] > entry.layer)
+        {
+            entry.layer = state->layer_overrides[condition];
+        }
     }
 
     return entry;

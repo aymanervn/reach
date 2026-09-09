@@ -18,7 +18,8 @@ extern "C"
         REACH_LAYOUT_CONDITION_GAME_MODE = 0,
         REACH_LAYOUT_CONDITION_BARS_FORCED = 1,
         REACH_LAYOUT_CONDITION_BARS_HELD = 2,
-        REACH_LAYOUT_CONDITION_COUNT = 3
+        REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN = 3,
+        REACH_LAYOUT_CONDITION_COUNT = 4
     } reach_layout_condition;
 
     typedef uint32_t reach_layout_participant;
@@ -31,6 +32,8 @@ extern "C"
         int32_t wants_visible;
         uint32_t layer_conditions;
         int32_t layer_overrides[REACH_LAYOUT_CONDITION_COUNT];
+        uint32_t layer_ceiling_conditions;
+        int32_t layer_ceilings[REACH_LAYOUT_CONDITION_COUNT];
         uint32_t visibility_conditions;
         int32_t visibility_overrides[REACH_LAYOUT_CONDITION_COUNT];
     } reach_layout_participant_state;
@@ -60,6 +63,10 @@ extern "C"
     reach_result reach_layout_register_override(reach_layout *layout,
                                                 reach_layout_participant participant,
                                                 reach_layout_condition condition, int32_t layer);
+    reach_result reach_layout_set_layer_ceiling(reach_layout *layout,
+                                                reach_layout_participant participant,
+                                                reach_layout_condition condition, int32_t enabled,
+                                                int32_t layer);
     reach_result reach_layout_register_visibility(reach_layout *layout,
                                                   reach_layout_participant participant,
                                                   reach_layout_condition condition,

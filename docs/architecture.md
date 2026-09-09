@@ -429,7 +429,10 @@ presentation differs: the dynamic top bar rests in the app band and uses
 `reach_bar_reveal_ops.position_frame` to push trespassing windows, while the
 permanently-topmost Dock reveals over them without a side effect. Static top-bar mode
 bypasses the visibility state machine, pointer observation, edge hotspot, and window
-push, and holds the surface in the active topmost layer. A single
+push, and normally holds the surface in the active topmost layer. While a foreground
+window occupies its whole monitor, static mode keeps the work-area reservation but
+yields its layer and native z-order behind that window. Dynamic mode retains its own
+hide and reveal behavior. A single
 screen-hotspot factory creates every
 definition-declared edge reveal. Fixed triggers declare an anchor and DP size;
 Stage is a normally enabled 4dp top-left square. Animated bars publish managed
@@ -652,8 +655,8 @@ unusable.
 
 Z-order and visibility for the windows Reach owns are decided in one place:
 the `features/common/layout` manager plus the apply pass in `host_layout.cpp`. Each
-participant registers a base layer and, optionally, per-condition layer and
-visibility overrides; `reach_layout_resolve` is a pure function of registrations,
+participant registers a base layer and, optionally, per-condition layer overrides,
+layer ceilings, and visibility overrides; `reach_layout_resolve` is a pure function of registrations,
 the active condition set, and per-participant intent. Layer 0 is the app band — an
 exit, not a slot, and Windows owns ordering inside it. Layers above 0 are the
 topmost band, ordered among ourselves: the pass walks the plan in descending layer,
@@ -661,7 +664,8 @@ seeds the chain with `set_topmost(1)`, and chains each following participant beh
 the previous with `place_behind`. It emits `set_topmost(0)` only on the transition
 out of the band, never while a participant rests there — `HWND_NOTOPMOST` lifts a
 window to the top of the app band, so a redundant demote would pop a resting bar
-above whatever covers it. The pass is the sole owner of `show()` / `hide()` for
+above whatever covers it. A surface that publishes fullscreen-yield intent is therefore
+explicitly placed behind the fullscreen target after demotion. The pass is the sole owner of `show()` / `hide()` for
 these windows; frame steps compute intent and render, and never touch visibility or
 z. It emits nothing when the resolved plan equals the last applied one unless native
 pointer interaction, a foreground change, or a completed window-control operation invalidated
@@ -673,7 +677,9 @@ actually changed.
 
 Conditions are bits, not triggers: the arrangement is recomputed from the whole
 active set, so setting an already-set condition is a no-op and a missed one heals on
-the next resolve. `reach_host_sync_bar_layout_conditions` publishes the process-wide
+the next resolve. A layer ceiling caps participant-owned layer intent before explicit condition
+promotions, allowing fullscreen to remove the static top-bar layer while Stage can still force the
+bar into its overview. `reach_host_sync_bar_layout_conditions` publishes the process-wide
 `BARS_FORCED` and `BARS_HELD` values once before the surface frame loop; individual bar
 reconciliation only owns that bar's visibility result and layer intent. `GAME_MODE` resolves every
 participant hidden except a definition
@@ -688,11 +694,17 @@ game, and then clears the shared cursor clip once. The Reach-owned Progman host
 permits that explicit activation while continuing to reject pointer activation.
 The top bar is the only participant whose layer moves: dynamic mode rests at 0 and rises to
 130 while its reveal transition is live, while a `bar_shown_while_open` surface is open, or while a
-popup holds the bars; static mode holds layer 130 continuously. Starting a dynamic Y animation and
+popup holds the bars; static mode holds layer 130 at rest except during a foreground-fullscreen
+yield. Starting a dynamic Y animation and
 reporting its transition are the same act, performed by `reach_bar_update_visibility` alone. A mode
 change may snap `REACH_TOP_BAR_ANIM_Y` to its shown position while disabling that visibility policy.
 The layer intent is still published generically from resolved capsule geometry and the dynamic
-visibility result. Definition-declared edge reveals are participants too,
+visibility result. Static geometry also publishes `yield_topmost_to_foreground_fullscreen`.
+Reach Service derives the foreground fullscreen HWND from event-driven foreground and location
+changes by comparing its actual bounds with its monitor, publishes it separately from game mode,
+and the `FOREGROUND_FULLSCREEN` layout condition caps only participating surfaces at layer 0.
+The apply pass then places them behind that exact HWND; leaving fullscreen restores the ordinary
+static layer without releasing or recomputing the work area. Definition-declared edge reveals are participants too,
 attached to their owning surface runtime but independently visible; the underlying
 screen-hotspot port carries `set_topmost` / `native_id` / `place_behind` so they
 chain and seed like any other participant.

@@ -22,6 +22,7 @@ struct reach_window_manager
     CRITICAL_SECTION lock;
     int32_t lock_initialized;
     int32_t game_mode_active;
+    reach_window_id foreground_fullscreen_window;
     LONG helper_prompt_active;
     LONG helper_start_active;
     LONG helper_retry_suppressed_until;
@@ -449,6 +450,22 @@ static void reach_window_manager_copy_shared_game_mode(reach_window_manager *man
     reach_window_manager_unlock(manager);
 }
 
+static void reach_window_manager_copy_shared_fullscreen(reach_window_manager *manager)
+{
+    if (manager == nullptr)
+    {
+        return;
+    }
+
+    uint64_t window = 0;
+    (void)reach_service_shared_copy_foreground_fullscreen(&window);
+
+    reach_window_manager_lock(manager);
+    manager->foreground_fullscreen_window = static_cast<reach_window_id>(window);
+    manager->dirty = 1;
+    reach_window_manager_unlock(manager);
+}
+
 static void reach_window_manager_shared_callback(void *user,
                                                  reach_service_shared_reader_event event)
 {
@@ -462,6 +479,7 @@ static void reach_window_manager_shared_callback(void *user,
     {
         reach_window_manager_copy_shared_windows(manager);
         reach_window_manager_copy_shared_game_mode(manager);
+        reach_window_manager_copy_shared_fullscreen(manager);
         return;
     }
 
@@ -477,11 +495,18 @@ static void reach_window_manager_shared_callback(void *user,
         return;
     }
 
+    if (event == REACH_SERVICE_SHARED_EVENT_FULLSCREEN_CHANGED)
+    {
+        reach_window_manager_copy_shared_fullscreen(manager);
+        return;
+    }
+
     if (event == REACH_SERVICE_SHARED_EVENT_DISCONNECTED)
     {
         reach_window_manager_lock(manager);
         manager->helper_windows.clear();
         manager->game_mode_active = 0;
+        manager->foreground_fullscreen_window = 0;
         manager->dirty = 1;
         reach_window_manager_unlock(manager);
         reach_window_manager_request_privileged_control_start(manager);
@@ -499,6 +524,7 @@ static reach_result reach_window_manager_start(reach_window_manager *manager)
     (void)reach_service_shared_reader_subscribe(reach_window_manager_shared_callback, manager);
     reach_window_manager_copy_shared_windows(manager);
     reach_window_manager_copy_shared_game_mode(manager);
+    reach_window_manager_copy_shared_fullscreen(manager);
     try
     {
         manager->helper_start_thread =
@@ -534,6 +560,7 @@ static reach_result reach_window_manager_stop(reach_window_manager *manager)
     reach_window_manager_lock(manager);
     manager->helper_windows.clear();
     manager->game_mode_active = 0;
+    manager->foreground_fullscreen_window = 0;
     manager->dirty = 0;
     reach_window_manager_unlock(manager);
     reach_service_shared_reader_unsubscribe(manager);
@@ -572,6 +599,20 @@ static int32_t reach_window_manager_game_mode_active(const reach_window_manager 
     int32_t active = manager->game_mode_active;
     reach_window_manager_unlock(manager);
     return active;
+}
+
+static reach_window_id
+reach_window_manager_foreground_fullscreen_window(const reach_window_manager *manager)
+{
+    if (manager == nullptr)
+    {
+        return 0;
+    }
+
+    reach_window_manager_lock(manager);
+    reach_window_id window = manager->foreground_fullscreen_window;
+    reach_window_manager_unlock(manager);
+    return window;
 }
 
 static int32_t reach_window_manager_needs_refresh(const reach_window_manager *manager)
@@ -812,6 +853,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.refresh = reach_window_manager_refresh;
     out_port->ops.snap = reach_window_manager_snap;
     out_port->ops.game_mode_active = reach_window_manager_game_mode_active;
+    out_port->ops.foreground_fullscreen_window = reach_window_manager_foreground_fullscreen_window;
     out_port->ops.needs_refresh = reach_window_manager_needs_refresh;
     out_port->ops.window_count = reach_window_manager_window_count;
     out_port->ops.window_at = reach_window_manager_window_at;

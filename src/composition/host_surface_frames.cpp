@@ -424,6 +424,11 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     }
     reach_feature_surface_geometry geometry = {};
     desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
+    desc->yield_topmost_to_foreground_fullscreen = geometry.yield_topmost_to_foreground_fullscreen;
+    (void)reach_layout_set_layer_ceiling(&host->layout_manager,
+                                         host->surface_participants[desc->definition->id],
+                                         REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN,
+                                         geometry.yield_topmost_to_foreground_fullscreen, 0);
     int32_t geometry_changed = !desc->resolved_bounds_valid ||
                                !reach_rect_equal(desc->resolved_bounds, geometry.visible_bounds);
     desc->resolved_bounds = geometry.visible_bounds;
