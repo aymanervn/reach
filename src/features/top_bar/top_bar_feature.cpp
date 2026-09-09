@@ -1302,6 +1302,7 @@ static void reach_top_bar_capsule_surface_geometry(const void *capsule,
         out->work_area_clearance = top_bar->state.layout.app_clearance;
         out->disable_bar_reveal = static_mode;
         out->force_topmost = static_mode;
+        out->yield_topmost_to_foreground_fullscreen = static_mode;
     }
 }
 

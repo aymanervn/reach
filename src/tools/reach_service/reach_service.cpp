@@ -626,10 +626,9 @@ static int32_t reach_helper_window_is_windowed(HWND hwnd)
     return has_caption || has_windowed_frame;
 }
 
-static int32_t reach_helper_window_is_game(HWND hwnd)
+static int32_t reach_helper_window_is_fullscreen(HWND hwnd)
 {
-    if (hwnd == nullptr || !IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd) ||
-        IsZoomed(hwnd) || reach_helper_window_is_windowed(hwnd))
+    if (hwnd == nullptr || !IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd))
     {
         return 0;
     }
@@ -641,28 +640,28 @@ static int32_t reach_helper_window_is_game(HWND hwnd)
     }
 
     RECT rect = {};
-    if (!GetWindowRect(hwnd, &rect))
-    {
-        return 0;
-    }
-
-    return reach_helper_window_occupies_whole_monitor(hwnd, rect);
+    return GetWindowRect(hwnd, &rect) && reach_helper_window_occupies_whole_monitor(hwnd, rect);
 }
 
-static int32_t reach_helper_detect_game_mode(void)
+static int32_t reach_helper_window_is_game(HWND hwnd)
 {
-    return reach_helper_window_is_game(GetForegroundWindow());
+    return !IsZoomed(hwnd) && !reach_helper_window_is_windowed(hwnd) &&
+           reach_helper_window_is_fullscreen(hwnd);
 }
 
-static void reach_helper_publish_game_mode(void)
+static void reach_helper_publish_window_modes(void)
 {
-    int32_t active = reach_helper_detect_game_mode();
-    if (active)
+    HWND foreground = GetForegroundWindow();
+    int32_t game_mode_active = reach_helper_window_is_game(foreground);
+    if (game_mode_active)
     {
         reach_helper_clear_hotkey_state();
     }
-    InterlockedExchange(&g_game_mode_active, active ? 1 : 0);
-    (void)reach_service_shared_publish_game_mode(active);
+    InterlockedExchange(&g_game_mode_active, game_mode_active ? 1 : 0);
+    (void)reach_service_shared_publish_game_mode(game_mode_active);
+    uint64_t fullscreen_window =
+        reach_helper_window_is_fullscreen(foreground) ? reinterpret_cast<uint64_t>(foreground) : 0;
+    (void)reach_service_shared_publish_foreground_fullscreen(fullscreen_window);
 }
 
 struct reach_helper_snapshot_builder
@@ -751,7 +750,7 @@ static void reach_helper_publish_window_state(void)
     uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
     (void)reach_service_shared_publish_windows(windows, window_count);
     reach_helper_store_window_state(windows, window_count);
-    reach_helper_publish_game_mode();
+    reach_helper_publish_window_modes();
 }
 
 static void reach_helper_finish_window_manipulation(void)
@@ -760,7 +759,7 @@ static void reach_helper_finish_window_manipulation(void)
     uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
     (void)reach_service_shared_finish_window_manipulation(windows, window_count);
     reach_helper_store_window_state(windows, window_count);
-    reach_helper_publish_game_mode();
+    reach_helper_publish_window_modes();
 }
 
 static reach_helper_window_state reach_helper_current_window_state(void)
@@ -812,7 +811,7 @@ static int32_t reach_helper_publish_foreground_change(void)
     {
         reach_helper_publish_cached_window_state(&state);
     }
-    reach_helper_publish_game_mode();
+    reach_helper_publish_window_modes();
     return 1;
 }
 
@@ -848,7 +847,7 @@ static int32_t reach_helper_publish_name_change(HWND hwnd)
 
     state.windows[target_index] = updated;
     reach_helper_publish_cached_window_state(&state);
-    reach_helper_publish_game_mode();
+    reach_helper_publish_window_modes();
     return 1;
 }
 

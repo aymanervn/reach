@@ -279,6 +279,41 @@ static void test_layer_zero_resolves_as_exit(void)
     expect_int(entry_for(&plan, resting)->layer, 0, "the participant falls back on its own");
 }
 
+static void test_layer_ceiling_caps_participant_intent(void)
+{
+    reach_layout layout = {};
+    reach_layout_participant bar = 0;
+    reach_layout_register(&layout, 0, &bar);
+    reach_layout_register_override(&layout, bar, REACH_LAYOUT_CONDITION_BARS_HELD, 130);
+    reach_layout_set_layer_intent(&layout, bar, 1, 150);
+    reach_layout_set_layer_ceiling(&layout, bar, REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN, 1,
+                                   0);
+    reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_BARS_HELD, 1);
+    reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN, 1);
+
+    reach_layout_plan plan = {};
+    reach_layout_resolve(&layout, &plan);
+    expect_int(entry_for(&plan, bar)->layer, 130,
+               "an explicit condition promotion wins over the fullscreen ceiling");
+
+    reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_BARS_HELD, 0);
+    reach_layout_resolve(&layout, &plan);
+    expect_int(entry_for(&plan, bar)->layer, 0,
+               "the fullscreen ceiling caps participant-owned layer intent");
+
+    reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN, 0);
+    reach_layout_resolve(&layout, &plan);
+    expect_int(entry_for(&plan, bar)->layer, 150,
+               "clearing fullscreen restores the strongest promotion");
+
+    reach_layout_set_condition(&layout, REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN, 1);
+    reach_layout_set_layer_ceiling(&layout, bar, REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN, 0,
+                                   0);
+    reach_layout_resolve(&layout, &plan);
+    expect_int(entry_for(&plan, bar)->layer, 150,
+               "a participant can opt out of the fullscreen ceiling");
+}
+
 static void test_plan_equality_detects_changes(void)
 {
     reach_layout layout = {};
@@ -327,6 +362,7 @@ int main(void)
     test_tie_break_is_registration_order();
     test_hidden_participants();
     test_layer_zero_resolves_as_exit();
+    test_layer_ceiling_caps_participant_intent();
     test_plan_equality_detects_changes();
     test_registration_limits();
 

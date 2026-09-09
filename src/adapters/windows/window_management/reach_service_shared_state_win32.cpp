@@ -29,6 +29,7 @@ struct reach_shared_reader
     uint64_t last_window_sequence;
     uint64_t last_hotkey_sequence;
     uint64_t last_game_mode_sequence;
+    uint64_t last_fullscreen_sequence;
     uint64_t last_manipulation_sequence;
     reach_service_shared_state cache;
     reach_shared_reader_subscriber subscribers[REACH_SHARED_MAX_SUBSCRIBERS];
@@ -220,6 +221,7 @@ static void reach_shared_reader_set_disconnected(void)
     g_reader.last_window_sequence = 0;
     g_reader.last_hotkey_sequence = 0;
     g_reader.last_game_mode_sequence = 0;
+    g_reader.last_fullscreen_sequence = 0;
     g_reader.last_manipulation_sequence = 0;
     reach_shared_reader_unlock();
 
@@ -243,6 +245,7 @@ static void reach_shared_reader_accept_state(const reach_service_shared_state *s
     int32_t windows_changed = 0;
     int32_t hotkeys_changed = 0;
     int32_t game_mode_changed = 0;
+    int32_t fullscreen_changed = 0;
     int32_t manipulation_changed = 0;
 
     reach_shared_reader_lock();
@@ -254,12 +257,14 @@ static void reach_shared_reader_accept_state(const reach_service_shared_state *s
     windows_changed = state->window_sequence != g_reader.last_window_sequence;
     hotkeys_changed = state->hotkey_sequence != g_reader.last_hotkey_sequence;
     game_mode_changed = state->game_mode_sequence != g_reader.last_game_mode_sequence;
+    fullscreen_changed = state->fullscreen_sequence != g_reader.last_fullscreen_sequence;
     manipulation_changed = state->manipulation_sequence != g_reader.last_manipulation_sequence;
     g_reader.cache = *state;
     g_reader.last_publish_sequence = state->publish_sequence;
     g_reader.last_window_sequence = state->window_sequence;
     g_reader.last_hotkey_sequence = state->hotkey_sequence;
     g_reader.last_game_mode_sequence = state->game_mode_sequence;
+    g_reader.last_fullscreen_sequence = state->fullscreen_sequence;
     g_reader.last_manipulation_sequence = state->manipulation_sequence;
     reach_shared_reader_unlock();
 
@@ -278,6 +283,10 @@ static void reach_shared_reader_accept_state(const reach_service_shared_state *s
     if (game_mode_changed)
     {
         reach_shared_reader_dispatch(REACH_SERVICE_SHARED_EVENT_GAME_MODE_CHANGED);
+    }
+    if (fullscreen_changed)
+    {
+        reach_shared_reader_dispatch(REACH_SERVICE_SHARED_EVENT_FULLSCREEN_CHANGED);
     }
     if (manipulation_changed)
     {
@@ -398,6 +407,7 @@ static void reach_shared_reader_stop_if_unused(void)
     g_reader.last_window_sequence = 0;
     g_reader.last_hotkey_sequence = 0;
     g_reader.last_game_mode_sequence = 0;
+    g_reader.last_fullscreen_sequence = 0;
     g_reader.last_manipulation_sequence = 0;
     reach_shared_reader_unlock();
 }
@@ -553,6 +563,19 @@ reach_result reach_service_shared_copy_game_mode(int32_t *out_active)
 
     reach_shared_reader_lock();
     *out_active = g_reader.cache.game_mode_active ? 1 : 0;
+    reach_shared_reader_unlock();
+    return REACH_OK;
+}
+
+reach_result reach_service_shared_copy_foreground_fullscreen(uint64_t *out_window)
+{
+    if (out_window == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    reach_shared_reader_lock();
+    *out_window = g_reader.cache.foreground_fullscreen_window;
     reach_shared_reader_unlock();
     return REACH_OK;
 }
@@ -827,6 +850,28 @@ reach_result reach_service_shared_publish_game_mode(int32_t active)
     g_writer.view->generation = g_writer.generation;
     g_writer.view->game_mode_active = active;
     ++g_writer.view->game_mode_sequence;
+    reach_shared_writer_end_publish();
+    return REACH_OK;
+}
+
+reach_result reach_service_shared_publish_foreground_fullscreen(uint64_t window)
+{
+    if (g_writer.view == nullptr)
+    {
+        return REACH_ERROR;
+    }
+    if (g_writer.view->foreground_fullscreen_window == window)
+    {
+        return REACH_OK;
+    }
+
+    reach_shared_writer_begin_publish();
+    g_writer.view->version = reach_service_protocol_version();
+    g_writer.view->layout_size = sizeof(reach_service_shared_state);
+    g_writer.view->writer_pid = GetCurrentProcessId();
+    g_writer.view->generation = g_writer.generation;
+    g_writer.view->foreground_fullscreen_window = window;
+    ++g_writer.view->fullscreen_sequence;
     reach_shared_writer_end_publish();
     return REACH_OK;
 }
