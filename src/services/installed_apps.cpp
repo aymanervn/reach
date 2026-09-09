@@ -8,6 +8,8 @@
 #include <new>
 #include <thread>
 
+// WIP: Keep Open and Options backend paths wired while Settings exposes only Uninstall.
+
 struct reach_installed_apps_service
 {
     reach_installed_apps_port port;

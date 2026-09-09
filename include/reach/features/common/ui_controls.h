@@ -37,6 +37,17 @@ extern "C"
         reach_color knob;
     } reach_ui_toggle_style;
 
+    typedef struct reach_ui_segmented_control_style
+    {
+        reach_color track;
+        reach_color selection;
+        reach_color text;
+        reach_color selected_text;
+        float selection_inset;
+        float text_size;
+        int32_t text_weight;
+    } reach_ui_segmented_control_style;
+
     typedef struct reach_ui_textbox_state
     {
         const uint16_t *text;
@@ -68,17 +79,17 @@ extern "C"
                                         const reach_ui_selection_item_style *style,
                                         float selection);
 
-    reach_rect_f32 reach_ui_segmented_selector_item_bounds(reach_rect_f32 bounds, size_t item_count,
-                                                           size_t index);
+    reach_rect_f32 reach_ui_segmented_control_item_bounds(reach_rect_f32 bounds, size_t item_count,
+                                                          size_t index);
 
-    int32_t reach_ui_segmented_selector_index_at(reach_rect_f32 bounds, size_t item_count, float x,
-                                                 float y);
+    int32_t reach_ui_segmented_control_index_at(reach_rect_f32 bounds, size_t item_count, float x,
+                                                float y);
 
-    void reach_ui_segmented_selector_render(reach_render_command_buffer *commands,
-                                            reach_rect_f32 bounds, const uint16_t *const *labels,
-                                            size_t item_count,
-                                            const reach_ui_selection_item_style *style,
-                                            float selection_position);
+    void reach_ui_segmented_control_render(reach_render_command_buffer *commands,
+                                           reach_rect_f32 bounds, const uint16_t *const *labels,
+                                           size_t item_count,
+                                           const reach_ui_segmented_control_style *style,
+                                           float selection_position);
 
     void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                                  const reach_ui_selection_item_style *style, float selection,

@@ -80,7 +80,7 @@ extern "C"
         REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE,
         REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE,
         REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE,
-        REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE,
+        REACH_SETTINGS_HIT_DISPLAY_THEME,
         REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME,
         REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE,
@@ -90,8 +90,6 @@ extern "C"
         REACH_SETTINGS_HIT_STARTUP_TOGGLE,
         REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK,
         REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB,
-        REACH_SETTINGS_HIT_APPLICATION_OPEN,
-        REACH_SETTINGS_HIT_APPLICATION_MANAGE,
         REACH_SETTINGS_HIT_APPLICATION_UNINSTALL,
         REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_TRACK,
         REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_THUMB,
@@ -394,8 +392,6 @@ extern "C"
         reach_rect_f32 installed_apps_scrollbar_track;
         reach_rect_f32 installed_apps_scrollbar_thumb;
         reach_rect_f32 installed_app_rows[REACH_INSTALLED_APP_MAX_ENTRIES];
-        reach_rect_f32 installed_app_open_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
-        reach_rect_f32 installed_app_manage_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
         reach_rect_f32 installed_app_uninstall_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
         size_t installed_app_row_count;
         float installed_apps_content_height;
@@ -413,7 +409,7 @@ extern "C"
         reach_rect_f32 display_theme_icon;
         reach_rect_f32 display_theme_title;
         reach_rect_f32 display_theme_subtitle;
-        reach_rect_f32 display_theme_toggle;
+        reach_rect_f32 display_theme_selector;
         reach_rect_f32 display_windows_section_title;
         reach_rect_f32 display_windows_system_card;
         reach_rect_f32 display_windows_system_title;
@@ -511,6 +507,7 @@ extern "C"
         size_t account_field;
         size_t startup_index;
         size_t installed_app_index;
+        int32_t display_light_theme;
         reach_config_theme_preference display_theme_preference;
         reach_config_top_bar_style top_bar_style;
         size_t wifi_index;
@@ -617,7 +614,7 @@ extern "C"
     int32_t reach_settings_model_toggle_bundled_font(reach_settings_model *model);
     void reach_settings_model_set_light_theme(reach_settings_model *model, int32_t enabled);
     int32_t reach_settings_model_light_theme(const reach_settings_model *model);
-    int32_t reach_settings_model_toggle_light_theme(reach_settings_model *model);
+    int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int32_t enabled);
     void reach_settings_model_set_windows_system_theme(reach_settings_model *model,
                                                        reach_config_theme_preference preference);
     reach_config_theme_preference

@@ -321,16 +321,22 @@ static void reach_settings_layout_toggle_card(const reach_settings_toggle_card_r
 
 static void reach_settings_layout_selector_card(reach_rect_f32 *card, reach_rect_f32 *title,
                                                 reach_rect_f32 *subtitle, reach_rect_f32 *selector,
-                                                float x, float y, float width, float height,
-                                                float scale)
+                                                reach_rect_f32 *icon, float x, float y, float width,
+                                                float height, float selector_width_dp, float scale)
 {
     *card = reach_settings_rect(x, y, width, height);
-    float selector_height = 28.0f * scale;
+    float selector_height = 32.0f * scale;
+    float icon_box = 34.0f * scale;
     if (width >= REACH_SETTINGS_SELECTOR_WIDE_WIDTH * scale)
     {
-        float selector_width = REACH_SETTINGS_SELECTOR_WIDTH * scale;
+        float selector_width = selector_width_dp * scale;
         float selector_x = x + width - 16.0f * scale - selector_width;
         float text_x = x + 18.0f * scale;
+        if (icon != nullptr)
+        {
+            *icon = reach_settings_rect(text_x, y + (height - icon_box) * 0.5f, icon_box, icon_box);
+            text_x += icon_box + 14.0f * scale;
+        }
         *title = reach_settings_rect(text_x, y + 15.0f * scale, selector_x - text_x - 16.0f * scale,
                                      20.0f * scale);
         *subtitle = reach_settings_rect(text_x, y + 37.0f * scale,
@@ -341,10 +347,16 @@ static void reach_settings_layout_selector_card(reach_rect_f32 *card, reach_rect
     }
 
     float text_x = x + 16.0f * scale;
-    *title = reach_settings_rect(text_x, y + 11.0f * scale, width - 32.0f * scale, 20.0f * scale);
-    *subtitle =
-        reach_settings_rect(text_x, y + 31.0f * scale, width - 32.0f * scale, 16.0f * scale);
-    *selector = reach_settings_rect(text_x, y + height - selector_height - 10.0f * scale,
+    if (icon != nullptr)
+    {
+        *icon = reach_settings_rect(text_x, y + 11.0f * scale, icon_box, icon_box);
+        text_x += icon_box + 14.0f * scale;
+    }
+    float text_width = x + width - 16.0f * scale - text_x;
+    *title = reach_settings_rect(text_x, y + 11.0f * scale, text_width, 20.0f * scale);
+    *subtitle = reach_settings_rect(text_x, y + 31.0f * scale, text_width, 16.0f * scale);
+    *selector = reach_settings_rect(x + 16.0f * scale,
+                                    y + height - selector_height - 10.0f * scale,
                                     width - 32.0f * scale, selector_height);
 }
 
@@ -659,11 +671,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
 
         float row_height = 64.0f * scale;
         float row_gap = 8.0f * scale;
-        float button_height = 30.0f * scale;
-        float button_gap = 8.0f * scale;
-        float uninstall_width = 78.0f * scale;
-        float manage_width = 68.0f * scale;
-        float open_width = 56.0f * scale;
+        float uninstall_height = 32.0f * scale;
+        float uninstall_width = 88.0f * scale;
         float content_y = 0.0f;
         layout.installed_app_row_count =
             model->installed_apps.count < REACH_INSTALLED_APP_MAX_ENTRIES
@@ -680,18 +689,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                           layout.installed_app_rows[index].width - 14.0f * scale;
             layout.installed_app_uninstall_buttons[index] = reach_settings_rect(
                 right - uninstall_width,
-                layout.installed_app_rows[index].y + (row_height - button_height) * 0.5f,
-                uninstall_width, button_height);
-            right -= uninstall_width + button_gap;
-            layout.installed_app_manage_buttons[index] = reach_settings_rect(
-                right - manage_width,
-                layout.installed_app_rows[index].y + (row_height - button_height) * 0.5f,
-                manage_width, button_height);
-            right -= manage_width + button_gap;
-            layout.installed_app_open_buttons[index] = reach_settings_rect(
-                right - open_width,
-                layout.installed_app_rows[index].y + (row_height - button_height) * 0.5f,
-                open_width, button_height);
+                layout.installed_app_rows[index].y + (row_height - uninstall_height) * 0.5f,
+                uninstall_width, uninstall_height);
             content_y += row_height + row_gap;
         }
         float base_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
@@ -723,8 +722,6 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
              &layout.display_fps_subtitle, &layout.display_fps_toggle},
             {&layout.display_font_card, &layout.display_font_icon, &layout.display_font_title,
              &layout.display_font_subtitle, &layout.display_font_toggle},
-            {&layout.display_theme_card, &layout.display_theme_icon, &layout.display_theme_title,
-             &layout.display_theme_subtitle, &layout.display_theme_toggle},
         };
         for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
         {
@@ -733,7 +730,17 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                               area_width, card_height, scale);
         }
 
-        float section_y = area_y + 3.0f * card_height + 2.0f * card_spacing + 18.0f * scale;
+        float theme_card_y = area_y + 2.0f * (card_height + card_spacing);
+        float theme_card_height = area_width >= REACH_SETTINGS_SELECTOR_WIDE_WIDTH * scale
+                                      ? card_height
+                                      : 104.0f * scale;
+        reach_settings_layout_selector_card(
+            &layout.display_theme_card, &layout.display_theme_title,
+            &layout.display_theme_subtitle, &layout.display_theme_selector,
+            &layout.display_theme_icon, area_x, theme_card_y, area_width, theme_card_height, 176.0f,
+            scale);
+
+        float section_y = theme_card_y + theme_card_height + 18.0f * scale;
         layout.display_windows_section_title =
             reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
         float appearance_y = section_y + 26.0f * scale;
@@ -743,12 +750,13 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_layout_selector_card(
             &layout.display_windows_system_card, &layout.display_windows_system_title,
             &layout.display_windows_system_subtitle, &layout.display_windows_system_selector,
-            area_x, appearance_y, area_width, appearance_card_height, scale);
+            nullptr, area_x, appearance_y, area_width, appearance_card_height,
+            REACH_SETTINGS_SELECTOR_WIDTH, scale);
         reach_settings_layout_selector_card(
             &layout.display_windows_app_card, &layout.display_windows_app_title,
-            &layout.display_windows_app_subtitle, &layout.display_windows_app_selector, area_x,
-            appearance_y + appearance_card_height + card_spacing, area_width,
-            appearance_card_height, scale);
+            &layout.display_windows_app_subtitle, &layout.display_windows_app_selector, nullptr,
+            area_x, appearance_y + appearance_card_height + card_spacing, area_width,
+            appearance_card_height, REACH_SETTINGS_SELECTOR_WIDTH, scale);
 
         float desktop_section_y =
             appearance_y + 2.0f * appearance_card_height + card_spacing + 18.0f * scale;
@@ -757,8 +765,9 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         float desktop_y = desktop_section_y + 26.0f * scale;
         reach_settings_layout_selector_card(&layout.top_bar_style_card, &layout.top_bar_style_title,
                                             &layout.top_bar_style_subtitle,
-                                            &layout.top_bar_style_selector, area_x, desktop_y,
-                                            area_width, appearance_card_height, scale);
+                                            &layout.top_bar_style_selector, nullptr, area_x,
+                                            desktop_y, area_width, appearance_card_height,
+                                            REACH_SETTINGS_SELECTOR_WIDTH, scale);
         reach_settings_toggle_card_rects auto_hide = {
             &layout.top_bar_auto_hide_card, nullptr, &layout.top_bar_auto_hide_title,
             &layout.top_bar_auto_hide_subtitle, &layout.top_bar_auto_hide_toggle};
@@ -1026,8 +1035,6 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
          REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE},
         {layout->display_font_card, layout->display_font_toggle,
          REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE},
-        {layout->display_theme_card, layout->display_theme_toggle,
-         REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE},
     };
     for (size_t index = 0; index < sizeof(display_cards) / sizeof(display_cards[0]); ++index)
     {
@@ -1039,6 +1046,14 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             return result;
         }
     }
+    int32_t option =
+        reach_ui_segmented_control_index_at(layout->display_theme_selector, 2, x, y);
+    if (option >= 0)
+    {
+        result.type = REACH_SETTINGS_HIT_DISPLAY_THEME;
+        result.display_light_theme = option == 1;
+        return result;
+    }
     if (layout->top_bar_auto_hide_toggle.width > 0.0f &&
         (reach_settings_rect_contains(layout->top_bar_auto_hide_toggle, x, y) ||
          reach_settings_rect_contains(layout->top_bar_auto_hide_card, x, y)))
@@ -1047,24 +1062,24 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         return result;
     }
 
-    int32_t option = reach_ui_segmented_selector_index_at(layout->top_bar_style_selector,
-                                                          REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y);
+    option = reach_ui_segmented_control_index_at(layout->top_bar_style_selector,
+                                                 REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y);
     if (option >= 0)
     {
         result.type = REACH_SETTINGS_HIT_TOP_BAR_STYLE;
         result.top_bar_style = (reach_config_top_bar_style)option;
         return result;
     }
-    option = reach_ui_segmented_selector_index_at(layout->display_windows_system_selector,
-                                                  REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y);
+    option = reach_ui_segmented_control_index_at(layout->display_windows_system_selector,
+                                                 REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y);
     if (option >= 0)
     {
         result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME;
         result.display_theme_preference = (reach_config_theme_preference)option;
         return result;
     }
-    option = reach_ui_segmented_selector_index_at(layout->display_windows_app_selector,
-                                                  REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y);
+    option = reach_ui_segmented_control_index_at(layout->display_windows_app_selector,
+                                                 REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y);
     if (option >= 0)
     {
         result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME;
@@ -1128,18 +1143,6 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
     {
         for (size_t index = 0; index < layout->installed_app_row_count; ++index)
         {
-            if (reach_settings_rect_contains(layout->installed_app_open_buttons[index], x, y))
-            {
-                result.type = REACH_SETTINGS_HIT_APPLICATION_OPEN;
-                result.installed_app_index = index;
-                return result;
-            }
-            if (reach_settings_rect_contains(layout->installed_app_manage_buttons[index], x, y))
-            {
-                result.type = REACH_SETTINGS_HIT_APPLICATION_MANAGE;
-                result.installed_app_index = index;
-                return result;
-            }
             if (reach_settings_rect_contains(layout->installed_app_uninstall_buttons[index], x, y))
             {
                 result.type = REACH_SETTINGS_HIT_APPLICATION_UNINSTALL;

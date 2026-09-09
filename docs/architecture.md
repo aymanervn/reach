@@ -887,10 +887,11 @@ AppUserModelID through search results and feature targets. The standalone Settin
 through `reach_installed_apps_service`, whose worker retains only packaged entries for which the
 Shell publishes an uninstall verb, thereby excluding desktop launchers and non-removable Windows
 components while preserving user-manageable packages. The worker serializes refresh, open,
-uninstall, and management commands and publishes snapshots to the UI tick. Current-user packaged
-uninstall uses the OS PackageManager API. Repair and reset are not reimplemented: the Applications
-page opens the package's Windows Advanced options page, because Settings-equivalent direct repair
-belongs to the Windows App SDK PackageDeploymentManager and Reach does not deploy that runtime.
+uninstall, and management commands and publishes snapshots to the UI tick. The Applications page
+currently exposes only uninstall; its Open and Options backend paths remain wired as WIP for later
+restoration. Current-user packaged uninstall uses the OS PackageManager API. Repair and reset are
+not reimplemented because Settings-equivalent direct repair belongs to the Windows App SDK
+PackageDeploymentManager and Reach does not deploy that runtime.
 
 ## tools
 
