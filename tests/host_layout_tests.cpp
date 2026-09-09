@@ -64,6 +64,7 @@ static size_t thumbnail_place_count;
 static size_t thumbnail_background_place_count;
 static float thumbnail_background_alpha;
 static size_t thumbnail_destroy_count;
+static size_t thumbnail_release_count;
 static reach_window_id thumbnail_unavailable_source;
 static reach_result thumbnail_placement_result = REACH_OK;
 static int32_t captured_release_active;
@@ -296,6 +297,18 @@ static reach_result fake_thumbnail_destroy_all(reach_window_thumbnails *thumbnai
 {
     (void)thumbnails;
     thumbnail_destroy_count++;
+    return REACH_OK;
+}
+
+static reach_result fake_thumbnail_release(reach_window_thumbnails *thumbnails,
+                                           reach_window_thumbnail_id id)
+{
+    (void)thumbnails;
+    if (id == REACH_WINDOW_THUMBNAIL_NONE)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    thumbnail_release_count++;
     return REACH_OK;
 }
 
@@ -1158,6 +1171,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     host->window_thumbnails.ops.set_target = fake_thumbnail_set_target;
     host->window_thumbnails.ops.create = fake_thumbnail_create;
     host->window_thumbnails.ops.set_placement = fake_thumbnail_set_placement;
+    host->window_thumbnails.ops.release = fake_thumbnail_release;
     host->window_thumbnails.ops.destroy_all = fake_thumbnail_destroy_all;
 
     thumbnail_create_count = 0;
@@ -1167,6 +1181,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     thumbnail_background_place_count = 0;
     thumbnail_background_alpha = 0.0f;
     thumbnail_destroy_count = 0;
+    thumbnail_release_count = 0;
     observed_bounds = {};
     reach_host_frame_context frame = {};
     frame.monitor_bounds = monitor;
@@ -1182,27 +1197,51 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     expect_true(thumbnail_background_place_count == 1 && thumbnail_background_alpha == 1.0f,
                 "Desktop lower plane carries one fully opaque Stage background");
 
-    thumbnail_unavailable_source = 42;
+    reach_stage_open_window joined[3] = {windows[0], {}, windows[1]};
+    joined[1].window = 126;
+    joined[1].label = label;
+    joined[1].frame = {300.0f, 200.0f, 900.0f, 700.0f};
+    thumbnail_unavailable_source = 126;
     expect_true(
         reach_stage_update_windows(
-            reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE), &windows[1], 1),
-        "a closed source starts a Stage reflow");
+            reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE), joined, 3),
+        "a new source starts a Stage reflow");
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
-                "a disappearing native thumbnail does not abort the Stage frame");
+                "an unavailable new thumbnail does not abort the Stage frame");
     expect_true(reach_host_surface_presented(stage),
-                "Stage remains presented while the closed source departs");
+                "Stage remains presented while the new source becomes available");
+    expect_true(thumbnail_create_count == 2 && thumbnail_behind_plane_create_count == 1 &&
+                    thumbnail_destroy_count == 0,
+                "joining a source preserves every existing native relationship");
+    thumbnail_unavailable_source = 0;
+    reach_feature_tick_result tick = {};
+    stage->definition->capsule_ops->tick(stage->capsule, 0.016, &tick);
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "the unavailable relationship is retried on the next frame");
+    expect_true(thumbnail_create_count == 3 && thumbnail_behind_plane_create_count == 1,
+                "the retry adds only the new app relationship");
+
     thumbnail_placement_result = REACH_ERROR;
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "a transient native placement failure does not abort an animated Stage frame");
     thumbnail_placement_result = REACH_OK;
-    reach_feature_tick_result tick = {};
+
+    reach_stage_open_window remaining[2] = {joined[1], joined[2]};
+    expect_true(
+        reach_stage_update_windows(
+            reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE), remaining, 2),
+        "a closed source starts a Stage reflow");
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "the departing source keeps its relationship through the transition");
     stage->definition->capsule_ops->tick(stage->capsule, 1.0, &tick);
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "Stage presents the settled layout after the source departs");
     expect_true(reach_stage_thumbnail_count(
-                    reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)) == 1,
+                    reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)) == 2,
                 "the closed source is removed after its reflow");
-    thumbnail_unavailable_source = 0;
+    expect_true(thumbnail_create_count == 3 && thumbnail_behind_plane_create_count == 1 &&
+                    thumbnail_release_count == 1 && thumbnail_destroy_count == 0,
+                "settling the reflow releases only the departed app relationship");
 
     size_t destroys_before_close = thumbnail_destroy_count;
     reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));

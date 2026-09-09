@@ -196,7 +196,10 @@ void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *
     for (size_t index = 0; index < REACH_SURFACE_NATIVE_OVERLAY_CAPACITY; ++index)
     {
         desc->native_overlay_ids[index] = REACH_WINDOW_THUMBNAIL_NONE;
+        desc->native_overlay_sources[index] = 0;
+        desc->native_overlay_planes[index] = REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
     }
+    desc->native_overlay_target = 0;
     desc->native_overlay_registered = 0;
     if (host->window_thumbnails.ops.destroy_all != nullptr)
     {
@@ -204,23 +207,40 @@ void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *
     }
 }
 
-static void reach_host_register_native_overlay(reach_host *host, reach_feature_runtime *desc,
-                                               const reach_feature_native_overlay_ops *ops)
+static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_runtime *desc,
+                                                const reach_feature_native_overlay_ops *ops)
 {
     if (host->window_thumbnails.ops.create == nullptr ||
+        host->window_thumbnails.ops.release == nullptr ||
         host->window_thumbnails.ops.set_target == nullptr ||
         desc->surface->window.ops.native_id == nullptr)
     {
         return;
     }
 
-    reach_host_release_native_overlay(host, desc);
-    desc->native_overlay_generation = ops->generation(desc->capsule);
     reach_window_id target = desc->surface->window.ops.native_id(desc->surface->window.window);
+    if (desc->native_overlay_registered && desc->native_overlay_target != target)
+    {
+        reach_host_release_native_overlay(host, desc);
+    }
     if (target == 0 || host->window_thumbnails.ops.set_target(host->window_thumbnails.thumbnails,
                                                               target) != REACH_OK)
     {
         return;
+    }
+
+    reach_window_thumbnail_id previous_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY] = {};
+    reach_window_id previous_sources[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY] = {};
+    reach_window_thumbnail_plane previous_planes[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY] = {};
+    int32_t previous_used[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY] = {};
+    for (size_t index = 0; index < REACH_SURFACE_NATIVE_OVERLAY_CAPACITY; ++index)
+    {
+        previous_ids[index] = desc->native_overlay_ids[index];
+        previous_sources[index] = desc->native_overlay_sources[index];
+        previous_planes[index] = desc->native_overlay_planes[index];
+        desc->native_overlay_ids[index] = REACH_WINDOW_THUMBNAIL_NONE;
+        desc->native_overlay_sources[index] = 0;
+        desc->native_overlay_planes[index] = REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
     }
 
     size_t count = ops->count(desc->capsule);
@@ -228,23 +248,57 @@ static void reach_host_register_native_overlay(reach_host *host, reach_feature_r
     {
         count = REACH_SURFACE_NATIVE_OVERLAY_CAPACITY;
     }
+    const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    for (size_t index = 0; index < count; ++index)
+    {
+        reach_feature_native_overlay_item item = {};
+        if (ops->item(desc->capsule, index, theme, &item) != REACH_OK)
+        {
+            continue;
+        }
+        desc->native_overlay_sources[index] = item.source;
+        desc->native_overlay_planes[index] = item.plane;
+        for (size_t previous = 0; previous < REACH_SURFACE_NATIVE_OVERLAY_CAPACITY; ++previous)
+        {
+            if (!previous_used[previous] && previous_ids[previous] != REACH_WINDOW_THUMBNAIL_NONE &&
+                previous_sources[previous] == item.source &&
+                previous_planes[previous] == item.plane)
+            {
+                desc->native_overlay_ids[index] = previous_ids[previous];
+                previous_used[previous] = 1;
+                break;
+            }
+        }
+    }
+
+    for (size_t index = 0; index < REACH_SURFACE_NATIVE_OVERLAY_CAPACITY; ++index)
+    {
+        if (!previous_used[index] && previous_ids[index] != REACH_WINDOW_THUMBNAIL_NONE)
+        {
+            (void)host->window_thumbnails.ops.release(host->window_thumbnails.thumbnails,
+                                                      previous_ids[index]);
+        }
+    }
+
     for (size_t index = count; index > 0; --index)
     {
         size_t item_index = index - 1;
-        reach_feature_native_overlay_item item = {};
-        const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
-        if (ops->item(desc->capsule, item_index, theme, &item) != REACH_OK)
+        if (desc->native_overlay_sources[item_index] == 0 ||
+            desc->native_overlay_ids[item_index] != REACH_WINDOW_THUMBNAIL_NONE)
         {
             continue;
         }
         reach_window_thumbnail_id id = REACH_WINDOW_THUMBNAIL_NONE;
-        if (host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails, item.source,
-                                               item.plane, &id) == REACH_OK)
+        if (host->window_thumbnails.ops.create(
+                host->window_thumbnails.thumbnails, desc->native_overlay_sources[item_index],
+                desc->native_overlay_planes[item_index], &id) == REACH_OK)
         {
             desc->native_overlay_ids[item_index] = id;
-            desc->native_overlay_registered = 1;
         }
     }
+    desc->native_overlay_target = target;
+    desc->native_overlay_generation = ops->generation(desc->capsule);
+    desc->native_overlay_registered = 1;
 }
 
 static reach_result reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
@@ -259,7 +313,7 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
     if (!desc->native_overlay_registered ||
         desc->native_overlay_generation != ops->generation(desc->capsule))
     {
-        reach_host_register_native_overlay(host, desc, ops);
+        reach_host_reconcile_native_overlay(host, desc, ops);
     }
 
     size_t count = ops->count(desc->capsule);

@@ -455,6 +455,41 @@ static reach_result reach_window_thumbnail_destroy_all(reach_window_thumbnails *
     return REACH_OK;
 }
 
+static reach_result reach_window_thumbnail_release(reach_window_thumbnails *thumbnails,
+                                                   reach_window_thumbnail_id id)
+{
+    if (thumbnails == nullptr || id == REACH_WINDOW_THUMBNAIL_NONE)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    for (size_t index = 0; index < thumbnails->entry_count; ++index)
+    {
+        if (thumbnails->entries[index].id != id)
+        {
+            continue;
+        }
+
+        reach_window_thumbnail_release_entry(&thumbnails->entries[index]);
+        size_t last = thumbnails->entry_count - 1;
+        if (index != last)
+        {
+            thumbnails->entries[index] = thumbnails->entries[last];
+            reach_window_thumbnail_entry *moved = &thumbnails->entries[index];
+            if (moved->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET &&
+                moved->destination != nullptr)
+            {
+                SetWindowLongPtrW(moved->destination, GWLP_USERDATA,
+                                  reinterpret_cast<LONG_PTR>(moved));
+            }
+        }
+        thumbnails->entries[last] = {};
+        thumbnails->entry_count--;
+        return REACH_OK;
+    }
+    return REACH_INVALID_ARGUMENT;
+}
+
 static void reach_window_thumbnail_destroy(reach_window_thumbnails *thumbnails)
 {
     if (thumbnails == nullptr)
@@ -495,6 +530,7 @@ reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port 
     out_port->ops.set_target = reach_window_thumbnail_set_target;
     out_port->ops.create = reach_window_thumbnail_create;
     out_port->ops.set_placement = reach_window_thumbnail_set_placement;
+    out_port->ops.release = reach_window_thumbnail_release;
     out_port->ops.destroy_all = reach_window_thumbnail_destroy_all;
     out_port->ops.destroy = reach_window_thumbnail_destroy;
     return REACH_OK;

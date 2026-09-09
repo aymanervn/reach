@@ -48,6 +48,8 @@ extern "C"
                                       reach_window_thumbnail_id id,
                                       const reach_window_thumbnail_placement *placement);
 
+        reach_result (*release)(reach_window_thumbnails *thumbnails, reach_window_thumbnail_id id);
+
         reach_result (*destroy_all)(reach_window_thumbnails *thumbnails);
 
         void (*destroy)(reach_window_thumbnails *thumbnails);

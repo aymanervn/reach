@@ -380,6 +380,9 @@ typedef struct reach_feature_runtime
     int32_t resolved_bounds_valid;
     int32_t yield_topmost_to_foreground_fullscreen;
     reach_window_thumbnail_id native_overlay_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
+    reach_window_id native_overlay_sources[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
+    reach_window_thumbnail_plane native_overlay_planes[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
+    reach_window_id native_overlay_target;
     size_t native_overlay_generation;
     int32_t native_overlay_registered;
     int32_t presentation_visible;
