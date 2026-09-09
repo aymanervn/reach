@@ -446,6 +446,34 @@ static void reach_settings_save_display_config(reach_settings_app *app)
     (void)reach_config_service_set_display(app->config_service, &settings);
 }
 
+static void reach_settings_load_top_bar_config(reach_settings_app *app)
+{
+    if (app == nullptr || app->config_service == nullptr)
+    {
+        return;
+    }
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
+    if (snapshot == nullptr ||
+        reach_config_service_snapshot(app->config_service, snapshot.get()) != REACH_OK)
+    {
+        return;
+    }
+    reach_settings_model_set_top_bar_style(&app->model, snapshot->top_bar_style);
+    reach_settings_model_set_top_bar_mode(&app->model, snapshot->top_bar_mode);
+}
+
+static void reach_settings_save_top_bar_config(reach_settings_app *app)
+{
+    if (app == nullptr || app->config_service == nullptr)
+    {
+        return;
+    }
+    reach_config_top_bar_settings settings = {};
+    settings.style = reach_settings_model_top_bar_style(&app->model);
+    settings.mode = reach_settings_model_top_bar_mode(&app->model);
+    (void)reach_config_service_set_top_bar(app->config_service, &settings);
+}
+
 static void reach_settings_on_config_service_event(void *, reach_config_service_event event)
 {
     if (event == REACH_CONFIG_SERVICE_PERSISTED)
@@ -2132,7 +2160,19 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_DISPLAY)
     {
-        if (hit.type == REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE)
+        if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_UNIFIED_TOGGLE)
+        {
+            (void)reach_settings_model_toggle_top_bar_style(&app->model);
+            reach_settings_save_top_bar_config(app);
+            app->dirty = 1;
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_STATIC_TOGGLE)
+        {
+            (void)reach_settings_model_toggle_top_bar_mode(&app->model);
+            reach_settings_save_top_bar_config(app);
+            app->dirty = 1;
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE)
         {
             (void)reach_settings_model_toggle_high_refresh_rate(&app->model);
             reach_settings_save_display_config(app);
@@ -2641,6 +2681,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     {
         reach_settings_load_power_config(app);
         reach_settings_load_display_config(app);
+        reach_settings_load_top_bar_config(app);
     }
 
     app->bounds = reach_settings_default_bounds(app);
@@ -2793,6 +2834,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    if (reach_settings_model_tick_top_bar_animations(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
     if (app->dirty)
     {
         reach_settings_refresh_bounds(app);
@@ -2858,6 +2903,7 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_button_press_active(&app->model) ||
            reach_settings_model_nav_selection_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
+           reach_settings_model_top_bar_animations_active(&app->model) ||
            app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||
            app->model.wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE ||
            app->radio_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||

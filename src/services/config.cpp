@@ -27,6 +27,7 @@ enum reach_config_operation_type
     REACH_CONFIG_OPERATION_MOVE_PIN,
     REACH_CONFIG_OPERATION_SET_POWER,
     REACH_CONFIG_OPERATION_SET_DISPLAY,
+    REACH_CONFIG_OPERATION_SET_TOP_BAR,
     REACH_CONFIG_OPERATION_SET_WALLPAPERS,
     REACH_CONFIG_OPERATION_SET_MONITOR_WALLPAPER
 };
@@ -39,6 +40,7 @@ struct reach_config_operation
     uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
     reach_config_power_settings power;
     reach_config_display_settings display;
+    reach_config_top_bar_settings top_bar;
     uint32_t pin_id;
     size_t target_index;
     size_t monitor_count;
@@ -119,6 +121,12 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         snapshot->light_theme = operation->display.light_theme;
         snapshot->windows_system_theme = operation->display.windows_system_theme;
         snapshot->windows_app_theme = operation->display.windows_app_theme;
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_SET_TOP_BAR:
+        *out_changed = snapshot->top_bar_style != operation->top_bar.style ||
+                       snapshot->top_bar_mode != operation->top_bar.mode;
+        snapshot->top_bar_style = operation->top_bar.style;
+        snapshot->top_bar_mode = operation->top_bar.mode;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_WALLPAPERS:
         *out_changed = !reach_path_equals(snapshot->wallpaper_path, operation->path);
@@ -634,6 +642,22 @@ reach_result reach_config_service_set_display(reach_config_service *service,
     reach_config_operation operation = {};
     operation.type = REACH_CONFIG_OPERATION_SET_DISPLAY;
     operation.display = *settings;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_set_top_bar(reach_config_service *service,
+                                              const reach_config_top_bar_settings *settings)
+{
+    if (settings == nullptr || settings->style < REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED ||
+        settings->style > REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ||
+        settings->mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
+        settings->mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_SET_TOP_BAR;
+    operation.top_bar = *settings;
     return reach_config_service_commit(service, &operation);
 }
 

@@ -503,17 +503,29 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     const reach_top_bar_state *state = &top_bar->state;
     const reach_top_bar_layout *layout = &state->layout;
 
-    for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
+    if (state->style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED)
     {
-        if (!layout->pill_visible[index] || index == REACH_TOP_BAR_PILL_TRAY)
-        {
-            continue;
-        }
         result = reach_top_bar_push_pill_background(
-            ctx->theme, out_commands, reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
+            ctx->theme, out_commands, reach_top_bar_background_bounds(top_bar), ctx->dpi_scale);
         if (result != REACH_OK)
         {
             return result;
+        }
+    }
+    else
+    {
+        for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
+        {
+            if (!layout->pill_visible[index] || index == REACH_TOP_BAR_PILL_TRAY)
+            {
+                continue;
+            }
+            result = reach_top_bar_push_pill_background(
+                ctx->theme, out_commands, reach_top_bar_render_pill(layout, index), ctx->dpi_scale);
+            if (result != REACH_OK)
+            {
+                return result;
+            }
         }
     }
 

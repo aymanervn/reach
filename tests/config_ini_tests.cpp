@@ -34,9 +34,13 @@ int main()
     failed += expect(snapshot->light_theme == 0);
     failed += expect(snapshot->windows_system_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
     failed += expect(snapshot->windows_app_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
+    failed += expect(snapshot->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED);
+    failed += expect(snapshot->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC);
 
     std::memset(snapshot.get(), 0, sizeof(*snapshot));
     snapshot->dock_height = 58.0f;
+    snapshot->top_bar_style = REACH_CONFIG_TOP_BAR_STYLE_UNIFIED;
+    snapshot->top_bar_mode = REACH_CONFIG_TOP_BAR_MODE_STATIC;
     snapshot->power_screen_off_minutes = 9;
     snapshot->power_sleep_minutes = 21;
     snapshot->power_lock_minutes = 7;
@@ -65,6 +69,8 @@ int main()
 
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
     failed += expect(loaded->dock_height == 58.0f);
+    failed += expect(loaded->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED);
+    failed += expect(loaded->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
     failed += expect(loaded->power_sleep_minutes == 21);
     failed += expect(loaded->stage_animation_ms == 345);
     failed += expect(loaded->windows_system_theme == REACH_CONFIG_THEME_LIGHT);

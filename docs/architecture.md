@@ -316,7 +316,9 @@ is a `shell:` location or a filesystem path.
 **Accepted coupling (by design — do not “fix”):** the top bar cluster. The top
 bar hosts the tray / quick-settings / power buttons, so its private tray overflow UI and the
 other popup features may take the top bar layout directly; no anchor indirection is wanted
-between them. Now Playing is not a
+between them. Segmented and unified top-bar styles are two chrome treatments over that same
+capsule, layout, control set, and action routing: the style changes background and input-region
+composition without duplicating controls. Now Playing is not a
 separate feature: its private UI subfeature lives inside the top bar and consumes
 the shared Now Playing service, leaving room for a future standalone music feature
 to consume the same stable service independently. It renders one bold line and
@@ -387,8 +389,13 @@ its worker thread because activate/minimize/close can block on another process,
 while a push that misses its frame is worse than useless. They also work in the
 outer window rect the OS repositions, never the DWM `frame_bounds` the rest of
 the shell measures with; mixing the two drifts by the invisible resize border.
-The work area is deliberately left alone: changing it costs ~37 ms per call,
-which no per-frame path can afford.
+Dynamic mode deliberately leaves the work area alone: changing it costs ~37 ms per call,
+which no animation-frame path can afford. Static mode disables reveal and window push, keeps the
+bar shown, and publishes work-area reservation intent with its surface geometry. The generic frame
+path derives the reservation from the resolved bar bounds and current layout monitor, mirroring the
+bar's inset from its reserved screen edge after the bar's far edge. The monitor adapter caches the
+applied geometry, changes the OS work area only when that state changes, and reconciles visible
+maximized windows on the affected monitor while preserving their normal restore bounds.
 
 Every popup gets its bounds and its notch from one place —
 `reach_popup_place(anchor, width, height, margin)` in `features/popup`. It
@@ -412,13 +419,16 @@ definition `bar_reveal` spec and feature-owned `reach_bar_reveal_ops`. The spec
 declaratively supplies dynamic edge-reveal and active-layer policy; the capsule
 names its own edge and caches whether a tracked app intersects the protected band
 returned by `reach_bar_protected_band`. The symmetric policy band reaches from the
-screen edge through the bar's content bounds and its rendered shadow extent. The
-shadow clearance comes from the theme's resolved per-monitor DPI geometry rather
-than an independent policy constant. `window_tracking` supplies the one outer-bounds
-trespass query used by both bars. The resulting hide policy is the
-same even though reveal presentation differs: the top bar rests in the app band
-and uses `reach_bar_reveal_ops.position_frame` to push trespassing windows, while
-the permanently-topmost Dock reveals over them without a side effect. A single
+screen edge through the bar's content bounds and its protected clearance. A bar can
+declare that clearance in DP when policy should not follow a large rendered shadow;
+the top bar declares 18dp, while the Dock retains the theme's resolved per-monitor
+shadow extent as its default. `window_tracking` supplies the one outer-bounds trespass
+query used by both bars. The resulting hide policy is the same even though reveal
+presentation differs: the dynamic top bar rests in the app band and uses
+`reach_bar_reveal_ops.position_frame` to push trespassing windows, while the
+permanently-topmost Dock reveals over them without a side effect. Static top-bar mode
+bypasses the visibility state machine, pointer observation, edge hotspot, and window
+push, and holds the surface in the active topmost layer. A single
 screen-hotspot factory creates every
 definition-declared edge reveal. Fixed triggers declare an anchor and DP size;
 Stage is a normally enabled 4dp top-left square. Animated bars publish managed
@@ -617,6 +627,16 @@ path: its capsule owns width animation, presentation, arranged bounds, and geome
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved
 bounds receives the remaining rectangle through the generic surface context; Stage uses this
 contract after Dock and top bar arrangement rather than reading either feature directly.
+Separately, a surface can publish `manage_monitor_work_area` and
+`reserve_monitor_work_area` in its resolved geometry. Composition maps the definition's
+reservation edge and resolved bounds to the monitor port's generic
+`set_work_area` operation. The reserved edge gap mirrors the surface's own screen-edge inset. The
+Windows monitor adapter uses `SPI_SETWORKAREA` with change broadcasting, caches identical writes,
+reconciles visible maximized windows on the affected monitor without changing their normal restore
+bounds, and restores full monitor bounds when the surface is hidden, enters game-mode suppression,
+returns to dynamic mode, or the adapter is destroyed. `reachctl` uses the same port when installation
+repairs monitor work areas. Monitor selection is not configuration here: the reservation follows the
+monitor in the current layout context.
 Clipboard declares Launcher as its anchor and likewise owns relayout, presentation, geometry,
 and command production. There is no named frame fallback: every registered surface runs the
 same frame function, and the architecture checker requires one runtime binding and one
@@ -665,14 +685,13 @@ Game-mode Alt-Tab is one Reach Service window transition: it transfers foregroun
 to the registered shell desktop, requires that handoff to succeed, minimizes the
 game, and then clears the shared cursor clip once. The Reach-owned Progman host
 permits that explicit activation while continuing to reject pointer activation.
-The top bar is the only participant whose layer moves: it rests at 0 and rises to
-130 while its reveal
-transition is live, while a `bar_shown_while_open` surface is open, or while a popup
-holds the bars. Starting that Y animation and reporting the transition are the same
-act, performed by `reach_bar_update_visibility` alone — nothing else may write
-`REACH_TOP_BAR_ANIM_Y`, and nothing may set the bar's layer except the resolve
-reading `reach_bar_visibility_result.reveal_transition_active` into that
-participant's layer intent. Definition-declared edge reveals are participants too,
+The top bar is the only participant whose layer moves: dynamic mode rests at 0 and rises to
+130 while its reveal transition is live, while a `bar_shown_while_open` surface is open, or while a
+popup holds the bars; static mode holds layer 130 continuously. Starting a dynamic Y animation and
+reporting its transition are the same act, performed by `reach_bar_update_visibility` alone. A mode
+change may snap `REACH_TOP_BAR_ANIM_Y` to its shown position while disabling that visibility policy.
+The layer intent is still published generically from resolved capsule geometry and the dynamic
+visibility result. Definition-declared edge reveals are participants too,
 attached to their owning surface runtime but independently visible; the underlying
 screen-hotspot port carries `set_topmost` / `native_id` / `place_behind` so they
 chain and seed like any other participant.

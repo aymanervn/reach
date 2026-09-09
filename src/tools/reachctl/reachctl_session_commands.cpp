@@ -5,6 +5,7 @@
 #include "reachctl_service.h"
 
 #include "reach/platform/shell_registration.h"
+#include "reach/platform/windows_adapters.h"
 
 #include <windows.h>
 #include <shlwapi.h>
@@ -245,103 +246,28 @@ static int32_t reachctl_watchdog_task_is_registered(void)
                                      L"/Query /TN \"ReachWatchdog\"", nullptr) == REACH_OK;
 }
 
-static BOOL CALLBACK reachctl_reset_monitor_work_area_proc(HMONITOR monitor, HDC dc, LPRECT rect,
-                                                           LPARAM param)
-{
-    (void)dc;
-    (void)rect;
-
-    reach_result *result = reinterpret_cast<reach_result *>(param);
-    if (result == nullptr)
-    {
-        return FALSE;
-    }
-
-    MONITORINFO info = {};
-    info.cbSize = sizeof(info);
-    if (!GetMonitorInfoW(monitor, &info))
-    {
-        *result = REACH_ERROR;
-        return TRUE;
-    }
-
-    RECT work_area = info.rcMonitor;
-    if (!SystemParametersInfoW(SPI_SETWORKAREA, 0, &work_area, SPIF_SENDCHANGE))
-    {
-        *result = REACH_ERROR;
-    }
-
-    return TRUE;
-}
-
 static reach_result reachctl_reset_monitor_work_areas(void)
 {
-    reach_result result = REACH_OK;
-    if (!EnumDisplayMonitors(nullptr, nullptr, reachctl_reset_monitor_work_area_proc,
-                             reinterpret_cast<LPARAM>(&result)))
+    reach_monitor_port monitors = {};
+    reach_result result = reach_windows_create_monitor_list(&monitors);
+    if (result != REACH_OK)
     {
-        return REACH_ERROR;
+        return result;
     }
 
+    size_t count = monitors.ops.count(monitors.list);
+    for (size_t index = 0; index < count; ++index)
+    {
+        const reach_monitor_info *monitor = monitors.ops.get(monitors.list, index);
+        if (monitor == nullptr ||
+            monitors.ops.set_work_area(monitors.list, monitor->bounds, monitor->bounds) !=
+                REACH_OK)
+        {
+            result = REACH_ERROR;
+        }
+    }
+    monitors.ops.destroy(monitors.list);
     return result;
-}
-
-static BOOL CALLBACK reachctl_repair_maximized_window_proc(HWND hwnd, LPARAM param)
-{
-    (void)param;
-
-    if (hwnd == nullptr || !IsWindow(hwnd) || !IsWindowVisible(hwnd))
-    {
-        return TRUE;
-    }
-
-    wchar_t class_name[64] = {};
-    GetClassNameW(hwnd, class_name, 64);
-    if (lstrcmpiW(class_name, L"Shell_TrayWnd") == 0 ||
-        lstrcmpiW(class_name, L"Shell_SecondaryTrayWnd") == 0 ||
-        lstrcmpiW(class_name, L"Progman") == 0 || lstrcmpiW(class_name, L"WorkerW") == 0)
-    {
-        return TRUE;
-    }
-
-    if (!IsZoomed(hwnd))
-    {
-        return TRUE;
-    }
-
-    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-    if (monitor == nullptr)
-    {
-        return TRUE;
-    }
-
-    MONITORINFO info = {};
-    info.cbSize = sizeof(info);
-    if (!GetMonitorInfoW(monitor, &info))
-    {
-        return TRUE;
-    }
-
-    int width = info.rcMonitor.right - info.rcMonitor.left;
-    int height = info.rcMonitor.bottom - info.rcMonitor.top;
-
-    WINDOWPLACEMENT placement = {};
-    placement.length = sizeof(placement);
-    if (GetWindowPlacement(hwnd, &placement))
-    {
-        placement.rcNormalPosition = info.rcMonitor;
-        (void)SetWindowPlacement(hwnd, &placement);
-    }
-
-    (void)SetWindowPos(hwnd, nullptr, info.rcMonitor.left, info.rcMonitor.top, width, height,
-                       SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-
-    return TRUE;
-}
-
-static reach_result reachctl_repair_maximized_windows(void)
-{
-    return EnumWindows(reachctl_repair_maximized_window_proc, 0) ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reachctl_start_explorer_shell(void)
@@ -399,17 +325,15 @@ reach_result reachctl_start_reach_session(const uint16_t *reach_exe)
     reach_result kill_explorer_result = reachctl_terminate_processes_by_name(L"explorer.exe");
 
     reach_result work_area_result = REACH_OK;
-    reach_result repair_result = REACH_OK;
     if (reachctl_consume_first_start_repair_pending())
     {
         work_area_result = reachctl_reset_monitor_work_areas();
-        repair_result = reachctl_repair_maximized_windows();
     }
 
     reach_result start_result = reachctl_run_watchdog_task();
 
     if (kill_reach_result != REACH_OK || kill_explorer_result != REACH_OK ||
-        work_area_result != REACH_OK || repair_result != REACH_OK || start_result != REACH_OK)
+        work_area_result != REACH_OK || start_result != REACH_OK)
     {
         return REACH_ERROR;
     }

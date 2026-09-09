@@ -40,6 +40,12 @@ extern "C"
         reach_config_theme_preference windows_app_theme;
     } reach_config_display_settings;
 
+    typedef struct reach_config_top_bar_settings
+    {
+        reach_config_top_bar_style style;
+        reach_config_top_bar_mode mode;
+    } reach_config_top_bar_settings;
+
     typedef void (*reach_config_service_notify)(void *user, reach_config_service_event event);
 
     reach_result reach_config_service_create(reach_config_store_port store,
@@ -68,6 +74,8 @@ extern "C"
                                                 const reach_config_power_settings *settings);
     reach_result reach_config_service_set_display(reach_config_service *service,
                                                   const reach_config_display_settings *settings);
+    reach_result reach_config_service_set_top_bar(
+        reach_config_service *service, const reach_config_top_bar_settings *settings);
     reach_result reach_config_service_set_wallpapers(reach_config_service *service,
                                                      const uint16_t *wallpaper_path,
                                                      const uint16_t monitor_wallpaper_paths[][260],

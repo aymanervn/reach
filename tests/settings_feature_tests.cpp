@@ -552,6 +552,31 @@ static void test_button_press_feedback(void)
                 "completed fade clears the feedback target");
 }
 
+static void test_top_bar_preferences(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+
+    expect_true(reach_settings_model_top_bar_style(model.get()) ==
+                    REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED,
+                "top bar defaults to segmented style");
+    expect_true(reach_settings_model_top_bar_mode(model.get()) ==
+                    REACH_CONFIG_TOP_BAR_MODE_DYNAMIC,
+                "top bar defaults to dynamic mode");
+
+    expect_true(reach_settings_model_toggle_top_bar_style(model.get()),
+                "top bar style can toggle");
+    expect_true(reach_settings_model_top_bar_style(model.get()) ==
+                    REACH_CONFIG_TOP_BAR_STYLE_UNIFIED,
+                "top bar style toggles to unified");
+    expect_true(reach_settings_model_toggle_top_bar_mode(model.get()),
+                "top bar mode can toggle");
+    expect_true(reach_settings_model_top_bar_mode(model.get()) ==
+                    REACH_CONFIG_TOP_BAR_MODE_STATIC,
+                "top bar mode toggles to static");
+    expect_true(reach_settings_model_top_bar_animations_active(model.get()),
+                "top bar preference changes animate their toggles");
+}
 static void test_bluetooth_radio_stops_scan(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
@@ -608,6 +633,7 @@ int main(void)
     test_display_theme_preferences();
     test_account_password_form();
     test_button_press_feedback();
+    test_top_bar_preferences();
     test_bluetooth_radio_stops_scan();
     test_radio_toggle_animations();
     return failures == 0 ? 0 : 1;

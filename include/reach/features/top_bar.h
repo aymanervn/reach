@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/config.h"
 #include "reach/core/geometry.h"
 #include "reach/core/menu_commands.h"
 #include "reach/core/render_commands.h"
@@ -141,6 +142,8 @@ extern "C"
     typedef struct reach_top_bar_state
     {
         reach_top_bar_layout layout;
+        reach_config_top_bar_style style;
+        reach_config_top_bar_mode mode;
         reach_bar_visibility_state visibility;
         reach_pressable pressable;
         int32_t power_hovered;
@@ -197,6 +200,10 @@ extern "C"
     void reach_top_bar_attach_app_control(reach_top_bar *top_bar, reach_app_control *apps);
 
     void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar);
+    int32_t reach_top_bar_apply_config(reach_top_bar *top_bar,
+                                       reach_config_top_bar_style style,
+                                       reach_config_top_bar_mode mode);
+    reach_rect_f32 reach_top_bar_background_bounds(const reach_top_bar *top_bar);
 
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);
 
