@@ -64,6 +64,8 @@ static size_t thumbnail_place_count;
 static size_t thumbnail_background_place_count;
 static float thumbnail_background_alpha;
 static size_t thumbnail_destroy_count;
+static reach_window_id thumbnail_unavailable_source;
+static reach_result thumbnail_placement_result = REACH_OK;
 static int32_t captured_release_active;
 static int32_t exclusive_release_open;
 static size_t captured_release_count;
@@ -248,6 +250,10 @@ static reach_result fake_thumbnail_create(reach_window_thumbnails *thumbnails,
     {
         return REACH_INVALID_ARGUMENT;
     }
+    if (source == thumbnail_unavailable_source)
+    {
+        return REACH_ERROR;
+    }
     if (plane == REACH_WINDOW_THUMBNAIL_PLANE_TARGET)
     {
         thumbnail_target_plane_create_count++;
@@ -272,6 +278,10 @@ static reach_result fake_thumbnail_set_placement(reach_window_thumbnails *thumbn
     if (id == REACH_WINDOW_THUMBNAIL_NONE || placement == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
+    }
+    if (thumbnail_placement_result != REACH_OK)
+    {
+        return thumbnail_placement_result;
     }
     thumbnail_place_count++;
     if (placement->background_visible)
@@ -1172,10 +1182,33 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     expect_true(thumbnail_background_place_count == 1 && thumbnail_background_alpha == 1.0f,
                 "Desktop lower plane carries one fully opaque Stage background");
 
+    thumbnail_unavailable_source = 42;
+    expect_true(
+        reach_stage_update_windows(
+            reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE), &windows[1], 1),
+        "a closed source starts a Stage reflow");
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "a disappearing native thumbnail does not abort the Stage frame");
+    expect_true(reach_host_surface_presented(stage),
+                "Stage remains presented while the closed source departs");
+    thumbnail_placement_result = REACH_ERROR;
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "a transient native placement failure does not abort an animated Stage frame");
+    thumbnail_placement_result = REACH_OK;
+    reach_feature_tick_result tick = {};
+    stage->definition->capsule_ops->tick(stage->capsule, 1.0, &tick);
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "Stage presents the settled layout after the source departs");
+    expect_true(reach_stage_thumbnail_count(
+                    reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)) == 1,
+                "the closed source is removed after its reflow");
+    thumbnail_unavailable_source = 0;
+
+    size_t destroys_before_close = thumbnail_destroy_count;
     reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "generic frame handles native-overlay closure");
-    expect_true(thumbnail_destroy_count == 1,
+    expect_true(thumbnail_destroy_count == destroys_before_close + 1,
                 "generic frame releases native overlays when the capsule closes");
 
     reach_host_destroy_registered_features(host);

@@ -48,7 +48,6 @@ extern "C"
     typedef enum reach_stage_close_phase
     {
         REACH_STAGE_CLOSE_NONE = 0,
-        REACH_STAGE_CLOSE_PREPARING,
         REACH_STAGE_CLOSE_MOVING,
         REACH_STAGE_CLOSE_ALIGNED,
         REACH_STAGE_CLOSE_REVEALING,
@@ -64,6 +63,7 @@ extern "C"
         int32_t close_failed;
         float backdrop_opacity;
         float progress;
+        float desktop_progress;
         float reflow;
         float close_hover;
         float animation_seconds;

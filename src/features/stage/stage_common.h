@@ -7,6 +7,8 @@
 #include "reach/features/common/pressable.h"
 #include "reach/support/animation.h"
 
+#define REACH_STAGE_DESKTOP_ANIMATION_FACTOR 0.35
+
 static inline float reach_stage_animation_seconds_default(void)
 {
     return reach_theme_default()->stage_animation_seconds;
@@ -25,11 +27,17 @@ static inline double reach_stage_reflow_seconds(void)
 enum
 {
     REACH_STAGE_ANIMATION_PROGRESS = 0,
+    REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
     REACH_STAGE_ANIMATION_REFLOW,
     REACH_STAGE_ANIMATION_CLOSE_HOVER,
     REACH_STAGE_ANIMATION_BACKDROP,
     REACH_STAGE_ANIMATION_COUNT
 };
+
+static inline double reach_stage_desktop_animation_seconds(float animation_seconds)
+{
+    return (double)animation_seconds * REACH_STAGE_DESKTOP_ANIMATION_FACTOR;
+}
 
 struct reach_stage
 {

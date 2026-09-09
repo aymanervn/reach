@@ -162,8 +162,6 @@ extern "C"
         int32_t (*presentation_visible)(const void *capsule);
         void (*presentation_committed)(void *capsule, reach_result result,
                                        reach_feature_tick_result *out);
-        void (*window_prepared)(void *capsule, uintptr_t window, reach_result result,
-                                reach_feature_tick_result *out);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

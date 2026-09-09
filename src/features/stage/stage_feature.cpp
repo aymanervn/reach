@@ -58,6 +58,30 @@ void reach_stage_set_animation_seconds(reach_stage *stage, float seconds)
     }
 }
 
+static int32_t reach_stage_has_desktop(const reach_stage_state *state)
+{
+    for (size_t index = 0; index < state->tile_count; ++index)
+    {
+        if (!state->tiles[index].departing && state->tiles[index].desktop)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int32_t reach_stage_has_apps(const reach_stage_state *state)
+{
+    for (size_t index = 0; index < state->tile_count; ++index)
+    {
+        if (!state->tiles[index].departing && !state->tiles[index].desktop)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds, float dpi_scale,
                               const reach_stage_open_window *windows, size_t window_count)
 {
@@ -111,13 +135,35 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP, 1.0f);
     state->closing = 0;
     state->progress = 0.0f;
+    state->desktop_progress = 0.0f;
     state->reflow = 1.0f;
     state->close_hover = 0.0f;
     state->selected_index = 0;
     state->has_selection = 0;
 
-    reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f, 1.0f,
-                                  (double)state->animation_seconds, REACH_EASING_EASE_OUT);
+    if (reach_stage_has_apps(state))
+    {
+        reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
+                                      1.0f, (double)state->animation_seconds,
+                                      REACH_EASING_EASE_OUT);
+    }
+    else
+    {
+        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 1.0f);
+        state->progress = 1.0f;
+    }
+    if (reach_stage_has_desktop(state))
+    {
+        reach_animation_manager_start(
+            &stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f, 1.0f,
+            reach_stage_desktop_animation_seconds(state->animation_seconds), REACH_EASING_EASE_OUT);
+    }
+    else
+    {
+        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
+                                    1.0f);
+        state->desktop_progress = 1.0f;
+    }
     reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_REFLOW, 1.0f);
     reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f);
 
@@ -266,22 +312,38 @@ void reach_stage_begin_close(reach_stage *stage)
     }
 
     stage->state.closing = 1;
-    stage->state.close_phase =
-        stage->state.has_selection ? REACH_STAGE_CLOSE_PREPARING : REACH_STAGE_CLOSE_MOVING;
+    stage->state.close_phase = REACH_STAGE_CLOSE_MOVING;
     reach_pressable_reset(&stage->pressable, nullptr);
     stage->pressable_generation = 0;
     stage->state.has_hover = 0;
     reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f,
                                        reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
-    if (stage->state.close_phase == REACH_STAGE_CLOSE_PREPARING)
+    int32_t selected_desktop =
+        stage->state.has_selection && stage->state.tiles[stage->state.selected_index].desktop;
+    if ((!stage->state.has_selection && reach_stage_has_apps(&stage->state)) ||
+        (stage->state.has_selection && !selected_desktop))
     {
-        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS,
-                                    stage->state.progress);
-        return;
+        reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
+                                           (double)stage->state.animation_seconds,
+                                           REACH_EASING_EASE_OUT);
     }
-    reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
-                                       (double)stage->state.animation_seconds,
-                                       REACH_EASING_EASE_OUT);
+    else
+    {
+        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f);
+    }
+    if ((!stage->state.has_selection && reach_stage_has_desktop(&stage->state)) ||
+        (stage->state.has_selection && selected_desktop))
+    {
+        reach_animation_manager_animate_to(
+            &stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f,
+            reach_stage_desktop_animation_seconds(stage->state.animation_seconds),
+            REACH_EASING_EASE_OUT);
+    }
+    else
+    {
+        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
+                                    0.0f);
+    }
 }
 
 void reach_stage_force_close(reach_stage *stage)
@@ -298,6 +360,7 @@ void reach_stage_force_close(reach_stage *stage)
     stage->pressable_generation = 0;
     state->animation_seconds = animation_seconds;
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
+    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP);
@@ -315,10 +378,40 @@ static int32_t reach_stage_holds_window(const reach_stage_state *state, uintptr_
     return 0;
 }
 
+static int32_t reach_stage_update_selected_closing_window(reach_stage_state *state,
+                                                          const reach_stage_open_window *windows,
+                                                          size_t window_count)
+{
+    if (!state->has_selection || state->selected_index >= state->tile_count)
+    {
+        return 0;
+    }
+
+    reach_stage_tile *tile = &state->tiles[state->selected_index];
+    if (tile->desktop)
+    {
+        return 0;
+    }
+
+    for (size_t index = 0; index < window_count; ++index)
+    {
+        if (windows[index].window != tile->window)
+        {
+            continue;
+        }
+        int32_t changed =
+            tile->minimized != windows[index].minimized || tile->icon_id != windows[index].icon_id;
+        tile->minimized = windows[index].minimized;
+        tile->icon_id = windows[index].icon_id;
+        return changed;
+    }
+    return 0;
+}
+
 int32_t reach_stage_update_windows(reach_stage *stage, const reach_stage_open_window *windows,
                                    size_t window_count)
 {
-    if (stage == nullptr || !stage->state.open || stage->state.closing)
+    if (stage == nullptr || !stage->state.open)
     {
         return 0;
     }
@@ -329,6 +422,10 @@ int32_t reach_stage_update_windows(reach_stage *stage, const reach_stage_open_wi
     if (window_count > REACH_STAGE_MAX_TILES)
     {
         window_count = REACH_STAGE_MAX_TILES;
+    }
+    if (stage->state.closing)
+    {
+        return reach_stage_update_selected_closing_window(&stage->state, windows, window_count);
     }
 
     reach_stage_state *state = &stage->state;
@@ -493,45 +590,6 @@ static void reach_stage_begin_reveal(reach_stage *stage)
                                        REACH_EASING_EASE_OUT);
 }
 
-static void reach_stage_capsule_window_prepared(void *capsule, uintptr_t window,
-                                                reach_result result, reach_feature_tick_result *out)
-{
-    reach_stage *stage = static_cast<reach_stage *>(capsule);
-    reach_stage_state *state = &stage->state;
-    if (state->close_phase != REACH_STAGE_CLOSE_PREPARING || !state->has_selection ||
-        (state->tiles[state->selected_index].desktop
-             ? window != 0
-             : state->tiles[state->selected_index].window != window))
-    {
-        return;
-    }
-    reach_rect_f32 frame = {};
-    bool desktop = state->tiles[state->selected_index].desktop != 0;
-    if (desktop)
-    {
-        frame = state->tiles[state->selected_index].source_rect;
-    }
-    if (result != REACH_OK ||
-        (!desktop &&
-         reach_app_control_window_frame_bounds(stage->apps, window, &frame) != REACH_OK) ||
-        frame.width <= 0.0f || frame.height <= 0.0f)
-    {
-        state->close_failed = 1;
-        reach_stage_begin_reveal(stage);
-    }
-    else
-    {
-        reach_stage_tile *tile = &state->tiles[state->selected_index];
-        tile->source_rect = frame;
-        tile->minimized = 0;
-        state->close_phase = REACH_STAGE_CLOSE_MOVING;
-        reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
-                                           state->animation_seconds, REACH_EASING_EASE_OUT);
-    }
-    out->redraw = 1;
-    out->request_update = 1;
-}
-
 static void reach_stage_capsule_presentation_committed(void *capsule, reach_result result,
                                                        reach_feature_tick_result *out)
 {
@@ -610,6 +668,8 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     reach_animation_manager_tick(&stage->animations, delta_seconds);
     state->progress =
         reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
+    state->desktop_progress =
+        reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
     state->backdrop_opacity =
         reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP);
     state->reflow = reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
@@ -625,7 +685,8 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     }
 
     if (state->close_phase == REACH_STAGE_CLOSE_MOVING &&
-        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS))
+        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS) &&
+        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS))
     {
         state->close_phase = REACH_STAGE_CLOSE_ALIGNED;
     }
@@ -669,9 +730,7 @@ static void reach_stage_capsule_on_game_mode(void *capsule, int32_t enabled)
 static int32_t reach_stage_capsule_needs_frame(const void *capsule)
 {
     const reach_stage *stage = static_cast<const reach_stage *>(capsule);
-    return reach_stage_animation_active(stage) ||
-           (reach_stage_is_closing(stage) &&
-            stage->state.close_phase != REACH_STAGE_CLOSE_PREPARING);
+    return reach_stage_animation_active(stage) || reach_stage_is_closing(stage);
 }
 
 static int32_t reach_stage_capsule_wants_pointer_move(const void *capsule)
@@ -871,28 +930,6 @@ int32_t reach_stage_sync_windows(reach_stage *stage)
     }
     reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
     size_t count = reach_stage_collect_windows(stage, windows, REACH_STAGE_MAX_TILES);
-    reach_stage_state *state = &stage->state;
-    if (state->closing && state->has_selection &&
-        state->close_phase != REACH_STAGE_CLOSE_PREPARING &&
-        !state->tiles[state->selected_index].desktop)
-    {
-        reach_window_id selected = state->tiles[state->selected_index].window;
-        bool available = false;
-        for (size_t index = 0; index < count; ++index)
-        {
-            available =
-                available || (windows[index].window == selected && !windows[index].minimized);
-        }
-        if (!available)
-        {
-            state->close_failed = 1;
-            if (state->close_phase < REACH_STAGE_CLOSE_REVEALING)
-            {
-                reach_stage_begin_reveal(stage);
-            }
-            return 1;
-        }
-    }
     return reach_stage_update_windows(stage, windows, count);
 }
 
@@ -912,7 +949,6 @@ const reach_feature_capsule_ops *reach_stage_capsule_ops(void)
                                                   nullptr,
                                                   nullptr,
                                                   reach_stage_capsule_presentation_visible,
-                                                  reach_stage_capsule_presentation_committed,
-                                                  reach_stage_capsule_window_prepared};
+                                                  reach_stage_capsule_presentation_committed};
     return &ops;
 }

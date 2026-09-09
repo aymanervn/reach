@@ -221,13 +221,25 @@ Stage is the window overview: a fullscreen overlay capsule that shrinks open app
 windows into a centered grid over a fixed Desktop preview. The Desktop keeps the
 same centered, solo-size geometry whether or not apps are present. Its outer edge fits between
 the top bar and Dock with 20dp clearance from each; it has no
-artificial header or title, and contributes only a phantom layout slot so the app
-grid retains overview-scale thumbnails without reserving a visible Desktop cell.
+artificial header or title, and contributes no app-grid layout slot. App sections consume the
+Desktop preview's final target rectangle with a fixed 24dp inner inset, falling back to the
+bar-reserved bounds only when no Desktop tile exists. Each monitor section first maximizes against
+available height, then all sections reduce together only when their combined visual width,
+including every tile and monitor-section gap, would overflow. That shared width solve gives
+portrait sections 1.3 times the scale priority of landscape sections, capped by the same available
+height, so mixed-monitor layouts trade some landscape size for larger portrait windows without
+resolution- or DPI-specific cases. Cell width comes from each window's actual aspect ratio rather
+than an invisible monitor-shaped box. Landscape sections use a compact grid; portrait-monitor
+sections use one vertical column ordered by the windows' original screen coordinates. Visual tiles
+use 20dp gaps, monitor sections use 28dp gaps, and the combined fitted content—not proxy boxes—is
+centered.
 Stage owns tile layout, the open/close animation, hover state, and hit resolution,
 gives overlapping app tiles pointer priority over Desktop, and reports only
 activate/dismiss actions. It uses no
 generic host transition: its fullscreen surface remains fixed to the monitor while
-the capsule's theme-timed progress animates the tiles. It never calls the thumbnail port — it
+the capsule's elapsed-time progress animates app tiles. Desktop uses a separate track at 35% of
+the configured Stage duration, so it settles substantially earlier without depending on a fixed
+millisecond delay. It never calls the thumbnail port — it
 publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
 into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in
@@ -247,33 +259,35 @@ compatibility host, cropped from the virtual-screen thumbnail to the primary
 monitor.
 Activating a tile suppresses every other tile's thumbnail for the close animation, so
 the chosen window animates alone instead of being covered by a maximized neighbour.
-Selection requests covered window preparation through the generic feature-action contract.
-After the opaque cover is presented, `app_control` restores and activates the selected window
-beneath it, or minimizes the app batch for Desktop selection. Preparation runs on the existing
-worker and publishes a separate request-correlated completion. The Windows service uses a
-versioned preparation command sharing ordinary activation's restore, owner/dialog resolution,
-and foreground transfer. Covered placement keeps the app in the ordinary window band and never
-uses the topmost cover as its insert-after window. Restoration temporarily disables the selected
-window's native transition and restores that setting. Ordinary activation retains its existing
+Tile selection starts that movement immediately and publishes ordinary app activation, or the
+Desktop minimize-all action, concurrently through the shared feature-action contract. For an
+already visible app, Stage begins closing before activation is queued. For a minimized app,
+activation and restoration are queued first and Stage begins closing immediately afterward without
+waiting for readiness. Window-state notifications may replace its placeholder with the live DWM
+thumbnail while the close animation is running. Stage does not wait for native window readiness
+before moving. Ordinary activation retains its existing
 topmost promotion/demotion sequence and native foreground-transfer compatibility path, including
-the final attached-input raise. Switcher uses that ordinary activation path. Its non-activating
+the final attached-input raise. Switcher uses the same ordinary activation path. Its non-activating
 overlay presents immediately and starts the shared close transition before publishing the selected
 window for activation. Switcher Begin runs the generic transient close sweep before refreshing the
 window world and dispatching the event to the capsule.
-The worker serializes window requests, coalesces pending activation selections, and preserves
-close, minimize, and snap requests. Preparation retains a queue hold until the surface releases
-its cover. Teardown cancels queued preparation and waits for running preparation before releasing
-the native overlay; overlay refresh also preserves the helper until preparation completes.
-Game mode immediately releases suppressed overlays and abandons their pending preparation;
-a running native operation settles asynchronously and its completion cannot resume the surface.
-Stage holds its preview during preparation, then animates toward the restored live frame bounds.
+The app-control worker serializes window requests, coalesces pending activation selections, and
+preserves close, minimize, and snap requests. Native activation completion is diagnostic state,
+not a prerequisite for visual progress.
 The close lifecycle retains the aligned thumbnail until renderer synchronization acknowledges
 that frame. Only then does the backdrop fade using the shared surface-close duration, while
 the selected app thumbnail stays opaque and stationary. A transparent-frame acknowledgement
 precedes native thumbnail and helper disposal; there is no second activation at disposal.
-Escape follows movement and reveal without preparing another app. Failed preparation or a
-vanished selected window drops the preview and fades out safely. The lower helper carries its
+Escape follows the same movement and reveal sequence without activating another app. A vanished
+selected window drops the preview and fades out safely. The lower helper carries its
 own layered opacity and changes bounds, order, visibility, and paint only when needed.
+The DWM adapter also caches the last submitted thumbnail properties and skips identical
+`DwmUpdateThumbnailProperties` calls; DWM owns live thumbnail resolution and Reach does not request
+a capture resolution or refresh rate. Native thumbnail registration and placement are best-effort
+while Stage is open or reflowing because a source can disappear between the window snapshot and
+the DWM call. Missing relationships are retried without aborting the host frame. Placement remains
+strict at Stage's synchronized close boundaries so a failed final handoff follows the capsule's
+existing recovery path.
 The renderer's synchronization operation waits for DirectComposition commit completion and
 then flushes the calling process's queued DWM work; it does not establish that an external
 application has finished producing its own content.

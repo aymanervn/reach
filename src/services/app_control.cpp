@@ -176,8 +176,6 @@ struct reach_app_control_window_request
     std::vector<uintptr_t> windows;
     int32_t is_snap = 0;
     reach_split_mode snap_mode = REACH_SPLIT_LEFT;
-    reach_window_id cover = 0;
-    uint64_t preparation = 0;
 };
 
 struct reach_app_control
@@ -196,22 +194,14 @@ struct reach_app_control
     int32_t window_completed = 0;
     reach_result window_completed_result = REACH_OK;
     std::deque<reach_app_control_window_request> window_requests;
-    uint64_t preparation_hold = 0;
-    uint64_t running_preparation = 0;
-    reach_window_preparation_result preparation = {};
 };
 
 static reach_result reach_app_control_window_dispatch(reach_app_control *service,
                                                       reach_window_control_action action,
-                                                      uintptr_t window_id, reach_window_id cover)
+                                                      uintptr_t window_id)
 {
     switch (action)
     {
-    case REACH_WINDOW_CONTROL_PREPARE:
-        return service->window_manager.ops.prepare != nullptr
-                   ? service->window_manager.ops.prepare(service->window_manager.manager, window_id,
-                                                         cover)
-                   : REACH_ERROR;
     case REACH_WINDOW_CONTROL_ACTIVATE:
         return service->window_manager.ops.activate != nullptr
                    ? service->window_manager.ops.activate(service->window_manager.manager,
@@ -233,7 +223,7 @@ static reach_result reach_app_control_window_dispatch(reach_app_control *service
 
 static reach_result reach_app_control_window_execute(reach_app_control *service,
                                                      reach_window_control_action action,
-                                                     uintptr_t window_id, reach_window_id cover = 0)
+                                                     uintptr_t window_id)
 {
     if (service == nullptr || window_id == 0)
     {
@@ -243,7 +233,7 @@ static reach_result reach_app_control_window_execute(reach_app_control *service,
     if (service->window_manager.ops.privileged_control_available != nullptr &&
         service->window_manager.ops.privileged_control_available(service->window_manager.manager))
     {
-        return reach_app_control_window_dispatch(service, action, window_id, cover);
+        return reach_app_control_window_dispatch(service, action, window_id);
     }
 
     if (service->window_manager.ops.start_privileged_control == nullptr ||
@@ -259,7 +249,7 @@ static reach_result reach_app_control_window_execute(reach_app_control *service,
         return REACH_ERROR;
     }
 
-    return reach_app_control_window_dispatch(service, action, window_id, cover);
+    return reach_app_control_window_dispatch(service, action, window_id);
 }
 
 static reach_result reach_app_control_snap_dispatch(reach_app_control *service, uintptr_t window_id,
@@ -307,21 +297,15 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
         reach_app_control_window_request request;
         {
             std::unique_lock<std::mutex> lock(service->window_mutex);
-            service->window_cv.wait(lock,
-                                    [service]()
-                                    {
-                                        return service->window_stop ||
-                                               (service->preparation_hold == 0 &&
-                                                !service->window_requests.empty());
-                                    });
+            service->window_cv.wait(
+                lock,
+                [service]() { return service->window_stop || !service->window_requests.empty(); });
             if (service->window_stop)
             {
                 return;
             }
             request = std::move(service->window_requests.front());
             service->window_requests.pop_front();
-            service->running_preparation = request.preparation;
-            service->preparation_hold = request.preparation;
         }
 
         reach_result result = REACH_OK;
@@ -329,8 +313,7 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
         {
             reach_result window_result =
                 request.is_snap ? reach_app_control_snap_execute(service, window, request.snap_mode)
-                                : reach_app_control_window_execute(service, request.action, window,
-                                                                   request.cover);
+                                : reach_app_control_window_execute(service, request.action, window);
             if (window_result != REACH_OK && result == REACH_OK)
             {
                 result = window_result;
@@ -339,24 +322,13 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
 
         {
             std::lock_guard<std::mutex> lock(service->window_mutex);
-            service->running_preparation = 0;
             if (!service->window_stop)
             {
-                if (request.preparation != 0)
+                if (!service->window_completed || result != REACH_OK)
                 {
-                    service->preparation = {
-                        request.preparation,
-                        request.action == REACH_WINDOW_CONTROL_PREPARE ? request.windows[0] : 0,
-                        result};
+                    service->window_completed_result = result;
                 }
-                else
-                {
-                    if (!service->window_completed || result != REACH_OK)
-                    {
-                        service->window_completed_result = result;
-                    }
-                    service->window_completed = 1;
-                }
+                service->window_completed = 1;
             }
         }
         if (service->notify != nullptr)
@@ -449,9 +421,6 @@ void reach_app_control_stop(reach_app_control *service)
         service->window_thread_started = 0;
         service->window_stop = 0;
         service->window_completed = 0;
-        service->preparation_hold = 0;
-        service->running_preparation = 0;
-        service->preparation = {};
     }
 }
 
@@ -622,13 +591,11 @@ static reach_result reach_app_control_enqueue_window(reach_app_control *service,
     }
     {
         std::lock_guard<std::mutex> lock(service->window_mutex);
-        if (request.action == REACH_WINDOW_CONTROL_ACTIVATE && !request.is_snap &&
-            request.preparation == 0)
+        if (request.action == REACH_WINDOW_CONTROL_ACTIVATE && !request.is_snap)
         {
             for (auto it = service->window_requests.begin(); it != service->window_requests.end();)
             {
-                if (it->action == REACH_WINDOW_CONTROL_ACTIVATE && !it->is_snap &&
-                    it->preparation == 0)
+                if (it->action == REACH_WINDOW_CONTROL_ACTIVATE && !it->is_snap)
                 {
                     it = service->window_requests.erase(it);
                 }
@@ -651,102 +618,6 @@ reach_result reach_app_control_schedule_window(reach_app_control *service,
     return reach_app_control_schedule_windows(service, action, &window_id, 1);
 }
 
-static reach_result reach_app_control_queue_preparation(reach_app_control *service,
-                                                        reach_window_control_action action,
-                                                        const uintptr_t *windows, size_t count,
-                                                        reach_window_id cover, uint64_t request_id)
-{
-    if (service == nullptr || (count != 0 && windows == nullptr) ||
-        count > REACH_APP_CONTROL_MAX_WINDOWS || cover == 0 || request_id == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    reach_app_control_window_request request;
-    request.action = action;
-    if (count != 0)
-    {
-        request.windows.assign(windows, windows + count);
-    }
-    request.cover = cover;
-    request.preparation = request_id;
-    return reach_app_control_enqueue_window(service, std::move(request));
-}
-
-reach_result reach_app_control_schedule_preparation(reach_app_control *service,
-                                                    reach_window_id window, reach_window_id cover,
-                                                    uint64_t request)
-{
-    return window != 0 ? reach_app_control_queue_preparation(service, REACH_WINDOW_CONTROL_PREPARE,
-                                                             &window, 1, cover, request)
-                       : REACH_INVALID_ARGUMENT;
-}
-
-reach_result reach_app_control_schedule_desktop_preparation(reach_app_control *service,
-                                                            const uintptr_t *windows, size_t count,
-                                                            reach_window_id cover, uint64_t request)
-{
-    return reach_app_control_queue_preparation(service, REACH_WINDOW_CONTROL_MINIMIZE, windows,
-                                               count, cover, request);
-}
-
-int32_t reach_app_control_cancel_preparation(reach_app_control *service, uint64_t request)
-{
-    if (service == nullptr || request == 0)
-    {
-        return 1;
-    }
-    std::lock_guard<std::mutex> lock(service->window_mutex);
-    for (auto it = service->window_requests.begin(); it != service->window_requests.end();)
-    {
-        if (it->preparation == request)
-        {
-            it = service->window_requests.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-    return service->running_preparation != request;
-}
-
-void reach_app_control_release_preparation(reach_app_control *service, uint64_t request)
-{
-    if (service == nullptr || request == 0)
-    {
-        return;
-    }
-    {
-        std::lock_guard<std::mutex> lock(service->window_mutex);
-        if (service->running_preparation == request)
-        {
-            return;
-        }
-        if (service->preparation_hold == request)
-        {
-            service->preparation_hold = 0;
-        }
-        if (service->preparation.request == request)
-        {
-            service->preparation = {};
-        }
-    }
-    service->window_cv.notify_one();
-}
-
-int32_t reach_app_control_take_preparation(reach_app_control *service,
-                                           reach_window_preparation_result *out)
-{
-    if (service == nullptr || out == nullptr)
-    {
-        return 0;
-    }
-    std::lock_guard<std::mutex> lock(service->window_mutex);
-    *out = service->preparation;
-    service->preparation = {};
-    return out->request != 0;
-}
-
 reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
                                              reach_split_mode mode)
 {
@@ -765,8 +636,7 @@ reach_result reach_app_control_schedule_windows(reach_app_control *service,
                                                 reach_window_control_action action,
                                                 const uintptr_t *window_ids, size_t window_count)
 {
-    if (service == nullptr || window_ids == nullptr || window_count == 0 ||
-        action == REACH_WINDOW_CONTROL_PREPARE)
+    if (service == nullptr || window_ids == nullptr || window_count == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
