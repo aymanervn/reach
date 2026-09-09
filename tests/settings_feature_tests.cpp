@@ -562,6 +562,8 @@ static void test_top_bar_preferences(void)
                 "top bar defaults to segmented style");
     expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC,
                 "top bar defaults to dynamic mode");
+    expect_true(reach_animation_manager_value(&model->top_bar_mode_animation, 0) == 1.0f,
+                "dynamic mode presents auto hide as enabled");
 
     expect_true(reach_settings_model_toggle_top_bar_style(model.get()), "top bar style can toggle");
     expect_true(reach_settings_model_top_bar_style(model.get()) ==
@@ -570,6 +572,8 @@ static void test_top_bar_preferences(void)
     expect_true(reach_settings_model_toggle_top_bar_mode(model.get()), "top bar mode can toggle");
     expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_STATIC,
                 "top bar mode toggles to static");
+    expect_true(reach_animation_manager_target(&model->top_bar_mode_animation, 0) == 0.0f,
+                "static mode presents auto hide as disabled");
     expect_true(reach_settings_model_top_bar_animations_active(model.get()),
                 "top bar preference changes animate their toggles");
 }
