@@ -107,6 +107,10 @@ extern "C"
         reach_rect_f32 visible_bounds;
         reach_rect_f32 envelope_bounds;
         int32_t synchronize_presentation;
+        int32_t manage_monitor_work_area;
+        int32_t reserve_monitor_work_area;
+        int32_t disable_bar_reveal;
+        int32_t force_topmost;
         float notch_anchor_x;
         int32_t notch_side;
         struct

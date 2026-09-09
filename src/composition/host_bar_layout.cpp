@@ -58,6 +58,41 @@ void reach_host_request_bar_visibility_update(reach_host *host)
     reach_host_request_update(host);
 }
 
+int32_t reach_host_bar_reveal_enabled(const reach_feature_runtime *runtime)
+{
+    if (runtime == nullptr || runtime->definition == nullptr ||
+        runtime->definition->surface.bar_reveal.ops == nullptr)
+    {
+        return 0;
+    }
+    if (runtime->definition->capsule_ops == nullptr ||
+        runtime->definition->capsule_ops->surface_geometry == nullptr)
+    {
+        return 1;
+    }
+
+    reach_feature_surface_geometry geometry = {};
+    runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+    return !geometry.disable_bar_reveal;
+}
+
+float reach_host_bar_protected_clearance(const reach_host *host,
+                                         const reach_feature_runtime *runtime)
+{
+    if (host == nullptr || runtime == nullptr || runtime->definition == nullptr)
+    {
+        return 0.0f;
+    }
+    float configured = runtime->definition->surface.bar_reveal.protected_clearance_dp;
+    if (configured > 0.0f)
+    {
+        return configured * reach_host_layout_dpi_scale(host);
+    }
+    return reach_theme_shadow_extent(
+        reach_host_surface_shadow(host, runtime->definition->id),
+        reach_host_layout_dpi_scale(host));
+}
+
 static void reach_host_sync_pointer_move_enabled(reach_platform_window_port *window,
                                                  int32_t desired, int32_t *current, int32_t force)
 {
@@ -97,7 +132,7 @@ static void reach_host_apply_pointer_move_subscriptions(reach_host *host, int32_
                                 desc->definition->capsule_ops->wants_pointer_move != nullptr
                             ? desc->definition->capsule_ops->wants_pointer_move(desc->capsule)
                             : 0;
-        if (desc->definition->surface.bar_reveal.ops != nullptr)
+        if (reach_host_bar_reveal_enabled(desc))
         {
             wants = 1;
         }
@@ -161,9 +196,9 @@ static void reach_host_apply_bar_pointer_observation(reach_host *host, reach_sur
                                        result->pointer_observation_active);
 }
 
-reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
-                                                   reach_rect_f32 shown_bounds,
-                                                   reach_rect_f32 monitor_bounds)
+reach_rect_f32 reach_host_reconcile_bar_visibility(
+    reach_host *host, reach_surface_id id, reach_rect_f32 shown_bounds,
+    reach_rect_f32 monitor_bounds, const reach_feature_surface_geometry *geometry)
 {
     REACH_ASSERT(host != nullptr);
 
@@ -171,6 +206,30 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     if (desc->definition->surface.bar_reveal.ops == nullptr ||
         desc->definition->surface.bar_reveal.ops->update_visibility == nullptr)
     {
+        return shown_bounds;
+    }
+    if (geometry != nullptr && geometry->disable_bar_reveal)
+    {
+        if (id == REACH_SURFACE_ID_TOP_BAR)
+        {
+            int32_t was_hidden = host->top_bar_hidden;
+            host->top_bar_hidden = 0;
+            if (was_hidden)
+            {
+                reach_feature_notification notification = {};
+                notification.kind = REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE;
+                notification.present = 1;
+                reach_host_notify_registered_features(host, &notification);
+            }
+        }
+        reach_host_set_pointer_observation(host, id, {}, 0);
+        if (desc->definition->surface.bar_reveal.active_layer > 0)
+        {
+            reach_layout_set_layer_intent(
+                &host->layout_manager, host->surface_participants[id],
+                geometry->force_topmost, desc->definition->surface.bar_reveal.active_layer);
+        }
+        reach_host_apply_edge_reveal(host, reach_host_edge_reveal_for_surface(host, id), 0, {});
         return shown_bounds;
     }
 
@@ -186,8 +245,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
     request.reveal_span_inset = desc->definition->surface.bar_reveal.span_start_inset_dp *
                                 reach_host_layout_dpi_scale(host);
-    request.shadow_clearance = reach_theme_shadow_extent(reach_host_surface_shadow(host, id),
-                                                         reach_host_layout_dpi_scale(host));
+    request.shadow_clearance = reach_host_bar_protected_clearance(host, desc);
 
     reach_bar_visibility_result result =
         desc->definition->surface.bar_reveal.ops->update_visibility(desc->capsule, &request);
@@ -209,9 +267,10 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     if (desc->definition->surface.bar_reveal.active_layer > 0)
     {
-        reach_layout_set_layer_intent(&host->layout_manager, host->surface_participants[id],
-                                      result.reveal_transition_active,
-                                      desc->definition->surface.bar_reveal.active_layer);
+        reach_layout_set_layer_intent(
+            &host->layout_manager, host->surface_participants[id],
+            result.reveal_transition_active || (geometry != nullptr && geometry->force_topmost),
+            desc->definition->surface.bar_reveal.active_layer);
     }
 
     if (result.redraw && desc->surface != nullptr)
@@ -302,7 +361,7 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
-        if (desc->definition->surface.bar_reveal.ops == nullptr ||
+        if (!reach_host_bar_reveal_enabled(desc) ||
             desc->definition->surface.bar_reveal.ops->animation == nullptr)
         {
             continue;
@@ -341,7 +400,7 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
-        if (desc->definition->surface.bar_reveal.ops == nullptr ||
+        if (!reach_host_bar_reveal_enabled(desc) ||
             desc->definition->surface.bar_reveal.ops->animation == nullptr ||
             desc->surface == nullptr)
         {

@@ -384,6 +384,7 @@ add_library(reach_settings_feature STATIC
     src/apps/settings/feature/settings_render.cpp
     src/apps/settings/feature/settings_render_common.cpp
     src/apps/settings/feature/settings_startup_apps.cpp
+    src/apps/settings/feature/settings_top_bar.cpp
     src/apps/settings/feature/settings_update.cpp
     src/apps/settings/feature/windows_update_policy.cpp
     src/apps/settings/feature/settings_wifi.cpp
@@ -458,6 +459,7 @@ add_executable(reachctl
     src/adapters/windows/shell_registration_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
+    src/adapters/windows/monitor_win32.cpp
     src/adapters/windows/wallpaper_win32.cpp
     src/adapters/windows/taskbar_pin_blob.cpp
     src/adapters/windows/taskbar_pins_win32.cpp
@@ -475,8 +477,10 @@ target_link_libraries(reachctl PRIVATE
     reach_features
     shell32
     shlwapi
+    shcore
     user32
     advapi32
+    dwmapi
     ole32
     oleaut32
     taskschd

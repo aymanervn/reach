@@ -160,6 +160,11 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
         const reach_monitor_info *monitor = host->monitors.ops.primary(host->monitors.list);
         if (monitor != nullptr)
         {
+            if (host->monitors.ops.set_work_area != nullptr)
+            {
+                (void)host->monitors.ops.set_work_area(host->monitors.list, monitor->bounds,
+                                                       monitor->bounds);
+            }
             reach_rect_f32 bounds = {(float)monitor->bounds.left, (float)monitor->bounds.top,
                                      (float)(monitor->bounds.right - monitor->bounds.left),
                                      (float)(monitor->bounds.bottom - monitor->bounds.top)};

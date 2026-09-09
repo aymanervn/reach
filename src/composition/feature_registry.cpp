@@ -275,6 +275,27 @@ static void reach_feature_notify_dock(void *capsule,
     }
 }
 
+static void reach_feature_notify_top_bar(void *capsule,
+                                         const reach_feature_notification *notification,
+                                         reach_feature_tick_result *out)
+{
+    if (capsule == nullptr || notification == nullptr || out == nullptr ||
+        notification->kind != REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED ||
+        notification->config == nullptr)
+    {
+        return;
+    }
+
+    if (reach_top_bar_apply_config(static_cast<reach_top_bar *>(capsule),
+                                   notification->config->top_bar_style,
+                                   notification->config->top_bar_mode))
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+}
+
 static int32_t reach_feature_control_launcher_open(void *capsule, int32_t open,
                                                    reach_feature_tick_result *out)
 {
@@ -645,6 +666,8 @@ static const reach_feature_control_ops reach_context_menu_control_ops = {
     reach_feature_control_context_menu_open, nullptr, nullptr, nullptr, nullptr};
 static const reach_feature_control_ops reach_dock_control_ops = {
     nullptr, nullptr, reach_feature_notify_dock, nullptr, nullptr};
+static const reach_feature_control_ops reach_top_bar_control_ops = {
+    nullptr, nullptr, reach_feature_notify_top_bar, nullptr, nullptr};
 static const reach_feature_control_ops reach_launcher_control_ops = {
     reach_feature_control_launcher_open, reach_feature_control_launcher_hidden, nullptr, nullptr,
     nullptr};
@@ -768,6 +791,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_STAGE].surface.dismiss_guard_slot = REACH_DOCK_CONTROL_TRIGGER;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].control_ops = &reach_context_menu_control_ops;
     definitions[REACH_SURFACE_ID_DOCK].control_ops = &reach_dock_control_ops;
+    definitions[REACH_SURFACE_ID_TOP_BAR].control_ops = &reach_top_bar_control_ops;
     definitions[REACH_SURFACE_ID_LAUNCHER].control_ops = &reach_launcher_control_ops;
     definitions[REACH_SURFACE_ID_SWITCHER].control_ops = &reach_switcher_control_ops;
     definitions[REACH_SURFACE_ID_CLIPBOARD].control_ops = &reach_clipboard_control_ops;
@@ -823,8 +847,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_DOCK].surface.bar_reveal = {reach_dock_reveal_ops(), 0, 0.0f};
     definitions[REACH_SURFACE_ID_TOP_BAR].surface.edge_reveal = {
         1, REACH_HOST_LAYER_TOP_BAR_EDGE_REVEAL, {}, nullptr};
-    definitions[REACH_SURFACE_ID_TOP_BAR].surface.bar_reveal = {reach_top_bar_reveal_ops(),
-                                                                REACH_HOST_LAYER_BAR_ACTIVE, 4.0f};
+    definitions[REACH_SURFACE_ID_TOP_BAR].surface.bar_reveal = {
+        reach_top_bar_reveal_ops(), REACH_HOST_LAYER_BAR_ACTIVE, 4.0f, 18.0f};
     definitions[REACH_SURFACE_ID_TOP_BAR].surface.role = REACH_SURFACE_TOP_BAR;
     definitions[REACH_SURFACE_ID_TOP_BAR].surface.pointer_priority = 80;
     definitions[REACH_SURFACE_ID_DOCK].surface.role = REACH_SURFACE_DOCK;

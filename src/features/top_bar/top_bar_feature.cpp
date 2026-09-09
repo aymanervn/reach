@@ -25,6 +25,34 @@ reach_animation_manager *reach_top_bar_manager(reach_top_bar *top_bar)
     return top_bar != nullptr ? &top_bar->manager : nullptr;
 }
 
+int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_style style,
+                                   reach_config_top_bar_mode mode)
+{
+    if (top_bar == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED ||
+        style > REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ||
+        mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC || mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
+    {
+        return 0;
+    }
+
+    int32_t changed = top_bar->state.style != style || top_bar->state.mode != mode;
+    int32_t mode_changed = top_bar->state.mode != mode;
+    top_bar->state.style = style;
+    top_bar->state.mode = mode;
+    if (mode_changed)
+    {
+        reach_bar_visibility_reset(&top_bar->state.visibility);
+        if (mode == REACH_CONFIG_TOP_BAR_MODE_STATIC)
+        {
+            reach_animation_manager_set(&top_bar->manager, REACH_TOP_BAR_ANIM_Y,
+                                        top_bar->state.layout.bounds.y);
+        }
+        reach_top_bar_window_push_release(top_bar->window_push);
+        reach_top_bar_invalidate_occlusion(top_bar);
+    }
+    return changed;
+}
+
 reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
 {
     if (out_top_bar == nullptr)
@@ -762,6 +790,40 @@ reach_point_i32 reach_top_bar_local_point(const reach_top_bar_layout *layout, in
     return point;
 }
 
+reach_rect_f32 reach_top_bar_background_bounds(const reach_top_bar *top_bar)
+{
+    reach_rect_f32 bounds = {};
+    if (top_bar == nullptr)
+    {
+        return bounds;
+    }
+
+    const reach_top_bar_layout *layout = &top_bar->state.layout;
+    float left = layout->bounds.width;
+    float right = 0.0f;
+    for (size_t index = 0; index < REACH_TOP_BAR_PILL_COUNT; ++index)
+    {
+        if (!layout->pill_visible[index])
+        {
+            continue;
+        }
+        if (layout->pills[index].x < left)
+        {
+            left = layout->pills[index].x;
+        }
+        float pill_right = layout->pills[index].x + layout->pills[index].width;
+        if (pill_right > right)
+        {
+            right = pill_right;
+        }
+    }
+    if (right > left)
+    {
+        bounds = reach_top_bar_rect(left, 0.0f, right - left, layout->bounds.height);
+    }
+    return bounds;
+}
+
 reach_rect_f32 reach_top_bar_rect_to_screen(const reach_top_bar_layout *layout, reach_rect_f32 rect)
 {
     if (layout == nullptr)
@@ -838,7 +900,7 @@ static void reach_top_bar_update_language(reach_top_bar *top_bar)
 static void reach_top_bar_bar_begin_session(void *capsule)
 {
     reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
-    if (top_bar != nullptr)
+    if (top_bar != nullptr && top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC)
     {
         reach_bar_begin_reveal_session(&top_bar->state.visibility);
     }
@@ -920,9 +982,12 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_TOP_BAR_EDGE;
     bar_request.pointer_sequence_active = reach_pressable_tracking(&top_bar->state.pressable);
+    int32_t dynamic = top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
+    bar_request.force_shown = dynamic ? bar_request.force_shown : 1;
     bar_request.can_hide =
-        reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds,
-                                          request->shadow_clearance, request->excluded_window);
+        dynamic && reach_top_bar_windows_trespassing(
+                       top_bar, request->shown_bounds, request->monitor_bounds,
+                       request->shadow_clearance, request->excluded_window);
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);
@@ -934,7 +999,14 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     top_bar->push_can_hide = bar_request.can_hide;
     top_bar->push_hover_revealed = result.hover_revealed;
     top_bar->push_excluded_window = request->excluded_window;
-    reach_top_bar_apply_window_push(top_bar, result.reveal_progress);
+    if (dynamic)
+    {
+        reach_top_bar_apply_window_push(top_bar, result.reveal_progress);
+    }
+    else
+    {
+        reach_top_bar_window_push_release(top_bar->window_push);
+    }
 
     return result;
 }
@@ -942,7 +1014,8 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
 static void reach_top_bar_bar_position_frame(void *capsule)
 {
     reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
-    if (top_bar == nullptr || top_bar->push_depth <= 0.0f)
+    if (top_bar == nullptr || top_bar->state.mode != REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
+        top_bar->push_depth <= 0.0f)
     {
         return;
     }
@@ -1194,7 +1267,10 @@ static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule
 
 static int32_t reach_top_bar_capsule_wants_pointer_move(const void *capsule)
 {
-    return reach_top_bar_capsule_pointer_sequence_active(capsule);
+    const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
+    return top_bar != nullptr &&
+           (top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_STATIC ||
+            reach_top_bar_capsule_pointer_sequence_active(capsule));
 }
 
 static int32_t reach_top_bar_capsule_pointer_capture_active(const void *capsule)
@@ -1213,7 +1289,12 @@ static void reach_top_bar_capsule_surface_geometry(const void *capsule,
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     if (top_bar != nullptr)
     {
+        int32_t static_mode = top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_STATIC;
         out->visible_bounds = top_bar->state.layout.bounds;
+        out->manage_monitor_work_area = 1;
+        out->reserve_monitor_work_area = static_mode;
+        out->disable_bar_reveal = static_mode;
+        out->force_topmost = static_mode;
     }
 }
 
@@ -1224,6 +1305,16 @@ static size_t reach_top_bar_capsule_input_regions(const void *capsule, reach_rec
     if (top_bar == nullptr || out_regions == nullptr)
     {
         return 0;
+    }
+
+    if (top_bar->state.style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED)
+    {
+        if (max_regions == 0)
+        {
+            return 0;
+        }
+        out_regions[0] = reach_top_bar_background_bounds(top_bar);
+        return out_regions[0].width > 0.0f ? 1 : 0;
     }
 
     size_t count = 0;

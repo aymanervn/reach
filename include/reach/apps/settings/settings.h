@@ -83,6 +83,8 @@ extern "C"
         REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE,
         REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME,
         REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME,
+        REACH_SETTINGS_HIT_TOP_BAR_UNIFIED_TOGGLE,
+        REACH_SETTINGS_HIT_TOP_BAR_STATIC_TOGGLE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
         REACH_SETTINGS_HIT_STARTUP_TOGGLE,
@@ -274,6 +276,12 @@ extern "C"
         reach_animation_manager display_theme_animation;
         reach_config_theme_preference display_windows_system_theme;
         reach_config_theme_preference display_windows_app_theme;
+        reach_config_top_bar_style top_bar_style;
+        reach_animation_track top_bar_style_track;
+        reach_animation_manager top_bar_style_animation;
+        reach_config_top_bar_mode top_bar_mode;
+        reach_animation_track top_bar_mode_track;
+        reach_animation_manager top_bar_mode_animation;
         int32_t hovered_button;
         reach_animation_track button_press_track;
         reach_animation_manager button_press_animation;
@@ -413,6 +421,15 @@ extern "C"
         reach_rect_f32 display_windows_app_title;
         reach_rect_f32 display_windows_app_subtitle;
         reach_rect_f32 display_windows_app_options[REACH_SETTINGS_THEME_OPTION_COUNT];
+        reach_rect_f32 display_desktop_section_title;
+        reach_rect_f32 top_bar_unified_card;
+        reach_rect_f32 top_bar_unified_title;
+        reach_rect_f32 top_bar_unified_subtitle;
+        reach_rect_f32 top_bar_unified_toggle;
+        reach_rect_f32 top_bar_static_card;
+        reach_rect_f32 top_bar_static_title;
+        reach_rect_f32 top_bar_static_subtitle;
+        reach_rect_f32 top_bar_static_toggle;
         reach_rect_f32 account_card;
         reach_rect_f32 account_avatar;
         reach_rect_f32 account_name;
@@ -614,6 +631,19 @@ extern "C"
     int32_t reach_settings_model_tick_display_animations(reach_settings_model *model,
                                                          double delta_seconds);
     int32_t reach_settings_model_display_animations_active(const reach_settings_model *model);
+    void reach_settings_model_set_top_bar_style(reach_settings_model *model,
+                                                reach_config_top_bar_style style);
+    reach_config_top_bar_style
+    reach_settings_model_top_bar_style(const reach_settings_model *model);
+    int32_t reach_settings_model_toggle_top_bar_style(reach_settings_model *model);
+    void reach_settings_model_set_top_bar_mode(reach_settings_model *model,
+                                               reach_config_top_bar_mode mode);
+    reach_config_top_bar_mode
+    reach_settings_model_top_bar_mode(const reach_settings_model *model);
+    int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model);
+    int32_t reach_settings_model_tick_top_bar_animations(reach_settings_model *model,
+                                                         double delta_seconds);
+    int32_t reach_settings_model_top_bar_animations_active(const reach_settings_model *model);
     int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
     void reach_settings_model_power_mark_applied(reach_settings_model *model);
     int32_t reach_settings_model_tick_power_caret(reach_settings_model *model,

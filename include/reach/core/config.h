@@ -20,6 +20,18 @@ extern "C"
         REACH_CONFIG_THEME_DARK = 2
     } reach_config_theme_preference;
 
+    typedef enum reach_config_top_bar_style
+    {
+        REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED = 0,
+        REACH_CONFIG_TOP_BAR_STYLE_UNIFIED = 1
+    } reach_config_top_bar_style;
+
+    typedef enum reach_config_top_bar_mode
+    {
+        REACH_CONFIG_TOP_BAR_MODE_DYNAMIC = 0,
+        REACH_CONFIG_TOP_BAR_MODE_STATIC = 1
+    } reach_config_top_bar_mode;
+
     typedef struct reach_config_snapshot
     {
         uint16_t version[32];
@@ -28,6 +40,8 @@ extern "C"
         uint16_t wallpaper_path[260];
         uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
         float dock_height;
+        reach_config_top_bar_style top_bar_style;
+        reach_config_top_bar_mode top_bar_mode;
         int32_t power_screen_off_minutes;
         int32_t power_sleep_minutes;
         int32_t power_lock_minutes;

@@ -1,5 +1,7 @@
 #include "host_internal.h"
 
+#include <math.h>
+
 void reach_host_sync_surface_input_regions(const reach_host *host,
                                            const reach_feature_runtime *desc)
 {
@@ -27,6 +29,57 @@ void reach_host_sync_surface_input_regions(const reach_host *host,
 static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id, int32_t visible)
 {
     reach_layout_set_visible(&host->layout_manager, host->surface_participants[id], visible);
+}
+
+static reach_rect_i32 reach_host_monitor_rect(reach_rect_f32 bounds)
+{
+    return {(int32_t)floorf(bounds.x), (int32_t)floorf(bounds.y),
+            (int32_t)ceilf(bounds.x + bounds.width),
+            (int32_t)ceilf(bounds.y + bounds.height)};
+}
+
+static void reach_host_sync_work_area_reservation(
+    const reach_host *host, const reach_feature_runtime *desc,
+    const reach_feature_surface_geometry *geometry, reach_rect_f32 monitor_bounds)
+{
+    if (host == nullptr || desc == nullptr || geometry == nullptr ||
+        !geometry->manage_monitor_work_area || host->monitors.list == nullptr ||
+        host->monitors.ops.set_work_area == nullptr)
+    {
+        return;
+    }
+
+    reach_rect_i32 monitor = reach_host_monitor_rect(monitor_bounds);
+    reach_rect_i32 work_area = monitor;
+    if (geometry->reserve_monitor_work_area)
+    {
+        if (desc->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_TOP)
+        {
+            float edge_gap = geometry->visible_bounds.y - monitor_bounds.y;
+            if (edge_gap < 0.0f)
+            {
+                edge_gap = 0.0f;
+            }
+            work_area.top = (int32_t)ceilf(geometry->visible_bounds.y +
+                                           geometry->visible_bounds.height + edge_gap);
+        }
+        else if (desc->definition->layout.reservation_edge ==
+                 REACH_LAYOUT_RESERVATION_BOTTOM)
+        {
+            float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
+            float edge_gap =
+                monitor_bottom - (geometry->visible_bounds.y + geometry->visible_bounds.height);
+            if (edge_gap < 0.0f)
+            {
+                edge_gap = 0.0f;
+            }
+            work_area.bottom = (int32_t)floorf(geometry->visible_bounds.y - edge_gap);
+        }
+    }
+    if (work_area.right > work_area.left && work_area.bottom > work_area.top)
+    {
+        (void)host->monitors.ops.set_work_area(host->monitors.list, monitor, work_area);
+    }
 }
 
 static reach_rect_f32 reach_host_available_bounds(const reach_host *host,
@@ -138,7 +191,7 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
 
 static int32_t reach_host_bar_position_only(const reach_feature_runtime *desc)
 {
-    if (desc->definition->surface.bar_reveal.ops == nullptr ||
+    if (!reach_host_bar_reveal_enabled(desc) ||
         desc->definition->surface.bar_reveal.ops->animation == nullptr)
     {
         return 0;
@@ -327,6 +380,10 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             }
         }
         reach_host_set_surface_visible(host, desc->definition->id, 0);
+        reach_feature_surface_geometry hidden_geometry = {};
+        desc->definition->capsule_ops->surface_geometry(desc->capsule, &hidden_geometry);
+        hidden_geometry.reserve_monitor_work_area = 0;
+        reach_host_sync_work_area_reservation(host, desc, &hidden_geometry, ctx->monitor_bounds);
         reach_host_release_native_overlay(host, desc);
         if (preparation != 0)
         {
@@ -386,12 +443,13 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     desc->resolved_bounds = geometry.visible_bounds;
     desc->resolved_bounds_valid = 1;
     surface_ctx.visible_bounds = geometry.visible_bounds;
+    reach_host_sync_work_area_reservation(host, desc, &geometry, ctx->monitor_bounds);
 
     reach_rect_f32 bounds = geometry.visible_bounds;
     if (desc->definition->surface.bar_reveal.ops != nullptr)
     {
-        bounds = reach_host_reconcile_bar_visibility(host, desc->definition->id,
-                                                     geometry.visible_bounds, ctx->monitor_bounds);
+        bounds = reach_host_reconcile_bar_visibility(
+            host, desc->definition->id, geometry.visible_bounds, ctx->monitor_bounds, &geometry);
     }
     reach_shadow_pad shadow_pad = reach_host_surface_shadow_pad(host, desc->definition->id);
     float applied_scale = 1.0f;

@@ -81,6 +81,8 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_animation_manager_init(&model->display_fps_animation, &model->display_fps_track, 1);
     reach_animation_manager_init(&model->display_font_animation, &model->display_font_track, 1);
     reach_animation_manager_init(&model->display_theme_animation, &model->display_theme_track, 1);
+    reach_animation_manager_init(&model->top_bar_style_animation, &model->top_bar_style_track, 1);
+    reach_animation_manager_init(&model->top_bar_mode_animation, &model->top_bar_mode_track, 1);
     reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
     reach_pressable_init(&model->button_pressable);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
@@ -282,12 +284,16 @@ static void reach_settings_layout_toggle_card(const reach_settings_toggle_card_r
     float toggle_width = 40.0f * scale;
     float toggle_height = 22.0f * scale;
     float toggle_x = x + width - 18.0f * scale - toggle_width;
-    float text_x = x + 16.0f * scale + icon_box + 14.0f * scale;
+    float text_x = x + 16.0f * scale;
+    if (rects->icon != nullptr)
+    {
+        *rects->icon = reach_settings_rect(text_x, y + (height - icon_box) * 0.5f, icon_box,
+                                           icon_box);
+        text_x += icon_box + 14.0f * scale;
+    }
     float text_width = toggle_x - 14.0f * scale - text_x;
 
     *rects->card = reach_settings_rect(x, y, width, height);
-    *rects->icon =
-        reach_settings_rect(x + 16.0f * scale, y + (height - icon_box) * 0.5f, icon_box, icon_box);
     *rects->toggle = reach_settings_rect(toggle_x, y + (height - toggle_height) * 0.5f,
                                          toggle_width, toggle_height);
     *rects->title = reach_settings_rect(text_x, y + 15.0f * scale, text_width, 20.0f * scale);
@@ -748,6 +754,25 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             &layout.display_windows_app_subtitle, layout.display_windows_app_options, area_x,
             appearance_y + appearance_card_height + card_spacing, area_width,
             appearance_card_height, scale);
+
+        float desktop_section_y =
+            appearance_y + 2.0f * appearance_card_height + card_spacing + 18.0f * scale;
+        layout.display_desktop_section_title =
+            reach_settings_rect(area_x, desktop_section_y, area_width, 18.0f * scale);
+        float desktop_y = desktop_section_y + 26.0f * scale;
+        reach_settings_toggle_card_rects desktop_cards[] = {
+            {&layout.top_bar_unified_card, nullptr, &layout.top_bar_unified_title,
+             &layout.top_bar_unified_subtitle, &layout.top_bar_unified_toggle},
+            {&layout.top_bar_static_card, nullptr, &layout.top_bar_static_title,
+             &layout.top_bar_static_subtitle, &layout.top_bar_static_toggle},
+        };
+        for (size_t index = 0; index < sizeof(desktop_cards) / sizeof(desktop_cards[0]); ++index)
+        {
+            reach_settings_layout_toggle_card(
+                &desktop_cards[index], area_x,
+                desktop_y + (float)index * (card_height + card_spacing), area_width, card_height,
+                scale);
+        }
     }
 
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_WIFI)
@@ -1019,6 +1044,27 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
              reach_settings_rect_contains(display_cards[index].card, x, y)))
         {
             result.type = display_cards[index].type;
+            return result;
+        }
+    }
+    const struct
+    {
+        reach_rect_f32 card;
+        reach_rect_f32 toggle;
+        reach_settings_hit_type type;
+    } top_bar_cards[] = {
+        {layout->top_bar_unified_card, layout->top_bar_unified_toggle,
+         REACH_SETTINGS_HIT_TOP_BAR_UNIFIED_TOGGLE},
+        {layout->top_bar_static_card, layout->top_bar_static_toggle,
+         REACH_SETTINGS_HIT_TOP_BAR_STATIC_TOGGLE},
+    };
+    for (size_t index = 0; index < sizeof(top_bar_cards) / sizeof(top_bar_cards[0]); ++index)
+    {
+        if (top_bar_cards[index].toggle.width > 0.0f &&
+            (reach_settings_rect_contains(top_bar_cards[index].toggle, x, y) ||
+             reach_settings_rect_contains(top_bar_cards[index].card, x, y)))
+        {
+            result.type = top_bar_cards[index].type;
             return result;
         }
     }

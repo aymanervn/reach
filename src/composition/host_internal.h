@@ -142,6 +142,7 @@ typedef struct reach_surface_bar_reveal_spec
     const reach_bar_reveal_ops *ops;
     int32_t active_layer;
     float span_start_inset_dp;
+    float protected_clearance_dp;
 } reach_surface_bar_reveal_spec;
 
 typedef struct reach_feature_factory
@@ -812,10 +813,13 @@ void reach_host_sync_pointer_move_subscriptions(reach_host *host);
 void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);
 void reach_host_sync_bar_layout_conditions(reach_host *host);
+int32_t reach_host_bar_reveal_enabled(const reach_feature_runtime *runtime);
+float reach_host_bar_protected_clearance(const reach_host *host,
+                                         const reach_feature_runtime *runtime);
 
-reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
-                                                   reach_rect_f32 shown_bounds,
-                                                   reach_rect_f32 monitor_bounds);
+reach_rect_f32 reach_host_reconcile_bar_visibility(
+    reach_host *host, reach_surface_id id, reach_rect_f32 shown_bounds,
+    reach_rect_f32 monitor_bounds, const reach_feature_surface_geometry *geometry);
 reach_result reach_host_cycle_input_language(reach_host *host);
 
 reach_result reach_host_refresh_monitor_layout(reach_host *host);

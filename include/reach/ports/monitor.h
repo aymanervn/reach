@@ -32,6 +32,8 @@ extern "C"
         size_t (*count)(const reach_monitor_list *list);
         const reach_monitor_info *(*get)(const reach_monitor_list *list, size_t index);
         const reach_monitor_info *(*primary)(const reach_monitor_list *list);
+        reach_result (*set_work_area)(reach_monitor_list *list, reach_rect_i32 monitor_bounds,
+                                      reach_rect_i32 work_area);
     } reach_monitor_ops;
 
     typedef struct reach_monitor_port

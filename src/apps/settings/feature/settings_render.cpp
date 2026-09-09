@@ -414,19 +414,22 @@ static void render_display_toggle_card(const reach_settings_render_input *input,
 {
     float radius = reach_settings_scale(input, input->theme->radius_small);
     reach_settings_push_rect(commands, card->card, radius, input->theme->settings_card_background);
-    reach_settings_push_rect(commands, card->icon, radius,
-                             input->theme->settings_icon_box_background);
-    if (card->icon_text != nullptr)
+    if (card->icon.width > 0.0f && card->icon.height > 0.0f)
     {
-        reach_settings_push_text(commands, card->icon, (const uint16_t *)card->icon_text,
-                                 reach_settings_scale(input, REACH_TEXT_SIZE_HEADING),
-                                 REACH_TEXT_WEIGHT_EXTRABOLD, REACH_TEXT_ALIGNMENT_CENTER,
-                                 input->theme->settings_secondary_text, 0);
-    }
-    else
-    {
-        reach_settings_push_icon(commands, card->icon, input->theme->settings_secondary_text,
-                                 card->icon_id, 0.22f);
+        reach_settings_push_rect(commands, card->icon, radius,
+                                 input->theme->settings_icon_box_background);
+        if (card->icon_text != nullptr)
+        {
+            reach_settings_push_text(commands, card->icon, (const uint16_t *)card->icon_text,
+                                     reach_settings_scale(input, REACH_TEXT_SIZE_HEADING),
+                                     REACH_TEXT_WEIGHT_EXTRABOLD, REACH_TEXT_ALIGNMENT_CENTER,
+                                     input->theme->settings_secondary_text, 0);
+        }
+        else
+        {
+            reach_settings_push_icon(commands, card->icon, input->theme->settings_secondary_text,
+                                     card->icon_id, 0.22f);
+        }
     }
     reach_settings_push_text(commands, card->title, (const uint16_t *)card->title_text,
                              reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
@@ -514,6 +517,27 @@ static void render_display_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Application theme",
         (const uint16_t *)u"Supported apps and Windows dialogs",
         reach_settings_model_windows_app_theme(model), accent);
+
+    reach_settings_push_text(
+        commands, layout->display_desktop_section_title,
+        (const uint16_t *)u"Desktop appearance",
+        reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
+        input->text_alignment_leading, input->theme->settings_secondary_text, 1);
+    const display_toggle_card desktop_cards[] = {
+        {layout->top_bar_unified_card, {}, layout->top_bar_unified_title,
+         layout->top_bar_unified_subtitle, layout->top_bar_unified_toggle,
+         REACH_VECTOR_ICON_NONE, nullptr, L"Unified top bar",
+         L"Draw every top bar item inside one pill",
+         reach_animation_manager_value(&model->top_bar_style_animation, 0)},
+        {layout->top_bar_static_card, {}, layout->top_bar_static_title,
+         layout->top_bar_static_subtitle, layout->top_bar_static_toggle, REACH_VECTOR_ICON_NONE,
+         nullptr, L"Static top bar", L"Keep it visible and reserve its screen region",
+         reach_animation_manager_value(&model->top_bar_mode_animation, 0)},
+    };
+    for (size_t index = 0; index < sizeof(desktop_cards) / sizeof(desktop_cards[0]); ++index)
+    {
+        render_display_toggle_card(input, commands, &toggle_style, &desktop_cards[index]);
+    }
 }
 
 static void build_startup_summary(const reach_settings_model *model, uint16_t *text,
