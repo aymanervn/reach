@@ -40,20 +40,24 @@ float reach_bar_reveal_progress(float animated_y, float shown_y, float hidden_y)
     return progress > 1.0f ? 1.0f : progress;
 }
 
+float reach_bar_reserved_edge(reach_bar_edge edge, reach_rect_f32 shown_bounds, float clearance)
+{
+    float resolved_clearance = clearance > 0.0f ? clearance : 0.0f;
+    return edge == REACH_BAR_EDGE_TOP ? shown_bounds.y + shown_bounds.height + resolved_clearance
+                                      : shown_bounds.y - resolved_clearance;
+}
+
 reach_rect_f32 reach_bar_protected_band(reach_bar_edge edge, reach_rect_f32 shown_bounds,
                                         reach_rect_f32 monitor_bounds, float shadow_clearance)
 {
     float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
-    float gap = edge == REACH_BAR_EDGE_TOP
-                    ? shown_bounds.y - monitor_bounds.y
-                    : monitor_bottom - (shown_bounds.y + shown_bounds.height);
-    if (gap < 0.0f)
+    float reserved_edge = reach_bar_reserved_edge(edge, shown_bounds, shadow_clearance);
+    float depth = edge == REACH_BAR_EDGE_TOP ? reserved_edge - monitor_bounds.y
+                                             : monitor_bottom - reserved_edge;
+    if (depth < 0.0f)
     {
-        gap = 0.0f;
+        depth = 0.0f;
     }
-
-    float clearance = shadow_clearance > 0.0f ? shadow_clearance : 0.0f;
-    float depth = gap + shown_bounds.height + clearance;
     if (depth > monitor_bounds.height)
     {
         depth = monitor_bounds.height;

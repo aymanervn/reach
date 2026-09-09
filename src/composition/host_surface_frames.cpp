@@ -53,26 +53,17 @@ static void reach_host_sync_work_area_reservation(const reach_host *host,
     reach_rect_i32 work_area = monitor;
     if (geometry->reserve_monitor_work_area)
     {
+        float clearance =
+            geometry->work_area_clearance > 0.0f ? geometry->work_area_clearance : 0.0f;
         if (desc->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_TOP)
         {
-            float edge_gap = geometry->visible_bounds.y - monitor_bounds.y;
-            if (edge_gap < 0.0f)
-            {
-                edge_gap = 0.0f;
-            }
-            work_area.top = (int32_t)ceilf(geometry->visible_bounds.y +
-                                           geometry->visible_bounds.height + edge_gap);
+            work_area.top = (int32_t)ceilf(
+                reach_bar_reserved_edge(REACH_BAR_EDGE_TOP, geometry->visible_bounds, clearance));
         }
         else if (desc->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_BOTTOM)
         {
-            float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
-            float edge_gap =
-                monitor_bottom - (geometry->visible_bounds.y + geometry->visible_bounds.height);
-            if (edge_gap < 0.0f)
-            {
-                edge_gap = 0.0f;
-            }
-            work_area.bottom = (int32_t)floorf(geometry->visible_bounds.y - edge_gap);
+            work_area.bottom = (int32_t)floorf(reach_bar_reserved_edge(
+                REACH_BAR_EDGE_BOTTOM, geometry->visible_bounds, clearance));
         }
     }
     if (work_area.right > work_area.left && work_area.bottom > work_area.top)

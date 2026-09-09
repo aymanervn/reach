@@ -442,11 +442,13 @@ static void render_display_toggle_card(const reach_settings_render_input *input,
     reach_ui_toggle_render(commands, card->toggle, toggle_style, card->position);
 }
 
-static void render_display_theme_choice_card(
-    const reach_settings_render_input *input, reach_render_command_buffer *commands,
-    reach_rect_f32 card, reach_rect_f32 title, reach_rect_f32 subtitle,
-    const reach_rect_f32 options[REACH_SETTINGS_THEME_OPTION_COUNT], const uint16_t *title_text,
-    const uint16_t *subtitle_text, reach_config_theme_preference selected, reach_color accent)
+static void render_display_selector_card(const reach_settings_render_input *input,
+                                         reach_render_command_buffer *commands, reach_rect_f32 card,
+                                         reach_rect_f32 title, reach_rect_f32 subtitle,
+                                         reach_rect_f32 selector, const uint16_t *title_text,
+                                         const uint16_t *subtitle_text,
+                                         const uint16_t *const *labels, size_t label_count,
+                                         float selection_position, reach_color accent)
 {
     reach_settings_push_rect(commands, card,
                              reach_settings_scale(input, input->theme->radius_small),
@@ -459,16 +461,10 @@ static void render_display_theme_choice_card(
                              REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
                              input->theme->settings_secondary_text, 1);
 
-    const uint16_t *labels[REACH_SETTINGS_THEME_OPTION_COUNT] = {
-        (const uint16_t *)u"Follow Reach", (const uint16_t *)u"Light", (const uint16_t *)u"Dark"};
     reach_ui_selection_item_style style = reach_settings_pill_style(input, accent);
     style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL);
-    for (size_t option = 0; option < REACH_SETTINGS_THEME_OPTION_COUNT; ++option)
-    {
-        reach_ui_selection_item_render(commands, options[option], labels[option], &style,
-                                       selected == (reach_config_theme_preference)option ? 1.0f
-                                                                                         : 0.0f);
-    }
+    reach_ui_segmented_selector_render(commands, selector, labels, label_count, &style,
+                                       selection_position);
 }
 
 static void render_display_page(const reach_settings_render_input *input,
@@ -506,48 +502,47 @@ static void render_display_page(const reach_settings_render_input *input,
         commands, layout->display_windows_section_title, (const uint16_t *)u"System appearance",
         reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
         input->text_alignment_leading, input->theme->settings_secondary_text, 1);
-    render_display_theme_choice_card(
+    const uint16_t *theme_labels[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
+        (const uint16_t *)u"Follow Reach", (const uint16_t *)u"Light", (const uint16_t *)u"Dark"};
+    render_display_selector_card(
         input, commands, layout->display_windows_system_card, layout->display_windows_system_title,
-        layout->display_windows_system_subtitle, layout->display_windows_system_options,
+        layout->display_windows_system_subtitle, layout->display_windows_system_selector,
         (const uint16_t *)u"System theme", (const uint16_t *)u"Taskbar, Start, and system surfaces",
-        reach_settings_model_windows_system_theme(model), accent);
-    render_display_theme_choice_card(
+        theme_labels, REACH_SETTINGS_SELECTOR_ITEM_COUNT,
+        (float)reach_settings_model_windows_system_theme(model), accent);
+    render_display_selector_card(
         input, commands, layout->display_windows_app_card, layout->display_windows_app_title,
-        layout->display_windows_app_subtitle, layout->display_windows_app_options,
+        layout->display_windows_app_subtitle, layout->display_windows_app_selector,
         (const uint16_t *)u"Application theme",
-        (const uint16_t *)u"Supported apps and Windows dialogs",
-        reach_settings_model_windows_app_theme(model), accent);
+        (const uint16_t *)u"Supported apps and Windows dialogs", theme_labels,
+        REACH_SETTINGS_SELECTOR_ITEM_COUNT, (float)reach_settings_model_windows_app_theme(model),
+        accent);
 
     reach_settings_push_text(
         commands, layout->display_desktop_section_title, (const uint16_t *)u"Desktop appearance",
         reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
         input->text_alignment_leading, input->theme->settings_secondary_text, 1);
-    const display_toggle_card desktop_cards[] = {
-        {layout->top_bar_unified_card,
-         {},
-         layout->top_bar_unified_title,
-         layout->top_bar_unified_subtitle,
-         layout->top_bar_unified_toggle,
-         REACH_VECTOR_ICON_NONE,
-         nullptr,
-         L"Unified top bar",
-         L"Draw every top bar item inside one pill",
-         reach_animation_manager_value(&model->top_bar_style_animation, 0)},
-        {layout->top_bar_static_card,
-         {},
-         layout->top_bar_static_title,
-         layout->top_bar_static_subtitle,
-         layout->top_bar_static_toggle,
-         REACH_VECTOR_ICON_NONE,
-         nullptr,
-         L"Auto hide top bar",
-         L"Hide it when a window enters its screen region",
-         reach_animation_manager_value(&model->top_bar_mode_animation, 0)},
-    };
-    for (size_t index = 0; index < sizeof(desktop_cards) / sizeof(desktop_cards[0]); ++index)
-    {
-        render_display_toggle_card(input, commands, &toggle_style, &desktop_cards[index]);
-    }
+    const uint16_t *top_bar_style_labels[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
+        (const uint16_t *)u"Split", (const uint16_t *)u"Unified", (const uint16_t *)u"Simple"};
+    render_display_selector_card(
+        input, commands, layout->top_bar_style_card, layout->top_bar_style_title,
+        layout->top_bar_style_subtitle, layout->top_bar_style_selector,
+        (const uint16_t *)u"Top bar style",
+        (const uint16_t *)u"Choose how top bar items are grouped and framed", top_bar_style_labels,
+        REACH_SETTINGS_SELECTOR_ITEM_COUNT,
+        reach_animation_manager_value(&model->top_bar_style_animation, 0), accent);
+    display_toggle_card auto_hide = {
+        layout->top_bar_auto_hide_card,
+        {},
+        layout->top_bar_auto_hide_title,
+        layout->top_bar_auto_hide_subtitle,
+        layout->top_bar_auto_hide_toggle,
+        REACH_VECTOR_ICON_NONE,
+        nullptr,
+        L"Auto hide top bar",
+        L"Hide it when a window enters its screen region",
+        reach_animation_manager_value(&model->top_bar_mode_animation, 0)};
+    render_display_toggle_card(input, commands, &toggle_style, &auto_hide);
 }
 
 static void build_startup_summary(const reach_settings_model *model, uint16_t *text,

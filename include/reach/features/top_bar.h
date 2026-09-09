@@ -56,6 +56,7 @@ extern "C"
     typedef struct reach_top_bar_layout
     {
         reach_rect_f32 bounds;
+        float app_clearance;
         reach_rect_f32 pills[REACH_TOP_BAR_PILL_COUNT];
         int32_t pill_visible[REACH_TOP_BAR_PILL_COUNT];
         reach_rect_f32 power_button;

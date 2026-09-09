@@ -40,7 +40,7 @@ extern "C"
 #define REACH_SETTINGS_ACCOUNT_FIELD_NEW 1
 #define REACH_SETTINGS_ACCOUNT_FIELD_CONFIRM 2
 #define REACH_SETTINGS_ACCOUNT_FIELD_COUNT 3
-#define REACH_SETTINGS_THEME_OPTION_COUNT 3
+#define REACH_SETTINGS_SELECTOR_ITEM_COUNT 3
 #define REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT 3
 #define REACH_SETTINGS_WIFI_FIELD_NONE (-1)
 #define REACH_SETTINGS_WIFI_FIELD_KEY 0
@@ -83,8 +83,8 @@ extern "C"
         REACH_SETTINGS_HIT_DISPLAY_THEME_TOGGLE,
         REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME,
         REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME,
-        REACH_SETTINGS_HIT_TOP_BAR_UNIFIED_TOGGLE,
-        REACH_SETTINGS_HIT_TOP_BAR_STATIC_TOGGLE,
+        REACH_SETTINGS_HIT_TOP_BAR_STYLE,
+        REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
         REACH_SETTINGS_HIT_STARTUP_TOGGLE,
@@ -418,20 +418,20 @@ extern "C"
         reach_rect_f32 display_windows_system_card;
         reach_rect_f32 display_windows_system_title;
         reach_rect_f32 display_windows_system_subtitle;
-        reach_rect_f32 display_windows_system_options[REACH_SETTINGS_THEME_OPTION_COUNT];
+        reach_rect_f32 display_windows_system_selector;
         reach_rect_f32 display_windows_app_card;
         reach_rect_f32 display_windows_app_title;
         reach_rect_f32 display_windows_app_subtitle;
-        reach_rect_f32 display_windows_app_options[REACH_SETTINGS_THEME_OPTION_COUNT];
+        reach_rect_f32 display_windows_app_selector;
         reach_rect_f32 display_desktop_section_title;
-        reach_rect_f32 top_bar_unified_card;
-        reach_rect_f32 top_bar_unified_title;
-        reach_rect_f32 top_bar_unified_subtitle;
-        reach_rect_f32 top_bar_unified_toggle;
-        reach_rect_f32 top_bar_static_card;
-        reach_rect_f32 top_bar_static_title;
-        reach_rect_f32 top_bar_static_subtitle;
-        reach_rect_f32 top_bar_static_toggle;
+        reach_rect_f32 top_bar_style_card;
+        reach_rect_f32 top_bar_style_title;
+        reach_rect_f32 top_bar_style_subtitle;
+        reach_rect_f32 top_bar_style_selector;
+        reach_rect_f32 top_bar_auto_hide_card;
+        reach_rect_f32 top_bar_auto_hide_title;
+        reach_rect_f32 top_bar_auto_hide_subtitle;
+        reach_rect_f32 top_bar_auto_hide_toggle;
         reach_rect_f32 account_card;
         reach_rect_f32 account_avatar;
         reach_rect_f32 account_name;
@@ -512,6 +512,7 @@ extern "C"
         size_t startup_index;
         size_t installed_app_index;
         reach_config_theme_preference display_theme_preference;
+        reach_config_top_bar_style top_bar_style;
         size_t wifi_index;
         size_t wifi_security_option;
         size_t bluetooth_index;
@@ -637,7 +638,8 @@ extern "C"
                                                 reach_config_top_bar_style style);
     reach_config_top_bar_style
     reach_settings_model_top_bar_style(const reach_settings_model *model);
-    int32_t reach_settings_model_toggle_top_bar_style(reach_settings_model *model);
+    int32_t reach_settings_model_select_top_bar_style(reach_settings_model *model,
+                                                      reach_config_top_bar_style style);
     void reach_settings_model_set_top_bar_mode(reach_settings_model *model,
                                                reach_config_top_bar_mode mode);
     reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model);

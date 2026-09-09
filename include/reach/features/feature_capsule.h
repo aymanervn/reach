@@ -109,6 +109,7 @@ extern "C"
         int32_t synchronize_presentation;
         int32_t manage_monitor_work_area;
         int32_t reserve_monitor_work_area;
+        float work_area_clearance;
         int32_t disable_bar_reveal;
         int32_t force_topmost;
         float notch_anchor_x;
