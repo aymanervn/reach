@@ -432,37 +432,287 @@ static void test_close_requires_completion_before_teardown(void)
     reach_stage_destroy(stage);
 }
 
-static void test_preparation_ignores_unrelated_results_and_recovers_from_failure(void)
+static void test_selected_close_starts_moving_immediately(void)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
     reach_stage_open_window window = make_window(1, make_rect(100, 120, 640, 480));
-    window.minimized = 1;
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &window, 1);
     advance_stage(stage, 30, 0.016);
     reach_stage_state *state = const_cast<reach_stage_state *>(reach_stage_state_ptr(stage));
     state->has_selection = 1;
     state->selected_index = 0;
+    reach_rect_f32 settled = state->tiles[0].current_rect;
     reach_stage_begin_close(stage);
     const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
     reach_feature_tick_result tick = {};
-    ops->tick(stage, 1.0, &tick);
-    expect_true(!ops->needs_frame(stage), "preparation sleeps until the worker completion event");
-    ops->window_prepared(stage, 2, REACH_ERROR, &tick);
-    expect_true(state->close_phase == REACH_STAGE_CLOSE_PREPARING,
-                "an unrelated completion cannot advance the selected window");
-    ops->window_prepared(stage, 1, REACH_ERROR, &tick);
-    expect_true(state->close_failed && state->close_phase != REACH_STAGE_CLOSE_PREPARING,
-                "a matching failure releases the preparation wait");
+    ops->tick(stage, 0.016, &tick);
+    expect_true(state->close_phase == REACH_STAGE_CLOSE_MOVING,
+                "a selected close starts in the moving phase");
+    expect_true(!reach_rect_equal(state->tiles[0].current_rect, settled),
+                "the selected thumbnail moves on the first animation tick");
+    expect_true(ops->needs_frame(stage), "the selected close keeps requesting animation frames");
+    reach_stage_destroy(stage);
+}
+
+static void test_desktop_uses_a_shorter_relative_animation(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_set_animation_seconds(stage, 1.0f);
+    reach_stage_open_window windows[2] = {make_window(1, make_rect(100, 120, 1200, 675)),
+                                          make_desktop(100, make_rect(0, 0, 1920, 1080))};
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
+
+    reach_feature_tick_result tick = {};
+    reach_stage_capsule_ops()->tick(stage, 0.35, &tick);
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    expect_near(state->desktop_progress, 1.0f,
+                "Desktop settles after its relative animation segment");
+    expect_true(state->progress > 0.0f && state->progress < 1.0f,
+                "app thumbnails retain the configured Stage duration");
+    reach_stage_destroy(stage);
+}
+
+static void test_desktop_only_close_has_no_hidden_app_wait(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_set_animation_seconds(stage, 1.0f);
+    reach_stage_open_window desktop = make_desktop(100, make_rect(0, 0, 1920, 1080));
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &desktop, 1);
+    advance_stage(stage, 1, 0.35);
+
+    reach_stage_begin_close(stage);
+    reach_feature_tick_result tick = {};
+    reach_stage_capsule_ops()->tick(stage, 0.35, &tick);
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
+                "Desktop-only close does not wait for an invisible app track");
+    reach_stage_destroy(stage);
+}
+
+static reach_capsule_pointer_result click_tile(reach_stage *stage, size_t index)
+{
+    const reach_stage_tile *tile = &reach_stage_state_ptr(stage)->tiles[index];
+    reach_pointer_event event = {};
+    event.button = REACH_POINTER_BUTTON_PRIMARY;
+    event.x = (int32_t)(tile->current_rect.x + tile->current_rect.width * 0.5f);
+    event.y = (int32_t)(tile->current_rect.y + tile->current_rect.height * 0.5f);
+    event.kind = REACH_POINTER_EVENT_DOWN;
+    reach_capsule_pointer_result result = {};
+    reach_stage_capsule_ops()->handle_pointer(stage, &event, &result);
+    event.kind = REACH_POINTER_EVENT_UP;
+    reach_stage_capsule_ops()->handle_pointer(stage, &event, &result);
+    return result;
+}
+
+static void test_tile_clicks_publish_immediate_window_actions(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window app = make_window(1, make_rect(100, 120, 1200, 675));
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &app, 1);
     advance_stage(stage, 30, 0.016);
-    expect_true(!reach_stage_is_open(stage), "failed preparation cannot strand an opaque Stage");
+    reach_capsule_pointer_result result = click_tile(stage, 0);
+    expect_true(result.action.kind == REACH_FEATURE_ACTION_ACTIVATE_WINDOW,
+                "an app tile publishes ordinary activation");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) != 0,
+                "an app tile starts Stage close before activation");
+
+    reach_stage_force_close(stage);
+    app.minimized = 1;
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &app, 1);
+    advance_stage(stage, 30, 0.016);
+    result = click_tile(stage, 0);
+    expect_true(result.action.kind == REACH_FEATURE_ACTION_ACTIVATE_WINDOW,
+                "a minimized app tile publishes ordinary activation");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0,
+                "a minimized app queues restore before Stage begins moving");
+
+    reach_stage_force_close(stage);
+    reach_stage_open_window desktop = make_desktop(100, make_rect(0, 0, 1920, 1080));
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &desktop, 1);
+    advance_stage(stage, 30, 0.016);
+    result = click_tile(stage, 0);
+    expect_true(result.action.kind == REACH_FEATURE_ACTION_MINIMIZE_ALL_WINDOWS,
+                "the Desktop tile publishes minimize all");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) != 0,
+                "the Desktop tile starts Stage close before minimizing apps");
+    reach_stage_destroy(stage);
+}
+
+static void test_minimized_selection_accepts_restore_during_close(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_rect_f32 bounds = make_rect(0, 0, 1920, 1080);
+    reach_stage_open_window app = make_window(1, make_rect(100, 120, 1200, 675));
+    app.minimized = 1;
+    reach_stage_open(stage, bounds, 1, &app, 1);
+    advance_stage(stage, 30, 0.016);
+    reach_stage_state *state = const_cast<reach_stage_state *>(reach_stage_state_ptr(stage));
+    state->has_selection = 1;
+    state->selected_index = 0;
+    reach_stage_begin_close(stage);
+    reach_feature_tick_result tick = {};
+    reach_stage_capsule_ops()->tick(stage, 0.016, &tick);
+
+    app.minimized = 0;
+    expect_true(reach_stage_update_windows(stage, &app, 1),
+                "a selected minimized app can publish restoration during close");
+    reach_stage_thumbnail_placement placement = {};
+    reach_stage_thumbnail_at(stage, 0, &placement);
+    expect_true(placement.visible, "the restored live thumbnail joins the running animation");
+    reach_stage_destroy(stage);
+}
+
+static void test_app_grid_fits_inside_desktop_preview(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_rect_f32 bounds = make_rect(0, 0, 1920, 1080);
+    reach_stage_open_window windows[4] = {
+        make_window(1, make_rect(0, 0, 1600, 900)), make_window(2, make_rect(1600, 0, 900, 800)),
+        make_window(3, make_rect(1600, 800, 900, 800)), make_desktop(100, bounds)};
+    windows[1].monitor_index = 1;
+    windows[1].monitor_portrait = 1;
+    windows[2].monitor_index = 1;
+    windows[2].monitor_portrait = 1;
+    reach_stage_open(stage, bounds, 1, windows, 4);
+    advance_stage(stage, 30, 0.016);
+
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    size_t desktop_index = find_desktop_tile(state);
+    const reach_rect_f32 desktop = state->tiles[desktop_index].target_rect;
+    for (size_t index = 0; index < state->tile_count; ++index)
+    {
+        const reach_stage_tile *tile = &state->tiles[index];
+        if (tile->desktop)
+        {
+            continue;
+        }
+        expect_true(tile->target_rect.x >= desktop.x + 23.0f,
+                    "app grid keeps its left inset inside Desktop");
+        expect_true(tile->target_rect.x + tile->target_rect.width <=
+                        desktop.x + desktop.width - 23.0f,
+                    "app grid keeps its right inset inside Desktop");
+        expect_true(tile->target_rect.y - tile->bar_height >= desktop.y + 23.0f,
+                    "app grid keeps its top inset inside Desktop");
+        expect_true(tile->target_rect.y + tile->target_rect.height <=
+                        desktop.y + desktop.height - 23.0f,
+                    "app grid keeps its bottom inset inside Desktop");
+    }
+    reach_stage_destroy(stage);
+}
+
+static void test_portrait_monitor_apps_stack_by_screen_position(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window windows[2] = {make_window(1, make_rect(1920, 900, 900, 700)),
+                                          make_window(2, make_rect(1920, 0, 900, 800))};
+    windows[0].monitor_portrait = 1;
+    windows[1].monitor_portrait = 1;
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
+    advance_stage(stage, 30, 0.016);
+
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    float lower_center = state->tiles[0].target_rect.x + state->tiles[0].target_rect.width * 0.5f;
+    float upper_center = state->tiles[1].target_rect.x + state->tiles[1].target_rect.width * 0.5f;
+    expect_true(state->tiles[1].target_rect.y < state->tiles[0].target_rect.y,
+                "portrait-monitor apps preserve their vertical screen order");
+    expect_near(lower_center, upper_center, "portrait-monitor apps share one vertical column");
+    expect_true(state->tiles[0].target_rect.height > 350.0f &&
+                    state->tiles[1].target_rect.height > 350.0f,
+                "portrait-monitor apps use the available vertical space");
+    reach_stage_destroy(stage);
+}
+
+static void test_portrait_monitor_receives_more_scale_when_width_is_constrained(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_rect_f32 bounds = make_rect(0, 0, 1920, 1080);
+    reach_stage_open_window windows[3] = {make_window(1, make_rect(0, 0, 1600, 900)),
+                                          make_window(2, make_rect(1920, 0, 900, 1600)),
+                                          make_desktop(100, bounds)};
+    windows[1].monitor_index = 1;
+    windows[1].monitor_portrait = 1;
+    reach_stage_open(stage, bounds, 1, windows, 3);
+    advance_stage(stage, 30, 0.016);
+
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    expect_true(state->tiles[1].target_rect.height > state->tiles[0].target_rect.height * 1.25f,
+                "portrait-monitor apps receive more scale than landscape-monitor apps");
+    reach_stage_destroy(stage);
+}
+
+static void test_app_targets_are_visually_centered(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window windows[2] = {make_window(1, make_rect(0, 0, 1200, 900)),
+                                          make_window(2, make_rect(1920, 0, 2100, 900))};
+    windows[1].monitor_index = 1;
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
+    advance_stage(stage, 30, 0.016);
+
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    float left = state->tiles[0].target_rect.x < state->tiles[1].target_rect.x
+                     ? state->tiles[0].target_rect.x
+                     : state->tiles[1].target_rect.x;
+    float right0 = state->tiles[0].target_rect.x + state->tiles[0].target_rect.width;
+    float right1 = state->tiles[1].target_rect.x + state->tiles[1].target_rect.width;
+    float right = right0 > right1 ? right0 : right1;
+    expect_near(left - 24.0f, 1896.0f - right,
+                "actual fitted thumbnails have balanced outer margins");
+    reach_stage_destroy(stage);
+}
+
+static void test_adjacent_apps_use_a_compact_gap(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window windows[2] = {make_window(1, make_rect(0, 0, 1600, 900)),
+                                          make_window(2, make_rect(1600, 0, 1600, 900))};
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
+    advance_stage(stage, 30, 0.016);
+
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    float gap = state->tiles[1].target_rect.x -
+                (state->tiles[0].target_rect.x + state->tiles[0].target_rect.width);
+    expect_true(gap >= 16.0f && gap <= 32.0f, "adjacent apps use a compact visual gap");
+    reach_stage_destroy(stage);
+}
+
+static void test_single_app_uses_the_available_stage_area(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window app = make_window(1, make_rect(0, 0, 1600, 900));
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &app, 1);
+    advance_stage(stage, 30, 0.016);
+
+    const reach_rect_f32 target = reach_stage_state_ptr(stage)->tiles[0].target_rect;
+    expect_true(target.width > 1600.0f && target.height > 850.0f,
+                "a single app uses most of the available Stage area");
     reach_stage_destroy(stage);
 }
 
 int main(void)
 {
     test_close_requires_completion_before_teardown();
-    test_preparation_ignores_unrelated_results_and_recovers_from_failure();
+    test_selected_close_starts_moving_immediately();
+    test_desktop_uses_a_shorter_relative_animation();
+    test_desktop_only_close_has_no_hidden_app_wait();
+    test_tile_clicks_publish_immediate_window_actions();
+    test_minimized_selection_accepts_restore_during_close();
+    test_app_grid_fits_inside_desktop_preview();
+    test_portrait_monitor_apps_stack_by_screen_position();
+    test_portrait_monitor_receives_more_scale_when_width_is_constrained();
+    test_app_targets_are_visually_centered();
+    test_adjacent_apps_use_a_compact_gap();
+    test_single_app_uses_the_available_stage_area();
     test_open_and_close_state_machine();
     test_force_close_keeps_configured_animation();
     test_closing_stage_finishes_without_external_wake_ups();

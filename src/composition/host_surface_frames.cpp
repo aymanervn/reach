@@ -250,12 +250,6 @@ static void reach_host_register_native_overlay(reach_host *host, reach_feature_r
 static reach_result reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
                                                    reach_rect_f32 visible_bounds)
 {
-    if (host->window_preparation.request != 0 &&
-        host->window_preparation.surface == desc->definition->id &&
-        !host->window_preparation.pending && !host->window_preparation.completed)
-    {
-        return REACH_OK;
-    }
     const reach_feature_native_overlay_ops *ops = desc->definition->surface_ops->native_overlay;
     if (ops == nullptr || ops->generation == nullptr || ops->count == nullptr ||
         ops->item == nullptr || host->window_thumbnails.ops.set_placement == nullptr)
@@ -287,9 +281,21 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
         {
             if (item.placement.visible || item.placement.background_visible)
             {
-                placement_result = REACH_ERROR;
+                reach_window_thumbnail_id created = REACH_WINDOW_THUMBNAIL_NONE;
+                if (host->window_thumbnails.ops.create != nullptr &&
+                    host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails,
+                                                       item.source, item.plane,
+                                                       &created) == REACH_OK)
+                {
+                    desc->native_overlay_ids[index] = created;
+                    id = created;
+                    desc->native_overlay_registered = 1;
+                }
             }
-            continue;
+            if (id == REACH_WINDOW_THUMBNAIL_NONE)
+            {
+                continue;
+            }
         }
         item.placement.destination.x -= visible_bounds.x;
         item.placement.destination.y -= visible_bounds.y;
@@ -354,29 +360,12 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     int32_t frame_active = active;
     if (!visible)
     {
-        uint64_t preparation = host->window_preparation.surface == desc->definition->id
-                                   ? host->window_preparation.request
-                                   : 0;
-        if (preparation != 0)
-        {
-            host->window_preparation.pending = 0;
-            if (!reach_app_control_cancel_preparation(host->app_control, preparation))
-            {
-                reach_host_set_surface_visible(host, desc->definition->id, 1);
-                return REACH_OK;
-            }
-        }
         reach_host_set_surface_visible(host, desc->definition->id, 0);
         reach_feature_surface_geometry hidden_geometry = {};
         desc->definition->capsule_ops->surface_geometry(desc->capsule, &hidden_geometry);
         hidden_geometry.reserve_monitor_work_area = 0;
         reach_host_sync_work_area_reservation(host, desc, &hidden_geometry, ctx->monitor_bounds);
         reach_host_release_native_overlay(host, desc);
-        if (preparation != 0)
-        {
-            reach_app_control_release_preparation(host->app_control, preparation);
-            host->window_preparation = {};
-        }
         return REACH_OK;
     }
     reach_host_set_surface_visible(host, desc->definition->id, visible);
@@ -501,29 +490,30 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     int32_t render_needed = host->dirty.render || desc->surface->dirty_flags || layout_changed ||
                             geometry_changed || scale_changed || transition_frame_active ||
                             (window_changed && !position_only);
+    reach_result native_overlay_result = REACH_OK;
     if (result == REACH_OK && active && desc->definition->surface_ops->native_overlay != nullptr)
     {
-        result = reach_host_sync_native_overlay(host, desc, geometry.visible_bounds);
+        native_overlay_result = reach_host_sync_native_overlay(host, desc, geometry.visible_bounds);
     }
-    if (result != REACH_OK)
+    if (result != REACH_OK ||
+        (native_overlay_result != REACH_OK && geometry.synchronize_presentation))
     {
-        reach_host_start_window_preparation(host, desc, result);
+        reach_result frame_result = result != REACH_OK ? result : native_overlay_result;
         if (desc->definition->capsule_ops->presentation_committed != nullptr)
         {
             reach_feature_tick_result tick = {};
-            desc->definition->capsule_ops->presentation_committed(desc->capsule, result, &tick);
+            desc->definition->capsule_ops->presentation_committed(desc->capsule, frame_result,
+                                                                  &tick);
             reach_host_apply_feature_tick_result(host, desc, &tick);
         }
-        return result;
+        return frame_result;
     }
     if (!frame_active || !render_needed)
     {
         return result;
     }
     result = reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
-    bool preparing = host->window_preparation.pending &&
-                     host->window_preparation.surface == desc->definition->id;
-    if (preparing || geometry.synchronize_presentation)
+    if (geometry.synchronize_presentation)
     {
         if (result == REACH_OK)
         {
@@ -531,7 +521,6 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                          ? desc->surface->renderer.ops.synchronize(desc->surface->renderer.backend)
                          : REACH_ERROR;
         }
-        reach_host_start_window_preparation(host, desc, result);
         if (desc->definition->capsule_ops->presentation_committed != nullptr)
         {
             reach_feature_tick_result tick = {};

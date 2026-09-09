@@ -21,6 +21,8 @@ typedef struct reach_window_thumbnail_entry
     int32_t background_set;
     BYTE background_opacity;
     int32_t opacity_set;
+    DWM_THUMBNAIL_PROPERTIES properties;
+    int32_t properties_set;
 } reach_window_thumbnail_entry;
 
 struct reach_window_thumbnails
@@ -151,6 +153,16 @@ reach_window_thumbnail_find(reach_window_thumbnails *thumbnails, reach_window_th
         }
     }
     return nullptr;
+}
+
+static int32_t reach_window_thumbnail_properties_equal(const DWM_THUMBNAIL_PROPERTIES *left,
+                                                       const DWM_THUMBNAIL_PROPERTIES *right)
+{
+    return left->dwFlags == right->dwFlags &&
+           EqualRect(&left->rcDestination, &right->rcDestination) &&
+           EqualRect(&left->rcSource, &right->rcSource) && left->opacity == right->opacity &&
+           left->fVisible == right->fVisible &&
+           left->fSourceClientAreaOnly == right->fSourceClientAreaOnly;
 }
 
 static reach_result reach_window_thumbnail_set_target(reach_window_thumbnails *thumbnails,
@@ -414,25 +426,18 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
     props.opacity = (BYTE)(clamped * 255.0f + 0.5f);
     props.fSourceClientAreaOnly = FALSE;
 
-    return SUCCEEDED(DwmUpdateThumbnailProperties(entry->handle, &props)) ? REACH_OK : REACH_ERROR;
-}
-
-static reach_window_id
-reach_window_thumbnail_cover_window(const reach_window_thumbnails *thumbnails)
-{
-    if (thumbnails != nullptr)
+    if (entry->properties_set &&
+        reach_window_thumbnail_properties_equal(&entry->properties, &props))
     {
-        for (size_t index = 0; index < thumbnails->entry_count; ++index)
-        {
-            const reach_window_thumbnail_entry *entry = &thumbnails->entries[index];
-            if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET && entry->opacity_set &&
-                entry->background_opacity == 255 && IsWindowVisible(entry->destination))
-            {
-                return reinterpret_cast<reach_window_id>(entry->destination);
-            }
-        }
+        return REACH_OK;
     }
-    return 0;
+    if (FAILED(DwmUpdateThumbnailProperties(entry->handle, &props)))
+    {
+        return REACH_ERROR;
+    }
+    entry->properties = props;
+    entry->properties_set = 1;
+    return REACH_OK;
 }
 
 static reach_result reach_window_thumbnail_destroy_all(reach_window_thumbnails *thumbnails)
@@ -492,6 +497,5 @@ reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port 
     out_port->ops.set_placement = reach_window_thumbnail_set_placement;
     out_port->ops.destroy_all = reach_window_thumbnail_destroy_all;
     out_port->ops.destroy = reach_window_thumbnail_destroy;
-    out_port->ops.cover_window = reach_window_thumbnail_cover_window;
     return REACH_OK;
 }

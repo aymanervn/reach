@@ -9,6 +9,10 @@
 #define REACH_STAGE_BAR_MAX_BOX_RATIO 0.20f
 #define REACH_STAGE_PRESENCE_MIN_SCALE 0.88f
 #define REACH_STAGE_DESKTOP_EDGE_GAP 20.0f
+#define REACH_STAGE_CONTENT_INSET 24.0f
+#define REACH_STAGE_TILE_GAP 20.0f
+#define REACH_STAGE_SECTION_GAP 28.0f
+#define REACH_STAGE_PORTRAIT_SCALE_WEIGHT 1.30f
 
 typedef struct reach_stage_section
 {
@@ -18,6 +22,7 @@ typedef struct reach_stage_section
     size_t count;
     size_t columns;
     size_t rows;
+    float scale;
 } reach_stage_section;
 
 typedef struct reach_stage_sections
@@ -28,6 +33,13 @@ typedef struct reach_stage_sections
 
 static void reach_stage_resolve_section_grid(reach_stage_section *section)
 {
+    if (section->portrait)
+    {
+        section->columns = 1;
+        section->rows = section->count;
+        return;
+    }
+
     section->columns = 1;
     while (section->columns * section->columns < section->count)
     {
@@ -40,26 +52,41 @@ static void reach_stage_resolve_section_grid(reach_stage_section *section)
     }
 }
 
-static float reach_stage_box_width(const reach_stage_section *section)
+static float reach_stage_box_height(float scale)
 {
-    return section->portrait ? REACH_STAGE_BOX_SHORT : REACH_STAGE_BOX_LONG;
+    return REACH_STAGE_BOX_SHORT * scale;
 }
 
-static float reach_stage_box_height(const reach_stage_section *section)
+static float reach_stage_box_bar(float box_height, float bar_height)
 {
-    return section->portrait ? REACH_STAGE_BOX_LONG : REACH_STAGE_BOX_SHORT;
+    float limit = box_height * REACH_STAGE_BAR_MAX_BOX_RATIO;
+    return bar_height < limit ? bar_height : limit;
+}
+
+static float reach_stage_tile_aspect(const reach_stage_tile *tile)
+{
+    return tile->source_rect.width > 0.0f && tile->source_rect.height > 0.0f
+               ? tile->source_rect.width / tile->source_rect.height
+               : REACH_STAGE_BOX_LONG / REACH_STAGE_BOX_SHORT;
+}
+
+static float reach_stage_tile_layout_width(const reach_stage_tile *tile, float box_height,
+                                           float bar_height, float border_thickness)
+{
+    float height =
+        box_height - reach_stage_box_bar(box_height, bar_height) - border_thickness * 2.0f;
+    return height > 0.0f ? height * reach_stage_tile_aspect(tile) : 0.0f;
 }
 
 static reach_rect_f32 reach_stage_content_area(reach_rect_f32 monitor_bounds, float dpi_scale)
 {
-    float inset_x = monitor_bounds.width * 0.06f + 24.0f * dpi_scale;
-    float inset_y = monitor_bounds.height * 0.08f + 24.0f * dpi_scale;
+    float inset = REACH_STAGE_CONTENT_INSET * dpi_scale;
 
     reach_rect_f32 area = {};
-    area.x = monitor_bounds.x + inset_x;
-    area.y = monitor_bounds.y + inset_y;
-    area.width = monitor_bounds.width - inset_x * 2.0f;
-    area.height = monitor_bounds.height - inset_y * 2.0f;
+    area.x = monitor_bounds.x + inset;
+    area.y = monitor_bounds.y + inset;
+    area.width = monitor_bounds.width - inset * 2.0f;
+    area.height = monitor_bounds.height - inset * 2.0f;
     return area;
 }
 
@@ -105,6 +132,26 @@ static void reach_stage_collect_sections(const reach_stage_state *state,
         reach_stage_section *section = &sections->entries[sections->count++];
         *section = buckets[rank];
 
+        for (size_t index = 1; index < section->count; ++index)
+        {
+            size_t current = section->indices[index];
+            size_t at = index;
+            while (at > 0)
+            {
+                size_t previous = section->indices[at - 1];
+                const reach_rect_f32 *current_rect = &state->tiles[current].source_rect;
+                const reach_rect_f32 *previous_rect = &state->tiles[previous].source_rect;
+                if (previous_rect->y < current_rect->y ||
+                    (previous_rect->y == current_rect->y && previous_rect->x <= current_rect->x))
+                {
+                    break;
+                }
+                section->indices[at] = previous;
+                --at;
+            }
+            section->indices[at] = current;
+        }
+
         reach_stage_resolve_section_grid(section);
     }
 }
@@ -121,39 +168,102 @@ static reach_stage_tile *reach_stage_desktop_tile(reach_stage_state *state)
     return nullptr;
 }
 
-static float reach_stage_solve_box_scale(const reach_stage_sections *sections, reach_rect_f32 area,
-                                         float gap)
+static float reach_stage_row_width(const reach_stage_state *state,
+                                   const reach_stage_section *section, size_t row, float scale,
+                                   float tile_gap, float bar_height, float border_thickness)
 {
-    float width_per_scale = 0.0f;
-    float fixed_width = gap * (float)(sections->count - 1);
-
-    for (size_t index = 0; index < sections->count; ++index)
+    size_t begin = row * section->columns;
+    size_t remaining = section->count - begin;
+    size_t count = remaining < section->columns ? remaining : section->columns;
+    float width = tile_gap * (float)(count - 1);
+    float box_height = reach_stage_box_height(scale);
+    for (size_t index = 0; index < count; ++index)
     {
-        const reach_stage_section *section = &sections->entries[index];
-        width_per_scale += (float)section->columns * reach_stage_box_width(section);
-        fixed_width += gap * (float)(section->columns - 1);
+        width += reach_stage_tile_layout_width(&state->tiles[section->indices[begin + index]],
+                                               box_height, bar_height, border_thickness);
     }
-
-    float scale = (area.width - fixed_width) / width_per_scale;
-
-    for (size_t index = 0; index < sections->count; ++index)
-    {
-        const reach_stage_section *section = &sections->entries[index];
-        float limit = (area.height - gap * (float)(section->rows - 1)) /
-                      ((float)section->rows * reach_stage_box_height(section));
-        if (limit < scale)
-        {
-            scale = limit;
-        }
-    }
-
-    return scale > 0.0f ? scale : 0.0f;
+    return width;
 }
 
-static float reach_stage_section_width(const reach_stage_section *section, float scale, float gap)
+static float reach_stage_section_width(const reach_stage_state *state,
+                                       const reach_stage_section *section, float scale,
+                                       float tile_gap, float bar_height, float border_thickness)
 {
-    return (float)section->columns * reach_stage_box_width(section) * scale +
-           gap * (float)(section->columns - 1);
+    float width = 0.0f;
+    for (size_t row = 0; row < section->rows; ++row)
+    {
+        float row_width = reach_stage_row_width(state, section, row, scale, tile_gap, bar_height,
+                                                border_thickness);
+        if (row_width > width)
+        {
+            width = row_width;
+        }
+    }
+    return width;
+}
+
+static float reach_stage_section_scale(const reach_stage_section *section, float factor)
+{
+    float weighted = factor * (section->portrait ? REACH_STAGE_PORTRAIT_SCALE_WEIGHT : 1.0f);
+    return section->scale * (weighted < 1.0f ? weighted : 1.0f);
+}
+
+static float reach_stage_sections_width(const reach_stage_state *state,
+                                        const reach_stage_sections *sections, float factor,
+                                        float tile_gap, float section_gap, float bar_height,
+                                        float border_thickness)
+{
+    float width = section_gap * (float)(sections->count - 1);
+    for (size_t index = 0; index < sections->count; ++index)
+    {
+        const reach_stage_section *section = &sections->entries[index];
+        width +=
+            reach_stage_section_width(state, section, reach_stage_section_scale(section, factor),
+                                      tile_gap, bar_height, border_thickness);
+    }
+    return width;
+}
+
+static void reach_stage_resolve_section_scales(const reach_stage_state *state,
+                                               reach_stage_sections *sections, reach_rect_f32 area,
+                                               float tile_gap, float section_gap, float bar_height,
+                                               float border_thickness)
+{
+    for (size_t index = 0; index < sections->count; ++index)
+    {
+        reach_stage_section *section = &sections->entries[index];
+        float scalable_height = (float)section->rows * REACH_STAGE_BOX_SHORT;
+        float fixed_height = tile_gap * (float)(section->rows - 1);
+        section->scale = scalable_height > 0.0f && area.height > fixed_height
+                             ? (area.height - fixed_height) / scalable_height
+                             : 0.0f;
+    }
+
+    if (reach_stage_sections_width(state, sections, 1.0f, tile_gap, section_gap, bar_height,
+                                   border_thickness) <= area.width)
+    {
+        return;
+    }
+
+    float low = 0.0f;
+    float high = 1.0f;
+    for (size_t iteration = 0; iteration < 24; ++iteration)
+    {
+        float middle = (low + high) * 0.5f;
+        if (reach_stage_sections_width(state, sections, middle, tile_gap, section_gap, bar_height,
+                                       border_thickness) <= area.width)
+        {
+            low = middle;
+        }
+        else
+        {
+            high = middle;
+        }
+    }
+    for (size_t index = 0; index < sections->count; ++index)
+    {
+        sections->entries[index].scale = reach_stage_section_scale(&sections->entries[index], low);
+    }
 }
 
 static reach_rect_f32 reach_stage_fit_into_box(reach_rect_f32 box, reach_rect_f32 source)
@@ -214,99 +324,43 @@ static void reach_stage_place_desktop(reach_stage_tile *tile, reach_rect_f32 are
     tile->target_rect = reach_stage_fit_into_box(inner, tile->source_rect);
 }
 
-static void reach_stage_add_desktop_scale_slot(reach_stage_sections *sections,
-                                               const reach_stage_tile *desktop)
-{
-    if (sections == nullptr || desktop == nullptr)
-    {
-        return;
-    }
-
-    size_t rank = (size_t)desktop->monitor_index;
-    if (rank >= REACH_STAGE_MAX_SECTIONS)
-    {
-        rank = REACH_STAGE_MAX_SECTIONS - 1;
-    }
-
-    for (size_t index = 0; index < sections->count; ++index)
-    {
-        if (sections->entries[index].rank == rank)
-        {
-            sections->entries[index].count++;
-            reach_stage_resolve_section_grid(&sections->entries[index]);
-            return;
-        }
-    }
-
-    if (sections->count >= REACH_STAGE_MAX_SECTIONS)
-    {
-        return;
-    }
-
-    size_t at = sections->count;
-    while (at > 0 && sections->entries[at - 1].rank > rank)
-    {
-        sections->entries[at] = sections->entries[at - 1];
-        --at;
-    }
-
-    reach_stage_section *section = &sections->entries[at];
-    *section = {};
-    section->rank = rank;
-    section->portrait = desktop->monitor_portrait;
-    section->count = 1;
-    reach_stage_resolve_section_grid(section);
-    sections->count++;
-}
-
 static void reach_stage_place_section(reach_stage_state *state, const reach_stage_section *section,
-                                      float scale, float gap, float origin_x, reach_rect_f32 area,
+                                      float tile_gap, float origin_x, reach_rect_f32 area,
                                       float bar_height, float border_thickness)
 {
-    float box_width = reach_stage_box_width(section) * scale;
-    float box_height = reach_stage_box_height(section) * scale;
-    float section_width = reach_stage_section_width(section, scale, gap);
-    float section_height = (float)section->rows * box_height + gap * (float)(section->rows - 1);
+    float box_height = reach_stage_box_height(section->scale);
+    float section_width = reach_stage_section_width(state, section, section->scale, tile_gap,
+                                                    bar_height, border_thickness);
+    float section_height =
+        (float)section->rows * box_height + tile_gap * (float)(section->rows - 1);
     float origin_y = area.y + (area.height - section_height) * 0.5f;
 
-    for (size_t index = 0; index < section->count; ++index)
+    for (size_t row = 0; row < section->rows; ++row)
     {
-        size_t column = index % section->columns;
-        size_t row = index / section->columns;
-
-        size_t remaining = section->count - row * section->columns;
-        size_t row_items = remaining < section->columns ? remaining : section->columns;
-        float row_width = (float)row_items * box_width + gap * (float)(row_items - 1);
-
-        reach_rect_f32 box = {};
-        box.x = origin_x + (section_width - row_width) * 0.5f + (float)column * (box_width + gap);
-        box.y = origin_y + (float)row * (box_height + gap);
-        box.width = box_width;
-        box.height = box_height;
-
-        float bar = bar_height;
-        if (bar > box.height * REACH_STAGE_BAR_MAX_BOX_RATIO)
+        size_t begin = row * section->columns;
+        size_t remaining = section->count - begin;
+        size_t count = remaining < section->columns ? remaining : section->columns;
+        float row_width = reach_stage_row_width(state, section, row, section->scale, tile_gap,
+                                                bar_height, border_thickness);
+        float x = origin_x + (section_width - row_width) * 0.5f;
+        float y = origin_y + (float)row * (box_height + tile_gap);
+        float bar = reach_stage_box_bar(box_height, bar_height);
+        float height = box_height - bar - border_thickness * 2.0f;
+        if (height < 0.0f)
         {
-            bar = box.height * REACH_STAGE_BAR_MAX_BOX_RATIO;
+            height = 0.0f;
         }
 
-        reach_rect_f32 inner = box;
-        inner.x += border_thickness;
-        inner.y += bar + border_thickness;
-        inner.width -= border_thickness * 2.0f;
-        inner.height -= bar + border_thickness * 2.0f;
-        if (inner.width < 0.0f)
+        for (size_t index = 0; index < count; ++index)
         {
-            inner.width = 0.0f;
+            reach_stage_tile *tile = &state->tiles[section->indices[begin + index]];
+            tile->bar_height = bar;
+            tile->target_rect.x = x;
+            tile->target_rect.y = y + bar + border_thickness;
+            tile->target_rect.width = height * reach_stage_tile_aspect(tile);
+            tile->target_rect.height = height;
+            x += tile->target_rect.width + tile_gap;
         }
-        if (inner.height < 0.0f)
-        {
-            inner.height = 0.0f;
-        }
-
-        reach_stage_tile *tile = &state->tiles[section->indices[index]];
-        tile->bar_height = bar;
-        tile->target_rect = reach_stage_fit_into_box(inner, tile->source_rect);
     }
 }
 
@@ -345,11 +399,16 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     }
 
     float dpi_scale = state->dpi_scale > 0.0f ? state->dpi_scale : 1.0f;
-    float gap = 56.0f * dpi_scale;
-    reach_rect_f32 area = reach_stage_content_area(state->bounds, dpi_scale);
+    float tile_gap = REACH_STAGE_TILE_GAP * dpi_scale;
+    float section_gap = REACH_STAGE_SECTION_GAP * dpi_scale;
     float border_thickness = reach_theme_border_thickness(reach_theme_default(), dpi_scale);
     reach_stage_tile *desktop = reach_stage_desktop_tile(state);
     reach_stage_place_desktop(desktop, state->desktop_bounds, border_thickness, dpi_scale);
+    reach_rect_f32 app_bounds = desktop != nullptr && desktop->target_rect.width > 0.0f &&
+                                        desktop->target_rect.height > 0.0f
+                                    ? desktop->target_rect
+                                    : state->desktop_bounds;
+    reach_rect_f32 area = reach_stage_content_area(app_bounds, dpi_scale);
 
     reach_stage_sections sections = {};
     reach_stage_collect_sections(state, &sections);
@@ -358,24 +417,21 @@ void reach_stage_rebuild_layout(reach_stage *stage)
         return;
     }
 
-    reach_stage_sections scale_sections = sections;
-    reach_stage_add_desktop_scale_slot(&scale_sections, desktop);
-    float scale = reach_stage_solve_box_scale(&scale_sections, area, gap);
     float bar_height = reach_stage_tile_bar_height(state);
+    reach_stage_resolve_section_scales(state, &sections, area, tile_gap, section_gap, bar_height,
+                                       border_thickness);
 
-    float total_width = gap * (float)(sections.count - 1);
-    for (size_t index = 0; index < sections.count; ++index)
-    {
-        total_width += reach_stage_section_width(&sections.entries[index], scale, gap);
-    }
+    float total_width = reach_stage_sections_width(state, &sections, 1.0f, tile_gap, section_gap,
+                                                   bar_height, border_thickness);
 
     float x = area.x + (area.width - total_width) * 0.5f;
     for (size_t index = 0; index < sections.count; ++index)
     {
         const reach_stage_section *section = &sections.entries[index];
-        reach_stage_place_section(state, section, scale, gap, x, area, bar_height,
-                                  border_thickness);
-        x += reach_stage_section_width(section, scale, gap) + gap;
+        reach_stage_place_section(state, section, tile_gap, x, area, bar_height, border_thickness);
+        x += reach_stage_section_width(state, section, section->scale, tile_gap, bar_height,
+                                       border_thickness) +
+             section_gap;
     }
 }
 
@@ -405,10 +461,10 @@ void reach_stage_apply_progress(reach_stage *stage)
                               (1.0f - REACH_STAGE_PRESENCE_MIN_SCALE) * tile->presence);
         }
 
-        tile->current_rect =
-            reach_stage_interpolate_rect(tile->source_rect, resolved, state->progress);
+        float progress = tile->desktop ? state->desktop_progress : state->progress;
+        tile->current_rect = reach_stage_interpolate_rect(tile->source_rect, resolved, progress);
 
-        float bar = tile->bar_height * state->progress * tile->presence;
+        float bar = tile->bar_height * progress * tile->presence;
         tile->current_bar.x = tile->current_rect.x;
         tile->current_bar.y = tile->current_rect.y - bar;
         tile->current_bar.width = tile->current_rect.width;

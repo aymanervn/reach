@@ -7,7 +7,6 @@
 #include <windows.h>
 
 reach_result reach_window_management_activate(HWND hwnd);
-reach_result reach_window_management_prepare(HWND hwnd, HWND cover);
 reach_result reach_window_management_activate_exact(HWND hwnd);
 void reach_window_management_prepare_minimize(HWND hwnd);
 reach_result reach_window_management_minimize(HWND hwnd);

@@ -76,21 +76,7 @@ reach_result reach_host_update_game_mode(reach_host *host)
         if (next_active && (desc->definition->surface.behavior_flags &
                             REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
         {
-            uint64_t preparation = host->window_preparation.surface == desc->definition->id
-                                       ? host->window_preparation.request
-                                       : 0;
-            int32_t settled = reach_app_control_cancel_preparation(host->app_control, preparation);
             reach_host_release_native_overlay(host, desc);
-            if (preparation != 0)
-            {
-                host->window_preparation.pending = 0;
-                host->window_preparation.cancelled = 1;
-                if (settled)
-                {
-                    reach_app_control_release_preparation(host->app_control, preparation);
-                    host->window_preparation = {};
-                }
-            }
         }
         if (desc->definition->capsule_ops != nullptr &&
             desc->definition->capsule_ops->on_game_mode != nullptr)

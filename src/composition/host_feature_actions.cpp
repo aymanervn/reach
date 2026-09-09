@@ -34,23 +34,16 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
     case REACH_FEATURE_ACTION_TOGGLE_WINDOW_FOCUS:
         return reach_host_focus_window(host, action->window, 1);
 
-    case REACH_FEATURE_ACTION_PREPARE_WINDOW:
-        host->window_preparation = {};
-        host->window_preparation.surface = desc->definition->id;
-        host->window_preparation.window = action->window;
-        host->window_preparation.request = ++host->next_window_preparation;
-        host->window_preparation.pending = 1;
-        reach_host_close_surface(host, desc);
-        reach_host_request_update(host);
-        return REACH_OK;
-
     case REACH_FEATURE_ACTION_ACTIVATE_WINDOW:
     {
         reach_result activate_result =
             action->window != 0 ? reach_host_schedule_window_control(
                                       host, REACH_WINDOW_CONTROL_ACTIVATE, action->window)
                                 : REACH_OK;
-        reach_host_close_surface(host, desc);
+        if ((action->flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0)
+        {
+            reach_host_close_surface(host, desc);
+        }
         return activate_result;
     }
 
@@ -70,7 +63,10 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
         return action->id != 0 ? reach_host_unpin_id(host, (uint32_t)action->id) : REACH_ERROR;
 
     case REACH_FEATURE_ACTION_MINIMIZE_ALL_WINDOWS:
-        reach_host_close_surface(host, desc);
+        if ((action->flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0)
+        {
+            reach_host_close_surface(host, desc);
+        }
         return reach_host_schedule_minimize_open_windows(host);
 
     case REACH_FEATURE_ACTION_MEDIA_CONTROL:

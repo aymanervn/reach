@@ -241,9 +241,15 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
 
         if (kind == REACH_STAGE_PRESSABLE_TILE)
         {
-            out->action.kind = REACH_FEATURE_ACTION_PREPARE_WINDOW;
+            out->action.kind = state->tiles[index].desktop
+                                   ? REACH_FEATURE_ACTION_MINIMIZE_ALL_WINDOWS
+                                   : REACH_FEATURE_ACTION_ACTIVATE_WINDOW;
+            if (state->tiles[index].desktop || !state->tiles[index].minimized)
+            {
+                out->action.flags |= REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST;
+            }
             out->action.index = index;
-            out->action.window = state->tiles[index].desktop ? 0 : state->tiles[index].window;
+            out->action.window = state->tiles[index].window;
             state->selected_index = index;
             state->has_selection = 1;
         }
