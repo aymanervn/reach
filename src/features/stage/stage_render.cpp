@@ -71,8 +71,7 @@ static reach_color reach_stage_tile_border(const reach_stage_render_context *ctx
 
 static reach_result reach_stage_push_tile_outline(const reach_stage_render_context *ctx,
                                                   reach_render_command_buffer *commands,
-                                                  reach_rect_f32 rect, float width, float hover,
-                                                  float alpha)
+                                                  reach_rect_f32 rect, float width, float alpha)
 {
     reach_rect_f32 strips[4] = {
         {rect.x - width, rect.y - width, rect.width + width * 2.0f, width},
@@ -85,7 +84,7 @@ static reach_result reach_stage_push_tile_outline(const reach_stage_render_conte
         reach_render_command strip = {};
         strip.type = REACH_RENDER_COMMAND_RECT;
         strip.rect = strips[index];
-        strip.color = reach_stage_tile_border(ctx, hover, alpha);
+        strip.color = reach_stage_tile_border(ctx, 0.0f, alpha);
         reach_result result = reach_render_command_buffer_push(commands, &strip);
         if (result != REACH_OK)
         {
@@ -288,9 +287,8 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
         {
             rect.x -= ctx->bounds.x;
             rect.y -= ctx->bounds.y;
-            float hover = state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
-            reach_result result = reach_stage_push_tile_outline(
-                ctx, out_commands, rect, border, hover, alpha);
+            reach_result result =
+                reach_stage_push_tile_outline(ctx, out_commands, rect, border, alpha);
             if (result != REACH_OK)
             {
                 return result;
