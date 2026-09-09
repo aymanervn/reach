@@ -322,8 +322,7 @@ static void test_desktop_keeps_solo_geometry_behind_apps(void)
     expect_true(desktop_index < state->tile_count, "desktop tile is present");
     reach_rect_f32 solo = state->tiles[desktop_index].target_rect;
     float border = reach_theme_border_thickness(reach_theme_default(), 1.0f);
-    expect_near(solo.y - border, 60.0f,
-                "desktop outer border leaves 20 dp below the top bar");
+    expect_near(solo.y - border, 60.0f, "desktop outer border leaves 20 dp below the top bar");
     expect_near(solo.y + solo.height + border, 980.0f,
                 "desktop outer border leaves 20 dp above the Dock");
     expect_true(solo.width > 1600.0f, "desktop thumbnail is noticeably larger");
@@ -337,9 +336,9 @@ static void test_desktop_keeps_solo_geometry_behind_apps(void)
                 "desktop thumbnail uses the plane behind the Stage surface");
 
     reach_stage_force_close(stage);
-    reach_stage_open_window windows[3] = {
-        make_window(1, make_rect(100.0f, 80.0f, 1200.0f, 800.0f)),
-        make_window(2, make_rect(300.0f, 160.0f, 900.0f, 700.0f)), desktop};
+    reach_stage_open_window windows[3] = {make_window(1, make_rect(100.0f, 80.0f, 1200.0f, 800.0f)),
+                                          make_window(2, make_rect(300.0f, 160.0f, 900.0f, 700.0f)),
+                                          desktop};
     expect_true(reach_stage_open(stage, bounds, 1.0f, windows, 3) == REACH_OK,
                 "stage opens with apps and desktop");
     expect_true(reach_stage_set_desktop_bounds(stage, available),
@@ -350,8 +349,7 @@ static void test_desktop_keeps_solo_geometry_behind_apps(void)
     desktop_index = find_desktop_tile(state);
     expect_true(desktop_index < state->tile_count, "desktop remains present with apps");
     const reach_stage_tile *desktop_tile = &state->tiles[desktop_index];
-    expect_near(desktop_tile->target_rect.x, solo.x,
-                "desktop keeps its solo horizontal position");
+    expect_near(desktop_tile->target_rect.x, solo.x, "desktop keeps its solo horizontal position");
     expect_near(desktop_tile->target_rect.y, solo.y, "desktop keeps its solo vertical position");
     expect_near(desktop_tile->target_rect.width, solo.width, "desktop keeps its solo width");
     expect_near(desktop_tile->target_rect.height, solo.height, "desktop keeps its solo height");

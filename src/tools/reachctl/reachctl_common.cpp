@@ -127,15 +127,14 @@ reach_result reachctl_initialize_config(void)
         }
         else
         {
-            std::unique_ptr<reach_config_snapshot> snapshot(
-                new (std::nothrow) reach_config_snapshot{});
-            result = snapshot != nullptr ? store.ops.load(store.store, snapshot.get())
-                                         : REACH_ERROR;
+            std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow)
+                                                                reach_config_snapshot{});
+            result =
+                snapshot != nullptr ? store.ops.load(store.store, snapshot.get()) : REACH_ERROR;
             if (result == REACH_OK && snapshot != nullptr)
             {
                 result = reach_windows_collect_taskbar_pins(
-                    snapshot->pinned_apps, REACH_MAX_PINNED_APPS,
-                    &snapshot->pinned_app_count);
+                    snapshot->pinned_apps, REACH_MAX_PINNED_APPS, &snapshot->pinned_app_count);
             }
             if (result == REACH_OK && snapshot != nullptr)
             {

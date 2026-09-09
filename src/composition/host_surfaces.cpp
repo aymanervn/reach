@@ -369,9 +369,10 @@ static int32_t reach_host_layout_anchor_equal(const reach_feature_layout_anchor 
            left->slot == right->slot && left->index == right->index;
 }
 
-reach_popup_activation_decision reach_host_popup_activation_decide(
-    int32_t open, const reach_feature_layout_anchor *current,
-    const reach_feature_layout_anchor *requested, reach_popup_activation_mode mode)
+reach_popup_activation_decision
+reach_host_popup_activation_decide(int32_t open, const reach_feature_layout_anchor *current,
+                                   const reach_feature_layout_anchor *requested,
+                                   reach_popup_activation_mode mode)
 {
     if (requested == nullptr || requested->surface >= REACH_HOST_SURFACE_COUNT)
     {
@@ -389,9 +390,10 @@ reach_popup_activation_decision reach_host_popup_activation_decide(
                                                  : REACH_POPUP_ACTIVATION_NONE;
 }
 
-reach_popup_activation_decision reach_host_prepare_registered_popup(
-    reach_host *host, reach_surface_id id, const reach_feature_layout_anchor *owner,
-    reach_popup_activation_mode mode)
+reach_popup_activation_decision
+reach_host_prepare_registered_popup(reach_host *host, reach_surface_id id,
+                                    const reach_feature_layout_anchor *owner,
+                                    reach_popup_activation_mode mode)
 {
     if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
     {

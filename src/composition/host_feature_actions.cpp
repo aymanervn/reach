@@ -2,8 +2,7 @@
 
 static void reach_host_close_surface(reach_host *host, const reach_feature_runtime *desc)
 {
-    reach_host_close_registered_surface(host, desc->definition->id,
-                                        REACH_SURFACE_CLOSE_SUPERSEDED);
+    reach_host_close_registered_surface(host, desc->definition->id, REACH_SURFACE_CLOSE_SUPERSEDED);
 }
 
 reach_result reach_host_apply_feature_action(reach_host *host, const reach_feature_runtime *desc,
@@ -88,8 +87,8 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
 
     case REACH_FEATURE_ACTION_OPEN_TARGET:
     {
-        reach_result open_result = reach_host_open_feature_target(
-            host, desc->definition->id, &action->target, action->flags);
+        reach_result open_result = reach_host_open_feature_target(host, desc->definition->id,
+                                                                  &action->target, action->flags);
         if (open_result == REACH_OK)
         {
             reach_host_close_transient_surfaces(host, 0);

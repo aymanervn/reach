@@ -296,8 +296,8 @@ static void test_menu_commands_execute_only_from_the_published_snapshot(void)
                 "close-all falls back to the item's own window when the set is empty");
 
     reach_capsule_action power = {};
-    reach_context_menu_command_action(&request, windows,
-                                      REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP, &power);
+    reach_context_menu_command_action(&request, windows, REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP,
+                                      &power);
     expect_true(power.kind == REACH_FEATURE_ACTION_EXECUTE_MENU_COMMAND &&
                     power.id == REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP,
                 "power commands stay system actions and skip the item snapshot");

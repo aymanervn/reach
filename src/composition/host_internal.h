@@ -446,12 +446,14 @@ void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
 void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
                                         reach_rect_f32 bounds, int32_t enabled);
 void reach_host_close_surfaces_on_persistent_press(reach_host *host);
-reach_popup_activation_decision reach_host_popup_activation_decide(
-    int32_t open, const reach_feature_layout_anchor *current,
-    const reach_feature_layout_anchor *requested, reach_popup_activation_mode mode);
-reach_popup_activation_decision reach_host_prepare_registered_popup(
-    reach_host *host, reach_surface_id id, const reach_feature_layout_anchor *owner,
-    reach_popup_activation_mode mode);
+reach_popup_activation_decision
+reach_host_popup_activation_decide(int32_t open, const reach_feature_layout_anchor *current,
+                                   const reach_feature_layout_anchor *requested,
+                                   reach_popup_activation_mode mode);
+reach_popup_activation_decision
+reach_host_prepare_registered_popup(reach_host *host, reach_surface_id id,
+                                    const reach_feature_layout_anchor *owner,
+                                    reach_popup_activation_mode mode);
 void reach_host_toggle_registered_popup(reach_host *host, reach_surface_id id);
 void reach_host_present_registered_popup(reach_host *host, reach_surface_id id,
                                          reach_surface_id origin);
@@ -552,7 +554,6 @@ typedef struct reach_host_pointer_move_state
 struct reach_host
 {
     reach_monitor_port monitors;
-
 
     reach_surface_runtime surfaces[REACH_HOST_SURFACE_COUNT];
 
@@ -753,7 +754,7 @@ void reach_host_stop_app_control(reach_host *host);
 void reach_host_process_deferred_launch(reach_host *host);
 void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *desc);
 void reach_host_start_window_preparation(reach_host *host, const reach_feature_runtime *source,
-                                          reach_result presentation_result);
+                                         reach_result presentation_result);
 reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
                                                           const reach_app_launch_request *request);
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
@@ -802,7 +803,6 @@ reach_result reach_host_schedule_window_controls(reach_host *host,
                                                  const uintptr_t *window_ids, size_t window_count);
 void reach_host_apply_window_control_result(reach_host *host);
 
-
 void reach_host_invalidate_bar_coverage(reach_host *host);
 void reach_host_refresh_window_world(reach_host *host);
 void reach_host_sync_window_manipulation(reach_host *host);
@@ -817,17 +817,15 @@ int32_t reach_host_bar_reveal_enabled(const reach_feature_runtime *runtime);
 float reach_host_bar_protected_clearance(const reach_host *host,
                                          const reach_feature_runtime *runtime);
 
-reach_rect_f32 reach_host_reconcile_bar_visibility(
-    reach_host *host, reach_surface_id id, reach_rect_f32 shown_bounds,
-    reach_rect_f32 monitor_bounds, const reach_feature_surface_geometry *geometry);
+reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
+                                                   reach_rect_f32 shown_bounds,
+                                                   reach_rect_f32 monitor_bounds,
+                                                   const reach_feature_surface_geometry *geometry);
 reach_result reach_host_cycle_input_language(reach_host *host);
 
 reach_result reach_host_refresh_monitor_layout(reach_host *host);
 int32_t reach_host_can_move_bars_without_redraw(const reach_host *host);
 reach_result reach_host_move_bar_animation_frame(reach_host *host);
-
-
-
 
 reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing_action action);
 reach_result reach_host_step_main_volume(reach_host *host, float delta);
@@ -837,8 +835,6 @@ reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mod
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags);
 void reach_host_on_audio_volume_changed(void *user);
-
-
 
 reach_result reach_host_request_config_reload(reach_host *host);
 reach_result reach_host_pin_app(reach_host *host, const reach_pinned_app_model *app);

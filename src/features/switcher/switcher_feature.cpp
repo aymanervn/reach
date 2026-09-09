@@ -189,16 +189,14 @@ static int32_t reach_switcher_capsule_is_open(const void *capsule)
 static int32_t reach_switcher_capsule_needs_frame(const void *capsule)
 {
     const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
-    return switcher != nullptr &&
-           (reach_feature_transition_active(&switcher->surface_transition) ||
-            reach_switcher_width_animation_active(switcher));
+    return switcher != nullptr && (reach_feature_transition_active(&switcher->surface_transition) ||
+                                   reach_switcher_width_animation_active(switcher));
 }
 
 static int32_t reach_switcher_capsule_presentation_visible(const void *capsule)
 {
     const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
-    return switcher != nullptr &&
-           reach_feature_transition_visible(&switcher->surface_transition);
+    return switcher != nullptr && reach_feature_transition_visible(&switcher->surface_transition);
 }
 
 static void reach_switcher_capsule_surface_geometry(const void *capsule,
@@ -260,9 +258,8 @@ static void reach_switcher_apply_action(reach_switcher *switcher, reach_switcher
     {
         (void)reach_feature_transition_set_open(&switcher->surface_transition, 1);
     }
-    else if (switcher != nullptr &&
-             (action.type == REACH_SWITCHER_ACTION_CLOSED ||
-              action.type == REACH_SWITCHER_ACTION_COMMITTED))
+    else if (switcher != nullptr && (action.type == REACH_SWITCHER_ACTION_CLOSED ||
+                                     action.type == REACH_SWITCHER_ACTION_COMMITTED))
     {
         (void)reach_feature_transition_set_open(&switcher->surface_transition, 0);
     }
@@ -325,8 +322,7 @@ int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open)
     return 1;
 }
 
-void reach_switcher_notify_windows_changed(reach_switcher *switcher,
-                                           reach_feature_tick_result *out)
+void reach_switcher_notify_windows_changed(reach_switcher *switcher, reach_feature_tick_result *out)
 {
     if (switcher == nullptr || out == nullptr)
     {

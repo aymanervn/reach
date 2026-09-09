@@ -16,10 +16,9 @@ int main()
 {
     int failed = 0;
     size_t count = 0;
-    const uint8_t valid[] = {0, 4, 0, 0, 0, 2, 0, 0, 0,
-                             0, 4, 0, 0, 0, 2, 0, 0, 0, 0xff};
-    failed += expect(reach_taskbar_pin_blob_visit(valid, sizeof(valid), count_entry, &count) ==
-                     REACH_OK);
+    const uint8_t valid[] = {0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0xff};
+    failed +=
+        expect(reach_taskbar_pin_blob_visit(valid, sizeof(valid), count_entry, &count) == REACH_OK);
     failed += expect(count == 2);
 
     const uint8_t missing_marker[] = {1, 4, 0, 0, 0, 2, 0, 0, 0, 0xff};

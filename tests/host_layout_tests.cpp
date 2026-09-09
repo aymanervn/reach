@@ -525,14 +525,14 @@ static void test_window_manipulation_tracks_pointer_monitor_membership(void)
 static void test_scaled_presentation_keeps_native_envelope_stationary(void)
 {
     reach_host_surface_presentation_frame offset_frame =
-        reach_host_surface_presentation_frame_compute(
-            {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f}, {}, 10.0f,
-            1.04f, 1.08f);
+        reach_host_surface_presentation_frame_compute({710.0f, 900.0f, 500.0f, 72.0f},
+                                                      {710.0f, 900.0f, 500.0f, 300.0f}, {}, 10.0f,
+                                                      1.04f, 1.08f);
 
     reach_host_surface_presentation_frame settled_frame =
-        reach_host_surface_presentation_frame_compute(
-            {710.0f, 900.0f, 500.0f, 72.0f}, {710.0f, 900.0f, 500.0f, 300.0f}, {}, 0.0f,
-            1.04f, 1.08f);
+        reach_host_surface_presentation_frame_compute({710.0f, 900.0f, 500.0f, 72.0f},
+                                                      {710.0f, 900.0f, 500.0f, 300.0f}, {}, 0.0f,
+                                                      1.04f, 1.08f);
 
     expect_true(
         reach_host_scalar_equal(offset_frame.window_bounds.y, settled_frame.window_bounds.y),
@@ -582,29 +582,28 @@ static void test_popup_pointer_coordinates_are_surface_local(void)
 
 static void test_popup_activation_uses_owner_identity(void)
 {
-    reach_feature_layout_anchor top_bar_power = {
-        REACH_SURFACE_ID_TOP_BAR, REACH_TOP_BAR_CONTROL_POWER, 0};
-    reach_feature_layout_anchor dock_item = {
-        REACH_SURFACE_ID_DOCK, REACH_DOCK_CONTROL_ITEM, 3};
+    reach_feature_layout_anchor top_bar_power = {REACH_SURFACE_ID_TOP_BAR,
+                                                 REACH_TOP_BAR_CONTROL_POWER, 0};
+    reach_feature_layout_anchor dock_item = {REACH_SURFACE_ID_DOCK, REACH_DOCK_CONTROL_ITEM, 3};
 
-    expect_true(reach_host_popup_activation_decide(
-                    0, nullptr, &top_bar_power, REACH_POPUP_ACTIVATION_TOGGLE) ==
+    expect_true(reach_host_popup_activation_decide(0, nullptr, &top_bar_power,
+                                                   REACH_POPUP_ACTIVATION_TOGGLE) ==
                     REACH_POPUP_ACTIVATION_PRESENT,
                 "a closed popup presents for its requested owner");
-    expect_true(reach_host_popup_activation_decide(
-                    1, &top_bar_power, &top_bar_power, REACH_POPUP_ACTIVATION_TOGGLE) ==
+    expect_true(reach_host_popup_activation_decide(1, &top_bar_power, &top_bar_power,
+                                                   REACH_POPUP_ACTIVATION_TOGGLE) ==
                     REACH_POPUP_ACTIVATION_CLOSE,
                 "a repeated owner activation toggles its popup closed");
-    expect_true(reach_host_popup_activation_decide(
-                    1, &top_bar_power, &dock_item, REACH_POPUP_ACTIVATION_TOGGLE) ==
+    expect_true(reach_host_popup_activation_decide(1, &top_bar_power, &dock_item,
+                                                   REACH_POPUP_ACTIVATION_TOGGLE) ==
                     REACH_POPUP_ACTIVATION_PRESENT,
                 "a different owner replaces the open popup");
-    expect_true(reach_host_popup_activation_decide(
-                    1, &dock_item, &dock_item, REACH_POPUP_ACTIVATION_PASSIVE) ==
+    expect_true(reach_host_popup_activation_decide(1, &dock_item, &dock_item,
+                                                   REACH_POPUP_ACTIVATION_PASSIVE) ==
                     REACH_POPUP_ACTIVATION_NONE,
                 "repeated passive presentation for one owner is unchanged");
-    expect_true(reach_host_popup_activation_decide(
-                    1, &dock_item, &dock_item, REACH_POPUP_ACTIVATION_REPLACE) ==
+    expect_true(reach_host_popup_activation_decide(1, &dock_item, &dock_item,
+                                                   REACH_POPUP_ACTIVATION_REPLACE) ==
                     REACH_POPUP_ACTIVATION_PRESENT,
                 "an explicit content replacement preserves the owner");
 }
@@ -660,8 +659,8 @@ static void test_captured_release_precedes_exclusive_popup(void)
     host->feature_definitions[REACH_SURFACE_ID_CONTEXT_MENU].capsule_ops = &exclusive_ops;
     host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU].capsule = host;
 
-    reach_host_surface_event_binding binding = {
-        host, &host->feature_runtimes[REACH_SURFACE_ID_DOCK]};
+    reach_host_surface_event_binding binding = {host,
+                                                &host->feature_runtimes[REACH_SURFACE_ID_DOCK]};
     reach_ui_event event = {};
     event.type = REACH_UI_EVENT_POINTER_UP;
     event.button = REACH_POINTER_BUTTON_PRIMARY;
@@ -699,8 +698,8 @@ static void test_popup_trigger_press_bypasses_unrelated_open_popup(void)
     host->feature_definitions[REACH_SURFACE_ID_QUICK_SETTINGS].capsule_ops = &popup_ops;
     host->feature_runtimes[REACH_SURFACE_ID_QUICK_SETTINGS].capsule = host;
 
-    reach_host_surface_event_binding binding = {
-        host, &host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]};
+    reach_host_surface_event_binding binding = {host,
+                                                &host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]};
     reach_ui_event event = {};
     event.type = REACH_UI_EVENT_POINTER_DOWN;
     event.button = REACH_POINTER_BUTTON_PRIMARY;
@@ -729,10 +728,10 @@ static void test_focus_restore_follows_the_close_intent(void)
     expect_true(!host->feature_runtimes[REACH_SURFACE_ID_SWITCHER]
                      .definition->surface.restores_focus_on_close,
                 "the Switcher never needs focus restoration because it does not activate");
-    expect_true((host->feature_runtimes[REACH_SURFACE_ID_SWITCHER]
-                     .definition->surface.behavior_flags &
-                 REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0,
-                "the Switcher remains non-activating while an app-switch gesture is active");
+    expect_true(
+        (host->feature_runtimes[REACH_SURFACE_ID_SWITCHER].definition->surface.behavior_flags &
+         REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0,
+        "the Switcher remains non-activating while an app-switch gesture is active");
 
     host->focus_restore_window[REACH_SURFACE_ID_LAUNCHER] = 4242;
     reach_host_arm_focus_restore(host, REACH_SURFACE_ID_LAUNCHER);
@@ -868,11 +867,12 @@ static void test_every_popup_names_the_control_that_holds_it_open(void)
                     battery->layout.anchor_slot == REACH_TOP_BAR_CONTROL_BATTERY,
                 "a top-bar popup is held open by the control it already anchors to");
 
-    expect_true(host->feature_runtimes[REACH_SURFACE_ID_DOCK]
-                        .definition->capsule_ops->control_at_point != nullptr &&
-                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
-                            .definition->capsule_ops->control_at_point != nullptr,
-                "both bars can name the control under a screen point");
+    expect_true(
+        host->feature_runtimes[REACH_SURFACE_ID_DOCK].definition->capsule_ops->control_at_point !=
+                nullptr &&
+            host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
+                    .definition->capsule_ops->control_at_point != nullptr,
+        "both bars can name the control under a screen point");
     expect_true(host->feature_runtimes[REACH_SURFACE_ID_DOCK]
                             .definition->capsule_ops->pointer_capture_active != nullptr &&
                     host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
@@ -912,9 +912,9 @@ static void test_registered_feature_lifecycle(void)
             nullptr,
         "Stage declares its native overlay contract");
     const reach_surface_id presentation_owned_surfaces[] = {
-        REACH_SURFACE_ID_LAUNCHER, REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_ID_TRAY,
-        REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_ID_BATTERY,
-        REACH_SURFACE_ID_CONTEXT_MENU, REACH_SURFACE_ID_SWITCHER, REACH_SURFACE_ID_STAGE};
+        REACH_SURFACE_ID_LAUNCHER,       REACH_SURFACE_ID_CLIPBOARD, REACH_SURFACE_ID_TRAY,
+        REACH_SURFACE_ID_QUICK_SETTINGS, REACH_SURFACE_ID_BATTERY,   REACH_SURFACE_ID_CONTEXT_MENU,
+        REACH_SURFACE_ID_SWITCHER,       REACH_SURFACE_ID_STAGE};
     for (size_t index = 0;
          index < sizeof(presentation_owned_surfaces) / sizeof(presentation_owned_surfaces[0]);
          ++index)
@@ -927,13 +927,13 @@ static void test_registered_feature_lifecycle(void)
         host->feature_runtimes[REACH_SURFACE_ID_DOCK].definition->resolve_anchor != nullptr &&
             host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].definition->resolve_anchor != nullptr,
         "dynamic anchor owners publish generic anchor resolvers");
-    expect_true(host->feature_runtimes[REACH_SURFACE_ID_DOCK]
-                        .definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_BOTTOM &&
-                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR]
-                            .definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_TOP &&
-                    host->feature_runtimes[REACH_SURFACE_ID_STAGE]
-                        .definition->layout.uses_reserved_bounds,
-                "Stage consumes the generic bounds reserved by the bars");
+    expect_true(
+        host->feature_runtimes[REACH_SURFACE_ID_DOCK].definition->layout.reservation_edge ==
+                REACH_LAYOUT_RESERVATION_BOTTOM &&
+            host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].definition->layout.reservation_edge ==
+                REACH_LAYOUT_RESERVATION_TOP &&
+            host->feature_runtimes[REACH_SURFACE_ID_STAGE].definition->layout.uses_reserved_bounds,
+        "Stage consumes the generic bounds reserved by the bars");
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
@@ -1000,9 +1000,9 @@ static void test_popup_surface_applies_managed_opacity(void)
                 "popup opacity test records its content command");
 
     observed_last_command_alpha = -1.0f;
-    expect_true(reach_host_render_popup_surface(
-                    host, REACH_SURFACE_ID_QUICK_SETTINGS, &surface,
-                    {0.0f, 0.0f, 320.0f, 240.0f}, 160.0f, 0, &content, 0.25f) == REACH_OK,
+    expect_true(reach_host_render_popup_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS, &surface,
+                                                {0.0f, 0.0f, 320.0f, 240.0f}, 160.0f, 0, &content,
+                                                0.25f) == REACH_OK,
                 "popup rendering succeeds with managed opacity");
     expect_true(reach_host_scalar_equal(observed_last_command_alpha, 0.2f),
                 "managed opacity applies to the complete popup command buffer");
@@ -1116,8 +1116,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     expect_true(thumbnail_target_plane_create_count == 1 &&
                     thumbnail_behind_plane_create_count == 1,
                 "generic frame separates app and Desktop thumbnail planes");
-    expect_true(thumbnail_background_place_count == 1 &&
-                    thumbnail_background_alpha == 1.0f,
+    expect_true(thumbnail_background_place_count == 1 && thumbnail_background_alpha == 1.0f,
                 "Desktop lower plane carries one fully opaque Stage background");
 
     reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
@@ -1161,10 +1160,12 @@ static void test_forced_bars_hold_through_a_closing_stage(void)
 
     reach_feature_tick_result tick = {};
     stage->definition->capsule_ops->tick(stage->capsule, 5.0, &tick);
-    expect_true(reach_host_surface_presented(stage), "bars remain forced through the aligned frame");
+    expect_true(reach_host_surface_presented(stage),
+                "bars remain forced through the aligned frame");
     stage->definition->capsule_ops->presentation_committed(stage->capsule, REACH_OK, &tick);
     stage->definition->capsule_ops->tick(stage->capsule, 5.0, &tick);
-    expect_true(reach_host_surface_presented(stage), "bars remain forced through the transparent frame");
+    expect_true(reach_host_surface_presented(stage),
+                "bars remain forced through the transparent frame");
     stage->definition->capsule_ops->presentation_committed(stage->capsule, REACH_OK, &tick);
     stage->definition->capsule_ops->tick(stage->capsule, 0.016, &tick);
     expect_true(!reach_host_surface_presented(stage),

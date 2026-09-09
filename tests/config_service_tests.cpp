@@ -221,8 +221,7 @@ int main()
     failed += expect(live.top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED);
     failed += expect(live.top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
     top_bar.mode = (reach_config_top_bar_mode)99;
-    failed +=
-        expect(reach_config_service_set_top_bar(service, &top_bar) == REACH_INVALID_ARGUMENT);
+    failed += expect(reach_config_service_set_top_bar(service, &top_bar) == REACH_INVALID_ARGUMENT);
     reach_config_service_destroy(service);
 
     static test_config_store failed_store = {};

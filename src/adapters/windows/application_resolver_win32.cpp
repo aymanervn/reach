@@ -48,8 +48,7 @@ static int32_t reach_windows_query_process_path(DWORD process_id, wchar_t *out_p
     return result;
 }
 
-static int32_t reach_windows_same_application_tree(const wchar_t *candidate,
-                                                   const wchar_t *runtime)
+static int32_t reach_windows_same_application_tree(const wchar_t *candidate, const wchar_t *runtime)
 {
     if (candidate == nullptr || runtime == nullptr || candidate[0] == 0 || runtime[0] == 0)
     {
@@ -59,8 +58,7 @@ static int32_t reach_windows_same_application_tree(const wchar_t *candidate,
     wchar_t runtime_directory[260] = {};
     wcscpy_s(candidate_directory, candidate);
     wcscpy_s(runtime_directory, runtime);
-    if (!PathRemoveFileSpecW(candidate_directory) ||
-        !PathRemoveFileSpecW(runtime_directory))
+    if (!PathRemoveFileSpecW(candidate_directory) || !PathRemoveFileSpecW(runtime_directory))
     {
         return 0;
     }
@@ -74,8 +72,8 @@ static int32_t reach_windows_same_application_tree(const wchar_t *candidate,
             runtime_directory[candidate_length] == L'/');
 }
 
-static void reach_windows_collect_process_entries(
-    std::vector<reach_windows_process_entry> *out_entries)
+static void
+reach_windows_collect_process_entries(std::vector<reach_windows_process_entry> *out_entries)
 {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE)
@@ -94,8 +92,9 @@ static void reach_windows_collect_process_entries(
     CloseHandle(snapshot);
 }
 
-static DWORD reach_windows_parent_process_id(
-    const std::vector<reach_windows_process_entry> &entries, DWORD process_id)
+static DWORD
+reach_windows_parent_process_id(const std::vector<reach_windows_process_entry> &entries,
+                                DWORD process_id)
 {
     for (const reach_windows_process_entry &entry : entries)
     {
@@ -107,11 +106,10 @@ static DWORD reach_windows_parent_process_id(
     return 0;
 }
 
-static int32_t reach_windows_process_launch_ancestor(
-    DWORD process_id, const uint16_t *runtime_path, uint16_t *out_path)
+static int32_t reach_windows_process_launch_ancestor(DWORD process_id, const uint16_t *runtime_path,
+                                                     uint16_t *out_path)
 {
-    if (process_id == 0 || runtime_path == nullptr || runtime_path[0] == 0 ||
-        out_path == nullptr)
+    if (process_id == 0 || runtime_path == nullptr || runtime_path[0] == 0 || out_path == nullptr)
     {
         return 0;
     }
@@ -123,8 +121,8 @@ static int32_t reach_windows_process_launch_ancestor(
     {
         wchar_t candidate[260] = {};
         if (!reach_windows_query_process_path(parent_process_id, candidate, 260) ||
-            !reach_windows_same_application_tree(
-                candidate, reinterpret_cast<const wchar_t *>(runtime_path)))
+            !reach_windows_same_application_tree(candidate,
+                                                 reinterpret_cast<const wchar_t *>(runtime_path)))
         {
             break;
         }
@@ -150,8 +148,8 @@ static int32_t reach_windows_read_registry_text(HKEY key, const wchar_t *value_n
     DWORD type = 0;
     DWORD bytes = 0;
     LONG result = RegQueryValueExW(key, value_name, nullptr, &type, nullptr, &bytes);
-    if (result != ERROR_SUCCESS ||
-        (type != REG_SZ && type != REG_EXPAND_SZ) || bytes < sizeof(wchar_t))
+    if (result != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ) ||
+        bytes < sizeof(wchar_t))
     {
         return 0;
     }
@@ -182,8 +180,7 @@ static int32_t reach_windows_read_registry_text(HKEY key, const wchar_t *value_n
     return 1;
 }
 
-static int32_t reach_windows_command_executable(const std::wstring &command,
-                                                std::wstring *out_path)
+static int32_t reach_windows_command_executable(const std::wstring &command, std::wstring *out_path)
 {
     if (command.empty())
     {
@@ -245,8 +242,7 @@ static void reach_windows_collect_aumid_key(HKEY classes, const wchar_t *subkey)
     {
         command_key.assign(subkey);
         command_key.append(L"\\shell\\explore\\command");
-        if (RegOpenKeyExW(classes, command_key.c_str(), 0, KEY_QUERY_VALUE, &key) !=
-            ERROR_SUCCESS)
+        if (RegOpenKeyExW(classes, command_key.c_str(), 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
         {
             return;
         }
@@ -265,8 +261,8 @@ static void reach_windows_collect_aumid_key(HKEY classes, const wchar_t *subkey)
 static void reach_windows_collect_aumid_root(HKEY root)
 {
     HKEY classes = nullptr;
-    if (RegOpenKeyExW(root, L"Software\\Classes", 0,
-                      KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS, &classes) != ERROR_SUCCESS)
+    if (RegOpenKeyExW(root, L"Software\\Classes", 0, KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS,
+                      &classes) != ERROR_SUCCESS)
     {
         return;
     }
@@ -296,8 +292,7 @@ static void reach_windows_collect_aumid_associations()
     reach_windows_collect_aumid_root(HKEY_LOCAL_MACHINE);
 }
 
-static int32_t reach_windows_aumid_executable(const uint16_t *app_user_model_id,
-                                              uint16_t *out_path)
+static int32_t reach_windows_aumid_executable(const uint16_t *app_user_model_id, uint16_t *out_path)
 {
     if (app_user_model_id == nullptr || app_user_model_id[0] == 0 || out_path == nullptr)
     {
@@ -305,8 +300,7 @@ static int32_t reach_windows_aumid_executable(const uint16_t *app_user_model_id,
     }
     std::call_once(reach_windows_aumid_once, reach_windows_collect_aumid_associations);
     const wchar_t *wanted = reinterpret_cast<const wchar_t *>(app_user_model_id);
-    for (const reach_windows_aumid_association &association :
-         reach_windows_aumid_associations)
+    for (const reach_windows_aumid_association &association : reach_windows_aumid_associations)
     {
         if (lstrcmpiW(association.app_user_model_id.c_str(), wanted) == 0)
         {
@@ -342,11 +336,10 @@ reach_result reach_windows_enrich_application(reach_application *application)
         if (application->launch.path[0] == 0)
         {
             application->launch.kind = REACH_APPLICATION_LAUNCH_PACKAGED;
-            if (swprintf_s(
-                    reinterpret_cast<wchar_t *>(application->launch.path),
-                    REACH_APPLICATION_TEXT_CAPACITY, L"shell:AppsFolder\\%ls",
-                    reinterpret_cast<const wchar_t *>(
-                        application->identity.app_user_model_id)) <= 0)
+            if (swprintf_s(reinterpret_cast<wchar_t *>(application->launch.path),
+                           REACH_APPLICATION_TEXT_CAPACITY, L"shell:AppsFolder\\%ls",
+                           reinterpret_cast<const wchar_t *>(
+                               application->identity.app_user_model_id)) <= 0)
             {
                 application->launch = {};
                 return REACH_ERROR;
@@ -356,25 +349,23 @@ reach_result reach_windows_enrich_application(reach_application *application)
     }
 
     uint16_t associated_path[REACH_APPLICATION_TEXT_CAPACITY] = {};
-    if (reach_windows_aumid_executable(application->identity.app_user_model_id,
-                                       associated_path))
+    if (reach_windows_aumid_executable(application->identity.app_user_model_id, associated_path))
     {
-        (void)reach_application_identity_add_runtime_path(&application->identity,
-                                                          associated_path);
+        (void)reach_application_identity_add_runtime_path(&application->identity, associated_path);
         if (application->launch.path[0] == 0)
         {
             application->launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
-            (void)reach_copy_utf16(application->launch.path,
-                                   REACH_APPLICATION_TEXT_CAPACITY, associated_path);
+            (void)reach_copy_utf16(application->launch.path, REACH_APPLICATION_TEXT_CAPACITY,
+                                   associated_path);
         }
     }
     return REACH_OK;
 }
 
-static reach_result reach_windows_application_resolve(
-    reach_application_resolver *resolver,
-    const reach_application_observation *observation,
-    reach_application *out_application)
+static reach_result
+reach_windows_application_resolve(reach_application_resolver *resolver,
+                                  const reach_application_observation *observation,
+                                  reach_application *out_application)
 {
     if (resolver == nullptr || observation == nullptr || out_application == nullptr ||
         (observation->runtime_path[0] == 0 && observation->app_user_model_id[0] == 0))
@@ -384,8 +375,7 @@ static reach_result reach_windows_application_resolve(
 
     *out_application = {};
     (void)reach_copy_utf16(out_application->identity.app_user_model_id,
-                           REACH_APPLICATION_TEXT_CAPACITY,
-                           observation->app_user_model_id);
+                           REACH_APPLICATION_TEXT_CAPACITY, observation->app_user_model_id);
     (void)reach_application_identity_add_runtime_path(&out_application->identity,
                                                       observation->runtime_path);
     (void)reach_copy_utf16(out_application->icon_ref, REACH_APPLICATION_TEXT_CAPACITY,
@@ -402,37 +392,33 @@ static reach_result reach_windows_application_resolve(
                                    observation->runtime_path);
         }
         out_application->launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
-        (void)reach_copy_utf16(out_application->launch.path,
-                               REACH_APPLICATION_TEXT_CAPACITY, launch_path);
-        (void)reach_application_identity_add_runtime_path(&out_application->identity,
-                                                          launch_path);
+        (void)reach_copy_utf16(out_application->launch.path, REACH_APPLICATION_TEXT_CAPACITY,
+                               launch_path);
+        (void)reach_application_identity_add_runtime_path(&out_application->identity, launch_path);
     }
     return out_application->launch.path[0] != 0 ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reach_windows_application_enrich(
-    reach_application_resolver *resolver, reach_application *application)
+static reach_result reach_windows_application_enrich(reach_application_resolver *resolver,
+                                                     reach_application *application)
 {
     return resolver != nullptr ? reach_windows_enrich_application(application)
                                : REACH_INVALID_ARGUMENT;
 }
 
-static void reach_windows_application_resolver_destroy(
-    reach_application_resolver *resolver)
+static void reach_windows_application_resolver_destroy(reach_application_resolver *resolver)
 {
     delete resolver;
 }
 
-reach_result reach_windows_create_application_resolver(
-    reach_application_resolver_port *out_port)
+reach_result reach_windows_create_application_resolver(reach_application_resolver_port *out_port)
 {
     if (out_port == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
     *out_port = {};
-    reach_application_resolver *resolver =
-        new (std::nothrow) reach_application_resolver();
+    reach_application_resolver *resolver = new (std::nothrow) reach_application_resolver();
     if (resolver == nullptr)
     {
         return REACH_ERROR;

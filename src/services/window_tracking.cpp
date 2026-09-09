@@ -34,8 +34,7 @@ static const uint16_t *reach_window_tracking_icon_ref(const reach_window_snapsho
 {
     const uint16_t *runtime_path =
         reach_application_identity_primary_runtime_path(&window->identity);
-    return window->icon_ref[0] != 0 || runtime_path == nullptr ? window->icon_ref
-                                                               : runtime_path;
+    return window->icon_ref[0] != 0 || runtime_path == nullptr ? window->icon_ref : runtime_path;
 }
 
 reach_result reach_window_tracking_create(reach_window_manager_port window_manager,
@@ -184,8 +183,7 @@ int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *a
     {
         return 0;
     }
-    return reach_application_identity_matches(&app->application.identity,
-                                              &window->identity);
+    return reach_application_identity_matches(&app->application.identity, &window->identity);
 }
 
 void reach_window_tracking_app_display_name(const reach_window_snapshot *window, uint16_t *out_name,
@@ -432,8 +430,8 @@ int32_t reach_window_tracking_window_is_foreground(const reach_window_tracking *
         return 0;
     }
     return service->window_manager.ops.is_foreground != nullptr
-        ? service->window_manager.ops.is_foreground(service->window_manager.manager, window)
-        : service->current_foreground_window == window;
+               ? service->window_manager.ops.is_foreground(service->window_manager.manager, window)
+               : service->current_foreground_window == window;
 }
 
 uintptr_t reach_window_tracking_foreground(const reach_window_tracking *service)
@@ -534,9 +532,8 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         size_t root = reach_window_tracking_group_root(parents, index);
         for (size_t old_index = 0; old_index < old_count; ++old_index)
         {
-            if (!reach_application_identity_matches(
-                    &service->open_windows[index].identity,
-                    &old_windows[old_index].identity))
+            if (!reach_application_identity_matches(&service->open_windows[index].identity,
+                                                    &old_windows[old_index].identity))
             {
                 continue;
             }
@@ -584,9 +581,8 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
         {
             int32_t item_changed =
                 old_windows[index].id != service->open_windows[index].id ||
-                !reach_application_identity_same(
-                    &old_windows[index].identity,
-                    &service->open_windows[index].identity);
+                !reach_application_identity_same(&old_windows[index].identity,
+                                                 &service->open_windows[index].identity);
             int32_t icon_ref_changed =
                 !reach_utf16_equal(reach_window_tracking_icon_ref(&old_windows[index]),
                                    reach_window_tracking_icon_ref(&service->open_windows[index]));

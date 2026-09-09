@@ -385,10 +385,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_POINTER_DOWN;
-            event.button = message == WM_RBUTTONDOWN
-                               ? REACH_POINTER_BUTTON_SECONDARY
-                               : message == WM_MBUTTONDOWN ? REACH_POINTER_BUTTON_MIDDLE
-                                                          : REACH_POINTER_BUTTON_PRIMARY;
+            event.button = message == WM_RBUTTONDOWN   ? REACH_POINTER_BUTTON_SECONDARY
+                           : message == WM_MBUTTONDOWN ? REACH_POINTER_BUTTON_MIDDLE
+                                                       : REACH_POINTER_BUTTON_PRIMARY;
             event.x = point.x;
             event.y = point.y;
             reach_platform_window_queue_event(window, &event);
@@ -405,10 +404,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             ClientToScreen(hwnd, &point);
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_POINTER_UP;
-            event.button = message == WM_RBUTTONUP
-                               ? REACH_POINTER_BUTTON_SECONDARY
-                               : message == WM_MBUTTONUP ? REACH_POINTER_BUTTON_MIDDLE
-                                                        : REACH_POINTER_BUTTON_PRIMARY;
+            event.button = message == WM_RBUTTONUP   ? REACH_POINTER_BUTTON_SECONDARY
+                           : message == WM_MBUTTONUP ? REACH_POINTER_BUTTON_MIDDLE
+                                                     : REACH_POINTER_BUTTON_PRIMARY;
             event.x = point.x;
             event.y = point.y;
             reach_platform_window_queue_event(window, &event);

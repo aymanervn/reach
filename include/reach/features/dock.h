@@ -34,7 +34,8 @@ extern "C"
 #define REACH_DOCK_MAX_INSTANCES 16
 
     /* One entry per application on the dock. Pinned and running are properties of an entry, not
-       different kinds of entry, so every icon carries the same information and behaves the same. */
+
+     * different kinds of entry, so every icon carries the same information and behaves the same. */
     typedef struct reach_dock_item_model
     {
         uint32_t key;
@@ -68,9 +69,8 @@ extern "C"
     void reach_dock_feature_model_move_order(reach_dock_feature_model *model, size_t source,
                                              size_t target);
     uint32_t reach_dock_item_key_at(const reach_dock_feature_model *model, size_t index);
-    int32_t reach_dock_item_identity_matches(
-        const reach_dock_item_model *item,
-        const reach_application_identity *identity);
+    int32_t reach_dock_item_identity_matches(const reach_dock_item_model *item,
+                                             const reach_application_identity *identity);
     size_t reach_dock_feature_model_pinned_order_index(const reach_dock_feature_model *model,
                                                        uint32_t pin_id);
     size_t
@@ -234,7 +234,6 @@ extern "C"
     reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout);
     int32_t reach_dock_item_anchor(const reach_dock *dock, size_t index, reach_rect_f32 *out_button,
                                    float *out_bar_edge_y);
-
 
     enum
     {

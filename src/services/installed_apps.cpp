@@ -26,6 +26,24 @@ struct reach_installed_apps_service
     reach_installed_apps_snapshot snapshot = {};
 };
 
+static void reach_installed_apps_keep_manageable_packages(reach_installed_app_list *apps)
+{
+    if (apps == nullptr)
+    {
+        return;
+    }
+    size_t write = 0;
+    for (size_t read = 0; read < apps->count; ++read)
+    {
+        const reach_installed_app *entry = &apps->entries[read];
+        if (entry->kind == REACH_INSTALLED_APP_PACKAGED && entry->can_uninstall)
+        {
+            apps->entries[write++] = *entry;
+        }
+    }
+    apps->count = write;
+}
+
 static void reach_installed_apps_service_thread_main(reach_installed_apps_service *service)
 {
     if (service->port.ops.thread_attach != nullptr)
@@ -61,9 +79,10 @@ static void reach_installed_apps_service_thread_main(reach_installed_apps_servic
             reach_app_launch_request request = {};
             reach_copy_utf16(request.path, 260, entry.launch_path);
             reach_copy_utf16(request.app_user_model_id, 260, entry.app_user_model_id);
-            succeeded = index < REACH_INSTALLED_APP_MAX_ENTRIES &&
-                        service->launcher.ops.launch != nullptr &&
-                        service->launcher.ops.launch(service->launcher.launcher, &request) == REACH_OK;
+            succeeded =
+                index < REACH_INSTALLED_APP_MAX_ENTRIES &&
+                service->launcher.ops.launch != nullptr &&
+                service->launcher.ops.launch(service->launcher.launcher, &request) == REACH_OK;
         }
         else if (command == REACH_INSTALLED_APPS_COMMAND_UNINSTALL)
         {
@@ -78,11 +97,16 @@ static void reach_installed_apps_service_thread_main(reach_installed_apps_servic
                         service->port.ops.manage(service->port.apps, &entry) == REACH_OK;
         }
 
-        std::unique_ptr<reach_installed_app_list> apps(new (std::nothrow) reach_installed_app_list());
+        std::unique_ptr<reach_installed_app_list> apps(new (std::nothrow)
+                                                           reach_installed_app_list());
         if (apps == nullptr || service->port.ops.enumerate == nullptr ||
             service->port.ops.enumerate(service->port.apps, apps.get()) != REACH_OK)
         {
             succeeded = command == REACH_INSTALLED_APPS_COMMAND_REFRESH ? 0 : succeeded;
+        }
+        else
+        {
+            reach_installed_apps_keep_manageable_packages(apps.get());
         }
 
         void (*notify)(void *) = nullptr;
@@ -117,9 +141,10 @@ static void reach_installed_apps_service_thread_main(reach_installed_apps_servic
     }
 }
 
-reach_result reach_installed_apps_service_create(
-    reach_installed_apps_port port, reach_app_launcher_port launcher, void (*notify)(void *user),
-    void *notify_user, reach_installed_apps_service **out_service)
+reach_result reach_installed_apps_service_create(reach_installed_apps_port port,
+                                                 reach_app_launcher_port launcher,
+                                                 void (*notify)(void *user), void *notify_user,
+                                                 reach_installed_apps_service **out_service)
 {
     if (out_service == nullptr)
     {
@@ -176,8 +201,7 @@ void reach_installed_apps_service_destroy(reach_installed_apps_service *service)
 }
 
 static void reach_installed_apps_service_submit(reach_installed_apps_service *service,
-                                                 reach_installed_apps_command command,
-                                                 size_t index)
+                                                reach_installed_apps_command command, size_t index)
 {
     if (service == nullptr)
     {
@@ -217,7 +241,7 @@ void reach_installed_apps_service_manage(reach_installed_apps_service *service, 
 }
 
 int32_t reach_installed_apps_service_take(reach_installed_apps_service *service,
-                                           reach_installed_apps_snapshot *out_snapshot)
+                                          reach_installed_apps_snapshot *out_snapshot)
 {
     if (service == nullptr || out_snapshot == nullptr)
     {

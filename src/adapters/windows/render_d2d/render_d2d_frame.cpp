@@ -138,7 +138,8 @@ reach_result reach_d2d_synchronize(reach_render_backend *backend)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    if (backend->dcomp_device != nullptr && FAILED(backend->dcomp_device->WaitForCommitCompletion()))
+    if (backend->dcomp_device != nullptr &&
+        FAILED(backend->dcomp_device->WaitForCommitCompletion()))
     {
         return REACH_ERROR;
     }

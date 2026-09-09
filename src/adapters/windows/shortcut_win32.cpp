@@ -3,8 +3,7 @@
 #include <windows.h>
 #include <shobjidl.h>
 
-int32_t reach_windows_read_shortcut(const wchar_t *path,
-                                    reach_windows_shortcut_info *out_info)
+int32_t reach_windows_read_shortcut(const wchar_t *path, reach_windows_shortcut_info *out_info)
 {
     if (path == nullptr || path[0] == 0 || out_info == nullptr)
     {

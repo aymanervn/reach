@@ -20,8 +20,7 @@ static float reach_stage_scaled(const reach_stage_render_context *ctx, float val
     return value * scale;
 }
 
-static float reach_stage_header_radius(const reach_stage_render_context *ctx,
-                                       reach_rect_f32 header)
+static float reach_stage_header_radius(const reach_stage_render_context *ctx, reach_rect_f32 header)
 {
     float radius = reach_stage_scaled(ctx, ctx->theme->radius_small);
     float limit = header.height * 0.5f;
@@ -325,7 +324,6 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
                 return result;
             }
         }
-
     }
 
     return REACH_OK;

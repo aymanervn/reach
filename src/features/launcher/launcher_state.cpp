@@ -100,29 +100,27 @@ static void reach_launcher_set_surface_animation_open(reach_launcher *launcher, 
                                         REACH_LAUNCHER_ANIMATION_SURFACE_SCALE,
                                         REACH_LAUNCHER_SURFACE_SCALE);
         }
-        reach_animation_manager_animate_to(
-            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y, 0.0f,
-            launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
-        reach_animation_manager_animate_to(
-            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY, 1.0f,
-            launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
-        reach_animation_manager_animate_to(
-            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_SCALE, 1.0f,
-            launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
+        reach_animation_manager_animate_to(&launcher->animations,
+                                           REACH_LAUNCHER_ANIMATION_SURFACE_Y, 0.0f,
+                                           launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
+        reach_animation_manager_animate_to(&launcher->animations,
+                                           REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY, 1.0f,
+                                           launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
+        reach_animation_manager_animate_to(&launcher->animations,
+                                           REACH_LAUNCHER_ANIMATION_SURFACE_SCALE, 1.0f,
+                                           launcher->surface_open_seconds, REACH_EASING_EASE_OUT);
     }
     else if (launcher->surface_visible)
     {
         reach_animation_manager_animate_to(
             &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y,
-            REACH_LAUNCHER_SURFACE_OFFSET, launcher->surface_close_seconds,
-            REACH_EASING_EASE_IN);
-        reach_animation_manager_animate_to(
-            &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY, 0.0f,
-            launcher->surface_close_seconds, REACH_EASING_EASE_IN);
+            REACH_LAUNCHER_SURFACE_OFFSET, launcher->surface_close_seconds, REACH_EASING_EASE_IN);
+        reach_animation_manager_animate_to(&launcher->animations,
+                                           REACH_LAUNCHER_ANIMATION_SURFACE_OPACITY, 0.0f,
+                                           launcher->surface_close_seconds, REACH_EASING_EASE_IN);
         reach_animation_manager_animate_to(
             &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_SCALE,
-            REACH_LAUNCHER_SURFACE_SCALE, launcher->surface_close_seconds,
-            REACH_EASING_EASE_IN);
+            REACH_LAUNCHER_SURFACE_SCALE, launcher->surface_close_seconds, REACH_EASING_EASE_IN);
     }
 }
 
@@ -820,7 +818,7 @@ const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count)
 const reach_ui_event_type *reach_launcher_routed_events(size_t *out_count)
 {
     static const reach_ui_event_type events[] = {
-        REACH_UI_EVENT_ESCAPE,    REACH_UI_EVENT_ENTER,     REACH_UI_EVENT_ARROW_UP,
+        REACH_UI_EVENT_ESCAPE,     REACH_UI_EVENT_ENTER,     REACH_UI_EVENT_ARROW_UP,
         REACH_UI_EVENT_ARROW_DOWN, REACH_UI_EVENT_TEXT_CHAR, REACH_UI_EVENT_TEXT_EDIT};
     if (out_count != nullptr)
     {
@@ -1196,8 +1194,7 @@ static void reach_launcher_capsule_handle_event(void *capsule, const reach_ui_ev
                                                 reach_capsule_event_result *out)
 {
     reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
-    if (launcher == nullptr || event == nullptr || out == nullptr ||
-        !launcher->state.model.open)
+    if (launcher == nullptr || event == nullptr || out == nullptr || !launcher->state.model.open)
     {
         return;
     }
@@ -1220,10 +1217,9 @@ static void reach_launcher_capsule_handle_event(void *capsule, const reach_ui_ev
     case REACH_UI_EVENT_ARROW_UP:
     case REACH_UI_EVENT_ARROW_DOWN:
     {
-        reach_result result =
-            event->type == REACH_UI_EVENT_ARROW_UP
-                ? reach_launcher_select_previous_result_state(&launcher->state)
-                : reach_launcher_select_next_result_state(&launcher->state);
+        reach_result result = event->type == REACH_UI_EVENT_ARROW_UP
+                                  ? reach_launcher_select_previous_result_state(&launcher->state)
+                                  : reach_launcher_select_next_result_state(&launcher->state);
         if (result == REACH_OK)
         {
             out->handled = 1;
@@ -1364,8 +1360,8 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
     out->presentation.y_offset =
         reach_animation_manager_value(&launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_Y) *
         launcher->surface_dpi_scale;
-    out->presentation.scale = reach_animation_manager_value(
-        &launcher->animations, REACH_LAUNCHER_ANIMATION_SURFACE_SCALE);
+    out->presentation.scale = reach_animation_manager_value(&launcher->animations,
+                                                            REACH_LAUNCHER_ANIMATION_SURFACE_SCALE);
     out->presentation.max_scale = REACH_LAUNCHER_SURFACE_SCALE;
 }
 

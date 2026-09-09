@@ -28,18 +28,18 @@ extern "C"
         int32_t command_succeeded;
     } reach_installed_apps_snapshot;
 
-    reach_result reach_installed_apps_service_create(
-        reach_installed_apps_port port, reach_app_launcher_port launcher,
-        void (*notify)(void *user), void *notify_user,
-        reach_installed_apps_service **out_service);
+    reach_result reach_installed_apps_service_create(reach_installed_apps_port port,
+                                                     reach_app_launcher_port launcher,
+                                                     void (*notify)(void *user), void *notify_user,
+                                                     reach_installed_apps_service **out_service);
     void reach_installed_apps_service_destroy(reach_installed_apps_service *service);
     void reach_installed_apps_service_refresh(reach_installed_apps_service *service);
     void reach_installed_apps_service_open(reach_installed_apps_service *service, size_t index);
     void reach_installed_apps_service_uninstall(reach_installed_apps_service *service,
-                                                 size_t index);
+                                                size_t index);
     void reach_installed_apps_service_manage(reach_installed_apps_service *service, size_t index);
     int32_t reach_installed_apps_service_take(reach_installed_apps_service *service,
-                                               reach_installed_apps_snapshot *out_snapshot);
+                                              reach_installed_apps_snapshot *out_snapshot);
     int32_t reach_installed_apps_service_pending(const reach_installed_apps_service *service);
 
 #ifdef __cplusplus

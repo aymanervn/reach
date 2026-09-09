@@ -91,8 +91,7 @@ void reach_host_finish_surface_presentations(reach_host *host)
         }
 
         const reach_feature_control_ops *control = runtime->definition->control_ops;
-        if (control != nullptr && control->surface_hidden != nullptr &&
-            runtime->capsule != nullptr)
+        if (control != nullptr && control->surface_hidden != nullptr && runtime->capsule != nullptr)
         {
             reach_feature_tick_result result = {};
             control->surface_hidden(runtime->capsule, &result);
@@ -281,9 +280,9 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         return monitor_result;
     }
 
-    if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.set_bounds != nullptr && host->monitors.list != nullptr &&
-        host->monitors.ops.count != nullptr && host->monitors.ops.primary != nullptr &&
-        host->monitors.ops.count(host->monitors.list) > 0)
+    if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.set_bounds != nullptr &&
+        host->monitors.list != nullptr && host->monitors.ops.count != nullptr &&
+        host->monitors.ops.primary != nullptr && host->monitors.ops.count(host->monitors.list) > 0)
     {
         const reach_monitor_info *monitor = host->monitors.ops.primary(host->monitors.list);
         REACH_ASSERT(monitor != nullptr);

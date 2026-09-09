@@ -853,13 +853,15 @@ publisher, and version. Reach never reads or executes files from the protected `
 directory; packaged launches use `IApplicationActivationManager`, with the AppsFolder parsing path
 retained as a shell fallback for desktop entries that publish an AppUserModelID but are not MSIX.
 
-The Launcher search catalog consumes the same adapter projection and carries the AppUserModelID
-through search results and feature targets. The standalone Settings app consumes it through
-`reach_installed_apps_service`, whose worker serializes refresh, open, uninstall, and management
-commands and publishes snapshots to the UI tick. Current-user packaged uninstall uses the OS
-PackageManager API. Repair and reset are not reimplemented: the Applications page opens the
-package's Windows Advanced options page, because Settings-equivalent direct repair belongs to the
-Windows App SDK PackageDeploymentManager and Reach does not deploy that runtime.
+The Launcher search catalog consumes the complete adapter projection and carries the
+AppUserModelID through search results and feature targets. The standalone Settings app consumes it
+through `reach_installed_apps_service`, whose worker retains only packaged entries for which the
+Shell publishes an uninstall verb, thereby excluding desktop launchers and non-removable Windows
+components while preserving user-manageable packages. The worker serializes refresh, open,
+uninstall, and management commands and publishes snapshots to the UI tick. Current-user packaged
+uninstall uses the OS PackageManager API. Repair and reset are not reimplemented: the Applications
+page opens the package's Windows Advanced options page, because Settings-equivalent direct repair
+belongs to the Windows App SDK PackageDeploymentManager and Reach does not deploy that runtime.
 
 ## tools
 

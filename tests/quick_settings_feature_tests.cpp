@@ -96,8 +96,7 @@ static void test_feature_transition_owns_presentation(void)
     reach_feature_surface_geometry geometry = {};
     reach_feature_transition_presentation(&transition, &geometry);
     expect_true(geometry.presentation.managed, "the popup reports managed presentation");
-    expect_near(geometry.presentation.opacity, 0.0f, 0.001f,
-                "the popup begins transparent");
+    expect_near(geometry.presentation.opacity, 0.0f, 0.001f, "the popup begins transparent");
     expect_near(geometry.presentation.y_offset, -12.0f, 0.001f,
                 "a dropdown begins above its anchor at DPI-scaled distance");
 
@@ -106,10 +105,8 @@ static void test_feature_transition_owns_presentation(void)
     expect_true(!reach_feature_transition_active(&transition),
                 "the settled popup does not request animation frames");
     expect_true(reach_feature_transition_visible(&transition), "the settled popup stays visible");
-    expect_near(geometry.presentation.opacity, 1.0f, 0.001f,
-                "the popup settles opaque");
-    expect_near(geometry.presentation.y_offset, 0.0f, 0.001f,
-                "the popup settles on its anchor");
+    expect_near(geometry.presentation.opacity, 1.0f, 0.001f, "the popup settles opaque");
+    expect_near(geometry.presentation.y_offset, 0.0f, 0.001f, "the popup settles on its anchor");
 
     expect_true(reach_feature_transition_set_open(&transition, 0),
                 "closing reverses the shared popup transition");

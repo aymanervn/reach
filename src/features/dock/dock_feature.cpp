@@ -616,8 +616,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
             if (event->button == REACH_POINTER_BUTTON_PRIMARY)
             {
                 reach_dock_interaction_result interaction = {};
-                reach_dock_item_press(dock, hit.index,
-                                      reach_dock_capsule_screen_x(dock, event->x),
+                reach_dock_item_press(dock, hit.index, reach_dock_capsule_screen_x(dock, event->x),
                                       reach_dock_capsule_screen_y(dock, event->y), &interaction_ctx,
                                       &interaction);
                 reach_dock_capsule_apply_interaction_result(dock, &interaction, out);
@@ -845,13 +844,12 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
     build.pinned_apps = dock->pinned_apps;
     build.pinned_app_count = dock->pinned_app_count;
 
-    reach_rect_f32 before = dock->pointer_layout_valid ? dock->pointer_layout.bounds
-                                                       : reach_rect_f32{};
+    reach_rect_f32 before =
+        dock->pointer_layout_valid ? dock->pointer_layout.bounds : reach_rect_f32{};
     if (reach_dock_take_items_changed(dock))
     {
-        reach_dock_rebuild_items(dock, &build,
-                                 dock->pointer_layout_valid ? &dock->pointer_layout : nullptr,
-                                 &layout);
+        reach_dock_rebuild_items(
+            dock, &build, dock->pointer_layout_valid ? &dock->pointer_layout : nullptr, &layout);
     }
     else
     {
@@ -1028,11 +1026,9 @@ static void reach_dock_item_set_application(reach_dock_item_model *item,
     if (item->application.icon_ref[0] == 0)
     {
         const uint16_t *runtime_path =
-            reach_application_identity_primary_runtime_path(
-                &item->application.identity);
+            reach_application_identity_primary_runtime_path(&item->application.identity);
         reach_copy_utf16(item->application.icon_ref, REACH_DOCK_TEXT_CAPACITY,
-                         runtime_path != nullptr ? runtime_path
-                                                 : item->application.launch.path);
+                         runtime_path != nullptr ? runtime_path : item->application.launch.path);
     }
 }
 
@@ -1129,11 +1125,9 @@ static void reach_dock_feature_model_build_candidates(
         if (runtime_path != nullptr)
         {
             application.launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
-            reach_copy_utf16(application.launch.path, REACH_DOCK_TEXT_CAPACITY,
-                             runtime_path);
+            reach_copy_utf16(application.launch.path, REACH_DOCK_TEXT_CAPACITY, runtime_path);
         }
-        reach_copy_utf16(application.icon_ref, REACH_DOCK_TEXT_CAPACITY,
-                         window->icon_ref);
+        reach_copy_utf16(application.icon_ref, REACH_DOCK_TEXT_CAPACITY, window->icon_ref);
         reach_dock_item_set_application(item, &application);
         reach_dock_item_add_instance(item, window->id);
         group_of[count] = group_id;
@@ -1146,8 +1140,9 @@ static void reach_dock_feature_model_build_candidates(
 
 /* A candidate inherits the key of the app it matches by identity, so an app keeps its dock slot
    through being pinned, unpinned, or handed a new pin id by the config store. */
-static void reach_dock_assign_keys(reach_dock_feature_model *model, reach_dock_item_model *candidates,
-                                   size_t candidate_count, uint32_t *next_key)
+static void reach_dock_assign_keys(reach_dock_feature_model *model,
+                                   reach_dock_item_model *candidates, size_t candidate_count,
+                                   uint32_t *next_key)
 {
     for (size_t index = 0; index < candidate_count; ++index)
     {
@@ -1155,8 +1150,8 @@ static void reach_dock_assign_keys(reach_dock_feature_model *model, reach_dock_i
         candidate->key = 0;
         for (size_t at = 0; at < model->item_count; ++at)
         {
-            if (reach_dock_item_identity_matches(
-                    &model->items[at], &candidate->application.identity))
+            if (reach_dock_item_identity_matches(&model->items[at],
+                                                 &candidate->application.identity))
             {
                 candidate->key = model->items[at].key;
                 break;
@@ -1328,12 +1323,10 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
     const reach_dock_item_model *item = reach_dock_item_at(dock, item_index);
     out_request->window = item->window;
     out_request->pin_id = item->pin_id;
-    reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY,
-                     item->application.launch.path);
+    reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, item->application.launch.path);
     reach_copy_utf16(out_request->app_user_model_id, REACH_MENU_TEXT_CAPACITY,
                      item->application.identity.app_user_model_id);
-    reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY,
-                     item->application.icon_ref);
+    reach_copy_utf16(out_request->icon_ref, REACH_MENU_TEXT_CAPACITY, item->application.icon_ref);
     out_request->launch_kind = item->application.launch.kind;
     if (item->pinned)
     {
@@ -1343,8 +1336,7 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
             {
                 const reach_application_launch_target *launch =
                     &dock->pinned_apps[index].application.launch;
-                reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY,
-                                 launch->path);
+                reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, launch->path);
                 reach_copy_utf16(out_request->arguments, REACH_MENU_TEXT_CAPACITY,
                                  launch->arguments);
                 break;
@@ -1765,8 +1757,8 @@ reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_i
     result.height = native_height * result.scale;
     result.icon_size = native_icon_size * result.scale;
     result.gap = native_gap * result.scale;
-    result.outer_padding = native_outer_padding * result.scale +
-                           (result.width - scaled_width) * 0.5f;
+    result.outer_padding =
+        native_outer_padding * result.scale + (result.width - scaled_width) * 0.5f;
     return result;
 }
 

@@ -111,8 +111,7 @@ static void reach_catalog_append(reach_windows_search_catalog *catalog, const ui
     reach_copy_utf16(entry.name, REACH_SEARCH_RESULT_NAME_CAPACITY, name);
     reach_copy_utf16(entry.path, REACH_SEARCH_RESULT_PATH_CAPACITY, path);
     reach_copy_utf16(entry.arguments, REACH_SEARCH_RESULT_ARGUMENTS_CAPACITY, arguments);
-    reach_copy_utf16(entry.app_user_model_id, REACH_SEARCH_RESULT_PATH_CAPACITY,
-                     app_user_model_id);
+    reach_copy_utf16(entry.app_user_model_id, REACH_SEARCH_RESULT_PATH_CAPACITY, app_user_model_id);
     entry.alias_index = alias_index;
     entry.has_alias = has_alias;
     catalog->entries.push_back(entry);

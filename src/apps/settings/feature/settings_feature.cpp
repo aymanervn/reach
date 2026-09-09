@@ -150,6 +150,20 @@ float reach_settings_model_button_press_value(const reach_settings_model *model,
     return reach_animation_manager_value(&model->button_press_animation, 0);
 }
 
+float reach_settings_model_installed_app_button_press_value(const reach_settings_model *model,
+                                                            int32_t hit_type,
+                                                            size_t installed_app_index)
+{
+    uint64_t target = (static_cast<uint64_t>(static_cast<uint32_t>(hit_type)) << 32) |
+                      static_cast<uint32_t>(installed_app_index);
+    if (model == nullptr ||
+        reach_pressable_feedback_index(&model->button_pressable) != static_cast<size_t>(target))
+    {
+        return 0.0f;
+    }
+    return reach_animation_manager_value(&model->button_press_animation, 0);
+}
+
 int32_t reach_settings_model_tick_button_press(reach_settings_model *model, double delta_seconds)
 {
     if (model == nullptr || !reach_animation_manager_any_active(&model->button_press_animation))
@@ -287,8 +301,8 @@ static void reach_settings_layout_toggle_card(const reach_settings_toggle_card_r
     float text_x = x + 16.0f * scale;
     if (rects->icon != nullptr)
     {
-        *rects->icon = reach_settings_rect(text_x, y + (height - icon_box) * 0.5f, icon_box,
-                                           icon_box);
+        *rects->icon =
+            reach_settings_rect(text_x, y + (height - icon_box) * 0.5f, icon_box, icon_box);
         text_x += icon_box + 14.0f * scale;
     }
     float text_width = toggle_x - 14.0f * scale - text_x;
@@ -645,7 +659,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
 
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_APPLICATIONS)
     {
-        float scrollbar_width = 5.0f * scale;
+        float scrollbar_width = 6.0f * scale;
         float area_x = layout.content_title.x;
         float area_y = layout.content_title.y + layout.content_title.height + 12.0f * scale;
         float area_width = layout.content.width - 64.0f * scale - scrollbar_width;
@@ -660,13 +674,13 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             layout.installed_apps_viewport.y, scrollbar_width,
             layout.installed_apps_viewport.height);
 
-        float row_height = 70.0f * scale;
+        float row_height = 64.0f * scale;
         float row_gap = 8.0f * scale;
-        float button_height = 26.0f * scale;
-        float button_gap = 7.0f * scale;
-        float uninstall_width = 72.0f * scale;
-        float manage_width = 64.0f * scale;
-        float open_width = 50.0f * scale;
+        float button_height = 30.0f * scale;
+        float button_gap = 8.0f * scale;
+        float uninstall_width = 78.0f * scale;
+        float manage_width = 68.0f * scale;
+        float open_width = 56.0f * scale;
         float content_y = 0.0f;
         layout.installed_app_row_count =
             model->installed_apps.count < REACH_INSTALLED_APP_MAX_ENTRIES
@@ -674,11 +688,11 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                 : REACH_INSTALLED_APP_MAX_ENTRIES;
         for (size_t index = 0; index < layout.installed_app_row_count; ++index)
         {
-            layout.installed_app_rows[index] = reach_settings_rect(
-                layout.installed_apps_viewport.x,
-                layout.installed_apps_viewport.y + content_y -
-                    model->installed_apps_scrollbar.offset,
-                layout.installed_apps_viewport.width, row_height);
+            layout.installed_app_rows[index] =
+                reach_settings_rect(layout.installed_apps_viewport.x,
+                                    layout.installed_apps_viewport.y + content_y -
+                                        model->installed_apps_scrollbar.offset,
+                                    layout.installed_apps_viewport.width, row_height);
             float right = layout.installed_app_rows[index].x +
                           layout.installed_app_rows[index].width - 14.0f * scale;
             layout.installed_app_uninstall_buttons[index] = reach_settings_rect(
@@ -698,9 +712,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             content_y += row_height + row_gap;
         }
         float base_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
-        layout.installed_apps_content_height =
-            base_height > layout.installed_apps_viewport.height ? base_height + 20.0f * scale
-                                                                 : base_height;
+        layout.installed_apps_content_height = base_height;
         reach_scrollbar_set_extents(&model->installed_apps_scrollbar,
                                     layout.installed_apps_content_height,
                                     layout.installed_apps_viewport.height);
@@ -768,10 +780,10 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         };
         for (size_t index = 0; index < sizeof(desktop_cards) / sizeof(desktop_cards[0]); ++index)
         {
-            reach_settings_layout_toggle_card(
-                &desktop_cards[index], area_x,
-                desktop_y + (float)index * (card_height + card_spacing), area_width, card_height,
-                scale);
+            reach_settings_layout_toggle_card(&desktop_cards[index], area_x,
+                                              desktop_y +
+                                                  (float)index * (card_height + card_spacing),
+                                              area_width, card_height, scale);
         }
     }
 
@@ -1126,6 +1138,18 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         }
     }
 
+    if (layout->installed_apps_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->installed_apps_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (layout->installed_apps_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->installed_apps_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_TRACK;
+        return result;
+    }
     if (reach_settings_rect_contains(layout->installed_apps_viewport, x, y))
     {
         for (size_t index = 0; index < layout->installed_app_row_count; ++index)

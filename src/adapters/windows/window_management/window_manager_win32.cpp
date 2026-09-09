@@ -741,12 +741,12 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
 static reach_result reach_window_manager_prepare(reach_window_manager *manager,
                                                  reach_window_id window, reach_window_id cover)
 {
-    return reach_window_manager_send_helper(manager, REACH_SERVICE_COMMAND_PREPARE,
-                                             window, REACH_SPLIT_LEFT, cover);
+    return reach_window_manager_send_helper(manager, REACH_SERVICE_COMMAND_PREPARE, window,
+                                            REACH_SPLIT_LEFT, cover);
 }
 
 static int32_t reach_window_manager_is_foreground(const reach_window_manager *manager,
-                                                   reach_window_id window)
+                                                  reach_window_id window)
 {
     if (manager == nullptr || window == 0)
     {

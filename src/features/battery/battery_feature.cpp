@@ -299,7 +299,7 @@ void reach_battery_open(reach_battery *battery, const reach_battery_open_context
     reach_battery_reset_pressable(battery);
     reach_battery_place(&battery->state, ctx);
     reach_feature_transition_configure(&battery->popup_transition, ctx->theme, ctx->dpi_scale,
-                                     ctx->drop_direction);
+                                       ctx->drop_direction);
     battery->state.open = 1;
     (void)reach_feature_transition_set_open(&battery->popup_transition, 1);
 }
@@ -312,7 +312,7 @@ void reach_battery_relayout(reach_battery *battery, const reach_battery_open_con
     }
     reach_battery_place(&battery->state, ctx);
     reach_feature_transition_configure(&battery->popup_transition, ctx->theme, ctx->dpi_scale,
-                                     ctx->drop_direction);
+                                       ctx->drop_direction);
 }
 
 static void reach_battery_capsule_reset(void *capsule)
@@ -375,9 +375,8 @@ static int32_t reach_battery_capsule_needs_frame(const void *capsule)
     const reach_battery *battery = static_cast<const reach_battery *>(capsule);
     return battery != nullptr &&
            (reach_feature_transition_active(&battery->popup_transition) ||
-            (battery->state.open &&
-             (battery->state.model.saver_pending ||
-              reach_animation_manager_any_active(&battery->animations))));
+            (battery->state.open && (battery->state.model.saver_pending ||
+                                     reach_animation_manager_any_active(&battery->animations))));
 }
 
 static int32_t reach_battery_capsule_presentation_visible(const void *capsule)
@@ -567,8 +566,7 @@ reach_result reach_battery_create(reach_battery **out_battery)
     }
     reach_animation_manager_init(&battery->animations, battery->animation_tracks,
                                  REACH_BATTERY_ANIMATION_COUNT);
-    reach_feature_transition_init(&battery->popup_transition,
-                                  REACH_FEATURE_TRANSITION_FROM_ABOVE);
+    reach_feature_transition_init(&battery->popup_transition, REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&battery->pressable);
     reach_battery_reset(battery);
     *out_battery = battery;

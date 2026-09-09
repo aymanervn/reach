@@ -15,12 +15,11 @@
 static int32_t reach_taskbar_pin_same(const reach_pinned_app_model *a,
                                       const reach_pinned_app_model *b)
 {
-    return reach_application_identity_matches(&a->application.identity,
-                                              &b->application.identity);
+    return reach_application_identity_matches(&a->application.identity, &b->application.identity);
 }
 
 static void reach_taskbar_copy_shell_string(IShellItem2 *item, REFPROPERTYKEY key,
-                                             uint16_t *out_value, size_t capacity)
+                                            uint16_t *out_value, size_t capacity)
 {
     PWSTR value = nullptr;
     if (SUCCEEDED(item->GetString(key, &value)) && value != nullptr)
@@ -41,8 +40,7 @@ static reach_result reach_taskbar_pin_from_item(IShellItem2 *item, reach_pinned_
     reach_application *application = &out_pin->application;
     reach_taskbar_copy_shell_string(item, PKEY_AppUserModel_ID,
                                     application->identity.app_user_model_id, 260);
-    reach_taskbar_copy_shell_string(item, PKEY_Link_Arguments,
-                                    application->launch.arguments, 260);
+    reach_taskbar_copy_shell_string(item, PKEY_Link_Arguments, application->launch.arguments, 260);
 
     PWSTR parsing_path = nullptr;
     if (SUCCEEDED(item->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &parsing_path)) &&
@@ -69,17 +67,15 @@ static reach_result reach_taskbar_pin_from_item(IShellItem2 *item, reach_pinned_
             (void)reach_copy_utf16(application->launch.path, 260,
                                    reinterpret_cast<const uint16_t *>(file_path));
             reach_windows_shortcut_info shortcut = {};
-            if (reach_windows_read_shortcut(file_path, &shortcut) &&
-                shortcut.target_path[0] != 0)
+            if (reach_windows_read_shortcut(file_path, &shortcut) && shortcut.target_path[0] != 0)
             {
                 (void)reach_application_identity_add_runtime_path(
                     &application->identity,
                     reinterpret_cast<const uint16_t *>(shortcut.target_path));
                 if (application->launch.arguments[0] == 0)
                 {
-                    (void)reach_copy_utf16(
-                        application->launch.arguments, 260,
-                        reinterpret_cast<const uint16_t *>(shortcut.arguments));
+                    (void)reach_copy_utf16(application->launch.arguments, 260,
+                                           reinterpret_cast<const uint16_t *>(shortcut.arguments));
                 }
             }
         }
@@ -94,14 +90,12 @@ static reach_result reach_taskbar_pin_from_item(IShellItem2 *item, reach_pinned_
     }
     CoTaskMemFree(file_path);
 
-    if (application->launch.path[0] == 0 &&
-        application->identity.app_user_model_id[0] != 0)
+    if (application->launch.path[0] == 0 && application->identity.app_user_model_id[0] != 0)
     {
         application->launch.kind = REACH_APPLICATION_LAUNCH_SHELL;
-        int written = swprintf_s(reinterpret_cast<wchar_t *>(application->launch.path), 260,
-                                 L"shell:AppsFolder\\%ls",
-                                 reinterpret_cast<const wchar_t *>(
-                                     application->identity.app_user_model_id));
+        int written = swprintf_s(
+            reinterpret_cast<wchar_t *>(application->launch.path), 260, L"shell:AppsFolder\\%ls",
+            reinterpret_cast<const wchar_t *>(application->identity.app_user_model_id));
         if (written <= 0)
         {
             *out_pin = {};
@@ -150,8 +144,8 @@ static int32_t reach_taskbar_aumid_character(BYTE value)
            value == '!';
 }
 
-static int32_t reach_taskbar_find_embedded_aumid(const BYTE *data, size_t size,
-                                                 uint16_t *out_aumid, size_t capacity)
+static int32_t reach_taskbar_find_embedded_aumid(const BYTE *data, size_t size, uint16_t *out_aumid,
+                                                 size_t capacity)
 {
     for (size_t offset = 0; offset + 1 < size; ++offset)
     {
@@ -159,8 +153,7 @@ static int32_t reach_taskbar_find_embedded_aumid(const BYTE *data, size_t size,
         {
             continue;
         }
-        if (offset >= 2 && data[offset - 1] == 0 &&
-            reach_taskbar_aumid_character(data[offset - 2]))
+        if (offset >= 2 && data[offset - 1] == 0 && reach_taskbar_aumid_character(data[offset - 2]))
         {
             continue;
         }
@@ -200,16 +193,15 @@ static int32_t reach_taskbar_add_embedded_aumid(const BYTE *data, size_t size,
                                                 size_t *count)
 {
     reach_pinned_app_model pin = {};
-    if (!reach_taskbar_find_embedded_aumid(
-            data, size, pin.application.identity.app_user_model_id, 260))
+    if (!reach_taskbar_find_embedded_aumid(data, size, pin.application.identity.app_user_model_id,
+                                           260))
     {
         return 0;
     }
     pin.application.launch.kind = REACH_APPLICATION_LAUNCH_PACKAGED;
-    if (swprintf_s(reinterpret_cast<wchar_t *>(pin.application.launch.path), 260,
-                   L"shell:AppsFolder\\%ls",
-                   reinterpret_cast<const wchar_t *>(
-                       pin.application.identity.app_user_model_id)) <= 0)
+    if (swprintf_s(
+            reinterpret_cast<wchar_t *>(pin.application.launch.path), 260, L"shell:AppsFolder\\%ls",
+            reinterpret_cast<const wchar_t *>(pin.application.identity.app_user_model_id)) <= 0)
     {
         return 0;
     }
@@ -281,18 +273,17 @@ struct reach_taskbar_favorites_decode
 
 static int32_t reach_taskbar_decode_favorite(const uint8_t *pidl, size_t size, void *user)
 {
-    reach_taskbar_favorites_decode *decode =
-        static_cast<reach_taskbar_favorites_decode *>(user);
-    int32_t added = reach_taskbar_add_embedded_aumid(
-        pidl, size, decode->pins, decode->capacity, &decode->count);
+    reach_taskbar_favorites_decode *decode = static_cast<reach_taskbar_favorites_decode *>(user);
+    int32_t added = reach_taskbar_add_embedded_aumid(pidl, size, decode->pins, decode->capacity,
+                                                     &decode->count);
     if (added)
     {
         return 1;
     }
 
     IShellItem2 *item = nullptr;
-    HRESULT hr = SHCreateItemFromIDList(reinterpret_cast<PCIDLIST_ABSOLUTE>(pidl),
-                                        IID_PPV_ARGS(&item));
+    HRESULT hr =
+        SHCreateItemFromIDList(reinterpret_cast<PCIDLIST_ABSOLUTE>(pidl), IID_PPV_ARGS(&item));
     if (SUCCEEDED(hr) && item != nullptr)
     {
         (void)reach_taskbar_add_item(item, decode->pins, decode->capacity, &decode->count);
@@ -322,9 +313,8 @@ static reach_result reach_taskbar_collect_favorites(reach_pinned_app_model *pins
     reach_taskbar_favorites_decode decode = {};
     decode.pins = decoded.data();
     decode.capacity = REACH_MAX_PINNED_APPS;
-    reach_result result =
-        reach_taskbar_pin_blob_visit(data.data(), data.size(), reach_taskbar_decode_favorite,
-                                     &decode);
+    reach_result result = reach_taskbar_pin_blob_visit(data.data(), data.size(),
+                                                       reach_taskbar_decode_favorite, &decode);
     if (result != REACH_OK)
     {
         return result;
@@ -390,8 +380,8 @@ static reach_result reach_taskbar_collect_folder(reach_pinned_app_model *pins, s
     return REACH_OK;
 }
 
-reach_result reach_windows_collect_taskbar_pins(reach_pinned_app_model *out_pins,
-                                                size_t capacity, size_t *out_count)
+reach_result reach_windows_collect_taskbar_pins(reach_pinned_app_model *out_pins, size_t capacity,
+                                                size_t *out_count)
 {
     if (out_pins == nullptr || capacity == 0 || out_count == nullptr)
     {

@@ -260,8 +260,7 @@ static reach_result reachctl_reset_monitor_work_areas(void)
     {
         const reach_monitor_info *monitor = monitors.ops.get(monitors.list, index);
         if (monitor == nullptr ||
-            monitors.ops.set_work_area(monitors.list, monitor->bounds, monitor->bounds) !=
-                REACH_OK)
+            monitors.ops.set_work_area(monitors.list, monitor->bounds, monitor->bounds) != REACH_OK)
         {
             result = REACH_ERROR;
         }

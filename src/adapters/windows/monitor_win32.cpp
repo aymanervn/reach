@@ -93,8 +93,7 @@ static void reach_monitor_list_destroy(reach_monitor_list *list)
 {
     if (list != nullptr && list->work_area_changed)
     {
-        (void)reach_monitor_set_work_area(list, list->controlled_monitor,
-                                          list->controlled_monitor);
+        (void)reach_monitor_set_work_area(list, list->controlled_monitor, list->controlled_monitor);
     }
     delete list;
 }
@@ -253,8 +252,7 @@ static reach_result reach_monitor_apply_work_area(reach_rect_i32 monitor_bounds,
     reach_monitor_work_area_repair repair = {};
     repair.monitor = reach_monitor_win32_rect(monitor_bounds);
     repair.work_area = desired;
-    return EnumWindows(reach_monitor_repair_maximized_window,
-                       reinterpret_cast<LPARAM>(&repair))
+    return EnumWindows(reach_monitor_repair_maximized_window, reinterpret_cast<LPARAM>(&repair))
                ? REACH_OK
                : REACH_ERROR;
 }

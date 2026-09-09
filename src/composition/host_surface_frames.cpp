@@ -34,13 +34,13 @@ static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id
 static reach_rect_i32 reach_host_monitor_rect(reach_rect_f32 bounds)
 {
     return {(int32_t)floorf(bounds.x), (int32_t)floorf(bounds.y),
-            (int32_t)ceilf(bounds.x + bounds.width),
-            (int32_t)ceilf(bounds.y + bounds.height)};
+            (int32_t)ceilf(bounds.x + bounds.width), (int32_t)ceilf(bounds.y + bounds.height)};
 }
 
-static void reach_host_sync_work_area_reservation(
-    const reach_host *host, const reach_feature_runtime *desc,
-    const reach_feature_surface_geometry *geometry, reach_rect_f32 monitor_bounds)
+static void reach_host_sync_work_area_reservation(const reach_host *host,
+                                                  const reach_feature_runtime *desc,
+                                                  const reach_feature_surface_geometry *geometry,
+                                                  reach_rect_f32 monitor_bounds)
 {
     if (host == nullptr || desc == nullptr || geometry == nullptr ||
         !geometry->manage_monitor_work_area || host->monitors.list == nullptr ||
@@ -63,8 +63,7 @@ static void reach_host_sync_work_area_reservation(
             work_area.top = (int32_t)ceilf(geometry->visible_bounds.y +
                                            geometry->visible_bounds.height + edge_gap);
         }
-        else if (desc->definition->layout.reservation_edge ==
-                 REACH_LAYOUT_RESERVATION_BOTTOM)
+        else if (desc->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_BOTTOM)
         {
             float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
             float edge_gap =
@@ -104,8 +103,7 @@ static reach_rect_f32 reach_host_available_bounds(const reach_host *host,
                 available.y = edge;
             }
         }
-        else if (runtime->definition->layout.reservation_edge ==
-                 REACH_LAYOUT_RESERVATION_BOTTOM)
+        else if (runtime->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_BOTTOM)
         {
             if (reserved.y < bottom)
             {
@@ -155,18 +153,15 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
     const reach_feature_definition *definition = desc->definition;
     if (definition != nullptr && definition->surface.popup_chrome)
     {
-        return reach_host_render_popup_surface(host, desc->definition->id, desc->surface,
-                                               geometry->visible_bounds, geometry->notch_anchor_x,
-                                               geometry->notch_side, commands,
-                                               geometry->presentation.managed
-                                                   ? geometry->presentation.opacity
-                                                   : 1.0f);
+        return reach_host_render_popup_surface(
+            host, desc->definition->id, desc->surface, geometry->visible_bounds,
+            geometry->notch_anchor_x, geometry->notch_side, commands,
+            geometry->presentation.managed ? geometry->presentation.opacity : 1.0f);
     }
     reach_host_stamp_surface_content(host, desc->definition->id, commands);
     if (geometry->presentation.managed)
     {
-        reach_render_command_buffer_multiply_opacity(commands,
-                                                     geometry->presentation.opacity);
+        reach_render_command_buffer_multiply_opacity(commands, geometry->presentation.opacity);
     }
     if (ctx->content_transform_active)
     {
@@ -262,7 +257,7 @@ static void reach_host_register_native_overlay(reach_host *host, reach_feature_r
 }
 
 static reach_result reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
-                                           reach_rect_f32 visible_bounds)
+                                                   reach_rect_f32 visible_bounds)
 {
     if (host->window_preparation.request != 0 &&
         host->window_preparation.surface == desc->definition->id &&
@@ -369,7 +364,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     if (!visible)
     {
         uint64_t preparation = host->window_preparation.surface == desc->definition->id
-            ? host->window_preparation.request : 0;
+                                   ? host->window_preparation.request
+                                   : 0;
         if (preparation != 0)
         {
             host->window_preparation.pending = 0;
@@ -437,9 +433,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     }
     reach_feature_surface_geometry geometry = {};
     desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
-    int32_t geometry_changed =
-        !desc->resolved_bounds_valid ||
-        !reach_rect_equal(desc->resolved_bounds, geometry.visible_bounds);
+    int32_t geometry_changed = !desc->resolved_bounds_valid ||
+                               !reach_rect_equal(desc->resolved_bounds, geometry.visible_bounds);
     desc->resolved_bounds = geometry.visible_bounds;
     desc->resolved_bounds_valid = 1;
     surface_ctx.visible_bounds = geometry.visible_bounds;
@@ -462,11 +457,10 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         shadow_pad.top *= shadow_scale;
         shadow_pad.right *= shadow_scale;
         shadow_pad.bottom *= shadow_scale;
-        reach_host_surface_presentation_frame frame =
-            reach_host_surface_presentation_frame_compute(
-                geometry.visible_bounds, geometry.envelope_bounds, shadow_pad,
-                geometry.presentation.y_offset, geometry.presentation.scale,
-                geometry.presentation.max_scale);
+        reach_host_surface_presentation_frame frame = reach_host_surface_presentation_frame_compute(
+            geometry.visible_bounds, geometry.envelope_bounds, shadow_pad,
+            geometry.presentation.y_offset, geometry.presentation.scale,
+            geometry.presentation.max_scale);
         bounds = frame.window_bounds;
         surface_ctx.content_rect = frame.content_rect;
         surface_ctx.render_transform = frame.render_transform;
@@ -538,8 +532,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         if (result == REACH_OK)
         {
             result = desc->surface->renderer.ops.synchronize != nullptr
-                ? desc->surface->renderer.ops.synchronize(desc->surface->renderer.backend)
-                : REACH_ERROR;
+                         ? desc->surface->renderer.ops.synchronize(desc->surface->renderer.backend)
+                         : REACH_ERROR;
         }
         reach_host_start_window_preparation(host, desc, result);
         if (desc->definition->capsule_ops->presentation_committed != nullptr)

@@ -13,8 +13,7 @@ void reach_settings_model_set_top_bar_style(reach_settings_model *model,
                                 style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ? 1.0f : 0.0f);
 }
 
-reach_config_top_bar_style
-reach_settings_model_top_bar_style(const reach_settings_model *model)
+reach_config_top_bar_style reach_settings_model_top_bar_style(const reach_settings_model *model)
 {
     return model != nullptr ? model->top_bar_style : REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED;
 }
@@ -29,10 +28,10 @@ int32_t reach_settings_model_toggle_top_bar_style(reach_settings_model *model)
                                ? REACH_CONFIG_TOP_BAR_STYLE_SEGMENTED
                                : REACH_CONFIG_TOP_BAR_STYLE_UNIFIED;
     float current = reach_animation_manager_value(&model->top_bar_style_animation, 0);
-    reach_animation_manager_start(
-        &model->top_bar_style_animation, 0, current,
-        model->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ? 1.0f : 0.0f, 0.18,
-        REACH_EASING_EASE_OUT);
+    reach_animation_manager_start(&model->top_bar_style_animation, 0, current,
+                                  model->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_UNIFIED ? 1.0f
+                                                                                             : 0.0f,
+                                  0.18, REACH_EASING_EASE_OUT);
     return 1;
 }
 
@@ -49,8 +48,7 @@ void reach_settings_model_set_top_bar_mode(reach_settings_model *model,
                                 mode == REACH_CONFIG_TOP_BAR_MODE_STATIC ? 1.0f : 0.0f);
 }
 
-reach_config_top_bar_mode
-reach_settings_model_top_bar_mode(const reach_settings_model *model)
+reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model)
 {
     return model != nullptr ? model->top_bar_mode : REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
 }
@@ -65,10 +63,10 @@ int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model)
                               ? REACH_CONFIG_TOP_BAR_MODE_DYNAMIC
                               : REACH_CONFIG_TOP_BAR_MODE_STATIC;
     float current = reach_animation_manager_value(&model->top_bar_mode_animation, 0);
-    reach_animation_manager_start(
-        &model->top_bar_mode_animation, 0, current,
-        model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC ? 1.0f : 0.0f, 0.18,
-        REACH_EASING_EASE_OUT);
+    reach_animation_manager_start(&model->top_bar_mode_animation, 0, current,
+                                  model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC ? 1.0f
+                                                                                          : 0.0f,
+                                  0.18, REACH_EASING_EASE_OUT);
     return 1;
 }
 

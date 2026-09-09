@@ -14,8 +14,7 @@ static uint16_t reach_dock_item_fallback_initial(const reach_dock_item_model *it
         return '?';
     }
     const uint16_t *path =
-        reach_application_identity_primary_runtime_path(
-            &item->application.identity);
+        reach_application_identity_primary_runtime_path(&item->application.identity);
     if (path == nullptr)
     {
         path = item->application.launch.path;

@@ -74,10 +74,11 @@ reach_result reach_host_update_game_mode(reach_host *host)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (next_active && (desc->definition->surface.behavior_flags &
-                           REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
+                            REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
         {
             uint64_t preparation = host->window_preparation.surface == desc->definition->id
-                ? host->window_preparation.request : 0;
+                                       ? host->window_preparation.request
+                                       : 0;
             int32_t settled = reach_app_control_cancel_preparation(host->app_control, preparation);
             reach_host_release_native_overlay(host, desc);
             if (preparation != 0)

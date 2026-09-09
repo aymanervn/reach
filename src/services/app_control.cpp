@@ -209,8 +209,8 @@ static reach_result reach_app_control_window_dispatch(reach_app_control *service
     {
     case REACH_WINDOW_CONTROL_PREPARE:
         return service->window_manager.ops.prepare != nullptr
-                   ? service->window_manager.ops.prepare(service->window_manager.manager,
-                                                         window_id, cover)
+                   ? service->window_manager.ops.prepare(service->window_manager.manager, window_id,
+                                                         cover)
                    : REACH_ERROR;
     case REACH_WINDOW_CONTROL_ACTIVATE:
         return service->window_manager.ops.activate != nullptr
@@ -307,11 +307,13 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
         reach_app_control_window_request request;
         {
             std::unique_lock<std::mutex> lock(service->window_mutex);
-            service->window_cv.wait(lock, [service]()
-            {
-                return service->window_stop ||
-                    (service->preparation_hold == 0 && !service->window_requests.empty());
-            });
+            service->window_cv.wait(lock,
+                                    [service]()
+                                    {
+                                        return service->window_stop ||
+                                               (service->preparation_hold == 0 &&
+                                                !service->window_requests.empty());
+                                    });
             if (service->window_stop)
             {
                 return;
@@ -325,9 +327,10 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
         reach_result result = REACH_OK;
         for (uintptr_t window : request.windows)
         {
-            reach_result window_result = request.is_snap
-                ? reach_app_control_snap_execute(service, window, request.snap_mode)
-                : reach_app_control_window_execute(service, request.action, window, request.cover);
+            reach_result window_result =
+                request.is_snap ? reach_app_control_snap_execute(service, window, request.snap_mode)
+                                : reach_app_control_window_execute(service, request.action, window,
+                                                                   request.cover);
             if (window_result != REACH_OK && result == REACH_OK)
             {
                 result = window_result;
@@ -341,7 +344,8 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
             {
                 if (request.preparation != 0)
                 {
-                    service->preparation = {request.preparation,
+                    service->preparation = {
+                        request.preparation,
                         request.action == REACH_WINDOW_CONTROL_PREPARE ? request.windows[0] : 0,
                         result};
                 }
@@ -609,7 +613,7 @@ reach_result reach_app_control_schedule_open_location(reach_app_control *service
 }
 
 static reach_result reach_app_control_enqueue_window(reach_app_control *service,
-                                                      reach_app_control_window_request request)
+                                                     reach_app_control_window_request request)
 {
     reach_result result = reach_app_control_start_window_worker(service);
     if (result != REACH_OK)
@@ -648,8 +652,9 @@ reach_result reach_app_control_schedule_window(reach_app_control *service,
 }
 
 static reach_result reach_app_control_queue_preparation(reach_app_control *service,
-    reach_window_control_action action, const uintptr_t *windows, size_t count,
-    reach_window_id cover, uint64_t request_id)
+                                                        reach_window_control_action action,
+                                                        const uintptr_t *windows, size_t count,
+                                                        reach_window_id cover, uint64_t request_id)
 {
     if (service == nullptr || (count != 0 && windows == nullptr) ||
         count > REACH_APP_CONTROL_MAX_WINDOWS || cover == 0 || request_id == 0)
@@ -668,17 +673,20 @@ static reach_result reach_app_control_queue_preparation(reach_app_control *servi
 }
 
 reach_result reach_app_control_schedule_preparation(reach_app_control *service,
-    reach_window_id window, reach_window_id cover, uint64_t request)
+                                                    reach_window_id window, reach_window_id cover,
+                                                    uint64_t request)
 {
-    return window != 0 ? reach_app_control_queue_preparation(service,
-        REACH_WINDOW_CONTROL_PREPARE, &window, 1, cover, request) : REACH_INVALID_ARGUMENT;
+    return window != 0 ? reach_app_control_queue_preparation(service, REACH_WINDOW_CONTROL_PREPARE,
+                                                             &window, 1, cover, request)
+                       : REACH_INVALID_ARGUMENT;
 }
 
 reach_result reach_app_control_schedule_desktop_preparation(reach_app_control *service,
-    const uintptr_t *windows, size_t count, reach_window_id cover, uint64_t request)
+                                                            const uintptr_t *windows, size_t count,
+                                                            reach_window_id cover, uint64_t request)
 {
-    return reach_app_control_queue_preparation(service, REACH_WINDOW_CONTROL_MINIMIZE,
-                                               windows, count, cover, request);
+    return reach_app_control_queue_preparation(service, REACH_WINDOW_CONTROL_MINIMIZE, windows,
+                                               count, cover, request);
 }
 
 int32_t reach_app_control_cancel_preparation(reach_app_control *service, uint64_t request)
