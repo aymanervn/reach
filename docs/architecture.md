@@ -238,7 +238,7 @@ non-activating top-level helper HWND that the Windows adapter keeps fullscreen a
 directly behind Stage. That lower HWND paints one fully opaque, theme-colored Stage
 background and positions the animated Desktop thumbnail within it. The upper Stage
 DirectComposition surface stays transparent except for app plates, headers, titles,
-close buttons, and the Desktop's transparent-center hover outline made from ordinary fills, so no
+close buttons, and the Desktop's transparent-center outline made from ordinary fills, so no
 moving cutout or split backdrop is required. Because each app DWM
 thumbnail still composites on top of its own destination surface, app chrome stays
 outside the app thumbnail rect. Minimized windows have no DWM content and fall back
