@@ -11,7 +11,6 @@ enum reach_service_shared_reader_event : uint32_t
     REACH_SERVICE_SHARED_EVENT_HOTKEYS_CHANGED = 4,
     REACH_SERVICE_SHARED_EVENT_GAME_MODE_CHANGED = 5,
     REACH_SERVICE_SHARED_EVENT_WINDOW_MANIPULATION_CHANGED = 6,
-    REACH_SERVICE_SHARED_EVENT_FULLSCREEN_CHANGED = 7,
 };
 
 typedef void (*reach_service_shared_reader_callback)(void *user,
@@ -27,7 +26,6 @@ reach_result
 reach_service_shared_finish_window_manipulation(const reach_service_window_snapshot *windows,
                                                 uint32_t window_count);
 reach_result reach_service_shared_publish_game_mode(int32_t active);
-reach_result reach_service_shared_publish_foreground_fullscreen(uint64_t window);
 reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, uint32_t modifiers);
 
 reach_result reach_service_shared_reader_subscribe(reach_service_shared_reader_callback callback,
@@ -41,7 +39,6 @@ reach_result reach_service_shared_copy_hotkeys_since(
     uint32_t *out_record_count, int32_t *out_missed, uint64_t *out_first_available,
     uint64_t *out_last_available);
 reach_result reach_service_shared_copy_game_mode(int32_t *out_active);
-reach_result reach_service_shared_copy_foreground_fullscreen(uint64_t *out_window);
 reach_result reach_service_shared_copy_window_manipulation(uint64_t *out_window,
                                                            int32_t *out_active);
 

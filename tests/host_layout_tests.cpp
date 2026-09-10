@@ -34,7 +34,6 @@ static size_t call_count;
 static int failures;
 static reach_host order_repair_host;
 static reach_host app_band_host;
-static reach_host fullscreen_host;
 static reach_host manipulation_host;
 static reach_host monitor_entry_host;
 static reach_host transition_frame_host;
@@ -75,7 +74,6 @@ static int32_t fake_source_popup_trigger;
 static size_t unrelated_popup_down_count;
 static reach_window_id observed_foreground_window;
 static int32_t foreground_window_available;
-static reach_window_id observed_foreground_fullscreen_window;
 
 typedef struct fake_presentation_capsule
 {
@@ -209,12 +207,6 @@ static reach_result fake_foreground_window_at(const reach_window_manager *manage
     out_window->visible = 1;
     out_window->title[0] = 'A';
     return REACH_OK;
-}
-
-static reach_window_id fake_foreground_fullscreen_window(const reach_window_manager *manager)
-{
-    (void)manager;
-    return observed_foreground_fullscreen_window;
 }
 
 static size_t fake_monitor_count(const reach_monitor_list *list)
@@ -499,38 +491,6 @@ static void test_app_band_surface_does_not_invalidate_topmost_order(void)
     reach_host_invalidate_surface_z_order(host, REACH_SURFACE_ID_TOP_BAR);
     expect_true(!host->dirty.z_order, "an app-band surface leaves native order to Windows");
     expect_true(!host->dirty.update_requested, "an app-band press schedules no order repair");
-}
-
-static void test_fullscreen_condition_places_yielding_surface_behind_foreground(void)
-{
-    reach_host *host = &fullscreen_host;
-    initialize_host(host);
-    host->window_manager.ops.foreground_fullscreen_window = fake_foreground_fullscreen_window;
-    reach_feature_runtime *top_bar = &host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR];
-    top_bar->yield_topmost_to_foreground_fullscreen = 1;
-    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_FORCED, 0);
-    reach_layout_set_layer_intent(&host->layout_manager,
-                                  host->surface_participants[REACH_SURFACE_ID_TOP_BAR], 1, 130);
-    reach_layout_set_layer_ceiling(&host->layout_manager,
-                                   host->surface_participants[REACH_SURFACE_ID_TOP_BAR],
-                                   REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN, 1, 0);
-
-    observed_foreground_fullscreen_window = 0;
-    reach_host_apply_layout(host);
-
-    call_count = 0;
-    observed_foreground_fullscreen_window = 900;
-    reach_host_apply_layout(host);
-    expect_true(has_call(FAKE_WINDOW_CALL_SET_TOPMOST, 101, 0),
-                "fullscreen entry removes the yielding surface from the topmost band");
-    expect_true(has_call(FAKE_WINDOW_CALL_PLACE_BEHIND, 101, 900),
-                "fullscreen entry places the yielding surface behind the foreground window");
-
-    call_count = 0;
-    observed_foreground_fullscreen_window = 0;
-    reach_host_apply_layout(host);
-    expect_true(has_call(FAKE_WINDOW_CALL_SET_TOPMOST, 101, 1),
-                "fullscreen exit restores the yielding surface's topmost layer");
 }
 
 static void test_window_manipulation_relevance_survives_unavailable_pointer(void)
@@ -1379,7 +1339,6 @@ int main(void)
 {
     test_order_invalidation_rechains_without_replaying_visibility();
     test_app_band_surface_does_not_invalidate_topmost_order();
-    test_fullscreen_condition_places_yielding_surface_behind_foreground();
     test_window_manipulation_relevance_survives_unavailable_pointer();
     test_window_manipulation_tracks_pointer_monitor_membership();
     test_scaled_presentation_keeps_native_envelope_stationary();

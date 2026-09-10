@@ -27,6 +27,8 @@ extern "C"
         int32_t visible;
         int32_t maximized;
         int32_t minimized;
+        int32_t fullscreen;
+        int32_t fullscreen_game;
     } reach_window_snapshot;
 
     typedef struct reach_window_move
@@ -44,7 +46,6 @@ extern "C"
                              reach_split_mode mode);
 
         int32_t (*game_mode_active)(const reach_window_manager *manager);
-        reach_window_id (*foreground_fullscreen_window)(const reach_window_manager *manager);
         int32_t (*needs_refresh)(const reach_window_manager *manager);
         size_t (*window_count)(const reach_window_manager *manager);
         reach_result (*window_at)(const reach_window_manager *manager, size_t index,

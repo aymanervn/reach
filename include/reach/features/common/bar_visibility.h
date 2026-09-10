@@ -33,6 +33,7 @@ extern "C"
         reach_point_i32 pointer;
         int32_t pointer_valid;
         int32_t can_hide;
+        int32_t auto_hide_active;
         int32_t pointer_sequence_active;
         int32_t force_shown;
         int32_t force_hidden;

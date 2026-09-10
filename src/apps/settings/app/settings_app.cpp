@@ -1781,9 +1781,8 @@ static size_t reach_settings_pressable_feedback_index(reach_settings_hit_result 
     {
         return REACH_PRESSABLE_FEEDBACK_NONE;
     }
-    return hit.type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL
-               ? static_cast<size_t>(target)
-               : static_cast<size_t>(hit.type);
+    return hit.type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL ? static_cast<size_t>(target)
+                                                                : static_cast<size_t>(hit.type);
 }
 
 static reach_pressable_feedback_style reach_settings_pressable_feedback(reach_settings_app *app)

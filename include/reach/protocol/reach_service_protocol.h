@@ -75,6 +75,8 @@ struct reach_service_window_snapshot
     int32_t focused;
     int32_t enabled;
     int32_t maximized;
+    int32_t fullscreen;
+    int32_t fullscreen_game;
     wchar_t classification_reason[160];
 };
 
@@ -150,10 +152,8 @@ struct reach_service_shared_state
     uint64_t window_sequence;
     uint64_t hotkey_sequence;
     uint64_t game_mode_sequence;
-    uint64_t fullscreen_sequence;
     uint64_t manipulation_sequence;
     uint64_t manipulation_window;
-    uint64_t foreground_fullscreen_window;
     uint32_t window_count;
     uint32_t hotkey_queue_start;
     uint32_t hotkey_queue_count;

@@ -77,8 +77,8 @@ static void test_top_bar_styles_publish_their_clearance(void)
     expect_true(split_geometry.reserve_monitor_work_area &&
                     split_geometry.work_area_clearance == 6.0f,
                 "split top bar publishes its static work-area clearance");
-    expect_true(split_geometry.yield_topmost_to_foreground_fullscreen,
-                "static top bar yields its topmost layer to fullscreen apps");
+    expect_true(split_geometry.bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_FULLSCREEN,
+                "static top bar enables auto hide only for fullscreen apps");
 
     (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
                                      REACH_CONFIG_TOP_BAR_MODE_STATIC);
@@ -99,8 +99,8 @@ static void test_top_bar_styles_publish_their_clearance(void)
                                      REACH_CONFIG_TOP_BAR_MODE_DYNAMIC);
     reach_feature_surface_geometry dynamic_geometry = {};
     reach_top_bar_capsule_ops()->surface_geometry(top_bar, &dynamic_geometry);
-    expect_true(!dynamic_geometry.yield_topmost_to_foreground_fullscreen,
-                "dynamic top bar keeps its independent reveal layer policy");
+    expect_true(dynamic_geometry.bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_ALWAYS,
+                "dynamic top bar keeps auto hide active for ordinary app overlap");
 
     reach_top_bar_destroy(top_bar);
 }

@@ -31,6 +31,27 @@ static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id
     reach_layout_set_visible(&host->layout_manager, host->surface_participants[id], visible);
 }
 
+static int32_t reach_host_bar_auto_hide_active(const reach_host *host,
+                                               const reach_feature_runtime *desc,
+                                               const reach_feature_surface_geometry *geometry,
+                                               reach_rect_f32 monitor_bounds)
+{
+    if (host == nullptr || desc == nullptr || geometry == nullptr || desc->definition == nullptr ||
+        desc->definition->surface.bar_reveal.ops == nullptr)
+    {
+        return 0;
+    }
+    if (geometry->bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_ALWAYS)
+    {
+        return 1;
+    }
+    if (geometry->bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_FULLSCREEN)
+    {
+        return reach_window_tracking_any_non_game_fullscreen(host->window_tracking, monitor_bounds);
+    }
+    return 0;
+}
+
 static reach_rect_i32 reach_host_monitor_rect(reach_rect_f32 bounds)
 {
     return {(int32_t)floorf(bounds.x), (int32_t)floorf(bounds.y),
@@ -467,11 +488,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     }
     reach_feature_surface_geometry geometry = {};
     desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
-    desc->yield_topmost_to_foreground_fullscreen = geometry.yield_topmost_to_foreground_fullscreen;
-    (void)reach_layout_set_layer_ceiling(&host->layout_manager,
-                                         host->surface_participants[desc->definition->id],
-                                         REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN,
-                                         geometry.yield_topmost_to_foreground_fullscreen, 0);
+    desc->bar_auto_hide_active =
+        reach_host_bar_auto_hide_active(host, desc, &geometry, ctx->monitor_bounds);
     int32_t geometry_changed = !desc->resolved_bounds_valid ||
                                !reach_rect_equal(desc->resolved_bounds, geometry.visible_bounds);
     desc->resolved_bounds = geometry.visible_bounds;

@@ -15,7 +15,7 @@ static void reach_host_on_edge_reveal_event(void *user, reach_screen_hotspot_eve
     const reach_feature_runtime *owner = runtime->owner;
     if (owner->definition->surface.bar_reveal.ops != nullptr)
     {
-        if (!reach_host_bar_reveal_enabled(owner))
+        if (!reach_host_bar_reveal_enabled(owner) || !owner->bar_auto_hide_active)
         {
             return;
         }
