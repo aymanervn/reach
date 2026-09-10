@@ -131,6 +131,52 @@ static void test_trespass_uses_protected_band_and_monitor(void)
     reach_window_tracking_destroy(service);
 }
 
+static void test_non_game_fullscreen_survives_focus_and_respects_monitor(void)
+{
+    reach_window_tracking *service = make_service();
+    if (service == nullptr)
+    {
+        ++failures;
+        return;
+    }
+
+    reach_window_snapshot windows[3] = {
+        make_window(51, "C:\\apps\\video.exe", ""),
+        make_window(52, "C:\\apps\\game.exe", ""),
+        make_window(53, "C:\\apps\\secondary.exe", ""),
+    };
+    windows[0].fullscreen = 1;
+    windows[1].fullscreen = 1;
+    windows[1].fullscreen_game = 1;
+    windows[2].fullscreen = 1;
+    set_windows(windows, 3);
+    fake_window_bounds[0] = {0.0f, 0.0f, 1000.0f, 800.0f};
+    fake_window_bounds[1] = {0.0f, 0.0f, 1000.0f, 800.0f};
+    fake_window_bounds[2] = {1000.0f, 0.0f, 1000.0f, 800.0f};
+    (void)reach_window_tracking_refresh(service, nullptr);
+
+    reach_rect_f32 primary = {0.0f, 0.0f, 1000.0f, 800.0f};
+    reach_rect_f32 secondary = {1000.0f, 0.0f, 1000.0f, 800.0f};
+    expect_true(reach_window_tracking_any_non_game_fullscreen(service, primary),
+                "a fullscreen app remains relevant without foreground state");
+    expect_true(reach_window_tracking_any_non_game_fullscreen(service, secondary),
+                "fullscreen relevance follows the hosting monitor");
+
+    windows[0].minimized = 1;
+    windows[2].visible = 0;
+    set_windows(windows, 3);
+    fake_window_bounds[0] = {0.0f, 0.0f, 1000.0f, 800.0f};
+    fake_window_bounds[1] = {0.0f, 0.0f, 1000.0f, 800.0f};
+    fake_window_bounds[2] = {1000.0f, 0.0f, 1000.0f, 800.0f};
+    (void)reach_window_tracking_refresh(service, nullptr);
+    expect_true(!reach_window_tracking_any_non_game_fullscreen(service, primary),
+                "minimized apps and fullscreen games do not activate the override");
+    expect_true(!reach_window_tracking_any_non_game_fullscreen(service, secondary),
+                "hidden fullscreen apps do not activate the override");
+
+    reach_window_tracking_destroy(service);
+}
+
 static uint32_t group_of(const reach_window_tracking *service, uintptr_t window_id)
 {
     return reach_window_tracking_window_group_id(service, window_id);
@@ -326,5 +372,6 @@ int main(void)
     test_identity_groups_are_transitive();
     test_identity_groups_split_without_a_bridge();
     test_trespass_uses_protected_band_and_monitor();
+    test_non_game_fullscreen_survives_focus_and_respects_monitor();
     return failures == 0 ? 0 : 1;
 }

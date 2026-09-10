@@ -73,7 +73,7 @@ int32_t reach_host_bar_reveal_enabled(const reach_feature_runtime *runtime)
 
     reach_feature_surface_geometry geometry = {};
     runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
-    return !geometry.disable_bar_reveal;
+    return geometry.bar_reveal_policy != REACH_FEATURE_BAR_REVEAL_DISABLED;
 }
 
 float reach_host_bar_protected_clearance(const reach_host *host,
@@ -208,7 +208,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     {
         return shown_bounds;
     }
-    if (geometry != nullptr && geometry->disable_bar_reveal)
+    if (!reach_host_bar_reveal_enabled(desc))
     {
         if (id == REACH_SURFACE_ID_TOP_BAR)
         {
@@ -237,7 +237,8 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.shown_bounds = shown_bounds;
     request.monitor_bounds = monitor_bounds;
     request.pointer_valid = reach_host_get_pointer_position(host, &request.pointer);
-    request.force_shown = reach_host_bar_forced_shown(host);
+    request.auto_hide_active = desc->bar_auto_hide_active;
+    request.force_shown = reach_host_bar_forced_shown(host) || !request.auto_hide_active;
     request.force_hidden = host->window_manipulation.relevant;
     request.hold_open = reach_host_popup_open(host);
     request.excluded_window = host->window_manipulation.active_window;
@@ -267,10 +268,11 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     if (desc->definition->surface.bar_reveal.active_layer > 0)
     {
-        reach_layout_set_layer_intent(&host->layout_manager, host->surface_participants[id],
-                                      result.reveal_transition_active ||
-                                          (geometry != nullptr && geometry->force_topmost),
-                                      desc->definition->surface.bar_reveal.active_layer);
+        reach_layout_set_layer_intent(
+            &host->layout_manager, host->surface_participants[id],
+            result.reveal_transition_active ||
+                (!request.auto_hide_active && geometry != nullptr && geometry->force_topmost),
+            desc->definition->surface.bar_reveal.active_layer);
     }
 
     if (result.redraw && desc->surface != nullptr)

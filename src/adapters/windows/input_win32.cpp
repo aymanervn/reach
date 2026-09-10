@@ -507,8 +507,7 @@ static void reach_input_shared_callback(void *user, reach_service_shared_reader_
     }
 
     if (event == REACH_SERVICE_SHARED_EVENT_WINDOWS_CHANGED ||
-        event == REACH_SERVICE_SHARED_EVENT_GAME_MODE_CHANGED ||
-        event == REACH_SERVICE_SHARED_EVENT_FULLSCREEN_CHANGED)
+        event == REACH_SERVICE_SHARED_EVENT_GAME_MODE_CHANGED)
     {
         reach_input_post_ui_event(source, REACH_UI_EVENT_WINDOW_STATE_CHANGED, 0);
         return;

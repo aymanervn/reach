@@ -559,6 +559,9 @@ static void reach_helper_classify_window(reach_service_window_snapshot *snapshot
     reach_helper_copy_wide(snapshot->classification_reason, 160, L"accepted visible app");
 }
 
+static int32_t reach_helper_window_is_fullscreen(HWND hwnd);
+static int32_t reach_helper_window_is_game(HWND hwnd, int32_t fullscreen);
+
 static reach_service_window_snapshot reach_helper_inspect_window(HWND hwnd)
 {
     reach_service_window_snapshot snapshot = {};
@@ -582,6 +585,8 @@ static reach_service_window_snapshot reach_helper_inspect_window(HWND hwnd)
     snapshot.focused = reach_helper_window_has_foreground(hwnd);
     snapshot.enabled = IsWindowEnabled(hwnd) ? 1 : 0;
     snapshot.maximized = IsZoomed(hwnd) ? 1 : 0;
+    snapshot.fullscreen = reach_helper_window_is_fullscreen(hwnd);
+    snapshot.fullscreen_game = reach_helper_window_is_game(hwnd, snapshot.fullscreen);
     reach_helper_classify_window(&snapshot);
     return snapshot;
 }
@@ -591,16 +596,22 @@ static LONG reach_helper_abs_long(LONG value)
     return value < 0 ? -value : value;
 }
 
-static int32_t reach_helper_rect_matches_monitor(RECT window_rect, RECT monitor_rect)
+static int32_t reach_helper_rect_has_monitor_extent(RECT window_rect, RECT monitor_rect)
 {
     const LONG tolerance = 2;
-    return reach_helper_abs_long(window_rect.left - monitor_rect.left) <= tolerance &&
-           reach_helper_abs_long(window_rect.top - monitor_rect.top) <= tolerance &&
-           reach_helper_abs_long(window_rect.right - monitor_rect.right) <= tolerance &&
-           reach_helper_abs_long(window_rect.bottom - monitor_rect.bottom) <= tolerance;
+    LONG window_width = window_rect.right - window_rect.left;
+    LONG window_height = window_rect.bottom - window_rect.top;
+    LONG monitor_width = monitor_rect.right - monitor_rect.left;
+    LONG monitor_height = monitor_rect.bottom - monitor_rect.top;
+    LONG center_x = window_rect.left + window_width / 2;
+    LONG center_y = window_rect.top + window_height / 2;
+    return reach_helper_abs_long(window_width - monitor_width) <= tolerance &&
+           reach_helper_abs_long(window_height - monitor_height) <= tolerance &&
+           center_x >= monitor_rect.left && center_x < monitor_rect.right &&
+           center_y >= monitor_rect.top && center_y < monitor_rect.bottom;
 }
 
-static int32_t reach_helper_window_occupies_whole_monitor(HWND hwnd, RECT window_rect)
+static int32_t reach_helper_window_has_fullscreen_extent(HWND hwnd, RECT window_rect)
 {
     HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
     if (monitor == nullptr)
@@ -615,7 +626,7 @@ static int32_t reach_helper_window_occupies_whole_monitor(HWND hwnd, RECT window
         return 0;
     }
 
-    return reach_helper_rect_matches_monitor(window_rect, info.rcMonitor);
+    return reach_helper_rect_has_monitor_extent(window_rect, info.rcMonitor);
 }
 
 static int32_t reach_helper_window_is_windowed(HWND hwnd)
@@ -640,28 +651,25 @@ static int32_t reach_helper_window_is_fullscreen(HWND hwnd)
     }
 
     RECT rect = {};
-    return GetWindowRect(hwnd, &rect) && reach_helper_window_occupies_whole_monitor(hwnd, rect);
+    return GetWindowRect(hwnd, &rect) && reach_helper_window_has_fullscreen_extent(hwnd, rect);
 }
 
-static int32_t reach_helper_window_is_game(HWND hwnd)
+static int32_t reach_helper_window_is_game(HWND hwnd, int32_t fullscreen)
 {
-    return !IsZoomed(hwnd) && !reach_helper_window_is_windowed(hwnd) &&
-           reach_helper_window_is_fullscreen(hwnd);
+    return fullscreen && !IsZoomed(hwnd) && !reach_helper_window_is_windowed(hwnd);
 }
 
-static void reach_helper_publish_window_modes(void)
+static void reach_helper_publish_game_mode(void)
 {
     HWND foreground = GetForegroundWindow();
-    int32_t game_mode_active = reach_helper_window_is_game(foreground);
+    int32_t fullscreen = reach_helper_window_is_fullscreen(foreground);
+    int32_t game_mode_active = reach_helper_window_is_game(foreground, fullscreen);
     if (game_mode_active)
     {
         reach_helper_clear_hotkey_state();
     }
     InterlockedExchange(&g_game_mode_active, game_mode_active ? 1 : 0);
     (void)reach_service_shared_publish_game_mode(game_mode_active);
-    uint64_t fullscreen_window =
-        reach_helper_window_is_fullscreen(foreground) ? reinterpret_cast<uint64_t>(foreground) : 0;
-    (void)reach_service_shared_publish_foreground_fullscreen(fullscreen_window);
 }
 
 struct reach_helper_snapshot_builder
@@ -750,7 +758,7 @@ static void reach_helper_publish_window_state(void)
     uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
     (void)reach_service_shared_publish_windows(windows, window_count);
     reach_helper_store_window_state(windows, window_count);
-    reach_helper_publish_window_modes();
+    reach_helper_publish_game_mode();
 }
 
 static void reach_helper_finish_window_manipulation(void)
@@ -759,7 +767,7 @@ static void reach_helper_finish_window_manipulation(void)
     uint32_t window_count = reach_helper_collect_window_state(windows, REACH_SERVICE_MAX_WINDOWS);
     (void)reach_service_shared_finish_window_manipulation(windows, window_count);
     reach_helper_store_window_state(windows, window_count);
-    reach_helper_publish_window_modes();
+    reach_helper_publish_game_mode();
 }
 
 static reach_helper_window_state reach_helper_current_window_state(void)
@@ -811,7 +819,7 @@ static int32_t reach_helper_publish_foreground_change(void)
     {
         reach_helper_publish_cached_window_state(&state);
     }
-    reach_helper_publish_window_modes();
+    reach_helper_publish_game_mode();
     return 1;
 }
 
@@ -847,7 +855,7 @@ static int32_t reach_helper_publish_name_change(HWND hwnd)
 
     state.windows[target_index] = updated;
     reach_helper_publish_cached_window_state(&state);
-    reach_helper_publish_window_modes();
+    reach_helper_publish_game_mode();
     return 1;
 }
 
@@ -959,7 +967,8 @@ static void reach_helper_minimize_game(HWND hwnd)
 {
     reach_helper_publish_window_state();
 
-    if (!reach_helper_window_is_game(hwnd))
+    int32_t fullscreen = reach_helper_window_is_fullscreen(hwnd);
+    if (!reach_helper_window_is_game(hwnd, fullscreen))
     {
         return;
     }

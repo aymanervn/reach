@@ -378,7 +378,7 @@ typedef struct reach_feature_runtime
     void *capsule;
     reach_rect_f32 resolved_bounds;
     int32_t resolved_bounds_valid;
-    int32_t yield_topmost_to_foreground_fullscreen;
+    int32_t bar_auto_hide_active;
     reach_window_thumbnail_id native_overlay_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
     reach_window_id native_overlay_sources[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
     reach_window_thumbnail_plane native_overlay_planes[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];

@@ -481,7 +481,6 @@ static void test_display_theme_preferences(void)
     expect_true(reach_settings_model_select_windows_system_theme(model.get(),
                                                                  REACH_CONFIG_THEME_FOLLOW_REACH),
                 "Windows mode can return to Reach synchronization");
-
 }
 
 static void test_segmented_control_choice_counts(void)

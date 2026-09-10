@@ -52,6 +52,8 @@ extern "C"
                                                   reach_rect_f32 monitor_bounds,
                                                   reach_rect_f32 protected_band,
                                                   uintptr_t excluded_window);
+    int32_t reach_window_tracking_any_non_game_fullscreen(const reach_window_tracking *service,
+                                                          reach_rect_f32 monitor_bounds);
 
     void reach_window_tracking_note_foreground(reach_window_tracking *service,
                                                uintptr_t foreground_window);

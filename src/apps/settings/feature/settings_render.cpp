@@ -452,8 +452,7 @@ static void render_display_selector_card(const reach_settings_render_input *inpu
                                          float selection_position, reach_color accent)
 {
     float radius = reach_settings_scale(input, input->theme->radius_small);
-    reach_settings_push_rect(commands, card,
-                             radius, input->theme->settings_card_background);
+    reach_settings_push_rect(commands, card, radius, input->theme->settings_card_background);
     if (icon.width > 0.0f && icon.height > 0.0f)
     {
         reach_settings_push_rect(commands, icon, radius,
@@ -508,15 +507,13 @@ static void render_display_page(const reach_settings_render_input *input,
         render_display_toggle_card(input, commands, &toggle_style, &cards[index]);
     }
 
-    const uint16_t *reach_theme_labels[2] = {(const uint16_t *)u"Dark",
-                                             (const uint16_t *)u"Light"};
+    const uint16_t *reach_theme_labels[2] = {(const uint16_t *)u"Dark", (const uint16_t *)u"Light"};
     render_display_selector_card(
         input, commands, layout->display_theme_card, layout->display_theme_icon,
-        REACH_VECTOR_ICON_BRIGHTNESS, layout->display_theme_title,
-        layout->display_theme_subtitle, layout->display_theme_selector,
-        (const uint16_t *)u"Reach theme", (const uint16_t *)u"Choose the Reach interface theme",
-        reach_theme_labels, 2, reach_animation_manager_value(&model->display_theme_animation, 0),
-        accent);
+        REACH_VECTOR_ICON_BRIGHTNESS, layout->display_theme_title, layout->display_theme_subtitle,
+        layout->display_theme_selector, (const uint16_t *)u"Reach theme",
+        (const uint16_t *)u"Choose the Reach interface theme", reach_theme_labels, 2,
+        reach_animation_manager_value(&model->display_theme_animation, 0), accent);
 
     reach_settings_push_text(
         commands, layout->display_windows_section_title, (const uint16_t *)u"System appearance",
@@ -527,15 +524,14 @@ static void render_display_page(const reach_settings_render_input *input,
     render_display_selector_card(
         input, commands, layout->display_windows_system_card, {}, REACH_VECTOR_ICON_NONE,
         layout->display_windows_system_title, layout->display_windows_system_subtitle,
-        layout->display_windows_system_selector,
-        (const uint16_t *)u"System theme", (const uint16_t *)u"Taskbar, Start, and system surfaces",
-        theme_labels, REACH_SETTINGS_SELECTOR_ITEM_COUNT,
-        (float)reach_settings_model_windows_system_theme(model), accent);
+        layout->display_windows_system_selector, (const uint16_t *)u"System theme",
+        (const uint16_t *)u"Taskbar, Start, and system surfaces", theme_labels,
+        REACH_SETTINGS_SELECTOR_ITEM_COUNT, (float)reach_settings_model_windows_system_theme(model),
+        accent);
     render_display_selector_card(
         input, commands, layout->display_windows_app_card, {}, REACH_VECTOR_ICON_NONE,
         layout->display_windows_app_title, layout->display_windows_app_subtitle,
-        layout->display_windows_app_selector,
-        (const uint16_t *)u"Application theme",
+        layout->display_windows_app_selector, (const uint16_t *)u"Application theme",
         (const uint16_t *)u"Supported apps and Windows dialogs", theme_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT, (float)reach_settings_model_windows_app_theme(model),
         accent);
@@ -548,8 +544,7 @@ static void render_display_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Split", (const uint16_t *)u"Unified", (const uint16_t *)u"Simple"};
     render_display_selector_card(
         input, commands, layout->top_bar_style_card, {}, REACH_VECTOR_ICON_NONE,
-        layout->top_bar_style_title, layout->top_bar_style_subtitle,
-        layout->top_bar_style_selector,
+        layout->top_bar_style_title, layout->top_bar_style_subtitle, layout->top_bar_style_selector,
         (const uint16_t *)u"Top bar style",
         (const uint16_t *)u"Choose how top bar items are grouped and framed", top_bar_style_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT,
@@ -779,8 +774,8 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
         }
 
         float text_x = icon_box.x + icon_box.width + reach_settings_scale(input, 14.0f);
-        float text_right = layout->installed_app_uninstall_buttons[index].x -
-                           reach_settings_scale(input, 14.0f);
+        float text_right =
+            layout->installed_app_uninstall_buttons[index].x - reach_settings_scale(input, 14.0f);
         float text_width = text_right > text_x ? text_right - text_x : 0.0f;
         reach_settings_push_text(commands,
                                  {text_x, row.y + reach_settings_scale(input, 13.0f), text_width,
@@ -817,8 +812,8 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
             uninstall_style.background, input->theme->settings_button_danger, press);
         uninstall_style.disabled_background = reach_theme_color_mix(
             uninstall_style.disabled_background, input->theme->settings_button_danger, press);
-        uninstall_style.text = reach_theme_color_mix(
-            uninstall_style.text, input->theme->settings_button_text, press);
+        uninstall_style.text =
+            reach_theme_color_mix(uninstall_style.text, input->theme->settings_button_text, press);
         uninstall_style.disabled_text = reach_theme_color_mix(
             uninstall_style.disabled_text, input->theme->settings_button_text, press);
         uninstall_style.radius = layout->installed_app_uninstall_buttons[index].height * 0.5f;

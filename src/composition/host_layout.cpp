@@ -123,13 +123,6 @@ void reach_host_apply_layout(reach_host *host)
         return;
     }
 
-    reach_window_id foreground_fullscreen =
-        host->window_manager.ops.foreground_fullscreen_window != nullptr
-            ? host->window_manager.ops.foreground_fullscreen_window(host->window_manager.manager)
-            : 0;
-    reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_FOREGROUND_FULLSCREEN,
-                               foreground_fullscreen != 0);
-
     reach_layout_plan plan = {};
     reach_layout_resolve(&host->layout_manager, &plan);
     int32_t plan_changed = !host->has_applied_layout_plan ||
@@ -180,11 +173,6 @@ void reach_host_apply_layout(reach_host *host)
             if (applied != nullptr && applied->layer > 0)
             {
                 (void)reach_host_layout_set_topmost(target, 0);
-            }
-            if (entry->visible && foreground_fullscreen != 0 && target->runtime != nullptr &&
-                target->runtime->yield_topmost_to_foreground_fullscreen)
-            {
-                (void)reach_host_layout_place_behind(target, foreground_fullscreen);
             }
             continue;
         }

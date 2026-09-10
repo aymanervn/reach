@@ -355,8 +355,7 @@ static void reach_settings_layout_selector_card(reach_rect_f32 *card, reach_rect
     float text_width = x + width - 16.0f * scale - text_x;
     *title = reach_settings_rect(text_x, y + 11.0f * scale, text_width, 20.0f * scale);
     *subtitle = reach_settings_rect(text_x, y + 31.0f * scale, text_width, 16.0f * scale);
-    *selector = reach_settings_rect(x + 16.0f * scale,
-                                    y + height - selector_height - 10.0f * scale,
+    *selector = reach_settings_rect(x + 16.0f * scale, y + height - selector_height - 10.0f * scale,
                                     width - 32.0f * scale, selector_height);
 }
 
@@ -731,14 +730,12 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         }
 
         float theme_card_y = area_y + 2.0f * (card_height + card_spacing);
-        float theme_card_height = area_width >= REACH_SETTINGS_SELECTOR_WIDE_WIDTH * scale
-                                      ? card_height
-                                      : 104.0f * scale;
+        float theme_card_height =
+            area_width >= REACH_SETTINGS_SELECTOR_WIDE_WIDTH * scale ? card_height : 104.0f * scale;
         reach_settings_layout_selector_card(
-            &layout.display_theme_card, &layout.display_theme_title,
-            &layout.display_theme_subtitle, &layout.display_theme_selector,
-            &layout.display_theme_icon, area_x, theme_card_y, area_width, theme_card_height, 176.0f,
-            scale);
+            &layout.display_theme_card, &layout.display_theme_title, &layout.display_theme_subtitle,
+            &layout.display_theme_selector, &layout.display_theme_icon, area_x, theme_card_y,
+            area_width, theme_card_height, 176.0f, scale);
 
         float section_y = theme_card_y + theme_card_height + 18.0f * scale;
         layout.display_windows_section_title =
@@ -763,11 +760,10 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.display_desktop_section_title =
             reach_settings_rect(area_x, desktop_section_y, area_width, 18.0f * scale);
         float desktop_y = desktop_section_y + 26.0f * scale;
-        reach_settings_layout_selector_card(&layout.top_bar_style_card, &layout.top_bar_style_title,
-                                            &layout.top_bar_style_subtitle,
-                                            &layout.top_bar_style_selector, nullptr, area_x,
-                                            desktop_y, area_width, appearance_card_height,
-                                            REACH_SETTINGS_SELECTOR_WIDTH, scale);
+        reach_settings_layout_selector_card(
+            &layout.top_bar_style_card, &layout.top_bar_style_title, &layout.top_bar_style_subtitle,
+            &layout.top_bar_style_selector, nullptr, area_x, desktop_y, area_width,
+            appearance_card_height, REACH_SETTINGS_SELECTOR_WIDTH, scale);
         reach_settings_toggle_card_rects auto_hide = {
             &layout.top_bar_auto_hide_card, nullptr, &layout.top_bar_auto_hide_title,
             &layout.top_bar_auto_hide_subtitle, &layout.top_bar_auto_hide_toggle};
@@ -1046,8 +1042,7 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             return result;
         }
     }
-    int32_t option =
-        reach_ui_segmented_control_index_at(layout->display_theme_selector, 2, x, y);
+    int32_t option = reach_ui_segmented_control_index_at(layout->display_theme_selector, 2, x, y);
     if (option >= 0)
     {
         result.type = REACH_SETTINGS_HIT_DISPLAY_THEME;

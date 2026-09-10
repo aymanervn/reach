@@ -124,9 +124,8 @@ int32_t reach_ui_segmented_control_index_at(reach_rect_f32 bounds, size_t item_c
     return index < item_count ? (int32_t)index : -1;
 }
 
-void reach_ui_segmented_control_render(reach_render_command_buffer *commands,
-                                       reach_rect_f32 bounds, const uint16_t *const *labels,
-                                       size_t item_count,
+void reach_ui_segmented_control_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
+                                       const uint16_t *const *labels, size_t item_count,
                                        const reach_ui_segmented_control_style *style,
                                        float selection_position)
 {

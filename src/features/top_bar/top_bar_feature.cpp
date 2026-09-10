@@ -908,7 +908,7 @@ static void reach_top_bar_update_language(reach_top_bar *top_bar)
 static void reach_top_bar_bar_begin_session(void *capsule)
 {
     reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
-    if (top_bar != nullptr && top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC)
+    if (top_bar != nullptr)
     {
         reach_bar_begin_reveal_session(&top_bar->state.visibility);
     }
@@ -990,10 +990,9 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_TOP_BAR_EDGE;
     bar_request.pointer_sequence_active = reach_pressable_tracking(&top_bar->state.pressable);
-    int32_t dynamic = top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
-    bar_request.force_shown = dynamic ? bar_request.force_shown : 1;
-    bar_request.can_hide = dynamic && reach_top_bar_windows_trespassing(
-                                          top_bar, request->shown_bounds, request->monitor_bounds,
+    bar_request.can_hide =
+        request->auto_hide_active &&
+        reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds,
                                           request->shadow_clearance, request->excluded_window);
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
@@ -1006,7 +1005,7 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     top_bar->push_can_hide = bar_request.can_hide;
     top_bar->push_hover_revealed = result.hover_revealed;
     top_bar->push_excluded_window = request->excluded_window;
-    if (dynamic)
+    if (request->auto_hide_active)
     {
         reach_top_bar_apply_window_push(top_bar, result.reveal_progress);
     }
@@ -1021,8 +1020,7 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
 static void reach_top_bar_bar_position_frame(void *capsule)
 {
     reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
-    if (top_bar == nullptr || top_bar->state.mode != REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
-        top_bar->push_depth <= 0.0f)
+    if (top_bar == nullptr || top_bar->push_depth <= 0.0f)
     {
         return;
     }
@@ -1300,9 +1298,9 @@ static void reach_top_bar_capsule_surface_geometry(const void *capsule,
         out->manage_monitor_work_area = 1;
         out->reserve_monitor_work_area = static_mode;
         out->work_area_clearance = top_bar->state.layout.app_clearance;
-        out->disable_bar_reveal = static_mode;
+        out->bar_reveal_policy =
+            static_mode ? REACH_FEATURE_BAR_REVEAL_FULLSCREEN : REACH_FEATURE_BAR_REVEAL_ALWAYS;
         out->force_topmost = static_mode;
-        out->yield_topmost_to_foreground_fullscreen = static_mode;
     }
 }
 

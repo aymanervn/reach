@@ -102,6 +102,13 @@ extern "C"
         reach_capsule_action action;
     } reach_capsule_pointer_result;
 
+    typedef enum reach_feature_bar_reveal_policy
+    {
+        REACH_FEATURE_BAR_REVEAL_ALWAYS = 0,
+        REACH_FEATURE_BAR_REVEAL_FULLSCREEN = 1,
+        REACH_FEATURE_BAR_REVEAL_DISABLED = 2
+    } reach_feature_bar_reveal_policy;
+
     typedef struct reach_feature_surface_geometry
     {
         reach_rect_f32 visible_bounds;
@@ -110,9 +117,8 @@ extern "C"
         int32_t manage_monitor_work_area;
         int32_t reserve_monitor_work_area;
         float work_area_clearance;
-        int32_t disable_bar_reveal;
+        reach_feature_bar_reveal_policy bar_reveal_policy;
         int32_t force_topmost;
-        int32_t yield_topmost_to_foreground_fullscreen;
         float notch_anchor_x;
         int32_t notch_side;
         struct
