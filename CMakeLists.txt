@@ -126,6 +126,7 @@ add_library(reach_features STATIC
     src/features/common/level_presentation/level_presentation.cpp
     src/features/common/loader/loader_render.cpp
     src/features/common/marquee/marquee.cpp
+    src/features/common/now_playing_artwork/now_playing_artwork.cpp
     src/features/common/progress_bar/progress_bar_render.cpp
     src/features/common/pressable/pressable.cpp
     src/features/common/scrollbar/scrollbar_render.cpp

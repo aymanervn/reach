@@ -43,7 +43,6 @@ reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing
         reach_feature_notification notification = {};
         notification.kind = REACH_FEATURE_NOTIFICATION_MEDIA_ACTION;
         notification.media_action = action;
-        notification.present = host->top_bar_hidden;
         reach_host_notify_registered_features(host, &notification);
         reach_host_request_update(host);
     }
@@ -75,7 +74,6 @@ reach_result reach_host_step_main_volume(reach_host *host, float delta)
     notification.kind = REACH_FEATURE_NOTIFICATION_MAIN_VOLUME;
     notification.volume = state;
     notification.volume.level = level;
-    notification.present = host->top_bar_hidden;
     reach_host_notify_registered_features(host, &notification);
 
     return REACH_OK;
@@ -107,7 +105,6 @@ reach_result reach_host_toggle_main_volume_mute(reach_host *host)
     notification.volume = state;
     notification.volume.level = reach_host_clamp01(state.level);
     notification.volume.muted = muted;
-    notification.present = host->top_bar_hidden;
     reach_host_notify_registered_features(host, &notification);
 
     return REACH_OK;
@@ -160,7 +157,6 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_BRIGHTNESS;
     notification.brightness = state;
-    notification.present = host->top_bar_hidden;
     reach_host_notify_registered_features(host, &notification);
 
     return REACH_OK;

@@ -2,6 +2,7 @@
 
 #include "reach/core/typography.h"
 #include "reach/features/common/level_presentation.h"
+#include "reach/features/common/now_playing_artwork.h"
 #include "reach/features/common/progress_bar_render.h"
 
 static void reach_system_hud_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
@@ -47,35 +48,44 @@ static reach_vector_icon_id reach_system_hud_media_action_icon(reach_now_playing
                                                     : REACH_VECTOR_ICON_PLAY;
 }
 
-static void reach_system_hud_render_media(const reach_system_hud_state *state,
-                                          const reach_system_hud_render_context *ctx,
-                                          reach_render_command_buffer *commands)
+static reach_result reach_system_hud_render_media(const reach_system_hud_state *state,
+                                                  const reach_system_hud_render_context *ctx,
+                                                  reach_render_command_buffer *commands)
 {
     const reach_theme *theme = ctx->theme;
-    if (state->media.cover_image_id != 0)
+    reach_rect_f32 surface_bounds = {0.0f, 0.0f, state->layout.bounds.width,
+                                     state->layout.bounds.height};
+    reach_rect_f32 artwork_bounds =
+        reach_theme_border_content_rect(theme, ctx->dpi_scale, surface_bounds);
+    reach_now_playing_artwork_render_input artwork = {};
+    artwork.bounds = artwork_bounds;
+    artwork.cover_bounds = state->layout.media_cover;
+    artwork.cover_image_id = state->media.cover_image_id;
+    artwork.base_background = theme->system_hud_background;
+    artwork.overlay = theme->now_playing_background;
+    artwork.radius = artwork_bounds.height * 0.5f;
+    artwork.cover_radius = artwork.radius;
+    artwork.cover_corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT;
+    reach_result result = reach_now_playing_artwork_build_render_commands(&artwork, commands);
+    if (result != REACH_OK)
     {
-        reach_render_command cover = {};
-        cover.type = REACH_RENDER_COMMAND_ICON;
-        cover.rect = state->layout.media_cover;
-        cover.icon_id = state->media.cover_image_id;
-        cover.icon_crop_to_fill = 1;
-        cover.radius = 12.0f * ctx->dpi_scale;
-        cover.color.a = 1.0f;
-        (void)reach_render_command_buffer_push(commands, &cover);
+        return result;
     }
-    else
+
+    if (state->media.cover_image_id == 0)
     {
         reach_render_command placeholder = {};
         placeholder.type = REACH_RENDER_COMMAND_RECT;
         placeholder.rect = state->layout.media_cover;
-        placeholder.radius = 12.0f * ctx->dpi_scale;
+        placeholder.radius = artwork.radius;
+        placeholder.corner_mask = artwork.cover_corner_mask;
         placeholder.color = theme->system_hud_icon_background;
         (void)reach_render_command_buffer_push(commands, &placeholder);
-        reach_rect_f32 glyph = state->layout.media_cover;
-        glyph.x += glyph.width * 0.25f;
-        glyph.y += glyph.height * 0.25f;
-        glyph.width *= 0.5f;
-        glyph.height *= 0.5f;
+        float glyph_size = state->layout.media_cover.height * 0.5f;
+        reach_rect_f32 glyph = {
+            state->layout.media_cover.x + (state->layout.media_cover.width - glyph_size) * 0.5f,
+            state->layout.media_cover.y + (state->layout.media_cover.height - glyph_size) * 0.5f,
+            glyph_size, glyph_size};
         reach_system_hud_push_vector_icon(commands, glyph, REACH_VECTOR_ICON_MUSIC_NOTE,
                                           theme->system_hud_glyph);
     }
@@ -92,6 +102,7 @@ static void reach_system_hud_render_media(const reach_system_hud_state *state,
         commands, state->layout.media_action,
         reach_system_hud_media_action_icon(state->media_action, state->media.playback),
         theme->system_hud_glyph);
+    return REACH_OK;
 }
 
 static void reach_system_hud_render_level(const reach_system_hud_state *state,
@@ -156,7 +167,11 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
 
     if (state->kind == REACH_SYSTEM_HUD_MEDIA)
     {
-        reach_system_hud_render_media(state, ctx, out_commands);
+        result = reach_system_hud_render_media(state, ctx, out_commands);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
     }
     else
     {

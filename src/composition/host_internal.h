@@ -183,13 +183,12 @@ typedef enum reach_feature_notification_kind
     REACH_FEATURE_NOTIFICATION_MEDIA_ACTION = 3,
     REACH_FEATURE_NOTIFICATION_MAIN_VOLUME = 4,
     REACH_FEATURE_NOTIFICATION_BRIGHTNESS = 5,
-    REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE = 6,
-    REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED = 7,
-    REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED = 8,
-    REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 9,
-    REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 10,
-    REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED = 11,
-    REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 12
+    REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED = 6,
+    REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED = 7,
+    REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 8,
+    REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 9,
+    REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED = 10,
+    REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 11
 } reach_feature_notification_kind;
 
 typedef struct reach_feature_notification
@@ -204,7 +203,6 @@ typedef struct reach_feature_notification
     int32_t icon_size_px;
     reach_display_environment display;
     const reach_config_snapshot *config;
-    int32_t present;
 } reach_feature_notification;
 
 typedef struct reach_feature_render_resource
@@ -607,7 +605,6 @@ struct reach_host
     reach_host_dirty_state dirty;
     reach_config_service *config_service;
     reach_wallpaper *wallpaper;
-    int32_t top_bar_hidden;
     reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;
     reach_clipboard_port clipboard;

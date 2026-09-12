@@ -2,14 +2,13 @@
 
 #include "top_bar_metrics.h"
 #include "reach/core/typography.h"
+#include "reach/features/common/now_playing_artwork.h"
 
 #include <math.h>
 #include <new>
 
 static const float REACH_TOP_BAR_NOW_PLAYING_COVER_WIDTH = 0.70f;
 static const float REACH_TOP_BAR_NOW_PLAYING_COVER_FADE_START = 0.65f;
-static const float REACH_TOP_BAR_NOW_PLAYING_BG_BLUR = 0.45f;
-static const float REACH_TOP_BAR_NOW_PLAYING_BG_CONTRAST = 1.20f;
 
 struct reach_top_bar_now_playing
 {
@@ -233,46 +232,21 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
         return reach_render_command_buffer_push(out_commands, &glyph);
     }
 
-    if (input->model->cover_image_id != 0)
+    reach_now_playing_artwork_render_input artwork = {};
+    artwork.bounds = input->layout->bounds;
+    artwork.cover_bounds = input->layout->cover;
+    artwork.cover_image_id = input->model->cover_image_id;
+    artwork.base_background = theme->bar_button_background;
+    artwork.overlay = theme->now_playing_background;
+    artwork.radius = radius;
+    artwork.cover_radius = radius;
+    artwork.cover_fade_start = REACH_TOP_BAR_NOW_PLAYING_COVER_FADE_START;
+    artwork.cover_corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT;
+    reach_result artwork_result =
+        reach_now_playing_artwork_build_render_commands(&artwork, out_commands);
+    if (artwork_result != REACH_OK)
     {
-        float width = input->layout->bounds.width * 1.5f;
-        float height = input->layout->bounds.height * 1.5f;
-        reach_rect_f32 background = {
-            input->layout->bounds.x - (width - input->layout->bounds.width) * 0.5f,
-            input->layout->bounds.y - (height - input->layout->bounds.height) * 0.5f, width,
-            height};
-        reach_render_command blurred = {};
-        blurred.type = REACH_RENDER_COMMAND_BLURRED_IMAGE;
-        blurred.rect = background;
-        blurred.icon_id = input->model->cover_image_id;
-        blurred.icon_crop_to_fill = 1;
-        blurred.radius = radius;
-        blurred.blur_radius = input->layout->bounds.height * REACH_TOP_BAR_NOW_PLAYING_BG_BLUR;
-        blurred.image_contrast = REACH_TOP_BAR_NOW_PLAYING_BG_CONTRAST;
-        blurred.color.a = 1.0f;
-        blurred.has_clip_rect = 1;
-        blurred.clip_rect = input->layout->bounds;
-        blurred.clip_radius = radius;
-        (void)reach_render_command_buffer_push(out_commands, &blurred);
-
-        reach_render_command cover = {};
-        cover.type = REACH_RENDER_COMMAND_ICON;
-        cover.rect = input->layout->cover;
-        cover.icon_id = input->model->cover_image_id;
-        cover.icon_crop_to_fill = 1;
-        cover.radius = radius;
-        cover.corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT;
-        cover.icon_fade_start = REACH_TOP_BAR_NOW_PLAYING_COVER_FADE_START;
-        cover.color.a = 1.0f;
-        (void)reach_render_command_buffer_push(out_commands, &cover);
-
-        reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                            theme->now_playing_background, radius);
-    }
-    else
-    {
-        reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                            theme->bar_button_background, radius);
+        return artwork_result;
     }
 
     if (input->layout->text.width <= 0.0f || input->layout->play_pause_button.width <= 0.0f)
