@@ -1290,7 +1290,8 @@ static reach_result reach_quick_settings_surface_render(void *capsule,
                                                         reach_render_command_buffer *out_commands)
 {
     return reach_quick_settings_append_render_commands(static_cast<reach_quick_settings *>(capsule),
-                                                       ctx->theme, ctx->dpi_scale, out_commands);
+                                                       ctx->theme, ctx->dpi_scale,
+                                                       &ctx->text_measure, out_commands);
 }
 
 static const reach_feature_surface_ops reach_quick_settings_surface_ops = {
