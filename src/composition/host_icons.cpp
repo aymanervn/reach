@@ -35,7 +35,6 @@ void reach_host_notify_icons_retained(reach_host *host)
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_ICONS_RETAIN;
     notification.icon_size_px = reach_host_icon_size_px(host);
-    notification.present = 1;
     reach_host_notify_registered_features(host, &notification);
 }
 

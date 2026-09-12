@@ -455,22 +455,17 @@ static void reach_feature_notify_system_hud(void *capsule,
     {
         return;
     }
-    if (notification->kind == REACH_FEATURE_NOTIFICATION_MEDIA_ACTION && notification->present)
+    if (notification->kind == REACH_FEATURE_NOTIFICATION_MEDIA_ACTION)
     {
         reach_system_hud_show_media(hud, notification->media_action);
     }
-    else if (notification->kind == REACH_FEATURE_NOTIFICATION_MAIN_VOLUME && notification->present)
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_MAIN_VOLUME)
     {
         reach_system_hud_show_volume(hud, &notification->volume);
     }
-    else if (notification->kind == REACH_FEATURE_NOTIFICATION_BRIGHTNESS && notification->present)
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_BRIGHTNESS)
     {
         reach_system_hud_show_brightness(hud, &notification->brightness);
-    }
-    else if (notification->kind == REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE &&
-             notification->present)
-    {
-        reach_system_hud_hide(hud);
     }
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_NOW_PLAYING_CHANGED)
     {

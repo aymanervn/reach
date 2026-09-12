@@ -78,7 +78,6 @@ extern "C"
     void reach_system_hud_show_volume(reach_system_hud *hud, const reach_audio_volume_state *state);
     void reach_system_hud_show_brightness(reach_system_hud *hud,
                                           const reach_brightness_state *state);
-    void reach_system_hud_hide(reach_system_hud *hud);
     void reach_system_hud_refresh_media(reach_system_hud *hud);
     int32_t reach_system_hud_arrange(reach_system_hud *hud,
                                      const reach_system_hud_arrange_context *ctx);

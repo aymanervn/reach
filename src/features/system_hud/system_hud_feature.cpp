@@ -8,6 +8,7 @@
 static const double REACH_SYSTEM_HUD_VISIBLE_SECONDS = 1.5;
 static const double REACH_SYSTEM_HUD_DEFAULT_OPEN_SECONDS = 0.16;
 static const double REACH_SYSTEM_HUD_DEFAULT_CLOSE_SECONDS = 0.12;
+static const float REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH = 100.0f;
 
 static int32_t reach_system_hud_rect_equal(reach_rect_f32 left, reach_rect_f32 right)
 {
@@ -90,16 +91,6 @@ void reach_system_hud_show_brightness(reach_system_hud *hud, const reach_brightn
     }
     hud->state.brightness = *state;
     reach_system_hud_begin_show(hud, REACH_SYSTEM_HUD_BRIGHTNESS);
-}
-
-void reach_system_hud_hide(reach_system_hud *hud)
-{
-    if (hud == nullptr)
-    {
-        return;
-    }
-    hud->state.hovered = 0;
-    reach_system_hud_begin_close(hud);
 }
 
 float reach_system_hud_opacity(const reach_system_hud *hud)
@@ -325,10 +316,13 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
 
     float padding = 14.0f * scale + border;
     float icon_size = (hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 56.0f : 40.0f) * scale;
-    next.icon = {padding, border + (inner_height - icon_size) * 0.5f, icon_size, icon_size};
-    next.media_cover = next.icon;
+    float icon_y = border + (inner_height - icon_size) * 0.5f;
+    next.icon = {padding, icon_y, icon_size, icon_size};
+    next.media_cover = {border, border, REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH * scale, inner_height};
 
-    float content_x = next.icon.x + next.icon.width + 14.0f * scale;
+    reach_rect_f32 leading_visual =
+        hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? next.media_cover : next.icon;
+    float content_x = leading_visual.x + leading_visual.width + 14.0f * scale;
     float trailing = 18.0f * scale + border;
     float content_width = width - content_x - trailing;
 

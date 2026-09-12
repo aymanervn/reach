@@ -177,7 +177,6 @@ void reach_host_notify_windows_changed(reach_host *host)
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED;
     notification.windows.changed = 1;
-    notification.present = 1;
     reach_host_notify_registered_features(host, &notification);
 }
 
@@ -192,7 +191,6 @@ void reach_host_notify_windows_refreshed(reach_host *host,
     notification.kind = REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED;
     notification.windows = *report;
     notification.windows.changed = 0;
-    notification.present = 1;
     reach_host_notify_registered_features(host, &notification);
 }
 
@@ -205,7 +203,6 @@ void reach_host_notify_display_changed(reach_host *host)
 
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED;
-    notification.present = 1;
     notification.display.icon_size_px = reach_host_icon_size_px(host);
     notification.display.dpi_scale = reach_host_layout_dpi_scale(host);
     notification.display.desktop_window =
@@ -246,7 +243,6 @@ void reach_host_notify_config_changed(reach_host *host, const reach_config_snaps
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED;
     notification.config = snapshot;
-    notification.present = 1;
     reach_host_notify_registered_features(host, &notification);
 }
 
@@ -258,7 +254,6 @@ void reach_host_notify_popups_closed(reach_host *host)
     }
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED;
-    notification.present = 1;
     reach_host_notify_registered_features(host, &notification);
 }
 
@@ -272,7 +267,6 @@ void reach_host_notify_pinned_apps_changed(reach_host *host)
     notification.kind = REACH_FEATURE_NOTIFICATION_PINNED_APPS_CHANGED;
     notification.pinned_apps = host->pinned_apps;
     notification.pinned_app_count = host->pinned_app_count;
-    notification.present = 1;
     reach_host_notify_registered_features(host, &notification);
 }
 

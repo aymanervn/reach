@@ -210,18 +210,6 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     }
     if (!reach_host_bar_reveal_enabled(desc))
     {
-        if (id == REACH_SURFACE_ID_TOP_BAR)
-        {
-            int32_t was_hidden = host->top_bar_hidden;
-            host->top_bar_hidden = 0;
-            if (was_hidden)
-            {
-                reach_feature_notification notification = {};
-                notification.kind = REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE;
-                notification.present = 1;
-                reach_host_notify_registered_features(host, &notification);
-            }
-        }
         reach_host_set_pointer_observation(host, id, {}, 0);
         if (desc->definition->surface.bar_reveal.active_layer > 0)
         {
@@ -250,19 +238,6 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
 
     reach_bar_visibility_result result =
         desc->definition->surface.bar_reveal.ops->update_visibility(desc->capsule, &request);
-
-    if (id == REACH_SURFACE_ID_TOP_BAR)
-    {
-        int32_t was_hidden = host->top_bar_hidden;
-        host->top_bar_hidden = result.visible ? 0 : 1;
-        if (was_hidden && !host->top_bar_hidden)
-        {
-            reach_feature_notification notification = {};
-            notification.kind = REACH_FEATURE_NOTIFICATION_TOP_BAR_VISIBLE;
-            notification.present = 1;
-            reach_host_notify_registered_features(host, &notification);
-        }
-    }
 
     reach_host_apply_bar_pointer_observation(host, id, &result);
 

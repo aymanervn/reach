@@ -549,7 +549,7 @@ policy, pointer subscriptions, popup capture, dirtying, and update scheduling ar
 the capsule's semantic `set_open`; registry adapters are the only code that translates that call to
 a concrete capsule. Typed host notifications are broadcast through the same contract for external
 state that more than one capsule may present, including system statistics, Now Playing, media
-actions, volume, brightness, and the final top-bar visibility result. Clipboard, Tray, Quick
+actions, volume, and brightness. Clipboard, Tray, Quick
 Settings, Battery, System HUD, Launcher, and Switcher use these operations rather than named host
 orchestration files. Closing carries an intent: `REACH_SURFACE_CLOSE_DISMISS` for a dismissal the
 user drove, `REACH_SURFACE_CLOSE_SUPERSEDED` when something else took over. A surface that declares
@@ -607,11 +607,12 @@ action→port translators for media transport, volume, and brightness live in
 `host_system_actions.cpp`, out of the input routing path. Brightness translation submits a relative
 command to `reach_system_status`; the host uses only the cached target returned by the service for
 immediate presentation. The resulting typed notification is offered to every registered control;
-Quick Settings and System HUD consume the kinds they support. System HUD also consumes the final
-top-bar visibility notification from that same bar reconciliation, so keyboard media, volume, and
-brightness actions never reconstruct the hiding predicate. Successful level changes carry the
-exact post-action state; media actions make the HUD refresh its presentation snapshot from the Now
-Playing service. The HUD is a persistent, source-gated surface at layer
+Quick Settings and System HUD consume the kinds they support. Successful media, volume, mute, and
+brightness actions present System HUD independently of top-bar visibility and game mode. Successful
+level changes carry the exact post-action state; media actions make the HUD refresh its presentation
+snapshot from the Now Playing service. Its media presentation shares the cover-art rendering path
+with the top bar: cropped artwork fills and blurs behind the item, then a translucent overlay keeps
+static, ellipsized title and artist text legible. The HUD is a persistent, source-gated surface at layer
 220, above every other Reach layer. Its visual card is one blocking input region:
 presses are consumed without actions or capture, while pointer enter pauses its
 dismissal dwell and pointer leave releases it. It is centered above the Dock's
@@ -697,8 +698,8 @@ the next resolve. `reach_host_sync_bar_layout_conditions` publishes the process-
 reconciliation only owns that bar's visibility result and layer intent. `GAME_MODE` resolves every
 participant hidden except a definition
 that declares `BEHAVIOR_GAME_MODE_VISIBLE`. The system HUD is the only such
-participant because hardware media and level keys remain active while the top bar
-is suppressed. `host_game_mode.cpp` owns the state and the main gate in
+participant because hardware media and level keys remain active and always present it while the top
+bar is suppressed. `host_game_mode.cpp` owns the state and the main gate in
 `reach_host_update`; the game-mode path runs only behavior-flagged capsules and
 their frames, leaving all ordinary composition work below the gate dormant.
 Game-mode Alt-Tab is one Reach Service window transition: it transfers foreground
