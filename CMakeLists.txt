@@ -24,6 +24,9 @@ function(reach_configure_common target)
         ${REACH_INCLUDE_DIR}
         ${REACH_GENERATED_INCLUDE_DIR}
     )
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /utf-8)
+    endif()
     target_compile_definitions(${target} PUBLIC
         UNICODE
         _UNICODE
