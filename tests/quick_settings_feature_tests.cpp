@@ -141,7 +141,15 @@ static void test_expansion_keeps_popup_anchor_position(void)
     ctx.drop_direction = REACH_POPUP_DROP_DOWN;
 
     (void)reach_quick_settings_set_open(quick_settings, 1);
+    reach_quick_settings_model model = test_model_with_sessions(3);
+    reach_quick_settings_apply_sessions(quick_settings, &model.sessions);
     reach_quick_settings_refresh_layout(quick_settings, &ctx);
+    reach_feature_surface_geometry opening_geometry = {};
+    reach_quick_settings_capsule_ops()->surface_geometry(quick_settings, &opening_geometry);
+    expect_near(opening_geometry.presentation.y_offset, 0.0f, 0.001f,
+                "quick settings opens without moving its anchored position");
+    reach_feature_tick_result tick = {};
+    reach_quick_settings_capsule_ops()->tick(quick_settings, 1.0, &tick);
     const reach_quick_settings_state *state = reach_quick_settings_state_ptr(quick_settings);
     const float narrow_width = state->bounds.width;
     const float content_width = state->content_bounds.width;
@@ -159,10 +167,16 @@ static void test_expansion_keeps_popup_anchor_position(void)
 
     (void)reach_quick_settings_toggle_expanded(quick_settings);
     reach_quick_settings_relayout(quick_settings, &ctx, 1);
-    (void)reach_quick_settings_update_open_animation(quick_settings, &ctx);
-
-    expect_near(reach_quick_settings_state_ptr(quick_settings)->bounds.y, initial_y, 0.001f,
-                "height animation preserves the popup anchor position");
+    expect_true(reach_quick_settings_state_ptr(quick_settings)->target_bounds.height >
+                    reach_quick_settings_state_ptr(quick_settings)->bounds.height,
+                "app rows increase the quick settings target height");
+    for (size_t frame = 0; frame < 12; ++frame)
+    {
+        reach_quick_settings_capsule_ops()->tick(quick_settings, 0.03, &tick);
+        (void)reach_quick_settings_update_open_animation(quick_settings, &ctx);
+        expect_near(reach_quick_settings_state_ptr(quick_settings)->bounds.y, initial_y, 0.001f,
+                    "height animation preserves the popup anchor position on every frame");
+    }
     reach_quick_settings_destroy(quick_settings);
 }
 
