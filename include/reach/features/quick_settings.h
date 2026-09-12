@@ -6,6 +6,7 @@
 #include "reach/features/feature_capsule.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/system_controls.h"
+#include "reach/ports/text_measure.h"
 #include "reach/services/system_status.h"
 #include "reach/support/util.h"
 #include "reach/support/animation.h"
@@ -125,6 +126,7 @@ extern "C"
         float dpi_scale;
         float output_devices_expansion;
         float app_volumes_expansion;
+        reach_text_measure_port text_measure;
         uint64_t press_feedback_target;
         float press_feedback_opacity;
     } reach_quick_settings_render_input;
@@ -229,6 +231,7 @@ extern "C"
     reach_result
     reach_quick_settings_append_render_commands(reach_quick_settings *quick_settings,
                                                 const reach_theme *theme, float dpi_scale,
+                                                const reach_text_measure_port *text_measure,
                                                 reach_render_command_buffer *out_commands);
 
     typedef struct reach_quick_settings_layout_context
