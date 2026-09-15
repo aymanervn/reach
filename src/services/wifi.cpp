@@ -193,6 +193,17 @@ static void reach_wifi_service_thread_main(reach_wifi_service *service)
 
         {
             std::lock_guard<std::mutex> lock(service->mutex);
+            if (command == REACH_WIFI_SERVICE_COMMAND_REFRESH && service->completed &&
+                service->completed_generation == generation &&
+                service->snapshot.completed_command != REACH_WIFI_SERVICE_COMMAND_REFRESH)
+            {
+                snapshot.completed_command = service->snapshot.completed_command;
+                snapshot.command_succeeded = service->snapshot.command_succeeded;
+                snapshot.scan_result = service->snapshot.scan_result;
+                snapshot.connect_result = service->snapshot.connect_result;
+                reach_copy_utf16(snapshot.connect_ssid, REACH_WIFI_SSID_CAPACITY,
+                                 service->snapshot.connect_ssid);
+            }
             service->snapshot = snapshot;
             service->completed_generation = generation;
             service->completed = 1;
@@ -241,7 +252,10 @@ static void reach_wifi_service_submit(reach_wifi_service *service,
         {
             return;
         }
-        ++service->generation;
+        if (command != REACH_WIFI_SERVICE_COMMAND_REFRESH)
+        {
+            ++service->generation;
+        }
         service->pending_generation = service->generation;
         service->pending_command = command;
     }
