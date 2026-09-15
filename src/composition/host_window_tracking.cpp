@@ -203,8 +203,13 @@ void reach_host_notify_display_changed(reach_host *host)
 
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED;
-    notification.display.icon_size_px = reach_host_icon_size_px(host);
-    notification.display.dpi_scale = reach_host_layout_dpi_scale(host);
+    const reach_monitor_info *primary =
+        host->monitors.list != nullptr && host->monitors.ops.primary != nullptr
+            ? host->monitors.ops.primary(host->monitors.list)
+            : nullptr;
+    notification.display.dpi_scale = reach_host_monitor_dpi_scale(primary);
+    notification.display.icon_size_px =
+        reach_host_icon_size_px_for_scale(notification.display.dpi_scale);
     notification.display.desktop_window =
         host->wallpaper_surface.ops.desktop_window != nullptr
             ? host->wallpaper_surface.ops.desktop_window(host->wallpaper_surface.surface)

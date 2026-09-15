@@ -663,6 +663,35 @@ void reach_host_mark_all_surfaces_dirty(reach_host *host)
     }
 }
 
+void reach_host_invalidate_display_geometry(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+
+    host->dirty.monitors = 1;
+    reach_monitor_refresh_retry_reset(&host->monitor_refresh_retry);
+    reach_monitor_topology_cancel(&host->monitor_topology);
+    host->dirty.layout = 1;
+    host->dirty.z_order = 1;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        runtime->resolved_bounds_valid = 0;
+        if (runtime->surface != nullptr)
+        {
+            runtime->surface->bounds_valid = 0;
+            runtime->surface->transition_scale_valid = 0;
+            runtime->surface->native_visibility_invalidated = 1;
+            runtime->surface->dirty_flags = 1;
+        }
+        host->edge_reveals[index].bounds_valid = 0;
+    }
+    reach_host_invalidate_bar_coverage(host);
+    reach_host_request_update(host);
+}
+
 int32_t reach_host_any_surface_dirty(const reach_host *host)
 {
     if (host == nullptr)

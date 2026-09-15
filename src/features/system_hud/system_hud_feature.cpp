@@ -300,9 +300,23 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
     }
 
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    float base_width = hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 340.0f : 272.0f;
+    float base_height = hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 84.0f : 76.0f;
+    float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
+    float width_scale = ctx->monitor_bounds.width / (base_width + 48.0f + base_border * 2.0f);
+    float height_scale = ctx->monitor_bounds.height / (base_height + 48.0f + base_border * 2.0f);
+    if (width_scale > 0.0f && scale > width_scale)
+    {
+        scale = width_scale;
+    }
+    if (height_scale > 0.0f && scale > height_scale)
+    {
+        scale = height_scale;
+    }
+    hud->state.content_scale = scale;
     float border = reach_theme_border_thickness(ctx->theme, scale);
-    float inner_width = (hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 340.0f : 272.0f) * scale;
-    float inner_height = (hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 84.0f : 76.0f) * scale;
+    float inner_width = base_width * scale;
+    float inner_height = base_height * scale;
     float width = inner_width + border * 2.0f;
     float height = inner_height + border * 2.0f;
     float gap = 12.0f * scale;
@@ -313,6 +327,17 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
     reach_system_hud_layout next = {};
     next.bounds = {ctx->monitor_bounds.x + (ctx->monitor_bounds.width - width) * 0.5f,
                    dock_top - gap - height, width, height};
+    float screen_margin = 24.0f * scale;
+    float minimum_y = ctx->monitor_bounds.y + screen_margin;
+    float maximum_y = ctx->monitor_bounds.y + ctx->monitor_bounds.height - screen_margin - height;
+    if (next.bounds.y < minimum_y)
+    {
+        next.bounds.y = minimum_y;
+    }
+    if (next.bounds.y > maximum_y)
+    {
+        next.bounds.y = maximum_y;
+    }
 
     float padding = 14.0f * scale + border;
     float icon_size = (hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 56.0f : 40.0f) * scale;

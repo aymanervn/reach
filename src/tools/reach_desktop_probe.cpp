@@ -6,9 +6,14 @@
 #ifndef _UNICODE
 #define _UNICODE
 #endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
+#include <dbt.h>
 #include <shellapi.h>
 #include <shobjidl.h>
 #include <shlwapi.h>
@@ -446,6 +451,8 @@ static LRESULT CALLBACK HostWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         ss << L"\"wParam\":" << (unsigned)wp << L",\"lParamString\":\""
            << JsonEscape(lp ? (LPCWSTR)lp : L"") << L"\"";
         LogEvent(L"WM_SETTINGCHANGE", ss.str());
+        DumpMonitors();
+        DumpTopology(L"after-WM_SETTINGCHANGE");
         break;
     }
     case WM_DPICHANGED:
@@ -472,6 +479,11 @@ static LRESULT CALLBACK HostWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         std::wstringstream ss;
         ss << L"\"event\":" << (unsigned)wp;
         LogEvent(L"WM_DEVICECHANGE", ss.str());
+        if (wp == DBT_DEVNODES_CHANGED || wp == DBT_CONFIGCHANGED)
+        {
+            DumpMonitors();
+            DumpTopology(L"after-WM_DEVICECHANGE");
+        }
         break;
     }
     case WM_WTSSESSION_CHANGE:

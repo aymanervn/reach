@@ -8,6 +8,7 @@ typedef struct reach_context_menu_render_input
 {
     const reach_theme *theme;
     reach_rect_f32 bounds;
+    reach_rect_f32 item_viewport;
     const reach_rect_f32 *item_slots;
     const uint32_t *item_commands;
     const uint32_t *item_icon_ids;

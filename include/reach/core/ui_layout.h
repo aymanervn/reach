@@ -48,7 +48,7 @@ extern "C"
         reach_dock_layout dock;
     } reach_ui_layout;
 
-#define REACH_DISPLAY_MAX_MONITORS 8
+#define REACH_DISPLAY_MAX_MONITORS 32
 
     /* Monitors resolved by composition, so a feature that has to reason about where a window
        lives never reaches for the platform itself. */

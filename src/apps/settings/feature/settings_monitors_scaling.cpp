@@ -1,5 +1,18 @@
 #include "settings_pages_internal.h"
 
+void reach_settings_model_scroll_display(reach_settings_model *model, float delta)
+{
+    if (model != nullptr)
+    {
+        reach_scrollbar_scroll(&model->display_scrollbar, delta);
+    }
+}
+
+int32_t reach_settings_model_display_scroll(reach_settings_model *model, double delta_seconds)
+{
+    return model != nullptr ? reach_scrollbar_update(&model->display_scrollbar, delta_seconds) : 0;
+}
+
 const uint16_t *reach_settings_display_page_title(void)
 {
     return (const uint16_t *)L"Display";

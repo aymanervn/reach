@@ -207,6 +207,8 @@ extern "C"
         reach_rect_f32 content_bounds;
         float output_devices_expansion;
         float app_volumes_expansion;
+        float scroll_offset;
+        float scroll_max;
         float notch_anchor_x;
         int32_t drop_direction;
         reach_quick_settings_drag_state drag;
@@ -228,11 +230,9 @@ extern "C"
     void reach_quick_settings_apply_output_devices(reach_quick_settings *quick_settings,
                                                    const reach_audio_output_device_list *devices);
 
-    reach_result
-    reach_quick_settings_append_render_commands(reach_quick_settings *quick_settings,
-                                                const reach_theme *theme, float dpi_scale,
-                                                const reach_text_measure_port *text_measure,
-                                                reach_render_command_buffer *out_commands);
+    reach_result reach_quick_settings_append_render_commands(
+        reach_quick_settings *quick_settings, const reach_theme *theme, float dpi_scale,
+        const reach_text_measure_port *text_measure, reach_render_command_buffer *out_commands);
 
     typedef struct reach_quick_settings_layout_context
     {

@@ -202,6 +202,23 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     }
     reach_launcher_configure_surface_animation(launcher, ctx->theme, ctx->dpi_scale);
 
+    float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    float border = reach_theme_border_thickness(
+        ctx->theme != nullptr ? ctx->theme : reach_theme_default(), scale);
+    float available_results_height = ctx->monitor_bounds.height - 48.0f * scale -
+                                     (52.0f * scale + border * 2.0f) - 16.0f * scale;
+    size_t visible_capacity =
+        available_results_height > 0.0f ? (size_t)(available_results_height / (56.0f * scale)) : 1;
+    if (visible_capacity < 1)
+    {
+        visible_capacity = 1;
+    }
+    if (visible_capacity > REACH_SEARCH_VISIBLE_RESULTS)
+    {
+        visible_capacity = REACH_SEARCH_VISIBLE_RESULTS;
+    }
+    launcher->state.model.visible_result_capacity = visible_capacity;
+
     reach_ui_layout_input input = {};
     input.monitor_bounds = ctx->monitor_bounds;
     input.work_area = ctx->monitor_bounds;
@@ -273,17 +290,22 @@ static size_t reach_launcher_visible_count(const reach_launcher_state *state)
     {
         return 0;
     }
-    return state->model.result_count < REACH_SEARCH_VISIBLE_RESULTS ? state->model.result_count
-                                                                    : REACH_SEARCH_VISIBLE_RESULTS;
+    size_t capacity = state->model.visible_result_capacity > 0
+                          ? state->model.visible_result_capacity
+                          : REACH_SEARCH_VISIBLE_RESULTS;
+    return state->model.result_count < capacity ? state->model.result_count : capacity;
 }
 
 static size_t reach_launcher_max_scroll_offset(const reach_launcher_state *state)
 {
-    if (state == 0 || state->model.result_count <= REACH_SEARCH_VISIBLE_RESULTS)
+    size_t capacity = state != 0 && state->model.visible_result_capacity > 0
+                          ? state->model.visible_result_capacity
+                          : REACH_SEARCH_VISIBLE_RESULTS;
+    if (state == 0 || state->model.result_count <= capacity)
     {
         return 0;
     }
-    return state->model.result_count - REACH_SEARCH_VISIBLE_RESULTS;
+    return state->model.result_count - capacity;
 }
 
 size_t reach_launcher_model_result_scroll_offset(const reach_launcher_model *launcher)

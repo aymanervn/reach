@@ -11,6 +11,7 @@ int32_t reach_host_get_pointer_position(reach_host *host, reach_point_i32 *out_p
 static int32_t reach_host_game_mode_allows_event(reach_ui_event_type type)
 {
     return type == REACH_UI_EVENT_CONFIG_CHANGED || type == REACH_UI_EVENT_DISPLAY_CHANGED ||
+           type == REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT ||
            type == REACH_UI_EVENT_WINDOW_STATE_CHANGED ||
            type == REACH_UI_EVENT_WALLPAPER_CHANGED || type == REACH_UI_EVENT_POINTER_CANCEL ||
            type == REACH_UI_EVENT_MEDIA_PREVIOUS || type == REACH_UI_EVENT_MEDIA_PLAY_PAUSE ||
@@ -799,9 +800,19 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED)
     {
-        host->dirty.monitors = 1;
-        host->dirty.layout = 1;
-        reach_host_mark_all_surfaces_dirty(host);
+        reach_host_invalidate_display_geometry(host);
+        return REACH_OK;
+    }
+
+    if (event->type == REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT)
+    {
+        if (!host->dirty.monitors || host->monitor_topology.hint_active)
+        {
+            reach_monitor_topology_request(&host->monitor_topology);
+            reach_monitor_refresh_retry_reset(&host->monitor_refresh_retry);
+            host->dirty.monitors = 1;
+            reach_host_request_update(host);
+        }
         return REACH_OK;
     }
 

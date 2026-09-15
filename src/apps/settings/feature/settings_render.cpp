@@ -486,6 +486,7 @@ static void render_display_page(const reach_settings_render_input *input,
     const reach_settings_model *model = input->model;
     const reach_settings_layout *layout = input->layout;
     reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_CYAN);
+    reach_render_command_buffer_set_scissor(commands, layout->display_viewport);
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
@@ -561,6 +562,14 @@ static void render_display_page(const reach_settings_render_input *input,
         L"Hide it when a window enters its screen region",
         reach_animation_manager_value(&model->top_bar_mode_animation, 0)};
     render_display_toggle_card(input, commands, &toggle_style, &auto_hide);
+    reach_render_command_buffer_clear_scissor(commands);
+    if (layout->display_scrollbar_thumb.height > 0.0f)
+    {
+        reach_scrollbar_build_render_commands(
+            layout->display_scrollbar_track, layout->display_scrollbar_thumb,
+            {0.0f, 0.0f, 0.0f, 0.0f}, input->theme->settings_scrollbar_track,
+            input->theme->settings_scrollbar_thumb, commands);
+    }
 }
 
 static void build_startup_summary(const reach_settings_model *model, uint16_t *text,

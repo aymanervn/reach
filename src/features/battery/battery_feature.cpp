@@ -266,6 +266,11 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
     reach_popup_placement placement = reach_popup_place(&anchor, popup_width, popup_height, margin);
     state->bounds = placement.bounds;
     state->notch_anchor_x = placement.notch_anchor_x;
+    body_width = placement.bounds.width - border_thickness * 2.0f;
+    if (body_width < 0.0f)
+    {
+        body_width = 0.0f;
+    }
 
     float content_y = border_thickness + padding +
                       (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);

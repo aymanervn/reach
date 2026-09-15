@@ -5,21 +5,26 @@
 #include <shellscalingapi.h>
 
 #include <new>
+#include <string>
 #include <vector>
 
 struct reach_monitor_list
 {
     std::vector<reach_monitor_info> monitors;
+    std::vector<std::wstring> devices;
+    int32_t enumeration_failed;
     int32_t work_area_initialized;
     int32_t work_area_changed;
     reach_rect_i32 controlled_monitor;
     reach_rect_i32 controlled_work_area;
+    std::wstring controlled_device;
 };
 
 static reach_result reach_monitor_refresh(reach_monitor_list *list);
 static reach_result reach_monitor_set_work_area(reach_monitor_list *list,
                                                 reach_rect_i32 monitor_bounds,
                                                 reach_rect_i32 work_area);
+static int32_t reach_monitor_rect_equal(reach_rect_i32 left, reach_rect_i32 right);
 
 static reach_rect_i32 reach_rect_from_win32(const RECT &rect)
 {
@@ -29,6 +34,20 @@ static reach_rect_i32 reach_rect_from_win32(const RECT &rect)
     result.right = rect.right;
     result.bottom = rect.bottom;
     return result;
+}
+
+static uint32_t reach_monitor_device_id(const wchar_t *device)
+{
+    uint32_t hash = 2166136261u;
+    if (device != nullptr)
+    {
+        while (*device != L'\0')
+        {
+            hash ^= (uint32_t)*device++;
+            hash *= 16777619u;
+        }
+    }
+    return hash != 0 ? hash : 1u;
 }
 
 static BOOL CALLBACK reach_monitor_enum_proc(HMONITOR monitor, HDC dc, LPRECT rect, LPARAM param)
@@ -41,11 +60,12 @@ static BOOL CALLBACK reach_monitor_enum_proc(HMONITOR monitor, HDC dc, LPRECT re
     info.cbSize = sizeof(info);
     if (!GetMonitorInfoW(monitor, &info))
     {
-        return TRUE;
+        list->enumeration_failed = 1;
+        return FALSE;
     }
 
     reach_monitor_info item = {};
-    item.id = static_cast<uint32_t>(list->monitors.size() + 1);
+    item.id = reach_monitor_device_id(info.szDevice);
     item.bounds = reach_rect_from_win32(info.rcMonitor);
     item.work_area = reach_rect_from_win32(info.rcWork);
     item.primary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0;
@@ -68,6 +88,7 @@ static BOOL CALLBACK reach_monitor_enum_proc(HMONITOR monitor, HDC dc, LPRECT re
     }
 
     list->monitors.push_back(item);
+    list->devices.emplace_back(info.szDevice);
     return TRUE;
 }
 
@@ -93,7 +114,15 @@ static void reach_monitor_list_destroy(reach_monitor_list *list)
 {
     if (list != nullptr && list->work_area_changed)
     {
-        (void)reach_monitor_set_work_area(list, list->controlled_monitor, list->controlled_monitor);
+        for (size_t index = 0; index < list->devices.size(); ++index)
+        {
+            if (list->devices[index] == list->controlled_device)
+            {
+                (void)reach_monitor_set_work_area(list, list->monitors[index].bounds,
+                                                  list->monitors[index].bounds);
+                break;
+            }
+        }
     }
     delete list;
 }
@@ -105,13 +134,68 @@ static reach_result reach_monitor_refresh(reach_monitor_list *list)
         return REACH_INVALID_ARGUMENT;
     }
 
-    list->monitors.clear();
-    list->work_area_initialized = 0;
+    reach_monitor_list snapshot = {};
     if (!EnumDisplayMonitors(nullptr, nullptr, reach_monitor_enum_proc,
-                             reinterpret_cast<LPARAM>(list)))
+                             reinterpret_cast<LPARAM>(&snapshot)) ||
+        snapshot.enumeration_failed ||
+        snapshot.monitors.empty())
     {
         return REACH_ERROR;
     }
+
+    if (list->work_area_changed && !list->controlled_device.empty())
+    {
+        size_t controlled_index = snapshot.devices.size();
+        for (size_t index = 0; index < snapshot.devices.size(); ++index)
+        {
+            if (snapshot.devices[index] == list->controlled_device)
+            {
+                controlled_index = index;
+                break;
+            }
+        }
+        if (controlled_index < snapshot.monitors.size())
+        {
+            reach_rect_i32 next_monitor = snapshot.monitors[controlled_index].bounds;
+            int32_t left_inset = list->controlled_work_area.left - list->controlled_monitor.left;
+            int32_t top_inset = list->controlled_work_area.top - list->controlled_monitor.top;
+            int32_t right_inset = list->controlled_monitor.right - list->controlled_work_area.right;
+            int32_t bottom_inset =
+                list->controlled_monitor.bottom - list->controlled_work_area.bottom;
+            list->controlled_monitor = next_monitor;
+            list->controlled_work_area = {
+                next_monitor.left + left_inset, next_monitor.top + top_inset,
+                next_monitor.right - right_inset, next_monitor.bottom - bottom_inset};
+        }
+        else
+        {
+            list->work_area_changed = 0;
+            list->controlled_monitor = {};
+            list->controlled_work_area = {};
+            list->controlled_device.clear();
+        }
+    }
+
+    int32_t work_area_initialized = 0;
+    if (list->work_area_initialized && !list->controlled_device.empty())
+    {
+        for (size_t index = 0; index < snapshot.devices.size(); ++index)
+        {
+            if (snapshot.devices[index] == list->controlled_device &&
+                reach_monitor_rect_equal(snapshot.monitors[index].bounds,
+                                         list->controlled_monitor) &&
+                reach_monitor_rect_equal(snapshot.monitors[index].work_area,
+                                         list->controlled_work_area))
+            {
+                work_area_initialized = 1;
+                break;
+            }
+        }
+    }
+
+    list->monitors.swap(snapshot.monitors);
+    list->devices.swap(snapshot.devices);
+    list->work_area_initialized = work_area_initialized;
 
     return REACH_OK;
 }
@@ -283,19 +367,38 @@ static reach_result reach_monitor_set_work_area(reach_monitor_list *list,
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (list->work_area_initialized &&
-        reach_monitor_rect_equal(list->controlled_monitor, monitor_bounds) &&
+    size_t target_index = list->monitors.size();
+    for (size_t index = 0; index < list->monitors.size(); ++index)
+    {
+        if (reach_monitor_rect_equal(list->monitors[index].bounds, monitor_bounds))
+        {
+            target_index = index;
+            break;
+        }
+    }
+    if (target_index >= list->devices.size())
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    const std::wstring &target_device = list->devices[target_index];
+
+    if (list->work_area_initialized && list->controlled_device == target_device &&
         reach_monitor_rect_equal(list->controlled_work_area, work_area))
     {
         return REACH_OK;
     }
 
-    if (list->work_area_changed &&
-        !reach_monitor_rect_equal(list->controlled_monitor, monitor_bounds) &&
-        reach_monitor_apply_work_area(list->controlled_monitor, list->controlled_monitor) !=
-            REACH_OK)
+    if (list->work_area_changed && list->controlled_device != target_device)
     {
-        return REACH_ERROR;
+        for (size_t index = 0; index < list->devices.size(); ++index)
+        {
+            if (list->devices[index] == list->controlled_device &&
+                reach_monitor_apply_work_area(list->monitors[index].bounds,
+                                              list->monitors[index].bounds) != REACH_OK)
+            {
+                return REACH_ERROR;
+            }
+        }
     }
 
     if (reach_monitor_apply_work_area(monitor_bounds, work_area) != REACH_OK)
@@ -307,6 +410,7 @@ static reach_result reach_monitor_set_work_area(reach_monitor_list *list,
     list->work_area_changed = !reach_monitor_rect_equal(monitor_bounds, work_area);
     list->controlled_monitor = monitor_bounds;
     list->controlled_work_area = work_area;
+    list->controlled_device = target_device;
     reach_monitor_update_cached_work_area(list, monitor_bounds, work_area);
     return REACH_OK;
 }

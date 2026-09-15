@@ -666,6 +666,25 @@ target_link_libraries(reach_tray_probe PRIVATE
     user32
 )
 
+add_executable(reach_desktop_probe EXCLUDE_FROM_ALL
+    src/tools/reach_desktop_probe.cpp
+)
+reach_configure_common(reach_desktop_probe)
+reach_configure_windows(reach_desktop_probe)
+target_compile_features(reach_desktop_probe PRIVATE cxx_std_17)
+target_link_libraries(reach_desktop_probe PRIVATE
+    user32
+    gdi32
+    ole32
+    shell32
+    shlwapi
+    psapi
+    shcore
+    dwmapi
+    wtsapi32
+    comctl32
+)
+
 if(REACH_BUILD_TESTS)
 add_executable(reach_svg_document_tests
     tests/svg_document_tests.cpp
