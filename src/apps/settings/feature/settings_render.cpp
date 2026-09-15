@@ -1189,11 +1189,25 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         input->text_alignment_leading,
         reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.7f), 1);
 
-    reach_settings_push_text(commands, input->layout->content_title,
+    reach_rect_f32 title = input->layout->content_title;
+    reach_color title_color = input->theme->settings_text;
+    if (input->model->selected_page == REACH_SETTINGS_PAGE_WIFI)
+    {
+        reach_color green = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_GREEN);
+        title.width = reach_settings_scale(input, 122.0f);
+        reach_settings_push_rect(commands, title,
+                                 reach_settings_scale(input, input->theme->radius_small),
+                                 reach_settings_color_with_alpha(green,
+                                                                 input->theme->accent_tint_alpha));
+        title.x += reach_settings_scale(input, 14.0f);
+        title.width -= reach_settings_scale(input, 28.0f);
+        title_color = green;
+    }
+    reach_settings_push_text(commands, title,
                              reach_settings_page_title(input->model->selected_page),
                              reach_settings_scale(input, REACH_TEXT_SIZE_XLARGE),
                              REACH_TEXT_WEIGHT_DEMIBOLD, input->text_alignment_leading,
-                             input->theme->settings_text, 1);
+                             title_color, 1);
     if (input->model->selected_page == REACH_SETTINGS_PAGE_UPDATE)
         render_update_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)

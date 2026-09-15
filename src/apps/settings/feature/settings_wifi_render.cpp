@@ -216,7 +216,8 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
         network->in_range
             ? input->theme->settings_secondary_text
             : reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.6f);
-    reach_settings_push_icon(commands, icon, icon_color,
+    reach_settings_push_icon(commands, icon, icon_color, REACH_VECTOR_ICON_WIFI_HIGH, 0.0f);
+    reach_settings_push_icon(commands, icon, accent,
                              reach_wifi_signal_icon(network->signal_strength), 0.0f);
 
     float text_x = icon.x + icon_size + reach_settings_scale(input, 14.0f);
