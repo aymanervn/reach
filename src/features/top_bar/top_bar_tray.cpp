@@ -20,7 +20,11 @@ struct reach_top_bar_tray_popup
     reach_animation_track tracks[REACH_TOP_BAR_TRAY_ANIM_COUNT];
     reach_feature_transition popup_transition;
     reach_pressable pressable;
+    reach_rect_f32 item_viewport;
     reach_rect_f32 item_slots[REACH_MAX_TRAY_ITEMS];
+    float scroll_offset;
+    float scroll_max;
+    float row_pitch;
     size_t overflow_start;
     int32_t open;
     reach_rect_f32 pointer_bounds;
@@ -214,7 +218,8 @@ static reach_top_bar_tray_hit reach_top_bar_tray_hit_test(const reach_top_bar *t
     size_t count = reach_top_bar_ordered_tray_item_count(top_bar);
     for (size_t index = popup->overflow_start; index < count; ++index)
     {
-        if (reach_top_bar_tray_contains(popup->item_slots[index], x, y))
+        if (reach_top_bar_tray_contains(popup->item_viewport, x, y) &&
+            reach_top_bar_tray_contains(popup->item_slots[index], x, y))
         {
             hit.type = REACH_TOP_BAR_TRAY_HIT_ITEM;
             hit.index = index;
@@ -285,6 +290,7 @@ int32_t reach_top_bar_set_tray_popup_open(reach_top_bar *top_bar, int32_t open)
     }
     else
     {
+        top_bar->tray_popup->scroll_offset = 0.0f;
         (void)reach_top_bar_refresh_tray(top_bar);
     }
     return 1;
@@ -365,8 +371,13 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     size_t overflow_count =
         item_count > popup->overflow_start ? item_count - popup->overflow_start : 0;
     size_t visual_count = overflow_count > 0 ? overflow_count : 1;
-    size_t columns = reach_top_bar_tray_min_size(visual_count, 5);
-    size_t rows = (visual_count + 4) / 5;
+    float available_grid_width =
+        anchor->monitor.width - 16.0f * scale - padding * 2.0f - border_thickness * 2.0f;
+    size_t column_capacity = available_grid_width > slot_size
+                                 ? (size_t)((available_grid_width + gap) / (slot_size + gap))
+                                 : 1;
+    size_t columns = reach_top_bar_tray_min_size(visual_count, column_capacity);
+    size_t rows = (visual_count + columns - 1) / columns;
     float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
     float content_height = padding * 2.0f + (float)rows * slot_size + (float)(rows - 1) * gap;
     popup->placement = reach_popup_place(
@@ -379,7 +390,30 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;
     float content_top =
         content_bounds.y + (anchor->direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
-    float grid_y = content_top + (content_height - grid_height) * 0.5f;
+    float content_bottom = content_bounds.y + content_bounds.height -
+                           (anchor->direction == REACH_POPUP_DROP_UP ? notch_height : 0.0f);
+    popup->item_viewport = {content_bounds.x + padding, content_top + padding,
+                            content_bounds.width - padding * 2.0f,
+                            content_bottom - content_top - padding * 2.0f};
+    if (popup->item_viewport.width < 0.0f)
+    {
+        popup->item_viewport.width = 0.0f;
+    }
+    if (popup->item_viewport.height < 0.0f)
+    {
+        popup->item_viewport.height = 0.0f;
+    }
+    popup->scroll_max = grid_height - popup->item_viewport.height;
+    if (popup->scroll_max < 0.0f)
+    {
+        popup->scroll_max = 0.0f;
+    }
+    if (popup->scroll_offset > popup->scroll_max)
+    {
+        popup->scroll_offset = popup->scroll_max;
+    }
+    popup->row_pitch = slot_size + gap;
+    float grid_y = popup->item_viewport.y - popup->scroll_offset;
     for (size_t index = 0; index < item_count; ++index)
     {
         if (index < popup->overflow_start)
@@ -388,13 +422,13 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
             continue;
         }
         size_t shown = index - popup->overflow_start;
-        size_t row = shown / 5;
-        size_t column = shown % 5;
-        size_t row_start = row * 5;
+        size_t row = shown / columns;
+        size_t column = shown % columns;
+        size_t row_start = row * columns;
         size_t row_remaining = overflow_count - row_start;
-        size_t row_columns = reach_top_bar_tray_min_size(row_remaining, 5);
+        size_t row_columns = reach_top_bar_tray_min_size(row_remaining, columns);
         float row_width = (float)row_columns * slot_size + (float)(row_columns - 1) * gap;
-        float row_x = content_bounds.x + (content_bounds.width - row_width) * 0.5f;
+        float row_x = popup->item_viewport.x + (popup->item_viewport.width - row_width) * 0.5f;
         popup->item_slots[index] = {row_x + (float)column * (slot_size + gap),
                                     grid_y + (float)row * (slot_size + gap), slot_size, slot_size};
     }
@@ -418,6 +452,8 @@ static void reach_top_bar_tray_reset(void *capsule)
     top_bar->tray_popup->open = 0;
     reach_feature_transition_reset(&top_bar->tray_popup->popup_transition);
     top_bar->tray_popup->pointer_bounds_valid = 0;
+    top_bar->tray_popup->scroll_offset = 0.0f;
+    top_bar->tray_popup->scroll_max = 0.0f;
     top_bar->state.tray_popup_open = 0;
 }
 
@@ -602,6 +638,36 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
         return;
     }
 
+    if (event->kind == REACH_POINTER_EVENT_WHEEL)
+    {
+        if (popup->scroll_max > 0.0f && event->wheel_delta != 0)
+        {
+            float previous = popup->scroll_offset;
+            popup->scroll_offset +=
+                event->wheel_delta > 0 ? -popup->row_pitch * 3.0f : popup->row_pitch * 3.0f;
+            if (popup->scroll_offset < 0.0f)
+            {
+                popup->scroll_offset = 0.0f;
+            }
+            if (popup->scroll_offset > popup->scroll_max)
+            {
+                popup->scroll_offset = popup->scroll_max;
+            }
+            float moved = popup->scroll_offset - previous;
+            if (moved != 0.0f)
+            {
+                size_t count = reach_top_bar_ordered_tray_item_count(top_bar);
+                for (size_t index = popup->overflow_start; index < count; ++index)
+                {
+                    popup->item_slots[index].y -= moved;
+                }
+                out->redraw = 1;
+            }
+        }
+        out->handled = 1;
+        return;
+    }
+
     if (event->kind == REACH_POINTER_EVENT_CANCEL)
     {
         int32_t was_tracking = reach_pressable_tracking(&popup->pressable);
@@ -669,6 +735,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
     size_t feedback_index = reach_pressable_feedback_index(&popup_state->pressable);
     float feedback_opacity = reach_pressable_feedback_value(&popup_state->pressable, &feedback);
     size_t count = reach_top_bar_ordered_tray_item_count(top_bar);
+    reach_render_command_buffer_set_scissor(out_commands, popup_state->item_viewport);
     for (size_t index = popup_state->overflow_start; index < count; ++index)
     {
         const reach_tray_item *item = reach_top_bar_tray_item(top_bar, index);
@@ -709,6 +776,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
                 ctx->theme->bar_tray_background, feedback_opacity, 0.001f);
         }
     }
+    reach_render_command_buffer_clear_scissor(out_commands);
     return REACH_OK;
 }
 

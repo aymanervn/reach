@@ -33,15 +33,39 @@ static float reach_popup_clamp(float value, float min_value, float max_value)
     return value > max_value ? max_value : value;
 }
 
-static float reach_popup_clamp_to_monitor(float value, float extent, float monitor_origin,
-                                          float monitor_extent, float margin)
+reach_rect_f32 reach_popup_constrain_bounds(reach_rect_f32 bounds, reach_rect_f32 monitor,
+                                            float margin)
 {
-    if (monitor_extent <= 0.0f)
+    if (monitor.width <= 0.0f || monitor.height <= 0.0f)
     {
-        return value;
+        return bounds;
     }
-    return reach_popup_clamp(value, monitor_origin + margin,
-                             monitor_origin + monitor_extent - extent - margin);
+
+    float horizontal_margin = margin * 2.0f < monitor.width ? margin : 0.0f;
+    float vertical_margin = margin * 2.0f < monitor.height ? margin : 0.0f;
+    float available_width = monitor.width - horizontal_margin * 2.0f;
+    float available_height = monitor.height - vertical_margin * 2.0f;
+    if (bounds.width > available_width)
+    {
+        bounds.width = available_width;
+    }
+    if (bounds.height > available_height)
+    {
+        bounds.height = available_height;
+    }
+    if (bounds.width < 0.0f)
+    {
+        bounds.width = 0.0f;
+    }
+    if (bounds.height < 0.0f)
+    {
+        bounds.height = 0.0f;
+    }
+    bounds.x = reach_popup_clamp(bounds.x, monitor.x + horizontal_margin,
+                                 monitor.x + monitor.width - bounds.width - horizontal_margin);
+    bounds.y = reach_popup_clamp(bounds.y, monitor.y + vertical_margin,
+                                 monitor.y + monitor.height - bounds.height - vertical_margin);
+    return bounds;
 }
 
 reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float width, float height,
@@ -53,17 +77,13 @@ reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float 
         return placement;
     }
 
-    float drop_y = anchor->direction == REACH_POPUP_DROP_DOWN
-                       ? anchor->bar_edge_y + margin
-                       : anchor->bar_edge_y - height - margin;
-
     placement.bounds.width = width;
     placement.bounds.height = height;
-    placement.bounds.x =
-        reach_popup_clamp_to_monitor(anchor->button.x + anchor->button.width * 0.5f - width * 0.5f,
-                                     width, anchor->monitor.x, anchor->monitor.width, margin);
-    placement.bounds.y = reach_popup_clamp_to_monitor(drop_y, height, anchor->monitor.y,
-                                                      anchor->monitor.height, margin);
+    placement.bounds.x = anchor->button.x + anchor->button.width * 0.5f - width * 0.5f;
+    placement.bounds.y = anchor->direction == REACH_POPUP_DROP_DOWN
+                             ? anchor->bar_edge_y + margin
+                             : anchor->bar_edge_y - height - margin;
+    placement.bounds = reach_popup_constrain_bounds(placement.bounds, anchor->monitor, margin);
     placement.notch_anchor_x = anchor->button.x + anchor->button.width * 0.5f;
     placement.notch_side = reach_popup_notch_side(anchor->direction);
     return placement;

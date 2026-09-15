@@ -223,7 +223,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     int exit_code = 0;
     while (reach_settings_app_running(app))
     {
-        DWORD wait_ms = reach_settings_app_needs_frame(app) ? 16 : INFINITE;
+        DWORD wait_ms = reach_settings_app_needs_frame(app)
+                            ? 16
+                            : (DWORD)reach_settings_app_idle_wait_ms(app);
         DWORD wait_result =
             MsgWaitForMultipleObjectsEx(2, waits, wait_ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         if (wait_result == WAIT_OBJECT_0)

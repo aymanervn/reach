@@ -6,6 +6,8 @@
 #include "reach/services/bluetooth.h"
 #include "reach/services/config.h"
 #include "reach/services/installed_apps.h"
+#include "reach/services/monitor_refresh_retry.h"
+#include "reach/services/monitor_topology.h"
 #include "reach/services/system_status.h"
 #include "reach/services/wifi.h"
 
@@ -146,6 +148,8 @@ struct reach_settings_app
     reach_scrollbar_drag bluetooth_scrollbar_drag;
     int32_t running;
     int32_t dirty;
+    reach_monitor_refresh_retry monitor_refresh_retry;
+    reach_monitor_topology monitor_topology;
 };
 
 static float reach_settings_monitor_scale(const reach_monitor_info *monitor)
@@ -180,7 +184,21 @@ static float reach_settings_intersection_area(reach_rect_f32 bounds,
 
 static float reach_settings_app_scale(const reach_settings_app *app)
 {
-    if (app == nullptr || app->monitors.list == nullptr || app->monitors.ops.count == nullptr ||
+    if (app == nullptr)
+    {
+        return 1.0f;
+    }
+
+    if (app->window.ops.dpi_scale != nullptr)
+    {
+        float scale = app->window.ops.dpi_scale(app->window.window);
+        if (scale > 0.0f)
+        {
+            return scale;
+        }
+    }
+
+    if (app->monitors.list == nullptr || app->monitors.ops.count == nullptr ||
         app->monitors.ops.get == nullptr)
     {
         return 1.0f;
@@ -271,6 +289,84 @@ static void reach_settings_refresh_bounds(reach_settings_app *app)
     {
         app->bounds = bounds;
     }
+}
+
+static void reach_settings_constrain_to_displays(reach_settings_app *app)
+{
+    if (app == nullptr || app->monitors.list == nullptr || app->monitors.ops.count == nullptr ||
+        app->monitors.ops.get == nullptr || app->window.ops.set_bounds == nullptr)
+    {
+        return;
+    }
+
+    const reach_monitor_info *best = nullptr;
+    float best_area = 0.0f;
+    size_t count = app->monitors.ops.count(app->monitors.list);
+    for (size_t index = 0; index < count; ++index)
+    {
+        const reach_monitor_info *monitor = app->monitors.ops.get(app->monitors.list, index);
+        float area = reach_settings_intersection_area(app->bounds, monitor);
+        if (area > best_area)
+        {
+            best = monitor;
+            best_area = area;
+        }
+    }
+    if (best == nullptr && app->monitors.ops.primary != nullptr)
+    {
+        best = app->monitors.ops.primary(app->monitors.list);
+    }
+    if (best == nullptr)
+    {
+        return;
+    }
+
+    reach_rect_i32 available = best->work_area;
+    if (available.right <= available.left || available.bottom <= available.top)
+    {
+        available = best->bounds;
+    }
+    float scale = reach_settings_monitor_scale(best);
+    float margin = 16.0f * scale;
+    reach_rect_f32 constrained = app->bounds;
+    float left = (float)available.left + margin;
+    float top = (float)available.top + margin;
+    float width = (float)(available.right - available.left) - margin * 2.0f;
+    float height = (float)(available.bottom - available.top) - margin * 2.0f;
+    if (width <= 0.0f || height <= 0.0f)
+    {
+        left = (float)available.left;
+        top = (float)available.top;
+        width = (float)(available.right - available.left);
+        height = (float)(available.bottom - available.top);
+    }
+    if (constrained.width > width)
+    {
+        constrained.width = width;
+    }
+    if (constrained.height > height)
+    {
+        constrained.height = height;
+    }
+    if (constrained.x < left)
+    {
+        constrained.x = left;
+    }
+    if (constrained.y < top)
+    {
+        constrained.y = top;
+    }
+    if (constrained.x + constrained.width > left + width)
+    {
+        constrained.x = left + width - constrained.width;
+    }
+    if (constrained.y + constrained.height > top + height)
+    {
+        constrained.y = top + height - constrained.height;
+    }
+
+    app->bounds = constrained;
+    (void)app->window.ops.set_bounds(app->window.window, constrained);
 }
 
 static void reach_settings_apply_caption(reach_settings_app *app)
@@ -2475,6 +2571,45 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
     app->dirty = 1;
 }
 
+static reach_monitor_topology_result reach_settings_refresh_monitors(reach_settings_app *app)
+{
+    reach_monitor_topology_result result = reach_monitor_topology_refresh(&app->monitors);
+    if (result == REACH_MONITOR_TOPOLOGY_FAILED)
+    {
+        (void)reach_monitor_refresh_retry_defer(&app->monitor_refresh_retry);
+        return result;
+    }
+    reach_monitor_refresh_retry_reset(&app->monitor_refresh_retry);
+    return result;
+}
+
+static int32_t reach_settings_reconcile_topology_hint(reach_settings_app *app)
+{
+    reach_monitor_topology_result result = reach_settings_refresh_monitors(app);
+    if (result == REACH_MONITOR_TOPOLOGY_FAILED)
+    {
+        if (!app->monitor_refresh_retry.scheduled)
+        {
+            reach_monitor_topology_cancel(&app->monitor_topology);
+        }
+        return 0;
+    }
+    if (result == REACH_MONITOR_TOPOLOGY_CHANGED)
+    {
+        reach_monitor_topology_cancel(&app->monitor_topology);
+        return 1;
+    }
+    if (!app->monitor_topology.confirmation_attempted)
+    {
+        reach_monitor_topology_confirm_later(&app->monitor_topology);
+    }
+    else
+    {
+        reach_monitor_topology_cancel(&app->monitor_topology);
+    }
+    return 0;
+}
+
 static void reach_settings_handle_event(void *user, const reach_ui_event *event)
 {
     reach_settings_app *app = static_cast<reach_settings_app *>(user);
@@ -2573,6 +2708,14 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         app->dirty = 1;
     }
     else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
+             app->model.selected_page == REACH_SETTINGS_PAGE_DISPLAY && event->wheel_delta != 0)
+    {
+        reach_settings_model_scroll_display(
+            &app->model, event->wheel_delta > 0 ? -86.0f * reach_settings_app_scale(app)
+                                                : 86.0f * reach_settings_app_scale(app));
+        app->dirty = 1;
+    }
+    else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
              app->model.selected_page == REACH_SETTINGS_PAGE_WIFI && event->wheel_delta != 0)
     {
         reach_settings_model_scroll_wifi(&app->model, event->wheel_delta > 0
@@ -2589,13 +2732,34 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         app->dirty = 1;
     }
     else if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED ||
+             event->type == REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT ||
              event->type == REACH_UI_EVENT_WINDOW_BOUNDS_CHANGED)
     {
-        if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED && app->monitors.ops.refresh != nullptr)
+        if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED)
         {
-            (void)app->monitors.ops.refresh(app->monitors.list);
+            reach_monitor_topology_cancel(&app->monitor_topology);
+            reach_monitor_refresh_retry_reset(&app->monitor_refresh_retry);
+            (void)reach_settings_refresh_monitors(app);
+        }
+        else if (event->type == REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT)
+        {
+            if (app->monitor_refresh_retry.scheduled && !app->monitor_topology.hint_active)
+            {
+                return;
+            }
+            reach_monitor_topology_request(&app->monitor_topology);
+            reach_monitor_refresh_retry_reset(&app->monitor_refresh_retry);
+            if (!reach_settings_reconcile_topology_hint(app))
+            {
+                return;
+            }
         }
         reach_settings_refresh_bounds(app);
+        if (event->type == REACH_UI_EVENT_DISPLAY_CHANGED ||
+            event->type == REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT)
+        {
+            reach_settings_constrain_to_displays(app);
+        }
         reach_settings_refresh_layout(app);
         app->dirty = 1;
         if (reach_settings_render(app) == REACH_OK)
@@ -2765,6 +2929,21 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         return REACH_INVALID_ARGUMENT;
     }
+    if (reach_monitor_refresh_retry_due(&app->monitor_refresh_retry) ||
+        reach_monitor_topology_confirmation_due(&app->monitor_topology))
+    {
+        app->monitor_refresh_retry.scheduled = 0;
+        app->monitor_topology.confirmation_scheduled = 0;
+        int32_t redraw = app->monitor_topology.hint_active
+                             ? reach_settings_reconcile_topology_hint(app)
+                             : reach_settings_refresh_monitors(app) != REACH_MONITOR_TOPOLOGY_FAILED;
+        if (redraw)
+        {
+            reach_settings_refresh_bounds(app);
+            reach_settings_constrain_to_displays(app);
+            app->dirty = 1;
+        }
+    }
     reach_settings_apply_progress(app);
     reach_settings_apply_result(app);
     reach_settings_apply_reach_progress(app);
@@ -2799,6 +2978,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
         app->dirty = 1;
     }
     if (reach_settings_model_installed_apps_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_display_scroll(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -2901,6 +3084,14 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     {
         return 0;
     }
+    if (reach_monitor_refresh_retry_due(&app->monitor_refresh_retry))
+    {
+        return 1;
+    }
+    if (reach_monitor_topology_confirmation_due(&app->monitor_topology))
+    {
+        return 1;
+    }
     reach_settings_reach_worker *reach_worker =
         const_cast<reach_settings_reach_worker *>(&app->reach_worker);
     int32_t reach_busy = 0;
@@ -2925,6 +3116,7 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->model.startup_scrollbar.offset != app->model.startup_scrollbar.target ||
            app->model.installed_apps_scrollbar.offset !=
                app->model.installed_apps_scrollbar.target ||
+           app->model.display_scrollbar.offset != app->model.display_scrollbar.target ||
            app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
            reach_settings_model_startup_animations_active(&app->model) ||
            reach_settings_model_power_animations_active(&app->model) ||
@@ -2946,6 +3138,27 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_bluetooth_animations_active(&app->model) ||
            app->model.wifi_status == REACH_SETTINGS_WIFI_STATUS_SCANNING ||
            app->model.bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING;
+}
+
+uint32_t reach_settings_app_idle_wait_ms(const reach_settings_app *app)
+{
+    if (app == nullptr)
+    {
+        return INFINITE;
+    }
+    uint32_t wait_ms = app->monitor_refresh_retry.scheduled
+                           ? reach_monitor_refresh_retry_wait_ms(&app->monitor_refresh_retry)
+                           : INFINITE;
+    if (app->monitor_topology.confirmation_scheduled)
+    {
+        uint32_t confirmation_wait =
+            reach_monitor_topology_confirmation_wait_ms(&app->monitor_topology);
+        if (wait_ms == INFINITE || confirmation_wait < wait_ms)
+        {
+            wait_ms = confirmation_wait;
+        }
+    }
+    return wait_ms;
 }
 
 int32_t reach_settings_app_running(const reach_settings_app *app)

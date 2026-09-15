@@ -27,6 +27,7 @@ extern "C"
         int32_t window_list_open;
         size_t target_index;
         reach_rect_f32 bounds;
+        reach_rect_f32 item_viewport;
         reach_rect_f32 item_slots[REACH_CONTEXT_MENU_MAX_ITEMS];
         uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS];
         uint32_t item_icon_ids[REACH_CONTEXT_MENU_MAX_ITEMS];
@@ -36,6 +37,9 @@ extern "C"
         size_t hovered_index;
         size_t close_hovered_index;
         float dpi_scale;
+        float scroll_offset;
+        float scroll_max;
+        float item_height;
 
         int32_t anchored;
         int32_t drop_direction;

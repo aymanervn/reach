@@ -789,6 +789,7 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
     reach_quick_settings_set_bluetooth_pending(quick_settings, 0, 0);
     if (next_open)
     {
+        state->scroll_offset = 0.0f;
         reach_quick_settings_refresh_system(quick_settings, 0);
         reach_quick_settings_refresh_audio(quick_settings);
         reach_quick_settings_reset_height_animation(quick_settings);
@@ -831,6 +832,8 @@ void reach_quick_settings_reset(reach_quick_settings *quick_settings)
     state->content_bounds = {};
     state->output_devices_expansion = 0.0f;
     state->app_volumes_expansion = 0.0f;
+    state->scroll_offset = 0.0f;
+    state->scroll_max = 0.0f;
     state->layout = {};
     state->drag = {};
     reach_feature_transition_reset(&quick_settings->popup_transition);
@@ -977,6 +980,13 @@ reach_quick_settings_capsule_hit_test(reach_quick_settings *quick_settings, int3
         return hit;
     }
     const reach_quick_settings_state *state = &quick_settings->state;
+    if ((float)x < state->content_bounds.x ||
+        (float)x > state->content_bounds.x + state->content_bounds.width ||
+        (float)y < state->content_bounds.y ||
+        (float)y > state->content_bounds.y + state->content_bounds.height)
+    {
+        return hit;
+    }
     return reach_quick_settings_hit_test(&state->layout, &state->model, (float)x, (float)y);
 }
 
@@ -1276,6 +1286,26 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
         out->handled = 1;
         out->capture = -1;
         out->sync_pointer_subscriptions = 1;
+    }
+    if (event->kind == REACH_POINTER_EVENT_WHEEL && event->wheel_delta != 0 &&
+        quick_settings->state.scroll_max > 0.0f)
+    {
+        float scale = quick_settings->state.bounds.width > 0.0f
+                          ? quick_settings->state.bounds.width / 280.0f
+                          : 1.0f;
+        quick_settings->state.scroll_offset +=
+            event->wheel_delta > 0 ? -86.0f * scale : 86.0f * scale;
+        if (quick_settings->state.scroll_offset < 0.0f)
+        {
+            quick_settings->state.scroll_offset = 0.0f;
+        }
+        if (quick_settings->state.scroll_offset > quick_settings->state.scroll_max)
+        {
+            quick_settings->state.scroll_offset = quick_settings->state.scroll_max;
+        }
+        out->handled = 1;
+        out->redraw = 1;
+        out->relayout = 1;
     }
 }
 
@@ -1651,9 +1681,23 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
         quick_settings, REACH_QUICK_SETTINGS_ANIMATION_APP_VOLUMES_EXPANSION);
     state->output_devices_expansion = output_devices_expansion;
     state->app_volumes_expansion = app_volumes_expansion;
+    float content_height = reach_quick_settings_content_height_for_expansion_scaled(
+        &state->model, output_devices_expansion, app_volumes_expansion, ctx->dpi_scale);
+    state->scroll_max = content_height - state->content_bounds.height;
+    if (state->scroll_max < 0.0f)
+    {
+        state->scroll_max = 0.0f;
+    }
+    if (state->scroll_offset > state->scroll_max)
+    {
+        state->scroll_offset = state->scroll_max;
+    }
+    reach_rect_f32 layout_bounds = state->content_bounds;
+    layout_bounds.y -= state->scroll_offset;
+    layout_bounds.height = content_height;
     state->layout = reach_quick_settings_layout_for_expansion_scaled(
-        state->content_bounds, ctx->theme, &state->model, output_devices_expansion,
-        app_volumes_expansion, ctx->dpi_scale);
+        layout_bounds, ctx->theme, &state->model, output_devices_expansion, app_volumes_expansion,
+        ctx->dpi_scale);
 }
 
 void reach_quick_settings_relayout(reach_quick_settings *quick_settings,

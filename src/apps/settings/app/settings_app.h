@@ -18,6 +18,7 @@ extern "C"
     reach_result reach_settings_app_dispatch_events(reach_settings_app *app);
     int32_t reach_settings_app_has_pending_events(const reach_settings_app *app);
     int32_t reach_settings_app_needs_frame(const reach_settings_app *app);
+    uint32_t reach_settings_app_idle_wait_ms(const reach_settings_app *app);
     int32_t reach_settings_app_running(const reach_settings_app *app);
     void reach_settings_app_activate(reach_settings_app *app);
     void reach_settings_app_destroy(reach_settings_app *app);

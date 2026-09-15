@@ -152,14 +152,22 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
         return REACH_OK;
     }
 
+    reach_system_hud_render_context scaled_context = *ctx;
+    if (state->content_scale > 0.0f)
+    {
+        scaled_context.dpi_scale = state->content_scale;
+    }
+    const reach_system_hud_render_context *render_ctx = &scaled_context;
+
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = {0.0f, 0.0f, state->layout.bounds.width, state->layout.bounds.height};
     shape.radius = shape.rect.height * 0.5f;
     reach_result result = reach_render_push_bordered_background(
-        out_commands, &shape, ctx->theme->system_hud_background, ctx->theme->system_hud_border,
-        reach_theme_border_thickness(ctx->theme, ctx->dpi_scale), &ctx->theme->popup_shadow,
-        ctx->dpi_scale);
+        out_commands, &shape, render_ctx->theme->system_hud_background,
+        render_ctx->theme->system_hud_border,
+        reach_theme_border_thickness(render_ctx->theme, render_ctx->dpi_scale),
+        &render_ctx->theme->popup_shadow, render_ctx->dpi_scale);
     if (result != REACH_OK)
     {
         return result;
@@ -167,7 +175,7 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
 
     if (state->kind == REACH_SYSTEM_HUD_MEDIA)
     {
-        result = reach_system_hud_render_media(state, ctx, out_commands);
+        result = reach_system_hud_render_media(state, render_ctx, out_commands);
         if (result != REACH_OK)
         {
             return result;
@@ -175,7 +183,7 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
     }
     else
     {
-        reach_system_hud_render_level(state, ctx, out_commands);
+        reach_system_hud_render_level(state, render_ctx, out_commands);
     }
     reach_render_command_buffer_multiply_opacity(out_commands, reach_system_hud_opacity(hud));
     return REACH_OK;

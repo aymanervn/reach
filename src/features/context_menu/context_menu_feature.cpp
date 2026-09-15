@@ -220,6 +220,8 @@ void reach_context_menu_reset(reach_context_menu *menu)
     menu->state.hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     menu->state.close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     menu->state.item_count = 0;
+    menu->state.scroll_offset = 0.0f;
+    menu->state.scroll_max = 0.0f;
     for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
     {
         menu->state.item_icon_ids[index] = 0;
@@ -312,8 +314,7 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     float popup_body_height = padding * 2.0f + item_height * (float)state->item_count;
     float popup_height = popup_body_height + notch_height + border_thickness * 2.0f;
 
-    float popup_x;
-    float popup_y;
+    reach_rect_f32 placed = {};
     if (ctx->anchored)
     {
         reach_popup_anchor anchor = {};
@@ -324,25 +325,48 @@ static void reach_context_menu_place(reach_context_menu_state *state,
 
         reach_popup_placement placement =
             reach_popup_place(&anchor, popup_width, popup_height, margin);
-        popup_x = placement.bounds.x;
-        popup_y = placement.bounds.y;
+        placed = placement.bounds;
         state->notch_anchor_x = placement.notch_anchor_x;
     }
     else
     {
-        popup_x = ctx->pointer_x - popup_width * anchor_ratio;
-        popup_y = ctx->pointer_y - popup_height;
+        placed = {ctx->pointer_x - popup_width * anchor_ratio, ctx->pointer_y - popup_height,
+                  popup_width, popup_height};
+        placed = reach_popup_constrain_bounds(placed, ctx->monitor, margin);
         state->notch_anchor_x = ctx->pointer_x;
     }
 
-    state->bounds = {popup_x, popup_y, popup_width, popup_height};
+    state->bounds = placed;
     float items_y = border_thickness + padding +
                     (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
+    float items_bottom = state->bounds.height - border_thickness - padding -
+                         (ctx->drop_direction == REACH_POPUP_DROP_UP ? notch_height : 0.0f);
+    state->item_viewport = {border_thickness + padding, items_y,
+                            state->bounds.width - border_thickness * 2.0f - padding * 2.0f,
+                            items_bottom - items_y};
+    if (state->item_viewport.width < 0.0f)
+    {
+        state->item_viewport.width = 0.0f;
+    }
+    if (state->item_viewport.height < 0.0f)
+    {
+        state->item_viewport.height = 0.0f;
+    }
+    state->item_height = item_height;
+    state->scroll_max = item_height * (float)state->item_count - state->item_viewport.height;
+    if (state->scroll_max < 0.0f)
+    {
+        state->scroll_max = 0.0f;
+    }
+    if (state->scroll_offset > state->scroll_max)
+    {
+        state->scroll_offset = state->scroll_max;
+    }
     for (size_t index = 0; index < state->item_count; ++index)
     {
         state->item_slots[index] = {border_thickness + padding,
-                                    items_y + item_height * (float)index,
-                                    popup_content_width - padding * 2.0f, item_height};
+                                    items_y + item_height * (float)index - state->scroll_offset,
+                                    state->item_viewport.width, item_height};
     }
 }
 
@@ -400,6 +424,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
         return;
     }
     reach_context_menu_state *state = &menu->state;
+    state->scroll_offset = 0.0f;
     reach_context_menu_build_power_commands(state->item_commands, state->item_icon_ids,
                                             &state->item_count);
     state->power_open = 1;
@@ -510,6 +535,7 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
         return;
     }
     reach_context_menu_state *state = &menu->state;
+    state->scroll_offset = 0.0f;
     state->item_count = ctx->item_count < REACH_CONTEXT_MENU_MAX_ITEMS
                             ? ctx->item_count
                             : REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -547,6 +573,7 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
         return;
     }
     reach_context_menu_state *state = &menu->state;
+    state->scroll_offset = 0.0f;
     menu->request = ctx->request != nullptr ? *ctx->request : reach_menu_request{};
     menu->hover_margin = REACH_CONTEXT_MENU_HOVER_MARGIN * ctx->dpi_scale;
     state->item_count = ctx->window_entry_count < REACH_CONTEXT_MENU_MAX_ITEMS
@@ -610,6 +637,20 @@ size_t reach_context_menu_window_list_remove(reach_context_menu *menu, uintptr_t
     --state->item_count;
     state->item_windows[state->item_count] = 0;
     state->item_titles[state->item_count][0] = 0;
+    state->scroll_max = state->item_height * (float)state->item_count - state->item_viewport.height;
+    if (state->scroll_max < 0.0f)
+    {
+        state->scroll_max = 0.0f;
+    }
+    if (state->scroll_offset > state->scroll_max)
+    {
+        float moved = state->scroll_max - state->scroll_offset;
+        state->scroll_offset = state->scroll_max;
+        for (size_t index = 0; index < state->item_count; ++index)
+        {
+            state->item_slots[index].y -= moved;
+        }
+    }
 
     state->hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
     state->close_hovered_index = REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -684,6 +725,15 @@ static int32_t reach_context_menu_point_in_bounds(const reach_context_menu_state
            (float)y <= state->bounds.height;
 }
 
+static int32_t reach_context_menu_point_in_item_viewport(const reach_context_menu_state *state,
+                                                         int32_t x, int32_t y)
+{
+    return state != nullptr && (float)x >= state->item_viewport.x &&
+           (float)x <= state->item_viewport.x + state->item_viewport.width &&
+           (float)y >= state->item_viewport.y &&
+           (float)y <= state->item_viewport.y + state->item_viewport.height;
+}
+
 static uint64_t reach_context_menu_pressable_target(const reach_context_menu *menu, int32_t x,
                                                     int32_t y, reach_pointer_button button)
 {
@@ -697,7 +747,8 @@ static uint64_t reach_context_menu_pressable_target(const reach_context_menu *me
                    ? ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND << 32)
                    : REACH_PRESSABLE_TARGET_NONE;
     }
-    if (menu->state.window_list_open)
+    if (menu->state.window_list_open &&
+        reach_context_menu_point_in_item_viewport(&menu->state, x, y))
     {
         reach_context_menu_hit_result close_hit =
             reach_context_menu_hit_test_close_buttons(&menu->state, x, y);
@@ -706,8 +757,12 @@ static uint64_t reach_context_menu_pressable_target(const reach_context_menu *me
             return ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_CLOSE << 32) | close_hit.index;
         }
     }
-    reach_context_menu_hit_result hit =
-        reach_context_menu_hit_test_items(menu->state.item_slots, menu->state.item_count, x, y);
+    reach_context_menu_hit_result hit = {};
+    if (reach_context_menu_point_in_item_viewport(&menu->state, x, y))
+    {
+        hit =
+            reach_context_menu_hit_test_items(menu->state.item_slots, menu->state.item_count, x, y);
+    }
     if (hit.hit)
     {
         return ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_ITEM << 32) | hit.index;
@@ -883,11 +938,18 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
                                                 reach_pressable_button(&menu->pressable)),
             &pressable_result);
         reach_context_menu_apply_pressable_result(&pressable_result, out);
-        reach_context_menu_hit_result hit = reach_context_menu_hit_test_items(
-            menu->state.item_slots, menu->state.item_count, event->x, event->y);
+        reach_context_menu_hit_result hit = {};
+        if (reach_context_menu_point_in_item_viewport(&menu->state, event->x, event->y))
+        {
+            hit = reach_context_menu_hit_test_items(menu->state.item_slots, menu->state.item_count,
+                                                    event->x, event->y);
+        }
         size_t hovered = hit.hit ? hit.index : REACH_CONTEXT_MENU_MAX_ITEMS;
-        reach_context_menu_hit_result close_hit =
-            reach_context_menu_hit_test_close_buttons(&menu->state, event->x, event->y);
+        reach_context_menu_hit_result close_hit = {};
+        if (reach_context_menu_point_in_item_viewport(&menu->state, event->x, event->y))
+        {
+            close_hit = reach_context_menu_hit_test_close_buttons(&menu->state, event->x, event->y);
+        }
         out->handled = 1;
         out->redraw |= reach_context_menu_set_hovered(menu, hovered);
         out->redraw |= reach_context_menu_set_close_hovered(
@@ -916,6 +978,34 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     }
 
     case REACH_POINTER_EVENT_WHEEL:
+    {
+        if (menu->state.scroll_max <= 0.0f || event->wheel_delta == 0)
+        {
+            break;
+        }
+        float previous = menu->state.scroll_offset;
+        float delta = menu->state.item_height * 3.0f;
+        menu->state.scroll_offset += event->wheel_delta > 0 ? -delta : delta;
+        if (menu->state.scroll_offset < 0.0f)
+        {
+            menu->state.scroll_offset = 0.0f;
+        }
+        if (menu->state.scroll_offset > menu->state.scroll_max)
+        {
+            menu->state.scroll_offset = menu->state.scroll_max;
+        }
+        float moved = menu->state.scroll_offset - previous;
+        if (moved != 0.0f)
+        {
+            for (size_t index = 0; index < menu->state.item_count; ++index)
+            {
+                menu->state.item_slots[index].y -= moved;
+            }
+            out->redraw = 1;
+        }
+        out->handled = 1;
+        break;
+    }
     default:
         break;
     }

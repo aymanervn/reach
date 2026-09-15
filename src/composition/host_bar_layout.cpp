@@ -261,10 +261,18 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     return result.animated_bounds;
 }
 
+static void reach_host_defer_monitor_refresh(reach_host *host)
+{
+    if (!reach_monitor_refresh_retry_defer(&host->monitor_refresh_retry))
+    {
+        host->dirty.monitors = 0;
+        reach_monitor_topology_cancel(&host->monitor_topology);
+    }
+}
+
 reach_result reach_host_refresh_monitor_layout(reach_host *host)
 {
-    if (host == nullptr || !host->dirty.monitors || host->monitors.list == nullptr ||
-        host->wallpaper_surface.ops.set_bounds == nullptr)
+    if (host == nullptr || !host->dirty.monitors || host->monitors.list == nullptr)
     {
         return REACH_OK;
     }
@@ -275,19 +283,61 @@ reach_result reach_host_refresh_monitor_layout(reach_host *host)
         return REACH_OK;
     }
 
-    (void)host->monitors.ops.refresh(host->monitors.list);
-    reach_host_notify_display_changed(host);
+    if (host->monitor_refresh_retry.scheduled &&
+        !reach_monitor_refresh_retry_due(&host->monitor_refresh_retry))
+    {
+        return REACH_OK;
+    }
+    if (host->monitor_topology.confirmation_scheduled &&
+        !reach_monitor_topology_confirmation_due(&host->monitor_topology))
+    {
+        return REACH_OK;
+    }
+    host->monitor_refresh_retry.scheduled = 0;
+    host->monitor_topology.confirmation_scheduled = 0;
+
+    reach_monitor_topology_result topology_result =
+        reach_monitor_topology_refresh(&host->monitors);
+    if (topology_result == REACH_MONITOR_TOPOLOGY_FAILED)
+    {
+        reach_host_defer_monitor_refresh(host);
+        return REACH_OK;
+    }
     size_t monitor_count = host->monitors.ops.count(host->monitors.list);
     if (monitor_count == 0)
     {
-        host->dirty.monitors = 0;
+        reach_host_defer_monitor_refresh(host);
         return REACH_OK;
     }
+
+    if (host->monitor_topology.hint_active)
+    {
+        if (topology_result == REACH_MONITOR_TOPOLOGY_UNCHANGED)
+        {
+            reach_monitor_refresh_retry_reset(&host->monitor_refresh_retry);
+            if (!host->monitor_topology.confirmation_attempted)
+            {
+                reach_monitor_topology_confirm_later(&host->monitor_topology);
+            }
+            else
+            {
+                host->dirty.monitors = 0;
+                reach_monitor_topology_cancel(&host->monitor_topology);
+            }
+            return REACH_OK;
+        }
+        reach_host_invalidate_display_geometry(host);
+    }
+    else if (host->monitor_refresh_retry.failures > 0)
+    {
+        reach_host_invalidate_display_geometry(host);
+    }
+
+    reach_host_notify_display_changed(host);
 
     const reach_monitor_info *monitor = host->monitors.ops.get(host->monitors.list, 0);
     if (monitor == nullptr)
     {
-        host->dirty.monitors = 0;
         return REACH_OK;
     }
 
@@ -317,14 +367,18 @@ reach_result reach_host_refresh_monitor_layout(reach_host *host)
     wallpaper_bounds.y = (float)top;
     wallpaper_bounds.width = (float)(right - left);
     wallpaper_bounds.height = (float)(bottom - top);
-    reach_result wallpaper_bounds_result =
-        reach_wallpaper_set_bounds(host->wallpaper, wallpaper_bounds);
-    if (wallpaper_bounds_result != REACH_OK)
+    if (host->wallpaper_surface.ops.set_bounds != nullptr)
     {
-        return wallpaper_bounds_result;
+        reach_result wallpaper_bounds_result =
+            reach_wallpaper_set_bounds(host->wallpaper, wallpaper_bounds);
+        if (wallpaper_bounds_result != REACH_OK)
+        {
+            return wallpaper_bounds_result;
+        }
     }
 
     host->dirty.monitors = 0;
+    reach_monitor_refresh_retry_reset(&host->monitor_refresh_retry);
     return REACH_OK;
 }
 

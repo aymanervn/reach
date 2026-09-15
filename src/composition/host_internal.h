@@ -22,6 +22,8 @@
 #include "reach/services/icon_service.h"
 #include "reach/services/idle_watch.h"
 #include "reach/services/now_playing.h"
+#include "reach/services/monitor_refresh_retry.h"
+#include "reach/services/monitor_topology.h"
 #include "reach/services/search.h"
 #include "reach/services/tray.h"
 #include "reach/services/clock.h"
@@ -506,6 +508,7 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
 int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask);
 int32_t reach_host_any_surface_dirty(const reach_host *host);
 void reach_host_mark_all_surfaces_dirty(reach_host *host);
+void reach_host_invalidate_display_geometry(reach_host *host);
 
 #define REACH_SURFACE_ORIGIN_NONE REACH_HOST_SURFACE_COUNT
 
@@ -603,6 +606,8 @@ struct reach_host
     float layout_dpi_scale;
     int32_t has_layout;
     reach_host_dirty_state dirty;
+    reach_monitor_refresh_retry monitor_refresh_retry;
+    reach_monitor_topology monitor_topology;
     reach_config_service *config_service;
     reach_wallpaper *wallpaper;
     reach_host_window_manipulation_state window_manipulation;
@@ -769,6 +774,7 @@ reach_result reach_host_set_pinned_apps(reach_host *host, const reach_pinned_app
 reach_result reach_host_close_window(reach_host *host, uintptr_t window_id);
 
 int32_t reach_host_icon_size_px(const reach_host *host);
+int32_t reach_host_icon_size_px_for_scale(float dpi_scale);
 
 void reach_host_release_render_icon(reach_host *host, uint64_t icon_id);
 

@@ -120,6 +120,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         hover_opacity = 1.0f;
     }
 
+    reach_render_command_buffer_set_scissor(out_commands, input->item_viewport);
+
     for (size_t index = 0; index < input->item_count; ++index)
     {
         reach_rect_f32 item = input->item_slots[index];
@@ -190,6 +192,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         }
     }
 
+    reach_render_command_buffer_clear_scissor(out_commands);
+
     return REACH_OK;
 }
 
@@ -207,6 +211,7 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     reach_context_menu_render_input input = {};
     input.theme = ctx->theme;
     input.bounds = state->bounds;
+    input.item_viewport = state->item_viewport;
     input.item_slots = state->item_slots;
     input.item_commands = state->item_commands;
     input.item_icon_ids = state->item_icon_ids;

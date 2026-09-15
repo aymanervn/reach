@@ -565,7 +565,8 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float download_advance = 0.0f;
     float upload_advance = 0.0f;
     float stats_width = 0.0f;
-    if (top_bar->state.stats_valid)
+    int32_t show_stats = top_bar->state.stats_valid;
+    if (show_stats)
     {
         cpu_advance = reach_top_bar_stats_slot_advance(
             &ctx->text_measure, top_bar->state.stats_cpu_text, (const uint16_t *)L"CPU 100%",
@@ -618,6 +619,90 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         top_bar, REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH, &top_bar->quick_settings_target_width,
         quick_settings_padding * 2.0f + quick_settings_content);
 
+    float responsive_budget =
+        layout->bounds.width - edge_inset * 2.0f - button_size - pill_gap * 3.0f;
+    if (power_clock_width + quick_settings_button_width + stats_width + language_width +
+            language_gap + battery_width + battery_gap + padding + button_size >
+        responsive_budget)
+    {
+        show_stats = 0;
+        stats_width = 0.0f;
+        cpu_advance = 0.0f;
+        memory_advance = 0.0f;
+        download_advance = 0.0f;
+        upload_advance = 0.0f;
+    }
+    if (power_clock_width + quick_settings_button_width + language_width + language_gap +
+            battery_width + battery_gap + padding + button_size >
+        responsive_budget)
+    {
+        network_name_advance = 0.0f;
+        quick_settings_content = glyph_size;
+        if (top_bar->state.bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
+        {
+            quick_settings_content += quick_settings_content_gap + glyph_size;
+        }
+        if (volume_advance > 0.0f)
+        {
+            quick_settings_content += quick_settings_content_gap + volume_advance;
+        }
+        quick_settings_button_width = quick_settings_padding * 2.0f + quick_settings_content;
+        top_bar->quick_settings_target_width = quick_settings_button_width;
+        reach_animation_manager_set(&top_bar->manager, REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
+                                    quick_settings_button_width);
+    }
+    if (power_clock_width + quick_settings_button_width + language_width + language_gap +
+            battery_width + battery_gap + padding + button_size >
+        responsive_budget)
+    {
+        language_width = 0.0f;
+        language_gap = 0.0f;
+    }
+    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding +
+            button_size >
+        responsive_budget)
+    {
+        volume_advance = 0.0f;
+        quick_settings_content = glyph_size;
+        if (top_bar->state.bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
+        {
+            quick_settings_content += quick_settings_content_gap + glyph_size;
+        }
+        quick_settings_button_width = quick_settings_padding * 2.0f + quick_settings_content;
+        top_bar->quick_settings_target_width = quick_settings_button_width;
+        reach_animation_manager_set(&top_bar->manager, REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
+                                    quick_settings_button_width);
+    }
+    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding +
+                button_size >
+            responsive_budget &&
+        now_playing_width > 0.0f)
+    {
+        power_clock_width -= now_playing_width + dot_gap * 2.0f + dot_size;
+        now_playing_width = 0.0f;
+        top_bar->now_playing_target_width = 0.0f;
+        reach_animation_manager_set(&top_bar->manager, REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH, 0.0f);
+        layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK].width = power_clock_width;
+        layout->now_playing = {};
+        layout->now_playing_separator = {};
+    }
+    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding +
+            button_size >
+        responsive_budget)
+    {
+        battery_width = 0.0f;
+        battery_gap = 0.0f;
+    }
+    if (power_clock_width + quick_settings_button_width + padding + button_size >
+            responsive_budget &&
+        date_advance > 0.0f)
+    {
+        power_clock_width -= date_advance + clock_gap;
+        date_advance = 0.0f;
+        layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK].width = power_clock_width;
+        layout->clock_date = {};
+    }
+
     float quick_settings_width = border_thickness + dot_size * 0.5f + dot_gap + stats_width +
                                  language_width + language_gap + battery_width + battery_gap +
                                  quick_settings_button_width + pill_gap + button_size + padding;
@@ -629,7 +714,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     float cluster_x =
         layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x + dot_size * 0.5f + dot_gap;
-    if (top_bar->state.stats_valid)
+    if (show_stats)
     {
         layout->stats_cpu = reach_top_bar_text_run(cluster_x, height, cpu_advance);
         cluster_x += cpu_advance + stats_gap;
@@ -686,10 +771,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     reach_top_bar_sync_tray_items(top_bar);
     const float tray_slot = height * metrics.tray_icon_scale;
     const float tray_gap = metrics.tray_icon_gap * scale;
-    const size_t tray_count = top_bar->state.tray_item_count;
-    const size_t tray_cells = tray_count + (top_bar->state.tray_overflow ? 1u : 0u);
-    const float tray_background_padding =
-        tray_cells > 0 ? metrics.tray_background_padding * scale : 0.0f;
+    size_t tray_count = top_bar->state.tray_item_count;
+    size_t tray_cells = tray_count + (top_bar->state.tray_overflow ? 1u : 0u);
+    float tray_background_padding = tray_cells > 0 ? metrics.tray_background_padding * scale : 0.0f;
     const float tray_background_height = height * metrics.tray_background_scale;
     const float tray_background_top_inset = (height - tray_background_height) * 0.5f;
     float tray_cells_span =
@@ -699,8 +783,31 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     float tray_target_width = border_thickness + tray_edge_inset + tray_background_padding * 2.0f +
                               tray_cells_span + dot_gap + dot_size * 0.5f;
+    int32_t compact_tray = 0;
+    float tray_available_width =
+        right - (layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK].x +
+                 layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK].width + pill_gap);
+    if (tray_target_width > tray_available_width && top_bar->tray_order_count > 0)
+    {
+        tray_count = 0;
+        tray_cells = 1;
+        top_bar->state.tray_item_count = 0;
+        top_bar->state.tray_overflow = 1;
+        compact_tray = 1;
+        tray_background_padding = metrics.tray_background_padding * scale;
+        tray_cells_span = tray_slot;
+        tray_target_width = border_thickness + tray_edge_inset + tray_background_padding * 2.0f +
+                            tray_cells_span + dot_gap + dot_size * 0.5f;
+    }
     float tray_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_TRAY_WIDTH, &top_bar->tray_target_width, tray_target_width);
+    if (compact_tray)
+    {
+        tray_width = tray_target_width;
+        top_bar->tray_target_width = tray_target_width;
+        reach_animation_manager_set(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_WIDTH,
+                                    tray_target_width);
+    }
     layout->pills[REACH_TOP_BAR_PILL_TRAY] =
         reach_top_bar_rect(right - tray_width, 0.0f, tray_width, height);
 
@@ -745,12 +852,37 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     {
         current_app_target = current_app_max_width;
     }
+    float current_app_left = layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK].x +
+                             layout->pills[REACH_TOP_BAR_PILL_POWER_CLOCK].width + pill_gap;
+    float current_app_right = layout->pills[REACH_TOP_BAR_PILL_TRAY].x - pill_gap;
+    float current_app_available = current_app_right - current_app_left;
+    if (current_app_available < 0.0f)
+    {
+        current_app_available = 0.0f;
+    }
+    if (current_app_target > current_app_available)
+    {
+        current_app_target = current_app_available;
+    }
     float current_app_width = reach_top_bar_resolve_animated_width(
         top_bar, REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH, &top_bar->current_app_target_width,
         current_app_target);
 
-    layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP] = reach_top_bar_rect(
-        (layout->bounds.width - current_app_width) * 0.5f, 0.0f, current_app_width, height);
+    if (current_app_width > current_app_available)
+    {
+        current_app_width = current_app_available;
+    }
+    float current_app_x = (layout->bounds.width - current_app_width) * 0.5f;
+    if (current_app_x < current_app_left)
+    {
+        current_app_x = current_app_left;
+    }
+    if (current_app_x + current_app_width > current_app_right)
+    {
+        current_app_x = current_app_right - current_app_width;
+    }
+    layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP] =
+        reach_top_bar_rect(current_app_x, 0.0f, current_app_width, height);
 
     reach_rect_f32 current_app = layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP];
     float current_app_text_x = current_app.x + border_thickness + padding;

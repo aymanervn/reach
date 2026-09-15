@@ -6,10 +6,10 @@
 
 static const float REACH_HOST_ICON_BASE_SIZE_PX = 154.0f;
 
-int32_t reach_host_icon_size_px(const reach_host *host)
+int32_t reach_host_icon_size_px_for_scale(float dpi_scale)
 {
     int32_t requested =
-        (int32_t)ceilf(REACH_HOST_ICON_BASE_SIZE_PX * reach_host_layout_dpi_scale(host));
+        (int32_t)ceilf(REACH_HOST_ICON_BASE_SIZE_PX * (dpi_scale > 0.0f ? dpi_scale : 1.0f));
     if (requested < 128)
     {
         requested = 128;
@@ -20,6 +20,11 @@ int32_t reach_host_icon_size_px(const reach_host *host)
     }
 
     return requested;
+}
+
+int32_t reach_host_icon_size_px(const reach_host *host)
+{
+    return reach_host_icon_size_px_for_scale(reach_host_layout_dpi_scale(host));
 }
 
 void reach_host_request_update(reach_host *host)
@@ -234,6 +239,12 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         reach_host_apply_foreground_change(host);
     }
 
+    reach_result monitor_result = reach_host_refresh_monitor_layout(host);
+    if (monitor_result != REACH_OK)
+    {
+        return monitor_result;
+    }
+
     (void)reach_host_update_game_mode(host);
     if (reach_host_game_mode_enabled(host))
     {
@@ -272,12 +283,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     {
         host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
         host->dirty.layout = 1;
-    }
-
-    reach_result monitor_result = reach_host_refresh_monitor_layout(host);
-    if (monitor_result != REACH_OK)
-    {
-        return monitor_result;
     }
 
     if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.set_bounds != nullptr &&
@@ -398,6 +403,15 @@ int32_t reach_host_needs_frame(const reach_host *host)
         return 0;
     }
 
+    if (reach_monitor_refresh_retry_due(&host->monitor_refresh_retry))
+    {
+        return 1;
+    }
+    if (reach_monitor_topology_confirmation_due(&host->monitor_topology))
+    {
+        return 1;
+    }
+
     int32_t window_manager_needs_refresh =
         host->window_manager.manager != nullptr &&
         host->window_manager.ops.needs_refresh != nullptr &&
@@ -451,6 +465,32 @@ uint32_t reach_host_idle_wait_ms(const reach_host *host)
     if (host == nullptr)
     {
         return REACH_CLOCK_WAIT_FOREVER;
+    }
+
+    if (host->monitor_refresh_retry.scheduled ||
+        host->monitor_topology.confirmation_scheduled)
+    {
+        uint32_t retry_wait = REACH_CLOCK_WAIT_FOREVER;
+        if (host->monitor_refresh_retry.scheduled)
+        {
+            retry_wait = reach_monitor_refresh_retry_wait_ms(&host->monitor_refresh_retry);
+        }
+        if (host->monitor_topology.confirmation_scheduled)
+        {
+            uint32_t confirmation_wait = reach_monitor_topology_confirmation_wait_ms(
+                &host->monitor_topology);
+            if (retry_wait == REACH_CLOCK_WAIT_FOREVER || confirmation_wait < retry_wait)
+            {
+                retry_wait = confirmation_wait;
+            }
+        }
+        if (reach_host_game_mode_enabled(host))
+        {
+            return retry_wait;
+        }
+        uint32_t clock_wait = reach_clock_next_minute_delay_ms(host->clock);
+        return clock_wait == REACH_CLOCK_WAIT_FOREVER || retry_wait < clock_wait ? retry_wait
+                                                                                : clock_wait;
     }
     if (reach_host_game_mode_enabled(host))
     {

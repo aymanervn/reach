@@ -29,6 +29,7 @@ extern "C"
         size_t window_count;
         size_t selected_index;
         size_t visible_start;
+        size_t visible_capacity;
     } reach_switcher_model;
 
     typedef struct reach_switcher_render_item
@@ -68,6 +69,8 @@ extern "C"
         size_t visible_start;
         uintptr_t windows[REACH_MAX_OPEN_WINDOWS];
         size_t window_count;
+        size_t visible_capacity;
+        float content_scale;
     } reach_switcher_state;
 
     typedef struct reach_switcher reach_switcher;

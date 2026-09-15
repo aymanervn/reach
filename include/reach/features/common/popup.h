@@ -36,6 +36,8 @@ extern "C"
 
     reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float width,
                                             float height, float margin);
+    reach_rect_f32 reach_popup_constrain_bounds(reach_rect_f32 bounds, reach_rect_f32 monitor,
+                                                float margin);
 
     typedef struct reach_popup_background_input
     {

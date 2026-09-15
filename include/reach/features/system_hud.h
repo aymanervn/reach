@@ -45,6 +45,7 @@ extern "C"
         reach_brightness_state brightness;
         reach_now_playing_snapshot media;
         reach_now_playing_action media_action;
+        float content_scale;
         double visible_seconds;
     } reach_system_hud_state;
 

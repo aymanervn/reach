@@ -3,6 +3,7 @@
 #include "reach/core/typography.h"
 
 #include <dwmapi.h>
+#include <dbt.h>
 #include <windows.h>
 #include <windowsx.h>
 
@@ -274,10 +275,36 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return 0;
     }
-    case WM_DEVICECHANGE:
-    case WM_SETTINGCHANGE:
     case WM_POWERBROADCAST:
         reach_windows_request_desktop_environment_sync();
+        if (window != nullptr &&
+            (wparam == PBT_APMRESUMEAUTOMATIC || wparam == PBT_APMRESUMESUSPEND ||
+             wparam == PBT_APMRESUMECRITICAL))
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_DISPLAY_CHANGED;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_DEVICECHANGE:
+        reach_windows_request_desktop_environment_sync();
+        if (window != nullptr &&
+            (wparam == DBT_DEVNODES_CHANGED || wparam == DBT_CONFIGCHANGED))
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT;
+            reach_platform_window_queue_event(window, &event);
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_SETTINGCHANGE:
+        reach_windows_request_desktop_environment_sync();
+        if (window != nullptr)
+        {
+            reach_ui_event event = {};
+            event.type = wparam == SPI_SETWORKAREA ? REACH_UI_EVENT_DISPLAY_CHANGED
+                                                   : REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT;
+            reach_platform_window_queue_event(window, &event);
+        }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_KEYDOWN:
         if (window != nullptr)
@@ -790,6 +817,16 @@ static reach_result reach_platform_window_get_bounds(const reach_platform_window
     return REACH_OK;
 }
 
+static float reach_platform_window_dpi_scale(const reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr)
+    {
+        return 1.0f;
+    }
+    UINT dpi = GetDpiForWindow(window->hwnd);
+    return dpi > 0 ? (float)dpi / 96.0f : 1.0f;
+}
+
 static reach_result reach_platform_window_set_blur_enabled(reach_platform_window *window,
                                                            int32_t enabled)
 {
@@ -931,6 +968,17 @@ static int32_t reach_platform_window_queue_event(reach_platform_window *window,
     {
         window->pending_events[window->pending_event_count - 1] = *event;
         return 1;
+    }
+
+    if (event->type == REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT)
+    {
+        for (size_t index = 0; index < window->pending_event_count; ++index)
+        {
+            if (window->pending_events[index].type == event->type)
+            {
+                return 1;
+            }
+        }
     }
 
     if (window->pending_event_count < REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS)
@@ -1128,6 +1176,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.hide = reach_platform_window_hide;
     out_port->ops.set_bounds = reach_platform_window_set_bounds;
     out_port->ops.get_bounds = reach_platform_window_get_bounds;
+    out_port->ops.dpi_scale = reach_platform_window_dpi_scale;
     out_port->ops.set_blur_enabled = reach_platform_window_set_blur_enabled;
     out_port->ops.set_caption = reach_platform_window_set_caption;
     out_port->ops.set_event_callback = reach_platform_window_set_event_callback;

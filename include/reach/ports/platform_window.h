@@ -49,6 +49,7 @@ extern "C"
         reach_result (*hide)(reach_platform_window *window);
         reach_result (*set_bounds)(reach_platform_window *window, reach_rect_f32 bounds);
         reach_result (*get_bounds)(const reach_platform_window *window, reach_rect_f32 *out_bounds);
+        float (*dpi_scale)(const reach_platform_window *window);
         reach_result (*set_blur_enabled)(reach_platform_window *window, int32_t enabled);
         reach_result (*set_caption)(reach_platform_window *window,
                                     const reach_platform_window_caption *caption);

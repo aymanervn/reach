@@ -48,6 +48,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     visible_model.window_count = state->window_count;
     visible_model.selected_index = state->selected_index;
     visible_model.visible_start = state->visible_start;
+    visible_model.visible_capacity = state->visible_capacity;
     reach_switcher_update_visible_start(&visible_model);
     state->visible_start = visible_model.visible_start;
 
@@ -77,7 +78,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     input.model = &visible_model;
     input.items = items;
     input.item_count = state->window_count;
-    input.dpi_scale = ctx->dpi_scale;
+    input.dpi_scale = state->content_scale > 0.0f ? state->content_scale : ctx->dpi_scale;
     input.text_measure = ctx->text_measure;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     input.text_weight_demi_bold = REACH_TEXT_WEIGHT_DEMIBOLD;
@@ -111,7 +112,10 @@ reach_result reach_switcher_build_render_commands(const reach_switcher_render_in
     float label_text_size = reach_switcher_input_scale(input, REACH_TEXT_SIZE_MEDIUM);
     const reach_theme *theme = input->theme;
     float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
-    size_t visible_count = reach_switcher_visible_count(input->model->window_count);
+    size_t visible_count = input->model->visible_capacity > 0 &&
+                                   input->model->window_count > input->model->visible_capacity
+                               ? input->model->visible_capacity
+                               : reach_switcher_visible_count(input->model->window_count);
 
     float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
     reach_rect_f32 content_bounds = reach_theme_border_content_rect(

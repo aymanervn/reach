@@ -16,6 +16,13 @@ size_t reach_switcher_visible_count(size_t window_count)
     return reach_switcher_min_size(window_count, REACH_SWITCHER_VISIBLE_MAX);
 }
 
+static size_t reach_switcher_model_visible_count(const reach_switcher_model *model)
+{
+    size_t capacity = model != nullptr && model->visible_capacity > 0 ? model->visible_capacity
+                                                                      : REACH_SWITCHER_VISIBLE_MAX;
+    return model != nullptr ? reach_switcher_min_size(model->window_count, capacity) : 0;
+}
+
 static float reach_switcher_scale(float value, float dpi_scale)
 {
     return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
@@ -51,6 +58,15 @@ reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bou
         bounds.width = monitor_bounds.width < min_width ? monitor_bounds.width : min_width;
     }
     bounds.height = reach_switcher_scale(184.0f, dpi_scale) + border_thickness * 2.0f;
+    float max_height = monitor_bounds.height - reach_switcher_scale(48.0f, dpi_scale);
+    if (max_height <= 0.0f)
+    {
+        max_height = monitor_bounds.height;
+    }
+    if (bounds.height > max_height)
+    {
+        bounds.height = max_height;
+    }
     bounds.x = monitor_bounds.x + (monitor_bounds.width - bounds.width) * 0.5f;
     bounds.y = monitor_bounds.y + (monitor_bounds.height - bounds.height) * 0.5f;
     return bounds;
@@ -66,7 +82,7 @@ void reach_switcher_update_visible_start(reach_switcher_model *model)
         }
         return;
     }
-    size_t visible_count = reach_switcher_visible_count(model->window_count);
+    size_t visible_count = reach_switcher_model_visible_count(model);
     if (visible_count == 0 || visible_count >= model->window_count)
     {
         model->visible_start = 0;
@@ -504,6 +520,7 @@ static void reach_switcher_apply_visible_start(reach_switcher_state *state)
     model.window_count = state->window_count;
     model.selected_index = state->selected_index;
     model.visible_start = state->visible_start;
+    model.visible_capacity = state->visible_capacity;
     reach_switcher_update_visible_start(&model);
     state->visible_start = model.visible_start;
 }
@@ -692,12 +709,35 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
         return 0;
     }
 
-    reach_feature_transition_configure(&switcher->surface_transition, ctx->theme, ctx->dpi_scale,
+    float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
+    float maximum_scale = ctx->monitor_bounds.height / (232.0f + base_border * 2.0f);
+    float maximum_width_scale = ctx->monitor_bounds.width / (208.0f + base_border * 2.0f);
+    if (maximum_scale > 0.0f && scale > maximum_scale)
+    {
+        scale = maximum_scale;
+    }
+    if (maximum_width_scale > 0.0f && scale > maximum_width_scale)
+    {
+        scale = maximum_width_scale;
+    }
+    float border = reach_theme_border_thickness(ctx->theme, scale);
+    float max_width = ctx->monitor_bounds.width - 48.0f * scale;
+    float item_room = max_width - border * 2.0f - 48.0f * scale;
+    size_t visible_capacity =
+        item_room > 112.0f * scale ? (size_t)((item_room + 14.0f * scale) / (126.0f * scale)) : 1;
+    if (visible_capacity > REACH_SWITCHER_VISIBLE_MAX)
+    {
+        visible_capacity = REACH_SWITCHER_VISIBLE_MAX;
+    }
+    switcher->state.visible_capacity = visible_capacity;
+    switcher->state.content_scale = scale;
+
+    reach_feature_transition_configure(&switcher->surface_transition, ctx->theme, scale,
                                        REACH_FEATURE_TRANSITION_FROM_BELOW);
-    float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
     reach_rect_f32 target = reach_switcher_bounds_for_count_scaled(
-        ctx->monitor_bounds, reach_switcher_visible_count(switcher->state.window_count),
-        ctx->dpi_scale, border);
+        ctx->monitor_bounds,
+        reach_switcher_min_size(switcher->state.window_count, visible_capacity), scale, border);
     reach_rect_f32 bounds = reach_switcher_apply_width_animation(
         switcher, ctx->transition_visible, switcher->state.open, ctx->bounds_valid,
         ctx->last_bounds.width, target, nullptr);

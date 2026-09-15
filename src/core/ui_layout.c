@@ -11,8 +11,9 @@ static size_t reach_visible_launcher_result_count(const reach_launcher_model *la
     {
         return 0;
     }
-    return launcher->result_count < REACH_SEARCH_VISIBLE_RESULTS ? launcher->result_count
-                                                                 : REACH_SEARCH_VISIBLE_RESULTS;
+    size_t capacity = launcher->visible_result_capacity > 0 ? launcher->visible_result_capacity
+                                                            : REACH_SEARCH_VISIBLE_RESULTS;
+    return launcher->result_count < capacity ? launcher->result_count : capacity;
 }
 
 static int32_t reach_launcher_error_row_visible(const reach_launcher_model *launcher)
@@ -65,19 +66,49 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
 
     float scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     float border_thickness = input->border_thickness > 0.0f ? input->border_thickness : 0.0f;
+    float screen_margin = reach_scale(24.0f, scale);
+    float available_width = input->monitor_bounds.width - screen_margin * 2.0f;
+    if (available_width <= 0.0f)
+    {
+        screen_margin = 0.0f;
+        available_width = input->monitor_bounds.width;
+    }
     float search_content_width = reach_scale(640.0f, scale);
     float search_content_height = reach_scale(52.0f, scale);
 
     out_layout->search_box.width = search_content_width + border_thickness * 2.0f;
+    if (out_layout->search_box.width > available_width)
+    {
+        out_layout->search_box.width = available_width;
+        search_content_width = out_layout->search_box.width - border_thickness * 2.0f;
+        if (search_content_width < 0.0f)
+        {
+            search_content_width = 0.0f;
+        }
+    }
     out_layout->search_box.height = search_content_height + border_thickness * 2.0f;
     out_layout->search_box.x = input->monitor_bounds.x +
                                (input->monitor_bounds.width - out_layout->search_box.width) * 0.5f;
     out_layout->search_box.y =
         input->monitor_bounds.y +
         (input->monitor_bounds.height - out_layout->search_box.height) * 0.5f;
+    size_t visible_capacity = launcher->visible_result_capacity > 0
+                                  ? launcher->visible_result_capacity
+                                  : REACH_SEARCH_VISIBLE_RESULTS;
+    float envelope_height =
+        out_layout->search_box.height + reach_scale(16.0f + 56.0f * (float)visible_capacity, scale);
+    float maximum_y =
+        input->monitor_bounds.y + input->monitor_bounds.height - screen_margin - envelope_height;
+    if (out_layout->search_box.y > maximum_y)
+    {
+        out_layout->search_box.y = maximum_y;
+    }
+    if (out_layout->search_box.y < input->monitor_bounds.y + screen_margin)
+    {
+        out_layout->search_box.y = input->monitor_bounds.y + screen_margin;
+    }
     out_layout->envelope_bounds = out_layout->search_box;
-    out_layout->envelope_bounds.height +=
-        reach_scale(16.0f + 56.0f * (float)REACH_SEARCH_VISIBLE_RESULTS, scale);
+    out_layout->envelope_bounds.height = envelope_height;
 
     float search_text_padding_x = reach_scale(12.0f, scale);
     float search_text_padding_y = reach_scale(8.0f, scale);
@@ -95,6 +126,10 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
         out_layout->search_box.y + border_thickness + search_text_padding_y;
     out_layout->search_text_input.width =
         out_layout->search_icon.x - search_text_padding_x - out_layout->search_text_input.x;
+    if (out_layout->search_text_input.width < 0.0f)
+    {
+        out_layout->search_text_input.width = 0.0f;
+    }
     out_layout->search_text_input.height = search_content_height - search_text_padding_y * 2.0f;
 
     float search_results_top_padding = reach_scale(8.0f, scale);
@@ -125,7 +160,7 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     out_layout->search_result_scrollbar_track = (reach_rect_f32){0};
     out_layout->search_result_scrollbar_thumb = (reach_rect_f32){0};
 
-    if (launcher->result_count > REACH_SEARCH_VISIBLE_RESULTS && visible_result_count > 0)
+    if (launcher->result_count > visible_capacity && visible_result_count > 0)
     {
         float gutter_width = reach_scale(18.0f, scale);
         float track_width = reach_scale(4.0f, scale);

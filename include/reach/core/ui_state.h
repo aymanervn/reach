@@ -55,6 +55,7 @@ extern "C"
         reach_launcher_result results[REACH_SEARCH_MAX_RESULTS];
         size_t result_count;
         size_t selected_result_index;
+        size_t visible_result_capacity;
         int32_t search_error;
         reach_scrollbar_model result_scrollbar;
     } reach_launcher_model;

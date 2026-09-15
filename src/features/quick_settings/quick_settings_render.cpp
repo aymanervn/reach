@@ -14,10 +14,11 @@ static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *
 static void reach_quick_settings_push_text(reach_render_command_buffer *commands,
                                            reach_rect_f32 rect, const uint16_t *text, float size,
                                            int32_t weight, int32_t alignment, reach_color color);
-static void reach_quick_settings_push_fitted_text(
-    reach_render_command_buffer *commands, reach_rect_f32 rect, const uint16_t *text, float size,
-    int32_t weight, int32_t alignment, reach_color color,
-    const reach_text_measure_port *text_measure);
+static void reach_quick_settings_push_fitted_text(reach_render_command_buffer *commands,
+                                                  reach_rect_f32 rect, const uint16_t *text,
+                                                  float size, int32_t weight, int32_t alignment,
+                                                  reach_color color,
+                                                  const reach_text_measure_port *text_measure);
 
 static reach_color reach_quick_settings_color_opacity(reach_color color, float opacity)
 {
@@ -287,9 +288,9 @@ static void reach_quick_settings_push_system_tile_commands(
     icon.color = foreground;
     (void)reach_render_command_buffer_push(commands, &icon);
 
-    reach_quick_settings_push_fitted_text(
-        commands, layout->label, label, values->system_tile_text_size,
-        REACH_TEXT_WEIGHT_SEMIBOLD, 0, foreground, text_measure);
+    reach_quick_settings_push_fitted_text(commands, layout->label, label,
+                                          values->system_tile_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+                                          0, foreground, text_measure);
 }
 
 static void reach_quick_settings_push_rounded_rect(reach_render_command_buffer *commands,
@@ -319,10 +320,11 @@ static void reach_quick_settings_push_text(reach_render_command_buffer *commands
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static void reach_quick_settings_push_fitted_text(
-    reach_render_command_buffer *commands, reach_rect_f32 rect, const uint16_t *text, float size,
-    int32_t weight, int32_t alignment, reach_color color,
-    const reach_text_measure_port *text_measure)
+static void reach_quick_settings_push_fitted_text(reach_render_command_buffer *commands,
+                                                  reach_rect_f32 rect, const uint16_t *text,
+                                                  float size, int32_t weight, int32_t alignment,
+                                                  reach_color color,
+                                                  const reach_text_measure_port *text_measure)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
@@ -516,9 +518,9 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
         display_label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, session->label);
     reach_quick_settings_capitalize_first_utf16(display_label);
 
-    reach_quick_settings_push_fitted_text(
-        commands, layout->app_label, display_label, values->app_row_text_size,
-        REACH_TEXT_WEIGHT_NORMAL, 0, theme->primary_text, text_measure);
+    reach_quick_settings_push_fitted_text(commands, layout->app_label, display_label,
+                                          values->app_row_text_size, REACH_TEXT_WEIGHT_NORMAL, 0,
+                                          theme->primary_text, text_measure);
 
     reach_color line_color = theme->quick_settings_app_volume_track;
     reach_color level_color = session->muted ? theme->quick_settings_app_volume_muted_fill
@@ -652,8 +654,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     static const uint16_t project_label[] = {'P', 'r', 'o', 'j', 'e', 'c', 't', 0};
     reach_quick_settings_push_system_tile_commands(
         commands, &input->layout.project_tile, REACH_VECTOR_ICON_PROJECT, project_label, 0,
-        REACH_THEME_ACCENT_YELLOW, &input->theme, &metrics, &input->text_measure,
-        input->dpi_scale);
+        REACH_THEME_ACCENT_YELLOW, &input->theme, &metrics, &input->text_measure, input->dpi_scale);
 
     if (input->model.brightness.available)
     {
@@ -722,9 +723,8 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     output_device_rect.height = metrics.output_button_device_height;
 
     reach_quick_settings_push_fitted_text(
-        commands, output_device_rect, output_device_label,
-        metrics.output_button_device_text_size, REACH_TEXT_WEIGHT_SEMIBOLD, 0,
-        input->theme.primary_text, &input->text_measure);
+        commands, output_device_rect, output_device_label, metrics.output_button_device_text_size,
+        REACH_TEXT_WEIGHT_SEMIBOLD, 0, input->theme.primary_text, &input->text_measure);
 
     reach_quick_settings_push_chevron_crossfade(
         commands, input->layout.output_device_button_chevron, input->output_devices_expansion,
@@ -815,10 +815,18 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     return REACH_OK;
 }
 
-reach_result reach_quick_settings_append_render_commands(reach_quick_settings *quick_settings,
-                                                         const reach_theme *theme, float dpi_scale,
-                                                         const reach_text_measure_port *text_measure,
-                                                         reach_render_command_buffer *out_commands)
+static reach_rect_f32 reach_quick_settings_intersect(reach_rect_f32 a, reach_rect_f32 b)
+{
+    float left = a.x > b.x ? a.x : b.x;
+    float top = a.y > b.y ? a.y : b.y;
+    float right = a.x + a.width < b.x + b.width ? a.x + a.width : b.x + b.width;
+    float bottom = a.y + a.height < b.y + b.height ? a.y + a.height : b.y + b.height;
+    return {left, top, right > left ? right - left : 0.0f, bottom > top ? bottom - top : 0.0f};
+}
+
+reach_result reach_quick_settings_append_render_commands(
+    reach_quick_settings *quick_settings, const reach_theme *theme, float dpi_scale,
+    const reach_text_measure_port *text_measure, reach_render_command_buffer *out_commands)
 {
     if (quick_settings == nullptr || theme == nullptr || out_commands == nullptr)
     {
@@ -838,5 +846,19 @@ reach_result reach_quick_settings_append_render_commands(reach_quick_settings *q
     input.press_feedback_target = reach_quick_settings_press_feedback_target(quick_settings);
     input.press_feedback_opacity = reach_quick_settings_press_feedback_value(quick_settings);
 
-    return reach_quick_settings_build_render_commands(&input, out_commands);
+    reach_result result = reach_quick_settings_build_render_commands(&input, out_commands);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    for (size_t index = 0; index < out_commands->count; ++index)
+    {
+        reach_render_command *command = &out_commands->commands[index];
+        command->scissor_rect =
+            command->has_scissor
+                ? reach_quick_settings_intersect(command->scissor_rect, state->content_bounds)
+                : state->content_bounds;
+        command->has_scissor = 1;
+    }
+    return REACH_OK;
 }

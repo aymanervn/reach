@@ -31,8 +31,9 @@ static inline size_t reach_launcher_visible_result_count(const reach_launcher_mo
     {
         return 0;
     }
-    return model->result_count < REACH_SEARCH_VISIBLE_RESULTS ? model->result_count
-                                                              : REACH_SEARCH_VISIBLE_RESULTS;
+    size_t capacity = model->visible_result_capacity > 0 ? model->visible_result_capacity
+                                                         : REACH_SEARCH_VISIBLE_RESULTS;
+    return model->result_count < capacity ? model->result_count : capacity;
 }
 
 typedef enum reach_launcher_hit_type

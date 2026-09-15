@@ -266,6 +266,7 @@ extern "C"
         int32_t installed_apps_busy;
         int32_t installed_apps_status;
         int32_t display_high_refresh_rate;
+        reach_scrollbar_model display_scrollbar;
         reach_animation_track display_fps_track;
         reach_animation_manager display_fps_animation;
         int32_t display_bundled_font;
@@ -395,6 +396,10 @@ extern "C"
         reach_rect_f32 installed_app_uninstall_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
         size_t installed_app_row_count;
         float installed_apps_content_height;
+        reach_rect_f32 display_viewport;
+        reach_rect_f32 display_scrollbar_track;
+        reach_rect_f32 display_scrollbar_thumb;
+        float display_content_height;
         reach_rect_f32 display_fps_card;
         reach_rect_f32 display_fps_icon;
         reach_rect_f32 display_fps_title;
@@ -631,6 +636,8 @@ extern "C"
     int32_t reach_settings_model_tick_display_animations(reach_settings_model *model,
                                                          double delta_seconds);
     int32_t reach_settings_model_display_animations_active(const reach_settings_model *model);
+    void reach_settings_model_scroll_display(reach_settings_model *model, float delta);
+    int32_t reach_settings_model_display_scroll(reach_settings_model *model, double delta_seconds);
     void reach_settings_model_set_top_bar_style(reach_settings_model *model,
                                                 reach_config_top_bar_style style);
     reach_config_top_bar_style
