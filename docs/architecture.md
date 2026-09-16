@@ -93,7 +93,8 @@ temporarily retains the previous cover; a missing or failed current cover replac
 with the UI placeholder. A media-to-no-media transition retains the last snapshot for
 four seconds, then refetches and publishes disappearance only if absence is confirmed.
 Cover acquisition waits for a 300-millisecond quiet period on the latest media
-generation, coalescing provider thumbnail bursts without delaying core state.
+generation, coalescing provider thumbnail bursts without delaying core state. The snapshot carries
+the source application's AppUserModelID with that core state.
 System status serializes blocking system-control reads and brightness writes on its system worker.
 Relative brightness commands accumulate against the latest queued target, publish the successful
 target through the cumulative system snapshot, and never call the WMI-backed port on the UI thread.
@@ -341,7 +342,9 @@ the shared Now Playing service, leaving room for a future standalone music featu
 to consume the same stable service independently. It renders one bold line and
 scrolls it with the shared `features/common/marquee` clock when the text
 overruns its slot; the scroll is gated on the bar being shown, so a hidden or
-game-mode bar never asks for a frame.
+game-mode bar never asks for a frame. Its transport controls keep their dedicated actions; a
+pressable release on the remaining card opens the snapshot's source application through the shared
+`OPEN_TARGET` action.
 
 Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the
 implementation with the same font family, size, and weight used for drawing; features retain only

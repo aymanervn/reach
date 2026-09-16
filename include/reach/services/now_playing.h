@@ -26,6 +26,7 @@ extern "C"
         int32_t has_session;
         uint16_t title[260];
         uint16_t artist[260];
+        uint16_t source_app_user_model_id[REACH_APPLICATION_TEXT_CAPACITY];
         uint64_t cover_image_id;
         reach_color cover_accent;
         reach_media_playback_state playback;

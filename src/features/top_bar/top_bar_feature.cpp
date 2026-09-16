@@ -1476,9 +1476,7 @@ static void reach_top_bar_capsule_apply_event_result(const reach_top_bar_event_r
     out->redraw = event_result->redraw;
     out->capture = event_result->capture;
     out->sync_pointer_subscriptions = event_result->sync_pointer_subscriptions;
-    out->action.kind = event_result->action_kind;
-    out->action.id = event_result->action_id;
-    out->action.index = event_result->action_index;
+    out->action = event_result->action;
     out->control = event_result->control;
 }
 

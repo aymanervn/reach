@@ -64,7 +64,9 @@ static int32_t reach_now_playing_snapshot_equal(const reach_now_playing_snapshot
                                                 const reach_now_playing_snapshot *b)
 {
     return a->has_session == b->has_session && reach_utf16_equal(a->title, b->title) &&
-           reach_utf16_equal(a->artist, b->artist) && a->cover_image_id == b->cover_image_id &&
+           reach_utf16_equal(a->artist, b->artist) &&
+           reach_utf16_equal(a->source_app_user_model_id, b->source_app_user_model_id) &&
+           a->cover_image_id == b->cover_image_id &&
            reach_now_playing_color_equal(a->cover_accent, b->cover_accent) &&
            a->playback == b->playback && a->previous_enabled == b->previous_enabled &&
            a->play_pause_enabled == b->play_pause_enabled && a->next_enabled == b->next_enabled &&
@@ -88,6 +90,8 @@ reach_now_playing_candidate(const reach_media_controls_state *state)
     result.has_session = 1;
     reach_now_playing_copy_or_unknown(result.title, state->title);
     reach_now_playing_copy_or_unknown(result.artist, state->artist);
+    reach_copy_utf16(result.source_app_user_model_id, REACH_APPLICATION_TEXT_CAPACITY,
+                     state->source_app_user_model_id);
     result.playback = state->playback;
     result.previous_enabled = state->previous_enabled ? 1 : 0;
     result.play_pause_enabled = state->play_pause_enabled ? 1 : 0;

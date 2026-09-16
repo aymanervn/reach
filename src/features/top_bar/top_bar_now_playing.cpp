@@ -375,6 +375,8 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     next.visible = snapshot.has_session;
     reach_copy_utf16(next.title, 260, snapshot.title);
     reach_copy_utf16(next.artist, 260, snapshot.artist);
+    reach_copy_utf16(next.source_app_user_model_id, REACH_APPLICATION_TEXT_CAPACITY,
+                     snapshot.source_app_user_model_id);
     reach_top_bar_now_playing_compose_line(&next);
     next.cover_image_id = snapshot.cover_image_id;
     next.cover_accent = snapshot.cover_accent;
@@ -460,6 +462,28 @@ reach_top_bar_now_playing_action_at(const reach_top_bar_now_playing *now_playing
         return REACH_NOW_PLAYING_ACTION_NONE;
     }
     return reach_top_bar_now_playing_hit_test(&now_playing->model, &now_playing->layout, x, y);
+}
+
+int32_t reach_top_bar_now_playing_source_at(const reach_top_bar_now_playing *now_playing, int32_t x,
+                                            int32_t y)
+{
+    if (now_playing == nullptr || !now_playing->model.visible ||
+        now_playing->model.source_app_user_model_id[0] == 0 ||
+        !reach_top_bar_now_playing_contains(now_playing->layout.bounds, x, y))
+    {
+        return 0;
+    }
+    return !reach_top_bar_now_playing_contains(now_playing->layout.previous_button, x, y) &&
+           !reach_top_bar_now_playing_contains(now_playing->layout.play_pause_button, x, y) &&
+           !reach_top_bar_now_playing_contains(now_playing->layout.next_button, x, y);
+}
+
+const uint16_t *
+reach_top_bar_now_playing_source_app_user_model_id(const reach_top_bar_now_playing *now_playing)
+{
+    return now_playing != nullptr && now_playing->model.source_app_user_model_id[0] != 0
+               ? now_playing->model.source_app_user_model_id
+               : nullptr;
 }
 
 reach_result reach_top_bar_now_playing_append_render_commands(

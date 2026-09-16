@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "reach/core/application.h"
 #include "reach/core/theme.h"
 
 #ifdef __cplusplus
@@ -24,6 +25,7 @@ extern "C"
         uint64_t media_generation;
         uint16_t title[260];
         uint16_t artist[260];
+        uint16_t source_app_user_model_id[REACH_APPLICATION_TEXT_CAPACITY];
         reach_media_playback_state playback;
         int32_t previous_enabled;
         int32_t play_pause_enabled;
