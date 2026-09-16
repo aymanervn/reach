@@ -68,6 +68,7 @@ extern "C"
         reach_window_id (*native_id)(const reach_platform_window *window);
         reach_result (*place_behind)(reach_platform_window *window, reach_window_id target);
         reach_result (*post_event)(reach_platform_window *window, reach_ui_event_type type);
+        reach_result (*set_input_passthrough)(reach_platform_window *window, int32_t enabled);
         reach_result (*set_input_regions)(reach_platform_window *window,
                                           const reach_rect_f32 *regions, size_t region_count);
         void (*destroy)(reach_platform_window *window);

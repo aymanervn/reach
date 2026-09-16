@@ -107,7 +107,8 @@ typedef enum reach_surface_behavior_flags
     REACH_SURFACE_BEHAVIOR_ACTIVATES = 1u << 0,
 
     REACH_SURFACE_BEHAVIOR_EXCLUSIVE = 1u << 1,
-    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE = 1u << 2
+    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE = 1u << 2,
+    REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH = 1u << 3
 } reach_surface_behavior_flags;
 
 typedef enum reach_edge_reveal_anchor

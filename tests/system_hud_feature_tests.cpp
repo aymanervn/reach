@@ -58,13 +58,13 @@ static void test_payloads_and_repeat_policy(void)
 
     reach_feature_tick_result tick = {};
     reach_system_hud_capsule_ops()->tick(hud, 0.5, &tick);
-    expect_true(state->visible_seconds >= 0.5, "the dismissal dwell advances while unhovered");
+    expect_true(state->elapsed_seconds >= 0.5, "the fixed lifetime advances while open");
 
     volume.level = 0.67f;
     volume.muted = 0;
     reach_system_hud_show_volume(hud, &volume);
-    expect_near((float)state->visible_seconds, 0.0f, 0.001f,
-                "a repeated key press restarts the dismissal dwell");
+    expect_near((float)state->elapsed_seconds, 0.0f, 0.001f,
+                "a repeated key press restarts the fixed lifetime");
     expect_near(state->volume.level, 0.67f, 0.001f,
                 "a repeated key press replaces the displayed value");
 
@@ -81,7 +81,7 @@ static void test_payloads_and_repeat_policy(void)
     reach_system_hud_destroy(hud);
 }
 
-static void test_layout_and_blocking_input(void)
+static void test_layout_and_pointer_transparency(void)
 {
     reach_system_hud *hud = nullptr;
     expect_true(reach_system_hud_create(&hud) == REACH_OK, "system HUD is created");
@@ -114,32 +114,22 @@ static void test_layout_and_blocking_input(void)
     expect_near(geometry.visible_bounds.width, state->layout.bounds.width, 0.001f,
                 "the capsule publishes its arranged surface size");
 
-    reach_rect_f32 region = {};
-    expect_true(ops->input_regions(hud, &region, 1) == 1,
-                "the visible card contributes one blocking input region");
-    expect_near(region.width, state->layout.bounds.width, 0.001f,
-                "the blocking region covers the visual card width");
+    expect_true(ops->input_regions == nullptr, "the HUD publishes no blocking input region");
+    expect_true(ops->wants_pointer_move == nullptr,
+                "the HUD does not subscribe to pointer movement");
+    expect_true(ops->handle_pointer == nullptr, "the HUD does not handle pointer input");
 
-    reach_pointer_event event = {};
-    event.kind = REACH_POINTER_EVENT_DOWN;
-    reach_capsule_pointer_result pointer = {};
-    ops->handle_pointer(hud, &event, &pointer);
-    expect_true(pointer.handled, "presses on the HUD are consumed");
-    expect_true(pointer.action.kind == 0 && !pointer.capture,
-                "consumed presses create no action or pointer capture");
-
-    event.kind = REACH_POINTER_EVENT_MOVE;
-    ops->handle_pointer(hud, &event, &pointer);
-    expect_true(state->hovered, "hovering holds the HUD on screen");
-    double held_seconds = state->visible_seconds;
     reach_feature_tick_result tick = {};
-    ops->tick(hud, 2.0, &tick);
-    expect_true(state->visible_seconds == held_seconds,
-                "the dismissal dwell pauses for the entire hover");
+    ops->tick(hud, 1.499, &tick);
+    expect_true(state->open, "the HUD remains open until its lifetime deadline");
+    ops->tick(hud, 0.001, &tick);
+    expect_true(!state->open, "the HUD is fully hidden at its lifetime deadline");
+    expect_near(reach_system_hud_opacity(hud), 0.0f, 0.001f,
+                "the HUD has zero opacity at its lifetime deadline");
 
-    event.kind = REACH_POINTER_EVENT_LEAVE;
-    ops->handle_pointer(hud, &event, &pointer);
-    expect_true(!state->hovered, "leaving releases the hover hold");
+    reach_system_hud_show_brightness(hud, &brightness);
+    ops->tick(hud, 2.0, &tick);
+    expect_true(!state->open, "a delayed frame cannot extend the fixed lifetime");
 
     reach_system_hud_destroy(hud);
 }
@@ -148,6 +138,6 @@ int main(void)
 {
     test_level_presentation();
     test_payloads_and_repeat_policy();
-    test_layout_and_blocking_input();
+    test_layout_and_pointer_transparency();
     return failures == 0 ? 0 : 1;
 }

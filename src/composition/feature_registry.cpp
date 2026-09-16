@@ -855,7 +855,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.role = REACH_SURFACE_SYSTEM_HUD;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.pointer_priority = 0;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.behavior_flags =
-        REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE;
+        REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE | REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.opening_origin = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor_slot =
@@ -1479,6 +1479,18 @@ void reach_host_bind_registered_surface_ports(reach_host *host,
     host->surfaces[REACH_SURFACE_ID_SYSTEM_HUD].renderer = dependencies->system_hud_renderer;
     host->surfaces[REACH_SURFACE_ID_CLIPBOARD].window = dependencies->clipboard_window;
     host->surfaces[REACH_SURFACE_ID_CLIPBOARD].renderer = dependencies->clipboard_renderer;
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        reach_platform_window_port *window = &runtime->surface->window;
+        if (window->ops.set_input_passthrough != nullptr)
+        {
+            int32_t enabled = (runtime->definition->surface.behavior_flags &
+                               REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH) != 0;
+            (void)window->ops.set_input_passthrough(window->window, enabled);
+        }
+    }
 }
 
 void reach_host_init_registered_surfaces(reach_host *host)

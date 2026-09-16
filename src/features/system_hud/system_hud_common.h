@@ -20,6 +20,4 @@ struct reach_system_hud
     double close_seconds;
 };
 
-void reach_system_hud_begin_close(reach_system_hud *hud);
-
 #endif

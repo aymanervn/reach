@@ -5,7 +5,7 @@
 #include <math.h>
 #include <new>
 
-static const double REACH_SYSTEM_HUD_VISIBLE_SECONDS = 1.5;
+static const double REACH_SYSTEM_HUD_LIFETIME_SECONDS = 1.5;
 static const double REACH_SYSTEM_HUD_DEFAULT_OPEN_SECONDS = 0.16;
 static const double REACH_SYSTEM_HUD_DEFAULT_CLOSE_SECONDS = 0.12;
 static const float REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH = 100.0f;
@@ -24,21 +24,21 @@ static void reach_system_hud_begin_show(reach_system_hud *hud, reach_system_hud_
     }
     hud->state.kind = kind;
     hud->state.open = 1;
-    hud->state.visible_seconds = 0.0;
+    hud->state.elapsed_seconds = 0.0;
     reach_animation_manager_animate_to(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY, 1.0f,
                                        hud->open_seconds, REACH_EASING_EASE_OUT);
 }
 
-void reach_system_hud_begin_close(reach_system_hud *hud)
+static void reach_system_hud_begin_close(reach_system_hud *hud, double remaining_seconds)
 {
-    if (hud == nullptr || !hud->state.open || hud->state.hovered ||
+    if (hud == nullptr || !hud->state.open ||
         reach_animation_manager_target(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY) <=
             0.0f)
     {
         return;
     }
     reach_animation_manager_animate_to(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY, 0.0f,
-                                       hud->close_seconds, REACH_EASING_EASE_IN);
+                                       remaining_seconds, REACH_EASING_EASE_IN);
 }
 
 const reach_system_hud_state *reach_system_hud_state_ptr(const reach_system_hud *hud)
@@ -107,9 +107,8 @@ void reach_system_hud_force_close(reach_system_hud *hud)
         return;
     }
     hud->state.open = 0;
-    hud->state.hovered = 0;
     hud->state.kind = REACH_SYSTEM_HUD_NONE;
-    hud->state.visible_seconds = 0.0;
+    hud->state.elapsed_seconds = 0.0;
     reach_animation_manager_set(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY, 0.0f);
 }
 
@@ -155,25 +154,21 @@ static void reach_system_hud_capsule_tick(void *capsule, double delta_seconds,
         out->redraw = 1;
     }
 
-    if (!hud->state.hovered)
-    {
-        hud->state.visible_seconds += delta_seconds;
-        if (hud->state.visible_seconds >= REACH_SYSTEM_HUD_VISIBLE_SECONDS &&
-            reach_animation_manager_target(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY) >
-                0.0f)
-        {
-            reach_system_hud_begin_close(hud);
-            out->redraw = 1;
-        }
-    }
-
-    if (!animating && reach_system_hud_opacity(hud) <= 0.001f &&
-        reach_animation_manager_target(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY) <=
-            0.0f)
+    hud->state.elapsed_seconds += delta_seconds;
+    if (hud->state.elapsed_seconds >= REACH_SYSTEM_HUD_LIFETIME_SECONDS)
     {
         reach_system_hud_force_close(hud);
         out->redraw = 1;
         return;
+    }
+
+    double close_start = REACH_SYSTEM_HUD_LIFETIME_SECONDS - hud->close_seconds;
+    if (hud->state.elapsed_seconds >= close_start &&
+        reach_animation_manager_target(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY) > 0.0f)
+    {
+        reach_system_hud_begin_close(hud, REACH_SYSTEM_HUD_LIFETIME_SECONDS -
+                                              hud->state.elapsed_seconds);
+        out->redraw = 1;
     }
     out->request_update = 1;
 }
@@ -187,57 +182,6 @@ static int32_t reach_system_hud_capsule_is_open(const void *capsule)
 static int32_t reach_system_hud_capsule_needs_frame(const void *capsule)
 {
     return reach_system_hud_capsule_is_open(capsule);
-}
-
-static int32_t reach_system_hud_capsule_wants_pointer_move(const void *capsule)
-{
-    return reach_system_hud_capsule_is_open(capsule);
-}
-
-static void reach_system_hud_capsule_handle_pointer(void *capsule, const reach_pointer_event *event,
-                                                    reach_capsule_pointer_result *out)
-{
-    if (out == nullptr)
-    {
-        return;
-    }
-    *out = {};
-    reach_system_hud *hud = static_cast<reach_system_hud *>(capsule);
-    if (hud == nullptr || event == nullptr || !hud->state.open)
-    {
-        return;
-    }
-
-    out->handled = 1;
-    if (event->kind == REACH_POINTER_EVENT_MOVE && !hud->state.hovered)
-    {
-        hud->state.hovered = 1;
-        reach_animation_manager_animate_to(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY,
-                                           1.0f, hud->open_seconds, REACH_EASING_EASE_OUT);
-        out->redraw = 1;
-    }
-    else if (event->kind == REACH_POINTER_EVENT_LEAVE && hud->state.hovered)
-    {
-        hud->state.hovered = 0;
-        if (hud->state.visible_seconds >= REACH_SYSTEM_HUD_VISIBLE_SECONDS)
-        {
-            reach_system_hud_begin_close(hud);
-        }
-        out->redraw = 1;
-    }
-}
-
-static size_t reach_system_hud_capsule_input_regions(const void *capsule,
-                                                     reach_rect_f32 *out_regions,
-                                                     size_t max_regions)
-{
-    const reach_system_hud *hud = static_cast<const reach_system_hud *>(capsule);
-    if (hud == nullptr || !hud->state.open || out_regions == nullptr || max_regions == 0)
-    {
-        return 0;
-    }
-    out_regions[0] = {0.0f, 0.0f, hud->state.layout.bounds.width, hud->state.layout.bounds.height};
-    return 1;
 }
 
 static void reach_system_hud_capsule_surface_geometry(const void *capsule,
@@ -260,11 +204,16 @@ static void reach_system_hud_capsule_surface_geometry(const void *capsule,
 const reach_feature_capsule_ops *reach_system_hud_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {
-        reach_system_hud_capsule_reset,          reach_system_hud_capsule_tick,
-        reach_system_hud_capsule_is_open,        nullptr,
-        reach_system_hud_capsule_needs_frame,    reach_system_hud_capsule_wants_pointer_move,
-        reach_system_hud_capsule_handle_pointer, nullptr,
-        reach_system_hud_capsule_input_regions,  reach_system_hud_capsule_surface_geometry,
+        reach_system_hud_capsule_reset,
+        reach_system_hud_capsule_tick,
+        reach_system_hud_capsule_is_open,
+        nullptr,
+        reach_system_hud_capsule_needs_frame,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        reach_system_hud_capsule_surface_geometry,
     };
     return &ops;
 }

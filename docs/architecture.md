@@ -616,11 +616,11 @@ level changes carry the exact post-action state; media actions make the HUD refr
 snapshot from the Now Playing service. Its media presentation shares the cover-art rendering path
 with the top bar: cropped artwork fills and blurs behind the item, then a translucent overlay keeps
 static, ellipsized title and artist text legible. The HUD is a persistent, source-gated surface at layer
-220, above every other Reach layer. Its visual card is one blocking input region:
-presses are consumed without actions or capture, while pointer enter pauses its
-dismissal dwell and pointer leave releases it. It is centered above the Dock's
-shown-position geometry even when the Dock itself is hidden, and its whole render
-command buffer is faded by the shared animation manager.
+220, above every other Reach layer. It is fully pointer-transparent. Each successful supported
+action resets one 1.5-second total lifetime; the closing fade completes inside that interval and a
+hard deadline makes the HUD fully hidden even after a delayed frame. It is centered above the
+Dock's shown-position geometry even when the Dock itself is hidden, and its whole render command
+buffer is faded by the shared animation manager.
 A deferred launch is keyed on the surface that requested it, so composition waits for that
 surface's own close presentation before running the launch rather than testing one named feature.
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
