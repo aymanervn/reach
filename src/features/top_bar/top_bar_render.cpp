@@ -599,6 +599,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;
     now_playing.dpi_scale = ctx->dpi_scale;
+    now_playing.animate_text = !top_bar->state.visibility.target_hidden;
     result = reach_top_bar_now_playing_append_render_commands(
         reach_top_bar_now_playing_subfeature(top_bar), &now_playing, out_commands);
     if (result != REACH_OK)

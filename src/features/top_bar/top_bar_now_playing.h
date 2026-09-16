@@ -2,7 +2,6 @@
 #define REACH_FEATURES_TOP_BAR_NOW_PLAYING_H
 
 #include "reach/core/render_commands.h"
-#include "reach/features/common/marquee.h"
 #include "reach/ports/text_measure.h"
 #include "reach/services/now_playing.h"
 
@@ -45,14 +44,15 @@ typedef struct reach_top_bar_now_playing_render_input
     const reach_theme *theme;
     const reach_top_bar_now_playing_model *model;
     const reach_top_bar_now_playing_layout *layout;
-    float text_offset_x;
     float dpi_scale;
+    int32_t animate_text;
 } reach_top_bar_now_playing_render_input;
 
 typedef struct reach_top_bar_now_playing_render_context
 {
     const reach_theme *theme;
     float dpi_scale;
+    int32_t animate_text;
 } reach_top_bar_now_playing_render_context;
 
 reach_result reach_top_bar_now_playing_create(reach_top_bar_now_playing **out_now_playing);
@@ -76,9 +76,6 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
 void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
                                     reach_now_playing_service *service,
                                     reach_top_bar_now_playing_update_result *out);
-int32_t reach_top_bar_now_playing_tick(reach_top_bar_now_playing *now_playing,
-                                       double delta_seconds);
-int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now_playing);
 float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *now_playing,
                                               const reach_theme *theme, float dpi_scale);
 void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing,

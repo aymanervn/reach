@@ -50,6 +50,422 @@ HRESULT reach_visual_set_size(IInspectable *inspectable, float width, float heig
     return hr;
 }
 
+int32_t reach_d2d_animated_text_command_equal(const reach_render_command *left,
+                                              const reach_render_command *right)
+{
+    if (left->rect.x != right->rect.x || left->rect.y != right->rect.y ||
+        left->rect.width != right->rect.width || left->rect.height != right->rect.height ||
+        left->scissor_rect.x != right->scissor_rect.x ||
+        left->scissor_rect.y != right->scissor_rect.y ||
+        left->scissor_rect.width != right->scissor_rect.width ||
+        left->scissor_rect.height != right->scissor_rect.height ||
+        left->color.r != right->color.r || left->color.g != right->color.g ||
+        left->color.b != right->color.b || left->color.a != right->color.a ||
+        left->text_weight != right->text_weight || left->text_size != right->text_size ||
+        left->text_alignment != right->text_alignment ||
+        left->animation_offset_x != right->animation_offset_x ||
+        left->animation_hold_seconds != right->animation_hold_seconds ||
+        left->animation_travel_seconds != right->animation_travel_seconds)
+    {
+        return 0;
+    }
+    for (size_t index = 0; index < 260; ++index)
+    {
+        if (left->text[index] != right->text[index])
+        {
+            return 0;
+        }
+        if (left->text[index] == 0)
+        {
+            return 1;
+        }
+    }
+    return 1;
+}
+
+static HRESULT reach_d2d_create_animated_text_visual(reach_render_backend *backend,
+                                                     reach_d2d_animated_text_layer *layer)
+{
+    HRESULT hr = backend->compositor->CreateContainerVisual(&layer->clip_visual);
+    if (SUCCEEDED(hr))
+    {
+        hr = backend->compositor->CreateSpriteVisual(&layer->content_visual);
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::IVisualCollection> clip_children;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->clip_visual->get_Children(&clip_children);
+    }
+    ComPtr<ABI::Windows::UI::Composition::IVisual> content_base;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->content_visual.As(&content_base);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = clip_children->InsertAtTop(content_base.Get());
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::IVisualCollection> root_children;
+    if (SUCCEEDED(hr))
+    {
+        hr = backend->root_visual->get_Children(&root_children);
+    }
+    ComPtr<ABI::Windows::UI::Composition::IVisual> clip_base;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->clip_visual.As(&clip_base);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = root_children->InsertAtTop(clip_base.Get());
+    }
+    if (FAILED(hr))
+    {
+        layer->content_visual.Reset();
+        layer->clip_visual.Reset();
+    }
+    return hr;
+}
+
+static HRESULT reach_d2d_draw_animated_text_surface(reach_render_backend *backend,
+                                                    reach_d2d_animated_text_layer *layer,
+                                                    const reach_render_command *command)
+{
+    float width = ceilf(command->rect.width);
+    float height = ceilf(command->rect.height);
+    if (width <= 0.0f || height <= 0.0f)
+    {
+        return E_INVALIDARG;
+    }
+
+    ABI::Windows::Foundation::Size size = {width, height};
+    layer->surface.Reset();
+    layer->brush.Reset();
+    HRESULT hr = backend->composition_graphics_device->CreateDrawingSurface(
+        size, ABI::Windows::Graphics::DirectX::DirectXPixelFormat_B8G8R8A8UIntNormalized,
+        ABI::Windows::Graphics::DirectX::DirectXAlphaMode_Premultiplied, &layer->surface);
+    ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> surface_base;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->surface.As(&surface_base);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = backend->compositor->CreateSurfaceBrushWithSurface(surface_base.Get(), &layer->brush);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->brush->put_Stretch(ABI::Windows::UI::Composition::CompositionStretch_None);
+    }
+    ComPtr<ABI::Windows::UI::Composition::ICompositionBrush> brush_base;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->brush.As(&brush_base);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->content_visual->put_Brush(brush_base.Get());
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::ICompositionDrawingSurfaceInterop> interop;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->surface.As(&interop);
+    }
+    ComPtr<ID2D1DeviceContext> context;
+    POINT offset = {};
+    if (SUCCEEDED(hr))
+    {
+        hr = interop->BeginDraw(nullptr, IID_PPV_ARGS(&context), &offset);
+    }
+    if (SUCCEEDED(hr))
+    {
+        context->SetTransform(D2D1::Matrix3x2F::Translation((float)offset.x, (float)offset.y));
+        context->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+        reach_render_command local = *command;
+        local.type = REACH_RENDER_COMMAND_TEXT;
+        local.rect = {0.0f, 0.0f, command->rect.width, command->rect.height};
+        local.has_scissor = 0;
+        hr = reach_d2d_draw_text_to_target(backend, context.Get(), &local) == REACH_OK ? S_OK
+                                                                                       : E_FAIL;
+        HRESULT end_hr = interop->EndDraw();
+        if (SUCCEEDED(hr))
+        {
+            hr = end_hr;
+        }
+    }
+    return hr;
+}
+
+static HRESULT reach_d2d_set_animated_text_geometry(reach_render_backend *backend,
+                                                    reach_d2d_animated_text_layer *layer,
+                                                    const reach_render_command *command,
+                                                    const reach_transform_f32 *transform)
+{
+    ComPtr<ABI::Windows::UI::Composition::IVisual> clip_base;
+    HRESULT hr = layer->clip_visual.As(&clip_base);
+    ABI::Windows::Foundation::Numerics::Vector3 clip_offset = {
+        command->scissor_rect.x * transform->scale_x + transform->offset_x,
+        command->scissor_rect.y * transform->scale_y + transform->offset_y, 0.0f};
+    ABI::Windows::Foundation::Numerics::Vector3 clip_scale = {transform->scale_x,
+                                                              transform->scale_y, 1.0f};
+    ABI::Windows::Foundation::Numerics::Vector2 clip_size = {command->scissor_rect.width,
+                                                             command->scissor_rect.height};
+    if (SUCCEEDED(hr))
+    {
+        hr = clip_base->put_Offset(clip_offset);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = clip_base->put_Scale(clip_scale);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = clip_base->put_Size(clip_size);
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset;
+    if (SUCCEEDED(hr))
+    {
+        hr = backend->compositor->CreateInsetClipWithInsets(0.0f, 0.0f, 0.0f, 0.0f, &inset);
+    }
+    ComPtr<ABI::Windows::UI::Composition::ICompositionClip> clip;
+    if (SUCCEEDED(hr))
+    {
+        hr = inset.As(&clip);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = clip_base->put_Clip(clip.Get());
+    }
+
+    ComPtr<ABI::Windows::UI::Composition::IVisual> content_base;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->content_visual.As(&content_base);
+    }
+    ABI::Windows::Foundation::Numerics::Vector2 content_size = {command->rect.width,
+                                                                command->rect.height};
+    if (SUCCEEDED(hr))
+    {
+        hr = content_base->put_Size(content_size);
+    }
+    return hr;
+}
+
+static HRESULT reach_d2d_start_animated_text(reach_render_backend *backend,
+                                             reach_d2d_animated_text_layer *layer,
+                                             const reach_render_command *command)
+{
+    ComPtr<ABI::Windows::UI::Composition::IVisual> content_base;
+    HRESULT hr = layer->content_visual.As(&content_base);
+    ComPtr<ABI::Windows::UI::Composition::ICompositionObject> object;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->content_visual.As(&object);
+    }
+    HSTRING property = nullptr;
+    if (SUCCEEDED(hr))
+    {
+        hr = WindowsCreateString(L"Offset.X", 8, &property);
+    }
+    if (SUCCEEDED(hr))
+    {
+        (void)object->StopAnimation(property);
+    }
+
+    float base_x = command->rect.x - command->scissor_rect.x;
+    ABI::Windows::Foundation::Numerics::Vector3 offset = {
+        base_x, command->rect.y - command->scissor_rect.y, 0.0f};
+    if (SUCCEEDED(hr))
+    {
+        hr = content_base->put_Offset(offset);
+    }
+
+    float hold = command->animation_hold_seconds;
+    float travel = command->animation_travel_seconds;
+    float cycle = (hold + travel) * 2.0f;
+    if (SUCCEEDED(hr) && command->animation_offset_x != 0.0f && hold >= 0.0f && travel > 0.0f &&
+        cycle > 0.0f)
+    {
+        ComPtr<ABI::Windows::UI::Composition::IScalarKeyFrameAnimation> scalar;
+        hr = backend->compositor->CreateScalarKeyFrameAnimation(&scalar);
+        ComPtr<ABI::Windows::UI::Composition::IKeyFrameAnimation> key_frames;
+        if (SUCCEEDED(hr))
+        {
+            hr = scalar.As(&key_frames);
+        }
+        ABI::Windows::Foundation::TimeSpan duration = {};
+        duration.Duration = (INT64)((double)cycle * 10000000.0);
+        if (SUCCEEDED(hr))
+        {
+            hr = key_frames->put_Duration(duration);
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = key_frames->put_IterationBehavior(
+                ABI::Windows::UI::Composition::AnimationIterationBehavior_Forever);
+        }
+
+        ABI::Windows::Foundation::Numerics::Vector2 control1 = {0.645f, 0.045f};
+        ABI::Windows::Foundation::Numerics::Vector2 control2 = {0.355f, 1.0f};
+        ComPtr<ABI::Windows::UI::Composition::ICubicBezierEasingFunction> cubic;
+        if (SUCCEEDED(hr))
+        {
+            hr = backend->compositor->CreateCubicBezierEasingFunction(control1, control2, &cubic);
+        }
+        ComPtr<ABI::Windows::UI::Composition::ICompositionEasingFunction> easing;
+        if (SUCCEEDED(hr))
+        {
+            hr = cubic.As(&easing);
+        }
+
+        float end_x = base_x + command->animation_offset_x;
+        if (SUCCEEDED(hr))
+        {
+            hr = scalar->InsertKeyFrame(0.0f, base_x);
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = scalar->InsertKeyFrame(hold / cycle, base_x);
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = scalar->InsertKeyFrameWithEasingFunction((hold + travel) / cycle, end_x,
+                                                          easing.Get());
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = scalar->InsertKeyFrame((hold * 2.0f + travel) / cycle, end_x);
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = scalar->InsertKeyFrameWithEasingFunction(1.0f, base_x, easing.Get());
+        }
+        ComPtr<ABI::Windows::UI::Composition::ICompositionAnimation> animation;
+        if (SUCCEEDED(hr))
+        {
+            hr = scalar.As(&animation);
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = object->StartAnimation(property, animation.Get());
+        }
+    }
+    if (property != nullptr)
+    {
+        WindowsDeleteString(property);
+    }
+    return hr;
+}
+
+reach_result reach_d2d_sync_animated_text(reach_render_backend *backend,
+                                          const reach_render_command *command,
+                                          const reach_transform_f32 *transform)
+{
+    if (backend == nullptr || command == nullptr || transform == nullptr || !command->has_scissor)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    if (backend->compositor == nullptr || backend->composition_graphics_device == nullptr ||
+        backend->root_visual == nullptr)
+    {
+        return reach_dcomp_sync_animated_text(backend, command, transform);
+    }
+    reach_d2d_animated_text_layer *layer = &backend->animated_text_layer;
+    layer->seen = 1;
+    int32_t same_command =
+        layer->has_command && reach_d2d_animated_text_command_equal(&layer->command, command);
+    if (same_command && layer->visible)
+    {
+        if (memcmp(&layer->transform, transform, sizeof(*transform)) == 0)
+        {
+            return REACH_OK;
+        }
+        HRESULT geometry_hr =
+            reach_d2d_set_animated_text_geometry(backend, layer, command, transform);
+        if (FAILED(geometry_hr))
+        {
+            reach_d2d_log_hresult(L"animated text geometry", geometry_hr);
+            return REACH_ERROR;
+        }
+        layer->transform = *transform;
+        return REACH_OK;
+    }
+
+    HRESULT hr = layer->clip_visual != nullptr && layer->content_visual != nullptr
+                     ? S_OK
+                     : reach_d2d_create_animated_text_visual(backend, layer);
+    if (SUCCEEDED(hr))
+    {
+        hr = reach_d2d_draw_animated_text_surface(backend, layer, command);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = reach_d2d_set_animated_text_geometry(backend, layer, command, transform);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = reach_d2d_start_animated_text(backend, layer, command);
+    }
+    ComPtr<ABI::Windows::UI::Composition::IVisual> clip_base;
+    if (SUCCEEDED(hr))
+    {
+        hr = layer->clip_visual.As(&clip_base);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = clip_base->put_IsVisible(TRUE);
+    }
+    if (FAILED(hr))
+    {
+        reach_d2d_log_hresult(L"animated text layer", hr);
+        return REACH_ERROR;
+    }
+    layer->command = *command;
+    layer->transform = *transform;
+    layer->has_command = 1;
+    layer->visible = 1;
+    return REACH_OK;
+}
+
+void reach_d2d_begin_animated_text_sync(reach_render_backend *backend)
+{
+    if (backend == nullptr)
+    {
+        return;
+    }
+    backend->animated_text_layer.seen = 0;
+}
+
+void reach_d2d_end_animated_text_sync(reach_render_backend *backend)
+{
+    if (backend == nullptr)
+    {
+        return;
+    }
+    reach_d2d_animated_text_layer &layer = backend->animated_text_layer;
+    if (layer.seen || !layer.visible)
+    {
+        return;
+    }
+    if (layer.clip_visual != nullptr)
+    {
+        ComPtr<ABI::Windows::UI::Composition::IVisual> clip_base;
+        if (SUCCEEDED(layer.clip_visual.As(&clip_base)))
+        {
+            (void)clip_base->put_IsVisible(FALSE);
+        }
+        layer.visible = 0;
+    }
+    else
+    {
+        reach_dcomp_hide_animated_text(backend);
+    }
+}
+
 reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
                                           reach_rect_f32 content_rect)
 {
@@ -233,6 +649,12 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
     if (SUCCEEDED(hr))
     {
         hr = backend->compositor.As(&compositor_interop);
+    }
+    if (SUCCEEDED(hr))
+    {
+        hr = compositor_interop->CreateGraphicsDevice(
+            backend->d2d_device, &backend->composition_graphics_device);
+        reach_d2d_log_hresult(L"CreateCompositionGraphicsDevice", hr);
     }
     if (SUCCEEDED(hr))
     {
