@@ -143,6 +143,8 @@ static void fake_set_state(fake_media_controls *fake, uint64_t media_generation,
         {
             reach_copy_ascii_to_utf16(fake->state.title, 260, title);
             reach_copy_ascii_to_utf16(fake->state.artist, 260, "Artist");
+            reach_copy_ascii_to_utf16(fake->state.source_app_user_model_id,
+                                      REACH_APPLICATION_TEXT_CAPACITY, "Test.Media");
             fake->state.playback = REACH_MEDIA_PLAYBACK_PLAYING;
             fake->state.previous_enabled = 1;
             fake->state.play_pause_enabled = 1;
@@ -242,6 +244,8 @@ static void test_progressive_latest_only_publication()
         "core state publishes while first cover is blocked");
     expect_true(snapshot.cover_image_id == 0, "first core generation does not wait for cover");
     expect_true(snapshot.next_enabled, "core controls publish before cover");
+    expect_true(reach_test_utf16_equals_ascii(snapshot.source_app_user_model_id, "Test.Media"),
+                "source application identity publishes with core state");
     expect_true(wait_for_cover_request(&fake, 1), "first cover read starts");
     auto first_cover_delay_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                     std::chrono::steady_clock::now() - service_started_at)

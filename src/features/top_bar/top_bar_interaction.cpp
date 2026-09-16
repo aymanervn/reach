@@ -305,6 +305,11 @@ static uint64_t reach_top_bar_pressable_target_at(reach_top_bar *top_bar, int32_
             return reach_top_bar_pressable_target(REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING,
                                                   static_cast<uint32_t>(media));
         }
+        if (reach_top_bar_now_playing_source_at(reach_top_bar_now_playing_subfeature(top_bar),
+                                                local_x, local_y))
+        {
+            return reach_top_bar_pressable_target(REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING, 0);
+        }
     }
     reach_top_bar_state *state = reach_top_bar_state_mut(top_bar);
     reach_top_bar_pointer_region region =
@@ -484,8 +489,20 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         }
         return;
     case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
-        out->action_kind = REACH_FEATURE_ACTION_MEDIA_CONTROL;
-        out->action_id = detail;
+        if (detail != REACH_NOW_PLAYING_ACTION_NONE)
+        {
+            out->action.kind = REACH_FEATURE_ACTION_MEDIA_CONTROL;
+            out->action.id = detail;
+            return;
+        }
+        out->action.target.app_user_model_id = reach_top_bar_now_playing_source_app_user_model_id(
+            reach_top_bar_now_playing_subfeature(top_bar));
+        if (out->action.target.app_user_model_id != nullptr)
+        {
+            out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
+            out->action.target.kind = REACH_FEATURE_TARGET_APP;
+            out->action.target.launch_kind = REACH_APPLICATION_LAUNCH_NONE;
+        }
         return;
     case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
         (void)reach_top_bar_activate_tray_item(top_bar, detail, REACH_TRAY_ACTION_LEFT_CLICK);
@@ -503,10 +520,10 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         }
         return;
     case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
-        out->action_kind = REACH_FEATURE_ACTION_OPEN_SETTINGS_APP;
+        out->action.kind = REACH_FEATURE_ACTION_OPEN_SETTINGS_APP;
         return;
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
-        out->action_kind = REACH_FEATURE_ACTION_CYCLE_INPUT_LANGUAGE;
+        out->action.kind = REACH_FEATURE_ACTION_CYCLE_INPUT_LANGUAGE;
         return;
     case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
         if (top_bar->routes.battery_activated != nullptr)

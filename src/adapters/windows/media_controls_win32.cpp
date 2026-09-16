@@ -429,6 +429,9 @@ static reach_result reach_media_controls_read_state(reach_media_controls_adapter
         reach_media_controls_state state = {};
         reach_media_controls_copy_hstring(state.title, 260, properties.Title());
         reach_media_controls_copy_hstring(state.artist, 260, properties.Artist());
+        reach_media_controls_copy_hstring(state.source_app_user_model_id,
+                                          REACH_APPLICATION_TEXT_CAPACITY,
+                                          session.SourceAppUserModelId());
         auto playback_info = session.GetPlaybackInfo();
         auto controls = playback_info.Controls();
 

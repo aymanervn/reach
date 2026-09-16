@@ -14,6 +14,7 @@ typedef struct reach_top_bar_now_playing_model
     uint16_t title[260];
     uint16_t artist[260];
     uint16_t line[260];
+    uint16_t source_app_user_model_id[REACH_APPLICATION_TEXT_CAPACITY];
     uint64_t cover_image_id;
     reach_color cover_accent;
     reach_media_playback_state playback;
@@ -88,6 +89,10 @@ void reach_top_bar_now_playing_relayout(reach_top_bar_now_playing *now_playing,
 reach_now_playing_action
 reach_top_bar_now_playing_action_at(const reach_top_bar_now_playing *now_playing, int32_t x,
                                     int32_t y);
+int32_t reach_top_bar_now_playing_source_at(const reach_top_bar_now_playing *now_playing, int32_t x,
+                                            int32_t y);
+const uint16_t *
+reach_top_bar_now_playing_source_app_user_model_id(const reach_top_bar_now_playing *now_playing);
 
 reach_result reach_top_bar_now_playing_append_render_commands(
     reach_top_bar_now_playing *now_playing, const reach_top_bar_now_playing_render_context *ctx,

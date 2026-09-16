@@ -79,9 +79,7 @@ typedef struct reach_top_bar_event_result
     int32_t redraw;
     int32_t capture;
     int32_t sync_pointer_subscriptions;
-    uint32_t action_kind;
-    uint64_t action_id;
-    size_t action_index;
+    reach_capsule_action action;
     reach_feature_control control;
 } reach_top_bar_event_result;
 
