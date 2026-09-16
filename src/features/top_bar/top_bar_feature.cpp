@@ -1127,8 +1127,10 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
         reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds,
                                           request->shadow_clearance, request->excluded_window);
 
+    int32_t was_target_hidden = top_bar->state.visibility.target_hidden;
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->manager, REACH_TOP_BAR_ANIM_Y, &bar_request);
+    result.redraw = was_target_hidden != top_bar->state.visibility.target_hidden;
 
     top_bar->push_monitor_bounds = bar_request.monitor_bounds;
     top_bar->push_shown_bounds = bar_request.shown_bounds;
@@ -1163,12 +1165,6 @@ static void reach_top_bar_bar_position_frame(void *capsule)
     float animated_y = reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
     reach_top_bar_apply_window_push(
         top_bar, reach_bar_reveal_progress(animated_y, top_bar->push_shown_bounds.y, hidden_y));
-}
-
-static int32_t reach_top_bar_now_playing_scroll_active(const reach_top_bar *top_bar)
-{
-    return !top_bar->state.visibility.target_hidden &&
-           reach_top_bar_now_playing_scrolling(top_bar->now_playing_subfeature);
 }
 
 static int32_t reach_top_bar_width_animation_active(const reach_top_bar *top_bar)
@@ -1219,9 +1215,7 @@ static reach_bar_reveal_animation reach_top_bar_bar_animation(const void *capsul
     animation.content_animating =
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
-        reach_top_bar_tray_motion_active(top_bar) ||
-        reach_top_bar_width_animation_active(top_bar) ||
-        reach_top_bar_now_playing_scroll_active(top_bar);
+        reach_top_bar_tray_motion_active(top_bar) || reach_top_bar_width_animation_active(top_bar);
     return animation;
 }
 
@@ -1321,13 +1315,6 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     {
         out->relayout = 1;
     }
-    if (!top_bar->state.visibility.target_hidden &&
-        reach_top_bar_now_playing_tick(top_bar->now_playing_subfeature, delta_seconds) &&
-        out != nullptr)
-    {
-        out->redraw = 1;
-    }
-
     reach_animation_manager *manager = &top_bar->manager;
     int32_t feedback_was_active =
         reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
@@ -1392,8 +1379,7 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
            reach_top_bar_tray_motion_active(top_bar) ||
            reach_top_bar_width_animation_active(top_bar) ||
-           reach_top_bar_bluetooth_absence_pending(top_bar) ||
-           reach_top_bar_now_playing_scroll_active(top_bar);
+           reach_top_bar_bluetooth_absence_pending(top_bar);
 }
 
 static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule)

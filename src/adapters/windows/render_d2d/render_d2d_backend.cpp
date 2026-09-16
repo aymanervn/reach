@@ -41,6 +41,8 @@ void reach_d2d_destroy(reach_render_backend *backend)
     }
 
     backend->composition_surface.Reset();
+    backend->animated_text_layer = {};
+    backend->composition_graphics_device.Reset();
     backend->swap_chain_visual.Reset();
     backend->backdrop_visual.Reset();
     backend->root_visual.Reset();
@@ -102,6 +104,8 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
     }
 
     backend->composition_surface.Reset();
+    backend->animated_text_layer = {};
+    backend->composition_graphics_device.Reset();
     backend->swap_chain_visual.Reset();
     backend->backdrop_visual.Reset();
     backend->root_visual.Reset();

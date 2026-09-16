@@ -302,14 +302,14 @@ static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend)
     return backend->ui_font_family;
 }
 
-reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_render_command *command)
+reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1RenderTarget *target,
+                                           const reach_render_command *command)
 {
     if (backend == nullptr || command == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    ID2D1RenderTarget *target = reach_d2d_target(backend);
     if (target == nullptr || backend->text_factory == nullptr)
     {
         return REACH_ERROR;
@@ -394,6 +394,11 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_rend
     format->Release();
 
     return REACH_OK;
+}
+
+reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_render_command *command)
+{
+    return reach_d2d_draw_text_to_target(backend, reach_d2d_target(backend), command);
 }
 
 reach_result reach_d2d_draw_textbox(reach_render_backend *backend,

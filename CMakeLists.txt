@@ -125,7 +125,6 @@ add_library(reach_features STATIC
     src/features/common/layout/layout.cpp
     src/features/common/level_presentation/level_presentation.cpp
     src/features/common/loader/loader_render.cpp
-    src/features/common/marquee/marquee.cpp
     src/features/common/now_playing_artwork/now_playing_artwork.cpp
     src/features/common/progress_bar/progress_bar_render.cpp
     src/features/common/pressable/pressable.cpp
@@ -714,6 +713,17 @@ target_link_libraries(reach_util_tests PRIVATE
     reach_support
 )
 
+add_executable(reach_now_playing_animation_tests
+    tests/now_playing_animation_tests.cpp
+)
+
+reach_configure_common(reach_now_playing_animation_tests)
+target_compile_features(reach_now_playing_animation_tests PRIVATE cxx_std_17)
+target_include_directories(reach_now_playing_animation_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/features/top_bar
+)
+target_link_libraries(reach_now_playing_animation_tests PRIVATE reach_features)
+
 add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
 )
@@ -1078,6 +1088,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
 
     add_test(NAME reach_svg_document_tests COMMAND reach_svg_document_tests)
     add_test(NAME reach_util_tests COMMAND reach_util_tests)
+    add_test(NAME reach_now_playing_animation_tests COMMAND reach_now_playing_animation_tests)
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
     add_test(NAME reach_wifi_service_tests COMMAND reach_wifi_service_tests)
     add_test(NAME reach_bluetooth_tests COMMAND reach_bluetooth_tests)

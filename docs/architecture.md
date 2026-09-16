@@ -339,10 +339,13 @@ background, border, screen inset, app clearance, and input-region composition wi
 controls. Now Playing is not a
 separate feature: its private UI subfeature lives inside the top bar and consumes
 the shared Now Playing service, leaving room for a future standalone music feature
-to consume the same stable service independently. It renders one bold line and
-scrolls it with the shared `features/common/marquee` clock when the text
-overruns its slot; the scroll is gated on the bar being shown, so a hidden or
-game-mode bar never asks for a frame. Its transport controls keep their dedicated actions; a
+to consume the same stable service independently. It renders one bold line and emits one
+animated-text command when that line overruns its slot. Windows Composition draws the text once,
+caches the clipped layer, and owns the repeating motion, so Now Playing never keeps the host frame
+loop awake. A renderer without that capability draws the command as static clipped text; there is
+no CPU animation fallback. A hide transition redraws once to remove the compositor layer before
+the position-only bar animation continues, so an off-screen or game-mode bar neither asks for host
+frames nor retains visible compositor work. Its transport controls keep their dedicated actions; a
 pressable release on the remaining card opens the snapshot's source application through the shared
 `OPEN_TARGET` action.
 

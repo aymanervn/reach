@@ -25,7 +25,8 @@ extern "C"
         REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
         REACH_RENDER_COMMAND_TEXTBOX = 15,
         REACH_RENDER_COMMAND_ARC_STROKE = 16,
-        REACH_RENDER_COMMAND_SHADOW = 17
+        REACH_RENDER_COMMAND_SHADOW = 17,
+        REACH_RENDER_COMMAND_ANIMATED_TEXT = 18
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -136,6 +137,9 @@ extern "C"
         int32_t notch_side;
         int32_t text_alignment;
         int32_t text_ellipsis;
+        float animation_offset_x;
+        float animation_hold_seconds;
+        float animation_travel_seconds;
         uint16_t text[260];
 
         reach_color text_color;

@@ -2,7 +2,8 @@
 
 static reach_result reach_d2d_execute_command(reach_render_backend *backend,
                                               ID2D1RenderTarget *target,
-                                              const reach_render_command *command)
+                                              const reach_render_command *command,
+                                              const reach_transform_f32 *transform)
 {
     if (command->type == REACH_RENDER_COMMAND_BLURRED_IMAGE)
     {
@@ -77,6 +78,12 @@ static reach_result reach_d2d_execute_command(reach_render_backend *backend,
         return reach_d2d_draw_text(backend, command);
     }
 
+    if (command->type == REACH_RENDER_COMMAND_ANIMATED_TEXT)
+    {
+        reach_result result = reach_d2d_sync_animated_text(backend, command, transform);
+        return result == REACH_NOT_IMPLEMENTED ? reach_d2d_draw_text(backend, command) : result;
+    }
+
     if (command->type == REACH_RENDER_COMMAND_TEXTBOX)
     {
         return reach_d2d_draw_textbox(backend, command);
@@ -104,6 +111,7 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
 
     const int32_t has_content_rect =
         commands->content_rect.width > 0.0f && commands->content_rect.height > 0.0f;
+    reach_d2d_begin_animated_text_sync(backend);
     if (has_content_rect)
     {
         (void)reach_wuc_apply_content_clip(backend, commands->content_rect);
@@ -119,7 +127,8 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
         const reach_render_command *command = &commands->commands[index];
         if (!command->has_scissor)
         {
-            outcome = reach_d2d_execute_command(backend, target, command);
+            outcome =
+                reach_d2d_execute_command(backend, target, command, &commands->content_transform);
             continue;
         }
 
@@ -132,7 +141,7 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
                                           command->scissor_rect.x + command->scissor_rect.width,
                                           command->scissor_rect.y + command->scissor_rect.height);
         target->PushAxisAlignedClip(scissor, D2D1_ANTIALIAS_MODE_ALIASED);
-        outcome = reach_d2d_execute_command(backend, target, command);
+        outcome = reach_d2d_execute_command(backend, target, command, &commands->content_transform);
         target->PopAxisAlignedClip();
     }
 
@@ -140,6 +149,8 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
     {
         target->SetTransform(D2D1::Matrix3x2F::Identity());
     }
+
+    reach_d2d_end_animated_text_sync(backend);
 
     return outcome;
 }

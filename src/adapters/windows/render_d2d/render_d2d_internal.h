@@ -55,6 +55,23 @@ struct reach_d2d_shadow_cache_entry
     ID2D1Bitmap1 *bitmap;
 };
 
+struct reach_d2d_animated_text_layer
+{
+    reach_render_command command;
+    reach_transform_f32 transform;
+    int32_t has_command;
+    int32_t seen;
+    int32_t visible;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionDrawingSurface> surface;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionSurfaceBrush> brush;
+    ComPtr<ABI::Windows::UI::Composition::IContainerVisual> clip_visual;
+    ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> content_visual;
+    ComPtr<IDCompositionSurface> dcomp_surface;
+    ComPtr<IDCompositionVisual> dcomp_clip_visual;
+    ComPtr<IDCompositionVisual> dcomp_content_visual;
+    ComPtr<IDCompositionAnimation> dcomp_animation;
+};
+
 struct reach_render_backend
 {
     HWND hwnd;
@@ -80,6 +97,8 @@ struct reach_render_backend
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> backdrop_visual;
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> swap_chain_visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> composition_surface;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
+    reach_d2d_animated_text_layer animated_text_layer;
 
     IDWriteFactory *text_factory;
     IWICImagingFactory *wic_factory;
@@ -115,6 +134,10 @@ reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT w
 reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend);
 reach_result reach_dcomp_create_target(reach_render_backend *backend);
 reach_result reach_dcomp_create_blur_target(reach_render_backend *backend);
+reach_result reach_dcomp_sync_animated_text(reach_render_backend *backend,
+                                             const reach_render_command *command,
+                                             const reach_transform_f32 *transform);
+void reach_dcomp_hide_animated_text(reach_render_backend *backend);
 
 HRESULT
 reach_winrt_activate_compositor(ABI::Windows::UI::Composition::ICompositor **out_compositor);
@@ -165,8 +188,18 @@ reach_result reach_d2d_draw_clipped_rounded_rect(ID2D1RenderTarget *target,
 
 reach_result reach_d2d_draw_text(reach_render_backend *backend,
                                  const reach_render_command *command);
+reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1RenderTarget *target,
+                                           const reach_render_command *command);
 reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
                                     const reach_render_command *command);
+
+int32_t reach_d2d_animated_text_command_equal(const reach_render_command *left,
+                                               const reach_render_command *right);
+reach_result reach_d2d_sync_animated_text(reach_render_backend *backend,
+                                          const reach_render_command *command,
+                                          const reach_transform_f32 *transform);
+void reach_d2d_begin_animated_text_sync(reach_render_backend *backend);
+void reach_d2d_end_animated_text_sync(reach_render_backend *backend);
 
 reach_result reach_d2d_execute(reach_render_backend *backend,
                                const reach_render_command_buffer *commands);

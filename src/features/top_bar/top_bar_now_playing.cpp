@@ -9,13 +9,14 @@
 
 static const float REACH_TOP_BAR_NOW_PLAYING_COVER_WIDTH = 0.70f;
 static const float REACH_TOP_BAR_NOW_PLAYING_COVER_FADE_START = 0.65f;
+static const float REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS = 1.6f;
+static const float REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED = 26.0f;
+static const float REACH_TOP_BAR_NOW_PLAYING_MIN_OVERFLOW = 1.0f;
 
 struct reach_top_bar_now_playing
 {
     reach_top_bar_now_playing_model model;
     reach_top_bar_now_playing_layout layout;
-    reach_marquee_state marquee;
-    float text_offset_x;
     uint64_t observed_generation;
 };
 
@@ -56,6 +57,28 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
     command.text_alignment = alignment;
     command.has_scissor = 1;
     command.scissor_rect = clip;
+    reach_copy_utf16(command.text, 260, value);
+    (void)reach_render_command_buffer_push(commands, &command);
+}
+
+static void reach_top_bar_now_playing_push_animated_text(reach_render_command_buffer *commands,
+                                                         reach_rect_f32 rect, const uint16_t *value,
+                                                         float size, int32_t weight,
+                                                         reach_color color, reach_rect_f32 clip,
+                                                         float overflow)
+{
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_ANIMATED_TEXT;
+    command.rect = rect;
+    command.color = color;
+    command.text_size = size;
+    command.text_weight = weight;
+    command.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
+    command.has_scissor = 1;
+    command.scissor_rect = clip;
+    command.animation_offset_x = -overflow;
+    command.animation_hold_seconds = REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS;
+    command.animation_travel_seconds = overflow / REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED;
     reach_copy_utf16(command.text, 260, value);
     (void)reach_render_command_buffer_push(commands, &command);
 }
@@ -256,13 +279,22 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
 
     float dpi_scale = input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     reach_rect_f32 text = input->layout->text;
-    text.x += input->text_offset_x;
     text.width =
         input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
-    reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
-                                        REACH_TEXT_SIZE_MEDIUM * dpi_scale, REACH_TEXT_WEIGHT_BOLD,
-                                        REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title,
-                                        input->layout->text);
+    float overflow = input->layout->text_advance - input->layout->text.width;
+    if (input->animate_text && overflow > REACH_TOP_BAR_NOW_PLAYING_MIN_OVERFLOW)
+    {
+        reach_top_bar_now_playing_push_animated_text(
+            out_commands, text, input->model->line, REACH_TEXT_SIZE_MEDIUM * dpi_scale,
+            REACH_TEXT_WEIGHT_BOLD, theme->now_playing_title, input->layout->text, overflow);
+    }
+    else
+    {
+        reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
+                                            REACH_TEXT_SIZE_MEDIUM * dpi_scale,
+                                            REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING,
+                                            theme->now_playing_title, input->layout->text);
+    }
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
                                      input->model->playback == REACH_MEDIA_PLAYBACK_PLAYING
@@ -346,8 +378,6 @@ void reach_top_bar_now_playing_reset(reach_top_bar_now_playing *now_playing)
     }
     reach_top_bar_now_playing_model_init(&now_playing->model);
     now_playing->layout = {};
-    reach_marquee_reset(&now_playing->marquee);
-    now_playing->text_offset_x = 0.0f;
     now_playing->observed_generation = 0;
 }
 
@@ -384,49 +414,10 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     next.previous_enabled = snapshot.previous_enabled;
     next.play_pause_enabled = snapshot.play_pause_enabled;
     next.next_enabled = snapshot.next_enabled;
-    if (!reach_utf16_equal(now_playing->model.line, next.line))
-    {
-        reach_marquee_reset(&now_playing->marquee);
-        now_playing->text_offset_x = 0.0f;
-    }
     now_playing->model = next;
     now_playing->observed_generation = snapshot.generation;
     out->changed = 1;
     out->visibility_changed = was_visible != next.visible;
-}
-
-int32_t reach_top_bar_now_playing_tick(reach_top_bar_now_playing *now_playing, double delta_seconds)
-{
-    if (now_playing == nullptr || !now_playing->model.visible)
-    {
-        return 0;
-    }
-
-    reach_marquee_request request = {};
-    request.content_width = now_playing->layout.text_advance;
-    request.viewport_width = now_playing->layout.text.width;
-    request.delta_seconds = delta_seconds;
-
-    float offset = reach_marquee_advance(&now_playing->marquee, &request);
-    if (offset == now_playing->text_offset_x)
-    {
-        return 0;
-    }
-    now_playing->text_offset_x = offset;
-    return 1;
-}
-
-int32_t reach_top_bar_now_playing_scrolling(const reach_top_bar_now_playing *now_playing)
-{
-    if (now_playing == nullptr || !now_playing->model.visible)
-    {
-        return 0;
-    }
-
-    reach_marquee_request request = {};
-    request.content_width = now_playing->layout.text_advance;
-    request.viewport_width = now_playing->layout.text.width;
-    return reach_marquee_scrolls(&request);
 }
 
 float reach_top_bar_now_playing_desired_width(const reach_top_bar_now_playing *now_playing,
@@ -500,7 +491,7 @@ reach_result reach_top_bar_now_playing_append_render_commands(
     input.theme = ctx->theme;
     input.model = &model;
     input.layout = &now_playing->layout;
-    input.text_offset_x = now_playing->text_offset_x;
     input.dpi_scale = ctx->dpi_scale;
+    input.animate_text = ctx->animate_text;
     return reach_top_bar_now_playing_build_render_commands(&input, out_commands);
 }
