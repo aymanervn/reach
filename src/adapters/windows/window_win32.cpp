@@ -30,6 +30,7 @@ struct reach_platform_window
     reach_rect_f32 input_regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS];
     size_t input_region_count;
     int input_regions_active;
+    int input_passthrough;
 };
 
 static int32_t reach_platform_window_rect_contains(reach_rect_f32 rect, float x, float y)
@@ -173,6 +174,10 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     switch (message)
     {
     case WM_NCHITTEST:
+        if (window != nullptr && window->input_passthrough)
+        {
+            return HTTRANSPARENT;
+        }
         if (window != nullptr && window->input_regions_active)
         {
             POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
@@ -1069,6 +1074,18 @@ static reach_result reach_platform_window_set_input_regions(reach_platform_windo
     return REACH_OK;
 }
 
+static reach_result reach_platform_window_set_input_passthrough(reach_platform_window *window,
+                                                                int32_t enabled)
+{
+    if (window == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    window->input_passthrough = enabled != 0;
+    return REACH_OK;
+}
+
 static reach_result reach_platform_window_post_event(reach_platform_window *window,
                                                      reach_ui_event_type type)
 {
@@ -1192,6 +1209,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.native_id = reach_platform_window_native_id;
     out_port->ops.place_behind = reach_platform_window_place_behind;
     out_port->ops.post_event = reach_platform_window_post_event;
+    out_port->ops.set_input_passthrough = reach_platform_window_set_input_passthrough;
     out_port->ops.set_input_regions = reach_platform_window_set_input_regions;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;

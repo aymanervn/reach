@@ -19,7 +19,8 @@ enum fake_window_call_kind
     FAKE_WINDOW_CALL_SHOW = 1,
     FAKE_WINDOW_CALL_HIDE = 2,
     FAKE_WINDOW_CALL_SET_TOPMOST = 3,
-    FAKE_WINDOW_CALL_PLACE_BEHIND = 4
+    FAKE_WINDOW_CALL_PLACE_BEHIND = 4,
+    FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH = 5
 };
 
 typedef struct fake_window_call
@@ -38,6 +39,7 @@ static reach_host manipulation_host;
 static reach_host monitor_entry_host;
 static reach_host transition_frame_host;
 static reach_host registry_host;
+static reach_host input_passthrough_host;
 static reach_host generic_frame_host;
 static reach_host native_overlay_host;
 static reach_host closing_stage_host;
@@ -365,6 +367,12 @@ static reach_result fake_set_topmost(reach_platform_window *window, int32_t enab
 static reach_result fake_place_behind(reach_platform_window *window, reach_window_id target)
 {
     record_call(FAKE_WINDOW_CALL_PLACE_BEHIND, window, target);
+    return REACH_OK;
+}
+
+static reach_result fake_set_input_passthrough(reach_platform_window *window, int32_t enabled)
+{
+    record_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, window, (reach_window_id)enabled);
     return REACH_OK;
 }
 
@@ -970,6 +978,10 @@ static void test_registered_feature_lifecycle(void)
                 REACH_LAYOUT_RESERVATION_TOP &&
             host->feature_runtimes[REACH_SURFACE_ID_STAGE].definition->layout.uses_reserved_bounds,
         "Stage consumes the generic bounds reserved by the bars");
+    expect_true(
+        (host->feature_runtimes[REACH_SURFACE_ID_SYSTEM_HUD].definition->surface.behavior_flags &
+         REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH) != 0,
+        "System HUD declares native input passthrough");
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
@@ -988,6 +1000,26 @@ static void test_registered_feature_lifecycle(void)
         expect_true(host->feature_runtimes[index].capsule == nullptr,
                     "destroying registered features clears every surface capsule");
     }
+}
+
+static void test_registered_surface_input_passthrough(void)
+{
+    reach_host *host = &input_passthrough_host;
+    reach_host_init_feature_registry(host);
+
+    reach_host_dependencies dependencies = {};
+    dependencies.launcher_window.window = reinterpret_cast<reach_platform_window *>(1);
+    dependencies.launcher_window.ops.set_input_passthrough = fake_set_input_passthrough;
+    dependencies.system_hud_window.window = reinterpret_cast<reach_platform_window *>(2);
+    dependencies.system_hud_window.ops.set_input_passthrough = fake_set_input_passthrough;
+
+    call_count = 0;
+    reach_host_bind_registered_surface_ports(host, &dependencies);
+
+    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, 1, 0),
+                "ordinary surfaces keep native input enabled");
+    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, 2, 1),
+                "System HUD enables native input passthrough");
 }
 
 static void test_frame_scheduling_does_not_present_a_closed_surface(void)
@@ -1352,6 +1384,7 @@ int main(void)
     test_every_dismissable_surface_reaches_the_shared_close_path();
     test_every_popup_names_the_control_that_holds_it_open();
     test_registered_feature_lifecycle();
+    test_registered_surface_input_passthrough();
     test_frame_scheduling_does_not_present_a_closed_surface();
     test_popup_surface_applies_managed_opacity();
     test_registered_surface_frame_uses_declared_anchor();

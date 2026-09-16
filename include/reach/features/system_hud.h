@@ -39,14 +39,13 @@ extern "C"
     {
         reach_system_hud_kind kind;
         int32_t open;
-        int32_t hovered;
         reach_system_hud_layout layout;
         reach_audio_volume_state volume;
         reach_brightness_state brightness;
         reach_now_playing_snapshot media;
         reach_now_playing_action media_action;
         float content_scale;
-        double visible_seconds;
+        double elapsed_seconds;
     } reach_system_hud_state;
 
     typedef struct reach_system_hud_arrange_context
