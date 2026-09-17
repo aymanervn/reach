@@ -856,7 +856,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
 
     if (event->type == REACH_UI_EVENT_MINIMIZE_ALL)
     {
-        (void)reach_host_schedule_minimize_open_windows(host);
+        (void)reach_host_schedule_minimize_open_windows(host, nullptr);
         return REACH_OK;
     }
 

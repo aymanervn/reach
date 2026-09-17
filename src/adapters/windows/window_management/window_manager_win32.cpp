@@ -660,7 +660,26 @@ static reach_result reach_window_manager_frame_bounds(const reach_window_manager
         {
             return REACH_ERROR;
         }
-        frame = placement.rcNormalPosition;
+        HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO monitor_info = {};
+        monitor_info.cbSize = sizeof(monitor_info);
+        int32_t restore_to_maximized = placement.showCmd == SW_SHOWMAXIMIZED ||
+                                       (placement.flags & WPF_RESTORETOMAXIMIZED) != 0;
+        if (restore_to_maximized && GetMonitorInfoW(monitor, &monitor_info))
+        {
+            frame = monitor_info.rcWork;
+        }
+        else
+        {
+            frame = placement.rcNormalPosition;
+            LONG_PTR ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+            if ((ex_style & WS_EX_TOOLWINDOW) == 0 && GetMonitorInfoW(monitor, &monitor_info))
+            {
+                LONG offset_x = monitor_info.rcWork.left - monitor_info.rcMonitor.left;
+                LONG offset_y = monitor_info.rcWork.top - monitor_info.rcMonitor.top;
+                OffsetRect(&frame, offset_x, offset_y);
+            }
+        }
     }
     else if (FAILED(
                  DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) &&

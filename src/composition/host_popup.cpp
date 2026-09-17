@@ -179,5 +179,5 @@ reach_result reach_host_close_window(reach_host *host, uintptr_t window_id)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id);
+    return reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_CLOSE, window_id, nullptr);
 }

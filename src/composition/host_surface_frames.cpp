@@ -147,6 +147,7 @@ static void reach_host_fill_surface_context(reach_host *host, const reach_featur
     out->dpi_scale = reach_host_layout_dpi_scale(host);
     out->icon_size_px = reach_host_icon_size_px(host);
     out->bounds_valid = desc->surface->bounds_valid;
+    out->preferred_front_source = desc->native_overlay_front_source;
 }
 
 static reach_result
@@ -210,6 +211,8 @@ static int32_t reach_host_bar_position_only(const reach_feature_runtime *desc)
 
 void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *desc)
 {
+    desc->native_overlay_front_source = 0;
+    desc->native_overlay_front_id = REACH_WINDOW_THUMBNAIL_NONE;
     if (!desc->native_overlay_registered)
     {
         return;
@@ -228,6 +231,49 @@ void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *
     }
 }
 
+static void reach_host_apply_native_overlay_front(reach_host *host, reach_feature_runtime *desc)
+{
+    if (desc->native_overlay_front_source == 0 ||
+        host->window_thumbnails.ops.bring_to_front == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_SURFACE_NATIVE_OVERLAY_CAPACITY; ++index)
+    {
+        reach_window_thumbnail_id id = desc->native_overlay_ids[index];
+        if (id == REACH_WINDOW_THUMBNAIL_NONE || id == desc->native_overlay_front_id ||
+            desc->native_overlay_sources[index] != desc->native_overlay_front_source ||
+            desc->native_overlay_planes[index] != REACH_WINDOW_THUMBNAIL_PLANE_TARGET)
+        {
+            continue;
+        }
+        if (host->window_thumbnails.ops.bring_to_front(host->window_thumbnails.thumbnails, id) ==
+            REACH_OK)
+        {
+            desc->native_overlay_front_id = id;
+        }
+        return;
+    }
+}
+
+void reach_host_set_native_overlay_front_source(reach_host *host, reach_feature_runtime *desc,
+                                                reach_window_id source)
+{
+    if (host == nullptr || desc == nullptr || source == 0 ||
+        desc->native_overlay_front_source == source)
+    {
+        return;
+    }
+    desc->native_overlay_front_source = source;
+    desc->native_overlay_front_id = REACH_WINDOW_THUMBNAIL_NONE;
+    reach_host_apply_native_overlay_front(host, desc);
+    if (desc->surface != nullptr)
+    {
+        desc->surface->dirty_flags = 1;
+    }
+    reach_host_request_update(host);
+}
+
 static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_runtime *desc,
                                                 const reach_feature_native_overlay_ops *ops)
 {
@@ -242,7 +288,9 @@ static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_
     reach_window_id target = desc->surface->window.ops.native_id(desc->surface->window.window);
     if (desc->native_overlay_registered && desc->native_overlay_target != target)
     {
+        reach_window_id front_source = desc->native_overlay_front_source;
         reach_host_release_native_overlay(host, desc);
+        desc->native_overlay_front_source = front_source;
     }
     if (target == 0 || host->window_thumbnails.ops.set_target(host->window_thumbnails.thumbnails,
                                                               target) != REACH_OK)
@@ -317,6 +365,7 @@ static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_
             desc->native_overlay_ids[item_index] = id;
         }
     }
+    reach_host_apply_native_overlay_front(host, desc);
     desc->native_overlay_target = target;
     desc->native_overlay_generation = ops->generation(desc->capsule);
     desc->native_overlay_registered = 1;
@@ -381,6 +430,7 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
             placement_result = result;
         }
     }
+    reach_host_apply_native_overlay_front(host, desc);
     return placement_result;
 }
 

@@ -256,6 +256,7 @@ typedef struct reach_feature_surface_context
     int32_t anchor_direction;
     int32_t anchor_valid;
     int32_t content_transform_active;
+    reach_window_id preferred_front_source;
 } reach_feature_surface_context;
 
 typedef enum reach_layout_reservation_edge
@@ -386,6 +387,8 @@ typedef struct reach_feature_runtime
     reach_window_id native_overlay_target;
     size_t native_overlay_generation;
     int32_t native_overlay_registered;
+    reach_window_id native_overlay_front_source;
+    reach_window_thumbnail_id native_overlay_front_id;
     int32_t presentation_visible;
     const reach_feature_definition *definition;
 } reach_feature_runtime;
@@ -423,7 +426,7 @@ typedef struct reach_host_layout_target
 } reach_host_layout_target;
 
 void reach_host_init_feature_registry(reach_host *host);
-reach_result reach_host_apply_feature_action(reach_host *host, const reach_feature_runtime *runtime,
+reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_runtime *runtime,
                                              const reach_capsule_action *action);
 void reach_host_bind_interfeature_routes(reach_host *host);
 void reach_host_clear_interfeature_routes(reach_host *host);
@@ -750,6 +753,8 @@ reach_result reach_host_launch_settings_app(reach_host *host);
 void reach_host_stop_app_control(reach_host *host);
 void reach_host_process_deferred_launch(reach_host *host);
 void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *desc);
+void reach_host_set_native_overlay_front_source(reach_host *host, reach_feature_runtime *desc,
+                                                reach_window_id source);
 reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
                                                           const reach_app_launch_request *request);
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
@@ -790,13 +795,14 @@ void reach_host_apply_foreground_change(reach_host *host);
 int32_t reach_host_window_is_minimized(const reach_host *host, uintptr_t window_id);
 reach_result reach_host_schedule_window_control(reach_host *host,
                                                 reach_window_control_action action,
-                                                uintptr_t window_id);
-reach_result reach_host_schedule_minimize_open_windows(reach_host *host);
+                                                uintptr_t window_id, uint64_t *out_request_id);
+reach_result reach_host_schedule_minimize_open_windows(reach_host *host, uint64_t *out_request_id);
 reach_result reach_host_schedule_open_terminal(reach_host *host);
 reach_result reach_host_schedule_terminal_command(reach_host *host, const uint16_t *command);
 reach_result reach_host_schedule_window_controls(reach_host *host,
                                                  reach_window_control_action action,
-                                                 const uintptr_t *window_ids, size_t window_count);
+                                                 const uintptr_t *window_ids, size_t window_count,
+                                                 uint64_t *out_request_id);
 void reach_host_apply_window_control_result(reach_host *host);
 
 void reach_host_invalidate_bar_coverage(reach_host *host);

@@ -440,6 +440,34 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
     return REACH_OK;
 }
 
+static reach_result reach_window_thumbnail_bring_to_front(reach_window_thumbnails *thumbnails,
+                                                          reach_window_thumbnail_id id)
+{
+    reach_window_thumbnail_entry *entry = reach_window_thumbnail_find(thumbnails, id);
+    if (entry == nullptr || entry->plane != REACH_WINDOW_THUMBNAIL_PLANE_TARGET ||
+        entry->handle == nullptr || entry->destination == nullptr || entry->source == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HTHUMBNAIL replacement = nullptr;
+    if (FAILED(DwmRegisterThumbnail(entry->destination, entry->source, &replacement)) ||
+        replacement == nullptr)
+    {
+        return REACH_ERROR;
+    }
+    if (entry->properties_set &&
+        FAILED(DwmUpdateThumbnailProperties(replacement, &entry->properties)))
+    {
+        DwmUnregisterThumbnail(replacement);
+        return REACH_ERROR;
+    }
+
+    DwmUnregisterThumbnail(entry->handle);
+    entry->handle = replacement;
+    return REACH_OK;
+}
+
 static reach_result reach_window_thumbnail_destroy_all(reach_window_thumbnails *thumbnails)
 {
     if (thumbnails == nullptr)
@@ -530,6 +558,7 @@ reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port 
     out_port->ops.set_target = reach_window_thumbnail_set_target;
     out_port->ops.create = reach_window_thumbnail_create;
     out_port->ops.set_placement = reach_window_thumbnail_set_placement;
+    out_port->ops.bring_to_front = reach_window_thumbnail_bring_to_front;
     out_port->ops.release = reach_window_thumbnail_release;
     out_port->ops.destroy_all = reach_window_thumbnail_destroy_all;
     out_port->ops.destroy = reach_window_thumbnail_destroy;

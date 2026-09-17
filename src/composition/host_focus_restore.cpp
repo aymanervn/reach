@@ -52,5 +52,5 @@ void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id)
         return;
     }
 
-    (void)reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window);
+    (void)reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window, nullptr);
 }

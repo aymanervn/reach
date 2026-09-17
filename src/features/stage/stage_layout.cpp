@@ -462,7 +462,27 @@ void reach_stage_apply_progress(reach_stage *stage)
         }
 
         float progress = tile->desktop ? state->desktop_progress : state->progress;
-        tile->current_rect = reach_stage_interpolate_rect(tile->source_rect, resolved, progress);
+        if (state->closing && tile->close_retargeting)
+        {
+            tile->current_rect = reach_stage_interpolate_rect(
+                tile->source_rect, tile->close_from_rect, state->retarget_progress);
+        }
+        else if (state->closing)
+        {
+            float close_progress =
+                tile->close_from_progress > 0.0f ? progress / tile->close_from_progress : 0.0f;
+            if (close_progress > 1.0f)
+            {
+                close_progress = 1.0f;
+            }
+            tile->current_rect = reach_stage_interpolate_rect(
+                tile->source_rect, tile->close_from_rect, close_progress);
+        }
+        else
+        {
+            tile->current_rect =
+                reach_stage_interpolate_rect(tile->source_rect, resolved, progress);
+        }
 
         float bar = tile->bar_height * progress * tile->presence;
         tile->current_bar.x = tile->current_rect.x;

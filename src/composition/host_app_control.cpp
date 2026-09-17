@@ -41,13 +41,14 @@ void reach_host_stop_app_control(reach_host *host)
 
 reach_result reach_host_schedule_window_control(reach_host *host,
                                                 reach_window_control_action action,
-                                                uintptr_t window_id)
+                                                uintptr_t window_id, uint64_t *out_request_id)
 {
     if (host == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_result result = reach_app_control_schedule_window(host->app_control, action, window_id);
+    reach_result result =
+        reach_app_control_schedule_window(host->app_control, action, window_id, out_request_id);
     if (result == REACH_OK)
     {
         reach_host_request_update(host);
@@ -57,14 +58,15 @@ reach_result reach_host_schedule_window_control(reach_host *host,
 
 reach_result reach_host_schedule_window_controls(reach_host *host,
                                                  reach_window_control_action action,
-                                                 const uintptr_t *window_ids, size_t window_count)
+                                                 const uintptr_t *window_ids, size_t window_count,
+                                                 uint64_t *out_request_id)
 {
     if (host == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_result result =
-        reach_app_control_schedule_windows(host->app_control, action, window_ids, window_count);
+    reach_result result = reach_app_control_schedule_windows(host->app_control, action, window_ids,
+                                                             window_count, out_request_id);
     if (result == REACH_OK)
     {
         reach_host_request_update(host);
@@ -72,8 +74,12 @@ reach_result reach_host_schedule_window_controls(reach_host *host,
     return result;
 }
 
-reach_result reach_host_schedule_minimize_open_windows(reach_host *host)
+reach_result reach_host_schedule_minimize_open_windows(reach_host *host, uint64_t *out_request_id)
 {
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = 0;
+    }
     if (host == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
@@ -88,9 +94,36 @@ reach_result reach_host_schedule_minimize_open_windows(reach_host *host)
     uintptr_t windows[REACH_MAX_OPEN_WINDOWS] = {};
     size_t window_count = reach_window_tracking_collect_unminimized(host->window_tracking, windows,
                                                                     REACH_MAX_OPEN_WINDOWS);
-    return window_count > 0 ? reach_host_schedule_window_controls(
-                                  host, REACH_WINDOW_CONTROL_MINIMIZE, windows, window_count)
-                            : REACH_OK;
+    return window_count > 0
+               ? reach_host_schedule_window_controls(host, REACH_WINDOW_CONTROL_MINIMIZE, windows,
+                                                     window_count, out_request_id)
+               : REACH_OK;
+}
+
+static void reach_host_resolve_close_handoff(reach_host *host, uint64_t request_id)
+{
+    if (request_id == 0)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->surface == nullptr || !runtime->surface->close_handoff_pending ||
+            runtime->surface->close_handoff_request_id != request_id)
+        {
+            continue;
+        }
+        runtime->surface->close_handoff_pending = 0;
+        runtime->surface->close_handoff_request_id = 0;
+        if (runtime->definition != nullptr && runtime->definition->capsule_ops != nullptr &&
+            runtime->definition->capsule_ops->set_close_handoff_pending != nullptr)
+        {
+            reach_feature_tick_result tick = {};
+            runtime->definition->capsule_ops->set_close_handoff_pending(runtime->capsule, 0, &tick);
+            reach_host_apply_feature_tick_result(host, runtime, &tick);
+        }
+    }
 }
 
 void reach_host_apply_window_control_result(reach_host *host)
@@ -100,19 +133,19 @@ void reach_host_apply_window_control_result(reach_host *host)
         return;
     }
 
-    reach_result result = REACH_OK;
-    if (!reach_app_control_take_window_completed(host->app_control, &result))
+    reach_window_control_completion completion = {};
+    while (reach_app_control_take_window_completion(host->app_control, &completion))
     {
-        return;
-    }
+        host->dirty.z_order = 1;
+        reach_host_end_programmatic_window_manipulation(host);
+        reach_host_refresh_window_world(host);
+        reach_host_apply_foreground_change(host);
+        reach_host_resolve_close_handoff(host, completion.request_id);
 
-    host->dirty.z_order = 1;
-    reach_host_end_programmatic_window_manipulation(host);
-    reach_host_refresh_window_world(host);
-
-    if (result == REACH_OK)
-    {
-        host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
+        if (completion.result == REACH_OK)
+        {
+            host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
+        }
     }
 }
 
@@ -320,11 +353,13 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
         reach_window_tracking_window_is_foreground(host->window_tracking, window_id) &&
         !reach_host_window_is_minimized(host, window_id))
     {
-        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_MINIMIZE, window_id);
+        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_MINIMIZE, window_id,
+                                                    nullptr);
     }
     else
     {
-        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window_id);
+        result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE, window_id,
+                                                    nullptr);
     }
 
     host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;

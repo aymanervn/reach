@@ -84,11 +84,13 @@ static reach_result fake_terminal_launch(reach_terminal_launcher *launcher,
     return REACH_OK;
 }
 
-static int wait_for_completion(reach_app_control *service, reach_result *out_result)
+static int wait_for_completion(reach_app_control *service,
+                               reach_window_control_completion *out_completion)
 {
     for (int attempt = 0; attempt < 500; ++attempt)
     {
-        if (fake_notified.load() && reach_app_control_take_window_completed(service, out_result))
+        if (fake_notified.load() &&
+            reach_app_control_take_window_completion(service, out_completion))
         {
             return 1;
         }
@@ -234,13 +236,19 @@ static void test_schedule_windows_closes_every_window(void)
     }
 
     const uintptr_t windows[3] = {11, 22, 33};
-    expect_true(reach_app_control_schedule_windows(service, REACH_WINDOW_CONTROL_CLOSE, windows,
-                                                   3) == REACH_OK,
+    uint64_t request_id = 0;
+    expect_true(reach_app_control_schedule_windows(service, REACH_WINDOW_CONTROL_CLOSE, windows, 3,
+                                                   &request_id) == REACH_OK,
                 "scheduling a batch of closes succeeds");
+    expect_true(request_id != 0, "a scheduled window batch receives a request id");
 
-    reach_result result = REACH_ERROR;
-    expect_true(wait_for_completion(service, &result), "batch reports completion");
-    expect_true(result == REACH_OK, "batch completes without error");
+    reach_window_control_completion completion = {};
+    expect_true(wait_for_completion(service, &completion), "batch reports completion");
+    expect_true(completion.request_id == request_id,
+                "the completion identifies the scheduled batch");
+    expect_true(completion.action == REACH_WINDOW_CONTROL_CLOSE,
+                "the completion identifies the window action");
+    expect_true(completion.result == REACH_OK, "batch completes without error");
     expect_true(fake_closed_count == 3, "every window in the batch is closed");
     expect_true(fake_closed[0] == 11 && fake_closed[1] == 22 && fake_closed[2] == 33,
                 "windows are closed in the order given");

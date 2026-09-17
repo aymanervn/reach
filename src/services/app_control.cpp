@@ -172,6 +172,7 @@ static void reach_app_control_launch_worker_main(reach_app_control_launch_state 
 
 struct reach_app_control_window_request
 {
+    uint64_t request_id = 0;
     reach_window_control_action action = REACH_WINDOW_CONTROL_ACTIVATE;
     std::vector<uintptr_t> windows;
     int32_t is_snap = 0;
@@ -191,9 +192,9 @@ struct reach_app_control
     std::condition_variable window_cv;
     int32_t window_thread_started = 0;
     int32_t window_stop = 0;
-    int32_t window_completed = 0;
-    reach_result window_completed_result = REACH_OK;
+    uint64_t next_window_request_id = 1;
     std::deque<reach_app_control_window_request> window_requests;
+    std::deque<reach_window_control_completion> window_completions;
 };
 
 static reach_result reach_app_control_window_dispatch(reach_app_control *service,
@@ -324,11 +325,11 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
             std::lock_guard<std::mutex> lock(service->window_mutex);
             if (!service->window_stop)
             {
-                if (!service->window_completed || result != REACH_OK)
-                {
-                    service->window_completed_result = result;
-                }
-                service->window_completed = 1;
+                reach_window_control_completion completion = {};
+                completion.request_id = request.request_id;
+                completion.action = request.action;
+                completion.result = result;
+                service->window_completions.push_back(completion);
             }
         }
         if (service->notify != nullptr)
@@ -420,7 +421,7 @@ void reach_app_control_stop(reach_app_control *service)
 
         service->window_thread_started = 0;
         service->window_stop = 0;
-        service->window_completed = 0;
+        service->window_completions.clear();
     }
 }
 
@@ -582,8 +583,14 @@ reach_result reach_app_control_schedule_open_location(reach_app_control *service
 }
 
 static reach_result reach_app_control_enqueue_window(reach_app_control *service,
-                                                     reach_app_control_window_request request)
+                                                     reach_app_control_window_request request,
+                                                     uint64_t *out_request_id)
 {
+    int32_t completion_added = 0;
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = 0;
+    }
     reach_result result = reach_app_control_start_window_worker(service);
     if (result != REACH_OK)
     {
@@ -591,12 +598,23 @@ static reach_result reach_app_control_enqueue_window(reach_app_control *service,
     }
     {
         std::lock_guard<std::mutex> lock(service->window_mutex);
+        request.request_id = service->next_window_request_id++;
+        if (service->next_window_request_id == 0)
+        {
+            service->next_window_request_id = 1;
+        }
         if (request.action == REACH_WINDOW_CONTROL_ACTIVATE && !request.is_snap)
         {
             for (auto it = service->window_requests.begin(); it != service->window_requests.end();)
             {
                 if (it->action == REACH_WINDOW_CONTROL_ACTIVATE && !it->is_snap)
                 {
+                    reach_window_control_completion completion = {};
+                    completion.request_id = it->request_id;
+                    completion.action = it->action;
+                    completion.result = REACH_ERROR;
+                    service->window_completions.push_back(completion);
+                    completion_added = 1;
                     it = service->window_requests.erase(it);
                 }
                 else
@@ -605,38 +623,57 @@ static reach_result reach_app_control_enqueue_window(reach_app_control *service,
                 }
             }
         }
+        if (out_request_id != nullptr)
+        {
+            *out_request_id = request.request_id;
+        }
         service->window_requests.push_back(std::move(request));
     }
     service->window_cv.notify_one();
+    if (completion_added && service->notify != nullptr)
+    {
+        service->notify(service->notify_user);
+    }
     return REACH_OK;
 }
 
 reach_result reach_app_control_schedule_window(reach_app_control *service,
                                                reach_window_control_action action,
-                                               uintptr_t window_id)
+                                               uintptr_t window_id, uint64_t *out_request_id)
 {
-    return reach_app_control_schedule_windows(service, action, &window_id, 1);
+    return reach_app_control_schedule_windows(service, action, &window_id, 1, out_request_id);
 }
 
 reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
-                                             reach_split_mode mode)
+                                             reach_split_mode mode, uint64_t *out_request_id)
 {
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = 0;
+    }
     if (service == nullptr || window_id == 0)
     {
         return REACH_INVALID_ARGUMENT;
     }
     reach_app_control_window_request request;
+    request.action = REACH_WINDOW_CONTROL_SNAP;
     request.windows.push_back(window_id);
     request.is_snap = 1;
     request.snap_mode = mode;
-    return reach_app_control_enqueue_window(service, std::move(request));
+    return reach_app_control_enqueue_window(service, std::move(request), out_request_id);
 }
 
 reach_result reach_app_control_schedule_windows(reach_app_control *service,
                                                 reach_window_control_action action,
-                                                const uintptr_t *window_ids, size_t window_count)
+                                                const uintptr_t *window_ids, size_t window_count,
+                                                uint64_t *out_request_id)
 {
-    if (service == nullptr || window_ids == nullptr || window_count == 0)
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = 0;
+    }
+    if (service == nullptr || window_ids == nullptr || window_count == 0 ||
+        action < REACH_WINDOW_CONTROL_ACTIVATE || action > REACH_WINDOW_CONTROL_CLOSE)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -654,7 +691,7 @@ reach_result reach_app_control_schedule_windows(reach_app_control *service,
     reach_app_control_window_request request;
     request.action = action;
     request.windows.assign(window_ids, window_ids + window_count);
-    return reach_app_control_enqueue_window(service, std::move(request));
+    return reach_app_control_enqueue_window(service, std::move(request), out_request_id);
 }
 
 reach_result reach_app_control_window_bounds(const reach_app_control *service, uintptr_t window_id,
@@ -702,12 +739,12 @@ reach_result reach_app_control_move_windows(reach_app_control *service,
                                                     count);
 }
 
-int32_t reach_app_control_take_window_completed(reach_app_control *service,
-                                                reach_result *out_result)
+int32_t reach_app_control_take_window_completion(reach_app_control *service,
+                                                 reach_window_control_completion *out_completion)
 {
-    if (out_result != nullptr)
+    if (out_completion != nullptr)
     {
-        *out_result = REACH_OK;
+        *out_completion = {};
     }
     if (service == nullptr)
     {
@@ -715,11 +752,14 @@ int32_t reach_app_control_take_window_completed(reach_app_control *service,
     }
 
     std::lock_guard<std::mutex> lock(service->window_mutex);
-    int32_t completed = service->window_completed;
-    if (out_result != nullptr)
+    if (service->window_completions.empty())
     {
-        *out_result = service->window_completed_result;
+        return 0;
     }
-    service->window_completed = 0;
-    return completed;
+    if (out_completion != nullptr)
+    {
+        *out_completion = service->window_completions.front();
+    }
+    service->window_completions.pop_front();
+    return 1;
 }

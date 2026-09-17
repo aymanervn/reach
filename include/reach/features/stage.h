@@ -43,6 +43,9 @@ extern "C"
         reach_rect_f32 reflow_from;
         reach_rect_f32 current_rect;
         reach_rect_f32 current_bar;
+        reach_rect_f32 close_from_rect;
+        float close_from_progress;
+        int32_t close_retargeting;
     } reach_stage_tile;
 
     typedef enum reach_stage_close_phase
@@ -66,6 +69,7 @@ extern "C"
         float desktop_progress;
         float reflow;
         float close_hover;
+        float retarget_progress;
         float animation_seconds;
         reach_rect_f32 bounds;
         reach_rect_f32 desktop_bounds;
@@ -75,8 +79,8 @@ extern "C"
         size_t hover_index;
         int32_t has_hover;
         size_t close_hover_index;
-        size_t selected_index;
-        int32_t has_selection;
+        int32_t close_handoff_pending;
+        int32_t close_aligned_committed;
         reach_stage_tile tiles[REACH_STAGE_MAX_TILES];
     } reach_stage_state;
 
@@ -151,6 +155,7 @@ extern "C"
         const reach_theme *theme;
         reach_rect_f32 bounds;
         float dpi_scale;
+        uintptr_t preferred_front_window;
     } reach_stage_render_context;
 
     reach_result reach_stage_append_render_commands(reach_stage *stage,

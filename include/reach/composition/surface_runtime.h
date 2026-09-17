@@ -23,6 +23,8 @@ extern "C"
         float last_transition_scale;
         int32_t transition_scale_valid;
         int32_t native_visibility_invalidated;
+        uint64_t close_handoff_request_id;
+        int32_t close_handoff_pending;
         uint32_t dirty_flags;
     } reach_surface_runtime;
 
