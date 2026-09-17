@@ -66,6 +66,8 @@ static size_t thumbnail_background_place_count;
 static float thumbnail_background_alpha;
 static size_t thumbnail_destroy_count;
 static size_t thumbnail_release_count;
+static size_t thumbnail_bring_to_front_count;
+static reach_window_thumbnail_id thumbnail_front_id;
 static reach_window_id thumbnail_unavailable_source;
 static reach_result thumbnail_placement_result = REACH_OK;
 static int32_t captured_release_active;
@@ -291,6 +293,19 @@ static reach_result fake_thumbnail_destroy_all(reach_window_thumbnails *thumbnai
 {
     (void)thumbnails;
     thumbnail_destroy_count++;
+    return REACH_OK;
+}
+
+static reach_result fake_thumbnail_bring_to_front(reach_window_thumbnails *thumbnails,
+                                                  reach_window_thumbnail_id id)
+{
+    (void)thumbnails;
+    if (id == REACH_WINDOW_THUMBNAIL_NONE)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    thumbnail_bring_to_front_count++;
+    thumbnail_front_id = id;
     return REACH_OK;
 }
 
@@ -1163,6 +1178,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     host->window_thumbnails.ops.set_target = fake_thumbnail_set_target;
     host->window_thumbnails.ops.create = fake_thumbnail_create;
     host->window_thumbnails.ops.set_placement = fake_thumbnail_set_placement;
+    host->window_thumbnails.ops.bring_to_front = fake_thumbnail_bring_to_front;
     host->window_thumbnails.ops.release = fake_thumbnail_release;
     host->window_thumbnails.ops.destroy_all = fake_thumbnail_destroy_all;
 
@@ -1174,6 +1190,8 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     thumbnail_background_alpha = 0.0f;
     thumbnail_destroy_count = 0;
     thumbnail_release_count = 0;
+    thumbnail_bring_to_front_count = 0;
+    thumbnail_front_id = REACH_WINDOW_THUMBNAIL_NONE;
     observed_bounds = {};
     reach_host_frame_context frame = {};
     frame.monitor_bounds = monitor;
@@ -1188,6 +1206,20 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
                 "generic frame separates app and Desktop thumbnail planes");
     expect_true(thumbnail_background_place_count == 1 && thumbnail_background_alpha == 1.0f,
                 "Desktop lower plane carries one fully opaque Stage background");
+
+    reach_window_thumbnail_id app_thumbnail = stage->native_overlay_ids[0];
+    size_t creates_before_front = thumbnail_create_count;
+    size_t releases_before_front = thumbnail_release_count;
+    reach_host_set_native_overlay_front_source(host, stage, windows[0].window);
+    expect_true(thumbnail_bring_to_front_count == 1 && thumbnail_front_id == app_thumbnail,
+                "the requested app relationship becomes the visual front owner");
+    expect_true(thumbnail_create_count == creates_before_front &&
+                    thumbnail_release_count == releases_before_front,
+                "front ownership preserves every native relationship");
+    expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
+                "the promoted native overlay keeps presenting");
+    expect_true(thumbnail_bring_to_front_count == 1,
+                "the promoted relationship is not recreated on every frame");
 
     reach_stage_open_window joined[3] = {windows[0], {}, windows[1]};
     joined[1].window = 126;
@@ -1241,6 +1273,9 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
                 "generic frame handles native-overlay closure");
     expect_true(thumbnail_destroy_count == destroys_before_close + 1,
                 "generic frame releases native overlays when the capsule closes");
+    expect_true(stage->native_overlay_front_source == 0 &&
+                    stage->native_overlay_front_id == REACH_WINDOW_THUMBNAIL_NONE,
+                "native overlay closure clears visual front ownership");
 
     reach_host_destroy_registered_features(host);
 }

@@ -1078,6 +1078,7 @@ static reach_result reach_stage_surface_render(void *capsule,
     render.theme = ctx->theme;
     render.bounds = ctx->visible_bounds;
     render.dpi_scale = ctx->dpi_scale;
+    render.preferred_front_window = ctx->preferred_front_source;
     return reach_stage_append_render_commands(static_cast<reach_stage *>(capsule), &render,
                                               out_commands);
 }

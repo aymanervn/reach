@@ -80,6 +80,8 @@ static void advance_stage(reach_stage *stage, int steps, double delta_seconds)
     }
 }
 
+static reach_capsule_pointer_result click_tile(reach_stage *stage, size_t index);
+
 static void test_open_and_close_state_machine(void)
 {
     reach_stage *stage = nullptr;
@@ -432,27 +434,88 @@ static void test_close_requires_completion_before_teardown(void)
     reach_stage_destroy(stage);
 }
 
-static void test_selected_close_starts_moving_immediately(void)
+static void test_close_handoff_holds_only_the_reveal(void)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
     reach_stage_open_window window = make_window(1, make_rect(100, 120, 640, 480));
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &window, 1);
     advance_stage(stage, 30, 0.016);
-    reach_stage_state *state = const_cast<reach_stage_state *>(reach_stage_state_ptr(stage));
-    state->has_selection = 1;
-    state->selected_index = 0;
-    reach_rect_f32 settled = state->tiles[0].current_rect;
-    reach_stage_begin_close(stage);
     const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
     reach_feature_tick_result tick = {};
-    ops->tick(stage, 0.016, &tick);
-    expect_true(state->close_phase == REACH_STAGE_CLOSE_MOVING,
-                "a selected close starts in the moving phase");
-    expect_true(!reach_rect_equal(state->tiles[0].current_rect, settled),
-                "the selected thumbnail moves on the first animation tick");
-    expect_true(ops->needs_frame(stage), "the selected close keeps requesting animation frames");
+    ops->set_close_handoff_pending(stage, 1, &tick);
+    reach_stage_begin_close(stage);
+    ops->tick(stage, 1.0, &tick);
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
+                "a pending handoff does not delay Stage movement");
+    ops->presentation_committed(stage, REACH_OK, &tick);
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
+                "a pending handoff retains the aligned opaque frame");
+    expect_true(!ops->needs_frame(stage),
+                "an aligned Stage waits for the event without polling frames");
+    ops->set_close_handoff_pending(stage, 0, &tick);
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_REVEALING,
+                "handoff completion releases the shared reveal");
     reach_stage_destroy(stage);
+}
+
+static void test_app_click_uses_shared_close_animation(void)
+{
+    reach_stage *button_close = nullptr;
+    reach_stage *app_close = nullptr;
+    reach_stage_create(&button_close);
+    reach_stage_create(&app_close);
+    reach_rect_f32 bounds = make_rect(0, 0, 1920, 1080);
+    reach_stage_open_window windows[3] = {make_window(1, make_rect(100, 120, 640, 480)),
+                                          make_window(2, make_rect(800, 160, 900, 700)),
+                                          make_desktop(100, bounds)};
+    reach_stage_open(button_close, bounds, 1, windows, 3);
+    reach_stage_open(app_close, bounds, 1, windows, 3);
+    advance_stage(button_close, 30, 0.016);
+    advance_stage(app_close, 30, 0.016);
+
+    reach_capsule_pointer_result action = click_tile(app_close, 0);
+    expect_true(action.action.kind == REACH_FEATURE_ACTION_ACTIVATE_WINDOW,
+                "an app click publishes activation before the shared close");
+    expect_true((action.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF) != 0,
+                "an app click associates activation with the shared close handoff");
+    reach_stage_begin_close(button_close);
+    reach_stage_begin_close(app_close);
+
+    reach_feature_tick_result button_tick = {};
+    reach_feature_tick_result app_tick = {};
+    reach_stage_capsule_ops()->tick(button_close, 0.050, &button_tick);
+    reach_stage_capsule_ops()->tick(app_close, 0.050, &app_tick);
+    const reach_stage_state *button_state = reach_stage_state_ptr(button_close);
+    const reach_stage_state *app_state = reach_stage_state_ptr(app_close);
+    expect_near(app_state->progress, button_state->progress,
+                "app and button closes share app progress");
+    expect_near(app_state->desktop_progress, button_state->desktop_progress,
+                "app and button closes share Desktop progress");
+    for (size_t index = 0; index < app_state->tile_count; ++index)
+    {
+        expect_near(app_state->tiles[index].current_rect.x,
+                    button_state->tiles[index].current_rect.x,
+                    "app and button closes share tile x");
+        expect_near(app_state->tiles[index].current_rect.y,
+                    button_state->tiles[index].current_rect.y,
+                    "app and button closes share tile y");
+        expect_near(app_state->tiles[index].current_rect.width,
+                    button_state->tiles[index].current_rect.width,
+                    "app and button closes share tile width");
+        expect_near(app_state->tiles[index].current_rect.height,
+                    button_state->tiles[index].current_rect.height,
+                    "app and button closes share tile height");
+        reach_stage_thumbnail_placement button_placement = {};
+        reach_stage_thumbnail_placement app_placement = {};
+        reach_stage_thumbnail_at(button_close, index, &button_placement);
+        reach_stage_thumbnail_at(app_close, index, &app_placement);
+        expect_true(app_placement.visible == button_placement.visible,
+                    "app and button closes share thumbnail visibility");
+    }
+
+    reach_stage_destroy(button_close);
+    reach_stage_destroy(app_close);
 }
 
 static void test_desktop_uses_a_shorter_relative_animation(void)
@@ -516,8 +579,10 @@ static void test_tile_clicks_publish_immediate_window_actions(void)
     reach_capsule_pointer_result result = click_tile(stage, 0);
     expect_true(result.action.kind == REACH_FEATURE_ACTION_ACTIVATE_WINDOW,
                 "an app tile publishes ordinary activation");
-    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) != 0,
-                "an app tile starts Stage close before activation");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0,
+                "an app tile queues activation before the shared Stage close");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF) != 0,
+                "an app tile requests a synchronized close handoff");
 
     reach_stage_force_close(stage);
     app.minimized = 1;
@@ -527,7 +592,9 @@ static void test_tile_clicks_publish_immediate_window_actions(void)
     expect_true(result.action.kind == REACH_FEATURE_ACTION_ACTIVATE_WINDOW,
                 "a minimized app tile publishes ordinary activation");
     expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0,
-                "a minimized app queues restore before Stage begins moving");
+                "a minimized app uses the same activation and close ordering");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF) != 0,
+                "a minimized app uses the same synchronized handoff");
 
     reach_stage_force_close(stage);
     reach_stage_open_window desktop = make_desktop(100, make_rect(0, 0, 1920, 1080));
@@ -536,12 +603,14 @@ static void test_tile_clicks_publish_immediate_window_actions(void)
     result = click_tile(stage, 0);
     expect_true(result.action.kind == REACH_FEATURE_ACTION_MINIMIZE_ALL_WINDOWS,
                 "the Desktop tile publishes minimize all");
-    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) != 0,
-                "the Desktop tile starts Stage close before minimizing apps");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0,
+                "the Desktop tile uses the shared Stage close");
+    expect_true((result.action.flags & REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF) != 0,
+                "the Desktop tile waits for minimize-all before reveal");
     reach_stage_destroy(stage);
 }
 
-static void test_minimized_selection_accepts_restore_during_close(void)
+static void test_closing_stage_retargets_restored_windows(void)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
@@ -550,19 +619,60 @@ static void test_minimized_selection_accepts_restore_during_close(void)
     app.minimized = 1;
     reach_stage_open(stage, bounds, 1, &app, 1);
     advance_stage(stage, 30, 0.016);
-    reach_stage_state *state = const_cast<reach_stage_state *>(reach_stage_state_ptr(stage));
-    state->has_selection = 1;
-    state->selected_index = 0;
     reach_stage_begin_close(stage);
     reach_feature_tick_result tick = {};
     reach_stage_capsule_ops()->tick(stage, 0.016, &tick);
+    reach_rect_f32 before = reach_stage_state_ptr(stage)->tiles[0].current_rect;
+
+    app.minimized = 0;
+    app.frame = make_rect(300, 220, 900, 700);
+    expect_true(reach_stage_update_windows(stage, &app, 1),
+                "a restored window retargets the shared close path");
+    reach_stage_capsule_ops()->tick(stage, 0.0, &tick);
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    expect_near(state->tiles[0].current_rect.x, before.x,
+                "retargeting preserves the current visual x");
+    expect_near(state->tiles[0].current_rect.y, before.y,
+                "retargeting preserves the current visual y");
+    reach_stage_thumbnail_placement placement = {};
+    reach_stage_thumbnail_at(stage, 0, &placement);
+    expect_true(placement.visible, "the restored live thumbnail joins the shared close");
+    reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
+    state = reach_stage_state_ptr(stage);
+    expect_near(state->tiles[0].current_rect.x, app.frame.x,
+                "the shared close lands on the restored x");
+    expect_near(state->tiles[0].current_rect.y, app.frame.y,
+                "the shared close lands on the restored y");
+    reach_stage_destroy(stage);
+}
+
+static void test_restored_thumbnail_is_committed_before_reveal(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window app = make_window(1, make_rect(100, 120, 1200, 675));
+    app.minimized = 1;
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &app, 1);
+    advance_stage(stage, 30, 0.016);
+    const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
+    reach_feature_tick_result tick = {};
+    ops->set_close_handoff_pending(stage, 1, &tick);
+    reach_stage_begin_close(stage);
+    ops->tick(stage, 1.0, &tick);
+    ops->presentation_committed(stage, REACH_OK, &tick);
 
     app.minimized = 0;
     expect_true(reach_stage_update_windows(stage, &app, 1),
-                "a selected minimized app can publish restoration during close");
-    reach_stage_thumbnail_placement placement = {};
-    reach_stage_thumbnail_at(stage, 0, &placement);
-    expect_true(placement.visible, "the restored live thumbnail joins the running animation");
+                "a restored thumbnail changes the aligned presentation");
+    expect_true(!reach_stage_state_ptr(stage)->close_aligned_committed,
+                "the restored thumbnail invalidates the old aligned frame");
+    ops->set_close_handoff_pending(stage, 0, &tick);
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
+                "handoff completion waits for the restored thumbnail frame");
+    expect_true(ops->needs_frame(stage), "the restored thumbnail schedules a synchronized frame");
+    ops->presentation_committed(stage, REACH_OK, &tick);
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_REVEALING,
+                "the shared reveal starts after the restored thumbnail is committed");
     reach_stage_destroy(stage);
 }
 
@@ -702,11 +812,13 @@ static void test_single_app_uses_the_available_stage_area(void)
 int main(void)
 {
     test_close_requires_completion_before_teardown();
-    test_selected_close_starts_moving_immediately();
+    test_close_handoff_holds_only_the_reveal();
+    test_app_click_uses_shared_close_animation();
     test_desktop_uses_a_shorter_relative_animation();
     test_desktop_only_close_has_no_hidden_app_wait();
     test_tile_clicks_publish_immediate_window_actions();
-    test_minimized_selection_accepts_restore_during_close();
+    test_closing_stage_retargets_restored_windows();
+    test_restored_thumbnail_is_committed_before_reveal();
     test_app_grid_fits_inside_desktop_preview();
     test_portrait_monitor_apps_stack_by_screen_position();
     test_portrait_monitor_receives_more_scale_when_width_is_constrained();

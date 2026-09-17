@@ -262,66 +262,71 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
     float eased = state->progress;
 
     float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
-    for (size_t index = 0; index < state->tile_count; ++index)
+    for (size_t pass = 0; pass < 2; ++pass)
     {
-        const reach_stage_tile *tile = &state->tiles[index];
-        if (state->closing && state->has_selection && index != state->selected_index)
+        for (size_t index = 0; index < state->tile_count; ++index)
         {
-            continue;
-        }
+            const reach_stage_tile *tile = &state->tiles[index];
+            int32_t preferred =
+                ctx->preferred_front_window != 0 && tile->window == ctx->preferred_front_window;
+            if (preferred != (pass == 1))
+            {
+                continue;
+            }
 
-        reach_rect_f32 rect = tile->current_rect;
-        if (rect.width <= 0.0f || rect.height <= 0.0f)
-        {
-            continue;
-        }
+            reach_rect_f32 rect = tile->current_rect;
+            if (rect.width <= 0.0f || rect.height <= 0.0f)
+            {
+                continue;
+            }
 
-        float alpha = eased * tile->presence;
-        if (alpha <= 0.0f)
-        {
-            continue;
-        }
+            float alpha = eased * tile->presence;
+            if (alpha <= 0.0f)
+            {
+                continue;
+            }
 
-        if (tile->desktop)
-        {
+            if (tile->desktop)
+            {
+                rect.x -= ctx->bounds.x;
+                rect.y -= ctx->bounds.y;
+                reach_result result =
+                    reach_stage_push_tile_outline(ctx, out_commands, rect, border, alpha);
+                if (result != REACH_OK)
+                {
+                    return result;
+                }
+                continue;
+            }
+
             rect.x -= ctx->bounds.x;
             rect.y -= ctx->bounds.y;
-            reach_result result =
-                reach_stage_push_tile_outline(ctx, out_commands, rect, border, alpha);
+
+            reach_rect_f32 item = rect;
+            item.y -= tile->current_bar.height;
+            item.height += tile->current_bar.height;
+            float hover = state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
+            reach_result result = reach_stage_push_tile_background(
+                ctx, out_commands, item, reach_stage_header_radius(ctx, tile->current_bar), border,
+                hover, alpha);
             if (result != REACH_OK)
             {
                 return result;
             }
-            continue;
-        }
 
-        rect.x -= ctx->bounds.x;
-        rect.y -= ctx->bounds.y;
-
-        reach_rect_f32 item = rect;
-        item.y -= tile->current_bar.height;
-        item.height += tile->current_bar.height;
-        float hover = state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
-        reach_result result = reach_stage_push_tile_background(
-            ctx, out_commands, item, reach_stage_header_radius(ctx, tile->current_bar), border,
-            hover, alpha);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-
-        result = reach_stage_push_tile_header(stage, ctx, index, alpha, out_commands);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-
-        if ((tile->minimized || tile->departing) && !tile->desktop)
-        {
-            result = reach_stage_push_tile_placeholder(ctx, tile, rect, alpha, out_commands);
+            result = reach_stage_push_tile_header(stage, ctx, index, alpha, out_commands);
             if (result != REACH_OK)
             {
                 return result;
+            }
+
+            if ((tile->minimized || tile->departing) && !tile->desktop)
+            {
+                result = reach_stage_push_tile_placeholder(ctx, tile, rect, alpha, out_commands);
+                if (result != REACH_OK)
+                {
+                    return result;
+                }
             }
         }
     }

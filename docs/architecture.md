@@ -258,29 +258,39 @@ outside the app thumbnail rect. Minimized windows have no DWM content and fall b
 to an icon tile. The Desktop source is the Reach-owned top-level Progman
 compatibility host, cropped from the virtual-screen thumbnail to the primary
 monitor.
-Activating a tile suppresses every other tile's thumbnail for the close animation, so
-the chosen window animates alone instead of being covered by a maximized neighbour.
-Tile selection starts that movement immediately and publishes ordinary app activation, or the
-Desktop minimize-all action, concurrently through the shared feature-action contract. For an
-already visible app, Stage begins closing before activation is queued. For a minimized app,
-activation and restoration are queued first and Stage begins closing immediately afterward without
-waiting for readiness. Window-state notifications may replace its placeholder with the live DWM
-thumbnail while the close animation is running. Stage does not wait for native window readiness
-before moving. Ordinary activation retains its existing
+Every Stage dismissal uses one close choreography. An app tile publishes ordinary activation
+without close-first ordering, so the app-control worker queues the selected window before generic
+feature-action handling requests the same Stage close used by the Dock trigger. Stage stores no
+closing selection: every app thumbnail returns to its source frame, Desktop follows its shorter
+track, and event-driven window-state changes update that same running close rather than selecting a
+different choreography. For an app handoff, composition marks the activated source as the
+presentation-only front owner before starting that close. The native-thumbnail adapter promotes
+the existing relationship without changing its stable ID or geometry, and Stage emits that tile's
+drawn chrome last; the preference remains until native-overlay teardown. This does not become
+Stage selection state and does not fork movement, synchronization, fade, or teardown. The feature
+never writes foreground tracking optimistically; the
+foreground watcher records the OS result. Stage does not wait for native window readiness before
+moving. Desktop publishes minimize-all through the same action contract and uses the same close
+choreography. Ordinary activation retains its existing
 topmost promotion/demotion sequence and native foreground-transfer compatibility path, including
 the final attached-input raise. Switcher uses the same ordinary activation path. Its non-activating
 overlay presents immediately and starts the shared close transition before publishing the selected
 window for activation. Switcher Begin runs the generic transient close sweep before refreshing the
 window world and dispatching the event to the capsule.
 The app-control worker serializes window requests, coalesces pending activation selections, and
-preserves close, minimize, and snap requests. Native activation completion is diagnostic state,
-not a prerequisite for visual progress.
-The close lifecycle retains the aligned thumbnail until renderer synchronization acknowledges
-that frame. Only then does the backdrop fade using the shared surface-close duration, while
-the selected app thumbnail stays opaque and stationary. A transparent-frame acknowledgement
-precedes native thumbnail and helper disposal; there is no second activation at disposal.
-Escape follows the same movement and reveal sequence without activating another app. A vanished
-selected window drops the preview and fades out safely. The lower helper carries its
+preserves close, minimize, and snap requests. Each request publishes a correlated completion.
+Activation or minimize-all completion never gates the initial movement; it only retains the final
+opaque aligned frame until composition refreshes the real window state.
+The close lifecycle retains every aligned thumbnail until renderer synchronization acknowledges
+that frame. A source-frame change during movement rebases interpolation from the currently drawn
+rectangle, and a change after alignment runs one short shared retarget. A restored minimized source
+joins the live DWM presentation before reveal even when its predicted and actual rectangles match.
+Only after the current aligned frame and any correlated app-control handoff are complete does the
+backdrop fade using the shared surface-close duration while the thumbnails stay opaque and
+stationary. A transparent-frame acknowledgement precedes native thumbnail and helper disposal;
+there is no second activation at disposal. Escape follows the same movement and reveal sequence
+without activating another app. A vanished source drops out through the native overlay's close
+recovery. The lower helper carries its
 own layered opacity and changes bounds, order, visibility, and paint only when needed.
 The DWM adapter also caches the last submitted thumbnail properties and skips identical
 `DwmUpdateThumbnailProperties` calls; DWM owns live thumbnail resolution and Reach does not request

@@ -168,6 +168,8 @@ extern "C"
         int32_t (*presentation_visible)(const void *capsule);
         void (*presentation_committed)(void *capsule, reach_result result,
                                        reach_feature_tick_result *out);
+        void (*set_close_handoff_pending)(void *capsule, int32_t pending,
+                                          reach_feature_tick_result *out);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

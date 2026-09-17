@@ -123,7 +123,8 @@ reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mod
         return REACH_OK;
     }
 
-    reach_result result = reach_app_control_schedule_snap(host->app_control, foreground, mode);
+    reach_result result =
+        reach_app_control_schedule_snap(host->app_control, foreground, mode, nullptr);
     if (result == REACH_OK)
     {
         reach_host_begin_programmatic_window_manipulation(host, foreground);

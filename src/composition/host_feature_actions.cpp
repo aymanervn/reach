@@ -5,7 +5,30 @@ static void reach_host_close_surface(reach_host *host, const reach_feature_runti
     reach_host_close_registered_surface(host, desc->definition->id, REACH_SURFACE_CLOSE_SUPERSEDED);
 }
 
-reach_result reach_host_apply_feature_action(reach_host *host, const reach_feature_runtime *desc,
+static void reach_host_arm_close_handoff(reach_host *host, reach_feature_runtime *desc,
+                                         const reach_capsule_action *action, uint64_t request_id)
+{
+    if ((action->flags & REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF) == 0 || request_id == 0 ||
+        desc->surface == nullptr)
+    {
+        return;
+    }
+    desc->surface->close_handoff_request_id = request_id;
+    desc->surface->close_handoff_pending = 1;
+    if (action->kind == REACH_FEATURE_ACTION_ACTIVATE_WINDOW && action->window != 0)
+    {
+        reach_host_set_native_overlay_front_source(host, desc, action->window);
+    }
+    if (desc->definition != nullptr && desc->definition->capsule_ops != nullptr &&
+        desc->definition->capsule_ops->set_close_handoff_pending != nullptr)
+    {
+        reach_feature_tick_result tick = {};
+        desc->definition->capsule_ops->set_close_handoff_pending(desc->capsule, 1, &tick);
+        reach_host_apply_feature_tick_result(host, desc, &tick);
+    }
+}
+
+reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_runtime *desc,
                                              const reach_capsule_action *action)
 {
     if (host == nullptr || desc == nullptr || action == nullptr)
@@ -36,10 +59,16 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
 
     case REACH_FEATURE_ACTION_ACTIVATE_WINDOW:
     {
+        uint64_t request_id = 0;
         reach_result activate_result =
-            action->window != 0 ? reach_host_schedule_window_control(
-                                      host, REACH_WINDOW_CONTROL_ACTIVATE, action->window)
-                                : REACH_OK;
+            action->window != 0
+                ? reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE,
+                                                     action->window, &request_id)
+                : REACH_OK;
+        if (activate_result == REACH_OK)
+        {
+            reach_host_arm_close_handoff(host, desc, action, request_id);
+        }
         if ((action->flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0)
         {
             reach_host_close_surface(host, desc);
@@ -53,7 +82,8 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
     case REACH_FEATURE_ACTION_CLOSE_WINDOWS:
         return action->windows != nullptr && action->window_count > 0
                    ? reach_host_schedule_window_controls(host, REACH_WINDOW_CONTROL_CLOSE,
-                                                         action->windows, action->window_count)
+                                                         action->windows, action->window_count,
+                                                         nullptr)
                    : REACH_OK;
 
     case REACH_FEATURE_ACTION_PIN_APP:
@@ -63,11 +93,19 @@ reach_result reach_host_apply_feature_action(reach_host *host, const reach_featu
         return action->id != 0 ? reach_host_unpin_id(host, (uint32_t)action->id) : REACH_ERROR;
 
     case REACH_FEATURE_ACTION_MINIMIZE_ALL_WINDOWS:
+    {
+        uint64_t request_id = 0;
+        reach_result minimize_result = reach_host_schedule_minimize_open_windows(host, &request_id);
+        if (minimize_result == REACH_OK)
+        {
+            reach_host_arm_close_handoff(host, desc, action, request_id);
+        }
         if ((action->flags & REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST) == 0)
         {
             reach_host_close_surface(host, desc);
         }
-        return reach_host_schedule_minimize_open_windows(host);
+        return minimize_result;
+    }
 
     case REACH_FEATURE_ACTION_MEDIA_CONTROL:
         return reach_host_execute_media_action(host, (reach_now_playing_action)action->id);
