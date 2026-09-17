@@ -1595,6 +1595,7 @@ extern "C" reach_result reach_windows_create_system_controls(reach_system_contro
     out_port->set_bluetooth_enabled = reach_system_controls_set_bluetooth_enabled;
     out_port->request_bluetooth_enabled = reach_system_controls_request_bluetooth_enabled;
     out_port->get_power_state = reach_system_controls_get_power_state;
+    out_port->set_battery_saver_enabled = reach_system_controls_set_battery_saver_enabled;
     out_port->get_brightness_state = reach_system_controls_get_brightness_state;
     out_port->set_brightness_level = reach_system_controls_set_brightness_level;
     out_port->open_project_menu = reach_system_controls_open_project_menu;
