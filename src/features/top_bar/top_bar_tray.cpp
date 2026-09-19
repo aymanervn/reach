@@ -614,7 +614,6 @@ static void reach_top_bar_tray_handle_pointer(void *capsule, const reach_pointer
                                                ? REACH_TRAY_ACTION_RIGHT_CLICK
                                                : REACH_TRAY_ACTION_LEFT_CLICK;
                 (void)reach_top_bar_activate_tray_item(top_bar, item->id, action);
-                out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
             }
             out->handled = 1;
         }
