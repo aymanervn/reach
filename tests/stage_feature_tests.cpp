@@ -666,13 +666,83 @@ static void test_restored_thumbnail_is_committed_before_reveal(void)
                 "a restored thumbnail changes the aligned presentation");
     expect_true(!reach_stage_state_ptr(stage)->close_aligned_committed,
                 "the restored thumbnail invalidates the old aligned frame");
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_MOVING,
+                "a late restored thumbnail retargets from the minimized destination");
     ops->set_close_handoff_pending(stage, 0, &tick);
-    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
-                "handoff completion waits for the restored thumbnail frame");
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_MOVING,
+                "handoff completion waits for restored thumbnail movement");
     expect_true(ops->needs_frame(stage), "the restored thumbnail schedules a synchronized frame");
+    ops->tick(stage, 1.0, &tick);
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
+                "the restored thumbnail reaches its live frame before reveal");
     ops->presentation_committed(stage, REACH_OK, &tick);
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_REVEALING,
                 "the shared reveal starts after the restored thumbnail is committed");
+    reach_stage_destroy(stage);
+}
+
+static void test_minimized_close_exits_top_left_without_expanding(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_rect_f32 bounds = make_rect(0, 0, 1920, 1080);
+    reach_stage_open_window app = make_window(1, make_rect(0, 0, 1920, 1040));
+    app.minimized = 1;
+    reach_stage_open(stage, bounds, 1, &app, 1);
+    expect_near(reach_stage_state_ptr(stage)->tiles[0].current_rect.width, app.frame.width,
+                "a minimized window keeps its opening source width");
+    expect_near(reach_stage_state_ptr(stage)->tiles[0].current_rect.height, app.frame.height,
+                "a minimized window keeps its opening source height");
+    advance_stage(stage, 30, 0.016);
+
+    reach_rect_f32 settled = reach_stage_state_ptr(stage)->tiles[0].current_rect;
+    reach_stage_begin_close(stage);
+    reach_feature_tick_result tick = {};
+    reach_stage_capsule_ops()->tick(stage, 0.1, &tick);
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    expect_near(state->tiles[0].current_rect.width, settled.width,
+                "a minimized placeholder does not expand while closing");
+    expect_near(state->tiles[0].current_rect.height, settled.height,
+                "a minimized placeholder keeps its settled height while closing");
+
+    reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
+    state = reach_stage_state_ptr(stage);
+    expect_true(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width <= bounds.x,
+                "a minimized placeholder lands beyond the left edge");
+    expect_true(state->tiles[0].current_rect.y + state->tiles[0].current_rect.height <= bounds.y,
+                "a minimized placeholder lands beyond the top edge");
+    reach_stage_destroy(stage);
+}
+
+static void test_closing_stage_retargets_newly_minimized_windows(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_rect_f32 bounds = make_rect(0, 0, 1920, 1080);
+    reach_stage_open_window app = make_window(1, make_rect(100, 120, 1200, 675));
+    reach_stage_open(stage, bounds, 1, &app, 1);
+    advance_stage(stage, 30, 0.016);
+    reach_stage_begin_close(stage);
+
+    reach_feature_tick_result tick = {};
+    reach_stage_capsule_ops()->tick(stage, 0.016, &tick);
+    reach_rect_f32 before = reach_stage_state_ptr(stage)->tiles[0].current_rect;
+    app.minimized = 1;
+    expect_true(reach_stage_update_windows(stage, &app, 1),
+                "a newly minimized window retargets the shared close path");
+    reach_stage_capsule_ops()->tick(stage, 0.0, &tick);
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    expect_near(state->tiles[0].current_rect.x, before.x,
+                "minimize retargeting preserves the current visual x");
+    expect_near(state->tiles[0].current_rect.y, before.y,
+                "minimize retargeting preserves the current visual y");
+
+    reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
+    state = reach_stage_state_ptr(stage);
+    expect_true(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width <= bounds.x,
+                "a newly minimized placeholder lands beyond the left edge");
+    expect_true(state->tiles[0].current_rect.y + state->tiles[0].current_rect.height <= bounds.y,
+                "a newly minimized placeholder lands beyond the top edge");
     reach_stage_destroy(stage);
 }
 
@@ -819,6 +889,8 @@ int main(void)
     test_tile_clicks_publish_immediate_window_actions();
     test_closing_stage_retargets_restored_windows();
     test_restored_thumbnail_is_committed_before_reveal();
+    test_minimized_close_exits_top_left_without_expanding();
+    test_closing_stage_retargets_newly_minimized_windows();
     test_app_grid_fits_inside_desktop_preview();
     test_portrait_monitor_apps_stack_by_screen_position();
     test_portrait_monitor_receives_more_scale_when_width_is_constrained();

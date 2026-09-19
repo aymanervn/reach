@@ -301,6 +301,22 @@ size_t reach_stage_tile_generation(const reach_stage *stage)
     return stage != nullptr ? stage->state.tile_generation : 0;
 }
 
+static reach_rect_f32 reach_stage_minimized_close_destination(const reach_stage_state *state,
+                                                              reach_rect_f32 rect)
+{
+    rect.x = state->bounds.x - rect.width;
+    rect.y = state->bounds.y - rect.height;
+    return rect;
+}
+
+static reach_rect_f32 reach_stage_close_destination(const reach_stage_state *state,
+                                                    const reach_stage_tile *tile,
+                                                    reach_rect_f32 minimized_rect)
+{
+    return tile->minimized ? reach_stage_minimized_close_destination(state, minimized_rect)
+                           : tile->source_rect;
+}
+
 void reach_stage_begin_close(reach_stage *stage)
 {
     if (stage == nullptr || !stage->state.open || stage->state.closing)
@@ -317,6 +333,8 @@ void reach_stage_begin_close(reach_stage *stage)
     {
         reach_stage_tile *tile = &stage->state.tiles[index];
         tile->close_from_rect = tile->current_rect;
+        tile->close_destination_rect =
+            reach_stage_close_destination(&stage->state, tile, tile->close_from_rect);
         tile->close_from_progress =
             tile->desktop ? stage->state.desktop_progress : stage->state.progress;
         tile->close_retargeting = 0;
@@ -408,24 +426,37 @@ static int32_t reach_stage_update_closing_windows(reach_stage *stage,
             continue;
         }
 
-        if (!reach_rect_equal(tile->source_rect, source->frame))
+        int32_t frame_changed = !reach_rect_equal(tile->source_rect, source->frame);
+        int32_t minimized_changed = tile->minimized != source->minimized;
+        if (frame_changed)
+        {
+            tile->source_rect = source->frame;
+            changed = 1;
+        }
+        if (minimized_changed)
+        {
+            tile->minimized = source->minimized;
+            presentation_changed = 1;
+            changed = 1;
+        }
+        reach_rect_f32 destination = tile->source_rect;
+        if (tile->minimized)
+        {
+            destination = minimized_changed
+                              ? reach_stage_minimized_close_destination(state, tile->current_rect)
+                              : tile->close_destination_rect;
+        }
+        if (!reach_rect_equal(tile->close_destination_rect, destination))
         {
             float progress = tile->desktop ? state->desktop_progress : state->progress;
             tile->close_from_rect = tile->current_rect;
             tile->close_from_progress = progress;
-            tile->source_rect = source->frame;
+            tile->close_destination_rect = destination;
             if (progress <= 0.0f || tile->close_retargeting)
             {
                 tile->close_retargeting = 1;
                 restart_retarget = 1;
             }
-            changed = 1;
-        }
-        if (tile->minimized != source->minimized)
-        {
-            tile->minimized = source->minimized;
-            presentation_changed = 1;
-            changed = 1;
         }
         if (tile->icon_id != source->icon_id)
         {

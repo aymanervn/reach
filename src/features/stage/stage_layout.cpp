@@ -465,7 +465,7 @@ void reach_stage_apply_progress(reach_stage *stage)
         if (state->closing && tile->close_retargeting)
         {
             tile->current_rect = reach_stage_interpolate_rect(
-                tile->source_rect, tile->close_from_rect, state->retarget_progress);
+                tile->close_destination_rect, tile->close_from_rect, state->retarget_progress);
         }
         else if (state->closing)
         {
@@ -476,7 +476,7 @@ void reach_stage_apply_progress(reach_stage *stage)
                 close_progress = 1.0f;
             }
             tile->current_rect = reach_stage_interpolate_rect(
-                tile->source_rect, tile->close_from_rect, close_progress);
+                tile->close_destination_rect, tile->close_from_rect, close_progress);
         }
         else
         {
