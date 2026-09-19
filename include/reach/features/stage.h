@@ -44,6 +44,7 @@ extern "C"
         reach_rect_f32 current_rect;
         reach_rect_f32 current_bar;
         reach_rect_f32 close_from_rect;
+        reach_rect_f32 close_destination_rect;
         float close_from_progress;
         int32_t close_retargeting;
     } reach_stage_tile;

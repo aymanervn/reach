@@ -261,9 +261,11 @@ monitor.
 Every Stage dismissal uses one close choreography. An app tile publishes ordinary activation
 without close-first ordering, so the app-control worker queues the selected window before generic
 feature-action handling requests the same Stage close used by the Dock trigger. Stage stores no
-closing selection: every app thumbnail returns to its source frame, Desktop follows its shorter
-track, and event-driven window-state changes update that same running close rather than selecting a
-different choreography. For an app handoff, composition marks the activated source as the
+closing selection: every live app thumbnail returns to its source frame, while a minimized icon
+placeholder keeps its Stage size and exits fully beyond the surface's top-left instead of expanding
+toward its restore bounds. Desktop follows its shorter track, and event-driven window-state changes
+update that same running close rather than selecting a different choreography. For an app handoff,
+composition marks the activated source as the
 presentation-only front owner before starting that close. The native-thumbnail adapter promotes
 the existing relationship without changing its stable ID or geometry, and Stage emits that tile's
 drawn chrome last; the preference remains until native-overlay teardown. This does not become
@@ -283,8 +285,9 @@ Activation or minimize-all completion never gates the initial movement; it only 
 opaque aligned frame until composition refreshes the real window state.
 The close lifecycle retains every aligned thumbnail until renderer synchronization acknowledges
 that frame. A source-frame change during movement rebases interpolation from the currently drawn
-rectangle, and a change after alignment runs one short shared retarget. A restored minimized source
-joins the live DWM presentation before reveal even when its predicted and actual rectangles match.
+rectangle, and a change after alignment runs one short shared retarget. A window that becomes
+minimized retargets toward the offscreen placeholder destination; a restored minimized source
+retargets toward its live frame and joins the DWM presentation before reveal.
 Only after the current aligned frame and any correlated app-control handoff are complete does the
 backdrop fade using the shared surface-close duration while the thumbnails stay opaque and
 stationary. A transparent-frame acknowledgement precedes native thumbnail and helper disposal;
@@ -304,14 +307,15 @@ boundaries so a failed final handoff follows the capsule's existing recovery pat
 The renderer's synchronization operation waits for DirectComposition commit completion and
 then flushes the calling process's queued DWM work; it does not establish that an external
 application has finished producing its own content.
-A tile's `source_rect` is the screen rect the close animation lands on, and windows
-move while the overview is up — opening Stage forces the top bar shown, and the bar
-pushes every trespassing window down with its reveal progress. Composition therefore
-re-seats the landing rects from live `frame_bounds` immediately before
-`reach_stage_begin_close` (`reach_stage_refresh_tile_frames`), so a tile returns to
-where its window is now rather than where it was when the overview opened. That
-refresh deliberately leaves `target_rect` alone: the grid box is an aspect fit of
-`source_rect`, so re-fitting it would resize tiles the instant a close begins.
+A tile's `source_rect` is its opening origin, layout aspect source, and normal live-window close
+destination. Windows move while the overview is up — opening Stage forces the top bar shown, and the
+bar pushes every trespassing window down with its reveal progress. Composition therefore re-seats
+the source rects from live `frame_bounds` immediately before `reach_stage_begin_close`
+(`reach_stage_refresh_tile_frames`), so a live tile returns to where its window is now rather than
+where it was when the overview opened. Stage then resolves a separate `close_destination_rect`;
+minimized placeholders use an equally sized rectangle beyond the surface's top-left, while other
+tiles use `source_rect`. The refresh deliberately leaves `target_rect` alone: the grid box is an
+aspect fit of `source_rect`, so re-fitting it would resize tiles the instant a close begins.
 
 Context Menu owns row hit resolution, hover state, command selection, dismissal,
 and cancellation through `handle_pointer`. Composition executes the reported
