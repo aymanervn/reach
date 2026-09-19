@@ -6,9 +6,12 @@
 #include <new>
 
 static const double REACH_SYSTEM_HUD_LIFETIME_SECONDS = 1.5;
+static const double REACH_SYSTEM_HUD_APP_REMOVED_LIFETIME_SECONDS =
+    REACH_SYSTEM_HUD_LIFETIME_SECONDS * 2.0;
 static const double REACH_SYSTEM_HUD_DEFAULT_OPEN_SECONDS = 0.16;
 static const double REACH_SYSTEM_HUD_DEFAULT_CLOSE_SECONDS = 0.12;
 static const float REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH = 100.0f;
+static const size_t REACH_SYSTEM_HUD_APP_NAME_MAX_CHARACTERS = 8;
 
 static int32_t reach_system_hud_rect_equal(reach_rect_f32 left, reach_rect_f32 right)
 {
@@ -93,6 +96,51 @@ void reach_system_hud_show_brightness(reach_system_hud *hud, const reach_brightn
     reach_system_hud_begin_show(hud, REACH_SYSTEM_HUD_BRIGHTNESS);
 }
 
+static void reach_system_hud_copy_app_name(uint16_t *destination, const uint16_t *source)
+{
+    destination[0] = 0;
+    if (source == nullptr)
+    {
+        return;
+    }
+    size_t length = reach_strlen_utf16(source);
+    size_t copy_count = length;
+    if (copy_count > REACH_SYSTEM_HUD_APP_NAME_MAX_CHARACTERS)
+    {
+        copy_count = REACH_SYSTEM_HUD_APP_NAME_MAX_CHARACTERS - 1;
+        if (copy_count > 0 && source[copy_count - 1] >= 0xD800 && source[copy_count - 1] <= 0xDBFF)
+        {
+            --copy_count;
+        }
+    }
+    for (size_t index = 0; index < copy_count; ++index)
+    {
+        destination[index] = source[index];
+    }
+    if (length > REACH_SYSTEM_HUD_APP_NAME_MAX_CHARACTERS)
+    {
+        destination[copy_count++] = 0x2026;
+    }
+    destination[copy_count] = 0;
+}
+
+void reach_system_hud_show_app_removed(reach_system_hud *hud, const uint16_t *app_name)
+{
+    if (hud == nullptr)
+    {
+        return;
+    }
+    reach_system_hud_copy_app_name(hud->state.app_name, app_name);
+    reach_system_hud_begin_show(hud, REACH_SYSTEM_HUD_APP_REMOVED);
+}
+
+static double reach_system_hud_lifetime(const reach_system_hud *hud)
+{
+    return hud != nullptr && hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED
+               ? REACH_SYSTEM_HUD_APP_REMOVED_LIFETIME_SECONDS
+               : REACH_SYSTEM_HUD_LIFETIME_SECONDS;
+}
+
 float reach_system_hud_opacity(const reach_system_hud *hud)
 {
     return hud != nullptr
@@ -154,20 +202,20 @@ static void reach_system_hud_capsule_tick(void *capsule, double delta_seconds,
         out->redraw = 1;
     }
 
+    double lifetime = reach_system_hud_lifetime(hud);
     hud->state.elapsed_seconds += delta_seconds;
-    if (hud->state.elapsed_seconds >= REACH_SYSTEM_HUD_LIFETIME_SECONDS)
+    if (hud->state.elapsed_seconds >= lifetime)
     {
         reach_system_hud_force_close(hud);
         out->redraw = 1;
         return;
     }
 
-    double close_start = REACH_SYSTEM_HUD_LIFETIME_SECONDS - hud->close_seconds;
+    double close_start = lifetime - hud->close_seconds;
     if (hud->state.elapsed_seconds >= close_start &&
         reach_animation_manager_target(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY) > 0.0f)
     {
-        reach_system_hud_begin_close(hud, REACH_SYSTEM_HUD_LIFETIME_SECONDS -
-                                              hud->state.elapsed_seconds);
+        reach_system_hud_begin_close(hud, lifetime - hud->state.elapsed_seconds);
         out->redraw = 1;
     }
     out->request_update = 1;
@@ -249,8 +297,12 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
     }
 
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
-    float base_width = hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 340.0f : 272.0f;
-    float base_height = hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 84.0f : 76.0f;
+    float base_width = hud->state.kind == REACH_SYSTEM_HUD_MEDIA
+                           ? 340.0f
+                           : (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED ? 560.0f : 272.0f);
+    float base_height = hud->state.kind == REACH_SYSTEM_HUD_MEDIA
+                            ? 84.0f
+                            : (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED ? 48.0f : 76.0f);
     float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
     float width_scale = ctx->monitor_bounds.width / (base_width + 48.0f + base_border * 2.0f);
     float height_scale = ctx->monitor_bounds.height / (base_height + 48.0f + base_border * 2.0f);
@@ -272,7 +324,6 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
     float dock_top = ctx->dock_shown_bounds.height > 0.0f
                          ? ctx->dock_shown_bounds.y
                          : ctx->monitor_bounds.y + ctx->monitor_bounds.height - 76.0f * scale;
-
     reach_system_hud_layout next = {};
     next.bounds = {ctx->monitor_bounds.x + (ctx->monitor_bounds.width - width) * 0.5f,
                    dock_top - gap - height, width, height};
@@ -309,6 +360,11 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
         content_width = next.media_action.x - content_x - 12.0f * scale;
         next.title = {content_x, border + 18.0f * scale, content_width, 22.0f * scale};
         next.subtitle = {content_x, next.title.y + 24.0f * scale, content_width, 18.0f * scale};
+    }
+    else if (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED)
+    {
+        next.title = {padding, border + (inner_height - 20.0f * scale) * 0.5f,
+                      width - padding * 2.0f, 20.0f * scale};
     }
     else
     {

@@ -1,18 +1,35 @@
 #include "host_internal.h"
 
-reach_result reach_host_schedule_app_launch(reach_host *host,
-                                            const reach_app_launch_request *request)
+static reach_result reach_host_schedule_app_launch_from(reach_host *host,
+                                                        const reach_app_launch_request *request,
+                                                        uint32_t pin_id, const uint16_t *app_name)
 {
     if (host == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_result result = reach_app_control_schedule_launch(host->app_control, request);
+    uint64_t request_id = 0;
+    reach_result result =
+        reach_app_control_schedule_launch(host->app_control, request, &request_id);
     if (result == REACH_OK)
     {
+        if (pin_id != 0)
+        {
+            reach_host_app_launch_context context = {};
+            context.request_id = request_id;
+            context.pin_id = pin_id;
+            reach_copy_utf16(context.app_name, REACH_APPLICATION_TEXT_CAPACITY, app_name);
+            host->app_launch_contexts.push_back(context);
+        }
         reach_host_request_update(host);
     }
     return result;
+}
+
+reach_result reach_host_schedule_app_launch(reach_host *host,
+                                            const reach_app_launch_request *request)
+{
+    return reach_host_schedule_app_launch_from(host, request, 0, nullptr);
 }
 
 reach_result reach_host_schedule_reveal_path(reach_host *host, const uint16_t *path)
@@ -37,6 +54,83 @@ void reach_host_stop_app_control(reach_host *host)
     }
     reach_app_control_stop(host->app_control);
     host->deferred_launch = {};
+    host->app_launch_contexts.clear();
+    host->pending_unpins.clear();
+}
+
+void reach_host_apply_app_launch_results(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_app_launch_completion completion = {};
+    while (reach_app_control_take_launch_completion(host->app_control, &completion))
+    {
+        reach_host_app_launch_context context = {};
+        int32_t has_context = 0;
+        for (auto it = host->app_launch_contexts.begin(); it != host->app_launch_contexts.end();
+             ++it)
+        {
+            if (it->request_id == completion.request_id)
+            {
+                context = *it;
+                host->app_launch_contexts.erase(it);
+                has_context = 1;
+                break;
+            }
+        }
+        if (!has_context || completion.result == REACH_OK ||
+            completion.failure != REACH_APP_LAUNCH_FAILURE_NOT_FOUND)
+        {
+            continue;
+        }
+        reach_feature_notification notification = {};
+        notification.kind = REACH_FEATURE_NOTIFICATION_APP_LAUNCH_FAILED;
+        notification.app_launch_failure = completion.failure;
+        reach_copy_utf16(notification.app_name, REACH_APPLICATION_TEXT_CAPACITY, context.app_name);
+        reach_host_notify_registered_features(host, &notification);
+        int32_t pending = 0;
+        for (const reach_host_pending_unpin &unpin : host->pending_unpins)
+        {
+            if (unpin.pin_id == context.pin_id)
+            {
+                pending = 1;
+                break;
+            }
+        }
+        if (!pending)
+        {
+            host->pending_unpins.push_back({context.pin_id, 0.0});
+        }
+    }
+}
+
+void reach_host_tick_pending_unpins(reach_host *host, double delta_seconds)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    if (delta_seconds < 0.0)
+    {
+        delta_seconds = 0.0;
+    }
+    for (auto it = host->pending_unpins.begin(); it != host->pending_unpins.end();)
+    {
+        it->elapsed_seconds += delta_seconds;
+        if (it->elapsed_seconds < 0.5)
+        {
+            ++it;
+            continue;
+        }
+        (void)reach_host_unpin_id(host, it->pin_id);
+        it = host->pending_unpins.erase(it);
+    }
+    if (!host->pending_unpins.empty())
+    {
+        reach_host_request_update(host);
+    }
 }
 
 reach_result reach_host_schedule_window_control(reach_host *host,
@@ -150,7 +244,8 @@ void reach_host_apply_window_control_result(reach_host *host)
 }
 
 reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
-                                                          const reach_app_launch_request *request)
+                                                          const reach_app_launch_request *request,
+                                                          uint32_t pin_id, const uint16_t *app_name)
 {
     if (host == nullptr || request == nullptr ||
         (request->path[0] == 0 && request->app_user_model_id[0] == 0) ||
@@ -161,6 +256,8 @@ reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reac
 
     host->deferred_launch.request = *request;
     host->deferred_launch.surface = source;
+    host->deferred_launch.pin_id = pin_id;
+    reach_copy_utf16(host->deferred_launch.app_name, REACH_APPLICATION_TEXT_CAPACITY, app_name);
     host->deferred_launch.active = 1;
     reach_host_close_registered_surface(host, source, REACH_SURFACE_CLOSE_SUPERSEDED);
     reach_host_request_update(host);
@@ -179,9 +276,10 @@ void reach_host_process_deferred_launch(reach_host *host)
         return;
     }
 
-    reach_app_launch_request request = host->deferred_launch.request;
+    reach_host_deferred_launch deferred = host->deferred_launch;
     host->deferred_launch = {};
-    (void)reach_host_schedule_app_launch(host, &request);
+    (void)reach_host_schedule_app_launch_from(host, &deferred.request, deferred.pin_id,
+                                              deferred.app_name);
 }
 
 reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature_target *target,
@@ -236,7 +334,8 @@ reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature
 }
 
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
-                                            const reach_feature_target *target, uint32_t flags)
+                                            const reach_feature_target *target, uint32_t flags,
+                                            uint32_t pin_id)
 {
     if (host == nullptr || target == nullptr)
     {
@@ -254,14 +353,16 @@ reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id s
                        (target->app_user_model_id != nullptr && target->app_user_model_id[0] != 0)
                    ? reach_host_open_app(host, target->path, target->arguments,
                                          target->app_user_model_id, target->launch_kind,
-                                         new_instance, run_as_admin, source, defer)
+                                         new_instance, run_as_admin, source, defer, pin_id,
+                                         target->display_name)
                    : REACH_OK;
 
     case REACH_FEATURE_TARGET_PATH:
         return target->path != nullptr && target->path[0] != 0
                    ? reach_host_launch_app(host, target->path, target->arguments, nullptr,
                                            REACH_APPLICATION_LAUNCH_NONE, new_instance,
-                                           run_as_admin, source, defer)
+                                           run_as_admin, source, defer, pin_id,
+                                           target->display_name)
                    : REACH_OK;
 
     case REACH_FEATURE_TARGET_TERMINAL_COMMAND:
@@ -371,7 +472,8 @@ reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
                                    const uint16_t *arguments, const uint16_t *app_user_model_id,
                                    reach_application_launch_kind launch_kind,
                                    int32_t force_new_instance, int32_t run_as_admin,
-                                   reach_surface_id source, int32_t defer_until_closed)
+                                   reach_surface_id source, int32_t defer_until_closed,
+                                   uint32_t pin_id, const uint16_t *app_name)
 {
     if (host == nullptr || ((path == nullptr || path[0] == 0) &&
                             (app_user_model_id == nullptr || app_user_model_id[0] == 0)))
@@ -399,15 +501,18 @@ reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
     request.force_new_instance = force_new_instance ? 1 : 0;
     request.run_as_admin = run_as_admin ? 1 : 0;
 
-    return defer_until_closed ? reach_host_defer_launch_until_surface_closed(host, source, &request)
-                              : reach_host_schedule_app_launch(host, &request);
+    return defer_until_closed
+               ? reach_host_defer_launch_until_surface_closed(host, source, &request, pin_id,
+                                                              app_name)
+               : reach_host_schedule_app_launch_from(host, &request, pin_id, app_name);
 }
 
 reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const uint16_t *arguments,
                                  const uint16_t *app_user_model_id,
                                  reach_application_launch_kind launch_kind,
                                  int32_t force_new_instance, int32_t run_as_admin,
-                                 reach_surface_id source, int32_t defer_until_closed)
+                                 reach_surface_id source, int32_t defer_until_closed,
+                                 uint32_t pin_id, const uint16_t *app_name)
 {
     if (host == nullptr || ((path == nullptr || path[0] == 0) &&
                             (app_user_model_id == nullptr || app_user_model_id[0] == 0)))
@@ -425,7 +530,8 @@ reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const u
     }
 
     return reach_host_launch_app(host, path, arguments, app_user_model_id, launch_kind,
-                                 force_new_instance, run_as_admin, source, defer_until_closed);
+                                 force_new_instance, run_as_admin, source, defer_until_closed,
+                                 pin_id, app_name);
 }
 
 reach_result reach_host_schedule_open_terminal(reach_host *host)

@@ -138,6 +138,51 @@ static void reach_system_hud_render_level(const reach_system_hud_state *state,
                                                    theme->system_hud_track, fill, commands);
 }
 
+static size_t reach_system_hud_append_text(uint16_t *destination, size_t capacity, size_t offset,
+                                           const uint16_t *text)
+{
+    if (destination == nullptr || capacity == 0 || text == nullptr || offset >= capacity)
+    {
+        return offset;
+    }
+    while (text[0] != 0 && offset + 1 < capacity)
+    {
+        destination[offset++] = *text++;
+    }
+    destination[offset] = 0;
+    return offset;
+}
+
+static void reach_system_hud_render_app_removed(const reach_system_hud_state *state,
+                                                const reach_system_hud_render_context *ctx,
+                                                reach_render_command_buffer *commands)
+{
+    static const uint16_t app_prefix[] = {'A', 'p', 'p', ' ', 0};
+    static const uint16_t fallback[] = {'T', 'h', 'i', 's', ' ', 'a', 'p', 'p', 0};
+    static const uint16_t suffix[] = {
+        ' ', 'n', 'o', ' ', 'l', 'o', 'n', 'g', 'e', 'r', ' ', 'e', 'x', 'i', 's', 't', 's',
+        ' ', 'a', 'n', 'd', ' ', 'h', 'a', 's', ' ', 'b', 'e', 'e', 'n', ' ', 'r', 'e', 'm',
+        'o', 'v', 'e', 'd', ' ', 'f', 'r', 'o', 'm', ' ', 'D', 'o', 'c', 'k', '.', 0};
+    uint16_t message[REACH_APPLICATION_TEXT_CAPACITY] = {};
+    size_t offset = 0;
+    if (state->app_name[0] != 0)
+    {
+        offset = reach_system_hud_append_text(message, REACH_APPLICATION_TEXT_CAPACITY, offset,
+                                              app_prefix);
+        offset = reach_system_hud_append_text(message, REACH_APPLICATION_TEXT_CAPACITY, offset,
+                                              state->app_name);
+    }
+    else
+    {
+        offset = reach_system_hud_append_text(message, REACH_APPLICATION_TEXT_CAPACITY, offset,
+                                              fallback);
+    }
+    reach_system_hud_append_text(message, REACH_APPLICATION_TEXT_CAPACITY, offset, suffix);
+    reach_system_hud_push_text(commands, state->layout.title, message,
+                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
+                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_primary_text);
+}
+
 reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud,
                                                      const reach_system_hud_render_context *ctx,
                                                      reach_render_command_buffer *out_commands)
@@ -180,6 +225,10 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
         {
             return result;
         }
+    }
+    else if (state->kind == REACH_SYSTEM_HUD_APP_REMOVED)
+    {
+        reach_system_hud_render_app_removed(state, render_ctx, out_commands);
     }
     else
     {

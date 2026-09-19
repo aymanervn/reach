@@ -31,6 +31,13 @@ extern "C"
         reach_result result;
     } reach_window_control_completion;
 
+    typedef struct reach_app_launch_completion
+    {
+        uint64_t request_id;
+        reach_result result;
+        reach_app_launch_failure failure;
+    } reach_app_launch_completion;
+
     reach_result reach_app_control_create(reach_app_launcher_port launcher,
                                           reach_terminal_launcher_port terminal_launcher,
                                           reach_explorer_service_port explorer,
@@ -43,7 +50,10 @@ extern "C"
 
     int32_t reach_app_control_launch_available(const reach_app_control *service);
     reach_result reach_app_control_schedule_launch(reach_app_control *service,
-                                                   const reach_app_launch_request *request);
+                                                   const reach_app_launch_request *request,
+                                                   uint64_t *out_request_id);
+    int32_t reach_app_control_take_launch_completion(reach_app_control *service,
+                                                     reach_app_launch_completion *out_completion);
 
     reach_result
     reach_app_control_schedule_terminal_launch(reach_app_control *service,

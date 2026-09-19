@@ -26,8 +26,50 @@ struct reach_terminal_launcher
     int32_t windows_terminal;
 };
 
-static reach_result reach_windows_activate_application(const reach_app_launch_request *request)
+static reach_app_launch_failure reach_windows_app_launch_failure(HRESULT result)
 {
+    DWORD code = HRESULT_CODE(result);
+    if (code == ERROR_FILE_NOT_FOUND || code == ERROR_PATH_NOT_FOUND ||
+        code == ERROR_BAD_PATHNAME || code == ERROR_NOT_FOUND)
+    {
+        return REACH_APP_LAUNCH_FAILURE_NOT_FOUND;
+    }
+#ifdef ERROR_PACKAGE_NOT_REGISTERED
+    if (code == ERROR_PACKAGE_NOT_REGISTERED)
+    {
+        return REACH_APP_LAUNCH_FAILURE_NOT_FOUND;
+    }
+#endif
+#ifdef APPMODEL_ERROR_NO_PACKAGE
+    if (code == APPMODEL_ERROR_NO_PACKAGE)
+    {
+        return REACH_APP_LAUNCH_FAILURE_NOT_FOUND;
+    }
+#endif
+#ifdef CO_E_APPNOTFOUND
+    if (result == CO_E_APPNOTFOUND)
+    {
+        return REACH_APP_LAUNCH_FAILURE_NOT_FOUND;
+    }
+#endif
+    if (code == ERROR_CANCELLED)
+    {
+        return REACH_APP_LAUNCH_FAILURE_CANCELLED;
+    }
+    if (code == ERROR_ACCESS_DENIED)
+    {
+        return REACH_APP_LAUNCH_FAILURE_ACCESS_DENIED;
+    }
+    return REACH_APP_LAUNCH_FAILURE_UNKNOWN;
+}
+
+static reach_result reach_windows_activate_application(const reach_app_launch_request *request,
+                                                       reach_app_launch_failure *out_failure)
+{
+    if (out_failure != nullptr)
+    {
+        *out_failure = REACH_APP_LAUNCH_FAILURE_NONE;
+    }
     if (request == nullptr || request->app_user_model_id[0] == 0 || request->run_as_admin)
     {
         return REACH_INVALID_ARGUMENT;
@@ -54,16 +96,25 @@ static reach_result reach_windows_activate_application(const reach_app_launch_re
     {
         CoUninitialize();
     }
+    if (FAILED(hr) && out_failure != nullptr)
+    {
+        *out_failure = reach_windows_app_launch_failure(hr);
+    }
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reach_windows_shell_launch(const wchar_t *verb, const wchar_t *path,
                                                const wchar_t *arguments,
-                                               const wchar_t *working_directory)
+                                               const wchar_t *working_directory,
+                                               reach_app_launch_failure *out_failure)
 {
+    if (out_failure != nullptr)
+    {
+        *out_failure = REACH_APP_LAUNCH_FAILURE_NONE;
+    }
     SHELLEXECUTEINFOW execute = {};
     execute.cbSize = sizeof(execute);
-    execute.fMask = SEE_MASK_ASYNCOK | SEE_MASK_FLAG_NO_UI;
+    execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
     execute.lpVerb = verb;
     execute.lpFile = path;
     execute.lpParameters = arguments;
@@ -74,18 +125,29 @@ static reach_result reach_windows_shell_launch(const wchar_t *verb, const wchar_
 
     HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     BOOL launched = ShellExecuteExW(&execute);
+    DWORD error = launched ? ERROR_SUCCESS : GetLastError();
     if (SUCCEEDED(com_result))
     {
         CoUninitialize();
     }
 
+    if (!launched && out_failure != nullptr)
+    {
+        *out_failure = reach_windows_app_launch_failure(
+            HRESULT_FROM_WIN32(error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE));
+    }
     return launched ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
-                                              const reach_app_launch_request *request)
+                                              const reach_app_launch_request *request,
+                                              reach_app_launch_failure *out_failure)
 {
     (void)launcher;
+    if (out_failure != nullptr)
+    {
+        *out_failure = REACH_APP_LAUNCH_FAILURE_NONE;
+    }
     if (request == nullptr || (request->path[0] == 0 && request->app_user_model_id[0] == 0))
     {
         return REACH_INVALID_ARGUMENT;
@@ -95,7 +157,7 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
         (request->launch_kind == REACH_APPLICATION_LAUNCH_PACKAGED ||
          (request->launch_kind == REACH_APPLICATION_LAUNCH_NONE && request->path[0] == 0)))
     {
-        reach_result activation = reach_windows_activate_application(request);
+        reach_result activation = reach_windows_activate_application(request, out_failure);
         if (activation == REACH_OK || request->path[0] == 0)
         {
             return activation;
@@ -116,7 +178,7 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
                                       request->arguments[0] != 0
                                           ? reinterpret_cast<const wchar_t *>(request->arguments)
                                           : nullptr,
-                                      launch_directory);
+                                      launch_directory, out_failure);
 }
 
 static reach_result reach_terminal_build_windows_terminal_arguments(const uint16_t *command,
@@ -403,7 +465,8 @@ static reach_result reach_terminal_launcher_launch(reach_terminal_launcher *laun
     }
 
     return reach_windows_shell_launch(nullptr, launcher->executable,
-                                      arguments[0] != 0 ? arguments : nullptr, home_directory);
+                                      arguments[0] != 0 ? arguments : nullptr, home_directory,
+                                      nullptr);
 }
 
 static reach_result reach_terminal_launcher_icon_ref(reach_terminal_launcher *launcher,

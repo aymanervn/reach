@@ -30,6 +30,7 @@ extern "C"
         const uint16_t *arguments;
         const uint16_t *app_user_model_id;
         const uint16_t *icon_ref;
+        const uint16_t *display_name;
         reach_application_launch_kind launch_kind;
     } reach_feature_target;
 
