@@ -240,7 +240,10 @@ activate/dismiss actions. It uses no
 generic host transition: its fullscreen surface remains fixed to the monitor while
 the capsule's elapsed-time progress animates app tiles. Desktop uses a separate track at 35% of
 the configured Stage duration, so it settles substantially earlier without depending on a fixed
-millisecond delay. It never calls the thumbnail port — it
+millisecond delay. Closing an individual window from its tile gives that departing tile a dedicated
+opacity track lasting one third of `stage_reflow_seconds`; the surviving tiles keep the full reflow
+duration, so this does not change Stage open/close timing or grid rearrangement. It never calls the
+thumbnail port — it
 publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
 into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in

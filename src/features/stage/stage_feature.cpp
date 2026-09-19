@@ -137,6 +137,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     state->progress = 0.0f;
     state->desktop_progress = 0.0f;
     state->reflow = 1.0f;
+    state->departure_progress = 1.0f;
     state->close_hover = 0.0f;
 
     if (reach_stage_has_apps(state))
@@ -163,6 +164,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
         state->desktop_progress = 1.0f;
     }
     reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_REFLOW, 1.0f);
+    reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE, 1.0f);
     reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f);
     reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_RETARGET, 0.0f);
 
@@ -214,6 +216,7 @@ void reach_stage_start_reflow(reach_stage *stage)
     }
 
     reach_stage_state *state = &stage->state;
+    int32_t has_departing = 0;
     for (size_t index = 0; index < state->tile_count; ++index)
     {
         reach_stage_tile *tile = &state->tiles[index];
@@ -222,6 +225,7 @@ void reach_stage_start_reflow(reach_stage *stage)
         tile->presence_from = tile->presence;
         if (tile->departing)
         {
+            has_departing = 1;
             tile->target_rect = tile->reflow_from;
         }
     }
@@ -231,6 +235,17 @@ void reach_stage_start_reflow(reach_stage *stage)
     state->reflow = 0.0f;
     reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_REFLOW, 0.0f, 1.0f,
                                   reach_stage_reflow_seconds(), REACH_EASING_EASE_IN_OUT);
+    state->departure_progress = has_departing ? 0.0f : 1.0f;
+    if (has_departing)
+    {
+        reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE, 0.0f,
+                                      1.0f, reach_stage_departure_seconds(),
+                                      REACH_EASING_EASE_IN_OUT);
+    }
+    else
+    {
+        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE, 1.0f);
+    }
     reach_stage_apply_progress(stage);
 }
 
@@ -384,6 +399,7 @@ void reach_stage_force_close(reach_stage *stage)
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
+    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP);
     reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_RETARGET);
@@ -752,6 +768,8 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     state->backdrop_opacity =
         reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP);
     state->reflow = reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
+    state->departure_progress =
+        reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE);
     state->close_hover =
         reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER);
     state->retarget_progress =

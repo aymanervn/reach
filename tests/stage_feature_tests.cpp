@@ -746,6 +746,44 @@ static void test_closing_stage_retargets_newly_minimized_windows(void)
     reach_stage_destroy(stage);
 }
 
+static void test_departing_tile_fades_three_times_faster_than_reflow(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window windows[2] = {make_window(1, make_rect(100, 120, 900, 600)),
+                                          make_window(2, make_rect(1100, 160, 700, 500))};
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
+    advance_stage(stage, 30, 0.016);
+
+    reach_rect_f32 close_button = reach_stage_tile_close_button_rect(stage, 0);
+    reach_pointer_event event = {};
+    event.button = REACH_POINTER_BUTTON_PRIMARY;
+    event.x = (int32_t)(close_button.x + close_button.width * 0.5f);
+    event.y = (int32_t)(close_button.y + close_button.height * 0.5f);
+    event.kind = REACH_POINTER_EVENT_DOWN;
+    reach_capsule_pointer_result result = {};
+    reach_stage_capsule_ops()->handle_pointer(stage, &event, &result);
+    event.kind = REACH_POINTER_EVENT_UP;
+    reach_stage_capsule_ops()->handle_pointer(stage, &event, &result);
+    expect_true(result.action.kind == REACH_FEATURE_ACTION_CLOSE_WINDOW,
+                "the Stage close button starts a window departure");
+    reach_feature_tick_result tick = {};
+    reach_stage_capsule_ops()->tick(
+        stage, (double)reach_theme_default()->stage_reflow_seconds / 3.0, &tick);
+    const reach_stage_state *state = reach_stage_state_ptr(stage);
+    expect_near(state->tiles[0].presence, 0.0f,
+                "a closed Stage window finishes fading after one third of reflow");
+    expect_true(state->reflow > 0.0f && state->reflow < 1.0f,
+                "remaining Stage windows keep the original reflow duration");
+    expect_true(state->tile_count == 2,
+                "the faded window remains retained until layout reflow settles");
+
+    reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
+    expect_true(reach_stage_state_ptr(stage)->tile_count == 1,
+                "the closed Stage window is removed when reflow settles");
+    reach_stage_destroy(stage);
+}
+
 static void test_app_grid_fits_inside_desktop_preview(void)
 {
     reach_stage *stage = nullptr;
@@ -891,6 +929,7 @@ int main(void)
     test_restored_thumbnail_is_committed_before_reveal();
     test_minimized_close_exits_top_left_without_expanding();
     test_closing_stage_retargets_newly_minimized_windows();
+    test_departing_tile_fades_three_times_faster_than_reflow();
     test_app_grid_fits_inside_desktop_preview();
     test_portrait_monitor_apps_stack_by_screen_position();
     test_portrait_monitor_receives_more_scale_when_width_is_constrained();

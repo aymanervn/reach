@@ -69,6 +69,7 @@ extern "C"
         float progress;
         float desktop_progress;
         float reflow;
+        float departure_progress;
         float close_hover;
         float retarget_progress;
         float animation_seconds;

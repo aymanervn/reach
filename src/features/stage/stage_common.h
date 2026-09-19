@@ -8,6 +8,7 @@
 #include "reach/support/animation.h"
 
 #define REACH_STAGE_DESKTOP_ANIMATION_FACTOR 0.35
+#define REACH_STAGE_DEPARTURE_ANIMATION_FACTOR (1.0 / 3.0)
 
 static inline float reach_stage_animation_seconds_default(void)
 {
@@ -24,11 +25,17 @@ static inline double reach_stage_reflow_seconds(void)
     return (double)reach_theme_default()->stage_reflow_seconds;
 }
 
+static inline double reach_stage_departure_seconds(void)
+{
+    return reach_stage_reflow_seconds() * REACH_STAGE_DEPARTURE_ANIMATION_FACTOR;
+}
+
 enum
 {
     REACH_STAGE_ANIMATION_PROGRESS = 0,
     REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
     REACH_STAGE_ANIMATION_REFLOW,
+    REACH_STAGE_ANIMATION_DEPARTURE,
     REACH_STAGE_ANIMATION_CLOSE_HOVER,
     REACH_STAGE_ANIMATION_BACKDROP,
     REACH_STAGE_ANIMATION_RETARGET,
