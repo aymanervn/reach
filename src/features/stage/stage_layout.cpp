@@ -449,8 +449,9 @@ void reach_stage_apply_progress(reach_stage *stage)
         reach_stage_tile *tile = &state->tiles[index];
 
         float presence_target = tile->departing ? 0.0f : 1.0f;
+        float presence_progress = tile->departing ? state->departure_progress : state->reflow;
         tile->presence =
-            tile->presence_from + (presence_target - tile->presence_from) * state->reflow;
+            tile->presence_from + (presence_target - tile->presence_from) * presence_progress;
 
         reach_rect_f32 resolved =
             reach_stage_interpolate_rect(tile->reflow_from, tile->target_rect, state->reflow);
