@@ -46,6 +46,11 @@ static reach_rect_f32 reach_host_surface_window_bounds(reach_rect_f32 content, r
     return content;
 }
 
+static int32_t reach_host_requested_bounds_equal(reach_rect_f32 a, reach_rect_f32 b)
+{
+    return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
+}
+
 void reach_host_stamp_surface_content(const reach_host *host, reach_surface_id id,
                                       reach_render_command_buffer *commands)
 {
@@ -83,7 +88,7 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
 
     *out_changed = 0;
     if (window->ops.set_bounds != nullptr &&
-        (!*bounds_valid || !reach_rect_equal(*last_bounds, bounds)))
+        (!*bounds_valid || !reach_host_requested_bounds_equal(*last_bounds, bounds)))
     {
         reach_result result =
             window->ops.set_bounds(window->window, reach_host_surface_window_bounds(bounds, pad));
