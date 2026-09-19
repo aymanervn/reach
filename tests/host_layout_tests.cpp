@@ -56,6 +56,7 @@ static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
 static reach_monitor_info primary_monitor = {1, {0, 0, 1000, 800}, {}, 96, 96, 1, 60};
 static reach_rect_f32 observed_bounds;
+static size_t observed_set_bounds_count;
 static size_t render_count;
 static float observed_last_command_alpha;
 static size_t thumbnail_create_count;
@@ -346,6 +347,7 @@ static reach_result fake_set_bounds(reach_platform_window *window, reach_rect_f3
 {
     (void)window;
     observed_bounds = bounds;
+    ++observed_set_bounds_count;
     return REACH_OK;
 }
 
@@ -604,6 +606,32 @@ static void test_scaled_presentation_keeps_native_envelope_stationary(void)
                                             settled_frame.pointer_transform.offset_y,
                                         10.0f),
                 "a scaled transition keeps pointer motion aligned with rendered content");
+}
+
+static void test_window_state_commits_terminal_subpixel_position(void)
+{
+    reach_platform_window_port window = {};
+    window.window = reinterpret_cast<reach_platform_window *>(1);
+    window.ops.set_bounds = fake_set_bounds;
+    reach_rect_f32 last_bounds = {};
+    int32_t bounds_valid = 0;
+    int32_t changed = 0;
+    observed_set_bounds_count = 0;
+
+    expect_true(reach_host_apply_window_state(&window, {100.25f, 39.90f, 280.0f, 200.0f}, {},
+                                              &last_bounds, &bounds_valid, &changed) == REACH_OK &&
+                    changed,
+                "the near-final presentation position reaches the platform window");
+    expect_true(reach_host_apply_window_state(&window, {100.25f, 40.25f, 280.0f, 200.0f}, {},
+                                              &last_bounds, &bounds_valid, &changed) == REACH_OK &&
+                    changed,
+                "the terminal presentation position reaches the platform window");
+    expect_true(observed_set_bounds_count == 2 && observed_bounds.y == 40.25f,
+                "subpixel logical movement that crosses a native pixel is not suppressed");
+    expect_true(reach_host_apply_window_state(&window, {100.25f, 40.25f, 280.0f, 200.0f}, {},
+                                              &last_bounds, &bounds_valid, &changed) == REACH_OK &&
+                    !changed && observed_set_bounds_count == 2,
+                "an identical platform window request remains cached");
 }
 
 static void test_popup_pointer_coordinates_are_surface_local(void)
@@ -1409,6 +1437,7 @@ int main(void)
     test_window_manipulation_relevance_survives_unavailable_pointer();
     test_window_manipulation_tracks_pointer_monitor_membership();
     test_scaled_presentation_keeps_native_envelope_stationary();
+    test_window_state_commits_terminal_subpixel_position();
     test_popup_pointer_coordinates_are_surface_local();
     test_popup_activation_uses_owner_identity();
     test_power_popup_resolves_its_exact_top_bar_owner();

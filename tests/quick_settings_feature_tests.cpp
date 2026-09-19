@@ -146,10 +146,13 @@ static void test_expansion_keeps_popup_anchor_position(void)
     reach_quick_settings_refresh_layout(quick_settings, &ctx);
     reach_feature_surface_geometry opening_geometry = {};
     reach_quick_settings_capsule_ops()->surface_geometry(quick_settings, &opening_geometry);
-    expect_near(opening_geometry.presentation.y_offset, 0.0f, 0.001f,
-                "quick settings opens without moving its anchored position");
+    expect_near(opening_geometry.presentation.y_offset, -10.0f, 0.001f,
+                "quick settings keeps the shared dropdown opening motion");
     reach_feature_tick_result tick = {};
     reach_quick_settings_capsule_ops()->tick(quick_settings, 1.0, &tick);
+    reach_quick_settings_capsule_ops()->surface_geometry(quick_settings, &opening_geometry);
+    expect_near(opening_geometry.presentation.y_offset, 0.0f, 0.001f,
+                "quick settings opening motion settles on its anchor");
     const reach_quick_settings_state *state = reach_quick_settings_state_ptr(quick_settings);
     const float narrow_width = state->bounds.width;
     const float content_width = state->content_bounds.width;
@@ -177,6 +180,15 @@ static void test_expansion_keeps_popup_anchor_position(void)
         expect_near(reach_quick_settings_state_ptr(quick_settings)->bounds.y, initial_y, 0.001f,
                     "height animation preserves the popup anchor position on every frame");
     }
+
+    (void)reach_quick_settings_set_open(quick_settings, 0);
+    reach_quick_settings_capsule_ops()->tick(quick_settings, 0.06, &tick);
+    reach_feature_surface_geometry closing_geometry = {};
+    reach_quick_settings_capsule_ops()->surface_geometry(quick_settings, &closing_geometry);
+    expect_true(closing_geometry.presentation.y_offset < 0.0f,
+                "quick settings keeps the shared dropdown closing motion");
+    expect_true(closing_geometry.presentation.opacity < 1.0f,
+                "quick settings keeps the shared dropdown closing fade");
     reach_quick_settings_destroy(quick_settings);
 }
 

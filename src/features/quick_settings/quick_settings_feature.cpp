@@ -968,7 +968,6 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
     out->notch_anchor_x = quick_settings->state.notch_anchor_x;
     out->notch_side = reach_popup_notch_side(quick_settings->state.drop_direction);
     reach_feature_transition_presentation(&quick_settings->popup_transition, out);
-    out->presentation.y_offset = 0.0f;
 }
 
 static reach_quick_settings_hit_result
