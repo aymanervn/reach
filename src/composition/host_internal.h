@@ -36,6 +36,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <deque>
 #include <mutex>
 #include <thread>
 
@@ -191,7 +192,8 @@ typedef enum reach_feature_notification_kind
     REACH_FEATURE_NOTIFICATION_ICONS_RETAIN = 8,
     REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 9,
     REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED = 10,
-    REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 11
+    REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 11,
+    REACH_FEATURE_NOTIFICATION_APP_LAUNCH_FAILED = 12
 } reach_feature_notification_kind;
 
 typedef struct reach_feature_notification
@@ -206,6 +208,8 @@ typedef struct reach_feature_notification
     int32_t icon_size_px;
     reach_display_environment display;
     const reach_config_snapshot *config;
+    reach_app_launch_failure app_launch_failure;
+    uint16_t app_name[REACH_APPLICATION_TEXT_CAPACITY];
 } reach_feature_notification;
 
 typedef struct reach_feature_render_resource
@@ -541,8 +545,23 @@ typedef struct reach_host_deferred_launch
 {
     int32_t active;
     reach_surface_id surface;
+    uint32_t pin_id;
+    uint16_t app_name[REACH_APPLICATION_TEXT_CAPACITY];
     reach_app_launch_request request;
 } reach_host_deferred_launch;
+
+typedef struct reach_host_app_launch_context
+{
+    uint64_t request_id;
+    uint32_t pin_id;
+    uint16_t app_name[REACH_APPLICATION_TEXT_CAPACITY];
+} reach_host_app_launch_context;
+
+typedef struct reach_host_pending_unpin
+{
+    uint32_t pin_id;
+    double elapsed_seconds;
+} reach_host_pending_unpin;
 
 typedef struct reach_host_dirty_state
 {
@@ -620,6 +639,8 @@ struct reach_host
     reach_search_service *search_service;
     reach_app_control *app_control;
     reach_host_deferred_launch deferred_launch;
+    std::deque<reach_host_app_launch_context> app_launch_contexts;
+    std::deque<reach_host_pending_unpin> pending_unpins;
     int32_t running;
     reach_runtime_policy_state runtime_policy;
     reach_audio_volume_port audio_volume;
@@ -752,13 +773,18 @@ reach_result reach_host_schedule_reveal_path(reach_host *host, const uint16_t *p
 reach_result reach_host_launch_settings_app(reach_host *host);
 void reach_host_stop_app_control(reach_host *host);
 void reach_host_process_deferred_launch(reach_host *host);
+void reach_host_apply_app_launch_results(reach_host *host);
+void reach_host_tick_pending_unpins(reach_host *host, double delta_seconds);
 void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *desc);
 void reach_host_set_native_overlay_front_source(reach_host *host, reach_feature_runtime *desc,
                                                 reach_window_id source);
 reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reach_surface_id source,
-                                                          const reach_app_launch_request *request);
+                                                          const reach_app_launch_request *request,
+                                                          uint32_t pin_id,
+                                                          const uint16_t *app_name);
 reach_result reach_host_open_feature_target(reach_host *host, reach_surface_id source,
-                                            const reach_feature_target *target, uint32_t flags);
+                                            const reach_feature_target *target, uint32_t flags,
+                                            uint32_t pin_id);
 reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature_target *target,
                                            uintptr_t window_id);
 
@@ -768,12 +794,14 @@ reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
                                    const uint16_t *arguments, const uint16_t *app_user_model_id,
                                    reach_application_launch_kind launch_kind,
                                    int32_t force_new_instance, int32_t run_as_admin,
-                                   reach_surface_id source, int32_t defer_until_closed);
+                                   reach_surface_id source, int32_t defer_until_closed,
+                                   uint32_t pin_id, const uint16_t *app_name);
 reach_result reach_host_open_app(reach_host *host, const uint16_t *path, const uint16_t *arguments,
                                  const uint16_t *app_user_model_id,
                                  reach_application_launch_kind launch_kind,
                                  int32_t force_new_instance, int32_t run_as_admin,
-                                 reach_surface_id source, int32_t defer_until_closed);
+                                 reach_surface_id source, int32_t defer_until_closed,
+                                 uint32_t pin_id, const uint16_t *app_name);
 reach_result reach_host_set_pinned_apps(reach_host *host, const reach_pinned_app_model *apps,
                                         size_t count);
 

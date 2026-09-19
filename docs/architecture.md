@@ -624,18 +624,26 @@ action→port translators for media transport, volume, and brightness live in
 command to `reach_system_status`; the host uses only the cached target returned by the service for
 immediate presentation. The resulting typed notification is offered to every registered control;
 Quick Settings and System HUD consume the kinds they support. Successful media, volume, mute, and
-brightness actions present System HUD independently of top-bar visibility and game mode. Successful
-level changes carry the exact post-action state; media actions make the HUD refresh its presentation
+brightness actions present System HUD independently of top-bar visibility and game mode. A confirmed
+missing Dock launch target presents a one-line System HUD notification naming the app and stating
+that it was removed. Successful level changes carry the exact post-action state; media actions make
+the HUD refresh its presentation
 snapshot from the Now Playing service. Its media presentation shares the cover-art rendering path
 with the top bar: cropped artwork fills and blurs behind the item, then a translucent overlay keeps
 static, ellipsized title and artist text legible. The HUD is a persistent, source-gated surface at layer
-220, above every other Reach layer. It is fully pointer-transparent. Each successful supported
-action resets one 1.5-second total lifetime; the closing fade completes inside that interval and a
-hard deadline makes the HUD fully hidden even after a delayed frame. It is centered above the
-Dock's shown-position geometry even when the Dock itself is hidden, and its whole render command
-buffer is faded by the shared animation manager.
+220, above every other Reach layer. It is fully pointer-transparent. Every presentation uses the normal
+centered position above the Dock's shown-position geometry. Media and level presentations use a
+1.5-second total lifetime; missing-app notifications use three seconds and cap the displayed app name
+at eight characters so the complete one-line sentence remains visible. The closing fade completes
+inside the applicable lifetime and a hard deadline makes the HUD fully hidden even after a delayed
+frame. The whole render command buffer is faded by the shared animation manager.
 A deferred launch is keyed on the surface that requested it, so composition waits for that
 surface's own close presentation before running the launch rather than testing one named feature.
+`app_control` publishes correlated asynchronous launch completions. Composition retains the generic
+pin id and display name until completion and broadcasts a typed failure notification only when the
+adapter classifies the target as missing; cancellation, access denial, and unknown failures do not
+masquerade as an uninstalled app. Composition removes that pin 500 milliseconds after presenting the
+notification, while the HUD keeps its copied display text for the rest of its independent lifetime.
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
 own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
 pass. Capsules also own feature-specific presentation animation. Launcher keeps its offset,
@@ -658,8 +666,8 @@ exposes uniform `surface_ops` for
 arrangement and render-command production. `reach_host_frame_registered_surface`
 then resolves the declared layout anchor, applies window geometry and visibility,
 and executes rendering without naming the feature. System HUD uses this path and
-declares Dock as its anchor; the Dock's shown-position bounds are stored on its
-feature runtime rather than in a HUD-specific host cache. Switcher also uses the
+declares Dock as its anchor. The Dock's shown-position bounds are stored on
+its feature runtime rather than in a HUD-specific host cache. Switcher also uses the
 path: its capsule owns width animation, presentation, arranged bounds, and geometry publication.
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved
 bounds receives the remaining rectangle through the generic surface context; Stage uses this

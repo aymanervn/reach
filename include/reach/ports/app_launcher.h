@@ -23,11 +23,21 @@ extern "C"
         int32_t run_as_admin;
     } reach_app_launch_request;
 
+    typedef enum reach_app_launch_failure
+    {
+        REACH_APP_LAUNCH_FAILURE_NONE = 0,
+        REACH_APP_LAUNCH_FAILURE_NOT_FOUND = 1,
+        REACH_APP_LAUNCH_FAILURE_CANCELLED = 2,
+        REACH_APP_LAUNCH_FAILURE_ACCESS_DENIED = 3,
+        REACH_APP_LAUNCH_FAILURE_UNKNOWN = 4
+    } reach_app_launch_failure;
+
     typedef struct reach_app_launcher_ops
     {
 
         reach_result (*launch)(reach_app_launcher *launcher,
-                               const reach_app_launch_request *request);
+                               const reach_app_launch_request *request,
+                               reach_app_launch_failure *out_failure);
         void (*destroy)(reach_app_launcher *launcher);
     } reach_app_launcher_ops;
 

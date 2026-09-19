@@ -19,7 +19,8 @@ extern "C"
         REACH_SYSTEM_HUD_NONE = 0,
         REACH_SYSTEM_HUD_MEDIA = 1,
         REACH_SYSTEM_HUD_VOLUME = 2,
-        REACH_SYSTEM_HUD_BRIGHTNESS = 3
+        REACH_SYSTEM_HUD_BRIGHTNESS = 3,
+        REACH_SYSTEM_HUD_APP_REMOVED = 4
     } reach_system_hud_kind;
 
     typedef struct reach_system_hud_layout
@@ -44,6 +45,7 @@ extern "C"
         reach_brightness_state brightness;
         reach_now_playing_snapshot media;
         reach_now_playing_action media_action;
+        uint16_t app_name[REACH_APPLICATION_TEXT_CAPACITY];
         float content_scale;
         double elapsed_seconds;
     } reach_system_hud_state;
@@ -78,6 +80,7 @@ extern "C"
     void reach_system_hud_show_volume(reach_system_hud *hud, const reach_audio_volume_state *state);
     void reach_system_hud_show_brightness(reach_system_hud *hud,
                                           const reach_brightness_state *state);
+    void reach_system_hud_show_app_removed(reach_system_hud *hud, const uint16_t *app_name);
     void reach_system_hud_refresh_media(reach_system_hud *hud);
     int32_t reach_system_hud_arrange(reach_system_hud *hud,
                                      const reach_system_hud_arrange_context *ctx);

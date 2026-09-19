@@ -121,8 +121,8 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
 
     case REACH_FEATURE_ACTION_OPEN_TARGET:
     {
-        reach_result open_result = reach_host_open_feature_target(host, desc->definition->id,
-                                                                  &action->target, action->flags);
+        reach_result open_result = reach_host_open_feature_target(
+            host, desc->definition->id, &action->target, action->flags, (uint32_t)action->id);
         if (open_result == REACH_OK)
         {
             reach_host_close_transient_surfaces(host, 0);

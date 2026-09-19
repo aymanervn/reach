@@ -32,6 +32,7 @@ enum reach_app_control_launch_item_kind
 struct reach_app_control_launch_item
 {
     int32_t kind;
+    uint64_t request_id;
     reach_app_launch_request launch;
     reach_terminal_launch_request terminal;
     reach_app_control_location_kind location;
@@ -51,6 +52,11 @@ struct reach_app_control_launch_state
     int32_t total_workers = 0;
     int32_t stop = 0;
     int32_t refs = 1;
+    int32_t callbacks_active = 0;
+    uint64_t next_request_id = 1;
+    std::deque<reach_app_launch_completion> completions;
+    void (*notify)(void *user) = nullptr;
+    void *notify_user = nullptr;
 };
 
 static void reach_app_control_launch_state_release(reach_app_control_launch_state *state)
@@ -105,6 +111,45 @@ static void reach_app_control_open_location(const reach_app_control_launch_state
     default:
         reach_app_control_open_default(state);
         return;
+    }
+}
+
+static void reach_app_control_publish_launch_completion(reach_app_control_launch_state *state,
+                                                        uint64_t request_id, reach_result result,
+                                                        reach_app_launch_failure failure)
+{
+    void (*notify)(void *user) = nullptr;
+    void *notify_user = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        if (state->stop)
+        {
+            return;
+        }
+        reach_app_launch_completion completion = {};
+        completion.request_id = request_id;
+        completion.result = result;
+        completion.failure = failure;
+        state->completions.push_back(completion);
+        notify = state->notify;
+        notify_user = state->notify_user;
+        if (notify != nullptr)
+        {
+            ++state->callbacks_active;
+        }
+    }
+    if (notify == nullptr)
+    {
+        return;
+    }
+    notify(notify_user);
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        --state->callbacks_active;
+        if (state->stop && state->callbacks_active == 0)
+        {
+            state->cv.notify_all();
+        }
     }
 }
 
@@ -165,7 +210,10 @@ static void reach_app_control_launch_worker_main(reach_app_control_launch_state 
         }
         else if (state->launcher.ops.launch != nullptr)
         {
-            (void)state->launcher.ops.launch(state->launcher.launcher, &item.launch);
+            reach_app_launch_failure failure = REACH_APP_LAUNCH_FAILURE_NONE;
+            reach_result result =
+                state->launcher.ops.launch(state->launcher.launcher, &item.launch, &failure);
+            reach_app_control_publish_launch_completion(state, item.request_id, result, failure);
         }
     }
 }
@@ -382,6 +430,8 @@ reach_result reach_app_control_create(reach_app_launcher_port launcher,
     launch->launcher = launcher;
     launch->terminal_launcher = terminal_launcher;
     launch->explorer = explorer;
+    launch->notify = notify;
+    launch->notify_user = notify_user;
     service->launch = launch;
     service->window_manager = window_manager;
     service->notify = notify;
@@ -399,10 +449,15 @@ void reach_app_control_stop(reach_app_control *service)
 
     if (service->launch != nullptr)
     {
-        std::lock_guard<std::mutex> lock(service->launch->mutex);
+        std::unique_lock<std::mutex> lock(service->launch->mutex);
         service->launch->stop = 1;
         service->launch->queue_count = 0;
+        service->launch->completions.clear();
+        service->launch->notify = nullptr;
+        service->launch->notify_user = nullptr;
         service->launch->cv.notify_all();
+        service->launch->cv.wait(lock,
+                                 [service]() { return service->launch->callbacks_active == 0; });
     }
 
     if (service->window_thread_started)
@@ -446,9 +501,15 @@ int32_t reach_app_control_launch_available(const reach_app_control *service)
 }
 
 static reach_result reach_app_control_enqueue(reach_app_control_launch_state *state,
-                                              const reach_app_control_launch_item *item)
+                                              const reach_app_control_launch_item *item,
+                                              uint64_t *out_request_id)
 {
     int32_t spawn = 0;
+    uint64_t request_id = 0;
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = 0;
+    }
     {
         std::lock_guard<std::mutex> lock(state->mutex);
         if (state->stop)
@@ -460,8 +521,18 @@ static reach_result reach_app_control_enqueue(reach_app_control_launch_state *st
         {
             return REACH_ERROR;
         }
+        reach_app_control_launch_item queued = *item;
+        if (item->kind == REACH_APP_CONTROL_ITEM_LAUNCH)
+        {
+            request_id = state->next_request_id++;
+            if (state->next_request_id == 0)
+            {
+                state->next_request_id = 1;
+            }
+            queued.request_id = request_id;
+        }
         state->queue[(state->queue_head + state->queue_count) %
-                     REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = *item;
+                     REACH_APP_CONTROL_LAUNCH_QUEUE_CAPACITY] = queued;
         ++state->queue_count;
 
         if (state->idle_workers > 0)
@@ -495,12 +566,21 @@ static reach_result reach_app_control_enqueue(reach_app_control_launch_state *st
         }
     }
 
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = request_id;
+    }
     return REACH_OK;
 }
 
 reach_result reach_app_control_schedule_launch(reach_app_control *service,
-                                               const reach_app_launch_request *request)
+                                               const reach_app_launch_request *request,
+                                               uint64_t *out_request_id)
 {
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = 0;
+    }
     if (service == nullptr || service->launch == nullptr || request == nullptr ||
         (request->path[0] == 0 && request->app_user_model_id[0] == 0))
     {
@@ -514,7 +594,31 @@ reach_result reach_app_control_schedule_launch(reach_app_control *service,
     reach_app_control_launch_item item = {};
     item.kind = REACH_APP_CONTROL_ITEM_LAUNCH;
     item.launch = *request;
-    return reach_app_control_enqueue(service->launch, &item);
+    return reach_app_control_enqueue(service->launch, &item, out_request_id);
+}
+
+int32_t reach_app_control_take_launch_completion(reach_app_control *service,
+                                                 reach_app_launch_completion *out_completion)
+{
+    if (out_completion != nullptr)
+    {
+        *out_completion = {};
+    }
+    if (service == nullptr || service->launch == nullptr)
+    {
+        return 0;
+    }
+    std::lock_guard<std::mutex> lock(service->launch->mutex);
+    if (service->launch->completions.empty())
+    {
+        return 0;
+    }
+    if (out_completion != nullptr)
+    {
+        *out_completion = service->launch->completions.front();
+    }
+    service->launch->completions.pop_front();
+    return 1;
 }
 
 reach_result
@@ -533,7 +637,7 @@ reach_app_control_schedule_terminal_launch(reach_app_control *service,
     reach_app_control_launch_item item = {};
     item.kind = REACH_APP_CONTROL_ITEM_TERMINAL;
     item.terminal = *request;
-    return reach_app_control_enqueue(service->launch, &item);
+    return reach_app_control_enqueue(service->launch, &item, nullptr);
 }
 
 int32_t reach_app_control_reveal_available(const reach_app_control *service)
@@ -556,7 +660,7 @@ reach_result reach_app_control_schedule_reveal(reach_app_control *service, const
     reach_app_control_launch_item item = {};
     item.kind = REACH_APP_CONTROL_ITEM_REVEAL;
     reach_copy_utf16(item.launch.path, 260, path);
-    return reach_app_control_enqueue(service->launch, &item);
+    return reach_app_control_enqueue(service->launch, &item, nullptr);
 }
 
 reach_result reach_app_control_schedule_open_location(reach_app_control *service,
@@ -579,7 +683,7 @@ reach_result reach_app_control_schedule_open_location(reach_app_control *service
     {
         reach_copy_utf16(item.launch.path, 260, path);
     }
-    return reach_app_control_enqueue(service->launch, &item);
+    return reach_app_control_enqueue(service->launch, &item, nullptr);
 }
 
 static reach_result reach_app_control_enqueue_window(reach_app_control *service,

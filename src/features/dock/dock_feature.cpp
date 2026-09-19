@@ -49,6 +49,7 @@ struct reach_dock
     reach_pinned_app_model pinned_apps[REACH_MAX_PINNED_APPS];
     size_t pinned_app_count;
     reach_menu_request action_request;
+    uint16_t action_display_name[REACH_APPLICATION_TEXT_CAPACITY];
     reach_menu_request hover_request;
     reach_dock_model metrics;
     uint32_t next_app_key;
@@ -545,6 +546,7 @@ static int32_t reach_dock_capsule_publish_open_item(reach_dock *dock, size_t ite
     }
     out->action.kind = REACH_FEATURE_ACTION_OPEN_TARGET;
     out->action.flags |= flags;
+    out->action.id = dock->action_request.pin_id;
     out->action.target.kind = REACH_FEATURE_TARGET_APP;
     out->action.target.path = dock->action_request.path;
     out->action.target.arguments =
@@ -552,6 +554,9 @@ static int32_t reach_dock_capsule_publish_open_item(reach_dock *dock, size_t ite
     out->action.target.app_user_model_id = dock->action_request.app_user_model_id[0] != 0
                                                ? dock->action_request.app_user_model_id
                                                : nullptr;
+    reach_copy_path_stem_utf16(dock->action_display_name, REACH_APPLICATION_TEXT_CAPACITY,
+                               dock->action_request.path);
+    out->action.target.display_name = dock->action_display_name;
     out->action.target.launch_kind = dock->action_request.launch_kind;
     return 1;
 }

@@ -78,8 +78,13 @@ static reach_result uninstall_app(reach_installed_apps *, const reach_installed_
     return REACH_ERROR;
 }
 
-static reach_result launch_app(reach_app_launcher *, const reach_app_launch_request *request)
+static reach_result launch_app(reach_app_launcher *, const reach_app_launch_request *request,
+                               reach_app_launch_failure *out_failure)
 {
+    if (out_failure != nullptr)
+    {
+        *out_failure = REACH_APP_LAUNCH_FAILURE_NONE;
+    }
     ++open_count;
     reach_copy_utf16(opened_aumid, 260, request->app_user_model_id);
     return REACH_OK;

@@ -81,10 +81,10 @@ static void reach_installed_apps_service_thread_main(reach_installed_apps_servic
             reach_app_launch_request request = {};
             reach_copy_utf16(request.path, 260, entry.launch_path);
             reach_copy_utf16(request.app_user_model_id, 260, entry.app_user_model_id);
-            succeeded =
-                index < REACH_INSTALLED_APP_MAX_ENTRIES &&
-                service->launcher.ops.launch != nullptr &&
-                service->launcher.ops.launch(service->launcher.launcher, &request) == REACH_OK;
+            succeeded = index < REACH_INSTALLED_APP_MAX_ENTRIES &&
+                        service->launcher.ops.launch != nullptr &&
+                        service->launcher.ops.launch(service->launcher.launcher, &request,
+                                                     nullptr) == REACH_OK;
         }
         else if (command == REACH_INSTALLED_APPS_COMMAND_UNINSTALL)
         {

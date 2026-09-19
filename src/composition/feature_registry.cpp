@@ -471,11 +471,17 @@ static void reach_feature_notify_system_hud(void *capsule,
     {
         reach_system_hud_refresh_media(hud);
     }
+    else if (notification->kind == REACH_FEATURE_NOTIFICATION_APP_LAUNCH_FAILED &&
+             notification->app_launch_failure == REACH_APP_LAUNCH_FAILURE_NOT_FOUND)
+    {
+        reach_system_hud_show_app_removed(hud, notification->app_name);
+    }
     else
     {
         return;
     }
     out->redraw = 1;
+    out->relayout = 1;
     out->request_update = 1;
 }
 

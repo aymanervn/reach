@@ -228,6 +228,8 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         host->dirty.events_dispatched_this_cycle = 0;
     }
 
+    reach_host_tick_pending_unpins(host, delta_seconds);
+    reach_host_apply_app_launch_results(host);
     reach_host_apply_window_control_result(host);
 
     int32_t window_manager_dirty =
