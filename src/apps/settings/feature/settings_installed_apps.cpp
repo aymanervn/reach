@@ -41,6 +41,10 @@ void reach_settings_model_set_installed_apps_busy(reach_settings_model *model, i
     if (model != nullptr)
     {
         model->installed_apps_busy = busy ? 1 : 0;
+        if (model->installed_apps_busy)
+        {
+            reach_loader_model_reset(&model->installed_apps_loader);
+        }
     }
 }
 
@@ -81,4 +85,14 @@ int32_t reach_settings_model_installed_apps_scroll(reach_settings_model *model,
     return model != nullptr
                ? reach_scrollbar_update(&model->installed_apps_scrollbar, delta_seconds)
                : 0;
+}
+
+int32_t reach_settings_model_installed_apps_loader(reach_settings_model *model,
+                                                   double delta_seconds)
+{
+    if (model == nullptr || !model->installed_apps_busy)
+    {
+        return 0;
+    }
+    return reach_loader_update(&model->installed_apps_loader, delta_seconds);
 }

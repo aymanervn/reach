@@ -262,6 +262,7 @@ extern "C"
         reach_installed_app_list installed_apps;
         uint64_t installed_app_icons[REACH_INSTALLED_APP_MAX_ENTRIES];
         reach_scrollbar_model installed_apps_scrollbar;
+        reach_loader_model installed_apps_loader;
         int32_t installed_apps_loaded;
         int32_t installed_apps_busy;
         int32_t installed_apps_status;
@@ -389,6 +390,7 @@ extern "C"
         size_t startup_row_count;
         float startup_content_height;
         reach_rect_f32 installed_apps_summary;
+        reach_rect_f32 installed_apps_loader_bar;
         reach_rect_f32 installed_apps_viewport;
         reach_rect_f32 installed_apps_scrollbar_track;
         reach_rect_f32 installed_apps_scrollbar_thumb;
@@ -609,6 +611,8 @@ extern "C"
     const uint16_t *reach_settings_installed_apps_status_message(int32_t status);
     void reach_settings_model_scroll_installed_apps(reach_settings_model *model, float delta);
     int32_t reach_settings_model_installed_apps_scroll(reach_settings_model *model,
+                                                       double delta_seconds);
+    int32_t reach_settings_model_installed_apps_loader(reach_settings_model *model,
                                                        double delta_seconds);
 
     void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int32_t enabled);

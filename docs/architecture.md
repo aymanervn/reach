@@ -889,6 +889,8 @@ goes through WinRT `Radio` with `RadioKind::WiFi`, matching the Bluetooth preced
 association endpoints — and drives `DeviceInformationCustomPairing`, holding the deferral for a
 `ConfirmPinMatch` request until the page answers. Device icons come from the `System.Devices.Icon`
 property, environment-expanded, and resolve through the existing `icon_provider` resource-ref path.
+The standalone Settings app consumes those references through `reach_icon_service`, so shell icon
+resolution stays off its UI thread and completed icons replace fallback glyphs incrementally.
 
 List policy is pure and lives in core: `reach_wifi_network_list_normalize` merges one SSID
 advertised by several access points, keeps the strongest signal and the union of the
@@ -921,6 +923,9 @@ through `reach_installed_apps_service`, whose worker retains only packaged entri
 Shell publishes an uninstall verb, thereby excluding desktop launchers and non-removable Windows
 components while preserving user-manageable packages. The worker serializes refresh, open,
 uninstall, and management commands and publishes snapshots to the UI tick. The Applications page
+commits its page state immediately on the activating release while preserving the selector's
+animated travel, shows the shared indeterminate loader while refresh is pending, renders the
+returned rows without waiting for icons, and resolves those icons through `reach_icon_service`. It
 currently exposes only uninstall; its Open and Options backend paths remain wired as WIP for later
 restoration. Current-user packaged uninstall uses the OS PackageManager API. Repair and reset are
 not reimplemented because Settings-equivalent direct repair belongs to the Windows App SDK

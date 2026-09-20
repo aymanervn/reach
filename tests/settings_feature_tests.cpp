@@ -105,7 +105,7 @@ static void test_navigation_pages(void)
 
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_UPDATE);
     expect_true(model->selected_page == REACH_SETTINGS_PAGE_UPDATE,
-                "valid page selection updates model");
+                "page state updates immediately");
     expect_true(reach_animation_manager_target(&model->nav_selection_animation, 0) == 7.0f &&
                     reach_settings_model_nav_selection_active(model.get()),
                 "page selection starts the navigation indicator animation");
@@ -645,6 +645,23 @@ static void test_bluetooth_radio_stops_scan(void)
                 "turning Bluetooth off clears the scan loader");
 }
 
+static void test_installed_apps_loader(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+
+    reach_settings_model_set_installed_apps_busy(model.get(), 1);
+    expect_true(model->installed_apps_loader.phase == REACH_LOADER_PHASE_GROW &&
+                    model->installed_apps_loader.phase_progress == 0.0f,
+                "Applications loading resets its loader");
+    expect_true(reach_settings_model_installed_apps_loader(model.get(), 0.1),
+                "Applications loader advances while busy");
+
+    reach_settings_model_set_installed_apps_busy(model.get(), 0);
+    expect_true(!reach_settings_model_installed_apps_loader(model.get(), 0.1),
+                "Applications loader stops when loading completes");
+}
+
 static void test_radio_toggle_animations(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
@@ -688,6 +705,7 @@ int main(void)
     test_button_press_feedback();
     test_top_bar_preferences();
     test_bluetooth_radio_stops_scan();
+    test_installed_apps_loader();
     test_radio_toggle_animations();
     return failures == 0 ? 0 : 1;
 }
