@@ -173,6 +173,22 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
 
     switch (message)
     {
+    case WM_CLOSE:
+        if (window != nullptr && window->role == REACH_SURFACE_SETTINGS)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_WINDOW_CLOSE_REQUESTED;
+            reach_platform_window_queue_event(window, &event);
+            return 0;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+    case WM_NCDESTROY:
+        if (window != nullptr)
+        {
+            window->hwnd = nullptr;
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_NCHITTEST:
         if (window != nullptr && window->input_passthrough)
         {
@@ -1003,6 +1019,10 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
     {
         return REACH_INVALID_ARGUMENT;
     }
+    if (!IsWindow(window->hwnd))
+    {
+        return REACH_ERROR;
+    }
 
     if (reach_window_no_activate_surface(window->role))
     {
@@ -1015,7 +1035,7 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
     BringWindowToTop(window->hwnd);
     reach_platform_window_focus(window->hwnd);
 
-    return REACH_OK;
+    return IsWindow(window->hwnd) ? REACH_OK : REACH_ERROR;
 }
 
 static reach_result reach_platform_window_minimize(reach_platform_window *window)

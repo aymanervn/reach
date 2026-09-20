@@ -147,6 +147,14 @@ struct reach_settings_app
     reach_monitor_topology monitor_topology;
 };
 
+static void reach_settings_app_request_close(reach_settings_app *app)
+{
+    if (app != nullptr)
+    {
+        app->running = 0;
+    }
+}
+
 static float reach_settings_monitor_scale(const reach_monitor_info *monitor)
 {
     if (monitor == nullptr)
@@ -1142,7 +1150,7 @@ static void reach_settings_launch_updater(reach_settings_app *app)
     parameters += install_dir;
     parameters += L"\" 0";
     ShellExecuteW(nullptr, L"open", temp_updater.c_str(), parameters.c_str(), nullptr, SW_HIDE);
-    app->running = 0;
+    reach_settings_app_request_close(app);
 }
 
 static void reach_settings_apply_reach_progress(reach_settings_app *app)
@@ -2038,7 +2046,7 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     }
     if (hit.type == REACH_SETTINGS_HIT_CLOSE)
     {
-        app->running = 0;
+        reach_settings_app_request_close(app);
     }
     else if (hit.type == REACH_SETTINGS_HIT_MINIMIZE)
     {
@@ -2528,6 +2536,10 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     if (app == nullptr || event == nullptr)
     {
         return;
+    }
+    else if (event->type == REACH_UI_EVENT_WINDOW_CLOSE_REQUESTED)
+    {
+        reach_settings_app_request_close(app);
     }
     else if (event->type == REACH_UI_EVENT_POINTER_DOWN &&
              event->button == REACH_POINTER_BUTTON_PRIMARY)
