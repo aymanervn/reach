@@ -5,6 +5,7 @@
 #include "reach/platform/windows_adapters.h"
 #include "reach/services/bluetooth.h"
 #include "reach/services/config.h"
+#include "reach/services/icon_service.h"
 #include "reach/services/installed_apps.h"
 #include "reach/services/monitor_refresh_retry.h"
 #include "reach/services/monitor_topology.h"
@@ -118,13 +119,13 @@ struct reach_settings_app
     reach_config_service *config_service;
     reach_user_account_port user_account;
     reach_startup_apps_port startup_apps;
-    reach_icon_provider_port icon_provider;
+    reach_icon_service *icon_service;
     reach_system_controls_port system_controls;
     reach_system_status *system_status;
     reach_wifi_service *wifi_service;
     reach_bluetooth_service *bluetooth_service;
     reach_installed_apps_service *installed_apps_service;
-    std::atomic<int32_t> radio_notify;
+    std::atomic<int32_t> async_notify;
     std::atomic<uint32_t> system_controls_change_flags;
     reach_settings_model model;
     reach_settings_layout layout;
@@ -134,12 +135,6 @@ struct reach_settings_app
     reach_settings_update_worker update_worker;
     reach_settings_reach_worker reach_worker;
     reach_settings_startup_worker startup_worker;
-    reach_icon_handle startup_icon_handles[REACH_STARTUP_APP_MAX_ENTRIES];
-    size_t startup_icon_count;
-    reach_icon_handle installed_app_icon_handles[REACH_INSTALLED_APP_MAX_ENTRIES];
-    size_t installed_app_icon_count;
-    reach_icon_handle bluetooth_icon_handles[REACH_BLUETOOTH_MAX_DEVICES];
-    size_t bluetooth_icon_count;
     uint16_t app_update_zip[260];
     reach_scrollbar_drag update_scrollbar_drag;
     reach_scrollbar_drag startup_scrollbar_drag;
@@ -1317,90 +1312,36 @@ static void reach_settings_schedule_startup_toggle(reach_settings_app *app, size
     app->dirty = 1;
 }
 
-static void reach_settings_release_startup_icons(reach_settings_app *app)
+static void reach_settings_refresh_startup_icons(reach_settings_app *app)
 {
-    if (app->icon_provider.ops.release != nullptr)
-    {
-        for (size_t index = 0; index < app->startup_icon_count; ++index)
-        {
-            if (app->startup_icon_handles[index].id != 0)
-            {
-                (void)app->icon_provider.ops.release(app->icon_provider.provider,
-                                                     app->startup_icon_handles[index]);
-            }
-        }
-    }
-    memset(app->startup_icon_handles, 0, sizeof(app->startup_icon_handles));
-    app->startup_icon_count = 0;
-}
-
-static void reach_settings_load_startup_icons(reach_settings_app *app)
-{
-    reach_settings_release_startup_icons(app);
-    if (app->icon_provider.ops.load == nullptr)
+    if (app->icon_service == nullptr)
     {
         return;
     }
 
-    app->startup_icon_count = app->model.startup_apps.count;
-    for (size_t index = 0; index < app->startup_icon_count; ++index)
+    int32_t size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
+    for (size_t index = 0; index < app->model.startup_apps.count; ++index)
     {
         const reach_startup_app_entry *entry = &app->model.startup_apps.entries[index];
         const uint16_t *path = entry->executable[0] != 0 ? entry->executable : entry->command;
-        if (path[0] == 0)
-        {
-            continue;
-        }
-        reach_icon_request request = {};
-        request.size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
-        reach_copy_utf16(request.path, 260, path);
-        reach_icon_handle handle = {};
-        if (app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) == REACH_OK)
-        {
-            app->startup_icon_handles[index] = handle;
-            reach_settings_model_set_startup_icon(&app->model, index, handle.id);
-        }
+        reach_settings_model_set_startup_icon(
+            &app->model, index, reach_icon_service_get(app->icon_service, path, size_px));
     }
 }
 
-static void reach_settings_release_installed_app_icons(reach_settings_app *app)
+static void reach_settings_refresh_installed_app_icons(reach_settings_app *app)
 {
-    if (app->icon_provider.ops.release != nullptr)
-    {
-        for (size_t index = 0; index < app->installed_app_icon_count; ++index)
-        {
-            if (app->installed_app_icon_handles[index].id != 0)
-            {
-                (void)app->icon_provider.ops.release(app->icon_provider.provider,
-                                                     app->installed_app_icon_handles[index]);
-            }
-        }
-    }
-    memset(app->installed_app_icon_handles, 0, sizeof(app->installed_app_icon_handles));
-    app->installed_app_icon_count = 0;
-}
-
-static void reach_settings_load_installed_app_icons(reach_settings_app *app)
-{
-    reach_settings_release_installed_app_icons(app);
-    if (app->icon_provider.ops.load == nullptr)
+    if (app->icon_service == nullptr)
     {
         return;
     }
-    app->installed_app_icon_count = app->model.installed_apps.count;
-    for (size_t index = 0; index < app->installed_app_icon_count; ++index)
+
+    int32_t size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
+    for (size_t index = 0; index < app->model.installed_apps.count; ++index)
     {
         const reach_installed_app *entry = &app->model.installed_apps.entries[index];
-        reach_icon_request request = {};
-        request.size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
-        reach_copy_utf16(request.path, 260, entry->icon_ref);
-        reach_icon_handle handle = {};
-        if (entry->icon_ref[0] != 0 &&
-            app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) == REACH_OK)
-        {
-            app->installed_app_icon_handles[index] = handle;
-            app->model.installed_app_icons[index] = handle.id;
-        }
+        app->model.installed_app_icons[index] =
+            reach_icon_service_get(app->icon_service, entry->icon_ref, size_px);
     }
 }
 
@@ -1414,7 +1355,7 @@ static void reach_settings_apply_installed_apps_snapshot(reach_settings_app *app
         return;
     }
     reach_settings_model_apply_installed_apps(&app->model, &snapshot->apps);
-    reach_settings_load_installed_app_icons(app);
+    reach_settings_refresh_installed_app_icons(app);
     if (snapshot->completed_command != REACH_INSTALLED_APPS_COMMAND_REFRESH &&
         !snapshot->command_succeeded)
     {
@@ -1451,7 +1392,7 @@ static void reach_settings_apply_startup_result(reach_settings_app *app)
         if (result == REACH_OK)
         {
             reach_settings_model_apply_startup_apps(&app->model, &list);
-            reach_settings_load_startup_icons(app);
+            reach_settings_refresh_startup_icons(app);
         }
         else
         {
@@ -1473,12 +1414,12 @@ static void reach_settings_apply_startup_result(reach_settings_app *app)
     app->dirty = 1;
 }
 
-static void reach_settings_radio_notify(void *user)
+static void reach_settings_async_notify(void *user)
 {
     reach_settings_app *app = static_cast<reach_settings_app *>(user);
     if (app != nullptr)
     {
-        app->radio_notify.store(1);
+        app->async_notify.store(1);
     }
 }
 
@@ -1648,48 +1589,19 @@ static void reach_settings_apply_wifi_snapshot(reach_settings_app *app)
     app->dirty = 1;
 }
 
-static void reach_settings_release_bluetooth_icons(reach_settings_app *app)
+static void reach_settings_refresh_bluetooth_icons(reach_settings_app *app)
 {
-    if (app->icon_provider.ops.release != nullptr)
-    {
-        for (size_t index = 0; index < app->bluetooth_icon_count; ++index)
-        {
-            if (app->bluetooth_icon_handles[index].id != 0)
-            {
-                (void)app->icon_provider.ops.release(app->icon_provider.provider,
-                                                     app->bluetooth_icon_handles[index]);
-            }
-        }
-    }
-    memset(app->bluetooth_icon_handles, 0, sizeof(app->bluetooth_icon_handles));
-    app->bluetooth_icon_count = 0;
-}
-
-static void reach_settings_load_bluetooth_icons(reach_settings_app *app)
-{
-    reach_settings_release_bluetooth_icons(app);
-    if (app->icon_provider.ops.load == nullptr)
+    if (app->icon_service == nullptr)
     {
         return;
     }
 
-    app->bluetooth_icon_count = app->model.bluetooth_devices.count;
-    for (size_t index = 0; index < app->bluetooth_icon_count; ++index)
+    int32_t size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
+    for (size_t index = 0; index < app->model.bluetooth_devices.count; ++index)
     {
         const uint16_t *path = app->model.bluetooth_devices.devices[index].icon_path;
-        if (path[0] == 0)
-        {
-            continue;
-        }
-        reach_icon_request request = {};
-        request.size_px = (int32_t)(32.0f * reach_settings_app_scale(app));
-        reach_copy_utf16(request.path, 260, path);
-        reach_icon_handle handle = {};
-        if (app->icon_provider.ops.load(app->icon_provider.provider, &request, &handle) == REACH_OK)
-        {
-            app->bluetooth_icon_handles[index] = handle;
-            reach_settings_model_set_bluetooth_icon(&app->model, index, handle.id);
-        }
+        reach_settings_model_set_bluetooth_icon(
+            &app->model, index, reach_icon_service_get(app->icon_service, path, size_px));
     }
 }
 
@@ -1704,7 +1616,7 @@ static void reach_settings_apply_bluetooth_snapshot(reach_settings_app *app)
 
     reach_settings_model_apply_bluetooth(&app->model, &snapshot.devices, &snapshot.pairing,
                                          snapshot.scanning);
-    reach_settings_load_bluetooth_icons(app);
+    reach_settings_refresh_bluetooth_icons(app);
 
     if (snapshot.pair_result != REACH_BLUETOOTH_PAIR_RESULT_NONE)
     {
@@ -2811,7 +2723,18 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
 
     (void)reach_windows_create_app_update(&app->app_update);
     (void)reach_windows_create_startup_apps(&app->startup_apps);
-    (void)reach_windows_create_icon_provider(&app->icon_provider);
+    reach_icon_provider_port icon_provider = {};
+    if (reach_windows_create_icon_provider(&icon_provider) == REACH_OK)
+    {
+        if (reach_icon_service_create(icon_provider, &app->icon_service) == REACH_OK)
+        {
+            reach_icon_service_set_notify(app->icon_service, reach_settings_async_notify, app);
+        }
+        else if (icon_provider.ops.destroy != nullptr)
+        {
+            icon_provider.ops.destroy(icon_provider.provider);
+        }
+    }
     reach_installed_apps_port installed_apps_port = {};
     reach_app_launcher_port installed_apps_launcher = {};
     reach_result installed_apps_result = reach_windows_create_installed_apps(&installed_apps_port);
@@ -2822,7 +2745,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     if (installed_apps_result == REACH_OK)
     {
         installed_apps_result = reach_installed_apps_service_create(
-            installed_apps_port, installed_apps_launcher, reach_settings_radio_notify, app,
+            installed_apps_port, installed_apps_launcher, reach_settings_async_notify, app,
             &app->installed_apps_service);
     }
     if (installed_apps_result != REACH_OK)
@@ -2839,18 +2762,18 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     (void)reach_windows_create_system_controls(&app->system_controls);
     reach_audio_volume_port settings_audio_volume = {};
     (void)reach_system_status_create(settings_audio_volume, app->system_controls,
-                                     reach_settings_radio_notify, app, &app->system_status);
+                                     reach_settings_async_notify, app, &app->system_status);
 
     reach_wifi_port wifi_port = {};
     if (reach_windows_create_wifi(&wifi_port) == REACH_OK)
     {
-        (void)reach_wifi_service_create(wifi_port, reach_settings_radio_notify, app,
+        (void)reach_wifi_service_create(wifi_port, reach_settings_async_notify, app,
                                         &app->wifi_service);
     }
     reach_bluetooth_port bluetooth_port = {};
     if (reach_windows_create_bluetooth(&bluetooth_port) == REACH_OK)
     {
-        (void)reach_bluetooth_service_create(bluetooth_port, reach_settings_radio_notify, app,
+        (void)reach_bluetooth_service_create(bluetooth_port, reach_settings_async_notify, app,
                                              &app->bluetooth_service);
     }
 
@@ -2950,6 +2873,13 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     reach_settings_apply_reach_result(app);
     reach_settings_apply_startup_result(app);
     reach_settings_apply_installed_apps_snapshot(app);
+    if (reach_icon_service_take_loads_completed(app->icon_service))
+    {
+        reach_settings_refresh_startup_icons(app);
+        reach_settings_refresh_installed_app_icons(app);
+        reach_settings_refresh_bluetooth_icons(app);
+        app->dirty = 1;
+    }
     uint32_t system_changes = app->system_controls_change_flags.exchange(0);
     if ((system_changes & REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH) != 0)
     {
@@ -2963,7 +2893,7 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
         reach_settings_apply_bluetooth_radio(app, &system_snapshot.bluetooth);
         app->dirty = 1;
     }
-    if (app->radio_notify.exchange(0) != 0)
+    if (app->async_notify.exchange(0) != 0)
     {
         app->dirty = 1;
     }
@@ -2978,6 +2908,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
         app->dirty = 1;
     }
     if (reach_settings_model_installed_apps_scroll(&app->model, delta_seconds))
+    {
+        app->dirty = 1;
+    }
+    if (reach_settings_model_installed_apps_loader(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -3126,7 +3060,8 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_top_bar_animations_active(&app->model) ||
            app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||
            app->model.wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE ||
-           app->radio_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
+           app->async_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
+           reach_icon_service_work_pending(app->icon_service) ||
            reach_system_status_system_pending(app->system_status) ||
            reach_wifi_service_pending(app->wifi_service) ||
            reach_bluetooth_service_pending(app->bluetooth_service) ||
@@ -3215,6 +3150,7 @@ void reach_settings_app_destroy(reach_settings_app *app)
         }
         app->startup_worker.cv.notify_one();
     }
+    reach_icon_service_stop(app->icon_service);
 
     if (app->renderer.ops.destroy != nullptr)
     {
@@ -3240,7 +3176,6 @@ void reach_settings_app_destroy(reach_settings_app *app)
         app->startup_worker.thread.join();
     }
     reach_settings_model_wifi_clear_secrets(&app->model);
-    reach_settings_release_bluetooth_icons(app);
     reach_wifi_service_destroy(app->wifi_service);
     app->wifi_service = nullptr;
     reach_bluetooth_service_destroy(app->bluetooth_service);
@@ -3251,18 +3186,14 @@ void reach_settings_app_destroy(reach_settings_app *app)
     {
         app->system_controls.destroy(app->system_controls.userdata);
     }
-    reach_settings_release_startup_icons(app);
-    reach_settings_release_installed_app_icons(app);
     reach_installed_apps_service_destroy(app->installed_apps_service);
     app->installed_apps_service = nullptr;
     if (app->startup_apps.ops.destroy != nullptr)
     {
         app->startup_apps.ops.destroy(app->startup_apps.apps);
     }
-    if (app->icon_provider.ops.destroy != nullptr)
-    {
-        app->icon_provider.ops.destroy(app->icon_provider.provider);
-    }
+    reach_icon_service_destroy(app->icon_service);
+    app->icon_service = nullptr;
     if (app->app_update.destroy != nullptr)
     {
         app->app_update.destroy(app->app_update.userdata);

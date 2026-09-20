@@ -50,6 +50,7 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->startup_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->installed_apps_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_loader_model_init(&model->installed_apps_loader, 0.7f);
     reach_scrollbar_model_init(&model->display_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->wifi_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
     reach_scrollbar_model_init(&model->bluetooth_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
@@ -661,6 +662,12 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.installed_apps_summary =
             reach_settings_rect(area_x, area_y, area_width, 16.0f * scale);
         float viewport_y = area_y + 28.0f * scale;
+        if (model->installed_apps_busy)
+        {
+            layout.installed_apps_loader_bar =
+                reach_settings_rect(area_x, viewport_y, area_width, 3.0f * scale);
+            viewport_y += 3.0f * scale + 10.0f * scale;
+        }
         float viewport_bottom = layout.content.y + layout.content.height - 22.0f * scale;
         layout.installed_apps_viewport =
             reach_settings_rect(area_x, viewport_y, area_width, viewport_bottom - viewport_y);

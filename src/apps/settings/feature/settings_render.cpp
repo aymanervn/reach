@@ -740,6 +740,15 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
             REACH_TEXT_ALIGNMENT_TRAILING, color, 1);
     }
 
+    if (layout->installed_apps_loader_bar.width > 0.0f)
+    {
+        reach_rect_f32 bar =
+            reach_loader_bar_rect(&model->installed_apps_loader, layout->installed_apps_loader_bar);
+        (void)reach_loader_build_render_commands(
+            layout->installed_apps_loader_bar, bar, {0.0f, 0.0f, 0.0f, 0.0f},
+            reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_BLUE), commands);
+    }
+
     if (layout->installed_app_row_count == 0)
     {
         reach_settings_push_text(
