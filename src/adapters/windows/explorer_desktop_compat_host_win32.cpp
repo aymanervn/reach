@@ -111,6 +111,9 @@ static LRESULT CALLBACK reach_explorer_desktop_compat_host_proc(HWND hwnd, UINT 
 {
     switch (message)
     {
+    case WM_CLOSE:
+        return 0;
+
     case WM_ERASEBKGND:
         return 1;
 
