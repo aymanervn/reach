@@ -11,6 +11,7 @@ typedef struct reach_top_bar_pushed_window
 {
     uintptr_t window;
     reach_point_f32 origin;
+    float applied_y;
 } reach_top_bar_pushed_window;
 
 struct reach_top_bar_window_push
@@ -22,7 +23,6 @@ struct reach_top_bar_window_push
     int32_t captured;
     int32_t recovered;
     float target_top;
-    float applied_progress;
 };
 
 reach_result reach_top_bar_window_push_create(reach_top_bar_window_push **out_push)
@@ -152,6 +152,7 @@ static void reach_top_bar_push_collect(reach_top_bar_window_push *push, reach_re
         push->pushed[push->pushed_count].window = window->id;
         push->pushed[push->pushed_count].origin.x = bounds.x;
         push->pushed[push->pushed_count].origin.y = bounds.y;
+        push->pushed[push->pushed_count].applied_y = bounds.y;
         ++push->pushed_count;
     }
 }
@@ -193,21 +194,64 @@ static void reach_top_bar_window_push_exclude(reach_top_bar_window_push *push,
     push->pushed_count = write;
 }
 
-static void reach_top_bar_push_write(reach_top_bar_window_push *push, float progress)
+static void reach_top_bar_push_write(reach_top_bar_window_push *push, float current_edge_y)
 {
     reach_window_move moves[REACH_TOP_BAR_PUSH_MAX_WINDOWS] = {};
+    size_t move_count = 0;
 
     for (size_t index = 0; index < push->pushed_count; ++index)
     {
-        const reach_top_bar_pushed_window *pushed = &push->pushed[index];
-        moves[index].window = pushed->window;
-        moves[index].position.x = pushed->origin.x;
-        moves[index].position.y =
-            pushed->origin.y + (push->target_top - pushed->origin.y) * progress;
+        reach_top_bar_pushed_window *pushed = &push->pushed[index];
+        float desired_y = current_edge_y;
+        if (desired_y < pushed->origin.y)
+        {
+            desired_y = pushed->origin.y;
+        }
+        if (desired_y > push->target_top)
+        {
+            desired_y = push->target_top;
+        }
+        if ((int)pushed->applied_y == (int)desired_y)
+        {
+            continue;
+        }
+
+        moves[move_count].window = pushed->window;
+        moves[move_count].position.x = pushed->origin.x;
+        moves[move_count].position.y = desired_y;
+        pushed->applied_y = desired_y;
+        ++move_count;
     }
 
-    (void)reach_app_control_move_windows(push->apps, moves, push->pushed_count);
-    push->applied_progress = progress;
+    if (move_count > 0)
+    {
+        (void)reach_app_control_move_windows(push->apps, moves, move_count);
+    }
+}
+
+static void reach_top_bar_push_restore(reach_top_bar_window_push *push)
+{
+    reach_window_move moves[REACH_TOP_BAR_PUSH_MAX_WINDOWS] = {};
+    size_t move_count = 0;
+
+    for (size_t index = 0; index < push->pushed_count; ++index)
+    {
+        reach_top_bar_pushed_window *pushed = &push->pushed[index];
+        if ((int)pushed->applied_y == (int)pushed->origin.y)
+        {
+            continue;
+        }
+
+        moves[move_count].window = pushed->window;
+        moves[move_count].position = pushed->origin;
+        pushed->applied_y = pushed->origin.y;
+        ++move_count;
+    }
+
+    if (move_count > 0)
+    {
+        (void)reach_app_control_move_windows(push->apps, moves, move_count);
+    }
 }
 
 void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
@@ -225,8 +269,7 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
         push->recovered = reach_top_bar_push_recover(push, request->monitor_bounds);
     }
 
-    float progress = request->reveal_progress;
-    if (!request->bar_can_hide || request->push_depth <= 0.0f || progress <= 0.0f)
+    if (!request->bar_can_hide || request->push_depth <= 0.0f || request->fully_hidden)
     {
         reach_top_bar_window_push_release(push);
         return;
@@ -243,11 +286,11 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
         push->captured = 1;
     }
 
-    if (push->pushed_count == 0 || progress == push->applied_progress)
+    if (push->pushed_count == 0)
     {
         return;
     }
-    reach_top_bar_push_write(push, progress);
+    reach_top_bar_push_write(push, request->current_edge_y);
 }
 
 void reach_top_bar_window_push_release(reach_top_bar_window_push *push)
@@ -258,10 +301,9 @@ void reach_top_bar_window_push_release(reach_top_bar_window_push *push)
     }
     if (push->pushed_count > 0)
     {
-        reach_top_bar_push_write(push, 0.0f);
+        reach_top_bar_push_restore(push);
     }
     push->captured = 0;
     push->pushed_count = 0;
     push->target_top = 0.0f;
-    push->applied_progress = 0.0f;
 }
