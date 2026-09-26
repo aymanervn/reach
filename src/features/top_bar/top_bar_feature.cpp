@@ -1046,14 +1046,17 @@ static void reach_top_bar_bar_begin_session(void *capsule)
     }
 }
 
-static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float reveal_progress)
+static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float animated_y,
+                                            int32_t fully_hidden)
 {
     reach_top_bar_window_push_request push_request = {};
     push_request.monitor_bounds = top_bar->push_monitor_bounds;
     push_request.push_depth = top_bar->push_depth;
-    push_request.reveal_progress = reveal_progress;
+    push_request.current_edge_y = top_bar->push_monitor_bounds.y + top_bar->push_depth +
+                                  animated_y - top_bar->push_shown_bounds.y;
     push_request.bar_can_hide = top_bar->push_can_hide;
     push_request.hover_revealed = top_bar->push_hover_revealed;
+    push_request.fully_hidden = fully_hidden;
     push_request.excluded_window = top_bar->push_excluded_window;
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
@@ -1141,7 +1144,8 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     top_bar->push_excluded_window = request->excluded_window;
     if (request->auto_hide_active)
     {
-        reach_top_bar_apply_window_push(top_bar, result.reveal_progress);
+        reach_top_bar_apply_window_push(top_bar, result.animated_bounds.y,
+                                        result.reveal_progress <= 0.0f);
     }
     else
     {
@@ -1164,7 +1168,8 @@ static void reach_top_bar_bar_position_frame(void *capsule)
                                   top_bar->push_monitor_bounds, top_bar->push_shadow_clearance);
     float animated_y = reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
     reach_top_bar_apply_window_push(
-        top_bar, reach_bar_reveal_progress(animated_y, top_bar->push_shown_bounds.y, hidden_y));
+        top_bar, animated_y,
+        reach_bar_reveal_progress(animated_y, top_bar->push_shown_bounds.y, hidden_y) <= 0.0f);
 }
 
 static int32_t reach_top_bar_width_animation_active(const reach_top_bar *top_bar)

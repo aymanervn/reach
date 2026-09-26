@@ -11,9 +11,10 @@ typedef struct reach_top_bar_window_push_request
 {
     reach_rect_f32 monitor_bounds;
     float push_depth;
-    float reveal_progress;
+    float current_edge_y;
     int32_t bar_can_hide;
     int32_t hover_revealed;
+    int32_t fully_hidden;
     uintptr_t excluded_window;
 } reach_top_bar_window_push_request;
 

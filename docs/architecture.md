@@ -375,19 +375,15 @@ remeasures every text-sized surface. The Dock window-list popup fits its widest 
 between one-letter-plus-close-control chrome and a monitor-bounded maximum, ellipsizing beyond it.
 All Reach-rendered text selects from the shared scale in `reach/core/typography.h`
 
-The window push is the top bar's second private subfeature: while the bar can
-hide and is sliding in, it moves the windows the bar would cover down by the
-bar's own reveal progress, so they track the bar edge on one clock. That
-progress is `reach_bar_visibility_result.reveal_progress` — the fraction of the
-bar's full travel between its hidden and shown positions, produced where the
-hidden position is known. Deriving it instead from how far the bar's bottom edge
-has crossed the screen edge leaves the windows parked for the first ~80% of the
-reveal and then racing to catch up. Both the full frame path and the
-`reach_host_move_bar_animation_frame` fast path feed it: that fast path slides a
-bar without a redraw and so never reaches `reconcile_bar_visibility`, which is
-exactly the state a hide settles into. The definition's optional
-`reach_bar_reveal_ops.position_frame` hook keeps feature-owned effects such as
-the top-bar push on that same clock while the generic path moves the surface.
+The window push is the top bar's second private subfeature. The animation manager remains the sole
+owner of motion: each frame, the top bar derives the current app-facing edge of its reserved band
+from the manager-owned animated Y position and resolved style geometry. Each affected window stays
+at its captured origin until that edge reaches it, then its outer top edge is clamped to the moving
+edge through the final target; hiding reverses the same relationship. The full frame path and the
+`reach_host_move_bar_animation_frame` fast path both provide the animated Y position. The
+definition's optional `reach_bar_reveal_ops.position_frame` hook keeps this feature-owned effect
+active while the generic path moves the surface without a redraw. Window push does not own a second
+animation or derive its position from normalized reveal progress.
 
 It **moves** windows and never resizes them. A resize makes the app relayout its
 whole client area on every frame, cross-process, which is the one cost this path
