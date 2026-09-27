@@ -19,7 +19,7 @@ Reach replaces Windows Explorer, nothing gets deleted, only an entry in the regi
 - Split screen: WIN + arrow keys snaps the focused window, pressing again maximizes it. Works both horizontally and vertically
 - Clipboard history supporting text and image previews
 - Windows security updates can be searched and installed from Reach's own settings app
-- No distractions: no ads, no widgets, no news. Reach also stops rendering its UI during a game session, disables hotkeys except for alt-tab, which will minimize the game when used
+- No distractions: no ads, no widgets, no news. Reach suppresses ambient UI during a game session while keeping the Switcher and system HUD available; Alt-Tab minimizes the game
 - Clean and minimalistic top bar design, includes the clock, current app, now playing, tray icons, keyboard layout, quick settings, volume, power controls and now playing media controls
 - Uses JetBrains Mono font as the default
 - Stage manager with window thumbnails, close buttons and smooth open and close animations

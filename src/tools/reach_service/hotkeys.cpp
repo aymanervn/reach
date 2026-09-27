@@ -270,15 +270,14 @@ reach_helper_handle_game_mode_key(const reach_helper_key_event *event)
         return REACH_HELPER_KEY_CONTINUE;
     }
 
-    if (event->key == REACH_SERVICE_HOTKEY_TAB && event->down && reach_helper_physical_alt_down())
+    if (event->key == REACH_SERVICE_HOTKEY_ALT ||
+        (event->key == REACH_SERVICE_HOTKEY_SHIFT &&
+         (g_hotkeys.alt_tab_active || reach_helper_physical_alt_down())) ||
+        (event->key == REACH_SERVICE_HOTKEY_TAB &&
+         (g_hotkeys.alt_tab_active || reach_helper_physical_alt_down())) ||
+        (event->key == REACH_SERVICE_HOTKEY_ESCAPE && g_hotkeys.alt_tab_active))
     {
-        HWND game = GetForegroundWindow();
-        reach_helper_clear_hotkey_state();
-
-        if (g_callbacks.minimize_game != nullptr && g_callbacks.minimize_game(game))
-        {
-            return REACH_HELPER_KEY_CONSUME;
-        }
+        return REACH_HELPER_KEY_CONTINUE;
     }
 
     return REACH_HELPER_KEY_PASS;

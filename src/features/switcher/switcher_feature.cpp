@@ -305,14 +305,6 @@ static void reach_switcher_apply_action(reach_switcher *switcher, reach_switcher
     }
 }
 
-static void reach_switcher_capsule_on_game_mode(void *capsule, int32_t enabled)
-{
-    if (enabled)
-    {
-        reach_switcher_force_close(static_cast<reach_switcher *>(capsule));
-    }
-}
-
 static void reach_switcher_capsule_handle_event(void *capsule, const reach_ui_event *event,
                                                 reach_capsule_event_result *out)
 {
@@ -356,7 +348,7 @@ const reach_feature_capsule_ops *reach_switcher_capsule_ops(void)
         nullptr,
         reach_switcher_capsule_tick,
         reach_switcher_capsule_is_open,
-        reach_switcher_capsule_on_game_mode,
+        nullptr,
         reach_switcher_capsule_needs_frame,
         nullptr,
         nullptr,

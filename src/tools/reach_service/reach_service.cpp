@@ -57,7 +57,6 @@ static LONG g_game_mode_active;
 
 static const wchar_t *REACH_SHELL_INSTANCE_MUTEX = REACH_SHELL_INSTANCE_MUTEX_NAME;
 static const wchar_t *REACH_HELPER_INSTANCE_MUTEX = L"Local\\ReachServiceInstance";
-static const UINT REACH_HELPER_WM_MINIMIZE_GAME = WM_APP + 41;
 static const UINT REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG = WM_APP + 42;
 
 static reach_result reach_helper_execute(const reach_service_request *request,
@@ -963,20 +962,6 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
     }
 }
 
-static void reach_helper_minimize_game(HWND hwnd)
-{
-    reach_helper_publish_window_state();
-
-    int32_t fullscreen = reach_helper_window_is_fullscreen(hwnd);
-    if (!reach_helper_window_is_game(hwnd, fullscreen))
-    {
-        return;
-    }
-
-    (void)reach_window_management_leave_game_to_desktop(hwnd);
-    reach_helper_publish_window_state();
-}
-
 static DWORD WINAPI reach_helper_window_event_thread(void *param)
 {
     (void)param;
@@ -1018,12 +1003,7 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
 
     while (GetMessageW(&message, nullptr, 0, 0) > 0)
     {
-        if (message.message == REACH_HELPER_WM_MINIMIZE_GAME)
-        {
-            HWND hwnd = reinterpret_cast<HWND>(message.wParam);
-            reach_helper_minimize_game(hwnd);
-        }
-        else if (message.message == REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG)
+        if (message.message == REACH_HELPER_WM_ACTIVATE_EXPLORER_DIALOG)
         {
             HWND hwnd = reinterpret_cast<HWND>(message.wParam);
             if (reach_window_is_explorer_dialog(hwnd))
@@ -1173,21 +1153,23 @@ static int32_t reach_helper_same_user_client(HANDLE pipe)
     return EqualSid(process_token_user->User.Sid, client_token_user->User.Sid);
 }
 
-static int32_t reach_helper_post_minimize_game(HWND hwnd)
-{
-    if (hwnd != nullptr && g_session.window_event_thread_id != 0)
-    {
-        return PostThreadMessageW(g_session.window_event_thread_id, REACH_HELPER_WM_MINIMIZE_GAME,
-                                  reinterpret_cast<WPARAM>(hwnd), 0)
-                   ? 1
-                   : 0;
-    }
-    return 0;
-}
-
 static int32_t reach_helper_game_mode_active(void)
 {
     return InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0;
+}
+
+static reach_result reach_helper_activate_window(HWND target)
+{
+    HWND foreground = GetForegroundWindow();
+    if (foreground != nullptr && foreground != target)
+    {
+        int32_t fullscreen = reach_helper_window_is_fullscreen(foreground);
+        if (reach_helper_window_is_game(foreground, fullscreen))
+        {
+            (void)reach_window_management_leave_game_to_desktop(foreground);
+        }
+    }
+    return reach_window_management_activate(target);
 }
 
 static reach_result reach_helper_execute(const reach_service_request *request,
@@ -1221,7 +1203,7 @@ static reach_result reach_helper_execute(const reach_service_request *request,
     switch (request->command)
     {
     case REACH_SERVICE_COMMAND_ACTIVATE:
-        result = reach_window_management_activate(hwnd);
+        result = reach_helper_activate_window(hwnd);
         break;
     case REACH_SERVICE_COMMAND_MINIMIZE:
         result = reach_window_management_minimize(hwnd);
@@ -1509,7 +1491,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     }
     reach_helper_hotkey_callbacks hotkey_callbacks = {};
     hotkey_callbacks.game_mode_active = reach_helper_game_mode_active;
-    hotkey_callbacks.minimize_game = reach_helper_post_minimize_game;
     reach_helper_hotkeys_configure(&hotkey_callbacks);
 
     reach_helper_publish_window_state();
