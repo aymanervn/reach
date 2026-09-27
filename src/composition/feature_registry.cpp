@@ -853,7 +853,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SWITCHER].surface.role = REACH_SURFACE_SWITCHER;
     definitions[REACH_SURFACE_ID_SWITCHER].surface.pointer_priority = 100;
     definitions[REACH_SURFACE_ID_SWITCHER].surface.behavior_flags =
-        REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
+        REACH_SURFACE_BEHAVIOR_EXCLUSIVE | REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE;
     definitions[REACH_SURFACE_ID_STAGE].surface.role = REACH_SURFACE_STAGE;
     definitions[REACH_SURFACE_ID_STAGE].surface.pointer_priority = 60;
     definitions[REACH_SURFACE_ID_STAGE].surface.bar_shown_while_open = 1;

@@ -725,15 +725,17 @@ the next resolve. `reach_host_sync_bar_layout_conditions` publishes the process-
 `BARS_FORCED` and `BARS_HELD` values once before the surface frame loop; individual bar
 reconciliation only owns that bar's visibility result and layer intent. `GAME_MODE` resolves every
 participant hidden except a definition
-that declares `BEHAVIOR_GAME_MODE_VISIBLE`. The system HUD is the only such
-participant because hardware media and level keys remain active and always present it while the top
-bar is suppressed. `host_game_mode.cpp` owns the state and the main gate in
+that declares `BEHAVIOR_GAME_MODE_VISIBLE`. System HUD uses it because hardware media and level
+keys remain active, and Switcher uses it so an Alt-Tab session can present while the game remains
+foreground. `host_game_mode.cpp` owns the state and the main gate in
 `reach_host_update`; the game-mode path runs only behavior-flagged capsules and
 their frames, leaving all ordinary composition work below the gate dormant.
-Game-mode Alt-Tab is one Reach Service window transition: it transfers foreground
-to the registered shell desktop, requires that handoff to succeed, minimizes the
-game, and then clears the shared cursor clip once. The Reach-owned Progman host
-permits that explicit activation while continuing to reject pointer activation.
+Game-mode Alt-Tab uses the ordinary Switcher transaction. Begin, navigation and cancellation do
+not change the game window. Committing a different target runs ordinary shared activation; Reach
+Service first transfers foreground to the registered shell desktop, minimizes the game and clears
+the shared cursor clip, then activates the committed target. Committing the foreground game does
+not minimize it. The Reach-owned Progman host permits the explicit desktop activation while
+continuing to reject pointer activation.
 The top bar is the only participant whose layer moves: dynamic mode rests at 0 and rises to
 130 while its reveal transition is live, while a `bar_shown_while_open` surface is open, or while a
 popup holds the bars; static mode holds layer 130 at rest unless its fullscreen-only auto-hide
