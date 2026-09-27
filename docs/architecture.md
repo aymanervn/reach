@@ -681,10 +681,11 @@ reservation edge, resolved bounds, and published `work_area_clearance` to the mo
 `set_work_area` operation. The
 Windows monitor adapter uses `SPI_SETWORKAREA` with change broadcasting, caches identical writes,
 reconciles visible maximized windows on the affected monitor without changing their normal restore
-bounds, and restores full monitor bounds when the surface is hidden, enters game-mode suppression,
-returns to dynamic mode, or the adapter is destroyed. `reachctl` uses the same port when installation
-repairs monitor work areas. Monitor selection is not configuration here: the reservation follows the
-monitor in the current layout context.
+bounds, and restores full monitor bounds when the surface is hidden, returns to dynamic mode, or the
+adapter is destroyed. Game-mode suppression changes Reach surface visibility without changing the
+applied monitor work area, so a static reservation remains stable across game focus transitions.
+`reachctl` uses the same port when installation repairs monitor work areas. Monitor selection is not
+configuration here: the reservation follows the monitor in the current layout context.
 Clipboard declares Launcher as its anchor and likewise owns relayout, presentation, geometry,
 and command production. There is no named frame fallback: every registered surface runs the
 same frame function, and the architecture checker requires one runtime binding and one
