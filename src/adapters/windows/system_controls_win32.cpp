@@ -4,12 +4,13 @@
 #include "system_controls_network.h"
 
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0600
+#define _WIN32_WINNT 0x0601
 #endif
 
 #include <winsock2.h>
 #include <windows.h>
 #include <powrprof.h>
+#include <powersetting.h>
 #include <wlanapi.h>
 #include <iphlpapi.h>
 #include <wbemidl.h>
@@ -42,6 +43,8 @@ struct reach_system_controls_adapter
     DWORD main_thread_id;
     reach_system_controls_change_callback callback;
     void *callback_user;
+    HPOWERNOTIFY power_notifications[3];
+    DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS power_subscription;
     HANDLE bluetooth_thread;
     HANDLE bluetooth_stop;
     HANDLE bluetooth_request;
@@ -98,6 +101,18 @@ static void reach_system_controls_notify(reach_system_controls_adapter *adapter,
     {
         PostThreadMessageW(adapter->main_thread_id, WM_NULL, 0, 0);
     }
+}
+
+static ULONG CALLBACK reach_system_controls_power_notification(void *context, ULONG type,
+                                                               void *setting)
+{
+    (void)setting;
+    if (type == PBT_POWERSETTINGCHANGE)
+    {
+        reach_system_controls_notify(static_cast<reach_system_controls_adapter *>(context),
+                                     REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+    }
+    return ERROR_SUCCESS;
 }
 
 static int32_t reach_bluetooth_worker_find_radio(winrt::Windows::Devices::Radios::Radio *out_radio)
@@ -1475,6 +1490,17 @@ reach_system_controls_start_watching(void *userdata, reach_system_controls_chang
     adapter->callback_user = callback_user;
     adapter->main_thread_id = GetCurrentThreadId();
 
+    adapter->power_subscription.Callback = reach_system_controls_power_notification;
+    adapter->power_subscription.Context = adapter;
+    const GUID *power_settings[] = {&GUID_POWER_SAVING_STATUS, &GUID_BATTERY_PERCENTAGE_REMAINING,
+                                    &GUID_ACDC_POWER_SOURCE};
+    for (size_t index = 0; index < 3; ++index)
+    {
+        (void)PowerSettingRegisterNotification(power_settings[index], DEVICE_NOTIFY_CALLBACK,
+                                               &adapter->power_subscription,
+                                               &adapter->power_notifications[index]);
+    }
+
     DWORD negotiated_version = 0;
     DWORD wlan_result = WlanOpenHandle(2, nullptr, &negotiated_version, &adapter->wlan);
     if (wlan_result == ERROR_SUCCESS && adapter->wlan != nullptr)
@@ -1499,7 +1525,8 @@ reach_system_controls_start_watching(void *userdata, reach_system_controls_chang
     }
 
     if (adapter->wlan == nullptr && adapter->addr_change_thread == nullptr &&
-        adapter->bluetooth_thread == nullptr)
+        adapter->bluetooth_thread == nullptr && adapter->power_notifications[0] == nullptr &&
+        adapter->power_notifications[1] == nullptr && adapter->power_notifications[2] == nullptr)
     {
         if (adapter->addr_change != nullptr)
         {
@@ -1528,6 +1555,14 @@ static void reach_system_controls_stop_watching(void *userdata)
         return;
     }
 
+    for (HPOWERNOTIFY &notification : adapter->power_notifications)
+    {
+        if (notification != nullptr)
+        {
+            (void)PowerSettingUnregisterNotification(notification);
+            notification = nullptr;
+        }
+    }
     adapter->callback = nullptr;
     adapter->callback_user = nullptr;
     adapter->main_thread_id = 0;

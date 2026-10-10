@@ -38,6 +38,7 @@ struct reach_system_status
     uint32_t brightness_target_generation = 0;
     float brightness_delta = 0.0f;
     reach_system_status_system_snapshot system_snapshot = {};
+    int32_t power_changed = 0;
 };
 
 static float reach_system_status_clamp01(float value)
@@ -169,18 +170,6 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
             }
         }
 
-        if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_POWER) != 0 &&
-            service->system_controls.get_power_state != nullptr)
-        {
-            reach_power_state power = {};
-            if (service->system_controls.get_power_state(service->system_controls.userdata,
-                                                         &power) == REACH_OK)
-            {
-                snapshot.power = power;
-                snapshot.power_valid = 1;
-            }
-        }
-
         if (brightness_target_valid || brightness_delta != 0.0f)
         {
             reach_brightness_state brightness = snapshot.brightness;
@@ -227,6 +216,9 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
 
         {
             std::lock_guard<std::mutex> lock(worker->mutex);
+            snapshot.power = service->system_snapshot.power;
+            snapshot.power_valid = service->system_snapshot.power_valid;
+            snapshot.change_flags |= service->system_snapshot.change_flags;
             service->system_snapshot = snapshot;
             if (service->brightness_target_valid &&
                 service->brightness_target_generation == brightness_target_generation)
@@ -242,6 +234,31 @@ static void reach_system_status_system_thread_main(reach_system_status *service)
         {
             service->notify(service->notify_user);
         }
+    }
+}
+
+static void reach_system_status_refresh_power(reach_system_status *service, int32_t publish)
+{
+    reach_power_state power = {};
+    int32_t valid = service->system_controls.get_power_state != nullptr &&
+                    service->system_controls.get_power_state(service->system_controls.userdata,
+                                                             &power) == REACH_OK;
+    {
+        std::lock_guard<std::mutex> lock(service->system.mutex);
+        if (valid)
+        {
+            service->system_snapshot.power = power;
+            service->system_snapshot.power_valid = 1;
+        }
+        if (publish)
+        {
+            service->system_snapshot.change_flags |= REACH_SYSTEM_CONTROLS_CHANGE_POWER;
+            service->power_changed = 1;
+        }
+    }
+    if (publish && service->notify != nullptr)
+    {
+        service->notify(service->notify_user);
     }
 }
 
@@ -263,6 +280,7 @@ reach_result reach_system_status_create(reach_audio_volume_port audio_volume,
     service->system_controls = system_controls;
     service->notify = notify;
     service->notify_user = notify_user;
+    reach_system_status_refresh_power(service, 0);
     *out_service = service;
     return REACH_OK;
 }
@@ -359,7 +377,17 @@ void reach_system_status_refresh_audio(reach_system_status *service)
 
 void reach_system_status_refresh_system(reach_system_status *service, uint32_t change_flags)
 {
-    if (service == nullptr ||
+    if (service == nullptr)
+    {
+        return;
+    }
+    change_flags = change_flags != 0 ? change_flags : (uint32_t)REACH_SYSTEM_CONTROLS_CHANGE_ALL;
+    if ((change_flags & REACH_SYSTEM_CONTROLS_CHANGE_POWER) != 0)
+    {
+        reach_system_status_refresh_power(service, 1);
+        change_flags &= ~REACH_SYSTEM_CONTROLS_CHANGE_POWER;
+    }
+    if (change_flags == 0 ||
         reach_system_status_start_worker(service, &service->system,
                                          reach_system_status_system_thread_main) != REACH_OK)
     {
@@ -370,8 +398,7 @@ void reach_system_status_refresh_system(reach_system_status *service, uint32_t c
         std::lock_guard<std::mutex> lock(service->system.mutex);
         ++service->system.generation;
         service->system.pending_generation = service->system.generation;
-        service->system_pending_change_flags |=
-            change_flags != 0 ? change_flags : (uint32_t)REACH_SYSTEM_CONTROLS_CHANGE_ALL;
+        service->system_pending_change_flags |= change_flags;
         service->system.pending = 1;
     }
     service->system.cv.notify_one();
@@ -408,6 +435,17 @@ int32_t reach_system_status_take_system(reach_system_status *service,
     }
 
     std::lock_guard<std::mutex> lock(service->system.mutex);
+    if (service->power_changed)
+    {
+        service->power_changed = 0;
+        if (service->system.completed_generation == service->system.generation)
+        {
+            service->system.completed = 0;
+        }
+        *out_snapshot = service->system_snapshot;
+        service->system_snapshot.change_flags = 0;
+        return 1;
+    }
     if (!service->system.completed)
     {
         return 0;
@@ -472,7 +510,14 @@ int32_t reach_system_status_audio_pending(const reach_system_status *service)
 
 int32_t reach_system_status_system_pending(const reach_system_status *service)
 {
-    return service != nullptr && reach_system_status_worker_pending(&service->system);
+    if (service == nullptr)
+    {
+        return 0;
+    }
+    auto *mutable_service = const_cast<reach_system_status *>(service);
+    std::lock_guard<std::mutex> lock(mutable_service->system.mutex);
+    return service->system.pending || service->system.in_flight || service->system.completed ||
+           service->power_changed;
 }
 
 reach_result reach_system_status_set_main_volume(reach_system_status *service, float level,
@@ -674,8 +719,13 @@ reach_result reach_system_status_set_battery_saver_enabled(reach_system_status *
     {
         return REACH_NOT_IMPLEMENTED;
     }
-    return service->system_controls.set_battery_saver_enabled(service->system_controls.userdata,
-                                                              enabled ? 1 : 0);
+    reach_result result = service->system_controls.set_battery_saver_enabled(
+        service->system_controls.userdata, enabled ? 1 : 0);
+    if (result == REACH_OK)
+    {
+        reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+    }
+    return result;
 }
 
 reach_result reach_system_status_open_system_quick_settings(reach_system_status *service)

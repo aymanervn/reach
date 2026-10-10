@@ -1,6 +1,7 @@
 #include "reach/services/system_status.h"
 
 #include <chrono>
+#include <atomic>
 #include <stdio.h>
 #include <thread>
 
@@ -71,11 +72,15 @@ typedef struct fake_controls
     int32_t bluetooth_fails;
     int32_t bluetooth_enabled;
     int32_t battery_percent;
+    int32_t battery_saver_on;
+    int32_t power_fails;
     float brightness_level;
     std::thread::id brightness_set_thread;
 } fake_controls;
 
 static fake_controls controls;
+static std::atomic<int32_t> bluetooth_blocked;
+static std::atomic<int32_t> bluetooth_entered;
 
 static reach_result fake_request_bluetooth(void *userdata, int32_t enabled)
 {
@@ -107,6 +112,11 @@ static reach_result fake_get_bluetooth(void *userdata, reach_bluetooth_state *ou
 {
     (void)userdata;
     ++controls.bluetooth_reads;
+    bluetooth_entered.store(1);
+    while (bluetooth_blocked.load())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     if (controls.bluetooth_fails)
     {
         return REACH_ERROR;
@@ -121,9 +131,14 @@ static reach_result fake_get_power(void *userdata, reach_power_state *out_state)
 {
     (void)userdata;
     ++controls.power_reads;
+    if (controls.power_fails)
+    {
+        return REACH_ERROR;
+    }
     *out_state = {};
     out_state->has_battery = 1;
     out_state->battery_percent = controls.battery_percent;
+    out_state->battery_saver_on = controls.battery_saver_on;
     return REACH_OK;
 }
 
@@ -162,7 +177,8 @@ static int32_t wait_for_system_snapshot(reach_system_status *service,
 {
     for (int attempt = 0; attempt < 400; ++attempt)
     {
-        if (reach_system_status_take_system(service, out_snapshot))
+        if (reach_system_status_take_system(service, out_snapshot) &&
+            !reach_system_status_system_pending(service))
         {
             return 1;
         }
@@ -335,7 +351,7 @@ static void test_a_scoped_refresh_probes_only_what_it_names(void)
     expect_true(wait_for_system_snapshot(service, &snapshot),
                 "a full refresh publishes a snapshot");
     expect_true(controls.network_reads == 1 && controls.bluetooth_reads == 1 &&
-                    controls.power_reads == 1 && controls.brightness_reads == 1,
+                    controls.power_reads == 2 && controls.brightness_reads == 1,
                 "a full refresh probes every capability");
 
     controls.bluetooth_enabled = 1;
@@ -343,7 +359,7 @@ static void test_a_scoped_refresh_probes_only_what_it_names(void)
     expect_true(wait_for_system_snapshot(service, &snapshot),
                 "a scoped refresh publishes a snapshot");
     expect_true(controls.bluetooth_reads == 2, "a bluetooth refresh re-reads bluetooth");
-    expect_true(controls.network_reads == 1 && controls.power_reads == 1 &&
+    expect_true(controls.network_reads == 1 && controls.power_reads == 2 &&
                     controls.brightness_reads == 1,
                 "a bluetooth refresh probes nothing else");
     expect_true(snapshot.bluetooth_valid && snapshot.bluetooth.enabled == 1,
@@ -427,8 +443,77 @@ static void test_null_service_is_rejected(void)
                 "a null service reports unsupported bluetooth");
 }
 
+static void test_power_startup_and_changes(void)
+{
+    controls = {};
+    controls.battery_percent = 73;
+    controls.battery_saver_on = 1;
+    reach_system_status *service = nullptr;
+    expect_true(reach_system_status_create({}, readable_controls_port(), nullptr, nullptr,
+                                           &service) == REACH_OK,
+                "power-aware service starts");
+    reach_system_status_system_snapshot snapshot = {};
+    reach_system_status_read_system(service, &snapshot);
+    expect_true(snapshot.power_valid && snapshot.power.battery_saver_on &&
+                    snapshot.power.battery_percent == 73 && controls.power_reads == 1,
+                "startup knows saver state before an asynchronous refresh");
+    expect_true(controls.network_reads == 0 && controls.bluetooth_reads == 0 &&
+                    controls.brightness_reads == 0,
+                "startup power read does not probe slower capabilities");
+
+    controls.battery_saver_on = 0;
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+    expect_true(reach_system_status_system_pending(service),
+                "a published power change requests a drain");
+    expect_true(wait_for_system_snapshot(service, &snapshot) && snapshot.power_valid &&
+                    !snapshot.power.battery_saver_on,
+                "a power notification publishes leaving saver");
+    expect_true(!reach_system_status_system_pending(service),
+                "consuming a power change allows idle sleeping");
+    reach_system_status_system_snapshot other_consumer = {};
+    reach_system_status_read_system(service, &other_consumer);
+    expect_true(other_consumer.power_valid && !other_consumer.power.battery_saver_on,
+                "consuming a notification preserves the shared snapshot");
+
+    controls.battery_saver_on = 1;
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+    expect_true(wait_for_system_snapshot(service, &snapshot) && snapshot.power.battery_saver_on,
+                "a power notification publishes entering saver");
+    controls.power_fails = 1;
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+    expect_true(wait_for_system_snapshot(service, &snapshot) && snapshot.power_valid &&
+                    snapshot.power.battery_saver_on,
+                "a failed power refresh preserves the last confirmed saver state");
+    reach_system_status_destroy(service);
+}
+
+static void test_power_changes_do_not_wait_for_bluetooth(void)
+{
+    reach_system_status *service = make_service(full_audio_port(), readable_controls_port());
+    bluetooth_entered.store(0);
+    bluetooth_blocked.store(1);
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH);
+    for (int attempt = 0; attempt < 400 && !bluetooth_entered.load(); ++attempt)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    expect_true(bluetooth_entered.load(), "a slow bluetooth read is in flight");
+    controls.battery_saver_on = 1;
+    reach_system_status_refresh_system(service, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+    reach_system_status_system_snapshot snapshot = {};
+    expect_true(reach_system_status_take_system(service, &snapshot) && snapshot.power_valid &&
+                    snapshot.power.battery_saver_on && reach_system_status_system_pending(service),
+                "power publishes immediately while bluetooth is still blocked");
+    bluetooth_blocked.store(0);
+    expect_true(wait_for_system_snapshot(service, &snapshot) && snapshot.power.battery_saver_on,
+                "a delayed worker publication cannot overwrite newer power state");
+    reach_system_status_destroy(service);
+}
+
 int main(void)
 {
+    test_power_changes_do_not_wait_for_bluetooth();
+    test_power_startup_and_changes();
     test_set_main_volume_unmutes_first();
     test_set_main_volume_reports_live_mute_when_unmute_fails();
     test_set_main_volume_keeps_caller_state_without_live_read();

@@ -740,14 +740,17 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             {&layout.display_font_card, &layout.display_font_icon, &layout.display_font_title,
              &layout.display_font_subtitle, &layout.display_font_toggle},
         };
+        float toggle_card_y = area_y;
         for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
         {
-            reach_settings_layout_toggle_card(&cards[index], area_x,
-                                              area_y + (float)index * (card_height + card_spacing),
-                                              area_width, card_height, scale);
+            float toggle_card_height = card_height + (index == 0 ? 16.0f * scale : 0.0f);
+            reach_settings_layout_toggle_card(&cards[index], area_x, toggle_card_y, area_width,
+                                              toggle_card_height, scale);
+            toggle_card_y += toggle_card_height + card_spacing;
         }
+        layout.display_fps_subtitle.height = 32.0f * scale;
 
-        float theme_card_y = area_y + 2.0f * (card_height + card_spacing);
+        float theme_card_y = toggle_card_y;
         float theme_card_height =
             area_width >= REACH_SETTINGS_SELECTOR_WIDE_WIDTH * scale ? card_height : 104.0f * scale;
         reach_settings_layout_selector_card(

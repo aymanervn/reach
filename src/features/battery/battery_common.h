@@ -16,7 +16,6 @@ enum
 struct reach_battery
 {
     reach_battery_state state;
-    reach_system_stats *stats;
     reach_system_status *status;
     reach_battery_routes routes;
     double saver_pending_seconds;

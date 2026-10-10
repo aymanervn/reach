@@ -526,9 +526,9 @@ int32_t reach_app_needs_frame(const reach_app *app)
     return app != nullptr && app->host != nullptr && reach_host_needs_frame(app->host);
 }
 
-int32_t reach_app_frame_interval_ms(const reach_app *app)
+int32_t reach_app_frame_rate_hz(const reach_app *app)
 {
-    return app != nullptr && app->host != nullptr ? reach_host_frame_interval_ms(app->host) : 16;
+    return app != nullptr && app->host != nullptr ? reach_host_frame_rate_hz(app->host) : 60;
 }
 
 uint32_t reach_app_idle_wait_ms(const reach_app *app)

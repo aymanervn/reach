@@ -7,6 +7,8 @@
 #include <wchar.h>
 
 #include "settings_app.h"
+#include "reach/core/frame_clock.h"
+#include "reach/adapters/windows/frame_wait.h"
 
 #include "reach/protocol/reach_service_protocol.h"
 
@@ -220,14 +222,22 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
 
     HANDLE waits[] = {shell_process, activate_event};
     MSG message = {};
+    reach_frame_clock frame_clock = {};
+    void *frame_timer = reach_windows_frame_timer_create();
     int exit_code = 0;
     while (reach_settings_app_running(app))
     {
-        DWORD wait_ms = reach_settings_app_needs_frame(app)
-                            ? 16
-                            : (DWORD)reach_settings_app_idle_wait_ms(app);
-        DWORD wait_result =
-            MsgWaitForMultipleObjectsEx(2, waits, wait_ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        int32_t needed_frame_before_wait = reach_settings_app_needs_frame(app);
+        LARGE_INTEGER wait_counter = {};
+        QueryPerformanceCounter(&wait_counter);
+        uint32_t frame_wait_ms = reach_frame_clock_wait_ms(
+            &frame_clock, (double)wait_counter.QuadPart / (double)frequency.QuadPart,
+            reach_settings_app_frame_rate_hz(app), needed_frame_before_wait);
+        DWORD wait_ms =
+            needed_frame_before_wait ? frame_wait_ms : (DWORD)reach_settings_app_idle_wait_ms(app);
+        DWORD wait_result = reach_windows_frame_wait(
+            frame_timer, waits, 2, wait_ms,
+            needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
         if (wait_result == WAIT_OBJECT_0)
         {
             break;
@@ -257,24 +267,23 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);
             double delta_seconds =
-                frequency.QuadPart > 0
+                needed_frame_before_wait && frequency.QuadPart > 0
                     ? (double)(current_counter.QuadPart - previous_counter.QuadPart) /
                           (double)frequency.QuadPart
-                    : 0.016;
+                    : 0.0;
             previous_counter = current_counter;
-            if (delta_seconds > 0.025)
-            {
-                delta_seconds = 0.025;
-            }
             if (reach_settings_app_update(app, delta_seconds) != REACH_OK)
             {
                 exit_code = 1;
                 break;
             }
+            reach_frame_clock_presented(&frame_clock, (double)current_counter.QuadPart /
+                                                          (double)frequency.QuadPart);
         }
     }
 
 exit_loop:
+    reach_windows_frame_timer_destroy(frame_timer);
     reach_settings_app_destroy(app);
     CoUninitialize();
     CloseHandle(activate_event);

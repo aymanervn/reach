@@ -19,6 +19,7 @@ static int32_t reach_host_game_mode_allows_event(reach_ui_event_type type)
            type == REACH_UI_EVENT_VOLUME_DOWN || type == REACH_UI_EVENT_VOLUME_MUTE ||
            type == REACH_UI_EVENT_BRIGHTNESS_UP || type == REACH_UI_EVENT_BRIGHTNESS_DOWN ||
            type == REACH_UI_EVENT_NOW_PLAYING_CHANGED ||
+           type == REACH_UI_EVENT_FEATURE_WORK_READY ||
            type == REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED ||
            type == REACH_UI_EVENT_APP_SWITCH_BEGIN || type == REACH_UI_EVENT_APP_SWITCH_NEXT ||
            type == REACH_UI_EVENT_APP_SWITCH_PREVIOUS || type == REACH_UI_EVENT_APP_SWITCH_COMMIT ||
