@@ -98,6 +98,7 @@ add_library(reach_core STATIC
     src/core/app_update.c
     src/core/bluetooth.c
     src/core/clipboard.c
+    src/core/frame_clock.c
     src/core/loader.c
     src/core/scrollbar.cpp
     src/core/ui_state.c
@@ -184,6 +185,7 @@ target_link_libraries(reach_features PUBLIC
 add_library(reach_windows_adapters STATIC
     src/adapters/windows/clipboard_win32.cpp
     src/adapters/windows/window_win32.cpp
+    src/adapters/windows/frame_wait_win32.cpp
     src/adapters/windows/explorer_desktop_compat_host_win32.cpp
     src/adapters/windows/render_d2d/render_d2d_backend.cpp
     src/adapters/windows/render_d2d/render_d2d_device.cpp
@@ -990,6 +992,17 @@ reach_configure_common(reach_bar_visibility_tests)
 target_compile_features(reach_bar_visibility_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_bar_visibility_tests PRIVATE reach_features)
 
+add_executable(reach_frame_clock_tests tests/frame_clock_tests.cpp)
+reach_configure_common(reach_frame_clock_tests)
+target_compile_features(reach_frame_clock_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_frame_clock_tests PRIVATE reach_core)
+
+add_executable(reach_frame_wait_tests tests/frame_wait_tests.cpp)
+reach_configure_common(reach_frame_wait_tests)
+reach_configure_windows(reach_frame_wait_tests)
+target_compile_features(reach_frame_wait_tests PRIVATE cxx_std_17)
+target_link_libraries(reach_frame_wait_tests PRIVATE reach_windows_adapters)
+
 add_executable(reach_loader_tests
     tests/loader_tests.cpp
 )
@@ -1119,6 +1132,8 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_dock_model_tests COMMAND reach_dock_model_tests)
     add_test(NAME reach_pressable_tests COMMAND reach_pressable_tests)
     add_test(NAME reach_bar_visibility_tests COMMAND reach_bar_visibility_tests)
+    add_test(NAME reach_frame_clock_tests COMMAND reach_frame_clock_tests)
+    add_test(NAME reach_frame_wait_tests COMMAND reach_frame_wait_tests)
     add_test(NAME reach_loader_tests COMMAND reach_loader_tests)
     add_test(NAME reach_window_tracking_tests COMMAND reach_window_tracking_tests)
     add_test(NAME reach_window_query_tests COMMAND reach_window_query_tests)

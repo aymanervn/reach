@@ -10,6 +10,7 @@
 #include "reach/services/monitor_refresh_retry.h"
 #include "reach/services/monitor_topology.h"
 #include "reach/services/system_status.h"
+#include "reach/core/frame_clock.h"
 #include "reach/services/wifi.h"
 
 #include <windows.h>
@@ -2897,6 +2898,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         reach_settings_request_bluetooth_radio(app);
     }
+    if ((system_changes & REACH_SYSTEM_CONTROLS_CHANGE_POWER) != 0)
+    {
+        reach_system_status_refresh_system(app->system_status, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+    }
     reach_system_status_system_snapshot system_snapshot = {};
     if (app->system_status != nullptr &&
         reach_system_status_take_system(app->system_status, &system_snapshot) &&
@@ -3087,6 +3092,23 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->model.bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING;
 }
 
+int32_t reach_settings_app_frame_rate_hz(const reach_settings_app *app)
+{
+    if (app == nullptr)
+    {
+        return 60;
+    }
+    reach_system_status_system_snapshot power = {};
+    reach_system_status_read_system(app->system_status, &power);
+    const reach_monitor_info *primary =
+        app->monitors.list != nullptr && app->monitors.ops.primary != nullptr
+            ? app->monitors.ops.primary(app->monitors.list)
+            : nullptr;
+    return reach_frame_rate_resolve(reach_settings_model_high_refresh_rate(&app->model),
+                                    primary != nullptr ? primary->refresh_rate_hz : 0,
+                                    power.power_valid && power.power.battery_saver_on);
+}
+
 uint32_t reach_settings_app_idle_wait_ms(const reach_settings_app *app)
 {
     if (app == nullptr)
@@ -3126,6 +3148,10 @@ void reach_settings_app_destroy(reach_settings_app *app)
     if (app == nullptr)
     {
         return;
+    }
+    if (app->system_controls.stop_watching != nullptr)
+    {
+        app->system_controls.stop_watching(app->system_controls.userdata);
     }
     if (app->update_worker.thread_started)
     {

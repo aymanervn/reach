@@ -756,10 +756,24 @@ static behavior. Definition-declared edge reveals are participants too,
 attached to their owning surface runtime but independently visible; the underlying
 screen-hotspot port carries `set_topmost` / `native_id` / `place_behind` so they
 chain and seed like any other participant.
-The host drains each `system_stats` change once, marks the top bar for layout, and broadcasts one
-typed notification. Battery consumes it through its registry control adapter and refreshes from the
-same stable snapshot so an open popup and saver pending state stay live. Battery publishes saver
-pending reconciliation through a neutral route bound to Top Bar in `interfeature_routes.cpp`.
+`system_stats` samples CPU, memory, and network rates; it no longer owns power state.
+`system_status` owns the canonical cumulative power snapshot, reads it synchronously at creation,
+and refreshes it on power-change requests independently of its slower system worker. The Windows
+system-controls adapter subscribes to saver, battery-percentage, and power-source notifications,
+including an initial notification, and unregisters them before teardown. Each process shares its
+service snapshot between its consumers. Top Bar and Battery read that snapshot; Battery publishes
+saver pending reconciliation through a neutral route bound to Top Bar in `interfeature_routes.cpp`.
+Power-change requests and service-ready wakeups remain active in game mode while CPU/network
+sampling is disabled. A failed power read retains the last successful value, and a delayed system
+worker publication cannot overwrite a newer power snapshot.
+
+The pure `reach_frame_rate_resolve` policy uses the main display's refresh rate when adaptive
+animations are enabled, with a 60 Hz override while battery saver is on. Adaptive off or an invalid
+display rate also selects 60 Hz, without changing the persisted adaptive preference. Reach and
+Settings use the same policy and `reach_frame_clock` deadlines. Their native event loops use the
+shared Windows frame-wait adapter's one-shot high-resolution timer, with ordinary timer/timeout
+fallback, message and process-event wakeups, and no recurring frame timer while idle. Deadlines
+preserve fractional periods and skip missed frames; animation progress uses elapsed time.
 The wallpaper service is not a participant: its presentation surface re-pins itself to
 `HWND_BOTTOM` and is
 deliberately not hidden in game mode.

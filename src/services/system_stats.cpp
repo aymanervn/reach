@@ -11,7 +11,6 @@
 struct reach_system_stats
 {
     reach_system_stats_port source;
-    reach_system_controls_port system_controls;
 
     void (*notify)(void *user);
     void *notify_user;
@@ -53,11 +52,7 @@ static int32_t reach_system_stats_snapshot_differs(const reach_system_stats_snap
     return a->valid != b->valid || (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
            (int32_t)a->memory_percent != (int32_t)b->memory_percent ||
            a->network_received_bytes_per_second != b->network_received_bytes_per_second ||
-           a->network_sent_bytes_per_second != b->network_sent_bytes_per_second ||
-           a->power_valid != b->power_valid || a->power.has_battery != b->power.has_battery ||
-           a->power.battery_percent != b->power.battery_percent ||
-           a->power.battery_saver_on != b->power.battery_saver_on ||
-           a->power.battery_charging != b->power.battery_charging;
+           a->network_sent_bytes_per_second != b->network_sent_bytes_per_second;
 }
 
 static void reach_system_stats_thread_main(reach_system_stats *service)
@@ -103,15 +98,6 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
         previous_time = now;
 
         reach_system_stats_snapshot next = published;
-        next.power = reach_power_state{};
-        next.power_valid = 0;
-        if (service->system_controls.get_power_state != nullptr &&
-            service->system_controls.get_power_state(service->system_controls.userdata,
-                                                     &next.power) == REACH_OK)
-        {
-            next.power_valid = 1;
-        }
-
         reach_system_stats_sample sample = {};
         if (service->source.ops.sample != nullptr &&
             service->source.ops.sample(service->source.source, &sample) == REACH_OK)
@@ -164,7 +150,6 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
 }
 
 reach_result reach_system_stats_create(reach_system_stats_port source,
-                                       reach_system_controls_port system_controls,
                                        void (*notify)(void *user), void *notify_user,
                                        reach_system_stats **out_service)
 {
@@ -180,7 +165,6 @@ reach_result reach_system_stats_create(reach_system_stats_port source,
     }
 
     service->source = source;
-    service->system_controls = system_controls;
     service->notify = notify;
     service->notify_user = notify_user;
 

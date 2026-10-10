@@ -76,7 +76,6 @@ static void reach_feature_attach_battery(void *capsule,
                                          const reach_feature_dependencies *dependencies)
 {
     reach_battery_attach_services(static_cast<reach_battery *>(capsule),
-                                  dependencies != nullptr ? dependencies->system_stats : nullptr,
                                   dependencies != nullptr ? dependencies->system_status : nullptr);
 }
 
@@ -433,19 +432,6 @@ static void reach_feature_notify_quick_settings(void *capsule,
     }
 }
 
-static void reach_feature_notify_battery(void *capsule,
-                                         const reach_feature_notification *notification,
-                                         reach_feature_tick_result *out)
-{
-    if (notification != nullptr && out != nullptr &&
-        notification->kind == REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED &&
-        reach_battery_refresh_power(static_cast<reach_battery *>(capsule)))
-    {
-        out->redraw = 1;
-        out->request_update = 1;
-    }
-}
-
 static void reach_feature_notify_system_hud(void *capsule,
                                             const reach_feature_notification *notification,
                                             reach_feature_tick_result *out)
@@ -681,7 +667,7 @@ static const reach_feature_control_ops reach_quick_settings_control_ops = {
     reach_feature_control_quick_settings_open, nullptr, reach_feature_notify_quick_settings,
     reach_feature_quick_settings_blocks_position_frame, &reach_quick_settings_resource_ops};
 static const reach_feature_control_ops reach_battery_control_ops = {
-    reach_feature_control_battery_open, nullptr, reach_feature_notify_battery, nullptr, nullptr};
+    reach_feature_control_battery_open, nullptr, nullptr, nullptr, nullptr};
 static const reach_feature_control_ops reach_system_hud_control_ops = {
     nullptr, nullptr, reach_feature_notify_system_hud, nullptr, nullptr};
 

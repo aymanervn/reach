@@ -144,12 +144,10 @@ void reach_battery_format_percent(uint16_t *dst, size_t dst_count, int32_t perce
     dst[length] = 0;
 }
 
-void reach_battery_attach_services(reach_battery *battery, reach_system_stats *stats,
-                                   reach_system_status *status)
+void reach_battery_attach_services(reach_battery *battery, reach_system_status *status)
 {
     if (battery != nullptr)
     {
-        battery->stats = stats;
         battery->status = status;
     }
 }
@@ -169,8 +167,12 @@ int32_t reach_battery_refresh_power(reach_battery *battery)
         return 0;
     }
 
-    reach_system_stats_snapshot snapshot = {};
-    reach_system_stats_snapshot_take(battery->stats, &snapshot);
+    reach_system_status_system_snapshot snapshot = {};
+    reach_system_status_read_system(battery->status, &snapshot);
+    if (!snapshot.power_valid)
+    {
+        return 0;
+    }
 
     int32_t has_reading =
         snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
@@ -342,6 +344,11 @@ static void reach_battery_capsule_tick(void *capsule, double delta_seconds,
     if (delta_seconds < 0.0)
     {
         delta_seconds = 0.0;
+    }
+
+    if (reach_battery_refresh_power(battery))
+    {
+        out->redraw = 1;
     }
 
     int32_t animations_were_active = reach_animation_manager_any_active(&battery->animations);

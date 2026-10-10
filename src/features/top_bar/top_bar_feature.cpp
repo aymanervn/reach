@@ -221,12 +221,6 @@ static void reach_top_bar_update_stats(reach_top_bar *top_bar)
     reach_system_stats_snapshot snapshot = {};
     reach_system_stats_snapshot_take(top_bar->stats, &snapshot);
 
-    state->battery_valid =
-        snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
-    state->battery_percent = state->battery_valid ? snapshot.power.battery_percent : 0;
-    state->battery_saver_on = snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0;
-    state->battery_charging = snapshot.power_valid && snapshot.power.battery_charging ? 1 : 0;
-
     state->stats_valid = snapshot.valid;
     if (!snapshot.valid)
     {
@@ -335,6 +329,11 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double
     reach_top_bar_state *state = &top_bar->state;
     reach_system_status_system_snapshot snapshot = {};
     reach_system_status_read_system(top_bar->status, &snapshot);
+    int32_t battery_valid =
+        snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
+    int32_t battery_percent = battery_valid ? snapshot.power.battery_percent : 0;
+    int32_t battery_saver_on = snapshot.power_valid && snapshot.power.battery_saver_on;
+    int32_t battery_charging = snapshot.power_valid && snapshot.power.battery_charging;
 
     reach_system_status_audio_snapshot audio = {};
     reach_system_status_read_audio(top_bar->status, &audio);
@@ -361,7 +360,10 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double
         reach_copy_utf16(name, REACH_SYSTEM_NETWORK_LABEL_CAPACITY, snapshot.network.label);
     }
 
-    if (state->network_icon_id == network_icon && state->bluetooth_icon_id == bluetooth_icon &&
+    if (state->battery_valid == battery_valid && state->battery_percent == battery_percent &&
+        state->battery_saver_on == battery_saver_on &&
+        state->battery_charging == battery_charging && state->network_icon_id == network_icon &&
+        state->bluetooth_icon_id == bluetooth_icon &&
         state->network_connected == network_connected &&
         state->bluetooth_enabled == bluetooth_enabled && state->volume_valid == audio.state_valid &&
         state->volume_muted == volume_muted && reach_utf16_equal(state->volume_text, volume_text) &&
@@ -370,6 +372,10 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double
         return 0;
     }
 
+    state->battery_valid = battery_valid;
+    state->battery_percent = battery_percent;
+    state->battery_saver_on = battery_saver_on;
+    state->battery_charging = battery_charging;
     state->network_icon_id = network_icon;
     state->bluetooth_icon_id = bluetooth_icon;
     state->network_connected = network_connected;

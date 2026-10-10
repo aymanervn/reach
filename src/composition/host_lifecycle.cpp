@@ -50,7 +50,7 @@ static void reach_host_on_foreground_changed(void *user)
 
 static void reach_host_on_system_status_ready(void *user)
 {
-    reach_host_request_update(static_cast<reach_host *>(user));
+    reach_host_post_feature_work_ready(static_cast<reach_host *>(user));
 }
 
 static void reach_host_on_system_stats_ready(void *user)
@@ -402,9 +402,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         result = REACH_ERROR;
     }
     host->system_stats = nullptr;
-    if (reach_system_stats_create(dependencies->system_stats, host->system_controls,
-                                  reach_host_on_system_stats_ready, host,
-                                  &host->system_stats) != REACH_OK)
+    if (reach_system_stats_create(dependencies->system_stats, reach_host_on_system_stats_ready,
+                                  host, &host->system_stats) != REACH_OK)
     {
         result = REACH_ERROR;
     }

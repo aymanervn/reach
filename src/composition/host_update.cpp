@@ -1,4 +1,5 @@
 #include "host_internal.h"
+#include "reach/core/frame_clock.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -41,7 +42,7 @@ void reach_host_on_system_controls_changed(void *user, uint32_t change_flags)
     if (host != nullptr && change_flags != 0)
     {
         host->quick_settings_system_change_flags.fetch_or(change_flags);
-        reach_host_request_update(host);
+        reach_host_post_feature_work_ready(host);
     }
 }
 
@@ -242,13 +243,13 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         return monitor_result;
     }
 
+    reach_host_process_system_status_requests(host);
     (void)reach_host_update_game_mode(host);
     if (reach_host_game_mode_enabled(host))
     {
         return reach_host_update_game_mode_surfaces(host, delta_seconds);
     }
 
-    reach_host_process_system_status_requests(host);
     reach_host_tick_features(host, delta_seconds);
     reach_host_drain_registered_render_resources(host);
     reach_host_drain_now_playing_retired_covers(host);
@@ -351,20 +352,21 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     return reach_host_finish_update(host);
 }
 
-int32_t reach_host_frame_interval_ms(const reach_host *host)
+int32_t reach_host_frame_rate_hz(const reach_host *host)
 {
-    if (host == nullptr || !host->high_refresh_rate)
+    if (host == nullptr)
     {
-        return 16;
+        return 60;
     }
-
-    const reach_monitor_info *primary = host->monitors.ops.primary(host->monitors.list);
-    if (primary == nullptr || primary->refresh_rate_hz == 0)
-    {
-        return 16;
-    }
-
-    return 1000 / primary->refresh_rate_hz;
+    reach_system_status_system_snapshot power = {};
+    reach_system_status_read_system(host->system_status, &power);
+    const reach_monitor_info *primary =
+        host->monitors.list != nullptr && host->monitors.ops.primary != nullptr
+            ? host->monitors.ops.primary(host->monitors.list)
+            : nullptr;
+    return reach_frame_rate_resolve(host->high_refresh_rate,
+                                    primary != nullptr ? primary->refresh_rate_hz : 0,
+                                    power.power_valid && power.power.battery_saver_on);
 }
 
 reach_theme_mode reach_host_theme_mode(const reach_host *host)
@@ -490,8 +492,9 @@ uint32_t reach_host_idle_wait_ms(const reach_host *host)
     }
     if (reach_host_game_mode_enabled(host))
     {
-        return reach_host_needs_frame(host) ? (uint32_t)reach_host_frame_interval_ms(host)
-                                            : REACH_CLOCK_WAIT_FOREVER;
+        return reach_host_needs_frame(host)
+                   ? (uint32_t)ceil(1000.0 / reach_host_frame_rate_hz(host))
+                   : REACH_CLOCK_WAIT_FOREVER;
     }
     return reach_clock_next_minute_delay_ms(host->clock);
 }

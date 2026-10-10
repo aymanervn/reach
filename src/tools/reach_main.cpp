@@ -3,6 +3,8 @@
 #include <shellapi.h>
 
 #include "reach/composition/composition_root.h"
+#include "reach/core/frame_clock.h"
+#include "reach/adapters/windows/frame_wait.h"
 #include "reach/protocol/reach_service_protocol.h"
 
 static const wchar_t *REACH_LAUNCH_ARG = L"--launch";
@@ -111,22 +113,30 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&previous_counter);
 
+    reach_frame_clock frame_clock = {};
+    void *frame_timer = reach_windows_frame_timer_create();
     int running = 1;
     while (running)
     {
         int32_t needed_frame_before_wait = app != nullptr && reach_app_needs_frame(app);
+        LARGE_INTEGER wait_counter = {};
+        QueryPerformanceCounter(&wait_counter);
+        double wait_seconds = (double)wait_counter.QuadPart / (double)frequency.QuadPart;
+        uint32_t frame_wait_ms = reach_frame_clock_wait_ms(
+            &frame_clock, wait_seconds, reach_app_frame_rate_hz(app), needed_frame_before_wait);
         DWORD wait_ms = INFINITE;
         if (needed_frame_before_wait)
         {
-            wait_ms = (DWORD)reach_app_frame_interval_ms(app);
+            wait_ms = frame_wait_ms;
         }
         else if (app != nullptr)
         {
             uint32_t idle_wait = reach_app_idle_wait_ms(app);
             wait_ms = idle_wait == REACH_APP_WAIT_FOREVER ? INFINITE : (DWORD)idle_wait;
         }
-        DWORD wait_result =
-            MsgWaitForMultipleObjectsEx(0, nullptr, wait_ms, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        DWORD wait_result = reach_windows_frame_wait(
+            frame_timer, nullptr, 0, wait_ms,
+            needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
         (void)wait_result;
 
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
@@ -155,19 +165,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             if (needs_frame_after_messages)
             {
                 double delta_seconds =
-                    frequency.QuadPart > 0
+                    needed_frame_before_wait && frequency.QuadPart > 0
                         ? (double)(current_counter.QuadPart - previous_counter.QuadPart) /
                               (double)frequency.QuadPart
-                        : 0.016;
+                        : 0.0;
 
                 previous_counter = current_counter;
 
-                if (delta_seconds > 0.025)
-                {
-                    delta_seconds = 0.025;
-                }
-
                 reach_result update_result = reach_app_update(app, delta_seconds);
+                reach_frame_clock_presented(&frame_clock, (double)current_counter.QuadPart /
+                                                              (double)frequency.QuadPart);
                 if (update_result != REACH_OK)
                 {
                     running = 0;
@@ -189,6 +196,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         (void)reach_app_stop(app);
         reach_app_destroy(app);
     }
+    reach_windows_frame_timer_destroy(frame_timer);
     CoUninitialize();
     CloseHandle(instance_mutex);
     return exit_code;

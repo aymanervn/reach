@@ -5,7 +5,6 @@
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/features/common/popup.h"
-#include "reach/services/system_stats.h"
 #include "reach/services/system_status.h"
 #include "reach/support/util.h"
 
@@ -76,8 +75,7 @@ extern "C"
 
     const reach_feature_capsule_ops *reach_battery_capsule_ops(void);
 
-    void reach_battery_attach_services(reach_battery *battery, reach_system_stats *stats,
-                                       reach_system_status *status);
+    void reach_battery_attach_services(reach_battery *battery, reach_system_status *status);
     void reach_battery_set_routes(reach_battery *battery, const reach_battery_routes *routes);
 
     int32_t reach_battery_refresh_power(reach_battery *battery);
