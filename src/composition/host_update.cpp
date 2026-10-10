@@ -364,8 +364,7 @@ int32_t reach_host_frame_interval_ms(const reach_host *host)
         return 16;
     }
 
-    const int32_t cap_fps = primary->refresh_rate_hz < 120 ? primary->refresh_rate_hz : 120;
-    return 1000 / cap_fps;
+    return 1000 / primary->refresh_rate_hz;
 }
 
 reach_theme_mode reach_host_theme_mode(const reach_host *host)
