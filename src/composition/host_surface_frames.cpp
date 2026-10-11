@@ -528,6 +528,18 @@ reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surfac
     return reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
 }
 
+static void reach_host_sync_surface_pointer_observation(reach_host *host,
+                                                        const reach_feature_runtime *desc)
+{
+    const reach_feature_surface_ops *ops = desc->definition->surface_ops;
+    if (ops->pointer_observation != nullptr)
+    {
+        reach_rect_f32 bounds = {};
+        int32_t observing = ops->pointer_observation(desc->capsule, &bounds);
+        reach_host_set_pointer_observation(host, desc->definition->id, bounds, observing);
+    }
+}
+
 reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature_runtime *desc,
                                                  const reach_host_frame_context *ctx)
 {
@@ -562,6 +574,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         hidden_geometry.reserve_monitor_work_area = 0;
         reach_host_sync_work_area_reservation(host, desc, &hidden_geometry, ctx->monitor_bounds);
         reach_host_release_native_overlay(host, desc);
+        reach_host_sync_surface_pointer_observation(host, desc);
         return REACH_OK;
     }
     reach_host_set_surface_visible(host, desc->definition->id, visible);
@@ -602,6 +615,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     }
 
     int32_t layout_changed = desc->definition->surface_ops->arrange(desc->capsule, &surface_ctx);
+    reach_host_sync_surface_pointer_observation(host, desc);
     if (needs_frame)
     {
         desc->surface->dirty_flags = 1;

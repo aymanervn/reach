@@ -4,47 +4,28 @@
 
 static int32_t reach_context_menu_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
 {
-    return (float)x >= rect.x && (float)x <= rect.x + rect.width && (float)y >= rect.y &&
+    return rect.width > 0.0f && rect.height > 0.0f && (float)x >= rect.x &&
+           (float)x <= rect.x + rect.width && (float)y >= rect.y &&
            (float)y <= rect.y + rect.height;
 }
 
-reach_rect_f32 reach_context_menu_close_button_rect(const reach_context_menu_metrics *metrics,
-                                                    reach_rect_f32 item_slot, float dpi_scale)
-{
-    float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    float size = metrics->close_button_size * scale;
-    float inset = metrics->close_button_inset * scale;
-    reach_rect_f32 button = {};
-    button.width = size;
-    button.height = size;
-    button.x = item_slot.x + item_slot.width - inset - size;
-    button.y = item_slot.y + (item_slot.height - size) * 0.5f;
-    return button;
-}
-
 reach_context_menu_hit_result
-reach_context_menu_hit_test_close_buttons(const reach_context_menu_state *state, int32_t x,
-                                          int32_t y)
+reach_context_menu_hit_test_close_buttons(const reach_context_menu *menu, int32_t x, int32_t y)
 {
     reach_context_menu_hit_result hit = {};
-    hit.hit = 0;
-    hit.index = REACH_CONTEXT_MENU_MAX_ITEMS;
-    if (state == nullptr || !state->window_list_open)
+    hit.index = REACH_CONTEXT_MENU_NO_ITEM;
+    if (menu == nullptr || !menu->state.window_list_open)
     {
         return hit;
     }
-    for (size_t index = 0; index < state->item_count; ++index)
+    for (size_t visible = 0; visible < menu->previews.count; ++visible)
     {
-        if (state->item_windows[index] != 0 &&
-            reach_context_menu_rect_contains(
-                reach_context_menu_close_button_rect(
-                    reach_context_menu_metrics_for(state->window_list_open),
-                    state->item_slots[index], state->dpi_scale),
-                x, y))
+        const reach_context_menu_preview_card *card = &menu->previews.cards[visible];
+        if (reach_context_menu_rect_contains(card->close, x, y))
         {
             hit.hit = 1;
-            hit.index = index;
-            return hit;
+            hit.index = card->index;
+            break;
         }
     }
     return hit;
@@ -56,7 +37,7 @@ reach_context_menu_hit_result reach_context_menu_hit_test_items(const reach_rect
 {
     reach_context_menu_hit_result hit = {};
     hit.hit = 0;
-    hit.index = REACH_CONTEXT_MENU_MAX_ITEMS;
+    hit.index = REACH_CONTEXT_MENU_NO_ITEM;
     if (item_slots == nullptr)
     {
         return hit;

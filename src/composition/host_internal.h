@@ -310,6 +310,7 @@ typedef struct reach_feature_surface_ops
                                            reach_render_command_buffer *out_commands);
     int32_t (*layout_anchor)(const void *capsule, reach_feature_layout_anchor *out);
     const reach_feature_native_overlay_ops *native_overlay;
+    int32_t (*pointer_observation)(const void *capsule, reach_rect_f32 *out);
 } reach_feature_surface_ops;
 
 typedef struct reach_surface_spec

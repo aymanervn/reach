@@ -18,9 +18,6 @@ reach_host_menu_open_context(reach_host *host, const reach_menu_request *request
     ctx.theme = host->theme != nullptr ? host->theme : reach_theme_default();
     ctx.dpi_scale = reach_host_layout_dpi_scale(host);
     ctx.monitor = reach_host_menu_monitor(host, request->anchor_button);
-    ctx.text_measure.context = host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.backend;
-    ctx.text_measure.measure =
-        host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.ops.measure_text;
     ctx.anchor_button = request->anchor_button;
     ctx.bar_edge_y = request->bar_edge_y;
     ctx.drop_direction = request->drop_direction;
@@ -104,19 +101,7 @@ static void reach_host_open_window_list(reach_host *host, const reach_menu_reque
         return;
     }
 
-    reach_context_menu_window_entry entries[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
-    size_t entry_count = request->window_count < REACH_CONTEXT_MENU_MAX_ITEMS
-                             ? request->window_count
-                             : REACH_CONTEXT_MENU_MAX_ITEMS;
-    for (size_t index = 0; index < entry_count; ++index)
-    {
-        entries[index].window = request->windows[index].window;
-        entries[index].title = request->windows[index].title;
-    }
-
     reach_context_menu_open_context ctx = reach_host_menu_open_context(host, request);
-    ctx.window_entries = entries;
-    ctx.window_entry_count = entry_count;
     reach_context_menu_open_window_list(
         reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
         request->target_index, &ctx);
@@ -141,6 +126,10 @@ static void reach_host_route_dock_item_hovered(void *user, const reach_menu_requ
     }
     if (open_target == request->target_index)
     {
+        reach_context_menu_refresh_window_list(menu, request);
+        host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].dirty_flags = 1;
+        reach_host_watch_window_list_pointer(host);
+        reach_host_request_update(host);
         return;
     }
     if (open_target == REACH_CONTEXT_MENU_NO_TARGET &&
@@ -152,6 +141,33 @@ static void reach_host_route_dock_item_hovered(void *user, const reach_menu_requ
     }
 
     reach_host_open_window_list(host, request);
+}
+
+static void reach_host_route_dock_windows_changed(void *user, const reach_menu_request *request)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_context_menu *menu =
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    if (!reach_context_menu_window_list_is_open(menu))
+    {
+        return;
+    }
+    if (request == nullptr || request->window_count == 0)
+    {
+        reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
+                                            REACH_SURFACE_CLOSE_SUPERSEDED);
+    }
+    else
+    {
+        reach_context_menu_refresh_window_list(menu, request);
+        host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].dirty_flags = 1;
+        reach_host_request_update(host);
+    }
+    reach_host_watch_window_list_pointer(host);
 }
 
 /* The window list is the only surface that must survive the pointer crossing the gap between
@@ -299,6 +315,7 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     dock.user = host;
     dock.item_context_menu = reach_host_route_dock_item_context_menu;
     dock.item_hovered = reach_host_route_dock_item_hovered;
+    dock.item_windows_changed = reach_host_route_dock_windows_changed;
     dock.trigger_activated = reach_host_route_dock_trigger_activated;
     reach_dock_set_routes(reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK),
                           &dock);

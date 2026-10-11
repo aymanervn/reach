@@ -51,6 +51,7 @@ struct reach_dock
     reach_menu_request action_request;
     uint16_t action_display_name[REACH_APPLICATION_TEXT_CAPACITY];
     reach_menu_request hover_request;
+    uint32_t hover_owner_key;
     reach_dock_model metrics;
     uint32_t next_app_key;
     reach_dock_routes routes;
@@ -336,6 +337,7 @@ static void reach_dock_capsule_reset(void *capsule)
     {
         dock->pointer_layout_valid = 0;
         dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
+        dock->hover_owner_key = 0;
         reach_draggable_init(&dock->state.drag.gesture);
         dock->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
         dock->state.drag.key = {};
@@ -444,6 +446,7 @@ static void reach_dock_notify_item_hovered(reach_dock *dock, size_t item_index)
         dock->routes.item_hovered(dock->routes.user, nullptr);
         return;
     }
+    dock->hover_owner_key = reach_dock_item_key_at(&dock->state.model, item_index);
     dock->routes.item_hovered(dock->routes.user, &dock->hover_request);
 }
 
@@ -820,7 +823,8 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
 
     reach_rect_f32 before =
         dock->pointer_layout_valid ? dock->pointer_layout.bounds : reach_rect_f32{};
-    if (reach_dock_take_items_changed(dock))
+    int32_t items_changed = reach_dock_take_items_changed(dock);
+    if (items_changed)
     {
         reach_dock_rebuild_items(
             dock, &build, dock->pointer_layout_valid ? &dock->pointer_layout : nullptr, &layout);
@@ -830,6 +834,20 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
         reach_dock_build_layout(dock, &build, &layout);
     }
 
+    if (items_changed && dock->hover_owner_key != 0 && dock->routes.item_windows_changed != nullptr)
+    {
+        size_t owner =
+            reach_dock_feature_model_find_item_key(&dock->state.model, dock->hover_owner_key);
+        if (reach_dock_build_menu_request(dock, owner, 0.0f, 0.0f, &dock->hover_request))
+        {
+            dock->routes.item_windows_changed(dock->routes.user, &dock->hover_request);
+        }
+        else
+        {
+            dock->routes.item_windows_changed(dock->routes.user, nullptr);
+            dock->hover_owner_key = 0;
+        }
+    }
     return !reach_rect_equal(before, dock->pointer_layout.bounds) ||
            reach_dock_slots_animating(dock);
 }

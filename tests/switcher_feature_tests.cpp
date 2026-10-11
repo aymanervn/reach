@@ -227,6 +227,17 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
     expect_true(portrait.visible && portrait.window == 2 &&
                     fabsf(portrait.destination.width / portrait.destination.height - 2.0f) < 0.01f,
                 "restored and resized sources publish their current aspect ratio");
+    const float scales[] = {1.25f, 1.5f, 2.0f};
+    for (float scale : scales)
+    {
+        event.type = REACH_UI_EVENT_APP_SWITCH_BEGIN;
+        reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
+        arrange.dpi_scale = scale;
+        (void)reach_switcher_arrange(switcher, &arrange);
+        (void)reach_switcher_thumbnail_at(switcher, 0, &first);
+        expect_true(fabsf(first.destination.height - 125.0f * scale) < 0.01f,
+                    "Switcher retains its nominal DP height at fractional and high DPI");
+    }
     reach_switcher_destroy(switcher);
     reach_window_tracking_destroy(windows);
     fake_count = 2;

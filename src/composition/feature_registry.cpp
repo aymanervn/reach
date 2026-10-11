@@ -56,6 +56,14 @@ static void reach_feature_attach_stage(void *capsule,
                                 dependencies != nullptr ? dependencies->app_control : nullptr);
 }
 
+static void reach_feature_attach_context_menu(void *capsule,
+                                              const reach_feature_dependencies *dependencies)
+{
+    reach_context_menu_attach_services(static_cast<reach_context_menu *>(capsule),
+                                       dependencies != nullptr ? dependencies->windows : nullptr,
+                                       dependencies != nullptr ? dependencies->icons : nullptr);
+}
+
 static void reach_feature_attach_switcher(void *capsule,
                                           const reach_feature_dependencies *dependencies)
 {
@@ -327,6 +335,24 @@ static int32_t reach_feature_control_switcher_open(void *capsule, int32_t open,
         out->request_update = 1;
     }
     return changed;
+}
+
+static void reach_feature_notify_context_menu(void *capsule,
+                                              const reach_feature_notification *notification,
+                                              reach_feature_tick_result *out)
+{
+    if (notification != nullptr &&
+        notification->kind == REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED &&
+        notification->windows.changed)
+    {
+        reach_context_menu_notify_windows_changed(static_cast<reach_context_menu *>(capsule), out);
+    }
+    else if (notification != nullptr &&
+             notification->kind == REACH_FEATURE_NOTIFICATION_ICONS_RETAIN)
+    {
+        reach_context_menu_touch_icons(static_cast<reach_context_menu *>(capsule),
+                                       notification->icon_size_px);
+    }
 }
 
 static void reach_feature_notify_switcher(void *capsule,
@@ -648,7 +674,8 @@ static const reach_feature_render_resource_ops reach_clipboard_resource_ops = {
 static const reach_feature_control_ops reach_stage_control_ops = {
     reach_feature_control_stage_open, nullptr, reach_feature_notify_stage, nullptr, nullptr};
 static const reach_feature_control_ops reach_context_menu_control_ops = {
-    reach_feature_control_context_menu_open, nullptr, nullptr, nullptr, nullptr};
+    reach_feature_control_context_menu_open, nullptr, reach_feature_notify_context_menu, nullptr,
+    nullptr};
 static const reach_feature_control_ops reach_dock_control_ops = {
     nullptr, nullptr, reach_feature_notify_dock, nullptr, nullptr};
 static const reach_feature_control_ops reach_top_bar_control_ops = {
@@ -761,6 +788,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_BATTERY].lifecycle.stop = reach_feature_stop_battery;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.attach = reach_feature_attach_system_hud;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.stop = reach_feature_stop_system_hud;
+    definitions[REACH_SURFACE_ID_CONTEXT_MENU].lifecycle.attach = reach_feature_attach_context_menu;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].lifecycle.start = reach_feature_start_context_menu;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].lifecycle.stop = reach_feature_stop_context_menu;
     definitions[REACH_SURFACE_ID_STAGE].lifecycle.attach = reach_feature_attach_stage;
@@ -1024,7 +1052,6 @@ static int32_t reach_context_menu_surface_arrange(void *capsule,
         return 0;
     }
     reach_context_menu *menu = static_cast<reach_context_menu *>(capsule);
-    reach_rect_f32 before = reach_context_menu_state_ptr(menu)->bounds;
     reach_context_menu_open_context arrange = {};
     arrange.theme = ctx->theme;
     arrange.monitor = ctx->monitor_bounds;
@@ -1033,9 +1060,7 @@ static int32_t reach_context_menu_surface_arrange(void *capsule,
     arrange.bar_edge_y = ctx->anchor_bar_edge_y;
     arrange.drop_direction = ctx->anchor_direction;
     arrange.anchored = 1;
-    arrange.text_measure = ctx->text_measure;
-    reach_context_menu_reanchor(menu, &arrange);
-    return !reach_rect_equal(before, reach_context_menu_state_ptr(menu)->bounds);
+    return reach_context_menu_reanchor(menu, &arrange);
 }
 
 static reach_result reach_context_menu_surface_render(void *capsule,
@@ -1044,15 +1069,57 @@ static reach_result reach_context_menu_surface_render(void *capsule,
 {
     reach_context_menu_render_context render = {};
     render.theme = ctx->theme;
+    render.icon_size_px = ctx->icon_size_px;
     render.dpi_scale = ctx->dpi_scale;
     return reach_context_menu_append_render_commands(static_cast<reach_context_menu *>(capsule),
                                                      &render, out_commands);
 }
 
+static size_t reach_context_menu_native_overlay_generation(const void *capsule)
+{
+    return reach_context_menu_preview_generation(static_cast<const reach_context_menu *>(capsule));
+}
+
+static size_t reach_context_menu_native_overlay_count(const void *capsule)
+{
+    return reach_context_menu_thumbnail_count(static_cast<const reach_context_menu *>(capsule));
+}
+
+static reach_result reach_context_menu_native_overlay_item(const void *capsule, size_t index,
+                                                           const reach_theme *theme,
+                                                           reach_feature_native_overlay_item *out)
+{
+    (void)theme;
+    if (out == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out = {};
+    out->plane = REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
+    out->placement.opacity = 1.0f;
+    reach_result result =
+        reach_context_menu_thumbnail_at(static_cast<const reach_context_menu *>(capsule), index,
+                                        &out->source, &out->placement.destination);
+    out->placement.visible = out->source != 0;
+    return result;
+}
+
+static int32_t reach_context_menu_pointer_observation(const void *capsule, reach_rect_f32 *out)
+{
+    return reach_context_menu_window_list_hover_bounds(
+        static_cast<const reach_context_menu *>(capsule), out);
+}
+
+static const reach_feature_native_overlay_ops reach_context_menu_native_overlay_ops = {
+    reach_context_menu_native_overlay_generation,
+    reach_context_menu_native_overlay_count,
+    reach_context_menu_native_overlay_item,
+};
+
 static const reach_feature_surface_ops reach_context_menu_surface_ops = {
-    reach_context_menu_surface_arrange,
-    reach_context_menu_surface_render,
-    reach_context_menu_surface_layout_anchor,
+    reach_context_menu_surface_arrange,       reach_context_menu_surface_render,
+    reach_context_menu_surface_layout_anchor, &reach_context_menu_native_overlay_ops,
+    reach_context_menu_pointer_observation,
 };
 
 static reach_result reach_stage_surface_render(void *capsule,

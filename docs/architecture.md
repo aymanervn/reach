@@ -260,6 +260,29 @@ while cycling the full ring. Minimized or unavailable frame geometry uses an ico
 native registration failure leaves the titled card usable. Titles and selection chrome stay outside
 native content. Visible membership changes reconcile relationships without recreating surviving
 sources. Switcher retains its ordinary non-activating Alt-Tab behavior and shared close transition.
+Dock hover previews use Context Menu's private window-preview layout and rendering components.
+They publish through the same native-overlay contract and reuse cached window tracking and the
+icon service. A horizontal row starts at 140dp preview height with source-proportional widths;
+Switcher retains 125dp. Both consume the shared pure aspect, common-height fitting, and range
+packing helpers in `reach/features/common/window_preview_layout.h`. Context Menu keeps its own
+anchoring and complete-card page navigation, exposing every instance in the 16-window semantic
+payload independently of the eight-command menu capacity. Headers and close controls stay above
+native previews; minimized or unavailable sources use retained icon placeholders.
+Window-change notifications refresh titles, geometry and eligibility, prune departed sources,
+and close an empty popup. Dock republishes the hovered owner's payload after model changes through
+its public route callback, preserving the popup transition for the same owner. Current layout
+resolves card placements, hit regions, anchor, DPI and pointer corridor together. An optional
+surface-ops pointer-observation hook lets the generic frame path update the event-driven watch
+after arrangement. Ordinary command and power menus keep their existing row presentation.
+Hover-popup width changes use a private 180ms ease-in-out track in the existing animation manager.
+Owner, source and page changes retarget from the track's current value. Target-width packing stays
+fixed during motion; the shared preview row-fit helper uniformly fits thumbnails and gaps within
+the animated inner width, preserving source proportions and a common preview height. Headers,
+controls, borders and the popup's height are not scaled by that fit. The current placed bounds
+supply drawn chrome, native placements and pointer retention. Closing freezes the width, fresh
+presentation starts at its target width, and monitor/DPI changes cut to the newly constrained
+layout. This remains CPU layout through the existing frame path; no new compositor capability is
+introduced.
 Each thumbnail relationship declares its destination at creation. Runtime teardown releases only
 that surface's IDs, and adapter entries retain stable addresses and support simultaneous targets,
 including overlapping Stage and Switcher presentations. Adapter destruction releases all remaining
@@ -413,10 +436,10 @@ in a duration-limited CPU fallback; repeating marquee motion remains static ther
 Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the
 implementation with the same font family, size, and weight used for drawing; features retain only
 a conservative estimate for unavailable-adapter cases. This keeps exact text metrics outside
-feature policy while allowing the top bar and Dock window-list popup to size before rendering.
+feature policy while allowing text-dependent surfaces such as the top bar to size before rendering.
 Applying a different UI font invalidates both rendering and layout so the next normal frame
-remeasures every text-sized surface. The Dock window-list popup fits its widest measured title
-between one-letter-plus-close-control chrome and a monitor-bounded maximum, ellipsizing beyond it.
+remeasures every text-sized surface. Dock preview card widths depend on source geometry, and their
+headers ellipsize titles within the remaining space beside the close control.
 All Reach-rendered text selects from the shared scale in `reach/core/typography.h`
 
 The window push is the top bar's second private subfeature. The animation manager remains the sole
