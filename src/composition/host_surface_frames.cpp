@@ -1,4 +1,5 @@
 #include "host_internal.h"
+#include "reach/support/workload.h"
 
 #include <math.h>
 
@@ -157,6 +158,7 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
 {
     reach_render_command_buffer *commands = &host->render_commands;
     reach_render_command_buffer_clear(commands);
+    reach_workload_add(REACH_WORKLOAD_COMMAND_BUILDS, 1);
     reach_result result =
         desc->definition->surface_ops->append_render_commands(desc->capsule, ctx, commands);
     if (result != REACH_OK)
@@ -614,6 +616,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         }
     }
 
+    reach_workload_add(REACH_WORKLOAD_LAYOUTS, 1);
     int32_t layout_changed = desc->definition->surface_ops->arrange(desc->capsule, &surface_ctx);
     reach_host_sync_surface_pointer_observation(host, desc);
     if (needs_frame)

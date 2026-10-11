@@ -44,6 +44,7 @@ add_library(reach_support STATIC
     src/support/util.cpp
     src/support/animation.cpp
     src/support/motion.cpp
+    src/support/workload.cpp
     src/support/layout.cpp
     src/support/search_ranking.cpp
     src/support/search_catalog.cpp
@@ -112,6 +113,7 @@ add_library(reach_core STATIC
 )
 
 reach_configure_common(reach_core)
+target_link_libraries(reach_core PUBLIC reach_support)
 target_compile_features(reach_core PUBLIC
     c_std_11
     cxx_std_17

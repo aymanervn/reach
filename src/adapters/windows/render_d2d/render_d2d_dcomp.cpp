@@ -1,4 +1,5 @@
 #include "render_d2d_internal.h"
+#include "reach/support/workload.h"
 
 reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend)
 {
@@ -150,6 +151,7 @@ reach_result reach_dcomp_create_target(reach_render_backend *backend)
     if (SUCCEEDED(hr))
     {
         hr = backend->dcomp_device->Commit();
+        reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
     }
     if (SUCCEEDED(hr))
     {

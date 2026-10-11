@@ -4,6 +4,7 @@
 
 #include "reach/composition/composition_root.h"
 #include "reach/core/frame_clock.h"
+#include "reach/support/workload.h"
 #include "reach/adapters/windows/frame_wait.h"
 #include "reach/protocol/reach_service_protocol.h"
 
@@ -75,6 +76,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         return 0;
     }
 
+    reach_workload_session workload("reach");
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(hr))
     {
@@ -138,6 +140,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             frame_timer, nullptr, 0, wait_ms,
             needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
         (void)wait_result;
+        reach_workload_add(REACH_WORKLOAD_WAKEUPS, 1);
 
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
         {

@@ -1,4 +1,5 @@
 #include "reach/core/scrollbar.h"
+#include "reach/support/workload.h"
 
 #include <math.h>
 
@@ -75,6 +76,7 @@ int32_t reach_scrollbar_update(reach_scrollbar_model *model, double delta_second
         return 0;
     }
     float blend = (float)(delta_seconds * 18.0);
+    reach_workload_add(REACH_WORKLOAD_SCROLL_ADVANCES, 1);
     if (blend > 1.0f)
     {
         blend = 1.0f;

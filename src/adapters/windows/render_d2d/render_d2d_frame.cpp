@@ -1,4 +1,5 @@
 #include "render_d2d_internal.h"
+#include "reach/support/workload.h"
 
 #include <dwmapi.h>
 
@@ -92,6 +93,7 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
 
     if (!reach_d2d_retained_supported(backend))
     {
+        reach_workload_add(REACH_WORKLOAD_RASTER_PASSES, 1);
         target->BeginDraw();
         target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
     }
@@ -130,11 +132,13 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
     if (SUCCEEDED(hr) && backend->swap_chain != nullptr && !reach_d2d_retained_supported(backend))
     {
         hr = backend->swap_chain->Present(1, 0);
+        reach_workload_add(REACH_WORKLOAD_SWAP_CHAIN_PRESENTS, 1);
     }
 
     if (SUCCEEDED(hr) && backend->dcomp_device != nullptr)
     {
         hr = backend->dcomp_device->Commit();
+        reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
     }
 
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;

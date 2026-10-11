@@ -427,6 +427,14 @@ before replacements are allocated. Processed cover artwork uses a 24-entry, 16 M
 ordinary text and measurement share 32 text formats and 128 layouts with bounded string lengths.
 Font changes, icon retirement, and backend destruction invalidate dependent entries.
 
+Optional process-wide workload diagnostics count application wakes/updates, scalar/loader/scroll
+work, layout and command production, renderer executions and actual raster passes, compositor
+submissions, and native-thumbnail calls separately. `REACH_WORKLOAD_REPORT` enables collection at
+startup; Reach and Settings write separate aggregate JSON summaries on ordinary exit. No diagnostic
+timer or reporting worker is added. Retained-surface bytes are an estimate, not total GPU allocation;
+system CPU/GPU, power and presentation latency require independent measurement. See
+`docs/gpu-workload-baseline.md`.
+
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
 positions, reordered neighbours and released items run compositor motion, and a stationary drag
 does not request frames. Dock insertion/removal fitting and Now Playing width changes still own
